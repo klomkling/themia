@@ -51,8 +51,7 @@ public sealed class ProblemDetailsMiddleware(
         logger.Log(level, ex, "{Title} for {Method} {Path} (TraceId: {TraceId})",
             title, ctx.Request.Method, ctx.Request.Path, traceId);
 
-        ctx.Response.ContentType = "application/problem+json";
-        ctx.Response.StatusCode = status;
+        ResetResponse(ctx, status);
 
         var problem = new ProblemDetails
         {
@@ -61,11 +60,10 @@ public sealed class ProblemDetailsMiddleware(
             Detail = ex.Message,
             Instance = ctx.Request.Path,
         };
+        // Consumer metadata first, then reserved keys last so they can't be overridden.
+        AddMetadata(problem, ex.Metadata);
         problem.Extensions["traceId"] = traceId;
         if (ex.ErrorCode is not null) problem.Extensions["errorCode"] = ex.ErrorCode;
-        if (ex.Metadata is not null)
-            foreach (var pair in ex.Metadata)
-                problem.Extensions[pair.Key] = pair.Value;
 
         await ctx.Response.WriteAsync(JsonSerializer.Serialize(problem, Json));
     }
@@ -75,8 +73,7 @@ public sealed class ProblemDetailsMiddleware(
         logger.LogWarning(ex, "Validation error for {Method} {Path} (TraceId: {TraceId})",
             ctx.Request.Method, ctx.Request.Path, traceId);
 
-        ctx.Response.ContentType = "application/problem+json";
-        ctx.Response.StatusCode = 400;
+        ResetResponse(ctx, 400);
 
         var problem = new ValidationProblemDetails(
             new Dictionary<string, string[]> { [ex.PropertyName] = [ex.Message] })
@@ -86,20 +83,35 @@ public sealed class ProblemDetailsMiddleware(
             Detail = ex.Message,
             Instance = ctx.Request.Path,
         };
+        // Consumer metadata first, then reserved keys last so they can't be overridden.
+        AddMetadata(problem, ex.Metadata);
         problem.Extensions["traceId"] = traceId;
         if (ex.ErrorCode is not null) problem.Extensions["errorCode"] = ex.ErrorCode;
-        if (ex.Metadata is not null)
-            foreach (var pair in ex.Metadata) problem.Extensions[pair.Key] = pair.Value;
 
         await ctx.Response.WriteAsync(JsonSerializer.Serialize(problem, Json));
     }
 
     private async Task WriteGeneric(HttpContext ctx, int status, string title, string detail, string traceId)
     {
-        ctx.Response.ContentType = "application/problem+json";
-        ctx.Response.StatusCode = status;
+        ResetResponse(ctx, status);
         var problem = new ProblemDetails { Status = status, Title = title, Detail = detail, Instance = ctx.Request.Path };
         problem.Extensions["traceId"] = traceId;
         await ctx.Response.WriteAsync(JsonSerializer.Serialize(problem, Json));
+    }
+
+    // Clears any Content-Length a downstream component may have set before throwing
+    // (a stale value would truncate the problem body) and sets the problem content type/status.
+    private static void ResetResponse(HttpContext ctx, int status)
+    {
+        ctx.Response.ContentLength = null;
+        ctx.Response.ContentType = "application/problem+json";
+        ctx.Response.StatusCode = status;
+    }
+
+    private static void AddMetadata(ProblemDetails problem, IReadOnlyDictionary<string, object?>? metadata)
+    {
+        if (metadata is null) return;
+        foreach (var pair in metadata)
+            problem.Extensions[pair.Key] = pair.Value;
     }
 }

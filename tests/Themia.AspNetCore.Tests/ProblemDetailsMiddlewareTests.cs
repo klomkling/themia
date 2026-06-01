@@ -72,6 +72,31 @@ public sealed class ProblemDetailsMiddlewareTests
     }
 
     [Fact]
+    public async Task Reserved_extensions_are_not_overwritten_by_metadata()
+    {
+        var meta = new Dictionary<string, object?> { ["traceId"] = "SPOOFED", ["custom"] = "keep" };
+        var (_, body) = await InvokeWith(new NotFoundException("x", metadata: meta));
+
+        Assert.NotEqual("SPOOFED", body.GetProperty("traceId").GetString());
+        Assert.Equal("keep", body.GetProperty("custom").GetString());
+    }
+
+    [Fact]
+    public async Task Clears_stale_content_length_before_writing()
+    {
+        var ctx = new DefaultHttpContext();
+        ctx.Request.Path = "/x";
+        ctx.Response.Body = new MemoryStream();
+
+        var mw = new ProblemDetailsMiddleware(
+            c => { c.Response.ContentLength = 9999; throw new NotFoundException("boom"); },
+            NullLogger<ProblemDetailsMiddleware>.Instance);
+        await mw.InvokeAsync(ctx);
+
+        Assert.NotEqual(9999L, ctx.Response.ContentLength);
+    }
+
+    [Fact]
     public async Task Rethrows_when_response_already_started()
     {
         var ctx = new DefaultHttpContext();
