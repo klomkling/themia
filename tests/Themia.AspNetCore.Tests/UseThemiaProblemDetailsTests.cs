@@ -25,7 +25,8 @@ public sealed class UseThemiaProblemDetailsTests
                 }))
             .StartAsync();
 
-        var response = await host.GetTestClient().GetAsync("/anything");
+        using var client = host.GetTestClient();
+        using var response = await client.GetAsync("/anything");
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType!.MediaType);
