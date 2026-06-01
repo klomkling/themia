@@ -18,8 +18,10 @@ on:
     types: [opened, reopened]
 
 permissions:
-  # Only PR comments are posted — no contents write needed.
-  pull-requests: write
+  # gh pr comment posts an *issue* comment (PR comments share the issues API) ->
+  # needs issues:write. pull-requests:read suffices for dependabot/fetch-metadata.
+  issues: write
+  pull-requests: read
 
 concurrency:
   group: dependabot-auto-merge-${{ github.event.pull_request.number }}
