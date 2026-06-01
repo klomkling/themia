@@ -205,6 +205,13 @@ spec). Later phases extend (SQLite, Oracle) without public-surface breaks.
 
 ## Phase roadmap (proposed)
 
+> **Phase ≠ version.** Phases are a *build-priority* grouping; the published *version* is a separate
+> single-shared counter. They do not align 1:1. Build order, release cadence, and the version each
+> deliverable ships at are defined in
+> [`release-strategy spec`](superpowers/specs/2026-06-01-themia-release-strategy-design.md)
+> (chosen order: `0.1.0` AspNetCore → `0.2.0` framework rename → `0.3.0` remaining neutral cores →
+> `0.4.0` Phase-1 modules → … → `1.0.0`).
+
 - **Phase 0 — Rename** `zenity`/`zenity-v2` → `Themia.Framework.*`/`Themia.Modules.*` (separate task).
 - **Phase 1 — Core cross-cutting:** Scheduling ✅, ExceptionLogging ✅, **Identity**, **Storage**
   (+ multi-DB SqlServer/MySql/Postgres baseline).
@@ -214,8 +221,10 @@ spec). Later phases extend (SQLite, Oracle) without public-surface breaks.
 
 ## Specs index
 
+- ✅ `docs/superpowers/specs/2026-06-01-themia-release-strategy-design.md` (versioning + build order)
 - ✅ `docs/superpowers/specs/2026-06-01-themia-quartz-scheduling-design.md`
 - ✅ `docs/superpowers/specs/2026-06-01-themia-exceptional-design.md`
+- ⬜ Phase 0 framework rename (`0.2.0`) — own spec when started
 - ⬜ Identity, Storage, Notifications, Pdf, Export, … (one spec each, this catalog as parent)
 
 ## Decisions
