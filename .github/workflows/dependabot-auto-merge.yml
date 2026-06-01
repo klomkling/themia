@@ -17,6 +17,9 @@ name: Dependabot Auto-Merge
 
 on:
   pull_request_target:
+    # Only PRs targeting main — don't auto-merge into release/maintenance branches
+    # if they are added later (matches the branch scoping of the other workflows).
+    branches: [main]
     # opened/reopened only — auto-merge persists across Dependabot's later pushes,
     # so there is no need to re-run on every `synchronize`.
     types: [opened, reopened]
