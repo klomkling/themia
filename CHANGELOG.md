@@ -10,6 +10,12 @@ released version tags the whole set.
 Categories: **Added**, **Changed**, **Deprecated**, **Removed**, **Fixed**, **Security**.
 Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.md](MIGRATION.md).
 
+- **Scope:** this file lists *notable* changes only. The exhaustive per-PR list lives in the
+  auto-generated [GitHub Releases](https://github.com/klomkling/themia/releases).
+- **Archiving (à la Serenity):** to keep this file readable, entries from **past years** are
+  moved out to `docs/changelog/changelog-YYYY.md` and replaced here by a one-line link under
+  [Older releases](#older-releases). The current (and most recent) year stays inline.
+
 ## [Unreleased]
 
 ### Added
@@ -25,3 +31,16 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 > The first published version will be **0.1.0**. Until then, changes accumulate under
 > *Unreleased* and are promoted to a dated version heading at release time.
+
+## Older releases
+
+_No archived years yet._ As the changelog grows, each past year's releases move to
+`docs/changelog/changelog-YYYY.md`, leaving a stub here — for example:
+
+<!--
+## 2027
+
+All Themia versions published in 2027 (x.y.z through a.b.c) are in
+[changelog-2027.md](docs/changelog/changelog-2027.md).
+-->
+
