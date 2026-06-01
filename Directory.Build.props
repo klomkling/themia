@@ -30,9 +30,8 @@
     <Authors>Sarawut Phaekuntod</Authors>
     <Company>Idevs</Company>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <!-- TODO: confirm the GitHub org/repo slug before first publish. -->
-    <PackageProjectUrl>https://github.com/Idevs/Themia</PackageProjectUrl>
-    <RepositoryUrl>https://github.com/Idevs/Themia</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/klomkling/themia</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/klomkling/themia</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
