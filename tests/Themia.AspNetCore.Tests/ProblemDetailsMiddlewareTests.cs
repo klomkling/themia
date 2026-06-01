@@ -3,6 +3,7 @@ using System.IO;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.Extensions.Logging.Abstractions;
 using Themia.AspNetCore.Exceptions;
 using Xunit;
@@ -25,7 +26,8 @@ public sealed class ProblemDetailsMiddlewareTests
         ctx.Response.Body.Position = 0;
         using var reader = new StreamReader(ctx.Response.Body);
         var json = await reader.ReadToEndAsync();
-        return (ctx.Response.StatusCode, JsonDocument.Parse(json).RootElement.Clone());
+        using var doc = JsonDocument.Parse(json);
+        return (ctx.Response.StatusCode, doc.RootElement.Clone());
     }
 
     [Theory]
@@ -67,5 +69,31 @@ public sealed class ProblemDetailsMiddlewareTests
         var (status, body) = await InvokeWith(new InvalidOperationException("secret internals"));
         Assert.Equal(500, status);
         Assert.DoesNotContain("secret internals", body.GetProperty("detail").GetString());
+    }
+
+    [Fact]
+    public async Task Rethrows_when_response_already_started()
+    {
+        var ctx = new DefaultHttpContext();
+        ctx.Request.Path = "/x";
+        ctx.Features.Set<IHttpResponseFeature>(new StartedResponseFeature());
+
+        var mw = new ProblemDetailsMiddleware(
+            _ => throw new NotFoundException("boom"),
+            NullLogger<ProblemDetailsMiddleware>.Instance);
+
+        await Assert.ThrowsAsync<NotFoundException>(() => mw.InvokeAsync(ctx));
+    }
+
+    /// <summary>Stub response feature whose <see cref="HasStarted"/> is always true.</summary>
+    private sealed class StartedResponseFeature : IHttpResponseFeature
+    {
+        public Stream Body { get; set; } = new MemoryStream();
+        public bool HasStarted => true;
+        public IHeaderDictionary Headers { get; set; } = new HeaderDictionary();
+        public string? ReasonPhrase { get; set; }
+        public int StatusCode { get; set; } = 200;
+        public void OnCompleted(Func<object, Task> callback, object state) { }
+        public void OnStarting(Func<object, Task> callback, object state) { }
     }
 }

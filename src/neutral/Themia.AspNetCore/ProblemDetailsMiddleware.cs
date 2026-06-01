@@ -25,6 +25,13 @@ public sealed class ProblemDetailsMiddleware(
         {
             await next(context);
         }
+        catch (Exception ex) when (context.Response.HasStarted)
+        {
+            // The response is already on the wire; we cannot rewrite status/headers. Log and rethrow.
+            logger.LogError(ex, "Response already started; cannot write problem response for {Method} {Path} (TraceId: {TraceId})",
+                context.Request.Method, context.Request.Path, traceId);
+            throw;
+        }
         catch (NotFoundException ex) { await Write(context, 404, "Not Found", ex, traceId, LogLevel.Warning); }
         catch (ConflictException ex) { await Write(context, 409, "Conflict", ex, traceId, LogLevel.Warning); }
         catch (ForbiddenException ex) { await Write(context, 403, "Forbidden", ex, traceId, LogLevel.Warning); }
