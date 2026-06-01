@@ -16,7 +16,7 @@ with the *why* and concrete upgrade steps.
 
 ## Template
 
-```markdown
+````markdown
 ## x.y.z
 
 ### <short title of the breaking change>
@@ -35,4 +35,4 @@ with the *why* and concrete upgrade steps.
   ```csharp
   // new usage
   ```
-```
+````
