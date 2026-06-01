@@ -1,0 +1,49 @@
+name: Dependabot Auto-Merge
+
+# Auto-merges Dependabot PRs by instructing Dependabot to merge them itself
+# (`@dependabot squash and merge`). Dependabot is in the default-branch ruleset's
+# bypass list, so its own merge skips the Copilot-review requirement; a merge
+# performed by github-actions would NOT bypass it. CI (Build & Test) still runs —
+# `@dependabot merge` waits for required checks before merging.
+#
+# pull_request_target is required so the workflow gets a writable token for
+# Dependabot-authored PRs (the default GITHUB_TOKEN is read-only on `pull_request`
+# from Dependabot). This workflow never checks out PR code, so it is not exposed
+# to the pull_request_target code-execution risk.
+
+on:
+  pull_request_target:
+    types: [opened, reopened, synchronize]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: dependabot-auto-merge-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  auto-merge:
+    runs-on: ubuntu-latest
+    if: github.actor == 'dependabot[bot]'
+    steps:
+      - name: Fetch Dependabot metadata
+        id: meta
+        uses: dependabot/fetch-metadata@v2
+
+      - name: Instruct Dependabot to merge (github-actions, or non-major)
+        # Auto-merge: all github-actions bumps (first-party, low risk) and any
+        # non-major update. NuGet *major* bumps are left for manual review.
+        if: steps.meta.outputs.package-ecosystem == 'github_actions' || steps.meta.outputs.update-type != 'version-update:semver-major'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+        run: gh pr comment "$PR_URL" --body "@dependabot squash and merge"
+
+      - name: Flag major updates for manual review
+        if: steps.meta.outputs.package-ecosystem != 'github_actions' && steps.meta.outputs.update-type == 'version-update:semver-major'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+        run: gh pr comment "$PR_URL" --body "🤖 Major version update — left for manual review. Comment \`@dependabot squash and merge\` to merge."
