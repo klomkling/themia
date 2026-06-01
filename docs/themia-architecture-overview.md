@@ -68,6 +68,31 @@ option* (cheap), not because PowerACC needs them now.
 - **.NET 12** added when released — cannot multi-target an unreleased TFM now. net8 + net10 are
   both LTS; that pair is the baseline.
 
+## Repository layout
+
+One repo (`Packages/themia/`) holds every Themia package, **grouped by layer** under `src/`
+(mirroring zenity-v2's `src/framework`+`src/modules`). Serenity adapters stay in the separate
+`Idevs.Net.CoreLib` repo (deferred). Single `Themia.sln`, one `Directory.Build.props` /
+`Directory.Packages.props`, shared version — all packages release together.
+
+```
+Packages/themia/
+├── Themia.sln · Directory.Build.props · Directory.Packages.props · LICENSE · README · CLAUDE.md
+├── .github/{workflows/{ci,integration,release}.yml, release.yml, dependabot.yml}
+├── docs/{themia-architecture-overview.md, superpowers/{specs,plans}/}
+├── src/
+│   ├── tooling/    # netstandard2.0 — Themia.Generators.Abstractions, .SourceGenerator, .Analyzers(.CodeFixes)
+│   ├── neutral/    # net8.0;net10.0 — Themia.AspNetCore, Themia.Quartz, Themia.Exceptional(.SqlServer/.MySql/.PostgreSql)
+│   ├── framework/  # net10.0 — Themia.Framework.{Core,Data.EFCore,AspNetCore}, .MultiTenancy, .Mediator, .Caching, .Logging, .Services  (moved in from zenity-v2 at rename)
+│   └── modules/    # net10.0 — Themia.Modules.{Scheduling,ExceptionLogging,Identity,Storage,…}
+├── tests/          # flat: <Package>.Tests/  (Exceptional.Tests carries [Trait("Category","Integration")])
+└── samples/        # optional example apps
+```
+
+Each package folder = `<Name>.csproj` + `PublicAPI.{Shipped,Unshipped}.txt` + sources.
+**TFM is set per-csproj** (Directory.Build.props does not set it) — the `src/<layer>/` folder tells
+you the target: `neutral/` = net8.0;net10.0, everything else = net10.0 (tooling = netstandard2.0).
+
 ## A. Framework core (rename from Zenity)
 
 | Themia | from Zenity | capability |

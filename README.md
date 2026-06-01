@@ -1,7 +1,9 @@
 # Themia
 
-A .NET 8/10 application framework: a **framework core** plus a catalog of **pluggable modules**
-(`IThemiaModule`). All packages ship under the `Themia.*` NuGet prefix.
+A **.NET 10** application framework — a **framework core** plus a catalog of **pluggable modules**
+(`IThemiaModule`). Its cross-cutting **neutral** packages additionally target **.NET 8**, so
+non-Themia apps (e.g. a net8 Serenity app) can consume them. All packages ship under the
+`Themia.*` NuGet prefix.
 
 > **Status:** design phase. This repository currently holds the architecture overview, module
 > specs, and implementation plans under [`docs/`](docs/). The first package to be implemented is
