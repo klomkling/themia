@@ -16,4 +16,15 @@ public sealed class ExceptionTests
         Assert.Equal("E1", ex.ErrorCode);
         Assert.Equal("v", ex.Metadata!["k"]);
     }
+
+    [Fact]
+    public void Validation_and_external_carry_extra_fields()
+    {
+        var v = new ValidationException("Email", "bad", errorCode: "INVALID");
+        Assert.Equal("Email", v.PropertyName);
+        Assert.Equal("INVALID", v.ErrorCode);
+
+        var e = new ExternalServiceException("payments", "down");
+        Assert.Equal("payments", e.ServiceName);
+    }
 }
