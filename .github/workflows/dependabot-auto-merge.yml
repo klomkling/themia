@@ -1,27 +1,32 @@
 name: Dependabot Auto-Merge
 
-# Auto-merges Dependabot PRs by instructing Dependabot to merge them itself
-# (`@dependabot squash and merge`). Dependabot is in the default-branch ruleset's
-# bypass list, so its own merge skips the Copilot-review requirement; a merge
-# performed by github-actions would NOT bypass it. CI (Build & Test) still runs —
-# `@dependabot squash and merge` waits for required checks before merging.
+# Enables GitHub *native* auto-merge on Dependabot PRs.
 #
-# pull_request_target is required so the workflow gets a writable token for
-# Dependabot-authored PRs (the default GITHUB_TOKEN is read-only on `pull_request`
-# from Dependabot). This workflow never checks out PR code, so it is not exposed
-# to the pull_request_target code-execution risk.
+# The `@dependabot merge` / `@dependabot squash and merge` comment commands were
+# DEPRECATED by GitHub on 2026-01-27 (no longer functional — only rebase/recreate
+# remain), so the old "post a comment" approach does nothing. Native auto-merge is
+# GitHub's recommended replacement: it merges the PR once ALL requirements pass.
+#
+# For Dependabot-authored PRs, Dependabot's entry in the default-branch ruleset
+# bypass list applies to the auto-merge, so the Copilot-review requirement is
+# skipped and a green CI is sufficient — verified on PR #8 (merged on CI pass
+# despite the "Copilot review" ruleset, with only Dependabot in the bypass list).
+#
+# Requires the repo setting "Allow auto-merge" (enabled). pull_request_target is
+# used only to obtain a writable token for Dependabot PRs; no PR code is checked out.
 
 on:
   pull_request_target:
-    # opened/reopened only — Dependabot acts on the command once; firing on every
-    # `synchronize` (push/rebase) would spam the thread with duplicate commands.
+    # Only PRs targeting main — don't auto-merge into release/maintenance branches
+    # if they are added later (matches the branch scoping of the other workflows).
+    branches: [main]
+    # opened/reopened only — auto-merge persists across Dependabot's later pushes,
+    # so there is no need to re-run on every `synchronize`.
     types: [opened, reopened]
 
 permissions:
-  # gh pr comment posts an *issue* comment (PR comments share the issues API) ->
-  # needs issues:write. pull-requests:read suffices for dependabot/fetch-metadata.
-  issues: write
-  pull-requests: read
+  contents: write
+  pull-requests: write
 
 concurrency:
   group: dependabot-auto-merge-${{ github.event.pull_request.number }}
@@ -30,18 +35,17 @@ concurrency:
 jobs:
   auto-merge:
     runs-on: ubuntu-latest
-    # Gate on the PR author, not github.actor — on a manual re-run github.actor
-    # is the human who clicked "Re-run", which would skip the job.
+    # Gate on the PR author (not github.actor — that is the human on a manual re-run).
     if: github.event.pull_request.user.login == 'dependabot[bot]'
     steps:
       - name: Fetch Dependabot metadata
         id: meta
         uses: dependabot/fetch-metadata@v2
 
-      - name: Instruct Dependabot to merge (github-actions, or non-major)
-        # Auto-merge: all github-actions bumps (first-party, low risk) and any
-        # non-major update. NuGet *major* bumps are left for manual review.
-        # (Match both ecosystem spellings defensively.)
+      - name: Enable native auto-merge (github-actions, or non-major)
+        # Auto-merge all github-actions bumps (first-party, low risk) and any
+        # non-major update. NuGet *major* bumps get no auto-merge — they stay open
+        # for manual review. (Match both ecosystem spellings defensively.)
         if: >-
           steps.meta.outputs.package-ecosystem == 'github-actions' ||
           steps.meta.outputs.package-ecosystem == 'github_actions' ||
@@ -49,14 +53,17 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_URL: ${{ github.event.pull_request.html_url }}
-        run: gh pr comment "$PR_URL" --body "@dependabot squash and merge"
-
-      - name: Flag major updates for manual review
-        if: >-
-          steps.meta.outputs.package-ecosystem != 'github-actions' &&
-          steps.meta.outputs.package-ecosystem != 'github_actions' &&
-          steps.meta.outputs.update-type == 'version-update:semver-major'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PR_URL: ${{ github.event.pull_request.html_url }}
-        run: gh pr comment "$PR_URL" --body "🤖 Major version update — left for manual review. Comment \`@dependabot squash and merge\` to merge."
+        # Retry: right after `opened`, mergeability may still be computing and
+        # `--auto` can fail transiently. Since the workflow only fires on
+        # opened/reopened, a one-shot failure would leave auto-merge un-enabled.
+        # Retry a few times, then warn (don't hard-fail the run).
+        run: |
+          for attempt in 1 2 3 4 5; do
+            if gh pr merge "$PR_URL" --auto --squash; then
+              echo "Auto-merge enabled (attempt $attempt)."
+              exit 0
+            fi
+            echo "::warning::Attempt $attempt to enable auto-merge failed (mergeability may still be computing); retrying in 15s."
+            sleep 15
+          done
+          echo "::warning::Could not enable auto-merge after 5 attempts for $PR_URL — enable it manually if appropriate."
