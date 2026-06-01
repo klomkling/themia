@@ -13,5 +13,7 @@ public sealed class ExternalServiceException(
     : ThemiaException(message, errorCode, metadata, innerException)
 {
     /// <summary>Name of the failing downstream service.</summary>
-    public string ServiceName { get; } = serviceName;
+    public string ServiceName { get; } = !string.IsNullOrWhiteSpace(serviceName)
+        ? serviceName
+        : throw new ArgumentException("Service name must be non-empty.", nameof(serviceName));
 }

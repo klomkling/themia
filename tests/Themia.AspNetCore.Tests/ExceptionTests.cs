@@ -40,4 +40,23 @@ public sealed class ExceptionTests
         Assert.Equal("ap-southeast-1", e.Metadata!["region"]);
         Assert.Same(inner, e.InnerException);
     }
+
+    [Fact]
+    public void Exception_requires_non_empty_message()
+    {
+        Assert.Throws<System.ArgumentException>(() => new NotFoundException(""));
+        Assert.Throws<System.ArgumentException>(() => new NotFoundException("   "));
+    }
+
+    [Fact]
+    public void Validation_requires_non_empty_property_name()
+    {
+        Assert.Throws<System.ArgumentException>(() => new ValidationException("", "bad"));
+    }
+
+    [Fact]
+    public void ExternalService_requires_non_empty_service_name()
+    {
+        Assert.Throws<System.ArgumentException>(() => new ExternalServiceException("  ", "down"));
+    }
 }

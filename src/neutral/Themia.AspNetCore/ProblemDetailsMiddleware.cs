@@ -51,8 +51,6 @@ public sealed class ProblemDetailsMiddleware(
         logger.Log(level, ex, "{Title} for {Method} {Path} (TraceId: {TraceId})",
             title, ctx.Request.Method, ctx.Request.Path, traceId);
 
-        ResetResponse(ctx, status);
-
         var problem = new ProblemDetails
         {
             Status = status,
@@ -64,16 +62,15 @@ public sealed class ProblemDetailsMiddleware(
         AddMetadata(problem, ex.Metadata);
         problem.Extensions["traceId"] = traceId;
         if (ex.ErrorCode is not null) problem.Extensions["errorCode"] = ex.ErrorCode;
+        if (ex is ExternalServiceException ese) problem.Extensions["service"] = ese.ServiceName;
 
-        await ctx.Response.WriteAsync(JsonSerializer.Serialize(problem, Json));
+        await WriteProblem(ctx, problem, status, traceId);
     }
 
     private async Task WriteValidation(HttpContext ctx, ValidationException ex, string traceId)
     {
         logger.LogWarning(ex, "Validation error for {Method} {Path} (TraceId: {TraceId})",
             ctx.Request.Method, ctx.Request.Path, traceId);
-
-        ResetResponse(ctx, 400);
 
         var problem = new ValidationProblemDetails(
             new Dictionary<string, string[]> { [ex.PropertyName] = [ex.Message] })
@@ -88,15 +85,37 @@ public sealed class ProblemDetailsMiddleware(
         problem.Extensions["traceId"] = traceId;
         if (ex.ErrorCode is not null) problem.Extensions["errorCode"] = ex.ErrorCode;
 
-        await ctx.Response.WriteAsync(JsonSerializer.Serialize(problem, Json));
+        await WriteProblem(ctx, problem, 400, traceId);
     }
 
     private async Task WriteGeneric(HttpContext ctx, int status, string title, string detail, string traceId)
     {
-        ResetResponse(ctx, status);
         var problem = new ProblemDetails { Status = status, Title = title, Detail = detail, Instance = ctx.Request.Path };
         problem.Extensions["traceId"] = traceId;
-        await ctx.Response.WriteAsync(JsonSerializer.Serialize(problem, Json));
+        await WriteProblem(ctx, problem, status, traceId);
+    }
+
+    // Serializes the body BEFORE touching the response. Consumer-supplied Metadata values are
+    // arbitrary objects, so serialization can fail; if it does we drop the extensions and emit a
+    // minimal, guaranteed-serializable body rather than letting the throw escape this error handler.
+    private async Task WriteProblem(HttpContext ctx, ProblemDetails problem, int status, string traceId)
+    {
+        string payload;
+        try
+        {
+            payload = JsonSerializer.Serialize(problem, problem.GetType(), Json);
+        }
+        catch (Exception serEx)
+        {
+            logger.LogError(serEx, "Failed to serialize problem response for {Method} {Path} (TraceId: {TraceId}); dropping extensions",
+                ctx.Request.Method, ctx.Request.Path, traceId);
+            problem.Extensions.Clear();
+            problem.Extensions["traceId"] = traceId;
+            payload = JsonSerializer.Serialize(problem, problem.GetType(), Json);
+        }
+
+        ResetResponse(ctx, status);
+        await ctx.Response.WriteAsync(payload);
     }
 
     // Clears any Content-Length a downstream component may have set before throwing

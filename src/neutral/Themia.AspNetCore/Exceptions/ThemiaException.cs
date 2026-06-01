@@ -14,6 +14,7 @@ public abstract class ThemiaException : Exception
         Exception? innerException = null)
         : base(message, innerException)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(message);
         ErrorCode = errorCode;
         Metadata = metadata;
     }
@@ -23,8 +24,8 @@ public abstract class ThemiaException : Exception
 
     /// <summary>
     /// Optional extra key/values surfaced as ProblemDetails extensions.
-    /// Values must be JSON-serializable (via System.Text.Json): they are serialized while
-    /// handling the exception, so a non-serializable value throws inside the error path.
+    /// Values should be JSON-serializable (via System.Text.Json). If serialization fails, the
+    /// middleware drops the extensions and emits a minimal problem response rather than failing.
     /// </summary>
     public IReadOnlyDictionary<string, object?>? Metadata { get; }
 }

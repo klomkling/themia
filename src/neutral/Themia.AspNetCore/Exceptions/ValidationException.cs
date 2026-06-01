@@ -11,5 +11,7 @@ public sealed class ValidationException(
     : ThemiaException(message, errorCode, metadata)
 {
     /// <summary>The offending property/field name.</summary>
-    public string PropertyName { get; } = propertyName;
+    public string PropertyName { get; } = !string.IsNullOrWhiteSpace(propertyName)
+        ? propertyName
+        : throw new ArgumentException("Property name must be non-empty.", nameof(propertyName));
 }
