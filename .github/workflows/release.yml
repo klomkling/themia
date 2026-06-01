@@ -25,7 +25,7 @@ jobs:
       should_release: ${{ steps.decide.outputs.should_release }}
       checkout_ref: ${{ steps.decide.outputs.checkout_ref }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -100,7 +100,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: nuget
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
           ref: ${{ needs.check.outputs.checkout_ref }}
