@@ -44,7 +44,8 @@ public sealed class ExceptionTests
     [Fact]
     public void Exception_requires_non_empty_message()
     {
-        Assert.Throws<System.ArgumentException>(() => new NotFoundException(""));
+        var ex = Assert.Throws<System.ArgumentException>(() => new NotFoundException(""));
+        Assert.Equal("message", ex.ParamName);
         Assert.Throws<System.ArgumentException>(() => new NotFoundException("   "));
     }
 
