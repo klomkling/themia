@@ -60,20 +60,21 @@ specced and slot in at `0.3.0` alongside/after the framework rather than blockin
 
 ## 4. Immediate action — cut `0.1.0`
 
-`Themia.AspNetCore` is merged to `main` but not yet on NuGet. Releasing it is the first concrete
-plan (see the implementation plan produced from this spec). Gate items:
+`Themia.AspNetCore` is merged to `main` but not yet on NuGet. Cutting the release is the first
+concrete piece of work; it will get its own follow-up implementation plan under
+`docs/superpowers/plans/` (not yet written). Gate items:
 
 - Add the `NUGET_API_KEY` repository secret and the `nuget` deployment environment the release
-  workflow expects.
+  workflow (`.github/workflows/release.yml`) expects.
 - Reserve the `Themia.` package-ID prefix on nuget.org (prevents ID hijacking; ties packages to
   the owner account).
 - Promote `CHANGELOG.md` `[Unreleased]` → a dated `0.1.0` heading.
-- Trigger the existing release workflow (reads `<Version>` from `Directory.Build.props`, packs the
-  solution, publishes, tags, and creates the GitHub Release). Confirm its trigger mechanism and
-  that `<Version>` is `0.1.0` before release.
 
-These steps are detailed in the implementation plan; the exact workflow trigger is verified there
-against `.github/workflows/release.yml`.
+The release workflow **auto-triggers on push to `main`**: it reads `<Version>` from
+`Directory.Build.props` (already `0.1.0`) and releases when no matching `v{version}` tag exists, so
+once the gate items are in place the CHANGELOG-promotion merge fires the publish (or the failed run
+can be re-run). The follow-up plan will sequence these steps and confirm the mechanics against the
+workflow file.
 
 ## 5. Phase 0 (the `0.2.0` framework rename) is its own brainstorm
 
