@@ -50,4 +50,17 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_URL: ${{ github.event.pull_request.html_url }}
-        run: gh pr merge "$PR_URL" --auto --squash
+        # Retry: right after `opened`, mergeability may still be computing and
+        # `--auto` can fail transiently. Since the workflow only fires on
+        # opened/reopened, a one-shot failure would leave auto-merge un-enabled.
+        # Retry a few times, then warn (don't hard-fail the run).
+        run: |
+          for attempt in 1 2 3 4 5; do
+            if gh pr merge "$PR_URL" --auto --squash; then
+              echo "Auto-merge enabled (attempt $attempt)."
+              exit 0
+            fi
+            echo "::warning::Attempt $attempt to enable auto-merge failed (mergeability may still be computing); retrying in 15s."
+            sleep 15
+          done
+          echo "::warning::Could not enable auto-merge after 5 attempts for $PR_URL — enable it manually if appropriate."
