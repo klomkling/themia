@@ -43,4 +43,29 @@ public sealed class ProblemDetailsMiddlewareTests
         Assert.Equal("boom", body.GetProperty("detail").GetString());
         Assert.False(string.IsNullOrEmpty(body.GetProperty("traceId").GetString()));
     }
+
+    [Fact]
+    public async Task Validation_returns_400_with_field_and_errorCode()
+    {
+        var (status, body) = await InvokeWith(new ValidationException("Email", "bad", errorCode: "INVALID"));
+
+        Assert.Equal(400, status);
+        Assert.Equal("INVALID", body.GetProperty("errorCode").GetString());
+        Assert.Equal("bad", body.GetProperty("errors").GetProperty("Email")[0].GetString());
+    }
+
+    [Fact]
+    public async Task ExternalService_returns_503()
+    {
+        var (status, _) = await InvokeWith(new ExternalServiceException("payments", "down"));
+        Assert.Equal(503, status);
+    }
+
+    [Fact]
+    public async Task Unknown_exception_returns_500_without_leaking_message()
+    {
+        var (status, body) = await InvokeWith(new InvalidOperationException("secret internals"));
+        Assert.Equal(500, status);
+        Assert.DoesNotContain("secret internals", body.GetProperty("detail").GetString());
+    }
 }

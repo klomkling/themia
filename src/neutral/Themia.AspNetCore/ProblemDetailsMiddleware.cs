@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -28,6 +29,14 @@ public sealed class ProblemDetailsMiddleware(
         catch (ConflictException ex) { await Write(context, 409, "Conflict", ex, traceId, LogLevel.Warning); }
         catch (ForbiddenException ex) { await Write(context, 403, "Forbidden", ex, traceId, LogLevel.Warning); }
         catch (UnauthorizedException ex) { await Write(context, 401, "Unauthorized", ex, traceId, LogLevel.Warning); }
+        catch (ValidationException ex) { await WriteValidation(context, ex, traceId); }
+        catch (ExternalServiceException ex) { await Write(context, 503, "Service unavailable", ex, traceId, LogLevel.Error); }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Unhandled exception for {Method} {Path} (TraceId: {TraceId})",
+                context.Request.Method, context.Request.Path, traceId);
+            await WriteGeneric(context, 500, "Server error", "An unexpected error occurred.", traceId);
+        }
     }
 
     private async Task Write(HttpContext ctx, int status, string title, ThemiaException ex, string traceId, LogLevel level)
@@ -51,6 +60,39 @@ public sealed class ProblemDetailsMiddleware(
             foreach (var pair in ex.Metadata)
                 problem.Extensions[pair.Key] = pair.Value;
 
+        await ctx.Response.WriteAsync(JsonSerializer.Serialize(problem, Json));
+    }
+
+    private async Task WriteValidation(HttpContext ctx, ValidationException ex, string traceId)
+    {
+        logger.LogWarning(ex, "Validation error for {Method} {Path} (TraceId: {TraceId})",
+            ctx.Request.Method, ctx.Request.Path, traceId);
+
+        ctx.Response.ContentType = "application/problem+json";
+        ctx.Response.StatusCode = 400;
+
+        var problem = new ValidationProblemDetails(
+            new Dictionary<string, string[]> { [ex.PropertyName] = [ex.Message] })
+        {
+            Status = 400,
+            Title = "Validation error",
+            Detail = ex.Message,
+            Instance = ctx.Request.Path,
+        };
+        problem.Extensions["traceId"] = traceId;
+        if (ex.ErrorCode is not null) problem.Extensions["errorCode"] = ex.ErrorCode;
+        if (ex.Metadata is not null)
+            foreach (var pair in ex.Metadata) problem.Extensions[pair.Key] = pair.Value;
+
+        await ctx.Response.WriteAsync(JsonSerializer.Serialize(problem, Json));
+    }
+
+    private async Task WriteGeneric(HttpContext ctx, int status, string title, string detail, string traceId)
+    {
+        ctx.Response.ContentType = "application/problem+json";
+        ctx.Response.StatusCode = status;
+        var problem = new ProblemDetails { Status = status, Title = title, Detail = detail, Instance = ctx.Request.Path };
+        problem.Extensions["traceId"] = traceId;
         await ctx.Response.WriteAsync(JsonSerializer.Serialize(problem, Json));
     }
 }
