@@ -27,4 +27,17 @@ public sealed class ExceptionTests
         var e = new ExternalServiceException("payments", "down");
         Assert.Equal("payments", e.ServiceName);
     }
+
+    [Fact]
+    public void ExternalService_carries_errorCode_and_metadata()
+    {
+        var meta = new Dictionary<string, object?> { ["region"] = "ap-southeast-1" };
+        var inner = new System.TimeoutException("timed out");
+        var e = new ExternalServiceException("payments", "down", errorCode: "PAY_503", metadata: meta, innerException: inner);
+
+        Assert.Equal("payments", e.ServiceName);
+        Assert.Equal("PAY_503", e.ErrorCode);
+        Assert.Equal("ap-southeast-1", e.Metadata!["region"]);
+        Assert.Same(inner, e.InnerException);
+    }
 }
