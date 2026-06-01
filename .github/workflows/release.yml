@@ -1,0 +1,199 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to (re-)publish (e.g. 0.1.0). Bypasses the tag-exists check; use to recover from a partial run that left the tag in place but missing nupkgs / GitHub Release. The job checks out the existing v{version} tag before building so published packages match the original release."
+        required: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  check:
+    name: Check version & tag
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.decide.outputs.version }}
+      should_release: ${{ steps.decide.outputs.should_release }}
+      checkout_ref: ${{ steps.decide.outputs.checkout_ref }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Read shared version from Directory.Build.props
+        id: version
+        run: |
+          VERSION=$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' Directory.Build.props | head -1)
+          if [ -z "$VERSION" ]; then
+            echo "::error::Could not read <Version> from Directory.Build.props"
+            exit 1
+          fi
+          echo "props_version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Detected version (Directory.Build.props on this ref): $VERSION"
+
+      - name: Decide whether to release
+        id: decide
+        env:
+          DISPATCH_VERSION: ${{ github.event.inputs.version }}
+          PROPS_VERSION: ${{ steps.version.outputs.props_version }}
+          GITHUB_SHA: ${{ github.sha }}
+        run: |
+          # Auto-trigger from `push: main` — compare the shared version to the
+          # matching tag and skip if it already exists.
+          if [ -z "${DISPATCH_VERSION}" ]; then
+            TAG="v${PROPS_VERSION}"
+            if git rev-parse "refs/tags/${TAG}" >/dev/null 2>&1; then
+              echo "version=${PROPS_VERSION}" >> "$GITHUB_OUTPUT"
+              echo "should_release=false" >> "$GITHUB_OUTPUT"
+              echo "checkout_ref=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+              echo "Tag ${TAG} already exists; skipping release."
+            else
+              echo "version=${PROPS_VERSION}" >> "$GITHUB_OUTPUT"
+              echo "should_release=true" >> "$GITHUB_OUTPUT"
+              echo "checkout_ref=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+              echo "Tag ${TAG} does not exist; proceeding with release at ${GITHUB_SHA}."
+            fi
+            exit 0
+          fi
+
+          # workflow_dispatch recovery path. Validate the user-supplied version
+          # format BEFORE it is ever used to build a git ref (ref-injection guard).
+          if ! printf '%s' "${DISPATCH_VERSION}" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.]+)?$'; then
+            echo "::error::Invalid version input '${DISPATCH_VERSION}'. Expected SemVer like 0.1.0 or 0.1.0-rc.1."
+            exit 1
+          fi
+
+          TAG="v${DISPATCH_VERSION}"
+          if git rev-parse "refs/tags/${TAG}" >/dev/null 2>&1; then
+            # Tag exists — recovery from a partial run after tag-push. Build
+            # from the tagged commit so published packages are identical.
+            echo "version=${DISPATCH_VERSION}" >> "$GITHUB_OUTPUT"
+            echo "should_release=true" >> "$GITHUB_OUTPUT"
+            echo "checkout_ref=refs/tags/${TAG}" >> "$GITHUB_OUTPUT"
+            echo "Recovery mode: tag ${TAG} exists; release job will checkout that tag."
+          elif [ "${PROPS_VERSION}" = "${DISPATCH_VERSION}" ]; then
+            # Tag not pushed yet but the props version matches — build current ref.
+            echo "version=${DISPATCH_VERSION}" >> "$GITHUB_OUTPUT"
+            echo "should_release=true" >> "$GITHUB_OUTPUT"
+            echo "checkout_ref=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+            echo "Recovery mode: tag ${TAG} not found; props matches, building from ${GITHUB_SHA}."
+          else
+            echo "::error::Refusing to release. Directory.Build.props <Version> on the selected ref is ${PROPS_VERSION}, but you requested v${DISPATCH_VERSION} and no matching tag exists."
+            echo "::error::  1. Re-run against an existing v${DISPATCH_VERSION} tag (Run workflow → ref: tags/v${DISPATCH_VERSION}), or"
+            echo "::error::  2. Push the version bump for ${DISPATCH_VERSION} to main and let the auto-trigger handle it."
+            exit 1
+          fi
+
+  release:
+    name: Tag, Pack & Publish
+    needs: check
+    if: needs.check.outputs.should_release == 'true'
+    runs-on: ubuntu-latest
+    environment: nuget
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ needs.check.outputs.checkout_ref }}
+
+      - name: Verify checked-out version matches release version
+        env:
+          EXPECTED: ${{ needs.check.outputs.version }}
+        run: |
+          ACTUAL=$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' Directory.Build.props | head -1)
+          if [ "${ACTUAL}" != "${EXPECTED}" ]; then
+            echo "::error::Directory.Build.props <Version> on the checked-out ref is '${ACTUAL}' but the release is for v'${EXPECTED}'. Refusing to publish wrong-version artifacts."
+            exit 1
+          fi
+          echo "Verified: <Version> = ${ACTUAL} matches release v${EXPECTED}."
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', '**/Directory.Packages.props') }}
+          restore-keys: ${{ runner.os }}-nuget-
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test --configuration Release --no-build --verbosity normal --filter "Category!=Integration"
+
+      - name: Pack
+        # Packs every packable project in the solution (test projects set
+        # IsPackable=false). Auto-includes new packages as they are added.
+        run: |
+          mkdir -p ./artifacts
+          dotnet pack Themia.sln --configuration Release --no-build --output ./artifacts
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: nupkgs
+          path: ./artifacts/*.nupkg
+
+      - name: Publish to NuGet
+        env:
+          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+        run: |
+          if [ -z "${NUGET_API_KEY}" ]; then
+            echo "::error::NUGET_API_KEY secret is not set."
+            exit 1
+          fi
+          dotnet nuget push "./artifacts/*.nupkg" \
+            --api-key "${NUGET_API_KEY}" \
+            --source https://api.nuget.org/v3/index.json \
+            --skip-duplicate
+
+      - name: Create and push tag (skip if exists)
+        env:
+          VERSION: ${{ needs.check.outputs.version }}
+        run: |
+          TAG="v${VERSION}"
+          git fetch --tags
+          if git rev-parse "refs/tags/${TAG}" >/dev/null 2>&1; then
+            echo "Tag ${TAG} already exists; skipping create/push."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "${TAG}" -m "Release ${TAG}"
+          git push origin "${TAG}"
+          echo "Created and pushed tag ${TAG}"
+
+      - name: Create or update GitHub Release (idempotent)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ needs.check.outputs.version }}
+        run: |
+          TAG="v${VERSION}"
+          if gh release view "${TAG}" >/dev/null 2>&1; then
+            echo "Release ${TAG} exists; uploading any missing/changed assets (--clobber)."
+            gh release upload "${TAG}" ./artifacts/*.nupkg --clobber
+          else
+            echo "Creating new release ${TAG}."
+            gh release create "${TAG}" \
+              --title "${TAG}" \
+              --generate-notes \
+              ./artifacts/*.nupkg
+          fi
