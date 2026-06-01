@@ -26,8 +26,13 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
   integration workflow, and a NuGet release workflow (version read from `Directory.Build.props`,
   pack the solution, publish + tag + GitHub Release).
 - Dependabot (NuGet + GitHub Actions) with **native auto-merge** for non-major and Actions bumps.
-- `Themia.AspNetCore` project skeleton (`net8.0;net10.0`) — typed exception hierarchy and the
-  RFC-7807 ProblemDetails middleware are in progress.
+- `Themia.AspNetCore` (`net8.0;net10.0`) — framework-neutral typed exception hierarchy
+  (`ThemiaException` base + `Validation`/`NotFound`/`Conflict`/`Forbidden`/`Unauthorized`/
+  `ExternalService` exceptions) and an RFC-7807 `ProblemDetailsMiddleware` that maps them to
+  HTTP statuses and writes `application/problem+json` with `traceId`/`errorCode`/metadata
+  extensions, plus the `UseThemiaProblemDetails()` registration extension. Exceptions are
+  HTTP-agnostic (the type→status map lives only in the middleware); unknown exceptions return a
+  generic 500 without leaking internal details.
 
 > The first published version will be **0.1.0**. Until then, changes accumulate under
 > *Unreleased* and are promoted to a dated version heading at release time.
