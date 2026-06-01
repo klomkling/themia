@@ -14,10 +14,11 @@ superpowers `executing-plans` / `subagent-driven-development` skills it calls ou
 
 ## What Themia is
 
-Themia is a .NET 8/10 application framework — a **framework core** plus a catalog of **pluggable
+Themia is a **.NET 10** application framework — a **framework core** plus a catalog of **pluggable
 modules** (`IThemiaModule`), rebranded from the in-repo `zenity`/`zenity-v2` and assembled by
-merging four existing codebases (Zenity, ezy-assets, PowerACC, Idevs.Net.CoreLib). All packages
-ship under the `Themia.*` NuGet prefix.
+merging four existing codebases (Zenity, ezy-assets, PowerACC, Idevs.Net.CoreLib). Its **neutral**
+cross-cutting packages additionally target **.NET 8** (so net8 apps like PowerACC can consume
+them); the framework core and modules are net10-only. All packages ship under the `Themia.*` NuGet prefix.
 
 ## Architecture (big picture)
 
@@ -100,3 +101,31 @@ Cross-cutting packages track a **PublicAPI** surface (`PublicAPI.Shipped.txt` /
 - New cross-cutting code follows: neutral core (no framework dep) first, then the module wrapper —
   not the other way around.
 ```
+
+## Session memory — capture to ai-brains
+
+This Themia effort is tracked in the **ai-brains vault** (`/Users/sarawut/Obsidian/ai-brains`):
+
+- Design / decision note: `03-Resources/Quartz.NET Dashboards & Porting SilkierQuartz.md`
+- Timeline log: `Note Timeline Hub.md`
+
+**What the vault hooks auto-capture** (global `~/.claude/settings.json`) — and *where*:
+
+- `vault-plan-logger` — fires on the **ExitPlanMode** and **TodoWrite** tools → appends to
+  `AI/logs/<repo>/<YYYY-MM-DD>-plans.md`.
+- `vault-precompact-snapshot` — fires on **PreCompact** → reasoning backstop in `AI/logs/<repo>/`.
+
+These trigger on **those tools/events only — not on "using a superpowers skill".** A superpowers
+`writing-plans` / `brainstorming` run that merely `Write`s a doc (no TodoWrite, no Plan Mode) is
+**not** captured. And the hooks log to `AI/logs/`, **not** the curated `03-Resources/` note.
+
+**So manually capture to the curated note + timeline** for any substantive decision, design change,
+or chunk of work that the hook triggers above did **not** record — i.e. ad-hoc reasoning, or
+design/doc work done without ExitPlanMode/TodoWrite. Do it before the session ends:
+
+1. Extend the design note (don't duplicate; follow the vault's own `CLAUDE.md` — YAML frontmatter,
+   `[[YYYY-MM-DD]]` date link, ≤4 meaningful tags, update the folder MOC).
+2. Log the edit in `Note Timeline Hub.md` under today's date heading.
+3. Keep it tight: **what changed + why** (the decision/rationale), not a transcript.
+
+Always read `/Users/sarawut/Obsidian/ai-brains/CLAUDE.md` first and obey it when writing there.

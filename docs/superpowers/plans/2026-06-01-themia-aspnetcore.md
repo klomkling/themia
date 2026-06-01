@@ -17,7 +17,7 @@ Packages/themia/
   Themia.sln
   Directory.Build.props              # shared: nullable, langversion, warnings-as-errors, TFMs
   Directory.Packages.props           # central package versions
-  src/Themia.AspNetCore/
+  src/neutral/Themia.AspNetCore/
     Themia.AspNetCore.csproj
     Exceptions/ThemiaException.cs       # abstract base (ErrorCode, Metadata)
     Exceptions/ValidationException.cs   # + PropertyName  → 400
@@ -45,29 +45,20 @@ Design notes:
 ### Task 1: Scaffold the Themia solution + Themia.AspNetCore project skeleton
 
 **Files:**
-- Create: `Packages/themia/Directory.Build.props`
+- **Already exists** (created with CI/CD setup): `Packages/themia/Directory.Build.props`, `LICENSE`, `.github/`
 - Create: `Packages/themia/Directory.Packages.props`
-- Create: `Packages/themia/src/Themia.AspNetCore/Themia.AspNetCore.csproj`
-- Create: `Packages/themia/src/Themia.AspNetCore/PublicAPI.Shipped.txt` (empty)
-- Create: `Packages/themia/src/Themia.AspNetCore/PublicAPI.Unshipped.txt` (empty)
+- Create: `Packages/themia/src/neutral/Themia.AspNetCore/Themia.AspNetCore.csproj`
+- Create: `Packages/themia/src/neutral/Themia.AspNetCore/PublicAPI.Shipped.txt` (empty)
+- Create: `Packages/themia/src/neutral/Themia.AspNetCore/PublicAPI.Unshipped.txt` (empty)
 - Create: `Packages/themia/tests/Themia.AspNetCore.Tests/Themia.AspNetCore.Tests.csproj`
 - Create: `Packages/themia/Themia.sln`
 
-- [ ] **Step 1: Create `Directory.Build.props`**
+- [ ] **Step 1: `Directory.Build.props` already exists — verify, do not recreate**
 
-```xml
-<Project>
-  <PropertyGroup>
-    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
-    <LangVersion>latest</LangVersion>
-    <Nullable>enable</Nullable>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-    <GenerateDocumentationFile>true</GenerateDocumentationFile>
-    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
-  </PropertyGroup>
-</Project>
-```
+It was created with the CI/CD setup and holds compiler settings, the **shared `<Version>0.1.0</Version>`** (all packages release together), and package metadata (Authors/Company/MIT/RepositoryUrl/symbols). **It deliberately does NOT set `TargetFrameworks`** — TFMs vary per layer (neutral cores `net8.0;net10.0`, framework/modules `net10.0`), so each csproj sets its own. Confirm it is present:
+
+Run: `test -f Packages/themia/Directory.Build.props && echo OK`
+Expected: `OK`. (If missing, see the CI/CD setup; do not invent a new one.)
 
 - [ ] **Step 2: Create `Directory.Packages.props`**
 
@@ -85,14 +76,16 @@ Design notes:
 </Project>
 ```
 
-- [ ] **Step 3: Create `src/Themia.AspNetCore/Themia.AspNetCore.csproj`**
+- [ ] **Step 3: Create `src/neutral/Themia.AspNetCore/Themia.AspNetCore.csproj`**
 
 ```xml
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <!-- Neutral cross-framework package: MUST include net8.0 (PowerACC reuse). -->
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
     <PackageId>Themia.AspNetCore</PackageId>
     <Description>Typed exceptions + RFC-7807 ProblemDetails middleware for ASP.NET Core. Framework-neutral.</Description>
-    <Version>0.1.0</Version>
+    <!-- Version is inherited from Directory.Build.props (shared 0.1.0). Do not set it here. -->
   </PropertyGroup>
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
@@ -113,6 +106,7 @@ Both files: a single line containing `#nullable enable`
 ```xml
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
     <IsPackable>false</IsPackable>
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
   </PropertyGroup>
@@ -124,7 +118,7 @@ Both files: a single line containing `#nullable enable`
     <PackageReference Include="Microsoft.AspNetCore.TestHost" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="../../src/Themia.AspNetCore/Themia.AspNetCore.csproj" />
+    <ProjectReference Include="../../src/neutral/Themia.AspNetCore/Themia.AspNetCore.csproj" />
   </ItemGroup>
 </Project>
 ```
@@ -135,7 +129,7 @@ Run:
 ```bash
 cd Packages/themia
 dotnet new sln -n Themia
-dotnet sln add src/Themia.AspNetCore/Themia.AspNetCore.csproj
+dotnet sln add src/neutral/Themia.AspNetCore/Themia.AspNetCore.csproj
 dotnet sln add tests/Themia.AspNetCore.Tests/Themia.AspNetCore.Tests.csproj
 ```
 
@@ -156,7 +150,7 @@ git commit -m "chore: scaffold Themia solution and Themia.AspNetCore project"
 ### Task 2: `ThemiaException` base
 
 **Files:**
-- Create: `Packages/themia/src/Themia.AspNetCore/Exceptions/ThemiaException.cs`
+- Create: `Packages/themia/src/neutral/Themia.AspNetCore/Exceptions/ThemiaException.cs`
 - Test: `Packages/themia/tests/Themia.AspNetCore.Tests/ExceptionTests.cs`
 
 - [ ] **Step 1: Write the failing test**
@@ -376,7 +370,7 @@ git commit -m "feat: add typed Themia exceptions (validation/conflict/forbidden/
 ### Task 4: `ProblemDetailsMiddleware` — status mapping for the four 4xx domain exceptions
 
 **Files:**
-- Create: `Packages/themia/src/Themia.AspNetCore/ProblemDetailsMiddleware.cs`
+- Create: `Packages/themia/src/neutral/Themia.AspNetCore/ProblemDetailsMiddleware.cs`
 - Test: `Packages/themia/tests/Themia.AspNetCore.Tests/ProblemDetailsMiddlewareTests.cs`
 
 - [ ] **Step 1: Write the failing test**
@@ -513,7 +507,7 @@ git commit -m "feat: ProblemDetailsMiddleware maps 4xx domain exceptions"
 ### Task 5: Validation (400 + field), ExternalService (503), unknown (500), and extensions
 
 **Files:**
-- Modify: `Packages/themia/src/Themia.AspNetCore/ProblemDetailsMiddleware.cs`
+- Modify: `Packages/themia/src/neutral/Themia.AspNetCore/ProblemDetailsMiddleware.cs`
 - Test: append to `ProblemDetailsMiddlewareTests.cs`
 
 - [ ] **Step 1: Write the failing tests (append)**
@@ -630,7 +624,7 @@ git commit -m "feat: ProblemDetailsMiddleware handles validation/external/unknow
 ### Task 6: `UseThemiaProblemDetails()` extension + integration test
 
 **Files:**
-- Create: `Packages/themia/src/Themia.AspNetCore/ApplicationBuilderExtensions.cs`
+- Create: `Packages/themia/src/neutral/Themia.AspNetCore/ApplicationBuilderExtensions.cs`
 - Test: `Packages/themia/tests/Themia.AspNetCore.Tests/UseThemiaProblemDetailsTests.cs`
 
 - [ ] **Step 1: Write the failing integration test**
@@ -709,7 +703,7 @@ git commit -m "feat: add UseThemiaProblemDetails() extension"
 ### Task 7: Finalize PublicAPI + full build/test on both TFMs
 
 **Files:**
-- Modify: `Packages/themia/src/Themia.AspNetCore/PublicAPI.Unshipped.txt`
+- Modify: `Packages/themia/src/neutral/Themia.AspNetCore/PublicAPI.Unshipped.txt`
 
 - [ ] **Step 1: Build to surface any `RS0016` (undocumented public API) diagnostics**
 

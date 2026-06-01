@@ -1,0 +1,57 @@
+name: Integration Tests
+
+# Runs the [Trait("Category", "Integration")] suite that the regular CI
+# workflow filters out (Testcontainers against real DB engines — SQL Server,
+# MySQL/MariaDB, PostgreSQL — for the Themia.Exceptional dialect engine, etc.).
+# Separate from PR CI because:
+#   1. Testcontainers pulls DB images (mcr.microsoft.com/...) that get 403'd
+#      by Microsoft's WAF on shared GitHub-hosted runner IPs from time to time.
+#   2. Integration tests are ~5-10x slower (image pull + container startup).
+#
+# Triggered on push to main (catch regressions soon after merge) and manually.
+# Until integration-tagged tests exist, the filter matches nothing and the job
+# is a fast no-op.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: integration-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  integration:
+    name: Integration (Testcontainers)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', '**/Directory.Packages.props') }}
+          restore-keys: ${{ runner.os }}-nuget-
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --configuration Release --no-restore
+
+      - name: Integration tests
+        # Inverse of ci.yml: Category=Integration only. Re-runnable from the
+        # Actions tab if a DB image pull fails at fixture init.
+        run: dotnet test --configuration Release --no-build --verbosity normal --filter "Category=Integration"
