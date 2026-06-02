@@ -2,17 +2,6 @@
 const Themia.Generators.Abstractions.Diagnostics.DiagnosticIdRange.ConsumerRange = "THEMIA200+" -> string!
 const Themia.Generators.Abstractions.Diagnostics.DiagnosticIdRange.ThemiaAnalyzersRange = "THEMIA100-THEMIA199" -> string!
 const Themia.Generators.Abstractions.Diagnostics.DiagnosticIdRange.ThemiaDIRange = "THEMIA001-THEMIA099" -> string!
-Themia.DependencyInjection.GenerateServiceRegistrationsAttribute
-Themia.DependencyInjection.GenerateServiceRegistrationsAttribute.GenerateServiceRegistrationsAttribute() -> void
-Themia.DependencyInjection.RegisterAsAttribute
-Themia.DependencyInjection.RegisterAsAttribute.RegisterAsAttribute(System.Type! serviceType) -> void
-Themia.DependencyInjection.RegisterAsAttribute.ServiceType.get -> System.Type!
-Themia.DependencyInjection.ScopedAttribute
-Themia.DependencyInjection.ScopedAttribute.ScopedAttribute() -> void
-Themia.DependencyInjection.SingletonAttribute
-Themia.DependencyInjection.SingletonAttribute.SingletonAttribute() -> void
-Themia.DependencyInjection.TransientAttribute
-Themia.DependencyInjection.TransientAttribute.TransientAttribute() -> void
 Themia.Generators.Abstractions.Diagnostics.DiagnosticIdRange
 Themia.Generators.Abstractions.Diagnostics.ThemiaDiagnostics
 Themia.Generators.Abstractions.Emission.ThemiaSourceWriter
