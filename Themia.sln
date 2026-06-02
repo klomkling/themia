@@ -23,6 +23,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Themia.DependencyInjection"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Themia.DependencyInjection.Tests", "tests\Themia.DependencyInjection.Tests\Themia.DependencyInjection.Tests.csproj", "{2FFB29F0-177D-4D2F-956B-2F4B58991E73}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Themia.SourceGenerator", "src\tooling\Themia.SourceGenerator\Themia.SourceGenerator.csproj", "{36D7F330-35B9-41E0-8216-E014B4569D9D}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Themia.SourceGenerator.Tests", "tests\Themia.SourceGenerator.Tests\Themia.SourceGenerator.Tests.csproj", "{7BC2909D-B013-48D9-ABA1-88C4AA8F7791}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -105,6 +109,30 @@ Global
 		{2FFB29F0-177D-4D2F-956B-2F4B58991E73}.Release|x64.Build.0 = Release|Any CPU
 		{2FFB29F0-177D-4D2F-956B-2F4B58991E73}.Release|x86.ActiveCfg = Release|Any CPU
 		{2FFB29F0-177D-4D2F-956B-2F4B58991E73}.Release|x86.Build.0 = Release|Any CPU
+		{36D7F330-35B9-41E0-8216-E014B4569D9D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{36D7F330-35B9-41E0-8216-E014B4569D9D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{36D7F330-35B9-41E0-8216-E014B4569D9D}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{36D7F330-35B9-41E0-8216-E014B4569D9D}.Debug|x64.Build.0 = Debug|Any CPU
+		{36D7F330-35B9-41E0-8216-E014B4569D9D}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{36D7F330-35B9-41E0-8216-E014B4569D9D}.Debug|x86.Build.0 = Debug|Any CPU
+		{36D7F330-35B9-41E0-8216-E014B4569D9D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{36D7F330-35B9-41E0-8216-E014B4569D9D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{36D7F330-35B9-41E0-8216-E014B4569D9D}.Release|x64.ActiveCfg = Release|Any CPU
+		{36D7F330-35B9-41E0-8216-E014B4569D9D}.Release|x64.Build.0 = Release|Any CPU
+		{36D7F330-35B9-41E0-8216-E014B4569D9D}.Release|x86.ActiveCfg = Release|Any CPU
+		{36D7F330-35B9-41E0-8216-E014B4569D9D}.Release|x86.Build.0 = Release|Any CPU
+		{7BC2909D-B013-48D9-ABA1-88C4AA8F7791}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7BC2909D-B013-48D9-ABA1-88C4AA8F7791}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7BC2909D-B013-48D9-ABA1-88C4AA8F7791}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{7BC2909D-B013-48D9-ABA1-88C4AA8F7791}.Debug|x64.Build.0 = Debug|Any CPU
+		{7BC2909D-B013-48D9-ABA1-88C4AA8F7791}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{7BC2909D-B013-48D9-ABA1-88C4AA8F7791}.Debug|x86.Build.0 = Debug|Any CPU
+		{7BC2909D-B013-48D9-ABA1-88C4AA8F7791}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7BC2909D-B013-48D9-ABA1-88C4AA8F7791}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7BC2909D-B013-48D9-ABA1-88C4AA8F7791}.Release|x64.ActiveCfg = Release|Any CPU
+		{7BC2909D-B013-48D9-ABA1-88C4AA8F7791}.Release|x64.Build.0 = Release|Any CPU
+		{7BC2909D-B013-48D9-ABA1-88C4AA8F7791}.Release|x86.ActiveCfg = Release|Any CPU
+		{7BC2909D-B013-48D9-ABA1-88C4AA8F7791}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -118,5 +146,7 @@ Global
 		{7B7ADA87-775C-4974-AB55-BC478770B134} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 		{716494CF-0CD2-4863-A011-207C0E68B2B4} = {1F655D57-935D-D295-E882-5052ED9A6376}
 		{2FFB29F0-177D-4D2F-956B-2F4B58991E73} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
+		{36D7F330-35B9-41E0-8216-E014B4569D9D} = {7F838D22-BBCC-2189-DC58-FA0F43262481}
+		{7BC2909D-B013-48D9-ABA1-88C4AA8F7791} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 	EndGlobalSection
 EndGlobal

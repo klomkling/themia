@@ -1,0 +1,47 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <!--
+      Microsoft.CodeAnalysis.CSharp.SourceGenerators.Testing.XUnit 1.1.2 declares
+      pinned dependencies on the 3.8.0 line of Microsoft.CodeAnalysis.* packages,
+      but our generator targets 4.11.0. The 4.11.0 line is a strict superset; the
+      runtime resolution is correct, but NU1608 fires per package. Out of our
+      control until the testing-xunit package is updated upstream.
+
+      CS0618: XUnitVerifier is marked [Obsolete] in the 1.1.2 Roslyn SDK testing
+      packages with a migration guide URL but no replacement type in this version.
+      The type still compiles and functions correctly; suppress until the package
+      ships a non-obsolete successor.
+    -->
+    <NoWarn>$(NoWarn);NU1608;CS0618</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="coverlet.collector">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Verify.Xunit" />
+    <PackageReference Include="Verify.SourceGenerators" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.SourceGenerators.Testing.XUnit" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Normal reference so test code can instantiate ServiceRegistrationGenerator directly -->
+    <ProjectReference Include="..\..\src\tooling\Themia.SourceGenerator\Themia.SourceGenerator.csproj" />
+    <!-- Normal reference so test consumer compilations can use the attributes/markers -->
+    <ProjectReference Include="..\..\src\neutral\Themia.DependencyInjection\Themia.DependencyInjection.csproj" />
+    <!-- Abstractions reference so the generator DLL resolves its dependency at runtime -->
+    <ProjectReference Include="..\..\src\tooling\Themia.Generators.Abstractions\Themia.Generators.Abstractions.csproj" />
+  </ItemGroup>
+</Project>
