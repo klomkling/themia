@@ -10,7 +10,7 @@ on:
         required: false
 
 permissions:
-  contents: write
+  contents: read    # default for all jobs (check only reads); the release job elevates its own
 
 concurrency:
   group: release
