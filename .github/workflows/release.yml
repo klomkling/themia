@@ -157,10 +157,10 @@ jobs:
 
       - name: NuGet login (Trusted Publishing via OIDC)
         id: nuget_login
-        # No NUGET_API_KEY secret needed. The job's `id-token: write` permission +
-        # a Trusted Publishing policy on nuget.org (account → repo klomkling/themia +
-        # workflow release.yml + environment nuget) let nuget.org mint a short-lived
-        # (~1h) key via OIDC. `user` is the nuget.org account username (repo variable).
+        # No NUGET_API_KEY secret needed. With the job's `id-token: write` permission and a
+        # matching Trusted Publishing policy on nuget.org (account → repo klomkling/themia,
+        # workflow release.yml, environment nuget), nuget.org mints a short-lived (~1h) key
+        # via OIDC. `user` is the nuget.org account username (repo variable).
         uses: NuGet/login@v1
         with:
           user: ${{ vars.NUGET_USER }}
