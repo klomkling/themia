@@ -10,7 +10,7 @@ on:
         required: false
 
 permissions:
-  contents: write
+  contents: read    # default for all jobs (check only reads); the release job elevates its own
 
 concurrency:
   group: release
@@ -99,6 +99,9 @@ jobs:
     if: needs.check.outputs.should_release == 'true'
     runs-on: ubuntu-latest
     environment: nuget
+    permissions:
+      contents: write    # push the release tag, create the GitHub Release
+      id-token: write    # mint the GitHub OIDC token for NuGet Trusted Publishing
     steps:
       - uses: actions/checkout@v6
         with:
@@ -152,12 +155,22 @@ jobs:
           name: nupkgs
           path: ./artifacts/*.nupkg
 
+      - name: NuGet login (Trusted Publishing via OIDC)
+        id: nuget_login
+        # No NUGET_API_KEY secret needed. With the job's `id-token: write` permission and a
+        # matching Trusted Publishing policy on nuget.org (account → repo klomkling/themia,
+        # workflow release.yml, environment nuget), nuget.org mints a short-lived (~1h) key
+        # via OIDC. `user` is the nuget.org account username (repo variable).
+        uses: NuGet/login@v1
+        with:
+          user: ${{ vars.NUGET_USER }}
+
       - name: Publish to NuGet
         env:
-          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+          NUGET_API_KEY: ${{ steps.nuget_login.outputs.NUGET_API_KEY }}
         run: |
           if [ -z "${NUGET_API_KEY}" ]; then
-            echo "::error::NUGET_API_KEY secret is not set."
+            echo "::error::NuGet OIDC login returned no key. Verify the Trusted Publishing policy on nuget.org and that the NUGET_USER repository variable is set."
             exit 1
           fi
           dotnet nuget push "./artifacts/*.nupkg" \
