@@ -6,9 +6,12 @@
     <PackageTags>themia;roslyn;source-generator;di;dependency-injection</PackageTags>
     <IsRoslynComponent>true</IsRoslynComponent>
     <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
-    <!-- Pack via 'dotnet pack' explicitly; do not trigger on every build to avoid NU5017 in dev -->
+    <!-- Pack via 'dotnet pack' explicitly; do not trigger on every build -->
     <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
     <IncludeBuildOutput>false</IncludeBuildOutput>
+    <!-- Analyzer-only package: no runtime output → symbols package would be empty → NU5017 -->
+    <IncludeSymbols>false</IncludeSymbols>
+    <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
     <DevelopmentDependency>true</DevelopmentDependency>
     <NoWarn>$(NoWarn);RS1032;RS2008;NU5128</NoWarn>
     <NoPackageAnalysis>true</NoPackageAnalysis>
@@ -29,10 +32,7 @@
 
   <ItemGroup>
     <!-- Placeholder so the package has a lib target and satisfies NuGet requirements -->
-    <None Include="NetStandard20LibPlaceholder._._">
-      <Pack>true</Pack>
-      <PackagePath>lib/netstandard2.0/_._</PackagePath>
-    </None>
+    <None Include="NetStandard20LibPlaceholder._._" Pack="true" PackagePath="lib/netstandard2.0/_._" Visible="false" />
   </ItemGroup>
 
   <ItemGroup>
@@ -42,17 +42,22 @@
     <AdditionalFiles Include="PublicAPI.Unshipped.txt" />
   </ItemGroup>
 
-  <!-- Pack both the generator and its abstractions dependency into the analyzer path -->
-  <Target Name="IncludeAbstractionsInAnalyzerPath" BeforeTargets="GenerateNuspec">
+  <!--
+    Use the documented Roslyn-cookbook pattern: hook into TargetsForTfmSpecificContentOutput
+    so the pack task sees the analyzer DLLs as real content going into analyzers/dotnet/cs.
+    NuGet counts TfmSpecificPackageFile items as package content (satisfies the NU5017 check).
+  -->
+  <PropertyGroup>
+    <TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);PackAnalyzerDlls</TargetsForTfmSpecificContentInPackage>
+  </PropertyGroup>
+  <Target Name="PackAnalyzerDlls" DependsOnTargets="Build">
     <ItemGroup>
-      <_PackageFiles Include="$(OutputPath)/Themia.Generators.Abstractions.dll">
+      <TfmSpecificPackageFile Include="$(MSBuildProjectDirectory)\bin\$(Configuration)\$(TargetFramework)\Themia.SourceGenerator.dll">
         <PackagePath>analyzers/dotnet/cs</PackagePath>
-        <BuildAction>None</BuildAction>
-      </_PackageFiles>
-      <_PackageFiles Include="$(OutputPath)/Themia.SourceGenerator.dll">
+      </TfmSpecificPackageFile>
+      <TfmSpecificPackageFile Include="$(MSBuildProjectDirectory)\bin\$(Configuration)\$(TargetFramework)\Themia.Generators.Abstractions.dll">
         <PackagePath>analyzers/dotnet/cs</PackagePath>
-        <BuildAction>None</BuildAction>
-      </_PackageFiles>
+      </TfmSpecificPackageFile>
     </ItemGroup>
   </Target>
 </Project>
