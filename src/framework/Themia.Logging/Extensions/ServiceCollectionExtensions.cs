@@ -17,7 +17,10 @@ public static class ServiceCollectionExtensions
     /// Adds Themia logging with default configuration (Console and File sinks).
     /// </summary>
     /// <param name="services">The service collection.</param>
-    /// <returns>The logging builder for further configuration.</returns>
+    /// <returns>
+    /// The logging builder. The global logger is already built before this returns; further
+    /// changes to the builder take effect only after calling <see cref="IThemiaLoggingBuilder.BuildLogger"/> again.
+    /// </returns>
     public static IThemiaLoggingBuilder AddThemiaLogging(this IServiceCollection services)
     {
         ArgumentNullException.ThrowIfNull(services);
@@ -40,7 +43,10 @@ public static class ServiceCollectionExtensions
     /// </summary>
     /// <param name="services">The service collection.</param>
     /// <param name="configure">Action to configure the Serilog logger.</param>
-    /// <returns>The logging builder for further configuration.</returns>
+    /// <returns>
+    /// The logging builder. The global logger is already built before this returns; further
+    /// changes to the builder take effect only after calling <see cref="IThemiaLoggingBuilder.BuildLogger"/> again.
+    /// </returns>
     public static IThemiaLoggingBuilder AddThemiaLogging(
         this IServiceCollection services,
         Action<LoggerConfiguration> configure)
@@ -68,7 +74,10 @@ public static class ServiceCollectionExtensions
     /// </summary>
     /// <param name="services">The service collection.</param>
     /// <param name="configuration">The configuration root.</param>
-    /// <returns>The logging builder for further configuration.</returns>
+    /// <returns>
+    /// The logging builder. The global logger is already built before this returns; further
+    /// changes to the builder take effect only after calling <see cref="IThemiaLoggingBuilder.BuildLogger"/> again.
+    /// </returns>
     public static IThemiaLoggingBuilder AddThemiaLogging(
         this IServiceCollection services,
         IConfiguration configuration)
