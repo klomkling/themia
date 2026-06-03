@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-
 namespace Themia.AspNetCore.Exceptions;
 
 /// <summary>Base type for Themia domain exceptions surfaced as RFC-7807 problem responses.</summary>

@@ -1,4 +1,3 @@
-using System;
 using System.Text.RegularExpressions;
 using Microsoft.CodeAnalysis;
 
@@ -27,7 +26,7 @@ public static class ThemiaDiagnostics
 
     private static DiagnosticDescriptor Create(string id, string title, string messageFormat, DiagnosticSeverity severity)
     {
-        if (id is null || !IdPattern.IsMatch(id))
+        if (!IdPattern.IsMatch(id))
             throw new ArgumentException($"Diagnostic ID '{id}' must match /^THEMIA[0-9]{{3,}}$/.", nameof(id));
 
         return new DiagnosticDescriptor(

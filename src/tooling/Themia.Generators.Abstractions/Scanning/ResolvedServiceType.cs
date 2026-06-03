@@ -1,4 +1,3 @@
-using System;
 using Themia.Generators.Abstractions.Validation;
 
 namespace Themia.Generators.Abstractions.Scanning;
@@ -9,10 +8,10 @@ namespace Themia.Generators.Abstractions.Scanning;
 /// </summary>
 public sealed class ResolvedServiceType
 {
-    /// <summary>Gets the fully-qualified name of the implementation type.</summary>
+    /// <summary>Gets the fully qualified name of the implementation type.</summary>
     public string ImplementationType { get; }
 
-    /// <summary>Gets the fully-qualified name of the service type (interface or concrete).</summary>
+    /// <summary>Gets the fully qualified name of the service type (interface or concrete).</summary>
     public string ServiceType { get; }
 
     /// <summary>Gets the DI lifetime for this registration.</summary>
@@ -21,8 +20,8 @@ public sealed class ResolvedServiceType
     /// <summary>Initializes a new <see cref="ResolvedServiceType"/>.</summary>
     public ResolvedServiceType(string implementationType, string serviceType, Lifetime lifetime)
     {
-        ImplementationType = implementationType ?? throw new ArgumentNullException(nameof(implementationType));
-        ServiceType = serviceType ?? throw new ArgumentNullException(nameof(serviceType));
+        ImplementationType = implementationType;
+        ServiceType = serviceType;
         Lifetime = lifetime;
     }
 }

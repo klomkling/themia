@@ -1,4 +1,3 @@
-using System;
 using Themia.Generators.Abstractions.Diagnostics;
 using Microsoft.CodeAnalysis;
 using Xunit;

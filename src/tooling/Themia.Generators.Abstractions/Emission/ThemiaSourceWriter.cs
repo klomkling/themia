@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Text;
 using Microsoft.CodeAnalysis.Text;
 
@@ -14,7 +11,7 @@ namespace Themia.Generators.Abstractions.Emission;
 /// </summary>
 public sealed class ThemiaSourceWriter
 {
-    private readonly List<string> _lines = new();
+    private readonly List<string> _lines = [];
     private readonly SortedSet<string> _usings = new(StringComparer.Ordinal);
     private bool _includeFileHeader;
     private string? _namespace;
@@ -39,7 +36,7 @@ public sealed class ThemiaSourceWriter
     /// <summary>Adds using directives, deduplicating across multiple calls.</summary>
     public ThemiaSourceWriter WithUsings(params string[] namespaces)
     {
-        foreach (var ns in namespaces ?? Array.Empty<string>())
+        foreach (var ns in namespaces)
         {
             if (!string.IsNullOrEmpty(ns)) _usings.Add(ns);
         }

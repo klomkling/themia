@@ -1,6 +1,4 @@
-using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Themia.Generators.Abstractions.Emission;
@@ -65,7 +63,7 @@ public sealed class ServiceRegistrationGenerator : IIncrementalGenerator
             var sorted = registrations
                 .GroupBy(r => (r.ImplementationFullName, r.ServiceFullName))
                 .Select(g => g.First())
-                .OrderBy(r => r.ImplementationFullName, System.StringComparer.Ordinal)
+                .OrderBy(r => r.ImplementationFullName, StringComparer.Ordinal)
                 .ToImmutableArray();
 
             if (sorted.Length > 0)
@@ -103,7 +101,7 @@ public sealed class ServiceRegistrationGenerator : IIncrementalGenerator
             }
 
             var sortedRegistrars = validRegistrars
-                .OrderBy(r => r, System.StringComparer.Ordinal)
+                .OrderBy(r => r, StringComparer.Ordinal)
                 .ToImmutableArray();
 
             if (sortedRegistrars.Length > 0)
@@ -155,39 +153,43 @@ public sealed class ServiceRegistrationGenerator : IIncrementalGenerator
         INamedTypeSymbol? genericMarkerServiceType = null;
         foreach (var iface in type.AllInterfaces)
         {
-            if (iface.IsGenericType && iface.TypeArguments.Length == 1)
+            if (!iface.IsGenericType || iface.TypeArguments.Length != 1)
+                continue;
+
+            var origDef = iface.OriginalDefinition.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+            if (origDef is not ("global::Themia.DependencyInjection.IScopedService<TService>"
+                or "global::Themia.DependencyInjection.ISingletonService<TService>"
+                or "global::Themia.DependencyInjection.ITransientService<TService>"))
+                continue;
+
+            if (iface.TypeArguments[0] is not INamedTypeSymbol named) continue;
+
+            genericMarkerServiceType = named;
+            break;
+        }
+
+        // Read the ServiceType named arg from the attribute (e.g. [Scoped(ServiceType = typeof(IFoo))]).
+        INamedTypeSymbol? attributeServiceType = null;
+        switch (lifetimeAttrs.Count)
+        {
+            case 1:
             {
-                var origDef = iface.OriginalDefinition.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
-                if (origDef == "global::Themia.DependencyInjection.IScopedService<TService>"
-                    || origDef == "global::Themia.DependencyInjection.ISingletonService<TService>"
-                    || origDef == "global::Themia.DependencyInjection.ITransientService<TService>")
+                var namedArgs = lifetimeAttrs[0].Attr.NamedArguments;
+                foreach (var kv in namedArgs)
                 {
-                    if (iface.TypeArguments[0] is INamedTypeSymbol named)
+                    if (kv is { Key: "ServiceType", Value.Value: INamedTypeSymbol svc })
                     {
-                        genericMarkerServiceType = named;
+                        attributeServiceType = svc;
                         break;
                     }
                 }
-            }
-        }
 
-        // Read ServiceType named arg from attribute (e.g. [Scoped(ServiceType = typeof(IFoo))]).
-        INamedTypeSymbol? attributeServiceType = null;
-        if (lifetimeAttrs.Count == 1)
-        {
-            var namedArgs = lifetimeAttrs[0].Attr.NamedArguments;
-            foreach (var kv in namedArgs)
-            {
-                if (kv.Key == "ServiceType" && kv.Value.Value is INamedTypeSymbol svc)
-                {
-                    attributeServiceType = svc;
-                    break;
-                }
+                break;
             }
+            // Only yield if there's something to process.
+            case 0 when markerLifetimes.Count == 0:
+                yield break;
         }
-
-        // Only yield if there's something to process.
-        if (lifetimeAttrs.Count == 0 && markerLifetimes.Count == 0) yield break;
 
         yield return new DiscoveredTypeInfo(
             type: type,
@@ -233,7 +235,6 @@ public sealed class ServiceRegistrationGenerator : IIncrementalGenerator
         List<RegistrationRecord> registrations)
     {
         var classLocation = info.ClassDecl.Identifier.GetLocation();
-        var typeName = info.Type.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat);
         var typeFullDisplayName = info.Type.ToDisplayString();
 
         // THEMIA001: Multiple lifetime attributes.
@@ -264,39 +265,50 @@ public sealed class ServiceRegistrationGenerator : IIncrementalGenerator
         var markerLifetime = ParseLifetime(markerLifetimeStr);
 
         // THEMIA003 / THEMIA004: Attribute + marker conflict resolution.
-        string? resolvedLifetimeStr = attrLifetimeStr ?? markerLifetimeStr;
+        var resolvedLifetimeStr = attrLifetimeStr ?? markerLifetimeStr;
         if (attrLifetime.HasValue && markerLifetime.HasValue)
         {
             var (_, conflict) = LifetimeResolver.Resolve(attrLifetime, markerLifetime);
-            if (conflict == LifetimeConflict.Disagreement)
+            switch (conflict)
             {
-                // THEMIA003: Attribute and marker disagree.
-                ctx.ReportDiagnostic(Diagnostic.Create(
-                    DiagnosticDescriptors.AttributeMarkerDisagreement,
-                    classLocation,
-                    typeFullDisplayName));
-                return;
-            }
-            if (conflict == LifetimeConflict.Redundant)
-            {
-                // THEMIA004: Redundant — warn but continue with attribute lifetime.
-                ctx.ReportDiagnostic(Diagnostic.Create(
-                    DiagnosticDescriptors.RedundantLifetimeAttributeAndMarker,
-                    classLocation,
-                    typeFullDisplayName));
-                // continue to emit using attrLifetimeStr
+                case LifetimeConflict.Disagreement:
+                    // THEMIA003: Attribute and marker disagree.
+                    ctx.ReportDiagnostic(Diagnostic.Create(
+                        DiagnosticDescriptors.AttributeMarkerDisagreement,
+                        classLocation,
+                        typeFullDisplayName));
+                    return;
+                case LifetimeConflict.Redundant:
+                    // THEMIA004: Redundant — warn but continue with attribute lifetime.
+                    ctx.ReportDiagnostic(Diagnostic.Create(
+                        DiagnosticDescriptors.RedundantLifetimeAttributeAndMarker,
+                        classLocation,
+                        typeFullDisplayName));
+                    // continue to emit using attrLifetimeStr
+                    break;
+                case LifetimeConflict.None:
+                case LifetimeConflict.NoneSpecified:
+                case null:
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException();
             }
         }
 
         // THEMIA010: Legacy attribute usage — report (Error as of 0.9.0) but
         // continue emission, so an .editorconfig downgrade still registers the type.
-        if (info.LifetimeAttrs.Count == 1 && info.LifetimeAttrs[0].IsLegacy)
+        if (info.LifetimeAttrs.Count == 1)
         {
-            ctx.ReportDiagnostic(Diagnostic.Create(
-                DiagnosticDescriptors.LegacyAttributeUsage,
-                classLocation,
-                typeFullDisplayName));
-            // continue emission
+            switch (info.LifetimeAttrs[0].IsLegacy)
+            {
+                case true:
+                    ctx.ReportDiagnostic(Diagnostic.Create(
+                        DiagnosticDescriptors.LegacyAttributeUsage,
+                        classLocation,
+                        typeFullDisplayName));
+                    // continue emission
+                    break;
+            }
         }
 
         // THEMIA007: Attribute ServiceType conflicts with generic marker service type.
@@ -315,7 +327,7 @@ public sealed class ServiceRegistrationGenerator : IIncrementalGenerator
         }
 
         // Determine final service type.
-        INamedTypeSymbol? serviceType = null;
+        INamedTypeSymbol? serviceType;
 
         if (info.AttributeServiceType is not null)
         {
@@ -337,7 +349,7 @@ public sealed class ServiceRegistrationGenerator : IIncrementalGenerator
             if (attrLifetimeStr is null && markerLifetimeStr is not null)
             {
                 // Marker-only path: no service type found.
-                // Check if it's ambiguous (multiple non-IXxxService interfaces) vs just missing.
+                // Check if it's ambiguous (multiple non-IXxxService interfaces) vs. just missing.
                 var candidateInterfaces = info.Type.AllInterfaces
                     .Where(i => !IsMarkerInterface(i))
                     .ToList();
@@ -452,66 +464,40 @@ public sealed class ServiceRegistrationGenerator : IIncrementalGenerator
     // Data types
     // -------------------------------------------------------------------------
 
-    private sealed class DiscoveredTypeInfo
+    private sealed class DiscoveredTypeInfo(
+        INamedTypeSymbol type,
+        ClassDeclarationSyntax classDecl,
+        List<(AttributeData Attr, string Lifetime, bool IsLegacy)> lifetimeAttrs,
+        List<string> markerLifetimes,
+        INamedTypeSymbol? genericMarkerServiceType,
+        INamedTypeSymbol? attributeServiceType)
     {
-        public INamedTypeSymbol Type { get; }
-        public ClassDeclarationSyntax ClassDecl { get; }
-        public List<(AttributeData Attr, string Lifetime, bool IsLegacy)> LifetimeAttrs { get; }
-        public List<string> MarkerLifetimes { get; }
-        public INamedTypeSymbol? GenericMarkerServiceType { get; }
-        public INamedTypeSymbol? AttributeServiceType { get; }
-
-        public DiscoveredTypeInfo(
-            INamedTypeSymbol type,
-            ClassDeclarationSyntax classDecl,
-            List<(AttributeData Attr, string Lifetime, bool IsLegacy)> lifetimeAttrs,
-            List<string> markerLifetimes,
-            INamedTypeSymbol? genericMarkerServiceType,
-            INamedTypeSymbol? attributeServiceType)
-        {
-            Type = type;
-            ClassDecl = classDecl;
-            LifetimeAttrs = lifetimeAttrs;
-            MarkerLifetimes = markerLifetimes;
-            GenericMarkerServiceType = genericMarkerServiceType;
-            AttributeServiceType = attributeServiceType;
-        }
+        public INamedTypeSymbol Type { get; } = type;
+        public ClassDeclarationSyntax ClassDecl { get; } = classDecl;
+        public List<(AttributeData Attr, string Lifetime, bool IsLegacy)> LifetimeAttrs { get; } = lifetimeAttrs;
+        public List<string> MarkerLifetimes { get; } = markerLifetimes;
+        public INamedTypeSymbol? GenericMarkerServiceType { get; } = genericMarkerServiceType;
+        public INamedTypeSymbol? AttributeServiceType { get; } = attributeServiceType;
     }
 
-    private sealed class RegistrarCandidate
+    private sealed class RegistrarCandidate(
+        string name,
+        string globalQualifiedName,
+        bool hasPublicParameterlessCtor,
+        bool isInternal,
+        Location location)
     {
-        public string Name { get; }
-        public string GlobalQualifiedName { get; }
-        public bool HasPublicParameterlessCtor { get; }
-        public bool IsInternal { get; }
-        public Location Location { get; }
-
-        public RegistrarCandidate(
-            string name,
-            string globalQualifiedName,
-            bool hasPublicParameterlessCtor,
-            bool isInternal,
-            Location location)
-        {
-            Name = name;
-            GlobalQualifiedName = globalQualifiedName;
-            HasPublicParameterlessCtor = hasPublicParameterlessCtor;
-            IsInternal = isInternal;
-            Location = location;
-        }
+        public string Name { get; } = name;
+        public string GlobalQualifiedName { get; } = globalQualifiedName;
+        public bool HasPublicParameterlessCtor { get; } = hasPublicParameterlessCtor;
+        public bool IsInternal { get; } = isInternal;
+        public Location Location { get; } = location;
     }
 
-    private sealed class RegistrationRecord
+    private sealed class RegistrationRecord(string implementationFullName, string serviceFullName, string lifetime)
     {
-        public string ImplementationFullName { get; }
-        public string ServiceFullName { get; }
-        public string Lifetime { get; }
-
-        public RegistrationRecord(string implementationFullName, string serviceFullName, string lifetime)
-        {
-            ImplementationFullName = implementationFullName;
-            ServiceFullName = serviceFullName;
-            Lifetime = lifetime;
-        }
+        public string ImplementationFullName { get; } = implementationFullName;
+        public string ServiceFullName { get; } = serviceFullName;
+        public string Lifetime { get; } = lifetime;
     }
 }

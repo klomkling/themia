@@ -1,5 +1,4 @@
 using System.Collections.Immutable;
-using System.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -14,7 +13,7 @@ public sealed class SwallowLogRethrowAnalyzer : DiagnosticAnalyzer
 {
     /// <inheritdoc/>
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
-        ImmutableArray.Create(DiagnosticDescriptors.SwallowLogRethrow);
+        [DiagnosticDescriptors.SwallowLogRethrow];
 
     /// <inheritdoc/>
     public override void Initialize(AnalysisContext context)
@@ -56,7 +55,7 @@ public sealed class SwallowLogRethrowAnalyzer : DiagnosticAnalyzer
             return false;
 
         // Unresolved-receiver posture: lean toward flagging. A LogError/LogCritical
-        // call whose receiver type can't bind is treated as a logger call so a real
+        // call whose receiver type can't bind is treated as a logger call, so a real
         // log-and-rethrow isn't missed on an incomplete compilation.
         var receiverType = model.GetTypeInfo(ma.Expression).Type;
         if (receiverType is null)

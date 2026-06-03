@@ -1,5 +1,3 @@
-using System;
-using System.Linq;
 using Themia.Generators.Abstractions.Scanning;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -15,7 +13,7 @@ public class ThemiaRoslynScannerTests
         var refs = AppDomain.CurrentDomain.GetAssemblies()
             .Where(a => !a.IsDynamic && !string.IsNullOrEmpty(a.Location))
             .Select(a => MetadataReference.CreateFromFile(a.Location));
-        return CSharpCompilation.Create("Test", new[] { tree }, refs);
+        return CSharpCompilation.Create("Test", [tree], refs);
     }
 
     [Fact]

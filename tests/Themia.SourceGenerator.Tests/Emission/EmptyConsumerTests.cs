@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Diagnostics;
@@ -34,7 +31,7 @@ internal static class TestHelpers
             .Where(a => !a.IsDynamic && !string.IsNullOrEmpty(a.Location))
             .Select(a => MetadataReference.CreateFromFile(a.Location))
             .Append(ThemiaDIRef);
-        var compilation = CSharpCompilation.Create("ConsumerAssembly", new[] { syntaxTree }, refs);
+        var compilation = CSharpCompilation.Create("ConsumerAssembly", [syntaxTree], refs);
 
         var generator = new TGenerator();
         GeneratorDriver driver = CSharpGeneratorDriver.Create(generator);
@@ -50,10 +47,10 @@ internal static class TestHelpers
             .Where(a => !a.IsDynamic && !string.IsNullOrEmpty(a.Location))
             .Select(a => MetadataReference.CreateFromFile(a.Location))
             .Append(ThemiaDIRef);
-        var compilation = CSharpCompilation.Create("ConsumerAssembly", new[] { syntaxTree }, refs);
+        var compilation = CSharpCompilation.Create("ConsumerAssembly", [syntaxTree], refs);
 
         var driver = CSharpGeneratorDriver.Create(
-            new ISourceGenerator[] { new TGenerator().AsSourceGenerator() },
+            [new TGenerator().AsSourceGenerator()],
             Array.Empty<AdditionalText>(),
             parseOptions: (CSharpParseOptions)syntaxTree.Options,
             optionsProvider: optionsProvider);

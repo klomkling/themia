@@ -1,5 +1,3 @@
-using System.Collections.Generic;
-
 namespace Themia.AspNetCore.Exceptions;
 
 /// <summary>Authenticated but not permitted. Maps to HTTP 403.</summary>

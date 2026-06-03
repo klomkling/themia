@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using Microsoft.CodeAnalysis;
 
 namespace Themia.Generators.Abstractions.Scanning;
@@ -16,7 +13,6 @@ public static class ThemiaRoslynScanner
     /// <summary>Returns all concrete types in <paramref name="compilation"/> that carry the named attribute.</summary>
     public static IEnumerable<INamedTypeSymbol> FindByAttribute(Compilation compilation, string fullAttributeName)
     {
-        if (compilation is null) throw new ArgumentNullException(nameof(compilation));
         if (string.IsNullOrEmpty(fullAttributeName)) throw new ArgumentException("fullAttributeName cannot be empty", nameof(fullAttributeName));
 
         return EnumerateConcreteTypes(compilation)
@@ -26,12 +22,11 @@ public static class ThemiaRoslynScanner
     /// <summary>Returns all concrete types in <paramref name="compilation"/> that implement any of the named interfaces.</summary>
     public static IEnumerable<INamedTypeSymbol> FindByInterface(Compilation compilation, params string[] fullInterfaceNames)
     {
-        if (compilation is null) throw new ArgumentNullException(nameof(compilation));
         if (fullInterfaceNames is null || fullInterfaceNames.Length == 0)
             throw new ArgumentException("At least one interface name is required.", nameof(fullInterfaceNames));
 
         return EnumerateConcreteTypes(compilation)
-            .Where(t => fullInterfaceNames.Any(name => t.ImplementsInterface(name)));
+            .Where(t => fullInterfaceNames.Any(t.ImplementsInterface));
     }
 
     /// <summary>
@@ -41,12 +36,11 @@ public static class ThemiaRoslynScanner
     public static IEnumerable<INamedTypeSymbol> FindByAttributeImplementingInterface(
         Compilation compilation, string fullInterfaceName)
     {
-        if (compilation is null) throw new ArgumentNullException(nameof(compilation));
         if (string.IsNullOrEmpty(fullInterfaceName)) throw new ArgumentException("fullInterfaceName cannot be empty", nameof(fullInterfaceName));
 
         return EnumerateConcreteTypes(compilation)
             .Where(t => t.GetAttributes().Any(a =>
-                a.AttributeClass is INamedTypeSymbol attrClass &&
+                a.AttributeClass is { } attrClass &&
                 attrClass.ImplementsInterface(fullInterfaceName)));
     }
 

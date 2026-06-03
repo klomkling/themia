@@ -1,4 +1,3 @@
-using System.Linq;
 using Microsoft.CodeAnalysis;
 
 namespace Themia.Generators.Abstractions.Scanning;
@@ -18,8 +17,6 @@ public static class ServiceTypeResolver
     public static bool TryResolveByConvention(INamedTypeSymbol implementationType, out INamedTypeSymbol? serviceType)
     {
         serviceType = null;
-        if (implementationType is null) return false;
-
         var conventionName = "I" + implementationType.Name;
         var match = implementationType.Interfaces.FirstOrDefault(i => i.Name == conventionName);
         if (match is null) return false;

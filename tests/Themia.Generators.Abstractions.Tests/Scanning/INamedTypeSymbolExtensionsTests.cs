@@ -1,5 +1,3 @@
-using System;
-using System.Linq;
 using Themia.Generators.Abstractions.Scanning;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -15,7 +13,7 @@ public class INamedTypeSymbolExtensionsTests
         var refs = AppDomain.CurrentDomain.GetAssemblies()
             .Where(a => !a.IsDynamic && !string.IsNullOrEmpty(a.Location))
             .Select(a => MetadataReference.CreateFromFile(a.Location));
-        var compilation = CSharpCompilation.Create("Test", new[] { tree }, refs);
+        var compilation = CSharpCompilation.Create("Test", [tree], refs);
         var symbol = compilation.GetTypeByMetadataName(typeName);
         Assert.NotNull(symbol);
         return symbol!;

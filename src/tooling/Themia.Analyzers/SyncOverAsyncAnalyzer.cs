@@ -1,5 +1,4 @@
 using System.Collections.Immutable;
-using System.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -15,7 +14,7 @@ public sealed class SyncOverAsyncAnalyzer : DiagnosticAnalyzer
 {
     /// <inheritdoc/>
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
-        ImmutableArray.Create(DiagnosticDescriptors.SyncOverAsync);
+        [DiagnosticDescriptors.SyncOverAsync];
 
     /// <inheritdoc/>
     public override void Initialize(AnalysisContext context)
@@ -65,7 +64,7 @@ public sealed class SyncOverAsyncAnalyzer : DiagnosticAnalyzer
             return false;
         // Unresolved-symbol posture: lean toward flagging. If the symbol can't bind
         // (incomplete compilation), treat `X.FromResult(call())` as Task.FromResult
-        // rather than silently skipping a likely-real occurrence.
+        // rather than silently skipping a likely real occurrence.
         var symbol = model.GetSymbolInfo(inv).Symbol;
         return symbol is null || symbol.ContainingType?.Name == "Task";
     }

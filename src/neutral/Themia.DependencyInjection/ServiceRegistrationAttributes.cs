@@ -42,19 +42,19 @@ public class ScopedAttribute : Attribute, IServiceRegistrationAttribute
     /// Gets or sets the service type to register as (optional).
     /// </summary>
     /// <remarks>
-    /// If not specified, will attempt to find interface following the I{ClassName} pattern.
+    /// If not specified, will attempt to find an interface following I{ClassName} pattern.
     /// </remarks>
-    public Type? ServiceType { get; set; }
+    public Type? ServiceType { get; init; }
 
     /// <summary>
     /// Gets or sets the service key for named registrations (optional).
     /// </summary>
-    public string? ServiceKey { get; set; }
+    public string? ServiceKey { get; init; }
 
     /// <summary>
     /// Gets or sets whether to try self-registration if no interface is found.
     /// </summary>
-    public bool AllowSelfRegistration { get; set; } = false;
+    public bool AllowSelfRegistration { get; init; } = false;
 
     /// <summary>
     /// Gets the service lifetime.
@@ -76,19 +76,19 @@ public class SingletonAttribute : Attribute, IServiceRegistrationAttribute
     /// Gets or sets the service type to register as (optional).
     /// </summary>
     /// <remarks>
-    /// If not specified, will attempt to find interface following the I{ClassName} pattern.
+    /// If not specified, will attempt to find an interface following I{ClassName} pattern.
     /// </remarks>
-    public Type? ServiceType { get; set; }
+    public Type? ServiceType { get; init; }
 
     /// <summary>
     /// Gets or sets the service key for named registrations (optional).
     /// </summary>
-    public string? ServiceKey { get; set; }
+    public string? ServiceKey { get; init; }
 
     /// <summary>
     /// Gets or sets whether to try self-registration if no interface is found.
     /// </summary>
-    public bool AllowSelfRegistration { get; set; } = false;
+    public bool AllowSelfRegistration { get; init; } = false;
 
     /// <summary>
     /// Gets the service lifetime.
@@ -110,19 +110,19 @@ public class TransientAttribute : Attribute, IServiceRegistrationAttribute
     /// Gets or sets the service type to register as (optional).
     /// </summary>
     /// <remarks>
-    /// If not specified, will attempt to find interface following the I{ClassName} pattern.
+    /// If not specified, will attempt to find an interface following I{ClassName} pattern.
     /// </remarks>
-    public Type? ServiceType { get; set; }
+    public Type? ServiceType { get; init; }
 
     /// <summary>
     /// Gets or sets the service key for named registrations (optional).
     /// </summary>
-    public string? ServiceKey { get; set; }
+    public string? ServiceKey { get; init; }
 
     /// <summary>
     /// Gets or sets whether to try self-registration if no interface is found.
     /// </summary>
-    public bool AllowSelfRegistration { get; set; } = false;
+    public bool AllowSelfRegistration { get; init; } = false;
 
     /// <summary>
     /// Gets the service lifetime.
