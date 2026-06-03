@@ -37,6 +37,8 @@ public static class DomainEventServiceCollectionExtensions
         where TEvent : IDomainEvent
         where THandler : class, IDomainEventHandler<TEvent>
     {
+        ArgumentNullException.ThrowIfNull(services);
+
         services.Add(new ServiceDescriptor(
             typeof(IDomainEventHandler<TEvent>),
             typeof(THandler),

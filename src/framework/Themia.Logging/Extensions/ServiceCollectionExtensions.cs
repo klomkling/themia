@@ -32,8 +32,9 @@ public static class ServiceCollectionExtensions
             .AddSink(new ConsoleSinkRegistration())
             .AddSink(new FileSinkRegistration());
 
-        WireMicrosoftExtensionsLogging(services);
+        // Build (assign Log.Logger) before wiring MEL, consistent with the IConfiguration overload.
         builder.BuildLogger();
+        WireMicrosoftExtensionsLogging(services);
 
         return builder;
     }
@@ -62,8 +63,9 @@ public static class ServiceCollectionExtensions
             .AddSink(new FileSinkRegistration())
             .Configure(configure);
 
-        WireMicrosoftExtensionsLogging(services);
+        // Build (assign Log.Logger) before wiring MEL, consistent with the IConfiguration overload.
         builder.BuildLogger();
+        WireMicrosoftExtensionsLogging(services);
 
         return builder;
     }
