@@ -17,6 +17,8 @@ public static class DomainEventServiceCollectionExtensions
     /// <returns>The service collection for chaining.</returns>
     public static IServiceCollection AddDomainEventDispatcher(this IServiceCollection services)
     {
+        ArgumentNullException.ThrowIfNull(services);
+
         services.TryAddScoped<IDomainEventDispatcher, DomainEventDispatcher>();
         return services;
     }

@@ -11,6 +11,8 @@ public interface ISerializationProvider
     /// <typeparam name="T">The type of the value to serialize.</typeparam>
     /// <param name="value">The value to serialize.</param>
     /// <returns>The serialized byte array.</returns>
+    /// <exception cref="System.ArgumentNullException">Thrown when <paramref name="value"/> is null.</exception>
+    /// <exception cref="System.InvalidOperationException">Thrown when serialization fails.</exception>
     byte[] Serialize<T>(T value);
 
     /// <summary>

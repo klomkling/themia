@@ -62,6 +62,10 @@ public abstract class SoftDeletableEntity<TId> : AuditableEntity<TId>, ISoftDele
         IsDeleted = true;
         DeletedAt = timestamp;
         DeletedBy = deletedBy;
+
+        // Clear any restore metadata from a prior restore so the two states never coexist.
+        RestoredAt = null;
+        RestoredBy = null;
     }
 
     /// <summary>
@@ -74,5 +78,9 @@ public abstract class SoftDeletableEntity<TId> : AuditableEntity<TId>, ISoftDele
         IsDeleted = false;
         RestoredAt = timestamp;
         RestoredBy = restoredBy;
+
+        // Clear the deletion metadata so a restored entity does not carry stale delete fields.
+        DeletedAt = null;
+        DeletedBy = null;
     }
 }
