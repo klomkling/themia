@@ -40,7 +40,7 @@ jobs:
     steps:
       - name: Fetch Dependabot metadata
         id: meta
-        uses: dependabot/fetch-metadata@v2
+        uses: dependabot/fetch-metadata@v3
 
       - name: Enable native auto-merge (github-actions, or non-major)
         # Auto-merge all github-actions bumps (first-party, low risk) and any
