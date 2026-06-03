@@ -32,6 +32,14 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
   registrars, including keyed registrations via `ServiceKey`; diagnostics `THEMIA001`–`THEMIA010`.
 - `Themia.Analyzers` (`netstandard2.0`) — `THEMIA101` (catch-log-rethrow) and `THEMIA102`
   (sync-over-async wrapped in `Task.FromResult`).
+- `Themia.Framework.Core` (`net10.0`) — DDD core: `Entity`/`AuditableEntity`, `ValueObject`,
+  `Result`/`Error` + `ResultExtensions`, domain events (`IDomainEvent`/`IDomainEventDispatcher` +
+  dispatcher), tenant context (`TenantId`/`TenantContext`/accessor), and the `IThemiaModule`
+  module system. (Ported from the canonical Zenity-v2 core.)
+- `Themia.Caching` (`net10.0`) — memory + Redis cache providers with JSON/MessagePack
+  serialization, a fluent builder, and options (`AddThemiaCaching`).
+- `Themia.Logging` (`net10.0`) — Serilog-backed logging with a fluent builder, console/file
+  sinks, thread/environment enrichers, and options (`AddThemiaLogging`).
 
 ## 0.1.0 — 2026-06-02
 
