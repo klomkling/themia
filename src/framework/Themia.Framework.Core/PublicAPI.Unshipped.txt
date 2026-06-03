@@ -1,5 +1,97 @@
 #nullable enable
 abstract Themia.Framework.Core.Primitives.ValueObject.GetEqualityComponents() -> System.Collections.Generic.IEnumerable<object?>!
+const Themia.Framework.Core.Abstractions.Tenancy.TenantId.MaxLength = 100 -> int
+const Themia.Framework.Core.Abstractions.Tenancy.TenantId.MinLength = 1 -> int
+override Themia.Framework.Core.Abstractions.Tenancy.TenantId.ToString() -> string!
+static Themia.Framework.Core.Abstractions.Tenancy.TenantContextAccessor.CurrentTenantId.get -> Themia.Framework.Core.Abstractions.Tenancy.TenantId?
+static Themia.Framework.Core.Abstractions.Tenancy.TenantContextAccessor.CurrentTenantId.set -> void
+static Themia.Framework.Core.Abstractions.Tenancy.TenantId.From(string? value) -> Themia.Framework.Core.Abstractions.Tenancy.TenantId?
+Themia.Framework.Core.Abstractions.Tenancy.ITenantContext
+Themia.Framework.Core.Abstractions.Tenancy.ITenantContext.CurrentTenantId.get -> Themia.Framework.Core.Abstractions.Tenancy.TenantId?
+Themia.Framework.Core.Abstractions.Tenancy.ITenantContext.HasTenant.get -> bool
+Themia.Framework.Core.Abstractions.Tenancy.ITenantContext.Source.get -> string?
+Themia.Framework.Core.Abstractions.Tenancy.ITenantEntity
+Themia.Framework.Core.Abstractions.Tenancy.ITenantEntity.TenantId.get -> Themia.Framework.Core.Abstractions.Tenancy.TenantId?
+Themia.Framework.Core.Abstractions.Tenancy.ITenantEntity.TenantId.set -> void
+Themia.Framework.Core.Abstractions.Tenancy.TenantContext
+Themia.Framework.Core.Abstractions.Tenancy.TenantContext.CurrentTenantId.get -> Themia.Framework.Core.Abstractions.Tenancy.TenantId?
+Themia.Framework.Core.Abstractions.Tenancy.TenantContext.HasTenant.get -> bool
+Themia.Framework.Core.Abstractions.Tenancy.TenantContext.Source.get -> string?
+Themia.Framework.Core.Abstractions.Tenancy.TenantContext.TenantContext(Themia.Framework.Core.Abstractions.Tenancy.TenantId? tenantId, string? source = null) -> void
+Themia.Framework.Core.Abstractions.Tenancy.TenantContextAccessor
+Themia.Framework.Core.Abstractions.Tenancy.TenantId
+Themia.Framework.Core.Abstractions.Tenancy.TenantId.TenantId() -> void
+Themia.Framework.Core.Abstractions.Tenancy.TenantId.TenantId(string! value) -> void
+Themia.Framework.Core.Abstractions.Tenancy.TenantId.Value.get -> string!
+Themia.Framework.Core.Abstractions.Entities.AuditableEntity<TId>
+Themia.Framework.Core.Abstractions.Entities.AuditableEntity<TId>.AuditableEntity() -> void
+Themia.Framework.Core.Abstractions.Entities.AuditableEntity<TId>.CreatedAt.get -> System.DateTimeOffset
+Themia.Framework.Core.Abstractions.Entities.AuditableEntity<TId>.CreatedAt.set -> void
+Themia.Framework.Core.Abstractions.Entities.AuditableEntity<TId>.CreatedBy.get -> string?
+Themia.Framework.Core.Abstractions.Entities.AuditableEntity<TId>.CreatedBy.set -> void
+Themia.Framework.Core.Abstractions.Entities.AuditableEntity<TId>.LastModifiedAt.get -> System.DateTimeOffset?
+Themia.Framework.Core.Abstractions.Entities.AuditableEntity<TId>.LastModifiedAt.set -> void
+Themia.Framework.Core.Abstractions.Entities.AuditableEntity<TId>.LastModifiedBy.get -> string?
+Themia.Framework.Core.Abstractions.Entities.AuditableEntity<TId>.LastModifiedBy.set -> void
+Themia.Framework.Core.Abstractions.Entities.AuditableEntity<TId>.MarkCreated(System.DateTimeOffset timestamp, string? createdBy = null) -> void
+Themia.Framework.Core.Abstractions.Entities.AuditableEntity<TId>.MarkModified(System.DateTimeOffset timestamp, string? modifiedBy = null) -> void
+Themia.Framework.Core.Abstractions.Entities.ConcurrencyAwareEntity<TId>
+Themia.Framework.Core.Abstractions.Entities.ConcurrencyAwareEntity<TId>.ConcurrencyAwareEntity() -> void
+Themia.Framework.Core.Abstractions.Entities.ConcurrencyAwareEntity<TId>.RowVersion.get -> byte[]?
+Themia.Framework.Core.Abstractions.Entities.ConcurrencyAwareEntity<TId>.RowVersion.set -> void
+Themia.Framework.Core.Abstractions.Entities.Entity<TId>
+Themia.Framework.Core.Abstractions.Entities.Entity<TId>.AddDomainEvent(Themia.Framework.Core.Abstractions.Events.IDomainEvent! domainEvent) -> void
+Themia.Framework.Core.Abstractions.Entities.Entity<TId>.ClearDomainEvents() -> void
+Themia.Framework.Core.Abstractions.Entities.Entity<TId>.DomainEvents.get -> System.Collections.Generic.IReadOnlyCollection<Themia.Framework.Core.Abstractions.Events.IDomainEvent!>!
+Themia.Framework.Core.Abstractions.Entities.Entity<TId>.Entity() -> void
+Themia.Framework.Core.Abstractions.Entities.Entity<TId>.Equals(Themia.Framework.Core.Abstractions.Entities.Entity<TId>? other) -> bool
+Themia.Framework.Core.Abstractions.Entities.Entity<TId>.Id.get -> TId
+Themia.Framework.Core.Abstractions.Entities.Entity<TId>.Id.set -> void
+Themia.Framework.Core.Abstractions.Entities.Entity<TId>.IsTransient.get -> bool
+Themia.Framework.Core.Abstractions.Entities.IAuditableEntity
+Themia.Framework.Core.Abstractions.Entities.IAuditableEntity.CreatedAt.get -> System.DateTimeOffset
+Themia.Framework.Core.Abstractions.Entities.IAuditableEntity.CreatedBy.get -> string?
+Themia.Framework.Core.Abstractions.Entities.IAuditableEntity.LastModifiedAt.get -> System.DateTimeOffset?
+Themia.Framework.Core.Abstractions.Entities.IAuditableEntity.LastModifiedBy.get -> string?
+Themia.Framework.Core.Abstractions.Entities.IConcurrencyAware
+Themia.Framework.Core.Abstractions.Entities.IConcurrencyAware.RowVersion.get -> byte[]?
+Themia.Framework.Core.Abstractions.Entities.IConcurrencyAware.RowVersion.set -> void
+Themia.Framework.Core.Abstractions.Entities.ISoftDeletable
+Themia.Framework.Core.Abstractions.Entities.ISoftDeletable.DeletedAt.get -> System.DateTimeOffset?
+Themia.Framework.Core.Abstractions.Entities.ISoftDeletable.DeletedBy.get -> string?
+Themia.Framework.Core.Abstractions.Entities.ISoftDeletable.IsDeleted.get -> bool
+Themia.Framework.Core.Abstractions.Entities.ISoftDeletable.RestoredAt.get -> System.DateTimeOffset?
+Themia.Framework.Core.Abstractions.Entities.ISoftDeletable.RestoredBy.get -> string?
+Themia.Framework.Core.Abstractions.Entities.SoftDeletableEntity<TId>
+Themia.Framework.Core.Abstractions.Entities.SoftDeletableEntity<TId>.DeletedAt.get -> System.DateTimeOffset?
+Themia.Framework.Core.Abstractions.Entities.SoftDeletableEntity<TId>.DeletedAt.set -> void
+Themia.Framework.Core.Abstractions.Entities.SoftDeletableEntity<TId>.DeletedBy.get -> string?
+Themia.Framework.Core.Abstractions.Entities.SoftDeletableEntity<TId>.DeletedBy.set -> void
+Themia.Framework.Core.Abstractions.Entities.SoftDeletableEntity<TId>.IsDeleted.get -> bool
+Themia.Framework.Core.Abstractions.Entities.SoftDeletableEntity<TId>.IsDeleted.set -> void
+Themia.Framework.Core.Abstractions.Entities.SoftDeletableEntity<TId>.MarkDeleted(System.DateTimeOffset timestamp, string? deletedBy = null) -> void
+Themia.Framework.Core.Abstractions.Entities.SoftDeletableEntity<TId>.Restore(System.DateTimeOffset timestamp, string? restoredBy = null) -> void
+Themia.Framework.Core.Abstractions.Entities.SoftDeletableEntity<TId>.RestoredAt.get -> System.DateTimeOffset?
+Themia.Framework.Core.Abstractions.Entities.SoftDeletableEntity<TId>.RestoredAt.set -> void
+Themia.Framework.Core.Abstractions.Entities.SoftDeletableEntity<TId>.RestoredBy.get -> string?
+Themia.Framework.Core.Abstractions.Entities.SoftDeletableEntity<TId>.RestoredBy.set -> void
+Themia.Framework.Core.Abstractions.Entities.SoftDeletableEntity<TId>.SoftDeletableEntity() -> void
+Themia.Framework.Core.Abstractions.Events.DomainEventBase
+Themia.Framework.Core.Abstractions.Events.DomainEventBase.DomainEventBase() -> void
+Themia.Framework.Core.Abstractions.Events.DomainEventBase.DomainEventBase(System.DateTimeOffset occurredAt) -> void
+Themia.Framework.Core.Abstractions.Events.DomainEventBase.OccurredAt.get -> System.DateTimeOffset
+Themia.Framework.Core.Abstractions.Events.DomainEventBase.OccurredAt.init -> void
+Themia.Framework.Core.Abstractions.Events.IDomainEvent
+Themia.Framework.Core.Abstractions.Events.IDomainEvent.OccurredAt.get -> System.DateTimeOffset
+Themia.Framework.Core.Abstractions.Events.IDomainEventDispatcher
+Themia.Framework.Core.Abstractions.Events.IDomainEventDispatcher.DispatchAsync(System.Collections.Generic.IEnumerable<Themia.Framework.Core.Abstractions.Events.IDomainEvent!>! domainEvents, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Framework.Core.Abstractions.Events.IDomainEventDispatcher.DispatchAsync(Themia.Framework.Core.Abstractions.Events.IDomainEvent! domainEvent, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Framework.Core.Abstractions.Events.IDomainEventHandler<TEvent>
+Themia.Framework.Core.Abstractions.Events.IDomainEventHandler<TEvent>.HandleAsync(TEvent domainEvent, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+override Themia.Framework.Core.Abstractions.Entities.Entity<TId>.Equals(object? obj) -> bool
+override Themia.Framework.Core.Abstractions.Entities.Entity<TId>.GetHashCode() -> int
+static Themia.Framework.Core.Abstractions.Entities.Entity<TId>.operator !=(Themia.Framework.Core.Abstractions.Entities.Entity<TId>? left, Themia.Framework.Core.Abstractions.Entities.Entity<TId>? right) -> bool
+static Themia.Framework.Core.Abstractions.Entities.Entity<TId>.operator ==(Themia.Framework.Core.Abstractions.Entities.Entity<TId>? left, Themia.Framework.Core.Abstractions.Entities.Entity<TId>? right) -> bool
 override Themia.Framework.Core.Primitives.Error.ToString() -> string!
 override Themia.Framework.Core.Primitives.ValueObject.Equals(object? obj) -> bool
 override Themia.Framework.Core.Primitives.ValueObject.GetHashCode() -> int

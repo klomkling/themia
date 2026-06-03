@@ -4,6 +4,10 @@
     <PackageId>Themia.Framework.Core</PackageId>
     <Description>Themia framework core — DDD building blocks: Entity, ValueObject, Result/Error, domain events, tenant context, and the IThemiaModule module system.</Description>
     <PackageTags>themia;framework;ddd;domain-driven-design;result;domain-events;multi-tenancy</PackageTags>
+    <!-- RS0026/RS0027: the IDomainEventDispatcher overloads carry an optional CancellationToken by
+         design (ported verbatim from the canonical v2 API). The optional-parameter backcompat rules
+         do not apply to a first-shipped surface. -->
+    <NoWarn>$(NoWarn);RS0026;RS0027</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
