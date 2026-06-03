@@ -88,6 +88,13 @@ Themia.Framework.Core.Abstractions.Events.IDomainEventDispatcher.DispatchAsync(S
 Themia.Framework.Core.Abstractions.Events.IDomainEventDispatcher.DispatchAsync(Themia.Framework.Core.Abstractions.Events.IDomainEvent! domainEvent, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
 Themia.Framework.Core.Abstractions.Events.IDomainEventHandler<TEvent>
 Themia.Framework.Core.Abstractions.Events.IDomainEventHandler<TEvent>.HandleAsync(TEvent domainEvent, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Framework.Core.Events.DomainEventDispatcher
+Themia.Framework.Core.Events.DomainEventDispatcher.DispatchAsync(System.Collections.Generic.IEnumerable<Themia.Framework.Core.Abstractions.Events.IDomainEvent!>! domainEvents, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Framework.Core.Events.DomainEventDispatcher.DispatchAsync(Themia.Framework.Core.Abstractions.Events.IDomainEvent! domainEvent, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Framework.Core.Events.DomainEventDispatcher.DomainEventDispatcher(System.IServiceProvider! serviceProvider) -> void
+Themia.Framework.Core.Extensions.DomainEventServiceCollectionExtensions
+static Themia.Framework.Core.Extensions.DomainEventServiceCollectionExtensions.AddDomainEventDispatcher(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static Themia.Framework.Core.Extensions.DomainEventServiceCollectionExtensions.AddDomainEventHandler<TEvent, THandler>(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, Microsoft.Extensions.DependencyInjection.ServiceLifetime lifetime = Microsoft.Extensions.DependencyInjection.ServiceLifetime.Scoped) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
 override Themia.Framework.Core.Abstractions.Entities.Entity<TId>.Equals(object? obj) -> bool
 override Themia.Framework.Core.Abstractions.Entities.Entity<TId>.GetHashCode() -> int
 static Themia.Framework.Core.Abstractions.Entities.Entity<TId>.operator !=(Themia.Framework.Core.Abstractions.Entities.Entity<TId>? left, Themia.Framework.Core.Abstractions.Entities.Entity<TId>? right) -> bool
