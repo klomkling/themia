@@ -65,6 +65,24 @@ public class DomainEventDispatcherTests
     }
 
     [Fact]
+    public async Task DispatchAsync_MultipleHandlers_InvokesSequentially()
+    {
+        // Handlers share state: sequential dispatch must never overlap, so the second handler
+        // always observes the first as already finished.
+        var services = new ServiceCollection();
+        var order = new List<string>();
+        services.AddSingleton<IDomainEventHandler<TestEvent>>(new OrderingHandler("first", order, delayMs: 30));
+        services.AddSingleton<IDomainEventHandler<TestEvent>>(new OrderingHandler("second", order, delayMs: 0));
+
+        var serviceProvider = services.BuildServiceProvider();
+        var dispatcher = new DomainEventDispatcher(serviceProvider);
+
+        await dispatcher.DispatchAsync(new TestEvent("test-data"));
+
+        Assert.Equal(new[] { "first:start", "first:end", "second:start", "second:end" }, order);
+    }
+
+    [Fact]
     public async Task DispatchAsync_NoHandlers_DoesNotThrow()
     {
         var services = new ServiceCollection();
@@ -85,6 +103,21 @@ public class DomainEventDispatcherTests
     }
 
     private sealed record TestEvent(string Data) : DomainEventBase;
+
+    private sealed class OrderingHandler(string name, List<string> order, int delayMs)
+        : IDomainEventHandler<TestEvent>
+    {
+        public async Task HandleAsync(TestEvent domainEvent, CancellationToken cancellationToken = default)
+        {
+            order.Add($"{name}:start");
+            if (delayMs > 0)
+            {
+                await Task.Delay(delayMs, cancellationToken);
+            }
+
+            order.Add($"{name}:end");
+        }
+    }
 
     private sealed class TestEventHandler : IDomainEventHandler<TestEvent>
     {

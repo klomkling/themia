@@ -37,11 +37,15 @@ public sealed class DomainEventDispatcher : IDomainEventDispatcher
 
         var invoker = HandlerInvokers.GetOrAdd(eventType, CreateHandlerInvoker);
 
-        var tasks = handlers
-            .Where(handler => handler is not null)
-            .Select(handler => invoker(handler!, domainEvent, cancellationToken));
-
-        await Task.WhenAll(tasks);
+        // Dispatch sequentially: handlers resolved from a single scope may share a non-thread-safe
+        // scoped service (e.g. an EF Core DbContext). Concurrent invocation would corrupt that state.
+        foreach (var handler in handlers)
+        {
+            if (handler is not null)
+            {
+                await invoker(handler, domainEvent, cancellationToken);
+            }
+        }
     }
 
     /// <inheritdoc />
