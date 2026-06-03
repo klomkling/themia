@@ -1,1 +1,95 @@
 #nullable enable
+const Themia.Caching.CachingOptions.SectionName = "Themia:Caching" -> string!
+static Themia.Caching.Extensions.ServiceCollectionExtensions.AddThemiaCaching(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static Themia.Caching.Extensions.ServiceCollectionExtensions.AddThemiaCaching(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, Microsoft.Extensions.Configuration.IConfiguration! configuration) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static Themia.Caching.Extensions.ServiceCollectionExtensions.AddThemiaCaching(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, Microsoft.Extensions.Configuration.IConfiguration! configuration, string! sectionName) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static Themia.Caching.Extensions.ServiceCollectionExtensions.AddThemiaCaching(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Themia.Caching.IThemiaCachingBuilder!>! configure) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+Themia.Caching.CacheEntryOptions
+Themia.Caching.CacheEntryOptions.AbsoluteExpiration.get -> System.TimeSpan?
+Themia.Caching.CacheEntryOptions.AbsoluteExpiration.init -> void
+Themia.Caching.CacheEntryOptions.CacheEntryOptions() -> void
+Themia.Caching.CacheEntryOptions.Size.get -> long?
+Themia.Caching.CacheEntryOptions.Size.init -> void
+Themia.Caching.CacheEntryOptions.SlidingExpiration.get -> System.TimeSpan?
+Themia.Caching.CacheEntryOptions.SlidingExpiration.init -> void
+Themia.Caching.CachingOptions
+Themia.Caching.CachingOptions.CachingOptions() -> void
+Themia.Caching.CachingOptions.DistributedCache.get -> Themia.Caching.DistributedCacheOptions!
+Themia.Caching.CachingOptions.DistributedCache.set -> void
+Themia.Caching.CachingOptions.MemoryCache.get -> Themia.Caching.MemoryCacheOptions!
+Themia.Caching.CachingOptions.MemoryCache.set -> void
+Themia.Caching.CachingOptions.Serialization.get -> Themia.Caching.SerializationOptions!
+Themia.Caching.CachingOptions.Serialization.set -> void
+Themia.Caching.DistributedCacheOptions
+Themia.Caching.DistributedCacheOptions.ConnectionString.get -> string?
+Themia.Caching.DistributedCacheOptions.ConnectionString.set -> void
+Themia.Caching.DistributedCacheOptions.DistributedCacheOptions() -> void
+Themia.Caching.DistributedCacheOptions.Enabled.get -> bool
+Themia.Caching.DistributedCacheOptions.Enabled.set -> void
+Themia.Caching.DistributedCacheOptions.InstanceName.get -> string!
+Themia.Caching.DistributedCacheOptions.InstanceName.set -> void
+Themia.Caching.DistributedCacheOptions.Provider.get -> string!
+Themia.Caching.DistributedCacheOptions.Provider.set -> void
+Themia.Caching.Extensions.ServiceCollectionExtensions
+Themia.Caching.ICacheProviderRegistration
+Themia.Caching.ICacheProviderRegistration.Priority.get -> int
+Themia.Caching.ICacheProviderRegistration.Register(Microsoft.Extensions.DependencyInjection.IServiceCollection! services, Microsoft.Extensions.Configuration.IConfiguration! configuration) -> void
+Themia.Caching.ISerializationProvider
+Themia.Caching.ISerializationProvider.Deserialize<T>(byte[]! data) -> T?
+Themia.Caching.ISerializationProvider.Serialize<T>(T value) -> byte[]!
+Themia.Caching.IThemiaCacheProvider
+Themia.Caching.IThemiaCacheProvider.ExistsAsync(string! key, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!
+Themia.Caching.IThemiaCacheProvider.GetAsync<T>(string! key, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<T?>!
+Themia.Caching.IThemiaCacheProvider.RefreshAsync(string! key, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Caching.IThemiaCacheProvider.RemoveAsync(string! key, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Caching.IThemiaCacheProvider.SetAsync<T>(string! key, T value, Themia.Caching.CacheEntryOptions? options = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Caching.IThemiaCachingBuilder
+Themia.Caching.IThemiaCachingBuilder.AddProvider<TProvider>(Microsoft.Extensions.DependencyInjection.ServiceLifetime lifetime = Microsoft.Extensions.DependencyInjection.ServiceLifetime.Singleton) -> Themia.Caching.IThemiaCachingBuilder!
+Themia.Caching.IThemiaCachingBuilder.Services.get -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+Themia.Caching.IThemiaCachingBuilder.UseJsonSerialization(System.Action<Themia.Caching.JsonSerializationOptions!>? configure = null) -> Themia.Caching.IThemiaCachingBuilder!
+Themia.Caching.IThemiaCachingBuilder.UseMemoryCache(System.Action<Themia.Caching.MemoryCacheOptions!>? configure = null) -> Themia.Caching.IThemiaCachingBuilder!
+Themia.Caching.IThemiaCachingBuilder.UseMessagePackSerialization() -> Themia.Caching.IThemiaCachingBuilder!
+Themia.Caching.IThemiaCachingBuilder.UseRedis(string! connectionString, System.Action<Themia.Caching.DistributedCacheOptions!>? configure = null) -> Themia.Caching.IThemiaCachingBuilder!
+Themia.Caching.JsonSerializationOptions
+Themia.Caching.JsonSerializationOptions.JsonSerializationOptions() -> void
+Themia.Caching.JsonSerializationOptions.PropertyNameCaseInsensitive.get -> bool
+Themia.Caching.JsonSerializationOptions.PropertyNameCaseInsensitive.set -> void
+Themia.Caching.JsonSerializationOptions.WriteIndented.get -> bool
+Themia.Caching.JsonSerializationOptions.WriteIndented.set -> void
+Themia.Caching.JsonSerializationProvider
+Themia.Caching.JsonSerializationProvider.Deserialize<T>(byte[]! data) -> T?
+Themia.Caching.JsonSerializationProvider.JsonSerializationProvider(System.Text.Json.JsonSerializerOptions! options) -> void
+Themia.Caching.JsonSerializationProvider.JsonSerializationProvider(Themia.Caching.JsonSerializationOptions? options = null) -> void
+Themia.Caching.JsonSerializationProvider.Serialize<T>(T value) -> byte[]!
+Themia.Caching.MemoryCacheOptions
+Themia.Caching.MemoryCacheOptions.CompactionPercentage.get -> double
+Themia.Caching.MemoryCacheOptions.CompactionPercentage.set -> void
+Themia.Caching.MemoryCacheOptions.Enabled.get -> bool
+Themia.Caching.MemoryCacheOptions.Enabled.set -> void
+Themia.Caching.MemoryCacheOptions.ExpirationScanFrequency.get -> System.TimeSpan?
+Themia.Caching.MemoryCacheOptions.ExpirationScanFrequency.set -> void
+Themia.Caching.MemoryCacheOptions.MemoryCacheOptions() -> void
+Themia.Caching.MemoryCacheOptions.SizeLimit.get -> long?
+Themia.Caching.MemoryCacheOptions.SizeLimit.set -> void
+Themia.Caching.MemoryCacheProvider
+Themia.Caching.MemoryCacheProvider.ExistsAsync(string! key, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!
+Themia.Caching.MemoryCacheProvider.GetAsync<T>(string! key, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<T?>!
+Themia.Caching.MemoryCacheProvider.MemoryCacheProvider(Microsoft.Extensions.Caching.Memory.IMemoryCache! cache, Themia.Caching.ISerializationProvider! serializer) -> void
+Themia.Caching.MemoryCacheProvider.RefreshAsync(string! key, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Caching.MemoryCacheProvider.RemoveAsync(string! key, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Caching.MemoryCacheProvider.SetAsync<T>(string! key, T value, Themia.Caching.CacheEntryOptions? options = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Caching.MessagePackSerializationProvider
+Themia.Caching.MessagePackSerializationProvider.Deserialize<T>(byte[]! data) -> T?
+Themia.Caching.MessagePackSerializationProvider.MessagePackSerializationProvider() -> void
+Themia.Caching.MessagePackSerializationProvider.Serialize<T>(T value) -> byte[]!
+Themia.Caching.RedisCacheProvider
+Themia.Caching.RedisCacheProvider.ExistsAsync(string! key, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!
+Themia.Caching.RedisCacheProvider.GetAsync<T>(string! key, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<T?>!
+Themia.Caching.RedisCacheProvider.RedisCacheProvider(StackExchange.Redis.IConnectionMultiplexer! redis, Themia.Caching.ISerializationProvider! serializer, Microsoft.Extensions.Options.IOptions<Themia.Caching.DistributedCacheOptions!>! options) -> void
+Themia.Caching.RedisCacheProvider.RefreshAsync(string! key, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Caching.RedisCacheProvider.RemoveAsync(string! key, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Caching.RedisCacheProvider.SetAsync<T>(string! key, T value, Themia.Caching.CacheEntryOptions? options = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Caching.SerializationOptions
+Themia.Caching.SerializationOptions.Provider.get -> string!
+Themia.Caching.SerializationOptions.Provider.set -> void
+Themia.Caching.SerializationOptions.SerializationOptions() -> void
