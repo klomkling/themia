@@ -1,0 +1,9 @@
+#nullable enable
+override Themia.Analyzers.SwallowLogRethrowAnalyzer.Initialize(Microsoft.CodeAnalysis.Diagnostics.AnalysisContext! context) -> void
+override Themia.Analyzers.SwallowLogRethrowAnalyzer.SupportedDiagnostics.get -> System.Collections.Immutable.ImmutableArray<Microsoft.CodeAnalysis.DiagnosticDescriptor!>
+override Themia.Analyzers.SyncOverAsyncAnalyzer.Initialize(Microsoft.CodeAnalysis.Diagnostics.AnalysisContext! context) -> void
+override Themia.Analyzers.SyncOverAsyncAnalyzer.SupportedDiagnostics.get -> System.Collections.Immutable.ImmutableArray<Microsoft.CodeAnalysis.DiagnosticDescriptor!>
+Themia.Analyzers.SwallowLogRethrowAnalyzer
+Themia.Analyzers.SwallowLogRethrowAnalyzer.SwallowLogRethrowAnalyzer() -> void
+Themia.Analyzers.SyncOverAsyncAnalyzer
+Themia.Analyzers.SyncOverAsyncAnalyzer.SyncOverAsyncAnalyzer() -> void
