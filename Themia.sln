@@ -37,6 +37,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Themia.Framework.Core", "sr
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Themia.Framework.Core.Tests", "tests\Themia.Framework.Core.Tests\Themia.Framework.Core.Tests.csproj", "{22E05787-AAD2-498A-8E7C-27772BB913D3}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Themia.Caching", "src\framework\Themia.Caching\Themia.Caching.csproj", "{1E00291A-EE3E-40A4-BFA1-999F46588170}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -191,6 +193,18 @@ Global
 		{22E05787-AAD2-498A-8E7C-27772BB913D3}.Release|x64.Build.0 = Release|Any CPU
 		{22E05787-AAD2-498A-8E7C-27772BB913D3}.Release|x86.ActiveCfg = Release|Any CPU
 		{22E05787-AAD2-498A-8E7C-27772BB913D3}.Release|x86.Build.0 = Release|Any CPU
+		{1E00291A-EE3E-40A4-BFA1-999F46588170}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1E00291A-EE3E-40A4-BFA1-999F46588170}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1E00291A-EE3E-40A4-BFA1-999F46588170}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{1E00291A-EE3E-40A4-BFA1-999F46588170}.Debug|x64.Build.0 = Debug|Any CPU
+		{1E00291A-EE3E-40A4-BFA1-999F46588170}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{1E00291A-EE3E-40A4-BFA1-999F46588170}.Debug|x86.Build.0 = Debug|Any CPU
+		{1E00291A-EE3E-40A4-BFA1-999F46588170}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1E00291A-EE3E-40A4-BFA1-999F46588170}.Release|Any CPU.Build.0 = Release|Any CPU
+		{1E00291A-EE3E-40A4-BFA1-999F46588170}.Release|x64.ActiveCfg = Release|Any CPU
+		{1E00291A-EE3E-40A4-BFA1-999F46588170}.Release|x64.Build.0 = Release|Any CPU
+		{1E00291A-EE3E-40A4-BFA1-999F46588170}.Release|x86.ActiveCfg = Release|Any CPU
+		{1E00291A-EE3E-40A4-BFA1-999F46588170}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -211,5 +225,6 @@ Global
 		{E0AD1809-C64F-3D39-45E0-E424261CE16D} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{53914AB7-AC84-46E9-9D2E-DA232775609A} = {E0AD1809-C64F-3D39-45E0-E424261CE16D}
 		{22E05787-AAD2-498A-8E7C-27772BB913D3} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
+		{1E00291A-EE3E-40A4-BFA1-999F46588170} = {E0AD1809-C64F-3D39-45E0-E424261CE16D}
 	EndGlobalSection
 EndGlobal
