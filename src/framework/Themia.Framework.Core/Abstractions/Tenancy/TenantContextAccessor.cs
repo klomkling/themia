@@ -1,5 +1,3 @@
-using System.Threading;
-
 namespace Themia.Framework.Core.Abstractions.Tenancy;
 
 /// <summary>
