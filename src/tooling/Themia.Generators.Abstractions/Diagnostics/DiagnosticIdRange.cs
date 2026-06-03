@@ -10,7 +10,7 @@ public static class DiagnosticIdRange
     /// <summary>Reserved for the Themia DI source generator.</summary>
     public const string ThemiaDIRange = "THEMIA001-THEMIA099";
 
-    /// <summary>Reserved for future Themia misuse analyzers.</summary>
+    /// <summary>Reserved for Themia misuse analyzers (THEMIA101 catch-log-rethrow, THEMIA102 sync-over-async, …).</summary>
     public const string ThemiaAnalyzersRange = "THEMIA100-THEMIA199";
 
     /// <summary>Recommended range for consumer-authored generator diagnostics.</summary>

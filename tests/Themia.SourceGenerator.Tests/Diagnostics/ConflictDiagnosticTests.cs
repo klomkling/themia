@@ -66,6 +66,23 @@ public class ConflictDiagnosticTests
     }
 
     [Fact]
+    public void THEMIA006_AttributeOnly_NoInterface_IsDiagnosed()
+    {
+        // [Scoped] with no I{ClassName} interface and AllowSelfRegistration=false: the
+        // attribute path now emits THEMIA006 instead of silently dropping the type
+        // (matching the marker-only path).
+        const string source = """
+            using Themia.DependencyInjection;
+            namespace Demo;
+            [Scoped]
+            public class Orphan { }
+            """;
+
+        var result = RunGenerator(source);
+        AssertSingleDiagnostic(result, "THEMIA006", DiagnosticSeverity.Warning);
+    }
+
+    [Fact]
     public void THEMIA002_MultipleMarkers()
     {
         const string source = """

@@ -22,7 +22,8 @@ public static class INamedTypeSymbolExtensions
 
     /// <summary>
     /// True when the type carries an attribute whose fully qualified name
-    /// matches <paramref name="fullName"/>. Inherited attributes are included.
+    /// matches <paramref name="fullName"/>. Only attributes declared directly on the type
+    /// are considered — <c>GetAttributes()</c> does not walk base types.
     /// </summary>
     public static bool HasAttributeWithFullName(this INamedTypeSymbol symbol, string fullName)
     {

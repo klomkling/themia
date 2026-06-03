@@ -59,11 +59,12 @@ public sealed class ServiceRegistrationGenerator : IIncrementalGenerator
                 ProcessTypeInfo(ctx, info, registrations);
             }
 
-            // De-dup by (impl, service) pair and sort for deterministic output.
+            // De-dup by (impl, service, key) and sort for deterministic output.
             var sorted = registrations
-                .GroupBy(r => (r.ImplementationFullName, r.ServiceFullName))
+                .GroupBy(r => (r.ImplementationFullName, r.ServiceFullName, r.Key))
                 .Select(g => g.First())
                 .OrderBy(r => r.ImplementationFullName, StringComparer.Ordinal)
+                .ThenBy(r => r.Key ?? string.Empty, StringComparer.Ordinal)
                 .ToImmutableArray();
 
             if (sorted.Length > 0)
@@ -71,7 +72,10 @@ public sealed class ServiceRegistrationGenerator : IIncrementalGenerator
                 writer.AppendLine();
                 foreach (var reg in sorted)
                 {
-                    writer.AppendLine($"services.Add{reg.Lifetime}<{reg.ServiceFullName}, {reg.ImplementationFullName}>();");
+                    // ServiceKey set → keyed registration (AddKeyedScoped/Singleton/Transient).
+                    writer.AppendLine(reg.Key is null
+                        ? $"services.Add{reg.Lifetime}<{reg.ServiceFullName}, {reg.ImplementationFullName}>();"
+                        : $"services.AddKeyed{reg.Lifetime}<{reg.ServiceFullName}, {reg.ImplementationFullName}>({Microsoft.CodeAnalysis.CSharp.SymbolDisplay.FormatLiteral(reg.Key, quote: true)});");
                 }
             }
 
@@ -171,6 +175,7 @@ public sealed class ServiceRegistrationGenerator : IIncrementalGenerator
         // Read the ServiceType named arg from the attribute (e.g. [Scoped(ServiceType = typeof(IFoo))]).
         INamedTypeSymbol? attributeServiceType = null;
         var allowSelfRegistration = false;
+        string? serviceKey = null;
         switch (lifetimeAttrs.Count)
         {
             case 1:
@@ -181,6 +186,8 @@ public sealed class ServiceRegistrationGenerator : IIncrementalGenerator
                         attributeServiceType = svc;
                     else if (kv is { Key: "AllowSelfRegistration", Value.Value: bool allow })
                         allowSelfRegistration = allow;
+                    else if (kv is { Key: "ServiceKey", Value.Value: string key })
+                        serviceKey = key;
                 }
 
                 break;
@@ -197,7 +204,8 @@ public sealed class ServiceRegistrationGenerator : IIncrementalGenerator
             markerLifetimes: markerLifetimes,
             genericMarkerServiceType: genericMarkerServiceType,
             attributeServiceType: attributeServiceType,
-            allowSelfRegistration: allowSelfRegistration);
+            allowSelfRegistration: allowSelfRegistration,
+            serviceKey: serviceKey);
     }
 
     private static List<string> CollectMarkerLifetimes(INamedTypeSymbol type)
@@ -295,8 +303,8 @@ public sealed class ServiceRegistrationGenerator : IIncrementalGenerator
             }
         }
 
-        // THEMIA010: Legacy attribute usage — report (Error as of 0.9.0) but
-        // continue emission, so an .editorconfig downgrade still registers the type.
+        // THEMIA010: Legacy attribute usage — report (Error severity) but continue
+        // emission, so an .editorconfig downgrade still registers the type.
         if (info.LifetimeAttrs.Count == 1)
         {
             switch (info.LifetimeAttrs[0].IsLegacy)
@@ -389,7 +397,17 @@ public sealed class ServiceRegistrationGenerator : IIncrementalGenerator
                         classLocation,
                         typeFullDisplayName));
                 }
-                // else: convention just didn't match — skip silently (no IFoo interface)
+                else
+                {
+                    // No I{ClassName} interface and AllowSelfRegistration is false — the same end
+                    // state the marker-only path above diagnoses, so emit THEMIA006 instead of
+                    // skipping silently (an explicit [Scoped] otherwise vanishes with no feedback).
+                    ctx.ReportDiagnostic(Diagnostic.Create(
+                        DiagnosticDescriptors.CannotRegister,
+                        classLocation,
+                        typeFullDisplayName,
+                        "no matching service interface found and AllowSelfRegistration is false"));
+                }
             }
             return;
         }
@@ -397,7 +415,8 @@ public sealed class ServiceRegistrationGenerator : IIncrementalGenerator
         registrations.Add(new RegistrationRecord(
             ToGlobalQualified(info.Type),
             ToGlobalQualified(serviceType),
-            resolvedLifetimeStr!));
+            resolvedLifetimeStr!,
+            info.ServiceKey));
     }
 
     private static bool IsMarkerInterface(INamedTypeSymbol iface)
@@ -482,7 +501,8 @@ public sealed class ServiceRegistrationGenerator : IIncrementalGenerator
         List<string> markerLifetimes,
         INamedTypeSymbol? genericMarkerServiceType,
         INamedTypeSymbol? attributeServiceType,
-        bool allowSelfRegistration)
+        bool allowSelfRegistration,
+        string? serviceKey)
     {
         public INamedTypeSymbol Type { get; } = type;
         public ClassDeclarationSyntax ClassDecl { get; } = classDecl;
@@ -491,6 +511,7 @@ public sealed class ServiceRegistrationGenerator : IIncrementalGenerator
         public INamedTypeSymbol? GenericMarkerServiceType { get; } = genericMarkerServiceType;
         public INamedTypeSymbol? AttributeServiceType { get; } = attributeServiceType;
         public bool AllowSelfRegistration { get; } = allowSelfRegistration;
+        public string? ServiceKey { get; } = serviceKey;
     }
 
     private sealed class RegistrarCandidate(
@@ -507,10 +528,11 @@ public sealed class ServiceRegistrationGenerator : IIncrementalGenerator
         public Location Location { get; } = location;
     }
 
-    private sealed class RegistrationRecord(string implementationFullName, string serviceFullName, string lifetime)
+    private sealed class RegistrationRecord(string implementationFullName, string serviceFullName, string lifetime, string? key)
     {
         public string ImplementationFullName { get; } = implementationFullName;
         public string ServiceFullName { get; } = serviceFullName;
         public string Lifetime { get; } = lifetime;
+        public string? Key { get; } = key;
     }
 }

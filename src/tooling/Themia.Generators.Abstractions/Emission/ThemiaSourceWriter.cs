@@ -103,6 +103,10 @@ public sealed class ThemiaSourceWriter
     /// <summary>Renders the accumulated source into a <see cref="SourceText"/>.</summary>
     public SourceText ToSourceText()
     {
+        if (_scopeStack.Count != 0)
+            throw new InvalidOperationException(
+                $"Cannot render: {_scopeStack.Count} scope(s) left open; every OpenClass/OpenMethod needs a matching Close.");
+
         var sb = new StringBuilder();
         if (_includeFileHeader)
         {

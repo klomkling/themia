@@ -40,7 +40,11 @@ public sealed class SwallowLogRethrowAnalyzer : DiagnosticAnalyzer
         if (!rethrows)
             return;
 
-        var logs = catchClause.Block.DescendantNodes().OfType<InvocationExpressionSyntax>()
+        // Same descendant scan + lambda/local-function exclusion as the rethrow check above:
+        // a LogError call inside a nested lambda is not part of the catch's log-and-rethrow.
+        var logs = catchClause.Block
+            .DescendantNodes(n => n is not (AnonymousFunctionExpressionSyntax or LocalFunctionStatementSyntax))
+            .OfType<InvocationExpressionSyntax>()
             .Any(inv => IsLoggerCall(inv, context.SemanticModel));
         if (!logs)
             return;
