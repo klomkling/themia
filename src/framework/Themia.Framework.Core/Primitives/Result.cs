@@ -100,7 +100,7 @@ public readonly struct Result<T>
     /// </summary>
     /// <param name="value">Returned value.</param>
     /// <returns>A successful result.</returns>
-    /// <exception cref="ArgumentNullException">Thrown when value is null for non-nullable types.</exception>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="value"/> is null.</exception>
     public static Result<T> Success(T value)
     {
         ArgumentNullException.ThrowIfNull(value);

@@ -18,6 +18,7 @@ public interface ISerializationProvider
     /// </summary>
     /// <typeparam name="T">The type to deserialize to.</typeparam>
     /// <param name="data">The byte array to deserialize.</param>
-    /// <returns>The deserialized value, or null if deserialization fails.</returns>
+    /// <returns>The deserialized value.</returns>
+    /// <exception cref="System.InvalidOperationException">Thrown when deserialization fails.</exception>
     T? Deserialize<T>(byte[] data);
 }

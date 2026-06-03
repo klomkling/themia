@@ -67,7 +67,7 @@ public class ResultTests
     }
 
     [Fact]
-    public void ToResult_ThrowsInvalidOperationException_WhenCalledOnSuccessWithoutError()
+    public void ToResult_ConvertsSuccessfully_WhenCalledOnSuccessResult()
     {
         var success = Result.Success();
 

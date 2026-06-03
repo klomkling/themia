@@ -52,9 +52,13 @@ public static class EntityExtensions
         ArgumentNullException.ThrowIfNull(dispatcher);
         ArgumentNullException.ThrowIfNull(entities);
 
+        // Materialize once: `entities` may be a single-pass enumerable, and it is iterated twice
+        // (collect events, then clear them) — re-enumerating could yield a different set.
+        var entityList = entities as IReadOnlyList<Entity<TId>> ?? entities.ToList();
+
         List<IDomainEvent> allEvents = [];
 
-        foreach (var entity in entities)
+        foreach (var entity in entityList)
         {
             allEvents.AddRange(entity.DomainEvents.ToArray()); // snapshot per entity to avoid collection mutation issues
         }
@@ -63,7 +67,7 @@ public static class EntityExtensions
         {
             await dispatcher.DispatchAsync(allEvents, cancellationToken);
 
-            foreach (var entity in entities)
+            foreach (var entity in entityList)
             {
                 entity.ClearDomainEvents();
             }
