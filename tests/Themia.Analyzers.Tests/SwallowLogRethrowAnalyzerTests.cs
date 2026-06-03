@@ -40,6 +40,21 @@ public class S {
     }
 
     [Fact]
+    public async Task LogAndRethrowNestedInIf_Flagged()
+    {
+        // The rethrow is inside a nested if-block, not at the top of the catch — still flagged.
+        var src = Stubs + @"
+public class S {
+    private ILogger _log = null!;
+    public void M(bool retry) {
+        try { } {|#0:catch|} (System.Exception ex) { if (retry) { _log.LogError(ex, ""x""); throw; } }
+    }
+}";
+        var expected = new DiagnosticResult("THEMIA101", DiagnosticSeverity.Warning).WithLocation(0);
+        await new Verify<SwallowLogRethrowAnalyzer>.Test { TestCode = src, ExpectedDiagnostics = { expected } }.RunAsync();
+    }
+
+    [Fact]
     public async Task LogInformationAndRethrow_NotFlagged()
     {
         // Only LogError/LogCritical count — an info-level log + rethrow is not flagged.

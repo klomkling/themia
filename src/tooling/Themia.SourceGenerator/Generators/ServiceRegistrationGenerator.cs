@@ -445,6 +445,11 @@ public sealed class ServiceRegistrationGenerator : IIncrementalGenerator
             location: location);
     }
 
+    // IsLegacy / THEMIA010 are reserved scaffolding: Themia is a clean brand with no superseded
+    // attribute set, so every current attribute maps to IsLegacy=false and THEMIA010 never fires
+    // today. The flag exists so a future "you're using a deprecated attribute, migrate" diagnostic
+    // (e.g. detecting leftover Idevs.ComponentModels.* during an Idevs→Themia migration) can be
+    // added by mapping those FQNs here with IsLegacy=true — intentionally NOT wired up in 0.2.0.
     private static (string? Lifetime, bool IsLegacy) ResolveAttributeLifetimeWithLegacyFlag(INamedTypeSymbol attrClass)
     {
         var name = attrClass.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
