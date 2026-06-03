@@ -83,6 +83,43 @@ public class ConflictDiagnosticTests
     }
 
     [Fact]
+    public void THEMIA005_MultipleGenericMarkers_DifferentServiceTypes()
+    {
+        // Two generic markers of the same lifetime with different TService → ambiguous,
+        // not a silent first-wins pick.
+        const string source = """
+            using Themia.DependencyInjection;
+            namespace Demo;
+            public interface IFoo { }
+            public interface IBar { }
+            public class Multi : IFoo, IBar, IScopedService<IFoo>, IScopedService<IBar> { }
+            """;
+
+        var result = RunGenerator(source);
+        AssertSingleDiagnostic(result, "THEMIA005", DiagnosticSeverity.Warning);
+    }
+
+    [Fact]
+    public void AttributeOnly_SingleInterfaceExtendingBase_NotAmbiguous()
+    {
+        // One direct service interface that extends a base: counting transitive interfaces
+        // would wrongly flag THEMIA005. With direct interfaces it's a clean convention miss →
+        // THEMIA006, never THEMIA005.
+        const string source = """
+            using Themia.DependencyInjection;
+            namespace Demo;
+            public interface IBase { }
+            public interface IProcessor : IBase { }
+            [Scoped]
+            public class Worker : IProcessor { }
+            """;
+
+        var result = RunGenerator(source);
+        AssertSingleDiagnostic(result, "THEMIA006", DiagnosticSeverity.Warning);
+        Assert.DoesNotContain(result.Diagnostics, d => d.Id == "THEMIA005");
+    }
+
+    [Fact]
     public void THEMIA002_MultipleMarkers()
     {
         const string source = """

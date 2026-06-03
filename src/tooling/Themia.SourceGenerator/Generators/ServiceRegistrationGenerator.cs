@@ -64,6 +64,7 @@ public sealed class ServiceRegistrationGenerator : IIncrementalGenerator
                 .GroupBy(r => (r.ImplementationFullName, r.ServiceFullName, r.Key))
                 .Select(g => g.First())
                 .OrderBy(r => r.ImplementationFullName, StringComparer.Ordinal)
+                .ThenBy(r => r.ServiceFullName, StringComparer.Ordinal)
                 .ThenBy(r => r.Key ?? string.Empty, StringComparer.Ordinal)
                 .ToImmutableArray();
 
@@ -153,8 +154,11 @@ public sealed class ServiceRegistrationGenerator : IIncrementalGenerator
         // Collect marker interface lifetimes.
         var markerLifetimes = CollectMarkerLifetimes(type);
 
-        // Collect generic marker service type.
+        // Collect generic marker service type(s). A class may implement multiple generic markers
+        // with different TService arguments — detect that as ambiguous rather than silently
+        // picking the first.
         INamedTypeSymbol? genericMarkerServiceType = null;
+        var multipleGenericMarkerServiceTypes = false;
         foreach (var iface in type.AllInterfaces)
         {
             if (!iface.IsGenericType || iface.TypeArguments.Length != 1)
@@ -168,8 +172,10 @@ public sealed class ServiceRegistrationGenerator : IIncrementalGenerator
 
             if (iface.TypeArguments[0] is not INamedTypeSymbol named) continue;
 
-            genericMarkerServiceType = named;
-            break;
+            if (genericMarkerServiceType is null)
+                genericMarkerServiceType = named;
+            else if (!SymbolEqualityComparer.Default.Equals(genericMarkerServiceType, named))
+                multipleGenericMarkerServiceTypes = true;
         }
 
         // Read the ServiceType named arg from the attribute (e.g. [Scoped(ServiceType = typeof(IFoo))]).
@@ -203,6 +209,7 @@ public sealed class ServiceRegistrationGenerator : IIncrementalGenerator
             lifetimeAttrs: lifetimeAttrs,
             markerLifetimes: markerLifetimes,
             genericMarkerServiceType: genericMarkerServiceType,
+            multipleGenericMarkerServiceTypes: multipleGenericMarkerServiceTypes,
             attributeServiceType: attributeServiceType,
             allowSelfRegistration: allowSelfRegistration,
             serviceKey: serviceKey);
@@ -260,6 +267,17 @@ public sealed class ServiceRegistrationGenerator : IIncrementalGenerator
         {
             ctx.ReportDiagnostic(Diagnostic.Create(
                 DiagnosticDescriptors.MultipleLifetimeMarkers,
+                classLocation,
+                typeFullDisplayName));
+            return;
+        }
+
+        // THEMIA005: Multiple generic markers with different TService — the service type is
+        // ambiguous, so don't silently pick one.
+        if (info.MultipleGenericMarkerServiceTypes)
+        {
+            ctx.ReportDiagnostic(Diagnostic.Create(
+                DiagnosticDescriptors.AmbiguousServiceType,
                 classLocation,
                 typeFullDisplayName));
             return;
@@ -360,7 +378,10 @@ public sealed class ServiceRegistrationGenerator : IIncrementalGenerator
             {
                 // Marker-only path: no service type found.
                 // Check if it's ambiguous (multiple non-IXxxService interfaces) vs. just missing.
-                var candidateInterfaces = info.Type.AllInterfaces
+                // Direct interfaces only, to align with TryResolveByConvention (which matches the
+                // I{ClassName} convention against Type.Interfaces) — counting transitive interfaces
+                // would falsely flag THEMIA005 for a single service interface that extends others.
+                var candidateInterfaces = info.Type.Interfaces
                     .Where(i => !IsMarkerInterface(i))
                     .ToList();
 
@@ -386,7 +407,10 @@ public sealed class ServiceRegistrationGenerator : IIncrementalGenerator
             {
                 // Attribute-only path: convention failed.
                 // Could be ambiguous or simply missing.
-                var candidateInterfaces = info.Type.AllInterfaces
+                // Direct interfaces only, to align with TryResolveByConvention (which matches the
+                // I{ClassName} convention against Type.Interfaces) — counting transitive interfaces
+                // would falsely flag THEMIA005 for a single service interface that extends others.
+                var candidateInterfaces = info.Type.Interfaces
                     .Where(i => !IsMarkerInterface(i))
                     .ToList();
 
@@ -500,6 +524,7 @@ public sealed class ServiceRegistrationGenerator : IIncrementalGenerator
         List<(AttributeData Attr, string Lifetime, bool IsLegacy)> lifetimeAttrs,
         List<string> markerLifetimes,
         INamedTypeSymbol? genericMarkerServiceType,
+        bool multipleGenericMarkerServiceTypes,
         INamedTypeSymbol? attributeServiceType,
         bool allowSelfRegistration,
         string? serviceKey)
@@ -508,6 +533,7 @@ public sealed class ServiceRegistrationGenerator : IIncrementalGenerator
         public ClassDeclarationSyntax ClassDecl { get; } = classDecl;
         public List<(AttributeData Attr, string Lifetime, bool IsLegacy)> LifetimeAttrs { get; } = lifetimeAttrs;
         public List<string> MarkerLifetimes { get; } = markerLifetimes;
+        public bool MultipleGenericMarkerServiceTypes { get; } = multipleGenericMarkerServiceTypes;
         public INamedTypeSymbol? GenericMarkerServiceType { get; } = genericMarkerServiceType;
         public INamedTypeSymbol? AttributeServiceType { get; } = attributeServiceType;
         public bool AllowSelfRegistration { get; } = allowSelfRegistration;
