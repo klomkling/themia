@@ -5,9 +5,10 @@ A **.NET 10** application framework — a **framework core** plus a catalog of *
 non-Themia apps (e.g. a net8 Serenity app) can consume them. All packages ship under the
 `Themia.*` NuGet prefix.
 
-> **Status:** design phase. This repository currently holds the architecture overview, module
-> specs, and implementation plans under [`docs/`](docs/). The first package to be implemented is
-> `Themia.AspNetCore`. No solution or code has landed yet.
+> **Status:** early implementation. `Themia.AspNetCore` is published (`0.1.0` on nuget.org), and the
+> build-time **tooling** layer (`Themia.Generators.Abstractions`, `Themia.DependencyInjection`,
+> `Themia.SourceGenerator`, `Themia.Analyzers`) has landed and awaits the next release. The
+> architecture overview, module specs, and implementation plans live under [`docs/`](docs/).
 
 ## Architecture
 
@@ -17,7 +18,7 @@ Layered, with a strict downward dependency direction:
 |---|---|---|
 | **Tooling** (build-time) | `netstandard2.0` | `Themia.SourceGenerator`, `Themia.Analyzers(.CodeFixes)`, `Themia.Generators.Abstractions` |
 | **Framework core** | `net10.0` | `Themia.Framework.Core` / `.Data.EFCore` / `.AspNetCore`, `Themia.MultiTenancy`, `Themia.Mediator`, `Themia.Caching`, `Themia.Logging`, `Themia.Services` |
-| **Neutral cores** | `net8.0;net10.0` | `Themia.Quartz`, `Themia.Exceptional(.SqlServer/.MySql/.PostgreSql)`, `Themia.AspNetCore` |
+| **Neutral cores** | `net8.0;net10.0` | `Themia.DependencyInjection`, `Themia.Quartz`, `Themia.Exceptional(.SqlServer/.MySql/.PostgreSql)`, `Themia.AspNetCore` |
 | **Modules** | `net10.0` | `Themia.Modules.*` (Scheduling, ExceptionLogging, Identity, Storage, …) |
 
 Two rules drive the design:

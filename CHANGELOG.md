@@ -18,7 +18,20 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
-_Nothing yet — changes accumulate here and are promoted to a dated version heading at release time._
+### Added
+
+- `Themia.Generators.Abstractions` (`netstandard2.0`) — reusable Roslyn helpers (compilation
+  scanner, service-type/lifetime resolvers, deterministic source writer, diagnostics factory +
+  reserved diagnostic-ID ranges) shared by the source generator and analyzers.
+- `Themia.DependencyInjection` (`net8.0;net10.0`) — DI marker attributes
+  (`[Scoped]`/`[Singleton]`/`[Transient]`, init-only, with `ServiceType`/`ServiceKey`/
+  `AllowSelfRegistration`), lifetime marker interfaces (`IScopedService<T>` etc.), and
+  `IThemiaServiceRegistrar`.
+- `Themia.SourceGenerator` (`netstandard2.0`) — reflection-free, compile-time DI registration
+  generator emitting `AddThemiaServices(IServiceCollection)` from attributes + markers +
+  registrars, including keyed registrations via `ServiceKey`; diagnostics `THEMIA001`–`THEMIA010`.
+- `Themia.Analyzers` (`netstandard2.0`) — `THEMIA101` (catch-log-rethrow) and `THEMIA102`
+  (sync-over-async wrapped in `Task.FromResult`).
 
 ## 0.1.0 — 2026-06-02
 
