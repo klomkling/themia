@@ -1,5 +1,21 @@
 #nullable enable
+abstract Themia.Framework.Core.Modules.ThemiaModuleBase.Descriptor.get -> Themia.Framework.Core.Modules.ModuleDescriptor!
 abstract Themia.Framework.Core.Primitives.ValueObject.GetEqualityComponents() -> System.Collections.Generic.IEnumerable<object?>!
+Themia.Framework.Core.Modules.IThemiaModule
+Themia.Framework.Core.Modules.IThemiaModule.ConfigureServices(Microsoft.Extensions.DependencyInjection.IServiceCollection! services) -> void
+Themia.Framework.Core.Modules.IThemiaModule.Descriptor.get -> Themia.Framework.Core.Modules.ModuleDescriptor!
+Themia.Framework.Core.Modules.IThemiaModule.InitializeAsync(System.IServiceProvider! serviceProvider, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+Themia.Framework.Core.Modules.ModuleDescriptor
+Themia.Framework.Core.Modules.ModuleDescriptor.Dependencies.get -> System.Collections.Generic.IReadOnlyCollection<string!>!
+Themia.Framework.Core.Modules.ModuleDescriptor.Description.get -> string?
+Themia.Framework.Core.Modules.ModuleDescriptor.DisplayName.get -> string!
+Themia.Framework.Core.Modules.ModuleDescriptor.ModuleDescriptor(string! name, string? displayName = null, string? description = null, System.Version? version = null, System.Collections.Generic.IReadOnlyCollection<string!>? dependencies = null) -> void
+Themia.Framework.Core.Modules.ModuleDescriptor.Name.get -> string!
+Themia.Framework.Core.Modules.ModuleDescriptor.Version.get -> System.Version!
+Themia.Framework.Core.Modules.ThemiaModuleBase
+Themia.Framework.Core.Modules.ThemiaModuleBase.ThemiaModuleBase() -> void
+virtual Themia.Framework.Core.Modules.ThemiaModuleBase.ConfigureServices(Microsoft.Extensions.DependencyInjection.IServiceCollection! services) -> void
+virtual Themia.Framework.Core.Modules.ThemiaModuleBase.InitializeAsync(System.IServiceProvider! serviceProvider, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
 Themia.Framework.Core.Extensions.EntityExtensions
 Themia.Framework.Core.Extensions.ResultExtensions
 static Themia.Framework.Core.Extensions.EntityExtensions.AddSafely(this System.Collections.Generic.ICollection<Themia.Framework.Core.Abstractions.Entities.Entity<System.Guid>!>! collection, params System.Collections.Generic.IEnumerable<Themia.Framework.Core.Abstractions.Entities.Entity<System.Guid>!>! entities) -> System.Collections.Generic.ICollection<Themia.Framework.Core.Abstractions.Entities.Entity<System.Guid>!>!
