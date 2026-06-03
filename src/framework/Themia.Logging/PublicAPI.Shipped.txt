@@ -1,0 +1,64 @@
+#nullable enable
+static Themia.Logging.ServiceCollectionExtensions.AddThemiaLogging(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services) -> Themia.Logging.IThemiaLoggingBuilder!
+static Themia.Logging.ServiceCollectionExtensions.AddThemiaLogging(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, Microsoft.Extensions.Configuration.IConfiguration! configuration) -> Themia.Logging.IThemiaLoggingBuilder!
+static Themia.Logging.ServiceCollectionExtensions.AddThemiaLogging(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Serilog.LoggerConfiguration!>! configure) -> Themia.Logging.IThemiaLoggingBuilder!
+static Themia.Logging.ThemiaLogContext.PushProperty(string! name, object? value, bool destructureObjects = false) -> System.IDisposable!
+Themia.Logging.ConsoleSinkRegistration
+Themia.Logging.ConsoleSinkRegistration.ConsoleSinkRegistration() -> void
+Themia.Logging.ConsoleSinkRegistration.Register(Serilog.LoggerConfiguration! loggerConfiguration, Themia.Logging.LoggingOptions! options, System.IServiceProvider? services) -> void
+Themia.Logging.FileSinkRegistration
+Themia.Logging.FileSinkRegistration.FileSinkRegistration() -> void
+Themia.Logging.FileSinkRegistration.Register(Serilog.LoggerConfiguration! loggerConfiguration, Themia.Logging.LoggingOptions! options, System.IServiceProvider? services) -> void
+Themia.Logging.ISerilogSinkRegistration
+Themia.Logging.ISerilogSinkRegistration.Register(Serilog.LoggerConfiguration! loggerConfiguration, Themia.Logging.LoggingOptions! options, System.IServiceProvider? services) -> void
+Themia.Logging.IThemiaLoggingBuilder
+Themia.Logging.IThemiaLoggingBuilder.AddSink(Themia.Logging.ISerilogSinkRegistration! registration) -> Themia.Logging.IThemiaLoggingBuilder!
+Themia.Logging.IThemiaLoggingBuilder.BuildLogger(System.IServiceProvider? serviceProvider = null) -> Serilog.ILogger!
+Themia.Logging.IThemiaLoggingBuilder.Configuration.get -> Microsoft.Extensions.Configuration.IConfiguration?
+Themia.Logging.IThemiaLoggingBuilder.Configure(System.Action<Serilog.LoggerConfiguration!>! configure) -> Themia.Logging.IThemiaLoggingBuilder!
+Themia.Logging.IThemiaLoggingBuilder.Options.get -> Themia.Logging.LoggingOptions!
+Themia.Logging.IThemiaLoggingBuilder.Services.get -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+Themia.Logging.LoggingOptions
+Themia.Logging.LoggingOptions.Console.get -> Themia.Logging.LoggingOptions.ConsoleOptions!
+Themia.Logging.LoggingOptions.Console.set -> void
+Themia.Logging.LoggingOptions.ConsoleOptions
+Themia.Logging.LoggingOptions.ConsoleOptions.ConsoleOptions() -> void
+Themia.Logging.LoggingOptions.ConsoleOptions.Enabled.get -> bool
+Themia.Logging.LoggingOptions.ConsoleOptions.Enabled.set -> void
+Themia.Logging.LoggingOptions.ConsoleOptions.OutputTemplate.get -> string!
+Themia.Logging.LoggingOptions.ConsoleOptions.OutputTemplate.set -> void
+Themia.Logging.LoggingOptions.ConsoleOptions.UseAnsiConsole.get -> bool
+Themia.Logging.LoggingOptions.ConsoleOptions.UseAnsiConsole.set -> void
+Themia.Logging.LoggingOptions.Enrichers.get -> Themia.Logging.LoggingOptions.EnrichersOptions!
+Themia.Logging.LoggingOptions.Enrichers.set -> void
+Themia.Logging.LoggingOptions.EnrichersOptions
+Themia.Logging.LoggingOptions.EnrichersOptions.EnrichersOptions() -> void
+Themia.Logging.LoggingOptions.EnrichersOptions.WithEnvironmentUserName.get -> bool
+Themia.Logging.LoggingOptions.EnrichersOptions.WithEnvironmentUserName.set -> void
+Themia.Logging.LoggingOptions.EnrichersOptions.WithMachineName.get -> bool
+Themia.Logging.LoggingOptions.EnrichersOptions.WithMachineName.set -> void
+Themia.Logging.LoggingOptions.EnrichersOptions.WithThreadId.get -> bool
+Themia.Logging.LoggingOptions.EnrichersOptions.WithThreadId.set -> void
+Themia.Logging.LoggingOptions.File.get -> Themia.Logging.LoggingOptions.FileOptions!
+Themia.Logging.LoggingOptions.File.set -> void
+Themia.Logging.LoggingOptions.FileOptions
+Themia.Logging.LoggingOptions.FileOptions.Buffered.get -> bool
+Themia.Logging.LoggingOptions.FileOptions.Buffered.set -> void
+Themia.Logging.LoggingOptions.FileOptions.Enabled.get -> bool
+Themia.Logging.LoggingOptions.FileOptions.Enabled.set -> void
+Themia.Logging.LoggingOptions.FileOptions.FileOptions() -> void
+Themia.Logging.LoggingOptions.FileOptions.FileSizeLimitBytes.get -> long?
+Themia.Logging.LoggingOptions.FileOptions.FileSizeLimitBytes.set -> void
+Themia.Logging.LoggingOptions.FileOptions.Path.get -> string!
+Themia.Logging.LoggingOptions.FileOptions.Path.set -> void
+Themia.Logging.LoggingOptions.FileOptions.RetainedFileCountLimit.get -> int?
+Themia.Logging.LoggingOptions.FileOptions.RetainedFileCountLimit.set -> void
+Themia.Logging.LoggingOptions.FileOptions.RollingInterval.get -> string!
+Themia.Logging.LoggingOptions.FileOptions.RollingInterval.set -> void
+Themia.Logging.LoggingOptions.FileOptions.Shared.get -> bool
+Themia.Logging.LoggingOptions.FileOptions.Shared.set -> void
+Themia.Logging.LoggingOptions.LoggingOptions() -> void
+Themia.Logging.LoggingOptions.MinimumLevel.get -> string!
+Themia.Logging.LoggingOptions.MinimumLevel.set -> void
+Themia.Logging.ServiceCollectionExtensions
+Themia.Logging.ThemiaLogContext
