@@ -68,6 +68,11 @@ public sealed class SyncOverAsyncAnalyzer : DiagnosticAnalyzer
         // (incomplete compilation), treat `X.FromResult(call())` as Task.FromResult
         // rather than silently skipping a likely real occurrence.
         var symbol = model.GetSymbolInfo(inv).Symbol;
-        return symbol is null || symbol.ContainingType?.Name == "Task";
+        if (symbol is null)
+            return true;
+        // Resolved: require System.Threading.Tasks.Task.FromResult, so a user type named Task
+        // with its own FromResult isn't matched.
+        return symbol.ContainingType is { Name: "Task" } ct
+               && ct.ContainingNamespace?.ToDisplayString() == "System.Threading.Tasks";
     }
 }

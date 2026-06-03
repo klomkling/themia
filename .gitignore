@@ -12,6 +12,9 @@ artifacts/
 *.suo
 *.userosscache
 *.sln.docstates
+# Rider/ReSharper per-solution settings (inspection prefs, not project config)
+*.DotSettings
+*.DotSettings.user
 
 # .NET
 project.lock.json

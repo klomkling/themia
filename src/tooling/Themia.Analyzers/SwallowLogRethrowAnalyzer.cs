@@ -29,14 +29,19 @@ public sealed class SwallowLogRethrowAnalyzer : DiagnosticAnalyzer
         if (catchClause.Block is null)
             return;
 
-        // A bare rethrow (`throw;` / `throw ex;`) may sit inside a nested if/try/using block,
-        // not just at the top of the catch — scan descendants. Skip nested lambdas and local
+        // A rethrow of the CAUGHT exception: `throw;`, or `throw ex;` where `ex` is the catch
+        // variable (`throw other;` of an unrelated variable is NOT a rethrow). It may sit inside
+        // a nested if/try/using block — scan descendants — but skip nested lambdas and local
         // functions, where a throw is not a rethrow of the caught exception. (Mirrors the deep
         // scan used for the logger-call check below.)
+        var caughtVariable = catchClause.Declaration?.Identifier.Text;
         var rethrows = catchClause.Block
             .DescendantNodes(n => n is not (AnonymousFunctionExpressionSyntax or LocalFunctionStatementSyntax))
             .OfType<ThrowStatementSyntax>()
-            .Any(t => t.Expression is null || t.Expression is IdentifierNameSyntax);
+            .Any(t => t.Expression is null
+                || (t.Expression is IdentifierNameSyntax id
+                    && !string.IsNullOrEmpty(caughtVariable)
+                    && id.Identifier.Text == caughtVariable));
         if (!rethrows)
             return;
 

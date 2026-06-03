@@ -90,4 +90,18 @@ public class S {
 }";
         await new Verify<SwallowLogRethrowAnalyzer>.Test { TestCode = src }.RunAsync();
     }
+
+    [Fact]
+    public async Task LogAndThrowDifferentVariable_NotFlagged()
+    {
+        // `throw other;` throws a different exception, not the caught `ex` — not a rethrow.
+        var src = Stubs + @"
+public class S {
+    private ILogger _log = null!;
+    public void M(System.Exception other) {
+        try { } catch (System.Exception ex) { _log.LogError(ex, ""x""); throw other; }
+    }
+}";
+        await new Verify<SwallowLogRethrowAnalyzer>.Test { TestCode = src }.RunAsync();
+    }
 }
