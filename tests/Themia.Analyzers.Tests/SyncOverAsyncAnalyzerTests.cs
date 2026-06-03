@@ -67,4 +67,19 @@ public class S {
 }";
         await new Verify<SyncOverAsyncAnalyzer>.Test { TestCode = src }.RunAsync();
     }
+
+    [Fact]
+    public async Task UserTypeNamedTask_NotFlagged()
+    {
+        // A user-defined type named Task (not System.Threading.Tasks.Task) must not be matched.
+        var src = @"
+namespace Custom {
+    public class Task<T> { public static Task<T> FromResult(T v) => new Task<T>(); }
+    public class S {
+        private int Compute() => 1;
+        public Task<int> GetAsync() => Task<int>.FromResult(Compute());
+    }
+}";
+        await new Verify<SyncOverAsyncAnalyzer>.Test { TestCode = src }.RunAsync();
+    }
 }

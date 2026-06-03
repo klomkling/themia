@@ -55,7 +55,7 @@ public sealed class ProblemDetailsMiddleware(
             Detail = ex.Message,
             Instance = ctx.Request.Path,
         };
-        // Consumer metadata first, then reservedly keys last so they can't be overridden.
+        // Consumer metadata first, then reserved keys last so they can't be overridden.
         AddMetadata(problem, ex.Metadata);
         problem.Extensions["traceId"] = traceId;
         if (ex.ErrorCode is not null) problem.Extensions["errorCode"] = ex.ErrorCode;
@@ -77,7 +77,7 @@ public sealed class ProblemDetailsMiddleware(
             Detail = ex.Message,
             Instance = ctx.Request.Path,
         };
-        // Consumer metadata first, then reservedly keys last so they can't be overridden.
+        // Consumer metadata first, then reserved keys last so they can't be overridden.
         AddMetadata(problem, ex.Metadata);
         problem.Extensions["traceId"] = traceId;
         if (ex.ErrorCode is not null) problem.Extensions["errorCode"] = ex.ErrorCode;

@@ -28,11 +28,13 @@ public sealed class SyncOverAsyncAnalyzer : DiagnosticAnalyzer
     {
         var method = (MethodDeclarationSyntax)context.Node;
 
-        // Exact name match: both Task and Task<T> report Name == "Task", so this
-        // covers the generic case without matching unrelated user types like
-        // TaskQueue/TaskResult.
+        // Match System.Threading.Tasks.Task / Task<T> only. Name == "Task" covers both the
+        // non-generic and generic forms; the namespace check rejects unrelated user-defined
+        // types named Task (and TaskQueue/TaskResult never match on name anyway).
         var returnType = context.SemanticModel.GetTypeInfo(method.ReturnType).Type;
-        if (returnType is null || returnType.Name != "Task")
+        if (returnType is null
+            || returnType.Name != "Task"
+            || returnType.ContainingNamespace?.ToDisplayString() != "System.Threading.Tasks")
             return;
 
         var inner = ExtractSingleReturnExpression(method);

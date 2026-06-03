@@ -170,18 +170,17 @@ public sealed class ServiceRegistrationGenerator : IIncrementalGenerator
 
         // Read the ServiceType named arg from the attribute (e.g. [Scoped(ServiceType = typeof(IFoo))]).
         INamedTypeSymbol? attributeServiceType = null;
+        var allowSelfRegistration = false;
         switch (lifetimeAttrs.Count)
         {
             case 1:
             {
-                var namedArgs = lifetimeAttrs[0].Attr.NamedArguments;
-                foreach (var kv in namedArgs)
+                foreach (var kv in lifetimeAttrs[0].Attr.NamedArguments)
                 {
                     if (kv is { Key: "ServiceType", Value.Value: INamedTypeSymbol svc })
-                    {
                         attributeServiceType = svc;
-                        break;
-                    }
+                    else if (kv is { Key: "AllowSelfRegistration", Value.Value: bool allow })
+                        allowSelfRegistration = allow;
                 }
 
                 break;
@@ -197,7 +196,8 @@ public sealed class ServiceRegistrationGenerator : IIncrementalGenerator
             lifetimeAttrs: lifetimeAttrs,
             markerLifetimes: markerLifetimes,
             genericMarkerServiceType: genericMarkerServiceType,
-            attributeServiceType: attributeServiceType);
+            attributeServiceType: attributeServiceType,
+            allowSelfRegistration: allowSelfRegistration);
     }
 
     private static List<string> CollectMarkerLifetimes(INamedTypeSymbol type)
@@ -339,8 +339,10 @@ public sealed class ServiceRegistrationGenerator : IIncrementalGenerator
         }
         else
         {
-            // Fall back to I{ClassName} convention.
-            ServiceTypeResolver.TryResolveByConvention(info.Type, out serviceType);
+            // Fall back to the I{ClassName} convention, then self-registration if the
+            // attribute opted in via AllowSelfRegistration.
+            ServiceTypeResolver.TryResolveWithSelfRegistration(
+                info.Type, info.AllowSelfRegistration, out serviceType);
         }
 
         if (serviceType is null)
@@ -479,7 +481,8 @@ public sealed class ServiceRegistrationGenerator : IIncrementalGenerator
         List<(AttributeData Attr, string Lifetime, bool IsLegacy)> lifetimeAttrs,
         List<string> markerLifetimes,
         INamedTypeSymbol? genericMarkerServiceType,
-        INamedTypeSymbol? attributeServiceType)
+        INamedTypeSymbol? attributeServiceType,
+        bool allowSelfRegistration)
     {
         public INamedTypeSymbol Type { get; } = type;
         public ClassDeclarationSyntax ClassDecl { get; } = classDecl;
@@ -487,6 +490,7 @@ public sealed class ServiceRegistrationGenerator : IIncrementalGenerator
         public List<string> MarkerLifetimes { get; } = markerLifetimes;
         public INamedTypeSymbol? GenericMarkerServiceType { get; } = genericMarkerServiceType;
         public INamedTypeSymbol? AttributeServiceType { get; } = attributeServiceType;
+        public bool AllowSelfRegistration { get; } = allowSelfRegistration;
     }
 
     private sealed class RegistrarCandidate(
