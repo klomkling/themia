@@ -457,8 +457,12 @@ public sealed class ServiceRegistrationGenerator : IIncrementalGenerator
         };
     }
 
+    // FullyQualifiedFormat already prefixes global:: on the type AND its type arguments.
+    // (A "global:: + Replace(\"global::\", \"\")" round-trip would strip qualification off the
+    // type arguments of a closed generic — e.g. global::Ns.Repo<Ns.Entity> — and reintroduce
+    // ambiguity in the generated code.)
     private static string ToGlobalQualified(INamedTypeSymbol s) =>
-        "global::" + s.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat).Replace("global::", "");
+        s.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
 
     // -------------------------------------------------------------------------
     // Data types
