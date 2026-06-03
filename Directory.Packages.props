@@ -16,7 +16,6 @@
     <PackageVersion Include="Microsoft.Extensions.Options" Version="9.0.0" />
     <PackageVersion Include="Microsoft.Extensions.Logging" Version="9.0.0" />
     <PackageVersion Include="Microsoft.Extensions.Caching.Memory" Version="9.0.0" />
-    <PackageVersion Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="9.0.0" />
     <!-- Caching providers -->
     <PackageVersion Include="StackExchange.Redis" Version="2.8.16" />
     <PackageVersion Include="MessagePack" Version="2.5.187" />
