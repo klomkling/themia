@@ -1,8 +1,5 @@
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.Text.Json;
-using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
@@ -32,21 +29,21 @@ public sealed class ProblemDetailsMiddleware(
                 context.Request.Method, context.Request.Path, traceId);
             throw;
         }
-        catch (NotFoundException ex) { await Write(context, 404, "Not Found", ex, traceId, LogLevel.Warning); }
-        catch (ConflictException ex) { await Write(context, 409, "Conflict", ex, traceId, LogLevel.Warning); }
-        catch (ForbiddenException ex) { await Write(context, 403, "Forbidden", ex, traceId, LogLevel.Warning); }
-        catch (UnauthorizedException ex) { await Write(context, 401, "Unauthorized", ex, traceId, LogLevel.Warning); }
-        catch (ValidationException ex) { await WriteValidation(context, ex, traceId); }
-        catch (ExternalServiceException ex) { await Write(context, 503, "Service unavailable", ex, traceId, LogLevel.Error); }
+        catch (NotFoundException ex) { await WriteAsync(context, 404, "Not Found", ex, traceId, LogLevel.Warning); }
+        catch (ConflictException ex) { await WriteAsync(context, 409, "Conflict", ex, traceId, LogLevel.Warning); }
+        catch (ForbiddenException ex) { await WriteAsync(context, 403, "Forbidden", ex, traceId, LogLevel.Warning); }
+        catch (UnauthorizedException ex) { await WriteAsync(context, 401, "Unauthorized", ex, traceId, LogLevel.Warning); }
+        catch (ValidationException ex) { await WriteValidationAsync(context, ex, traceId); }
+        catch (ExternalServiceException ex) { await WriteAsync(context, 503, "Service unavailable", ex, traceId, LogLevel.Error); }
         catch (Exception ex)
         {
             logger.LogError(ex, "Unhandled exception for {Method} {Path} (TraceId: {TraceId})",
                 context.Request.Method, context.Request.Path, traceId);
-            await WriteGeneric(context, 500, "Server error", "An unexpected error occurred.", traceId);
+            await WriteGenericAsync(context, 500, "Server error", "An unexpected error occurred.", traceId);
         }
     }
 
-    private async Task Write(HttpContext ctx, int status, string title, ThemiaException ex, string traceId, LogLevel level)
+    private async Task WriteAsync(HttpContext ctx, int status, string title, ThemiaException ex, string traceId, LogLevel level)
     {
         logger.Log(level, ex, "{Title} for {Method} {Path} (TraceId: {TraceId})",
             title, ctx.Request.Method, ctx.Request.Path, traceId);
@@ -64,10 +61,10 @@ public sealed class ProblemDetailsMiddleware(
         if (ex.ErrorCode is not null) problem.Extensions["errorCode"] = ex.ErrorCode;
         if (ex is ExternalServiceException ese) problem.Extensions["service"] = ese.ServiceName;
 
-        await WriteProblem(ctx, problem, status, traceId);
+        await WriteProblemAsync(ctx, problem, status, traceId);
     }
 
-    private async Task WriteValidation(HttpContext ctx, ValidationException ex, string traceId)
+    private async Task WriteValidationAsync(HttpContext ctx, ValidationException ex, string traceId)
     {
         logger.LogWarning(ex, "Validation error for {Method} {Path} (TraceId: {TraceId})",
             ctx.Request.Method, ctx.Request.Path, traceId);
@@ -85,20 +82,26 @@ public sealed class ProblemDetailsMiddleware(
         problem.Extensions["traceId"] = traceId;
         if (ex.ErrorCode is not null) problem.Extensions["errorCode"] = ex.ErrorCode;
 
-        await WriteProblem(ctx, problem, 400, traceId);
+        await WriteProblemAsync(ctx, problem, 400, traceId);
     }
 
-    private async Task WriteGeneric(HttpContext ctx, int status, string title, string detail, string traceId)
+    private async Task WriteGenericAsync(HttpContext ctx, int status, string title, string detail, string traceId)
     {
-        var problem = new ProblemDetails { Status = status, Title = title, Detail = detail, Instance = ctx.Request.Path };
-        problem.Extensions["traceId"] = traceId;
-        await WriteProblem(ctx, problem, status, traceId);
+        var problem = new ProblemDetails
+        {
+            Status = status,
+            Title = title,
+            Detail = detail,
+            Instance = ctx.Request.Path,
+            Extensions = { ["traceId"] = traceId },
+        };
+        await WriteProblemAsync(ctx, problem, status, traceId);
     }
 
     // Serializes the body BEFORE touching the response. Consumer-supplied Metadata values are
-    // arbitrary objects, so serialization can fail; if it does we drop the extensions and emit a
+    // arbitrary objects, so serialization can fail; if it does, we drop the extensions and emit a
     // minimal, guaranteed-serializable body rather than letting the throw escape this error handler.
-    private async Task WriteProblem(HttpContext ctx, ProblemDetails problem, int status, string traceId)
+    private async Task WriteProblemAsync(HttpContext ctx, ProblemDetails problem, int status, string traceId)
     {
         string payload;
         try

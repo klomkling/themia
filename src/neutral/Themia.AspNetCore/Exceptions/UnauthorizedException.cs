@@ -1,5 +1,3 @@
-using System.Collections.Generic;
-
 namespace Themia.AspNetCore.Exceptions;
 
 /// <summary>Not authenticated. Maps to HTTP 401.</summary>

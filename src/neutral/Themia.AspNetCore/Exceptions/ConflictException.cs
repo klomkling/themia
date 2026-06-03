@@ -1,5 +1,3 @@
-using System.Collections.Generic;
-
 namespace Themia.AspNetCore.Exceptions;
 
 /// <summary>State conflict (e.g. duplicate). Maps to HTTP 409.</summary>

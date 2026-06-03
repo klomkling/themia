@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-
 namespace Themia.AspNetCore.Exceptions;
 
 /// <summary>A downstream dependency failed. Maps to HTTP 503.</summary>

@@ -1,0 +1,53 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <!--
+      Microsoft.CodeAnalysis.CSharp.Analyzer.Testing.XUnit 1.1.2 declares
+      pinned dependencies on the 3.8.0 line of Microsoft.CodeAnalysis.* packages,
+      but our analyzers target 4.11.0. The 4.11.0 line is a strict superset; the
+      runtime resolution is correct, but NU1608 fires per package. Out of our
+      control until the testing-xunit package is updated upstream.
+
+      CS0618: XUnitVerifier is marked [Obsolete] in the 1.1.2 Roslyn SDK testing
+      packages with a migration guide URL but no replacement type in this version.
+      The type still compiles and functions correctly; suppress until the package
+      ships a non-obsolete successor.
+
+      NU1701: the Analyzer.Testing.XUnit harness transitively pulls net461-era
+      Microsoft.CodeAnalysis.*.Workspaces / Microsoft.Composition packages. They
+      resolve correctly against net10 at runtime; the cross-TFM restore warning is
+      out of our control until the testing harness updates its dependencies.
+    -->
+    <NoWarn>$(NoWarn);NU1608;CS0618;NU1701</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="coverlet.collector">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Analyzer.Testing.XUnit" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--
+      Plain compile reference (not OutputItemType="Analyzer"): these are analyzer unit
+      tests that instantiate the analyzer types directly via the Roslyn testing harness,
+      so the test code must see SwallowLogRethrowAnalyzer / SyncOverAsyncAnalyzer at
+      compile time. The harness loads the analyzer into its own in-memory compilation.
+    -->
+    <ProjectReference Include="..\..\src\tooling\Themia.Analyzers\Themia.Analyzers.csproj" />
+    <!-- Abstractions reference so the analyzer DLL resolves its dependency at runtime -->
+    <ProjectReference Include="..\..\src\tooling\Themia.Generators.Abstractions\Themia.Generators.Abstractions.csproj" />
+  </ItemGroup>
+</Project>

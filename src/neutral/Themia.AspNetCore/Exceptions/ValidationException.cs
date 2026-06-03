@@ -1,5 +1,3 @@
-using System.Collections.Generic;
-
 namespace Themia.AspNetCore.Exceptions;
 
 /// <summary>Input failed validation. Maps to HTTP 400.</summary>

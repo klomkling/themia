@@ -1,0 +1,47 @@
+#nullable enable
+const Themia.Generators.Abstractions.Diagnostics.DiagnosticIdRange.ConsumerRange = "THEMIA200+" -> string!
+const Themia.Generators.Abstractions.Diagnostics.DiagnosticIdRange.ThemiaAnalyzersRange = "THEMIA100-THEMIA199" -> string!
+const Themia.Generators.Abstractions.Diagnostics.DiagnosticIdRange.ThemiaDIRange = "THEMIA001-THEMIA099" -> string!
+Themia.Generators.Abstractions.Diagnostics.DiagnosticIdRange
+Themia.Generators.Abstractions.Diagnostics.ThemiaDiagnostics
+Themia.Generators.Abstractions.Emission.ThemiaSourceWriter
+Themia.Generators.Abstractions.Emission.ThemiaSourceWriter.AppendLine(string! line = "") -> Themia.Generators.Abstractions.Emission.ThemiaSourceWriter!
+Themia.Generators.Abstractions.Emission.ThemiaSourceWriter.AppendRaw(string! raw) -> Themia.Generators.Abstractions.Emission.ThemiaSourceWriter!
+Themia.Generators.Abstractions.Emission.ThemiaSourceWriter.CloseClass() -> Themia.Generators.Abstractions.Emission.ThemiaSourceWriter!
+Themia.Generators.Abstractions.Emission.ThemiaSourceWriter.CloseMethod() -> Themia.Generators.Abstractions.Emission.ThemiaSourceWriter!
+Themia.Generators.Abstractions.Emission.ThemiaSourceWriter.OpenClass(string! name, bool isStatic = false, bool isPartial = false) -> Themia.Generators.Abstractions.Emission.ThemiaSourceWriter!
+Themia.Generators.Abstractions.Emission.ThemiaSourceWriter.OpenMethod(string! signature) -> Themia.Generators.Abstractions.Emission.ThemiaSourceWriter!
+Themia.Generators.Abstractions.Emission.ThemiaSourceWriter.ThemiaSourceWriter() -> void
+Themia.Generators.Abstractions.Emission.ThemiaSourceWriter.ToSourceText() -> Microsoft.CodeAnalysis.Text.SourceText!
+Themia.Generators.Abstractions.Emission.ThemiaSourceWriter.WithFileHeader() -> Themia.Generators.Abstractions.Emission.ThemiaSourceWriter!
+Themia.Generators.Abstractions.Emission.ThemiaSourceWriter.WithNamespace(string! ns) -> Themia.Generators.Abstractions.Emission.ThemiaSourceWriter!
+Themia.Generators.Abstractions.Emission.ThemiaSourceWriter.WithUsings(params string![]! namespaces) -> Themia.Generators.Abstractions.Emission.ThemiaSourceWriter!
+Themia.Generators.Abstractions.Scanning.INamedTypeSymbolExtensions
+Themia.Generators.Abstractions.Scanning.ResolvedServiceType
+Themia.Generators.Abstractions.Scanning.ResolvedServiceType.ImplementationType.get -> string!
+Themia.Generators.Abstractions.Scanning.ResolvedServiceType.Lifetime.get -> Themia.Generators.Abstractions.Validation.Lifetime
+Themia.Generators.Abstractions.Scanning.ResolvedServiceType.ResolvedServiceType(string! implementationType, string! serviceType, Themia.Generators.Abstractions.Validation.Lifetime lifetime) -> void
+Themia.Generators.Abstractions.Scanning.ResolvedServiceType.ServiceType.get -> string!
+Themia.Generators.Abstractions.Scanning.ServiceTypeResolver
+Themia.Generators.Abstractions.Scanning.ThemiaRoslynScanner
+Themia.Generators.Abstractions.Validation.Lifetime
+Themia.Generators.Abstractions.Validation.Lifetime.Scoped = 0 -> Themia.Generators.Abstractions.Validation.Lifetime
+Themia.Generators.Abstractions.Validation.Lifetime.Singleton = 1 -> Themia.Generators.Abstractions.Validation.Lifetime
+Themia.Generators.Abstractions.Validation.Lifetime.Transient = 2 -> Themia.Generators.Abstractions.Validation.Lifetime
+Themia.Generators.Abstractions.Validation.LifetimeConflict
+Themia.Generators.Abstractions.Validation.LifetimeConflict.Disagreement = 2 -> Themia.Generators.Abstractions.Validation.LifetimeConflict
+Themia.Generators.Abstractions.Validation.LifetimeConflict.None = 0 -> Themia.Generators.Abstractions.Validation.LifetimeConflict
+Themia.Generators.Abstractions.Validation.LifetimeConflict.NoneSpecified = 3 -> Themia.Generators.Abstractions.Validation.LifetimeConflict
+Themia.Generators.Abstractions.Validation.LifetimeConflict.Redundant = 1 -> Themia.Generators.Abstractions.Validation.LifetimeConflict
+Themia.Generators.Abstractions.Validation.LifetimeResolver
+static Themia.Generators.Abstractions.Diagnostics.ThemiaDiagnostics.CreateError(string! id, string! title, string! messageFormat) -> Microsoft.CodeAnalysis.DiagnosticDescriptor!
+static Themia.Generators.Abstractions.Diagnostics.ThemiaDiagnostics.CreateInfo(string! id, string! title, string! messageFormat) -> Microsoft.CodeAnalysis.DiagnosticDescriptor!
+static Themia.Generators.Abstractions.Diagnostics.ThemiaDiagnostics.CreateWarning(string! id, string! title, string! messageFormat) -> Microsoft.CodeAnalysis.DiagnosticDescriptor!
+static Themia.Generators.Abstractions.Scanning.INamedTypeSymbolExtensions.HasAttributeWithFullName(this Microsoft.CodeAnalysis.INamedTypeSymbol! symbol, string! fullName) -> bool
+static Themia.Generators.Abstractions.Scanning.INamedTypeSymbolExtensions.ImplementsInterface(this Microsoft.CodeAnalysis.INamedTypeSymbol! symbol, string! fullName) -> bool
+static Themia.Generators.Abstractions.Scanning.ServiceTypeResolver.TryResolveByConvention(Microsoft.CodeAnalysis.INamedTypeSymbol! implementationType, out Microsoft.CodeAnalysis.INamedTypeSymbol? serviceType) -> bool
+static Themia.Generators.Abstractions.Scanning.ServiceTypeResolver.TryResolveWithSelfRegistration(Microsoft.CodeAnalysis.INamedTypeSymbol! implementationType, bool allowSelfRegistration, out Microsoft.CodeAnalysis.INamedTypeSymbol? serviceType) -> bool
+static Themia.Generators.Abstractions.Scanning.ThemiaRoslynScanner.FindByAttribute(Microsoft.CodeAnalysis.Compilation! compilation, string! fullAttributeName) -> System.Collections.Generic.IEnumerable<Microsoft.CodeAnalysis.INamedTypeSymbol!>!
+static Themia.Generators.Abstractions.Scanning.ThemiaRoslynScanner.FindByAttributeImplementingInterface(Microsoft.CodeAnalysis.Compilation! compilation, string! fullInterfaceName) -> System.Collections.Generic.IEnumerable<Microsoft.CodeAnalysis.INamedTypeSymbol!>!
+static Themia.Generators.Abstractions.Scanning.ThemiaRoslynScanner.FindByInterface(Microsoft.CodeAnalysis.Compilation! compilation, params string![]! fullInterfaceNames) -> System.Collections.Generic.IEnumerable<Microsoft.CodeAnalysis.INamedTypeSymbol!>!
+static Themia.Generators.Abstractions.Validation.LifetimeResolver.Resolve(Themia.Generators.Abstractions.Validation.Lifetime? attributeLifetime, Themia.Generators.Abstractions.Validation.Lifetime? markerLifetime) -> (Themia.Generators.Abstractions.Validation.Lifetime? Lifetime, Themia.Generators.Abstractions.Validation.LifetimeConflict? Conflict)

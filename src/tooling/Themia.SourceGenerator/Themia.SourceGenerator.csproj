@@ -1,0 +1,63 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <PackageId>Themia.SourceGenerator</PackageId>
+    <Description>Themia DI source generator — emits AddThemiaServices(IServiceCollection) from [Scoped/Singleton/Transient] attributes and lifetime marker interfaces.</Description>
+    <PackageTags>themia;roslyn;source-generator;di;dependency-injection</PackageTags>
+    <IsRoslynComponent>true</IsRoslynComponent>
+    <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+    <!-- Pack via 'dotnet pack' explicitly; do not trigger on every build -->
+    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <!-- Analyzer-only package: no runtime output → symbols package would be empty → NU5017 -->
+    <IncludeSymbols>false</IncludeSymbols>
+    <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+    <DevelopmentDependency>true</DevelopmentDependency>
+    <NoWarn>$(NoWarn);RS1032;RS2008;NU5128</NoWarn>
+    <NoPackageAnalysis>true</NoPackageAnalysis>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../Themia.Generators.Abstractions/Themia.Generators.Abstractions.csproj" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Placeholder so the package has a lib target and satisfies NuGet requirements -->
+    <None Include="NetStandard20LibPlaceholder._._" Pack="true" PackagePath="lib/netstandard2.0/_._" Visible="false" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AdditionalFiles Include="AnalyzerReleases.Shipped.md" />
+    <AdditionalFiles Include="AnalyzerReleases.Unshipped.md" />
+    <AdditionalFiles Include="PublicAPI.Shipped.txt" />
+    <AdditionalFiles Include="PublicAPI.Unshipped.txt" />
+  </ItemGroup>
+
+  <!--
+    Use the documented Roslyn-cookbook pattern: hook into TargetsForTfmSpecificContentOutput
+    so the pack task sees the analyzer DLLs as real content going into analyzers/dotnet/cs.
+    NuGet counts TfmSpecificPackageFile items as package content (satisfies the NU5017 check).
+  -->
+  <PropertyGroup>
+    <TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);PackAnalyzerDlls</TargetsForTfmSpecificContentInPackage>
+  </PropertyGroup>
+  <Target Name="PackAnalyzerDlls" DependsOnTargets="Build">
+    <ItemGroup>
+      <TfmSpecificPackageFile Include="$(MSBuildProjectDirectory)\bin\$(Configuration)\$(TargetFramework)\Themia.SourceGenerator.dll">
+        <PackagePath>analyzers/dotnet/cs</PackagePath>
+      </TfmSpecificPackageFile>
+      <TfmSpecificPackageFile Include="$(MSBuildProjectDirectory)\bin\$(Configuration)\$(TargetFramework)\Themia.Generators.Abstractions.dll">
+        <PackagePath>analyzers/dotnet/cs</PackagePath>
+      </TfmSpecificPackageFile>
+    </ItemGroup>
+  </Target>
+</Project>

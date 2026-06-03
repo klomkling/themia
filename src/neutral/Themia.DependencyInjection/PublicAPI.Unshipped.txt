@@ -1,0 +1,3 @@
+#nullable enable
+Themia.DependencyInjection.IThemiaServiceRegistrar
+Themia.DependencyInjection.IThemiaServiceRegistrar.Register(Microsoft.Extensions.DependencyInjection.IServiceCollection! services) -> void
