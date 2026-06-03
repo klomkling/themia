@@ -3,7 +3,6 @@
 #nullable enable
 
 using Microsoft.Extensions.DependencyInjection;
-using Themia.Extensions;
 
 namespace Themia.Generated;
 

@@ -28,8 +28,13 @@ public class ConsumerCompilationTests
         var references = AppDomain.CurrentDomain.GetAssemblies()
             .Where(a => !a.IsDynamic && !string.IsNullOrEmpty(a.Location))
             .Select(a => MetadataReference.CreateFromFile(a.Location))
+            // The consumer (and the generated AddThemiaServices extension) needs the DI
+            // attributes and IServiceCollection — reference both assemblies explicitly so the
+            // output compilation is complete enough to compile-check.
             .Append(MetadataReference.CreateFromFile(
-                typeof(Themia.DependencyInjection.ScopedAttribute).Assembly.Location));
+                typeof(Themia.DependencyInjection.ScopedAttribute).Assembly.Location))
+            .Append(MetadataReference.CreateFromFile(
+                typeof(Microsoft.Extensions.DependencyInjection.IServiceCollection).Assembly.Location));
         var compilation = CSharpCompilation.Create(
             "Consumer",
             [syntaxTree],
@@ -45,5 +50,13 @@ public class ConsumerCompilationTests
         Assert.Contains(
             "services.AddScoped<global::Consumer.IFooService, global::Consumer.FooService>();",
             generated);
+
+        // The generated code must itself compile in the consumer — e.g. no using of a
+        // namespace that does not exist. (Guards against emitting stray using directives.)
+        var compileErrors = outputCompilation.GetDiagnostics()
+            .Where(d => d.Severity == DiagnosticSeverity.Error)
+            .ToList();
+        Assert.True(compileErrors.Count == 0,
+            "Generated code did not compile cleanly: " + string.Join("; ", compileErrors));
     }
 }

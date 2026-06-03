@@ -47,7 +47,7 @@ public sealed class ServiceRegistrationGenerator : IIncrementalGenerator
 
             var writer = new ThemiaSourceWriter()
                 .WithFileHeader()
-                .WithUsings("Themia.Extensions", "Microsoft.Extensions.DependencyInjection")
+                .WithUsings("Microsoft.Extensions.DependencyInjection")
                 .WithNamespace("Themia.Generated")
                 .OpenClass("ThemiaServiceRegistrations", isStatic: true)
                 .OpenMethod("public static IServiceCollection AddThemiaServices(this IServiceCollection services)");
