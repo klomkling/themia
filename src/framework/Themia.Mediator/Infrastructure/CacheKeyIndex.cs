@@ -36,14 +36,12 @@ public sealed class CacheKeyIndex : ICacheKeyIndex
     public async Task TrackAsync(
         string valueKey,
         Type queryType,
-        string typePrefixKey,
         string? scopeRoot,
         string? customPrefix,
         CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(valueKey);
         ArgumentNullException.ThrowIfNull(queryType);
-        ArgumentException.ThrowIfNullOrWhiteSpace(typePrefixKey);
 
         try
         {

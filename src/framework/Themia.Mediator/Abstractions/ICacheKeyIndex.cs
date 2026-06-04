@@ -10,14 +10,12 @@ public interface ICacheKeyIndex
     /// </summary>
     /// <param name="valueKey">The actual cache key storing the value.</param>
     /// <param name="queryType">The query type that generated this cache entry.</param>
-    /// <param name="typePrefixKey">The type-based prefix key for this query type.</param>
     /// <param name="scopeRoot">Optional scope root for automatic invalidation (e.g., "Scope:Order").</param>
     /// <param name="customPrefix">Optional custom prefix from ICacheKeyProvider.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     Task TrackAsync(
         string valueKey,
         Type queryType,
-        string typePrefixKey,
         string? scopeRoot,
         string? customPrefix,
         CancellationToken cancellationToken = default);

@@ -155,11 +155,10 @@ public sealed class CachingBehavior<TRequest, TResponse> : IPipelineBehavior<TRe
                 slidingExpiration);
 
             // Track the cache key in the index
-            var typePrefix = _keyFactory.CreateTypePrefix(typeof(TRequest));
             var scopeRoot = _keyFactory.CreateScopeRoot(typeof(TRequest), _options);
             var customPrefix = request is ICacheKeyProvider keyProvider ? keyProvider.GetCacheKeyPrefix() : null;
 
-            await _keyIndex.TrackAsync(cacheKey, typeof(TRequest), typePrefix, scopeRoot, customPrefix, cancellationToken)
+            await _keyIndex.TrackAsync(cacheKey, typeof(TRequest), scopeRoot, customPrefix, cancellationToken)
                 .ConfigureAwait(false);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)

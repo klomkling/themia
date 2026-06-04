@@ -15,7 +15,7 @@ Themia.Mediator.Abstractions.ICacheKeyIndex
 Themia.Mediator.Abstractions.ICacheKeyIndex.RemoveByPrefixAsync(string! prefix, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
 Themia.Mediator.Abstractions.ICacheKeyIndex.RemoveByQueryTypeAsync(System.Type! queryType, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
 Themia.Mediator.Abstractions.ICacheKeyIndex.RemoveByScopeRootAsync(string! scopeRoot, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
-Themia.Mediator.Abstractions.ICacheKeyIndex.TrackAsync(string! valueKey, System.Type! queryType, string! typePrefixKey, string? scopeRoot, string? customPrefix, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Mediator.Abstractions.ICacheKeyIndex.TrackAsync(string! valueKey, System.Type! queryType, string? scopeRoot, string? customPrefix, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
 Themia.Mediator.Abstractions.ICacheKeyProvider
 Themia.Mediator.Abstractions.ICacheKeyProvider.GetCacheKey() -> string!
 Themia.Mediator.Abstractions.ICacheKeyProvider.GetCacheKeyPrefix() -> string?
@@ -99,7 +99,7 @@ Themia.Mediator.Infrastructure.AttributeCacheMetadataProvider.AttributeCacheMeta
 Themia.Mediator.Infrastructure.AttributeCacheMetadataProvider.Get(System.Type! requestType, object? requestInstance) -> Themia.Mediator.Infrastructure.CacheMetadata!
 Themia.Mediator.Infrastructure.CacheKeyIndex
 Themia.Mediator.Infrastructure.CacheKeyIndex.CacheKeyIndex(Themia.Caching.IThemiaCacheProvider! cacheProvider, Microsoft.Extensions.Logging.ILogger<Themia.Mediator.Infrastructure.CacheKeyIndex!>! logger, Themia.Mediator.Abstractions.IDistributedLockProvider! lockProvider) -> void
-Themia.Mediator.Infrastructure.CacheKeyIndex.TrackAsync(string! valueKey, System.Type! queryType, string! typePrefixKey, string? scopeRoot, string? customPrefix, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Mediator.Infrastructure.CacheKeyIndex.TrackAsync(string! valueKey, System.Type! queryType, string? scopeRoot, string? customPrefix, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
 Themia.Mediator.Infrastructure.CacheKeyIndex.RemoveByQueryTypeAsync(System.Type! queryType, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
 Themia.Mediator.Infrastructure.CacheKeyIndex.RemoveByPrefixAsync(string! prefix, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
 Themia.Mediator.Infrastructure.CacheKeyIndex.RemoveByScopeRootAsync(string! scopeRoot, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!

@@ -9,7 +9,7 @@ using Themia.Mediator.Tests.TestHandlers;
 
 namespace Themia.Mediator.Tests;
 
-public class MediatorIntegrationTests
+public class MediatorIntegrationTests : IDisposable
 {
     private readonly ServiceProvider _serviceProvider;
     private readonly IMediator _mediator;
@@ -168,6 +168,11 @@ public class MediatorIntegrationTests
         // Act & Assert
         await Assert.ThrowsAsync<ArgumentNullException>(
             async () => await _mediator.SendAsync<string>(null!));
+    }
+
+    public void Dispose()
+    {
+        _serviceProvider.Dispose();
     }
 
     // Helper class for testing unregistered request

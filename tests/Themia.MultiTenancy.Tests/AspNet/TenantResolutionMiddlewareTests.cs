@@ -218,7 +218,7 @@ public class TenantResolutionMiddlewareTests
 }
 
 // Extension method for easier header setting
-public static class HttpClientExtensions
+internal static class HttpClientExtensions
 {
     public static async Task<HttpResponseMessage> GetAsync(
         this HttpClient client,
