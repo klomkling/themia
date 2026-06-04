@@ -1,1 +1,5 @@
 #nullable enable
+Themia.Services.Abstractions.IDomainService
+Themia.Services.Abstractions.IInfrastructureService
+Themia.Services.Abstractions.IIntegrationService
+Themia.Services.Abstractions.IService
