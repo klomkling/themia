@@ -40,6 +40,25 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
   serialization, a fluent builder, and options (`AddThemiaCaching`).
 - `Themia.Logging` (`net10.0`) — Serilog-backed logging with a fluent builder, console/file
   sinks, thread/environment enrichers, and options (`AddThemiaLogging`).
+- `Themia.MultiTenancy` (`net10.0`) — tenant resolution stack: `Header`/`Path`/`Default`
+  strategies, `InMemory`/`Cached`/`Dapper` catalog stores, `ITenantResolver`, and a fail-closed
+  `TenantResolutionMiddleware` that bridges the resolved tenant into both the rich `ITenantAccessor`
+  (read-only `Current`; writes via `ITenantSetter`) and the framework's ambient `TenantContextAccessor`
+  so the data layer filters on the same tenant. `MultiTenancyBuilder` + validated options
+  (`ValidateOnStart`). `TenantInfo.ConnectionString` is redacted from `ToString`/JSON; the Dapper
+  catalog query is parameterized, table-name-allowlisted, and engine-portable. Supports both
+  shared-DB tenant-filtering and DB-per-tenant (via the per-tenant connection string).
+- `Themia.Mediator` (`net10.0`) — CQRS mediator: `IRequest`/`IRequestHandler`, `ICommand`/`IQuery`,
+  and pipeline behaviors (`Validation`/`Logging`/`Caching`/`Performance`/`Transaction`). Query
+  caching is tenant-scoped with attribute-driven invalidation by type/prefix/scope. Handler
+  registration + an `IMediator` dispatcher are generated at compile time by `Themia.SourceGenerator`
+  (opt in with `[assembly: GenerateMediatorHandlers]`; handler lifetime via `[SingletonHandler]`/
+  `[TransientHandler]`; diagnostics `THEMIA011`–`THEMIA013`).
+- `Themia.Services` (`net10.0`) — cross-cutting service taxonomy: the `IService`/`IDomainService`/
+  `IInfrastructureService`/`IIntegrationService` markers plus infrastructure-service contracts
+  (email, SMS, push, storage, report export, background jobs, secrets, audit, tokens, event bus)
+  as forward-seams for future modules. Business-domain contracts deliberately stay out (framework/app
+  boundary).
 
 ## 0.1.0 — 2026-06-02
 

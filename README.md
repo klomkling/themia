@@ -5,10 +5,14 @@ A **.NET 10** application framework — a **framework core** plus a catalog of *
 non-Themia apps (e.g. a net8 Serenity app) can consume them. All packages ship under the
 `Themia.*` NuGet prefix.
 
-> **Status:** early implementation. `Themia.AspNetCore` is published (`0.1.0` on nuget.org), and the
-> build-time **tooling** layer (`Themia.Generators.Abstractions`, `Themia.DependencyInjection`,
-> `Themia.SourceGenerator`, `Themia.Analyzers`) has landed and awaits the next release. The
-> architecture overview, module specs, and implementation plans live under [`docs/`](docs/).
+> **Status:** early implementation. `Themia.AspNetCore` is published (`0.1.0` on nuget.org). Landed on
+> `main` and awaiting the next (`0.2.0`) release: the build-time **tooling**
+> (`Themia.Generators.Abstractions`, `Themia.DependencyInjection`, `Themia.SourceGenerator`,
+> `Themia.Analyzers`), the **framework core** (`Themia.Framework.Core`, `Themia.Caching`,
+> `Themia.Logging`), and the **cross-cutting** packages (`Themia.MultiTenancy`, `Themia.Mediator`,
+> `Themia.Services`). Still to come for `0.2.0`: `Themia.Framework.Data.EFCore` and
+> `Themia.Framework.AspNetCore`. The architecture overview, module specs, and implementation plans
+> live under [`docs/`](docs/).
 
 ## Architecture
 
