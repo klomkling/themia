@@ -62,3 +62,12 @@ Themia.MultiTenancy.MultiTenancyOptions.PathPrefix.get -> string?
 Themia.MultiTenancy.MultiTenancyOptions.PathPrefix.set -> void
 Themia.MultiTenancy.MultiTenancyOptions.UseDefaultStrategies.get -> bool
 Themia.MultiTenancy.MultiTenancyOptions.UseDefaultStrategies.set -> void
+Themia.MultiTenancy.Strategies.DefaultTenantResolutionStrategy
+Themia.MultiTenancy.Strategies.DefaultTenantResolutionStrategy.DefaultTenantResolutionStrategy(Microsoft.Extensions.Options.IOptions<Themia.MultiTenancy.MultiTenancyOptions!>! options) -> void
+Themia.MultiTenancy.Strategies.DefaultTenantResolutionStrategy.ResolveAsync(Themia.MultiTenancy.Abstractions.TenantResolutionContext! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.MultiTenancy.Abstractions.TenantResolutionResult!>!
+Themia.MultiTenancy.Strategies.HeaderTenantResolutionStrategy
+Themia.MultiTenancy.Strategies.HeaderTenantResolutionStrategy.HeaderTenantResolutionStrategy(Microsoft.Extensions.Options.IOptions<Themia.MultiTenancy.MultiTenancyOptions!>! options, Microsoft.Extensions.Logging.ILogger<Themia.MultiTenancy.Strategies.HeaderTenantResolutionStrategy!>! logger) -> void
+Themia.MultiTenancy.Strategies.HeaderTenantResolutionStrategy.ResolveAsync(Themia.MultiTenancy.Abstractions.TenantResolutionContext! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.MultiTenancy.Abstractions.TenantResolutionResult!>!
+Themia.MultiTenancy.Strategies.PathTenantResolutionStrategy
+Themia.MultiTenancy.Strategies.PathTenantResolutionStrategy.PathTenantResolutionStrategy(Microsoft.Extensions.Options.IOptions<Themia.MultiTenancy.MultiTenancyOptions!>! options) -> void
+Themia.MultiTenancy.Strategies.PathTenantResolutionStrategy.ResolveAsync(Themia.MultiTenancy.Abstractions.TenantResolutionContext! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.MultiTenancy.Abstractions.TenantResolutionResult!>!
