@@ -1,0 +1,32 @@
+#nullable enable
+const Themia.Framework.Data.EFCore.Abstractions.DatabaseProviderNames.MySql = "mysql" -> string!
+const Themia.Framework.Data.EFCore.Abstractions.DatabaseProviderNames.Postgres = "postgres" -> string!
+const Themia.Framework.Data.EFCore.Abstractions.DatabaseProviderNames.SqlServer = "sqlserver" -> string!
+override Themia.Framework.Data.EFCore.ThemiaDbContext.Dispose() -> void
+override Themia.Framework.Data.EFCore.ThemiaDbContext.DisposeAsync() -> System.Threading.Tasks.ValueTask
+override Themia.Framework.Data.EFCore.ThemiaDbContext.Find(System.Type! entityType, params object?[]? keyValues) -> object?
+override Themia.Framework.Data.EFCore.ThemiaDbContext.Find<TEntity>(params object?[]? keyValues) -> TEntity?
+override Themia.Framework.Data.EFCore.ThemiaDbContext.FindAsync(System.Type! entityType, object?[]? keyValues, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask<object?>
+override Themia.Framework.Data.EFCore.ThemiaDbContext.FindAsync(System.Type! entityType, params object?[]? keyValues) -> System.Threading.Tasks.ValueTask<object?>
+override Themia.Framework.Data.EFCore.ThemiaDbContext.FindAsync<TEntity>(object?[]? keyValues, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask<TEntity?>
+override Themia.Framework.Data.EFCore.ThemiaDbContext.FindAsync<TEntity>(params object?[]? keyValues) -> System.Threading.Tasks.ValueTask<TEntity?>
+override Themia.Framework.Data.EFCore.ThemiaDbContext.OnConfiguring(Microsoft.EntityFrameworkCore.DbContextOptionsBuilder! optionsBuilder) -> void
+override Themia.Framework.Data.EFCore.ThemiaDbContext.OnModelCreating(Microsoft.EntityFrameworkCore.ModelBuilder! modelBuilder) -> void
+override Themia.Framework.Data.EFCore.ThemiaDbContext.SaveChanges(bool acceptAllChangesOnSuccess) -> int
+override Themia.Framework.Data.EFCore.ThemiaDbContext.SaveChangesAsync(bool acceptAllChangesOnSuccess, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<int>!
+Themia.Framework.Data.EFCore.Abstractions.DatabaseProviderNames
+Themia.Framework.Data.EFCore.Infrastructure.TenantModelCacheKeyFactory
+Themia.Framework.Data.EFCore.Infrastructure.TenantModelCacheKeyFactory.Create(Microsoft.EntityFrameworkCore.DbContext! context, bool designTime) -> object!
+Themia.Framework.Data.EFCore.Infrastructure.TenantModelCacheKeyFactory.TenantModelCacheKeyFactory() -> void
+Themia.Framework.Data.EFCore.TenantIsolationStrategy
+Themia.Framework.Data.EFCore.TenantIsolationStrategy.PerTenantModel = 0 -> Themia.Framework.Data.EFCore.TenantIsolationStrategy
+Themia.Framework.Data.EFCore.TenantIsolationStrategy.RuntimeTenantAccess = 1 -> Themia.Framework.Data.EFCore.TenantIsolationStrategy
+Themia.Framework.Data.EFCore.ThemiaDbContext
+Themia.Framework.Data.EFCore.ThemiaDbContext.CurrentTenantId.get -> Themia.Framework.Core.Abstractions.Tenancy.TenantId?
+Themia.Framework.Data.EFCore.ThemiaDbContext.TenantContext.get -> Themia.Framework.Core.Abstractions.Tenancy.ITenantContext?
+virtual Themia.Framework.Data.EFCore.ThemiaDbContext.CurrentUserId.get -> string?
+virtual Themia.Framework.Data.EFCore.ThemiaDbContext.EnableSoftDeleteFilters.get -> bool
+virtual Themia.Framework.Data.EFCore.ThemiaDbContext.EnableTenantFilters.get -> bool
+virtual Themia.Framework.Data.EFCore.ThemiaDbContext.IncludeGlobalRecordsForTenants.get -> bool
+virtual Themia.Framework.Data.EFCore.ThemiaDbContext.TenantIsolationStrategy.get -> Themia.Framework.Data.EFCore.TenantIsolationStrategy
+Themia.Framework.Data.EFCore.ThemiaDbContext.ThemiaDbContext(Microsoft.EntityFrameworkCore.DbContextOptions! options, Themia.Framework.Core.Abstractions.Tenancy.ITenantContext? tenantContext = null, System.TimeProvider? timeProvider = null) -> void
