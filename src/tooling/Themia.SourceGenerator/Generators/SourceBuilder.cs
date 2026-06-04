@@ -31,27 +31,6 @@ internal static class SourceBuilder
         sb.AppendLine("namespace Themia.Mediator.Generated;");
         sb.AppendLine();
 
-        // Debug info
-        var attrs = model.HandlerType.GetAttributes();
-        sb.AppendLine($"// DEBUG: Handler {model.HandlerType.Name} has Lifetime={model.Lifetime}");
-        sb.AppendLine($"// DEBUG: Handler has {attrs.Length} attributes:");
-        foreach (var attr in attrs)
-        {
-            var attrName = attr.AttributeClass?.Name ?? "null";
-            var fullName = attr.AttributeClass?.ToDisplayString() ?? "null";
-            sb.AppendLine($"//   - {attrName} (full: {fullName})");
-            sb.AppendLine($"//     ConstructorArgs: {attr.ConstructorArguments.Length}");
-            foreach (var arg in attr.ConstructorArguments)
-            {
-                sb.AppendLine($"//       [{arg.Type}] = {arg.Value}");
-            }
-            sb.AppendLine($"//     NamedArgs: {attr.NamedArguments.Length}");
-            foreach (var arg in attr.NamedArguments)
-            {
-                sb.AppendLine($"//       {arg.Key} = {arg.Value.Value}");
-            }
-        }
-
         sb.AppendLine("internal static partial class MediatorGenerated");
         sb.AppendLine("{");
 

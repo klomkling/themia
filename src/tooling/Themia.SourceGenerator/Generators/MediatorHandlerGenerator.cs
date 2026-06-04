@@ -37,10 +37,11 @@ public sealed class MediatorHandlerGenerator : IIncrementalGenerator
                         var fullName = attributeClass.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
                         var simpleName = attributeClass.ToDisplayString();
 
-                        // Check both fully qualified and simple name
+                        // Match the exact Themia attribute by fully-qualified name only — a bare
+                        // name match would wrongly enable generation for an unrelated consumer
+                        // attribute that happens to be called GenerateMediatorHandlersAttribute.
                         if (fullName == "global::Themia.Mediator.GenerateMediatorHandlersAttribute" ||
-                            simpleName == "Themia.Mediator.GenerateMediatorHandlersAttribute" ||
-                            attributeClass.Name == "GenerateMediatorHandlersAttribute")
+                            simpleName == "Themia.Mediator.GenerateMediatorHandlersAttribute")
                         {
                             return true;
                         }

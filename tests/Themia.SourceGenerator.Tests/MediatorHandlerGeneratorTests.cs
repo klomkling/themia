@@ -1,4 +1,5 @@
 using System.Linq;
+using Microsoft.CodeAnalysis;
 using Themia.SourceGenerator.Tests.Helpers;
 using Xunit;
 
@@ -387,6 +388,58 @@ namespace TestNamespace
         var registrationFile = result.GeneratedTrees.FirstOrDefault(t => t.FilePath.Contains("Registration"));
         Assert.NotNull(registrationFile);
         Assert.Contains("AddGeneratedMediatorHandlers", registrationFile!.ToString());
+    }
+
+    [Fact]
+    public void Generator_WithSameSimpleNameHandlersInDifferentNamespaces_DoesNotCollide()
+    {
+        // Arrange — NsA.PingHandler and NsB.PingHandler share the same simple class name and the
+        // same simple request name (PingCommand). Before the SafeHintName fix, the generator used
+        // the simple type name for the AddSource hint, causing a duplicate-hint collision (and
+        // potentially a duplicate Add_*/Invoke_* member) that produced generator errors.
+        var source = @"
+[assembly: Themia.Mediator.GenerateMediatorHandlers]
+" + MediatorGeneratorTestHelper.GetMediatorInfrastructureCode() + @"
+
+namespace NsA
+{
+    using Themia.Mediator.Abstractions;
+    using System.Threading;
+    using System.Threading.Tasks;
+
+    public record PingCommand : ICommand<string>;
+
+    public class PingHandler : ICommandHandler<PingCommand, string>
+    {
+        public Task<string> HandleAsync(PingCommand request, CancellationToken cancellationToken)
+            => Task.FromResult(""pong-a"");
+    }
+}
+
+namespace NsB
+{
+    using Themia.Mediator.Abstractions;
+    using System.Threading;
+    using System.Threading.Tasks;
+
+    public record PingCommand : ICommand<string>;
+
+    public class PingHandler : ICommandHandler<PingCommand, string>
+    {
+        public Task<string> HandleAsync(PingCommand request, CancellationToken cancellationToken)
+            => Task.FromResult(""pong-b"");
+    }
+}
+";
+
+        // Act
+        var result = MediatorGeneratorTestHelper.RunGenerator(source);
+
+        // Assert — the two handlers are distinct (different FQNs), so THEMIA011 must NOT fire.
+        // No error-severity diagnostics should be produced (hint-name collision would surface as
+        // an error diagnostic from the driver).
+        Assert.DoesNotContain(result.Diagnostics, d => d.Id == "THEMIA011");
+        Assert.DoesNotContain(result.Diagnostics, d => d.Severity == DiagnosticSeverity.Error);
     }
 
     [Fact]

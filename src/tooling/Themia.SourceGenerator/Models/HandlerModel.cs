@@ -55,15 +55,31 @@ internal sealed class HandlerModel
 
     private static string GenerateSafeHintName(INamedTypeSymbol handlerType, INamedTypeSymbol requestType)
     {
-        // Use handler name + request name to create unique, readable file name
-        var handlerName = handlerType.Name;
-        var requestName = requestType.Name;
+        // Readable prefix (simple names, generic arity markers stripped)...
+        var handlerName = handlerType.Name.Replace("`", "_");
+        var requestName = requestType.Name.Replace("`", "_");
 
-        // Remove generic arity markers
-        handlerName = handlerName.Replace("`", "_");
-        requestName = requestName.Replace("`", "_");
+        // ...plus a deterministic disambiguator from the fully-qualified names, so handlers that
+        // share simple names across namespaces don't collide on the generated hint/method names
+        // (which would fail AddSource / produce duplicate Add_*/Invoke_* members).
+        var disambiguator = StableHash($"{handlerType.ToDisplayString()}|{requestType.ToDisplayString()}");
 
-        return $"{handlerName}_{requestName}";
+        return $"{handlerName}_{requestName}_{disambiguator}";
+    }
+
+    private static string StableHash(string value)
+    {
+        // FNV-1a (32-bit) — deterministic across processes, unlike string.GetHashCode.
+        const uint offsetBasis = 2166136261;
+        const uint prime = 16777619;
+        var hash = offsetBasis;
+        foreach (var c in value)
+        {
+            hash ^= c;
+            hash *= prime;
+        }
+
+        return hash.ToString("x8");
     }
 
     public override bool Equals(object? obj)

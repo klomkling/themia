@@ -153,7 +153,36 @@ public sealed class CachingBehaviorTests
         Assert.Equal("ok", result);
     }
 
+    [Fact]
+    public async Task Should_execute_handler_on_value_type_cache_miss_and_not_return_default()
+    {
+        // Arrange — CountQuery returns int (a value type). default(int) == 0, but the handler
+        // returns 42. Before the fix, ExistsAsync was not used and GetAsync returned default(int)
+        // which boxed to non-null, causing the behavior to report a hit and return 0 without
+        // calling the handler.
+        var behavior = new CachingBehavior<CountQuery, int>(CreateLogger<CountQuery, int>(), _cacheProvider, _keyFactory, _metadataProvider, _keyIndex, _options);
+        var query = new CountQuery("items");
+        var handlerCalled = 0;
+        Task<int> Next(CancellationToken _) { handlerCalled++; return Task.FromResult(42); }
+
+        // Act 1: cold cache — handler must run and real value must be returned
+        var result1 = await behavior.HandleAsync(query, Next, CancellationToken.None);
+
+        // Assert: handler executed and real value returned (not default 0)
+        Assert.Equal(1, handlerCalled);
+        Assert.Equal(42, result1);
+
+        // Act 2: warm cache — handler must NOT run again
+        var result2 = await behavior.HandleAsync(query, Next, CancellationToken.None);
+
+        Assert.Equal(42, result2);
+        Assert.Equal(1, handlerCalled); // still only one invocation
+    }
+
     // Test request/command types
+
+    [Cacheable(AbsoluteExpirationSeconds = 60)]
+    public sealed record CountQuery(string Scope) : IQuery<int>, ICacheable<int>;
 
     [Cacheable(AbsoluteExpirationSeconds = 60)]
     public sealed record AttrQuery(string Key) : IQuery<string>;

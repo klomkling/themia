@@ -93,11 +93,26 @@ public sealed class CachingBehavior<TRequest, TResponse> : IPipelineBehavior<TRe
         // Try to get from cache
         try
         {
-            var cachedValue = await _cacheProvider.GetAsync<TResponse>(cacheKey, cancellationToken).ConfigureAwait(false);
-            if (cachedValue is not null)
+            if (typeof(TResponse).IsValueType)
             {
-                _logger.LogDebug("Cache hit for {RequestType}", typeof(TRequest).Name);
-                return cachedValue;
+                // A value-type default (e.g. 0/Guid.Empty/false) boxes to a non-null value, so a
+                // null check can't distinguish a cached default from a miss. Probe with ExistsAsync,
+                // then fetch only on a confirmed hit.
+                if (await _cacheProvider.ExistsAsync(cacheKey, cancellationToken).ConfigureAwait(false))
+                {
+                    var hitValue = await _cacheProvider.GetAsync<TResponse>(cacheKey, cancellationToken).ConfigureAwait(false);
+                    _logger.LogDebug("Cache hit for {RequestType}", typeof(TRequest).Name);
+                    return hitValue!;
+                }
+            }
+            else
+            {
+                var cachedValue = await _cacheProvider.GetAsync<TResponse>(cacheKey, cancellationToken).ConfigureAwait(false);
+                if (cachedValue is not null)
+                {
+                    _logger.LogDebug("Cache hit for {RequestType}", typeof(TRequest).Name);
+                    return cachedValue;
+                }
             }
 
             _logger.LogDebug("Cache miss for {RequestType}", typeof(TRequest).Name);
