@@ -93,3 +93,8 @@ Themia.MultiTenancy.MultiTenancyBuilder.UseHeaderStrategy() -> Themia.MultiTenan
 Themia.MultiTenancy.MultiTenancyBuilder.UsePathStrategy() -> Themia.MultiTenancy.MultiTenancyBuilder!
 Themia.MultiTenancy.MultiTenancyServiceCollectionExtensions
 static Themia.MultiTenancy.MultiTenancyServiceCollectionExtensions.AddThemiaMultiTenancy(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Themia.MultiTenancy.MultiTenancyOptions!>? configureOptions = null, System.Action<Themia.MultiTenancy.MultiTenancyBuilder!>? configure = null, bool? useDefaultStrategies = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+Themia.MultiTenancy.AspNet.TenantResolutionMiddleware
+Themia.MultiTenancy.AspNet.TenantResolutionMiddleware.InvokeAsync(Microsoft.AspNetCore.Http.HttpContext! context) -> System.Threading.Tasks.Task!
+Themia.MultiTenancy.AspNet.TenantResolutionMiddleware.TenantResolutionMiddleware(Microsoft.AspNetCore.Http.RequestDelegate! next) -> void
+Themia.MultiTenancy.AspNet.TenantResolutionMiddlewareExtensions
+static Themia.MultiTenancy.AspNet.TenantResolutionMiddlewareExtensions.UseThemiaMultiTenancy(this Microsoft.AspNetCore.Builder.IApplicationBuilder! app) -> Microsoft.AspNetCore.Builder.IApplicationBuilder!
