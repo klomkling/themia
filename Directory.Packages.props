@@ -16,6 +16,13 @@
     <PackageVersion Include="Microsoft.Extensions.Options" Version="9.0.0" />
     <PackageVersion Include="Microsoft.Extensions.Logging" Version="9.0.0" />
     <PackageVersion Include="Microsoft.Extensions.Caching.Memory" Version="9.0.0" />
+    <!-- MultiTenancy (Tier 2): Dapper catalog store + ASP.NET Core middleware -->
+    <PackageVersion Include="Dapper" Version="2.1.66" />
+    <!-- MultiTenancy tests: Microsoft.Data.Sqlite is a REAL database for the DapperTenantStore tests
+         (not a mock), so it stays. Themia is xUnit-only — do NOT pin Shouldly or NSubstitute. -->
+    <PackageVersion Include="Microsoft.Data.Sqlite" Version="9.0.0" />
+    <!-- Mediator (Tier 2): FluentValidation is a runtime dep of ValidationBehavior. -->
+    <PackageVersion Include="FluentValidation" Version="11.11.0" />
     <!-- Caching providers -->
     <PackageVersion Include="StackExchange.Redis" Version="2.8.16" />
     <PackageVersion Include="MessagePack" Version="2.5.187" />

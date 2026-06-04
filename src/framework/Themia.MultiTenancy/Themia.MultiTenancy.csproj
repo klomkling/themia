@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <PackageId>Themia.MultiTenancy</PackageId>
+    <Description>Themia multi-tenancy — tenant resolution strategies (header/path/default), tenant stores (in-memory/cached/Dapper catalog), and ASP.NET Core middleware that bridges resolution into the framework tenant context.</Description>
+    <PackageTags>themia;multi-tenancy;tenant;aspnetcore;dapper;resolution</PackageTags>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Themia.Framework.Core/Themia.Framework.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- ASP.NET Core middleware + IApplicationBuilder + concrete HttpContextAccessor via the
+         shared framework reference (the repo's established pattern, used by Themia.AspNetCore). -->
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <!-- Microsoft.Extensions.{Caching.Memory,DependencyInjection,Options,Logging} are provided
+         transitively by the Microsoft.AspNetCore.App shared framework (NU1510), so they are not
+         referenced directly here. -->
+    <PackageReference Include="Dapper" />
+    <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+  <ItemGroup>
+    <AdditionalFiles Include="PublicAPI.Shipped.txt" />
+    <AdditionalFiles Include="PublicAPI.Unshipped.txt" />
+  </ItemGroup>
+</Project>

@@ -1,4 +1,7 @@
 #nullable enable
+Themia.SourceGenerator.Generators.MediatorHandlerGenerator
+Themia.SourceGenerator.Generators.MediatorHandlerGenerator.Initialize(Microsoft.CodeAnalysis.IncrementalGeneratorInitializationContext context) -> void
+Themia.SourceGenerator.Generators.MediatorHandlerGenerator.MediatorHandlerGenerator() -> void
 Themia.SourceGenerator.Generators.ServiceRegistrationGenerator
 Themia.SourceGenerator.Generators.ServiceRegistrationGenerator.ServiceRegistrationGenerator() -> void
 Themia.SourceGenerator.Generators.ServiceRegistrationGenerator.Initialize(Microsoft.CodeAnalysis.IncrementalGeneratorInitializationContext context) -> void
