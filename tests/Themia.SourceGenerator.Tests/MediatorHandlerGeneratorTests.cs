@@ -192,6 +192,46 @@ namespace TestNamespace
     }
 
     [Fact]
+    public void Generator_WithNonHandlerOpenGenericType_DoesNotReportDiagnostic()
+    {
+        // Arrange — an open-generic, accessible type that is NOT a handler must not trip
+        // THEMIA012/THEMIA013 (regression: discovery used to validate before checking
+        // IRequestHandler<,>, flagging benign consumer types).
+        var source = @"
+[assembly: Themia.Mediator.GenerateMediatorHandlers]
+" + MediatorGeneratorTestHelper.GetMediatorInfrastructureCode() + @"
+
+namespace TestNamespace
+{
+    using Themia.Mediator.Abstractions;
+    using System.Threading;
+    using System.Threading.Tasks;
+
+    // Not a handler — just an unrelated open-generic helper in the consumer's assembly.
+    public sealed class Box<T>
+    {
+        public T? Value { get; set; }
+    }
+
+    public record PingCommand : ICommand<string>;
+
+    public class PingHandler : ICommandHandler<PingCommand, string>
+    {
+        public Task<string> HandleAsync(PingCommand request, CancellationToken cancellationToken)
+            => Task.FromResult(""pong"");
+    }
+}
+";
+
+        // Act
+        var result = MediatorGeneratorTestHelper.RunGenerator(source);
+
+        // Assert — no handler diagnostics fire for the non-handler open generic
+        Assert.DoesNotContain(result.Diagnostics, d => d.Id == "THEMIA012");
+        Assert.DoesNotContain(result.Diagnostics, d => d.Id == "THEMIA013");
+    }
+
+    [Fact]
     public void Generator_WithPipelineBehavior_DoesNotGenerateAsHandler()
     {
         // Arrange

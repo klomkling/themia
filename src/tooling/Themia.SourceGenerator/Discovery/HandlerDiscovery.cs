@@ -51,6 +51,19 @@ internal static class HandlerDiscovery
             }
         }
 
+        // Only types that actually implement IRequestHandler<,> are handler candidates.
+        // The syntax predicate feeds EVERY class in the assembly here, so the accessibility
+        // and closed-generic validations below must run only for real handlers — otherwise
+        // THEMIA012/THEMIA013 would fire as errors on a consumer's unrelated generic or
+        // inaccessible classes.
+        var isHandler = classSymbol.AllInterfaces.Any(iface =>
+            iface.OriginalDefinition.ToDisplayString() == "Themia.Mediator.Abstractions.IRequestHandler<TRequest, TResponse>");
+        if (!isHandler)
+        {
+            diagnostics = ImmutableArray<Diagnostic>.Empty;
+            return ImmutableArray<HandlerModel>.Empty;
+        }
+
         // Check if accessible for DI
         if (!classSymbol.IsAccessibleForDI())
         {
