@@ -115,7 +115,7 @@ public sealed class RedisCacheProvider : IThemiaCacheProvider
             await Database.KeyDeleteAsync(slidingMetadataKey);
         }
 
-        await Database.StringSetAsync(redisKey, bytes, expiration);
+        await Database.StringSetAsync(redisKey, bytes, ToExpiration(expiration));
 
         if (slidingExpiration.HasValue)
         {
@@ -123,9 +123,14 @@ public sealed class RedisCacheProvider : IThemiaCacheProvider
             await Database.StringSetAsync(
                 slidingMetadataKey,
                 metadataValue,
-                slidingExpiration);
+                ToExpiration(slidingExpiration));
         }
     }
+
+    // StackExchange.Redis 2.9+ replaced StringSetAsync's TimeSpan? expiry parameter with the
+    // Expiration struct (a non-null TimeSpan converts implicitly; null/no-expiry maps to the default).
+    private static Expiration ToExpiration(TimeSpan? expiry)
+        => expiry.HasValue ? expiry.Value : Expiration.Default;
 
     /// <inheritdoc />
     public async Task RemoveAsync(string key, CancellationToken cancellationToken = default)

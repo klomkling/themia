@@ -24,7 +24,7 @@
     <!-- Mediator (Tier 2): FluentValidation is a runtime dep of ValidationBehavior. -->
     <PackageVersion Include="FluentValidation" Version="11.11.0" />
     <!-- Caching providers -->
-    <PackageVersion Include="StackExchange.Redis" Version="2.8.16" />
+    <PackageVersion Include="StackExchange.Redis" Version="2.13.17" />
     <PackageVersion Include="MessagePack" Version="3.1.6" />
     <!-- Logging (Serilog) -->
     <PackageVersion Include="Serilog" Version="4.3.1" />
