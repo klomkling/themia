@@ -1,4 +1,6 @@
 #nullable enable
+static Themia.Mediator.Extensions.ServiceCollectionExtension.AddApplicationMediator(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+Themia.Mediator.Extensions.ServiceCollectionExtension
 static Themia.Mediator.Infrastructure.CacheMetadata.None.get -> Themia.Mediator.Infrastructure.CacheMetadata!
 Themia.Mediator.Abstractions.ICacheable<TResponse>
 Themia.Mediator.Abstractions.ICacheable<TResponse>.AbsoluteExpiration.get -> System.TimeSpan?
