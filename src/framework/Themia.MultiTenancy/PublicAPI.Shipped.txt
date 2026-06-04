@@ -1,1 +1,54 @@
 #nullable enable
+override Themia.MultiTenancy.Abstractions.TenantInfo.ToString() -> string!
+static Themia.MultiTenancy.Abstractions.TenantResolutionContext.Empty.get -> Themia.MultiTenancy.Abstractions.TenantResolutionContext!
+static Themia.MultiTenancy.Abstractions.TenantResolutionResult.Identified(string! identifier, string! source) -> Themia.MultiTenancy.Abstractions.TenantResolutionResult!
+static Themia.MultiTenancy.Abstractions.TenantResolutionResult.NotFound(string! source, string? reason = null) -> Themia.MultiTenancy.Abstractions.TenantResolutionResult!
+static Themia.MultiTenancy.Abstractions.TenantResolutionResult.Resolved(Themia.MultiTenancy.Abstractions.TenantInfo! tenant, string! source) -> Themia.MultiTenancy.Abstractions.TenantResolutionResult!
+Themia.MultiTenancy.Abstractions.ICacheableTenantStore
+Themia.MultiTenancy.Abstractions.ICacheableTenantStore.ClearCache() -> void
+Themia.MultiTenancy.Abstractions.ICacheableTenantStore.EvictFromCache(string! identifier) -> void
+Themia.MultiTenancy.Abstractions.ITenantAccessor
+Themia.MultiTenancy.Abstractions.ITenantAccessor.Current.get -> Themia.MultiTenancy.Abstractions.TenantInfo?
+Themia.MultiTenancy.Abstractions.ITenantAccessor.Current.set -> void
+Themia.MultiTenancy.Abstractions.ITenantResolutionStrategy
+Themia.MultiTenancy.Abstractions.ITenantResolutionStrategy.ResolveAsync(Themia.MultiTenancy.Abstractions.TenantResolutionContext! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.MultiTenancy.Abstractions.TenantResolutionResult!>!
+Themia.MultiTenancy.Abstractions.ITenantResolver
+Themia.MultiTenancy.Abstractions.ITenantResolver.ResolveAsync(Themia.MultiTenancy.Abstractions.TenantResolutionContext! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.MultiTenancy.Abstractions.TenantInfo?>!
+Themia.MultiTenancy.Abstractions.ITenantStore
+Themia.MultiTenancy.Abstractions.ITenantStore.FindByIdentifierAsync(string! identifier, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.MultiTenancy.Abstractions.TenantInfo?>!
+Themia.MultiTenancy.Abstractions.TenantInfo
+Themia.MultiTenancy.Abstractions.TenantInfo.ConnectionString.get -> string?
+Themia.MultiTenancy.Abstractions.TenantInfo.ConnectionString.init -> void
+Themia.MultiTenancy.Abstractions.TenantInfo.Environment.get -> string?
+Themia.MultiTenancy.Abstractions.TenantInfo.Environment.init -> void
+Themia.MultiTenancy.Abstractions.TenantInfo.Id.get -> string!
+Themia.MultiTenancy.Abstractions.TenantInfo.Id.init -> void
+Themia.MultiTenancy.Abstractions.TenantInfo.Identifier.get -> string!
+Themia.MultiTenancy.Abstractions.TenantInfo.Identifier.init -> void
+Themia.MultiTenancy.Abstractions.TenantInfo.Name.get -> string?
+Themia.MultiTenancy.Abstractions.TenantInfo.Name.init -> void
+Themia.MultiTenancy.Abstractions.TenantInfo.Properties.get -> System.Collections.Generic.IReadOnlyDictionary<string!, string!>!
+Themia.MultiTenancy.Abstractions.TenantInfo.Properties.init -> void
+Themia.MultiTenancy.Abstractions.TenantInfo.TenantInfo(string! Id, string! Identifier, string? Name = null, string? Environment = null, string? ConnectionString = null, System.Collections.Generic.IReadOnlyDictionary<string!, string!>? Properties = null) -> void
+Themia.MultiTenancy.Abstractions.TenantResolutionContext
+Themia.MultiTenancy.Abstractions.TenantResolutionContext.Claims.get -> System.Collections.Generic.IReadOnlyDictionary<string!, string!>!
+Themia.MultiTenancy.Abstractions.TenantResolutionContext.Claims.init -> void
+Themia.MultiTenancy.Abstractions.TenantResolutionContext.Headers.get -> System.Collections.Generic.IReadOnlyDictionary<string!, string!>!
+Themia.MultiTenancy.Abstractions.TenantResolutionContext.Headers.init -> void
+Themia.MultiTenancy.Abstractions.TenantResolutionContext.Host.get -> string?
+Themia.MultiTenancy.Abstractions.TenantResolutionContext.Host.init -> void
+Themia.MultiTenancy.Abstractions.TenantResolutionContext.Path.get -> string?
+Themia.MultiTenancy.Abstractions.TenantResolutionContext.Path.init -> void
+Themia.MultiTenancy.Abstractions.TenantResolutionContext.TenantResolutionContext(string? Host, string? Path, System.Collections.Generic.IReadOnlyDictionary<string!, string!>! Headers, System.Collections.Generic.IReadOnlyDictionary<string!, string!>! Claims) -> void
+Themia.MultiTenancy.Abstractions.TenantResolutionResult
+Themia.MultiTenancy.Abstractions.TenantResolutionResult.Identifier.get -> string?
+Themia.MultiTenancy.Abstractions.TenantResolutionResult.Identifier.init -> void
+Themia.MultiTenancy.Abstractions.TenantResolutionResult.Reason.get -> string?
+Themia.MultiTenancy.Abstractions.TenantResolutionResult.Reason.init -> void
+Themia.MultiTenancy.Abstractions.TenantResolutionResult.Source.get -> string?
+Themia.MultiTenancy.Abstractions.TenantResolutionResult.Source.init -> void
+Themia.MultiTenancy.Abstractions.TenantResolutionResult.Success.get -> bool
+Themia.MultiTenancy.Abstractions.TenantResolutionResult.Success.init -> void
+Themia.MultiTenancy.Abstractions.TenantResolutionResult.Tenant.get -> Themia.MultiTenancy.Abstractions.TenantInfo?
+Themia.MultiTenancy.Abstractions.TenantResolutionResult.Tenant.init -> void
+Themia.MultiTenancy.Abstractions.TenantResolutionResult.TenantResolutionResult(bool Success, Themia.MultiTenancy.Abstractions.TenantInfo? Tenant, string? Identifier = null, string? Source = null, string? Reason = null) -> void
