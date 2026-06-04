@@ -21,7 +21,7 @@ public sealed class MediatorCachingOptions
     /// <summary>
     /// Gets or sets a value indicating whether commands should automatically invalidate
     /// related query caches based on naming conventions (e.g., UpdateOrderCommand invalidates
-    /// GetOrderQuery because both strip to the same scope root "Order").
+    /// GetOrderQuery because both strip to the same scope root "Scope:Order").
     /// Note: scope root extraction removes one known suffix and one known verb prefix — there is
     /// no singular/plural normalization, so ListOrdersQuery produces "Scope:Orders" and would NOT
     /// be invalidated by UpdateOrderCommand ("Scope:Order").

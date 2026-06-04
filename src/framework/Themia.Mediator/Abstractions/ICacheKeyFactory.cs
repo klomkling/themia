@@ -32,7 +32,7 @@ public interface ICacheKeyFactory
     /// <param name="requestType">The request type.</param>
     /// <param name="options">Caching options containing known suffixes and prefixes.</param>
     /// <returns>
-    /// A scope root identifier (e.g., "Order" from "GetOrderQuery" or "UpdateOrderCommand").
+    /// A scope root identifier (e.g., "Scope:Order" from "GetOrderQuery" or "UpdateOrderCommand").
     /// Returns null if no recognizable pattern is found.
     /// </returns>
     string? CreateScopeRoot(Type requestType, MediatorCachingOptions options);

@@ -9,8 +9,11 @@ namespace Themia.Mediator.Infrastructure;
 /// <summary>
 /// Default implementation of <see cref="ICacheKeyFactory"/> that generates cache keys
 /// using JSON serialization of request properties.
-/// Keys are prefixed with the ambient tenant so that different tenants never share a
-/// cache entry (e.g. <c>t:acme:</c> for tenant "acme", <c>t:_:</c> for no tenant).
+/// The full cache key produced by <see cref="CreateKey"/> is prefixed with the ambient tenant so
+/// that different tenants never share a cache entry (e.g. <c>t:acme:</c> for tenant "acme",
+/// <c>t:_:</c> for no tenant). The sub-key helpers (<see cref="CreateTypePrefix"/>,
+/// <see cref="CreateScopeRoot"/>) return tenant-agnostic fragments; the cache key index applies the
+/// tenant prefix when it forms index entries from them.
 /// </summary>
 public sealed class DefaultCacheKeyFactory : ICacheKeyFactory
 {

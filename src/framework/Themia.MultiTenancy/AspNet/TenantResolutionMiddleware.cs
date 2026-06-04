@@ -8,10 +8,11 @@ using Themia.MultiTenancy.Abstractions;
 namespace Themia.MultiTenancy.AspNet;
 
 /// <summary>
-/// Middleware that resolves the tenant from the incoming HTTP request, stores it in
-/// <see cref="ITenantAccessor"/> (the rich model carrying the per-tenant connection string), and
-/// bridges the resolved identifier into <see cref="TenantContextAccessor"/> so the data layer's
-/// tenant query filter keys off the same tenant.
+/// Middleware that resolves the tenant from the incoming HTTP request, stores it via
+/// <see cref="ITenantSetter"/> (readable by application code through <see cref="ITenantAccessor"/> —
+/// the rich model carrying the per-tenant connection string), and bridges the resolved identifier
+/// into <see cref="TenantContextAccessor"/> so the data layer's tenant query filter keys off the
+/// same tenant.
 /// </summary>
 public sealed class TenantResolutionMiddleware
 {
