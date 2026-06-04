@@ -46,7 +46,7 @@ internal sealed class DefaultTenantResolver : ITenantResolver
                     return tenant;
                 }
 
-                // Changed from Warning to Debug - this is expected behavior when tenant is not yet registered
+                // Expected when the tenant is not yet registered; logged at Debug to avoid noise.
                 _logger.LogDebug("Tenant identifier {Identifier} not found in store (source: {Source})", result.Identifier, result.Source ?? "unknown");
             }
 

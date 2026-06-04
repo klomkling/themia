@@ -30,9 +30,12 @@ public sealed class InvalidatesCacheAttribute : Attribute
     public Type[] QueryTypes { get; }
 
     /// <summary>
-    /// Gets or sets an optional cache key prefix for pattern-based invalidation.
-    /// When set, all cache entries with keys starting with this prefix will be invalidated.
-    /// Example: "Order:" will invalidate all Order-related caches.
+    /// Gets or sets an optional registration prefix for targeted invalidation.
+    /// When set, the cache index is queried for all entries that were tracked under this exact
+    /// prefix (i.e. whose <see cref="Themia.Mediator.Abstractions.ICacheKeyProvider.GetCacheKeyPrefix"/>
+    /// returned this value) and removes them. This is an exact-match lookup against the index —
+    /// not a string starts-with scan over raw cache keys.
+    /// Example: "Order:" removes all cache entries whose provider returned prefix "Order:".
     /// </summary>
     public string? CacheKeyPrefix { get; set; }
 }

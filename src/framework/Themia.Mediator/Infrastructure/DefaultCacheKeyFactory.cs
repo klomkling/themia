@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Themia.Framework.Core.Abstractions.Tenancy;
 using Themia.Mediator.Abstractions;
 using Themia.Mediator.Configuration;
 
@@ -8,6 +9,8 @@ namespace Themia.Mediator.Infrastructure;
 /// <summary>
 /// Default implementation of <see cref="ICacheKeyFactory"/> that generates cache keys
 /// using JSON serialization of request properties.
+/// Keys are prefixed with the ambient tenant so that different tenants never share a
+/// cache entry (e.g. <c>t:acme:</c> for tenant "acme", <c>t:_:</c> for no tenant).
 /// </summary>
 public sealed class DefaultCacheKeyFactory : ICacheKeyFactory
 {
@@ -18,10 +21,19 @@ public sealed class DefaultCacheKeyFactory : ICacheKeyFactory
         WriteIndented = false
     };
 
+    /// <summary>Returns the tenant segment to prepend to every cache key.</summary>
+    private static string TenantSegment()
+    {
+        var tenantId = TenantContextAccessor.CurrentTenantId?.Value;
+        return $"t:{tenantId ?? "_"}:";
+    }
+
     /// <inheritdoc />
     public string CreateKey<TRequest>(TRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
+
+        var tenant = TenantSegment();
 
         // If request provides its own cache key, use it
         if (request is ICacheKeyProvider keyProvider)
@@ -33,14 +45,14 @@ public sealed class DefaultCacheKeyFactory : ICacheKeyFactory
                     $"Custom cache key provided by {typeof(TRequest).Name} is null or whitespace.");
             }
 
-            return customKey;
+            return $"{tenant}{customKey}";
         }
 
-        // Generate default key: TypeFullName:SerializedProperties
+        // Generate default key: tenant:TypeFullName:SerializedProperties
         var typeName = typeof(TRequest).FullName ?? typeof(TRequest).Name;
         var serialized = JsonSerializer.Serialize(request, SerializerOptions);
 
-        return $"{typeName}:{serialized}";
+        return $"{tenant}{typeName}:{serialized}";
     }
 
     /// <inheritdoc />

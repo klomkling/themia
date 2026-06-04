@@ -23,6 +23,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../Themia.Caching/Themia.Caching.csproj" />
+    <ProjectReference Include="../Themia.Framework.Core/Themia.Framework.Core.csproj" />
     <ProjectReference Include="../Themia.Logging/Themia.Logging.csproj" />
     <ProjectReference Include="../../neutral/Themia.DependencyInjection/Themia.DependencyInjection.csproj" />
     <!-- Generator as analyzer: emits the dispatcher/registration from [GenerateMediatorHandlers] -->

@@ -45,13 +45,13 @@ public sealed class LoggingBehavior<TRequest, TResponse> : IPipelineBehavior<TRe
         using var _ = ThemiaLogContext.PushProperty("RequestName", requestName);
         using var __ = ThemiaLogContext.PushProperty("RequestType", typeof(TRequest).FullName);
 
-        _logger.LogInformation("Handling {RequestName} with content: {@Request}", requestName, request);
+        _logger.LogInformation("Handling {RequestName}", requestName);
 
         try
         {
             var response = await next(cancellationToken).ConfigureAwait(false);
 
-            _logger.LogInformation("Handled {RequestName} with response: {@Response}", requestName, response);
+            _logger.LogInformation("Handled {RequestName}", requestName);
 
             return response;
         }

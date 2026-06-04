@@ -49,11 +49,11 @@ public sealed class DefaultCacheKeyFactoryTests
         // Arrange
         var request = new CustomKeyRequest("test");
 
-        // Act
+        // Act — no tenant set, so the key is prefixed with the no-tenant bucket "t:_:"
         var key = _factory.CreateKey(request);
 
-        // Assert
-        Assert.Equal("custom-key:test", key);
+        // Assert: tenant prefix is always applied; custom key follows it
+        Assert.Equal("t:_:custom-key:test", key);
     }
 
     [Fact]

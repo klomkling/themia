@@ -219,4 +219,29 @@ public class DapperTenantStoreTests
         Assert.DoesNotContain("LIMIT", query, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain(" TOP ", query, StringComparison.OrdinalIgnoreCase);
     }
+
+    // Fix 6 — constructor rejects malicious/invalid table names (SQL injection guard).
+
+    [Theory]
+    [InlineData("tenants; DROP TABLE users--")]
+    [InlineData("a b")]
+    [InlineData("1tenants")]
+    [InlineData("ten;ants")]
+    public async Task Constructor_WithInvalidTableName_ShouldThrowArgumentException(string tableName)
+    {
+        using var db = await SqliteTestDb.CreateAsync();
+
+        var ex = Assert.Throws<ArgumentException>(() =>
+            new DapperTenantStore(db.GetConnectionFactory(), tableName));
+
+        Assert.Equal("tableName", ex.ParamName);
+    }
+
+    [Fact]
+    public async Task Constructor_WithValidDottedTableName_ShouldBeAccepted()
+    {
+        // A schema-qualified name like "dbo.tenants" is valid per the regex.
+        using var db = await SqliteTestDb.CreateAsync("dbo_tenants"); // SQLite doesn't support schemas; just confirm no throw.
+        Assert.NotNull(new DapperTenantStore(db.GetConnectionFactory(), "dbo.tenants"));
+    }
 }

@@ -173,13 +173,22 @@ public static class MultiTenancyServiceCollectionExtensions
             });
         }
 
-        // Add options validation
-        services.AddSingleton<IValidateOptions<MultiTenancyOptions>, MultiTenancyOptionsValidator>();
+        // Register the validator and bind ValidateOnStart so misconfiguration surfaces at startup
+        // rather than the first time options are accessed.
+        services.TryAddSingleton<IValidateOptions<MultiTenancyOptions>, MultiTenancyOptionsValidator>();
+        services.AddOptions<MultiTenancyOptions>().ValidateOnStart();
 
-        // TenantAccessor is scoped to ensure proper isolation between concurrent requests
-        services.TryAddScoped<ITenantAccessor, TenantAccessor>();
+        // TenantAccessor is registered once as the concrete Scoped type; both the read-only
+        // ITenantAccessor and write-only ITenantSetter interfaces resolve to the same instance
+        // within the request scope.
+        services.TryAddScoped<TenantAccessor>();
+        services.TryAddScoped<ITenantAccessor>(sp => sp.GetRequiredService<TenantAccessor>());
+        services.TryAddScoped<ITenantSetter>(sp => sp.GetRequiredService<TenantAccessor>());
+
         services.TryAddSingleton<ITenantStore, InMemoryTenantStore>();
-        services.TryAddSingleton<ITenantResolver, DefaultTenantResolver>();
+        // Scoped so it can safely take a scoped ITenantStore (e.g. DapperTenantStore on a scoped
+        // connection) without creating a captive dependency.
+        services.TryAddScoped<ITenantResolver, DefaultTenantResolver>();
         services.TryAddSingleton<Microsoft.AspNetCore.Http.IHttpContextAccessor, Microsoft.AspNetCore.Http.HttpContextAccessor>();
 
         var builder = new MultiTenancyBuilder(services);

@@ -95,13 +95,15 @@ public class TenantResolutionMiddlewareTests
     public async Task Middleware_WithUnbridgeableIdentifier_ShouldFailClosedConsistently()
     {
         // A tenant whose identifier is non-null but violates TenantId's rules (here "a.b" — the dot
-        // is outside [A-Za-z0-9_-]) makes TenantId.From throw. The middleware must NOT 500: it bridges
-        // to no-tenant and leaves BOTH contexts null, so the Tier-3 EF filter denies access.
+        // is outside the allowed char set) makes TenantId.From throw. The middleware must NOT 500:
+        // it bridges to no-tenant and leaves BOTH contexts null, so the Tier-3 EF filter denies access.
         var resolved = new TenantInfo("tenant-bad", "a.b", "Misseeded Corp");
         var services = new ServiceCollection();
         services.AddLogging();
         services.AddSingleton<ITenantResolver>(new StubTenantResolver(resolved));
-        services.AddSingleton<ITenantAccessor>(new StubTenantAccessor());
+        var stub = new StubTenantAccessor();
+        services.AddSingleton<ITenantAccessor>(stub);
+        services.AddSingleton<ITenantSetter>(stub);
         await using var provider = services.BuildServiceProvider();
 
         TenantInfo? observedAccessorCurrent = null;
@@ -129,7 +131,9 @@ public class TenantResolutionMiddlewareTests
         var services = new ServiceCollection();
         services.AddLogging();
         services.AddSingleton<ITenantResolver>(new StubTenantResolver(resolved));
-        services.AddSingleton<ITenantAccessor>(new StubTenantAccessor());
+        var stub = new StubTenantAccessor();
+        services.AddSingleton<ITenantAccessor>(stub);
+        services.AddSingleton<ITenantSetter>(stub);
         await using var provider = services.BuildServiceProvider();
 
         TenantInfo? observedAccessorCurrent = null;
@@ -161,9 +165,11 @@ public class TenantResolutionMiddlewareTests
             Task.FromResult(_tenant);
     }
 
-    private sealed class StubTenantAccessor : ITenantAccessor
+    private sealed class StubTenantAccessor : ITenantAccessor, ITenantSetter
     {
-        public TenantInfo? Current { get; set; }
+        public TenantInfo? Current { get; private set; }
+
+        public void Set(TenantInfo? tenant) => Current = tenant;
     }
 
     private async Task<IHost> CreateTestHost(bool configureDefaultTenant = false)

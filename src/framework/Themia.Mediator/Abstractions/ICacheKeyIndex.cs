@@ -28,9 +28,14 @@ public interface ICacheKeyIndex
     Task RemoveByQueryTypeAsync(Type queryType, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Removes all cached entries with keys starting with the specified prefix.
+    /// Removes all cached entries that were registered under the specified prefix via
+    /// <see cref="TrackAsync"/>. The match is an exact lookup against the prefix that was
+    /// registered — it is not a string starts-with scan over raw cache keys.
     /// </summary>
-    /// <param name="prefix">The cache key prefix to match.</param>
+    /// <param name="prefix">
+    /// The exact prefix value that was previously passed to <see cref="TrackAsync"/> (matching
+    /// <see cref="Themia.Mediator.Abstractions.ICacheKeyProvider.GetCacheKeyPrefix"/>).
+    /// </param>
     /// <param name="cancellationToken">Cancellation token.</param>
     Task RemoveByPrefixAsync(string prefix, CancellationToken cancellationToken = default);
 

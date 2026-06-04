@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using Themia.Caching;
+using Themia.Framework.Core.Abstractions.Tenancy;
 using Themia.Mediator.Abstractions;
 
 namespace Themia.Mediator.Infrastructure;
@@ -32,6 +33,13 @@ public sealed class CacheKeyIndex : ICacheKeyIndex
         _lockProvider = lockProvider ?? throw new ArgumentNullException(nameof(lockProvider));
     }
 
+    /// <summary>Returns the tenant prefix for index keys, scoping invalidation to the current tenant.</summary>
+    private static string TenantPrefix()
+    {
+        var tenantId = TenantContextAccessor.CurrentTenantId?.Value;
+        return $"t:{tenantId ?? "_"}:";
+    }
+
     /// <inheritdoc />
     public async Task TrackAsync(
         string valueKey,
@@ -45,25 +53,27 @@ public sealed class CacheKeyIndex : ICacheKeyIndex
 
         try
         {
+            var tenant = TenantPrefix();
+
             // Track by query type
-            var typeIndexKey = $"Index:Type:{queryType.FullName ?? queryType.Name}";
+            var typeIndexKey = $"{tenant}Index:Type:{queryType.FullName ?? queryType.Name}";
             await AddToIndexSetAsync(typeIndexKey, valueKey, cancellationToken).ConfigureAwait(false);
 
             // Track by scope root if provided
             if (!string.IsNullOrWhiteSpace(scopeRoot))
             {
-                var scopeIndexKey = $"Index:{scopeRoot}";
+                var scopeIndexKey = $"{tenant}Index:{scopeRoot}";
                 await AddToIndexSetAsync(scopeIndexKey, valueKey, cancellationToken).ConfigureAwait(false);
             }
 
             // Track by custom prefix if provided
             if (!string.IsNullOrWhiteSpace(customPrefix))
             {
-                var prefixIndexKey = $"Index:Prefix:{customPrefix}";
+                var prefixIndexKey = $"{tenant}Index:Prefix:{customPrefix}";
                 await AddToIndexSetAsync(prefixIndexKey, valueKey, cancellationToken).ConfigureAwait(false);
             }
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger.LogWarning(ex, "Failed to track cache key {ValueKey} in index", valueKey);
             // Don't throw - tracking failures should not break the pipeline
@@ -75,7 +85,8 @@ public sealed class CacheKeyIndex : ICacheKeyIndex
     {
         ArgumentNullException.ThrowIfNull(queryType);
 
-        var typeIndexKey = $"Index:Type:{queryType.FullName ?? queryType.Name}";
+        var tenant = TenantPrefix();
+        var typeIndexKey = $"{tenant}Index:Type:{queryType.FullName ?? queryType.Name}";
         await RemoveIndexedKeysAsync(typeIndexKey, cancellationToken).ConfigureAwait(false);
     }
 
@@ -84,7 +95,8 @@ public sealed class CacheKeyIndex : ICacheKeyIndex
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(prefix);
 
-        var prefixIndexKey = $"Index:Prefix:{prefix}";
+        var tenant = TenantPrefix();
+        var prefixIndexKey = $"{tenant}Index:Prefix:{prefix}";
         await RemoveIndexedKeysAsync(prefixIndexKey, cancellationToken).ConfigureAwait(false);
     }
 
@@ -93,7 +105,8 @@ public sealed class CacheKeyIndex : ICacheKeyIndex
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(scopeRoot);
 
-        var scopeIndexKey = $"Index:{scopeRoot}";
+        var tenant = TenantPrefix();
+        var scopeIndexKey = $"{tenant}Index:{scopeRoot}";
         await RemoveIndexedKeysAsync(scopeIndexKey, cancellationToken).ConfigureAwait(false);
     }
 
@@ -157,7 +170,7 @@ public sealed class CacheKeyIndex : ICacheKeyIndex
 
             _logger.LogInformation("Successfully invalidated cache for index key {IndexKey}", indexKey);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger.LogWarning(ex, "Failed to remove indexed keys for {IndexKey}", indexKey);
             // Don't throw - invalidation failures should not break the pipeline

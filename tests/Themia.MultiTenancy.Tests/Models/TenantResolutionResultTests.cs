@@ -114,4 +114,66 @@ public class TenantResolutionResultTests
         Assert.Equal("globex", result.Identifier);
         Assert.Null(result.Tenant);
     }
+
+    // Fix 4 — compact constructor guard rejects illegal states.
+
+    [Fact]
+    public void Constructor_SuccessTrue_NullTenant_NullIdentifier_ShouldThrow()
+    {
+        // Success=true but neither Tenant nor Identifier — illegal.
+        var ex = Assert.Throws<ArgumentException>(() =>
+            new TenantResolutionResult(true, null, null));
+
+        Assert.Contains("Tenant", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Constructor_SuccessTrue_NullTenant_WhitespaceIdentifier_ShouldThrow()
+    {
+        // Success=true with a whitespace-only Identifier is equally illegal.
+        var ex = Assert.Throws<ArgumentException>(() =>
+            new TenantResolutionResult(true, null, "   "));
+
+        Assert.Contains("Tenant", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Constructor_SuccessFalse_NonNullTenant_ShouldThrow()
+    {
+        // Success=false must not carry a Tenant.
+        var tenant = new TenantInfo("t1", "acme");
+        var ex = Assert.Throws<ArgumentException>(() =>
+            new TenantResolutionResult(false, tenant));
+
+        Assert.Contains("Tenant", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Constructor_SuccessTrue_WithTenant_ShouldBeAccepted()
+    {
+        var tenant = new TenantInfo("t1", "acme");
+        var result = new TenantResolutionResult(true, tenant);
+
+        Assert.True(result.Success);
+        Assert.Equal(tenant, result.Tenant);
+    }
+
+    [Fact]
+    public void Constructor_SuccessTrue_WithIdentifier_ShouldBeAccepted()
+    {
+        var result = new TenantResolutionResult(true, null, "acme");
+
+        Assert.True(result.Success);
+        Assert.Null(result.Tenant);
+        Assert.Equal("acme", result.Identifier);
+    }
+
+    [Fact]
+    public void Constructor_SuccessFalse_NullTenant_ShouldBeAccepted()
+    {
+        var result = new TenantResolutionResult(false, null);
+
+        Assert.False(result.Success);
+        Assert.Null(result.Tenant);
+    }
 }

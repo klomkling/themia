@@ -9,7 +9,8 @@ Themia.MultiTenancy.Abstractions.ICacheableTenantStore.ClearCache() -> void
 Themia.MultiTenancy.Abstractions.ICacheableTenantStore.EvictFromCache(string! identifier) -> void
 Themia.MultiTenancy.Abstractions.ITenantAccessor
 Themia.MultiTenancy.Abstractions.ITenantAccessor.Current.get -> Themia.MultiTenancy.Abstractions.TenantInfo?
-Themia.MultiTenancy.Abstractions.ITenantAccessor.Current.set -> void
+Themia.MultiTenancy.Abstractions.ITenantSetter
+Themia.MultiTenancy.Abstractions.ITenantSetter.Set(Themia.MultiTenancy.Abstractions.TenantInfo? tenant) -> void
 Themia.MultiTenancy.Abstractions.ITenantResolutionStrategy
 Themia.MultiTenancy.Abstractions.ITenantResolutionStrategy.ResolveAsync(Themia.MultiTenancy.Abstractions.TenantResolutionContext! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.MultiTenancy.Abstractions.TenantResolutionResult!>!
 Themia.MultiTenancy.Abstractions.ITenantResolver

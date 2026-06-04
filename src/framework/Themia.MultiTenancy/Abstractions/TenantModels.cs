@@ -64,33 +64,114 @@ public sealed record TenantResolutionContext(
 /// <summary>
 /// Result of a tenant resolution attempt.
 /// </summary>
-public sealed record TenantResolutionResult(bool Success, TenantInfo? Tenant, string? Identifier = null, string? Source = null, string? Reason = null)
+/// <remarks>
+/// Constructor invariants (enforced regardless of call site):
+/// <list type="bullet">
+///   <item>When <see cref="Success"/> is <c>true</c>, at least one of <see cref="Tenant"/> or
+///   <see cref="Identifier"/> must be non-null/non-whitespace.</item>
+///   <item>When <see cref="Success"/> is <c>false</c>, <see cref="Tenant"/> must be <c>null</c>.</item>
+/// </list>
+/// Use the static factory methods (<see cref="NotFound"/>, <see cref="Resolved"/>,
+/// <see cref="Identified"/>) as the preferred creation API.
+/// </remarks>
+public sealed record TenantResolutionResult
 {
+    /// <summary>Gets whether the resolution succeeded.</summary>
+    public bool Success { get; init; }
+
+    /// <summary>Gets the resolved tenant, or <c>null</c> when only an identifier was resolved.</summary>
+    public TenantInfo? Tenant { get; init; }
+
+    /// <summary>Gets the resolved tenant identifier.</summary>
+    public string? Identifier { get; init; }
+
+    /// <summary>Gets the strategy source name that produced this result.</summary>
+    public string? Source { get; init; }
+
+    /// <summary>Gets an optional human-readable reason for a failed resolution.</summary>
+    public string? Reason { get; init; }
+
+    /// <summary>
+    /// Initializes a new <see cref="TenantResolutionResult"/> and enforces type invariants.
+    /// </summary>
+    /// <param name="Success">Whether the resolution succeeded.</param>
+    /// <param name="Tenant">The resolved tenant (may be <c>null</c> when <paramref name="Identifier"/> is provided).</param>
+    /// <param name="Identifier">The resolved identifier (optional).</param>
+    /// <param name="Source">The strategy source that produced the result (optional).</param>
+    /// <param name="Reason">Human-readable reason for a failed resolution (optional).</param>
+    public TenantResolutionResult(bool Success, TenantInfo? Tenant, string? Identifier = null, string? Source = null, string? Reason = null)
+    {
+        if (Success && Tenant is null && string.IsNullOrWhiteSpace(Identifier))
+        {
+            throw new ArgumentException(
+                "A successful TenantResolutionResult must carry a non-null Tenant or a non-whitespace Identifier.",
+                nameof(Tenant));
+        }
+
+        if (!Success && Tenant is not null)
+        {
+            throw new ArgumentException(
+                "A failed TenantResolutionResult must not carry a non-null Tenant.",
+                nameof(Tenant));
+        }
+
+        this.Success = Success;
+        this.Tenant = Tenant;
+        this.Identifier = Identifier;
+        this.Source = Source;
+        this.Reason = Reason;
+    }
+
     /// <summary>
     /// Creates a failed resolution result for the given source.
     /// </summary>
-    public static TenantResolutionResult NotFound(string source, string? reason = null) => new(false, null, null, source, reason);
+    public static TenantResolutionResult NotFound(string source, string? reason = null) =>
+        new(false, null, null, source, reason);
 
     /// <summary>
     /// Creates a successful resolution result carrying the fully resolved tenant.
     /// </summary>
-    public static TenantResolutionResult Resolved(TenantInfo tenant, string source) => new(true, tenant, tenant.Identifier, source, null);
+    public static TenantResolutionResult Resolved(TenantInfo tenant, string source) =>
+        new(true, tenant, tenant.Identifier, source, null);
 
     /// <summary>
     /// Creates a successful resolution result carrying only the resolved identifier.
     /// </summary>
-    public static TenantResolutionResult Identified(string identifier, string source) => new(true, null, identifier, source, null);
+    public static TenantResolutionResult Identified(string identifier, string source) =>
+        new(true, null, identifier, source, null);
 }
 
 /// <summary>
 /// Accessor for the current tenant within a request scope.
 /// </summary>
+/// <remarks>
+/// This interface is intentionally read-only. Only infrastructure that owns the request
+/// lifecycle (i.e. <c>TenantResolutionMiddleware</c>) should write the ambient tenant, and
+/// it does so via <see cref="ITenantSetter"/>. Application code and business logic should
+/// depend only on <see cref="ITenantAccessor"/> to prevent accidental mutation of the
+/// ambient tenant mid-request.
+/// </remarks>
 public interface ITenantAccessor
 {
     /// <summary>
-    /// Gets or sets the current tenant for the active request scope.
+    /// Gets the current tenant for the active request scope.
     /// </summary>
-    TenantInfo? Current { get; set; }
+    TenantInfo? Current { get; }
+}
+
+/// <summary>
+/// Allows the tenant resolution infrastructure to write the ambient tenant for the current
+/// request scope. Only <c>TenantResolutionMiddleware</c> (or equivalent request-lifecycle
+/// infrastructure) should depend on this interface; application code must depend only on
+/// <see cref="ITenantAccessor"/>.
+/// </summary>
+public interface ITenantSetter
+{
+    /// <summary>
+    /// Sets the current tenant for the active request scope.
+    /// </summary>
+    /// <param name="tenant">The resolved tenant, or <c>null</c> to clear the ambient tenant.</param>
+    void Set(TenantInfo? tenant);
 }
 
 /// <summary>

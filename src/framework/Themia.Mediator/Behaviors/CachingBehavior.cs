@@ -122,17 +122,8 @@ public sealed class CachingBehavior<TRequest, TResponse> : IPipelineBehavior<TRe
             _logger.LogWarning(ex, "Failed to read from cache for {RequestType}, proceeding to handler", typeof(TRequest).Name);
         }
 
-        // Execute handler
-        TResponse response;
-        try
-        {
-            response = await next(cancellationToken).ConfigureAwait(false);
-        }
-        catch
-        {
-            // Don't cache exceptions
-            throw;
-        }
+        // Execute handler; exceptions are not cached.
+        var response = await next(cancellationToken).ConfigureAwait(false);
 
         // Cache the response
         try

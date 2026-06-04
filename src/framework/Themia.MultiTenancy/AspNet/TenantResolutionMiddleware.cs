@@ -35,6 +35,7 @@ public sealed class TenantResolutionMiddleware
 
         var resolver = context.RequestServices.GetRequiredService<ITenantResolver>();
         var accessor = context.RequestServices.GetRequiredService<ITenantAccessor>();
+        var setter = context.RequestServices.GetRequiredService<ITenantSetter>();
         var logger = context.RequestServices.GetRequiredService<ILogger<TenantResolutionMiddleware>>();
 
         var resolution = await resolver.ResolveAsync(new TenantResolutionContext(
@@ -60,7 +61,8 @@ public sealed class TenantResolutionMiddleware
         }
         catch (ArgumentException ex)
         {
-            // Non-null but invalid identifier (length > 100 or a char outside [A-Za-z0-9_-]).
+            // Non-null but invalid identifier (length > 100, or a character outside the allowed set:
+            // letters and digits are Unicode-aware via char.IsLetterOrDigit; '-' and '_' are also allowed).
             logger.LogWarning(
                 "Resolved tenant identifier '{TenantIdentifier}' could not be bridged to the framework tenant context ({Reason}); proceeding with no tenant context.",
                 identifier,
@@ -70,7 +72,7 @@ public sealed class TenantResolutionMiddleware
 
         if (resolution is not null && bridgedTenantId is not null)
         {
-            accessor.Current = resolution;
+            setter.Set(resolution);
             TenantContextAccessor.CurrentTenantId = bridgedTenantId;
         }
         else
@@ -80,7 +82,7 @@ public sealed class TenantResolutionMiddleware
                 logger.LogDebug("No tenant resolved for the request; proceeding with no tenant context.");
             }
 
-            accessor.Current = null;
+            setter.Set(null);
             TenantContextAccessor.CurrentTenantId = null;
         }
 

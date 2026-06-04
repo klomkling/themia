@@ -68,10 +68,9 @@ public sealed class PerformanceBehavior<TRequest, TResponse> : IPipelineBehavior
         if (elapsedMilliseconds <= _threshold.TotalMilliseconds) return response;
 
         _logger.LogWarning(
-            "Long Running Request: {Name} ({ElapsedMilliseconds} milliseconds) {@Request}",
+            "Long Running Request: {Name} ({ElapsedMilliseconds} milliseconds)",
             requestName,
-            elapsedMilliseconds,
-            request);
+            elapsedMilliseconds);
 
         return response;
     }
