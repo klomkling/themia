@@ -68,4 +68,25 @@ public sealed class PostgresDatabaseProviderTests
         Assert.Throws<InvalidOperationException>(
             () => PostgresDatabaseProvider.ResolveConnectionString(ConfigWithDefault(null), sp));
     }
+
+    [Fact]
+    public void ResolveConnectionString_FallsBackToDefault_WhenTenantConnectionStringIsWhiteSpace()
+    {
+        var tenant = new TenantInfo("1", "acme", ConnectionString: "   ");
+        var sp = ProviderWith(new StubAccessor(tenant));
+
+        var result = PostgresDatabaseProvider.ResolveConnectionString(ConfigWithDefault("Host=shared"), sp);
+
+        Assert.Equal("Host=shared", result);
+    }
+
+    [Fact]
+    public void ResolveConnectionString_FallsBackToDefault_WhenTenantAccessorReturnsNullCurrent()
+    {
+        var sp = ProviderWith(new StubAccessor(current: null));
+
+        var result = PostgresDatabaseProvider.ResolveConnectionString(ConfigWithDefault("Host=shared"), sp);
+
+        Assert.Equal("Host=shared", result);
+    }
 }
