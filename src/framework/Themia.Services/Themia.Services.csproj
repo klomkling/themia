@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <PackageId>Themia.Services</PackageId>
+    <Description>Themia service abstractions — cross-cutting marker interfaces (IService/IDomainService/IInfrastructureService/IIntegrationService) and infrastructure-service contracts (email, SMS, push, storage, report export, cache accessor, background jobs, secrets, audit log, tokens, event bus) as forward-seams for Themia modules.</Description>
+    <PackageTags>themia;services;abstractions;infrastructure;ddd;architecture</PackageTags>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Themia.Caching/Themia.Caching.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+  <ItemGroup>
+    <AdditionalFiles Include="PublicAPI.Shipped.txt" />
+    <AdditionalFiles Include="PublicAPI.Unshipped.txt" />
+  </ItemGroup>
+</Project>
