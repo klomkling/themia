@@ -115,22 +115,8 @@ internal static class HandlerDiscovery
                 interfaceType.TypeArguments[1] is ITypeSymbol responseType)
             {
                 var kind = DetermineHandlerKind(requestType);
-
-                // Debug: collect attribute info
-                var attrDebug = new System.Text.StringBuilder();
-                var attrs = handlerType.GetAttributes();
-                attrDebug.Append($"Attrs({attrs.Length}): ");
-                foreach (var a in attrs)
-                {
-                    attrDebug.Append($"[{a.AttributeClass?.Name ?? "null"}] ");
-                }
-
                 var lifetime = GetLifetime(handlerType);
-                var model = new HandlerModel(handlerType, kind, requestType, responseType, lifetime);
-
-                // Store debug info in a way we can access it
-                // We'll add it to the generated code
-                return model;
+                return new HandlerModel(handlerType, kind, requestType, responseType, lifetime);
             }
         }
 
