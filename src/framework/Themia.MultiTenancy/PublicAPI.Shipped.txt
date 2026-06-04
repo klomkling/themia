@@ -79,3 +79,6 @@ Themia.MultiTenancy.Stores.CachedTenantStore.FindByIdentifierAsync(string! ident
 Themia.MultiTenancy.Stores.InMemoryTenantStore
 Themia.MultiTenancy.Stores.InMemoryTenantStore.FindByIdentifierAsync(string! identifier, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.MultiTenancy.Abstractions.TenantInfo?>!
 Themia.MultiTenancy.Stores.InMemoryTenantStore.InMemoryTenantStore(System.Collections.Generic.IEnumerable<Themia.MultiTenancy.Abstractions.TenantInfo!>? seedTenants = null) -> void
+Themia.MultiTenancy.Stores.DapperTenantStore
+Themia.MultiTenancy.Stores.DapperTenantStore.DapperTenantStore(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task<System.Data.IDbConnection!>!>! connectionFactory, string! tableName = "tenants") -> void
+Themia.MultiTenancy.Stores.DapperTenantStore.FindByIdentifierAsync(string! identifier, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.MultiTenancy.Abstractions.TenantInfo?>!
