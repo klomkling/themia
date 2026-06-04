@@ -1,5 +1,14 @@
 #nullable enable
 const Themia.Framework.Data.EFCore.Abstractions.DatabaseProviderNames.MySql = "mysql" -> string!
+Themia.Framework.Data.EFCore.Abstractions.IDatabaseProvider
+Themia.Framework.Data.EFCore.Abstractions.IDatabaseProvider.Configure(Microsoft.EntityFrameworkCore.DbContextOptionsBuilder! optionsBuilder, Microsoft.Extensions.Configuration.IConfiguration! configuration, System.IServiceProvider! serviceProvider) -> void
+Themia.Framework.Data.EFCore.Abstractions.IDatabaseProvider.ConfigureServices(Microsoft.Extensions.DependencyInjection.IServiceCollection! services, Microsoft.Extensions.Configuration.IConfiguration! configuration) -> void
+Themia.Framework.Data.EFCore.Abstractions.IDatabaseProvider.ProviderName.get -> string!
+Themia.Framework.Data.EFCore.Providers.PostgresDatabaseProvider
+Themia.Framework.Data.EFCore.Providers.PostgresDatabaseProvider.Configure(Microsoft.EntityFrameworkCore.DbContextOptionsBuilder! optionsBuilder, Microsoft.Extensions.Configuration.IConfiguration! configuration, System.IServiceProvider! serviceProvider) -> void
+Themia.Framework.Data.EFCore.Providers.PostgresDatabaseProvider.ConfigureServices(Microsoft.Extensions.DependencyInjection.IServiceCollection! services, Microsoft.Extensions.Configuration.IConfiguration! configuration) -> void
+Themia.Framework.Data.EFCore.Providers.PostgresDatabaseProvider.PostgresDatabaseProvider() -> void
+Themia.Framework.Data.EFCore.Providers.PostgresDatabaseProvider.ProviderName.get -> string!
 const Themia.Framework.Data.EFCore.Abstractions.DatabaseProviderNames.Postgres = "postgres" -> string!
 const Themia.Framework.Data.EFCore.Abstractions.DatabaseProviderNames.SqlServer = "sqlserver" -> string!
 override Themia.Framework.Data.EFCore.ThemiaDbContext.Dispose() -> void
