@@ -21,7 +21,7 @@ public static class ServiceCollectionExtension
     /// <param name="services">The service collection to add services to.</param>
     /// <returns>The service collection for chaining.</returns>
     /// <remarks>
-    /// This method registers pipeline behaviors (Validation, Logging, Performance, Transaction, Caching).
+    /// This method registers pipeline behaviors (Validation, Logging, Caching, Performance, Transaction).
     ///
     /// IMPORTANT: You must also:
     /// <list type="number">

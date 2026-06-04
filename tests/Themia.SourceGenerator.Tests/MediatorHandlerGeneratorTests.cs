@@ -443,6 +443,45 @@ namespace NsB
     }
 
     [Fact]
+    public void Generator_WithSingletonHandlerAttribute_RegistersAsSingleton()
+    {
+        // Arrange — handler decorated with [Themia.Mediator.SingletonHandler] must produce
+        // AddSingleton, not AddScoped (regression guard for the FQN-only GetLifetime fix).
+        var source = @"
+[assembly: Themia.Mediator.GenerateMediatorHandlers]
+" + MediatorGeneratorTestHelper.GetMediatorInfrastructureCode() + @"
+
+namespace TestNamespace
+{
+    using Themia.Mediator.Abstractions;
+    using System.Threading;
+    using System.Threading.Tasks;
+
+    public record CacheQuery(string Key) : IQuery<string>;
+
+    [Themia.Mediator.SingletonHandler]
+    public class CacheQueryHandler : IQueryHandler<CacheQuery, string>
+    {
+        public Task<string> HandleAsync(CacheQuery request, CancellationToken cancellationToken)
+            => Task.FromResult(request.Key);
+    }
+}
+";
+
+        // Act
+        var result = MediatorGeneratorTestHelper.RunGenerator(source);
+
+        // Assert
+        Assert.Empty(result.Diagnostics);
+        var handlerFile = result.GeneratedTrees.FirstOrDefault(t =>
+            t.FilePath.Contains("Handler") && t.FilePath.Contains("CacheQueryHandler"));
+        Assert.NotNull(handlerFile);
+
+        var generatedCode = handlerFile!.ToString();
+        Assert.Contains("AddSingleton", generatedCode);
+    }
+
+    [Fact]
     public void Generator_WithDuplicateHandlers_ReportsDiagnostic()
     {
         // Arrange

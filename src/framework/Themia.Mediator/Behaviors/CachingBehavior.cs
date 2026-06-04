@@ -117,7 +117,7 @@ public sealed class CachingBehavior<TRequest, TResponse> : IPipelineBehavior<TRe
 
             _logger.LogDebug("Cache miss for {RequestType}", typeof(TRequest).Name);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger.LogWarning(ex, "Failed to read from cache for {RequestType}, proceeding to handler", typeof(TRequest).Name);
         }
@@ -162,7 +162,7 @@ public sealed class CachingBehavior<TRequest, TResponse> : IPipelineBehavior<TRe
             await _keyIndex.TrackAsync(cacheKey, typeof(TRequest), typePrefix, scopeRoot, customPrefix, cancellationToken)
                 .ConfigureAwait(false);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger.LogWarning(ex, "Failed to cache response for {RequestType}", typeof(TRequest).Name);
             // Don't throw - caching failures should not break the pipeline
@@ -214,7 +214,7 @@ public sealed class CachingBehavior<TRequest, TResponse> : IPipelineBehavior<TRe
                 await _keyIndex.RemoveByPrefixAsync(prefix, cancellationToken).ConfigureAwait(false);
             }
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger.LogWarning(ex, "Failed to invalidate cache for {CommandType}", typeof(TRequest).Name);
             // Don't throw - invalidation failures should not break the pipeline

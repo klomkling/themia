@@ -144,28 +144,34 @@ internal static class HandlerDiscovery
 
     private static ServiceLifetime GetLifetime(INamedTypeSymbol handlerType)
     {
-        // Look for lifetime attributes from Themia.DependencyInjection
+        // Match lifetime attributes by fully-qualified name only — bare-name matching would
+        // wrongly classify any third-party attribute that happens to share the simple name.
         foreach (var attr in handlerType.GetAttributes())
         {
             var attributeClass = attr.AttributeClass;
             if (attributeClass == null) continue;
 
             var fullName = attributeClass.ToDisplayString();
-            var shortName = attributeClass.Name;
 
-            // Check for lifetime attributes (in Themia.DependencyInjection namespace)
-            if (fullName == "Themia.DependencyInjection.SingletonAttribute" ||
-                shortName == "SingletonAttribute")
+            // Mediator-specific handler lifetime attributes (Themia.Mediator namespace)
+            if (fullName == "Themia.Mediator.SingletonHandlerAttribute")
             {
                 return ServiceLifetime.Singleton;
             }
-            else if (fullName == "Themia.DependencyInjection.TransientAttribute" ||
-                     shortName == "TransientAttribute")
+            else if (fullName == "Themia.Mediator.TransientHandlerAttribute")
             {
                 return ServiceLifetime.Transient;
             }
-            else if (fullName == "Themia.DependencyInjection.ScopedAttribute" ||
-                     shortName == "ScopedAttribute")
+            // General DI lifetime attributes (Themia.DependencyInjection namespace)
+            else if (fullName == "Themia.DependencyInjection.SingletonAttribute")
+            {
+                return ServiceLifetime.Singleton;
+            }
+            else if (fullName == "Themia.DependencyInjection.TransientAttribute")
+            {
+                return ServiceLifetime.Transient;
+            }
+            else if (fullName == "Themia.DependencyInjection.ScopedAttribute")
             {
                 return ServiceLifetime.Scoped;
             }

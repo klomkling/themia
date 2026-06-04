@@ -45,10 +45,10 @@ internal static class SourceBuilder
 
         var handlerInterface = model.Kind switch
         {
-            HandlerKind.Command => "ICommandHandler",
-            HandlerKind.Query => "IQueryHandler",
-            HandlerKind.Request => "IRequestHandler",
-            _ => "IRequestHandler"
+            HandlerKind.Command => "global::Themia.Mediator.Abstractions.ICommandHandler",
+            HandlerKind.Query => "global::Themia.Mediator.Abstractions.IQueryHandler",
+            HandlerKind.Request => "global::Themia.Mediator.Abstractions.IRequestHandler",
+            _ => "global::Themia.Mediator.Abstractions.IRequestHandler"
         };
 
         sb.AppendLine($"    internal static void Add_{model.SafeHintName}(global::Microsoft.Extensions.DependencyInjection.IServiceCollection services)");
