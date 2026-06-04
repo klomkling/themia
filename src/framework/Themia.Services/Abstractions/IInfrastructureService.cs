@@ -42,9 +42,9 @@ namespace Themia.Services.Abstractions;
 ///
 /// public interface IStorageService : IInfrastructureService
 /// {
-///     Task&lt;string&gt; UploadAsync(Stream content, string fileName, CancellationToken ct);
-///     Task&lt;Stream&gt; DownloadAsync(string fileId, CancellationToken ct);
-///     Task DeleteAsync(string fileId, CancellationToken ct);
+///     Task&lt;StorageUploadResult&gt; UploadAsync(Stream content, string fileName, string contentType, CancellationToken cancellationToken = default);
+///     Task&lt;Stream&gt; DownloadAsync(string location, CancellationToken cancellationToken = default);
+///     Task DeleteAsync(string location, CancellationToken cancellationToken = default);
 /// }
 ///
 /// // Implementation
@@ -52,12 +52,12 @@ namespace Themia.Services.Abstractions;
 /// {
 ///     private readonly BlobServiceClient _blobClient;
 ///
-///     public async Task&lt;string&gt; UploadAsync(Stream content, string fileName, CancellationToken ct)
+///     public async Task&lt;StorageUploadResult&gt; UploadAsync(Stream content, string fileName, string contentType, CancellationToken cancellationToken = default)
 ///     {
 ///         var containerClient = _blobClient.GetBlobContainerClient("uploads");
 ///         var blobClient = containerClient.GetBlobClient(fileName);
-///         await blobClient.UploadAsync(content, ct);
-///         return blobClient.Uri.ToString();
+///         await blobClient.UploadAsync(content, cancellationToken);
+///         return new StorageUploadResult(blobClient.Uri.ToString(), contentType, content.Length);
 ///     }
 /// }
 /// </code>

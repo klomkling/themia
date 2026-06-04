@@ -103,6 +103,7 @@ public interface IBackgroundJobScheduler : IInfrastructureService
     /// <param name="jobName">The job name.</param>
     /// <param name="payload">The job payload.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>A task that completes when the job is enqueued.</returns>
     Task EnqueueAsync(string jobName, object payload, CancellationToken cancellationToken = default);
 }
 
@@ -160,8 +161,6 @@ public interface IEventBus : IInfrastructureService
     Task PublishAsync<T>(string topic, T message, CancellationToken cancellationToken = default);
 }
 
-#region Infrastructure contracts
-
 /// <summary>Represents an email message to be sent.</summary>
 /// <param name="To">The recipient address.</param>
 /// <param name="Subject">The email subject.</param>
@@ -209,7 +208,7 @@ public sealed record ReportExportResult(string ContentType, byte[] Content, stri
 /// <param name="ActorName">The display name of the actor.</param>
 /// <param name="EntityId">The identifier of the entity affected.</param>
 /// <param name="EntityType">The type name of the entity affected.</param>
-/// <param name="OccurredAtUtc">The UTC time the event occurred.</param>
+/// <param name="OccurredAtUtc">The UTC time the event occurred (capture time, not the time the record was persisted).</param>
 /// <param name="Metadata">Optional additional metadata.</param>
 public sealed record AuditEvent(string EventType, string ActorId, string ActorName, string EntityId, string EntityType, DateTimeOffset OccurredAtUtc, IReadOnlyDictionary<string, string>? Metadata = null);
 
@@ -226,5 +225,3 @@ public sealed record TokenDescriptor(string Subject, IReadOnlyDictionary<string,
 /// <param name="Claims">The claims extracted from the token, if valid.</param>
 /// <param name="Reason">The reason for validation failure, if invalid.</param>
 public sealed record TokenValidationResult(bool IsValid, IReadOnlyDictionary<string, string>? Claims = null, string? Reason = null);
-
-#endregion

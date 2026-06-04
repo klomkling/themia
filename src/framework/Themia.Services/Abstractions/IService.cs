@@ -1,7 +1,7 @@
 namespace Themia.Services.Abstractions;
 
 /// <summary>
-/// Marker interface for all services in the application.
+/// Marker interface for Themia-managed services.
 /// </summary>
 /// <remarks>
 /// This interface serves as a base marker for service discovery and registration.

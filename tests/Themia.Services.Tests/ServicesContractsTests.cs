@@ -9,7 +9,7 @@ namespace Themia.Services.Tests;
 public class ServicesContractsTests
 {
     [Fact]
-    public void InfrastructureService_marker_inherits_IService()
+    public void All_marker_interfaces_inherit_IService()
     {
         Assert.True(typeof(IService).IsAssignableFrom(typeof(IInfrastructureService)));
         Assert.True(typeof(IService).IsAssignableFrom(typeof(IDomainService)));
