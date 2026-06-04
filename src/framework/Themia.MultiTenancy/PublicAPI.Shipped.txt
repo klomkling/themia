@@ -71,3 +71,11 @@ Themia.MultiTenancy.Strategies.HeaderTenantResolutionStrategy.ResolveAsync(Themi
 Themia.MultiTenancy.Strategies.PathTenantResolutionStrategy
 Themia.MultiTenancy.Strategies.PathTenantResolutionStrategy.PathTenantResolutionStrategy(Microsoft.Extensions.Options.IOptions<Themia.MultiTenancy.MultiTenancyOptions!>! options) -> void
 Themia.MultiTenancy.Strategies.PathTenantResolutionStrategy.ResolveAsync(Themia.MultiTenancy.Abstractions.TenantResolutionContext! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.MultiTenancy.Abstractions.TenantResolutionResult!>!
+Themia.MultiTenancy.Stores.CachedTenantStore
+Themia.MultiTenancy.Stores.CachedTenantStore.CachedTenantStore(Themia.MultiTenancy.Abstractions.ITenantStore! inner, Microsoft.Extensions.Caching.Memory.IMemoryCache! cache, System.TimeSpan? ttl = null) -> void
+Themia.MultiTenancy.Stores.CachedTenantStore.ClearCache() -> void
+Themia.MultiTenancy.Stores.CachedTenantStore.EvictFromCache(string! identifier) -> void
+Themia.MultiTenancy.Stores.CachedTenantStore.FindByIdentifierAsync(string! identifier, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.MultiTenancy.Abstractions.TenantInfo?>!
+Themia.MultiTenancy.Stores.InMemoryTenantStore
+Themia.MultiTenancy.Stores.InMemoryTenantStore.FindByIdentifierAsync(string! identifier, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.MultiTenancy.Abstractions.TenantInfo?>!
+Themia.MultiTenancy.Stores.InMemoryTenantStore.InMemoryTenantStore(System.Collections.Generic.IEnumerable<Themia.MultiTenancy.Abstractions.TenantInfo!>? seedTenants = null) -> void
