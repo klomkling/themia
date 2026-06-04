@@ -7,6 +7,13 @@ namespace Themia.Mediator.Infrastructure;
 /// Provides process-level distributed locks backed by <see cref="SemaphoreSlim"/>.
 /// Consumers can replace this implementation with one backed by Redis or another distributed store.
 /// </summary>
+/// <remarks>
+/// Semaphores are intentionally never removed from the dictionary. Removing on release is racy:
+/// a queued waiter can still hold a reference to the old semaphore while a new caller adds a fresh
+/// one for the same resource, breaking mutual exclusion. The cost is one <see cref="SemaphoreSlim"/>
+/// per distinct resource key (bounded for typical lock key sets). High-cardinality or unbounded key
+/// sets should use a distributed/evicting provider instead.
+/// </remarks>
 public sealed class InMemoryDistributedLockProvider : IDistributedLockProvider
 {
     private readonly ConcurrentDictionary<string, SemaphoreSlim> _locks = new();
@@ -27,30 +34,19 @@ public sealed class InMemoryDistributedLockProvider : IDistributedLockProvider
             throw new TimeoutException($"Failed to acquire lock for resource '{resource}' within '{timeout}'.");
         }
 
-        return new InMemoryDistributedLock(resource, semaphore, this);
-    }
-
-    private void Release(string resource, SemaphoreSlim semaphore)
-    {
-        semaphore.Release();
-        if (semaphore.CurrentCount == 1)
-        {
-            _locks.TryRemove(new KeyValuePair<string, SemaphoreSlim>(resource, semaphore));
-        }
+        return new InMemoryDistributedLock(resource, semaphore);
     }
 
     private sealed class InMemoryDistributedLock : IDistributedLock
     {
         private readonly string _resource;
         private readonly SemaphoreSlim _semaphore;
-        private readonly InMemoryDistributedLockProvider _owner;
         private int _disposed;
 
-        public InMemoryDistributedLock(string resource, SemaphoreSlim semaphore, InMemoryDistributedLockProvider owner)
+        public InMemoryDistributedLock(string resource, SemaphoreSlim semaphore)
         {
             _resource = resource;
             _semaphore = semaphore;
-            _owner = owner;
         }
 
         /// <inheritdoc />
@@ -64,7 +60,7 @@ public sealed class InMemoryDistributedLockProvider : IDistributedLockProvider
                 return ValueTask.CompletedTask;
             }
 
-            _owner.Release(_resource, _semaphore);
+            _semaphore.Release();
             return ValueTask.CompletedTask;
         }
     }

@@ -77,7 +77,7 @@ public sealed class TenantResolutionMiddleware
         {
             if (resolution is null)
             {
-                logger.LogWarning("Tenant resolution returned null. Ensure strategies are configured.");
+                logger.LogDebug("No tenant resolved for the request; proceeding with no tenant context.");
             }
 
             accessor.Current = null;

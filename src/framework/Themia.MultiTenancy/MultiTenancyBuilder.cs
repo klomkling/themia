@@ -145,26 +145,32 @@ public static class MultiTenancyServiceCollectionExtensions
             throw new ArgumentNullException(nameof(services));
         }
 
-        // Determine whether to use default strategies
-        // Priority: explicit parameter > options configuration > default (true)
-        bool shouldUseDefaults = true;
-
-        if (useDefaultStrategies.HasValue)
-        {
-            shouldUseDefaults = useDefaultStrategies.Value;
-        }
-        else if (configureOptions is not null)
-        {
-            // Capture the configured value during options setup
-            var tempOptions = new MultiTenancyOptions();
-            configureOptions(tempOptions);
-            shouldUseDefaults = tempOptions.UseDefaultStrategies;
-        }
-
-        services.AddOptions<MultiTenancyOptions>();
+        // Determine whether to use default strategies.
+        // Priority: explicit parameter > options configuration > default (true).
+        // configureOptions is invoked AT MOST ONCE to avoid surprising double-invocation of
+        // user-supplied callbacks that may have side effects.
+        MultiTenancyOptions? captured = null;
         if (configureOptions is not null)
         {
-            services.Configure(configureOptions);
+            captured = new MultiTenancyOptions();
+            configureOptions(captured);
+        }
+
+        bool shouldUseDefaults = useDefaultStrategies ?? captured?.UseDefaultStrategies ?? true;
+
+        services.AddOptions<MultiTenancyOptions>();
+        if (captured is not null)
+        {
+            // Copy the already-captured values into the options registration; do NOT call
+            // configureOptions again here to avoid invoking the user callback a second time.
+            var snapshot = captured;
+            services.Configure<MultiTenancyOptions>(o =>
+            {
+                o.HeaderName = snapshot.HeaderName;
+                o.PathPrefix = snapshot.PathPrefix;
+                o.DefaultTenantIdentifier = snapshot.DefaultTenantIdentifier;
+                o.UseDefaultStrategies = snapshot.UseDefaultStrategies;
+            });
         }
 
         // Add options validation
