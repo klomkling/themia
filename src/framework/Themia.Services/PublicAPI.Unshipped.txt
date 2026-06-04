@@ -1,5 +1,126 @@
 #nullable enable
+Themia.Services.Abstractions.AuditEvent
+Themia.Services.Abstractions.AuditEvent.ActorId.get -> string!
+Themia.Services.Abstractions.AuditEvent.ActorId.init -> void
+Themia.Services.Abstractions.AuditEvent.ActorName.get -> string!
+Themia.Services.Abstractions.AuditEvent.ActorName.init -> void
+Themia.Services.Abstractions.AuditEvent.AuditEvent(string! EventType, string! ActorId, string! ActorName, string! EntityId, string! EntityType, System.DateTimeOffset OccurredAtUtc, System.Collections.Generic.IReadOnlyDictionary<string!, string!>? Metadata = null) -> void
+Themia.Services.Abstractions.AuditEvent.EntityId.get -> string!
+Themia.Services.Abstractions.AuditEvent.EntityId.init -> void
+Themia.Services.Abstractions.AuditEvent.EntityType.get -> string!
+Themia.Services.Abstractions.AuditEvent.EntityType.init -> void
+Themia.Services.Abstractions.AuditEvent.EventType.get -> string!
+Themia.Services.Abstractions.AuditEvent.EventType.init -> void
+Themia.Services.Abstractions.AuditEvent.Metadata.get -> System.Collections.Generic.IReadOnlyDictionary<string!, string!>?
+Themia.Services.Abstractions.AuditEvent.Metadata.init -> void
+Themia.Services.Abstractions.AuditEvent.OccurredAtUtc.get -> System.DateTimeOffset
+Themia.Services.Abstractions.AuditEvent.OccurredAtUtc.init -> void
+Themia.Services.Abstractions.EmailMessage
+Themia.Services.Abstractions.EmailMessage.Body.get -> string!
+Themia.Services.Abstractions.EmailMessage.Body.init -> void
+Themia.Services.Abstractions.EmailMessage.EmailMessage(string! To, string! Subject, string! Body, bool IsHtml = false, string? From = null, System.Collections.Generic.IReadOnlyDictionary<string!, string!>? Headers = null) -> void
+Themia.Services.Abstractions.EmailMessage.From.get -> string?
+Themia.Services.Abstractions.EmailMessage.From.init -> void
+Themia.Services.Abstractions.EmailMessage.Headers.get -> System.Collections.Generic.IReadOnlyDictionary<string!, string!>?
+Themia.Services.Abstractions.EmailMessage.Headers.init -> void
+Themia.Services.Abstractions.EmailMessage.IsHtml.get -> bool
+Themia.Services.Abstractions.EmailMessage.IsHtml.init -> void
+Themia.Services.Abstractions.EmailMessage.Subject.get -> string!
+Themia.Services.Abstractions.EmailMessage.Subject.init -> void
+Themia.Services.Abstractions.EmailMessage.To.get -> string!
+Themia.Services.Abstractions.EmailMessage.To.init -> void
+Themia.Services.Abstractions.IAuditLogService
+Themia.Services.Abstractions.IAuditLogService.WriteAsync(Themia.Services.Abstractions.AuditEvent! auditEvent, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Services.Abstractions.IBackgroundJobScheduler
+Themia.Services.Abstractions.IBackgroundJobScheduler.EnqueueAsync(string! jobName, object! payload, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Services.Abstractions.IBackgroundJobScheduler.ScheduleAsync(string! jobName, System.DateTimeOffset runAtUtc, object! payload, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<string!>!
+Themia.Services.Abstractions.ICacheProviderAccessor
+Themia.Services.Abstractions.ICacheProviderAccessor.Provider.get -> Themia.Caching.IThemiaCacheProvider!
 Themia.Services.Abstractions.IDomainService
+Themia.Services.Abstractions.IEmailService
+Themia.Services.Abstractions.IEmailService.SendAsync(Themia.Services.Abstractions.EmailMessage! message, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Services.Abstractions.IEmailService.SendBulkAsync(System.Collections.Generic.IEnumerable<Themia.Services.Abstractions.EmailMessage!>! messages, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Services.Abstractions.IEventBus
+Themia.Services.Abstractions.IEventBus.PublishAsync<T>(string! topic, T message, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
 Themia.Services.Abstractions.IInfrastructureService
 Themia.Services.Abstractions.IIntegrationService
+Themia.Services.Abstractions.IPushNotificationService
+Themia.Services.Abstractions.IPushNotificationService.SendAsync(Themia.Services.Abstractions.PushNotification! notification, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Services.Abstractions.IReportExportService
+Themia.Services.Abstractions.IReportExportService.ExportAsync(Themia.Services.Abstractions.ReportExportRequest! request, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Services.Abstractions.ReportExportResult!>!
+Themia.Services.Abstractions.ISecretsProvider
+Themia.Services.Abstractions.ISecretsProvider.GetSecretAsync(string! name, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<string?>!
 Themia.Services.Abstractions.IService
+Themia.Services.Abstractions.ISmsService
+Themia.Services.Abstractions.ISmsService.SendAsync(Themia.Services.Abstractions.SmsMessage! message, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Services.Abstractions.IStorageService
+Themia.Services.Abstractions.IStorageService.DeleteAsync(string! location, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Services.Abstractions.IStorageService.DownloadAsync(string! location, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.IO.Stream!>!
+Themia.Services.Abstractions.IStorageService.UploadAsync(System.IO.Stream! content, string! fileName, string! contentType, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Services.Abstractions.StorageUploadResult!>!
+Themia.Services.Abstractions.ITokenService
+Themia.Services.Abstractions.ITokenService.IssueTokenAsync(Themia.Services.Abstractions.TokenDescriptor! descriptor, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<string!>!
+Themia.Services.Abstractions.ITokenService.ValidateTokenAsync(string! token, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Services.Abstractions.TokenValidationResult!>!
+Themia.Services.Abstractions.PushNotification
+Themia.Services.Abstractions.PushNotification.Body.get -> string!
+Themia.Services.Abstractions.PushNotification.Body.init -> void
+Themia.Services.Abstractions.PushNotification.Data.get -> System.Collections.Generic.IReadOnlyDictionary<string!, string!>?
+Themia.Services.Abstractions.PushNotification.Data.init -> void
+Themia.Services.Abstractions.PushNotification.PushNotification(string! Target, string! Title, string! Body, System.Collections.Generic.IReadOnlyDictionary<string!, string!>? Data = null) -> void
+Themia.Services.Abstractions.PushNotification.Target.get -> string!
+Themia.Services.Abstractions.PushNotification.Target.init -> void
+Themia.Services.Abstractions.PushNotification.Title.get -> string!
+Themia.Services.Abstractions.PushNotification.Title.init -> void
+Themia.Services.Abstractions.ReportExportRequest
+Themia.Services.Abstractions.ReportExportRequest.Format.get -> string!
+Themia.Services.Abstractions.ReportExportRequest.Format.init -> void
+Themia.Services.Abstractions.ReportExportRequest.Parameters.get -> System.Collections.Generic.IReadOnlyDictionary<string!, string!>?
+Themia.Services.Abstractions.ReportExportRequest.Parameters.init -> void
+Themia.Services.Abstractions.ReportExportRequest.ReportExportRequest(string! TemplateName, System.Collections.Generic.IReadOnlyDictionary<string!, string!>? Parameters = null, string! Format = "pdf") -> void
+Themia.Services.Abstractions.ReportExportRequest.TemplateName.get -> string!
+Themia.Services.Abstractions.ReportExportRequest.TemplateName.init -> void
+Themia.Services.Abstractions.ReportExportResult
+Themia.Services.Abstractions.ReportExportResult.Content.get -> byte[]!
+Themia.Services.Abstractions.ReportExportResult.Content.init -> void
+Themia.Services.Abstractions.ReportExportResult.ContentType.get -> string!
+Themia.Services.Abstractions.ReportExportResult.ContentType.init -> void
+Themia.Services.Abstractions.ReportExportResult.FileName.get -> string!
+Themia.Services.Abstractions.ReportExportResult.FileName.init -> void
+Themia.Services.Abstractions.ReportExportResult.ReportExportResult(string! ContentType, byte[]! Content, string! FileName) -> void
+Themia.Services.Abstractions.SmsMessage
+Themia.Services.Abstractions.SmsMessage.Body.get -> string!
+Themia.Services.Abstractions.SmsMessage.Body.init -> void
+Themia.Services.Abstractions.SmsMessage.CountryCode.get -> string?
+Themia.Services.Abstractions.SmsMessage.CountryCode.init -> void
+Themia.Services.Abstractions.SmsMessage.From.get -> string?
+Themia.Services.Abstractions.SmsMessage.From.init -> void
+Themia.Services.Abstractions.SmsMessage.SmsMessage(string! To, string! Body, string? From = null, string? CountryCode = null) -> void
+Themia.Services.Abstractions.SmsMessage.To.get -> string!
+Themia.Services.Abstractions.SmsMessage.To.init -> void
+Themia.Services.Abstractions.StorageUploadResult
+Themia.Services.Abstractions.StorageUploadResult.ContentType.get -> string!
+Themia.Services.Abstractions.StorageUploadResult.ContentType.init -> void
+Themia.Services.Abstractions.StorageUploadResult.Location.get -> string!
+Themia.Services.Abstractions.StorageUploadResult.Location.init -> void
+Themia.Services.Abstractions.StorageUploadResult.SizeBytes.get -> long
+Themia.Services.Abstractions.StorageUploadResult.SizeBytes.init -> void
+Themia.Services.Abstractions.StorageUploadResult.StorageUploadResult(string! Location, string! ContentType, long SizeBytes) -> void
+Themia.Services.Abstractions.TokenDescriptor
+Themia.Services.Abstractions.TokenDescriptor.Audience.get -> string?
+Themia.Services.Abstractions.TokenDescriptor.Audience.init -> void
+Themia.Services.Abstractions.TokenDescriptor.Claims.get -> System.Collections.Generic.IReadOnlyDictionary<string!, string!>!
+Themia.Services.Abstractions.TokenDescriptor.Claims.init -> void
+Themia.Services.Abstractions.TokenDescriptor.ExpiresAtUtc.get -> System.DateTimeOffset
+Themia.Services.Abstractions.TokenDescriptor.ExpiresAtUtc.init -> void
+Themia.Services.Abstractions.TokenDescriptor.Issuer.get -> string?
+Themia.Services.Abstractions.TokenDescriptor.Issuer.init -> void
+Themia.Services.Abstractions.TokenDescriptor.Subject.get -> string!
+Themia.Services.Abstractions.TokenDescriptor.Subject.init -> void
+Themia.Services.Abstractions.TokenDescriptor.TokenDescriptor(string! Subject, System.Collections.Generic.IReadOnlyDictionary<string!, string!>! Claims, System.DateTimeOffset ExpiresAtUtc, string? Audience = null, string? Issuer = null) -> void
+Themia.Services.Abstractions.TokenValidationResult
+Themia.Services.Abstractions.TokenValidationResult.Claims.get -> System.Collections.Generic.IReadOnlyDictionary<string!, string!>?
+Themia.Services.Abstractions.TokenValidationResult.Claims.init -> void
+Themia.Services.Abstractions.TokenValidationResult.IsValid.get -> bool
+Themia.Services.Abstractions.TokenValidationResult.IsValid.init -> void
+Themia.Services.Abstractions.TokenValidationResult.Reason.get -> string?
+Themia.Services.Abstractions.TokenValidationResult.Reason.init -> void
+Themia.Services.Abstractions.TokenValidationResult.TokenValidationResult(bool IsValid, System.Collections.Generic.IReadOnlyDictionary<string!, string!>? Claims = null, string? Reason = null) -> void
