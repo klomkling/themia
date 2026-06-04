@@ -76,6 +76,9 @@ Themia.Mediator.SingletonHandlerAttribute
 Themia.Mediator.SingletonHandlerAttribute.SingletonHandlerAttribute() -> void
 Themia.Mediator.TransientHandlerAttribute
 Themia.Mediator.TransientHandlerAttribute.TransientHandlerAttribute() -> void
+Themia.Mediator.Behaviors.CachingBehavior<TRequest, TResponse>
+Themia.Mediator.Behaviors.CachingBehavior<TRequest, TResponse>.CachingBehavior(Microsoft.Extensions.Logging.ILogger<Themia.Mediator.Behaviors.CachingBehavior<TRequest, TResponse>!>! logger, Themia.Caching.IThemiaCacheProvider! cacheProvider, Themia.Mediator.Abstractions.ICacheKeyFactory! keyFactory, Themia.Mediator.Abstractions.ICacheMetadataProvider! metadataProvider, Themia.Mediator.Abstractions.ICacheKeyIndex! keyIndex, Microsoft.Extensions.Options.IOptions<Themia.Mediator.Configuration.MediatorCachingOptions!>! options) -> void
+Themia.Mediator.Behaviors.CachingBehavior<TRequest, TResponse>.HandleAsync(TRequest request, Themia.Mediator.Pipelines.RequestHandlerContinuation<TResponse>! next, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<TResponse>!
 Themia.Mediator.Behaviors.LoggingBehavior<TRequest, TResponse>
 Themia.Mediator.Behaviors.LoggingBehavior<TRequest, TResponse>.LoggingBehavior(Microsoft.Extensions.Logging.ILogger<Themia.Mediator.Behaviors.LoggingBehavior<TRequest, TResponse>!>! logger) -> void
 Themia.Mediator.Behaviors.LoggingBehavior<TRequest, TResponse>.HandleAsync(TRequest request, Themia.Mediator.Pipelines.RequestHandlerContinuation<TResponse>! next, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<TResponse>!
@@ -89,5 +92,22 @@ Themia.Mediator.Behaviors.TransactionBehavior<TRequest, TResponse>.HandleAsync(T
 Themia.Mediator.Behaviors.ValidationBehavior<TRequest, TResponse>
 Themia.Mediator.Behaviors.ValidationBehavior<TRequest, TResponse>.ValidationBehavior(System.Collections.Generic.IEnumerable<FluentValidation.IValidator<TRequest>!>? validators) -> void
 Themia.Mediator.Behaviors.ValidationBehavior<TRequest, TResponse>.HandleAsync(TRequest request, Themia.Mediator.Pipelines.RequestHandlerContinuation<TResponse>! next, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<TResponse>!
+Themia.Mediator.Infrastructure.AttributeCacheMetadataProvider
+Themia.Mediator.Infrastructure.AttributeCacheMetadataProvider.AttributeCacheMetadataProvider() -> void
+Themia.Mediator.Infrastructure.AttributeCacheMetadataProvider.Get(System.Type! requestType, object? requestInstance) -> Themia.Mediator.Infrastructure.CacheMetadata!
+Themia.Mediator.Infrastructure.CacheKeyIndex
+Themia.Mediator.Infrastructure.CacheKeyIndex.CacheKeyIndex(Themia.Caching.IThemiaCacheProvider! cacheProvider, Microsoft.Extensions.Logging.ILogger<Themia.Mediator.Infrastructure.CacheKeyIndex!>! logger, Themia.Mediator.Abstractions.IDistributedLockProvider! lockProvider) -> void
+Themia.Mediator.Infrastructure.CacheKeyIndex.TrackAsync(string! valueKey, System.Type! queryType, string! typePrefixKey, string? scopeRoot, string? customPrefix, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Mediator.Infrastructure.CacheKeyIndex.RemoveByQueryTypeAsync(System.Type! queryType, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Mediator.Infrastructure.CacheKeyIndex.RemoveByPrefixAsync(string! prefix, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Mediator.Infrastructure.CacheKeyIndex.RemoveByScopeRootAsync(string! scopeRoot, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Mediator.Infrastructure.DefaultCacheKeyFactory
+Themia.Mediator.Infrastructure.DefaultCacheKeyFactory.DefaultCacheKeyFactory() -> void
+Themia.Mediator.Infrastructure.DefaultCacheKeyFactory.CreateKey<TRequest>(TRequest request) -> string!
+Themia.Mediator.Infrastructure.DefaultCacheKeyFactory.CreateTypePrefix(System.Type! requestType) -> string!
+Themia.Mediator.Infrastructure.DefaultCacheKeyFactory.CreateScopeRoot(System.Type! requestType, Themia.Mediator.Configuration.MediatorCachingOptions! options) -> string?
+Themia.Mediator.Infrastructure.InMemoryDistributedLockProvider
+Themia.Mediator.Infrastructure.InMemoryDistributedLockProvider.InMemoryDistributedLockProvider() -> void
+Themia.Mediator.Infrastructure.InMemoryDistributedLockProvider.AcquireAsync(string! resource, System.TimeSpan timeout, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Mediator.Abstractions.IDistributedLock!>!
 Themia.Generated.ThemiaServiceRegistrations
 static Themia.Generated.ThemiaServiceRegistrations.AddThemiaServices(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
