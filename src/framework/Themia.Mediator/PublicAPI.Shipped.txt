@@ -76,5 +76,18 @@ Themia.Mediator.SingletonHandlerAttribute
 Themia.Mediator.SingletonHandlerAttribute.SingletonHandlerAttribute() -> void
 Themia.Mediator.TransientHandlerAttribute
 Themia.Mediator.TransientHandlerAttribute.TransientHandlerAttribute() -> void
+Themia.Mediator.Behaviors.LoggingBehavior<TRequest, TResponse>
+Themia.Mediator.Behaviors.LoggingBehavior<TRequest, TResponse>.LoggingBehavior(Microsoft.Extensions.Logging.ILogger<Themia.Mediator.Behaviors.LoggingBehavior<TRequest, TResponse>!>! logger) -> void
+Themia.Mediator.Behaviors.LoggingBehavior<TRequest, TResponse>.HandleAsync(TRequest request, Themia.Mediator.Pipelines.RequestHandlerContinuation<TResponse>! next, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<TResponse>!
+Themia.Mediator.Behaviors.PerformanceBehavior<TRequest, TResponse>
+Themia.Mediator.Behaviors.PerformanceBehavior<TRequest, TResponse>.PerformanceBehavior(Microsoft.Extensions.Logging.ILogger<Themia.Mediator.Behaviors.PerformanceBehavior<TRequest, TResponse>!>! logger) -> void
+Themia.Mediator.Behaviors.PerformanceBehavior<TRequest, TResponse>.PerformanceBehavior(Microsoft.Extensions.Logging.ILogger<Themia.Mediator.Behaviors.PerformanceBehavior<TRequest, TResponse>!>! logger, System.TimeSpan threshold) -> void
+Themia.Mediator.Behaviors.PerformanceBehavior<TRequest, TResponse>.HandleAsync(TRequest request, Themia.Mediator.Pipelines.RequestHandlerContinuation<TResponse>! next, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<TResponse>!
+Themia.Mediator.Behaviors.TransactionBehavior<TRequest, TResponse>
+Themia.Mediator.Behaviors.TransactionBehavior<TRequest, TResponse>.TransactionBehavior() -> void
+Themia.Mediator.Behaviors.TransactionBehavior<TRequest, TResponse>.HandleAsync(TRequest request, Themia.Mediator.Pipelines.RequestHandlerContinuation<TResponse>! next, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<TResponse>!
+Themia.Mediator.Behaviors.ValidationBehavior<TRequest, TResponse>
+Themia.Mediator.Behaviors.ValidationBehavior<TRequest, TResponse>.ValidationBehavior(System.Collections.Generic.IEnumerable<FluentValidation.IValidator<TRequest>!>? validators) -> void
+Themia.Mediator.Behaviors.ValidationBehavior<TRequest, TResponse>.HandleAsync(TRequest request, Themia.Mediator.Pipelines.RequestHandlerContinuation<TResponse>! next, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<TResponse>!
 Themia.Generated.ThemiaServiceRegistrations
 static Themia.Generated.ThemiaServiceRegistrations.AddThemiaServices(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
