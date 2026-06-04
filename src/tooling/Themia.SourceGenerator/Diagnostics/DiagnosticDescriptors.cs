@@ -68,13 +68,14 @@ internal static class DiagnosticDescriptors
             "(dotnet_diagnostic.THEMIA010.severity = warning) to emit but not fail.");
 
     // Mediator handler generator diagnostics. These use the dedicated "ThemiaMediator"
-    // category (distinct from the DI generator's "Themia.DI") and the THEMIA1xx ID range,
-    // so they are constructed directly rather than via ThemiaDiagnostics (which pins the
-    // DI category).
+    // category (distinct from the DI generator's "Themia.DI") and IDs THEMIA011-013 within
+    // the source-generator range (THEMIA001-099) — kept clear of the analyzers' reserved
+    // THEMIA100-199 range — so they are constructed directly rather than via ThemiaDiagnostics
+    // (which pins the DI category).
     private const string MediatorCategory = "ThemiaMediator";
 
     public static readonly DiagnosticDescriptor DuplicateHandler = new(
-        id: "THEMIA101",
+        id: "THEMIA011",
         title: "Duplicate handler registration",
         messageFormat: "Handler '{0}' implements the same interface as '{1}' for request type '{2}' and response type '{3}'",
         category: MediatorCategory,
@@ -83,7 +84,7 @@ internal static class DiagnosticDescriptors
         description: "Multiple handlers cannot be registered for the same request/response/kind combination.");
 
     public static readonly DiagnosticDescriptor OpenGenericHandler = new(
-        id: "THEMIA102",
+        id: "THEMIA012",
         title: "Open generic handler not supported",
         messageFormat: "Handler '{0}' contains unbound generic parameters and cannot be registered",
         category: MediatorCategory,
@@ -92,7 +93,7 @@ internal static class DiagnosticDescriptors
         description: "Handlers with open generic parameters cannot be automatically registered. Use closed generic types.");
 
     public static readonly DiagnosticDescriptor HandlerNotAccessible = new(
-        id: "THEMIA103",
+        id: "THEMIA013",
         title: "Handler not accessible for dependency injection",
         messageFormat: "Handler '{0}' is not accessible (must be public or internal, and not a private nested class)",
         category: MediatorCategory,

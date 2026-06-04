@@ -15,6 +15,6 @@ THEMIA007 | Themia.DI | Error | Attribute service type conflicts with generic ma
 THEMIA008 | Themia.DI | Error | Registrar missing public constructor.
 THEMIA009 | Themia.DI | Warning | Registrar is internal.
 THEMIA010 | Themia.DI | Error | Legacy attribute usage.
-THEMIA101 | ThemiaMediator | Error | Duplicate handler registration.
-THEMIA102 | ThemiaMediator | Error | Open generic handler not supported.
-THEMIA103 | ThemiaMediator | Error | Handler not accessible for dependency injection.
+THEMIA011 | ThemiaMediator | Error | Duplicate handler registration.
+THEMIA012 | ThemiaMediator | Error | Open generic handler not supported.
+THEMIA013 | ThemiaMediator | Error | Handler not accessible for dependency injection.

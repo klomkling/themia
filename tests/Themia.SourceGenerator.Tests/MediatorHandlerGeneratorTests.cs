@@ -187,8 +187,8 @@ namespace TestNamespace
         var result = MediatorGeneratorTestHelper.RunGenerator(source);
 
         // Assert
-        var openGenericDiagnostic = result.Diagnostics.Any(d => d.Id == "THEMIA102");
-        Assert.True(openGenericDiagnostic, "Should report THEMIA102 for open generic handler");
+        var openGenericDiagnostic = result.Diagnostics.Any(d => d.Id == "THEMIA012");
+        Assert.True(openGenericDiagnostic, "Should report THEMIA012 for open generic handler");
     }
 
     [Fact]
@@ -300,8 +300,8 @@ namespace TestNamespace
         var result = MediatorGeneratorTestHelper.RunGenerator(source);
 
         // Assert
-        var accessibilityDiagnostic = result.Diagnostics.Any(d => d.Id == "THEMIA103");
-        Assert.True(accessibilityDiagnostic, "Should report THEMIA103 for inaccessible handler");
+        var accessibilityDiagnostic = result.Diagnostics.Any(d => d.Id == "THEMIA013");
+        Assert.True(accessibilityDiagnostic, "Should report THEMIA013 for inaccessible handler");
     }
 
     [Fact]
@@ -383,6 +383,6 @@ namespace TestNamespace
         var result = MediatorGeneratorTestHelper.RunGenerator(source);
 
         // Assert
-        Assert.Contains(result.Diagnostics, d => d.Id == "THEMIA101");
+        Assert.Contains(result.Diagnostics, d => d.Id == "THEMIA011");
     }
 }
