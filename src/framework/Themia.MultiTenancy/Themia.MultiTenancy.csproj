@@ -9,10 +9,8 @@
     <ProjectReference Include="../Themia.Framework.Core/Themia.Framework.Core.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <!-- ASP.NET Core middleware + IApplicationBuilder + concrete HttpContextAccessor.
-         The Http.Abstractions package only ships the IHttpContextAccessor interface, so the
-         shared framework reference (the repo's established pattern, used by Themia.AspNetCore)
-         is required for the resolution middleware and DI builder. -->
+    <!-- ASP.NET Core middleware + IApplicationBuilder + concrete HttpContextAccessor via the
+         shared framework reference (the repo's established pattern, used by Themia.AspNetCore). -->
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <!-- Microsoft.Extensions.{Caching.Memory,DependencyInjection,Options,Logging} are provided
          transitively by the Microsoft.AspNetCore.App shared framework (NU1510), so they are not

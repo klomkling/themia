@@ -213,11 +213,10 @@ public class DapperTenantStoreTests
     {
         // Guards the [INTRODUCED] portability fix: the catalog query must run on SQL Server too,
         // so it carries no LIMIT (MySQL/PostgreSQL/SQLite) nor TOP (SQL Server) clause.
-        // The query template lives in the store; we assert against the canonical SQL string it builds.
-        const string expectedQuery =
-            "SELECT id, identifier, name, environment, connection_string FROM tenants WHERE identifier = @identifier";
+        // Assert against the REAL query the store executes — one source of truth, no hard-coded copy.
+        var query = DapperTenantStore.BuildCatalogQuery("tenants");
 
-        Assert.DoesNotContain("LIMIT", expectedQuery, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain(" TOP ", expectedQuery, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("LIMIT", query, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(" TOP ", query, StringComparison.OrdinalIgnoreCase);
     }
 }

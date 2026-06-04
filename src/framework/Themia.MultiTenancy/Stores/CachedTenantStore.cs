@@ -33,7 +33,7 @@ public sealed class CachedTenantStore : ICacheableTenantStore
         // Register post-eviction callback to track cache keys
         _cacheEntryOptions.RegisterPostEvictionCallback((key, value, reason, state) =>
         {
-            if (key is string strKey && strKey.StartsWith(CacheKeyPrefix))
+            if (key is string strKey && strKey.StartsWith(CacheKeyPrefix, StringComparison.Ordinal))
             {
                 var identifier = strKey.Substring(CacheKeyPrefix.Length);
                 lock (_cachedKeys)
@@ -54,7 +54,10 @@ public sealed class CachedTenantStore : ICacheableTenantStore
             throw new ArgumentException("Identifier cannot be null or whitespace", nameof(identifier));
         }
 
-        var cacheKey = CacheKeyPrefix + identifier;
+        // Inner stores treat identifiers case-insensitively, so normalize the cache key to avoid
+        // duplicate entries (e.g. "Acme" vs "acme") for the same tenant.
+        var normalized = identifier.ToLowerInvariant();
+        var cacheKey = CacheKeyPrefix + normalized;
 
         if (_cache.TryGetValue(cacheKey, out TenantInfo? cached))
         {
@@ -68,7 +71,7 @@ public sealed class CachedTenantStore : ICacheableTenantStore
             _cache.Set(cacheKey, result, _cacheEntryOptions);
             lock (_cachedKeys)
             {
-                _cachedKeys.Add(identifier);
+                _cachedKeys.Add(normalized);
             }
         }
 
@@ -86,11 +89,12 @@ public sealed class CachedTenantStore : ICacheableTenantStore
             return;
         }
 
-        var cacheKey = CacheKeyPrefix + identifier;
+        var normalized = identifier.ToLowerInvariant();
+        var cacheKey = CacheKeyPrefix + normalized;
         _cache.Remove(cacheKey);
         lock (_cachedKeys)
         {
-            _cachedKeys.Remove(identifier);
+            _cachedKeys.Remove(normalized);
         }
     }
 

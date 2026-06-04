@@ -39,6 +39,22 @@ public class CachedTenantStoreTests
     }
 
     [Fact]
+    public async Task FindByIdentifierAsync_DifferentCasing_ShouldHitCacheOnce()
+    {
+        var tenant = new TenantInfo("tenant-1", "acme");
+        var innerStore = new FakeTenantStore(tenant);
+        var cache = new MemoryCache(new MemoryCacheOptions());
+        var cachedStore = new CachedTenantStore(innerStore, cache);
+
+        var first = await cachedStore.FindByIdentifierAsync("Acme");
+        var second = await cachedStore.FindByIdentifierAsync("acme");
+
+        Assert.NotNull(first);
+        Assert.NotNull(second);
+        Assert.Equal(1, innerStore.FindCallCount); // "Acme" and "acme" map to one cache entry
+    }
+
+    [Fact]
     public async Task FindByIdentifierAsync_WithNullIdentifier_ShouldThrowArgumentException()
     {
         var innerStore = new FakeTenantStore();

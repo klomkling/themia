@@ -48,7 +48,7 @@ public sealed class DapperTenantStore : ITenantStore
         }
 
         using var connection = await _connectionFactory(cancellationToken).ConfigureAwait(false);
-        var sql = $"SELECT id, identifier, name, environment, connection_string FROM {_tableName} WHERE identifier = @identifier";
+        var sql = BuildCatalogQuery(_tableName);
 
         var row = await connection.QuerySingleOrDefaultAsync(sql, new { identifier }).ConfigureAwait(false);
 
@@ -65,4 +65,12 @@ public sealed class DapperTenantStore : ITenantStore
 
         return new TenantInfo(id, ident, name, env, conn);
     }
+
+    /// <summary>
+    /// Builds the catalog lookup query the store executes. Carries no engine-specific row-limit
+    /// clause (no LIMIT, no TOP) so it stays portable across SQL Server, MySQL, and PostgreSQL.
+    /// Single source of truth shared by <see cref="FindByIdentifierAsync"/> and the portability guard test.
+    /// </summary>
+    internal static string BuildCatalogQuery(string tableName) =>
+        $"SELECT id, identifier, name, environment, connection_string FROM {tableName} WHERE identifier = @identifier";
 }

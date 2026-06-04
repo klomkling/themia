@@ -43,17 +43,46 @@ public sealed class TenantResolutionMiddleware
             context.Request.Headers.ToDictionary(h => h.Key, h => h.Value.ToString(), StringComparer.OrdinalIgnoreCase),
             context.User.Claims.GroupBy(c => c.Type).ToDictionary(g => g.Key, g => g.First().Value)), context.RequestAborted);
 
-        if (resolution is null)
-        {
-            logger.LogWarning("Tenant resolution returned null. Ensure strategies are configured.");
-        }
-
-        accessor.Current = resolution;
-
         // [INTRODUCED] Bridge the resolved tenant into the framework's ambient tenant context so the
         // Tier-3 EF Core global query filter keys off the same tenant. Dropped: v1's
         // TenantContext<string, string> hydration (that internal generic type is not ported).
-        TenantContextAccessor.CurrentTenantId = TenantId.From(resolution?.Identifier);
+        //
+        // Fail closed — an unbridgeable tenant yields no tenant context; the Tier-3 EF global filter
+        // MUST treat a null TenantContext as no-access (return no rows), never as all-tenants.
+        // TenantInfo/the catalog do NOT enforce TenantId's format rules, so a mis-seeded identifier
+        // (e.g. "a.b") would make TenantId.From throw. We bridge first WITHOUT throwing, and only set
+        // both contexts together so they can never disagree.
+        var identifier = resolution?.Identifier;
+        TenantId? bridgedTenantId;
+        try
+        {
+            bridgedTenantId = TenantId.From(identifier);
+        }
+        catch (ArgumentException ex)
+        {
+            // Non-null but invalid identifier (length > 100 or a char outside [A-Za-z0-9_-]).
+            logger.LogWarning(
+                "Resolved tenant identifier '{TenantIdentifier}' could not be bridged to the framework tenant context ({Reason}); proceeding with no tenant context.",
+                identifier,
+                ex.Message);
+            bridgedTenantId = null;
+        }
+
+        if (resolution is not null && bridgedTenantId is not null)
+        {
+            accessor.Current = resolution;
+            TenantContextAccessor.CurrentTenantId = bridgedTenantId;
+        }
+        else
+        {
+            if (resolution is null)
+            {
+                logger.LogWarning("Tenant resolution returned null. Ensure strategies are configured.");
+            }
+
+            accessor.Current = null;
+            TenantContextAccessor.CurrentTenantId = null;
+        }
 
         await _next(context);
     }
