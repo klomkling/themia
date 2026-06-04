@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -26,9 +27,18 @@ public static class MediatorGeneratorTestHelper
         var syntaxTree = CSharpSyntaxTree.ParseText(source);
         var additionalTrees = additionalSources.Select(static s => CSharpSyntaxTree.ParseText(s)).ToArray();
 
-        var references = AppDomain.CurrentDomain.GetAssemblies()
-            .Where(static a => !a.IsDynamic && !string.IsNullOrWhiteSpace(a.Location))
-            .Select(static a => (MetadataReference)MetadataReference.CreateFromFile(a.Location));
+        // Build references from the runtime's trusted-platform-assemblies (a complete, deterministic
+        // set independent of which assemblies happen to be loaded) and EXCLUDE every real Themia.*
+        // assembly. This compilation inlines its own Themia.Mediator.* / Themia.DependencyInjection.*
+        // infrastructure (see GetMediatorInfrastructureCode); referencing the real assemblies too would
+        // create CS0433 duplicate-type conflicts that degrade symbol binding non-deterministically
+        // (e.g. attribute lifetime resolution) depending on load order/platform.
+        var trustedAssemblies = ((string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") ?? string.Empty)
+            .Split(Path.PathSeparator);
+        var references = trustedAssemblies
+            .Where(static path => !string.IsNullOrEmpty(path))
+            .Where(static path => !Path.GetFileNameWithoutExtension(path).StartsWith("Themia.", StringComparison.Ordinal))
+            .Select(static path => (MetadataReference)MetadataReference.CreateFromFile(path));
 
         var compilation = CSharpCompilation.Create(
             assemblyName: "TestAssembly",
@@ -63,6 +73,12 @@ namespace Themia.Mediator
 {
     [AttributeUsage(AttributeTargets.Assembly, AllowMultiple = false, Inherited = false)]
     public sealed class GenerateMediatorHandlersAttribute : Attribute { }
+
+    [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
+    public sealed class SingletonHandlerAttribute : Attribute { }
+
+    [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
+    public sealed class TransientHandlerAttribute : Attribute { }
 }
 
 namespace Themia.DependencyInjection
