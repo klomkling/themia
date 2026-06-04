@@ -82,3 +82,14 @@ Themia.MultiTenancy.Stores.InMemoryTenantStore.InMemoryTenantStore(System.Collec
 Themia.MultiTenancy.Stores.DapperTenantStore
 Themia.MultiTenancy.Stores.DapperTenantStore.DapperTenantStore(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task<System.Data.IDbConnection!>!>! connectionFactory, string! tableName = "tenants") -> void
 Themia.MultiTenancy.Stores.DapperTenantStore.FindByIdentifierAsync(string! identifier, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.MultiTenancy.Abstractions.TenantInfo?>!
+Themia.MultiTenancy.MultiTenancyBuilder
+Themia.MultiTenancy.MultiTenancyBuilder.AddStrategy<TStrategy>() -> Themia.MultiTenancy.MultiTenancyBuilder!
+Themia.MultiTenancy.MultiTenancyBuilder.ClearStrategies() -> Themia.MultiTenancy.MultiTenancyBuilder!
+Themia.MultiTenancy.MultiTenancyBuilder.EnableStoreCaching(System.TimeSpan? ttl = null) -> Themia.MultiTenancy.MultiTenancyBuilder!
+Themia.MultiTenancy.MultiTenancyBuilder.SeedTenants(System.Collections.Generic.IEnumerable<Themia.MultiTenancy.Abstractions.TenantInfo!>! tenants) -> Themia.MultiTenancy.MultiTenancyBuilder!
+Themia.MultiTenancy.MultiTenancyBuilder.Services.get -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+Themia.MultiTenancy.MultiTenancyBuilder.UseDefaultStrategy() -> Themia.MultiTenancy.MultiTenancyBuilder!
+Themia.MultiTenancy.MultiTenancyBuilder.UseHeaderStrategy() -> Themia.MultiTenancy.MultiTenancyBuilder!
+Themia.MultiTenancy.MultiTenancyBuilder.UsePathStrategy() -> Themia.MultiTenancy.MultiTenancyBuilder!
+Themia.MultiTenancy.MultiTenancyServiceCollectionExtensions
+static Themia.MultiTenancy.MultiTenancyServiceCollectionExtensions.AddThemiaMultiTenancy(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Themia.MultiTenancy.MultiTenancyOptions!>? configureOptions = null, System.Action<Themia.MultiTenancy.MultiTenancyBuilder!>? configure = null, bool? useDefaultStrategies = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
