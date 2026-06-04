@@ -34,7 +34,6 @@ public sealed class TenantResolutionMiddleware
         }
 
         var resolver = context.RequestServices.GetRequiredService<ITenantResolver>();
-        var accessor = context.RequestServices.GetRequiredService<ITenantAccessor>();
         var setter = context.RequestServices.GetRequiredService<ITenantSetter>();
         var logger = context.RequestServices.GetRequiredService<ILogger<TenantResolutionMiddleware>>();
 

@@ -50,7 +50,8 @@ public sealed class DapperTenantStore : ITenantStore
         using var connection = await _connectionFactory(cancellationToken).ConfigureAwait(false);
         var sql = BuildCatalogQuery(_tableName);
 
-        var row = await connection.QuerySingleOrDefaultAsync(sql, new { identifier }).ConfigureAwait(false);
+        var command = new CommandDefinition(sql, new { identifier }, cancellationToken: cancellationToken);
+        var row = await connection.QuerySingleOrDefaultAsync(command).ConfigureAwait(false);
 
         if (row is null)
         {
