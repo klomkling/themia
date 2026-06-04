@@ -52,3 +52,13 @@ Themia.MultiTenancy.Abstractions.TenantResolutionResult.Success.init -> void
 Themia.MultiTenancy.Abstractions.TenantResolutionResult.Tenant.get -> Themia.MultiTenancy.Abstractions.TenantInfo?
 Themia.MultiTenancy.Abstractions.TenantResolutionResult.Tenant.init -> void
 Themia.MultiTenancy.Abstractions.TenantResolutionResult.TenantResolutionResult(bool Success, Themia.MultiTenancy.Abstractions.TenantInfo? Tenant, string? Identifier = null, string? Source = null, string? Reason = null) -> void
+Themia.MultiTenancy.MultiTenancyOptions
+Themia.MultiTenancy.MultiTenancyOptions.DefaultTenantIdentifier.get -> string?
+Themia.MultiTenancy.MultiTenancyOptions.DefaultTenantIdentifier.set -> void
+Themia.MultiTenancy.MultiTenancyOptions.HeaderName.get -> string!
+Themia.MultiTenancy.MultiTenancyOptions.HeaderName.set -> void
+Themia.MultiTenancy.MultiTenancyOptions.MultiTenancyOptions() -> void
+Themia.MultiTenancy.MultiTenancyOptions.PathPrefix.get -> string?
+Themia.MultiTenancy.MultiTenancyOptions.PathPrefix.set -> void
+Themia.MultiTenancy.MultiTenancyOptions.UseDefaultStrategies.get -> bool
+Themia.MultiTenancy.MultiTenancyOptions.UseDefaultStrategies.set -> void
