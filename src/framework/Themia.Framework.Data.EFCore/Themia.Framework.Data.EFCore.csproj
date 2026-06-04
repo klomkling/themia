@@ -27,5 +27,6 @@
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="Themia.Framework.Data.EFCore.Tests" />
+    <InternalsVisibleTo Include="Themia.Framework.Data.EFCore.IntegrationTests" />
   </ItemGroup>
 </Project>
