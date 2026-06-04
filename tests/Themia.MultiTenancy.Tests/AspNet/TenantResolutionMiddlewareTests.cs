@@ -231,7 +231,7 @@ internal static class HttpClientExtensions
         string requestUri,
         Action<HttpRequestMessage> configureRequest)
     {
-        var request = new HttpRequestMessage(HttpMethod.Get, requestUri);
+        using var request = new HttpRequestMessage(HttpMethod.Get, requestUri);
         configureRequest(request);
         return await client.SendAsync(request);
     }

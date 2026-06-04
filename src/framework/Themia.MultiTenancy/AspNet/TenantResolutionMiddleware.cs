@@ -70,23 +70,35 @@ public sealed class TenantResolutionMiddleware
             bridgedTenantId = null;
         }
 
-        if (resolution is not null && bridgedTenantId is not null)
+        // Restore the ambient tenant after the request so it stays scoped to this middleware
+        // invocation — the static accessor is AsyncLocal, and leaving it set could leak the tenant
+        // into work that continues past the request (e.g. fire-and-forget tasks that captured the
+        // ExecutionContext). The scoped ITenantSetter is naturally per-request and needs no restore.
+        var previousTenantId = TenantContextAccessor.CurrentTenantId;
+        try
         {
-            setter.Set(resolution);
-            TenantContextAccessor.CurrentTenantId = bridgedTenantId;
-        }
-        else
-        {
-            if (resolution is null)
+            if (resolution is not null && bridgedTenantId is not null)
             {
-                logger.LogDebug("No tenant resolved for the request; proceeding with no tenant context.");
+                setter.Set(resolution);
+                TenantContextAccessor.CurrentTenantId = bridgedTenantId;
+            }
+            else
+            {
+                if (resolution is null)
+                {
+                    logger.LogDebug("No tenant resolved for the request; proceeding with no tenant context.");
+                }
+
+                setter.Set(null);
+                TenantContextAccessor.CurrentTenantId = null;
             }
 
-            setter.Set(null);
-            TenantContextAccessor.CurrentTenantId = null;
+            await _next(context);
         }
-
-        await _next(context);
+        finally
+        {
+            TenantContextAccessor.CurrentTenantId = previousTenantId;
+        }
     }
 }
 
