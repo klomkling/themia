@@ -4,6 +4,12 @@
     <PackageId>Themia.Mediator</PackageId>
     <Description>Themia mediator — IMediator/IRequest pipeline with FluentValidation, logging, caching, performance, and transaction behaviors, plus a source-generated handler dispatcher.</Description>
     <PackageTags>themia;mediator;cqrs;pipeline;source-generator</PackageTags>
+    <!--
+      The source generator emits ThemiaServiceRegistrations without XML docs; since all hand-written
+      public members are documented, suppress CS1591 to keep TreatWarningsAsErrors clean.
+      The public API surface is enforced by RS0016 via PublicAPI.Shipped.txt instead.
+    -->
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Logging" />
@@ -20,6 +26,10 @@
     <ProjectReference Include="../Themia.Logging/Themia.Logging.csproj" />
     <ProjectReference Include="../../neutral/Themia.DependencyInjection/Themia.DependencyInjection.csproj" />
     <!-- Generator as analyzer: emits the dispatcher/registration from [GenerateMediatorHandlers] -->
+    <!-- Generators.Abstractions must be listed first so Roslyn's load context can resolve it as a dep -->
+    <ProjectReference Include="../../tooling/Themia.Generators.Abstractions/Themia.Generators.Abstractions.csproj"
+                      OutputItemType="Analyzer"
+                      ReferenceOutputAssembly="false" />
     <ProjectReference Include="../../tooling/Themia.SourceGenerator/Themia.SourceGenerator.csproj"
                       OutputItemType="Analyzer"
                       ReferenceOutputAssembly="false" />
