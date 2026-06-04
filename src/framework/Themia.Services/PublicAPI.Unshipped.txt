@@ -1,4 +1,8 @@
 #nullable enable
+static Themia.Services.ServiceCollectionExtensions.AddThemiaServices(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Themia.Services.ThemiaServicesBuilder!>? configure = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+Themia.Services.ServiceCollectionExtensions
+Themia.Services.ThemiaServicesBuilder
+Themia.Services.ThemiaServicesBuilder.Services.get -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
 Themia.Services.Abstractions.AuditEvent
 Themia.Services.Abstractions.AuditEvent.ActorId.get -> string!
 Themia.Services.Abstractions.AuditEvent.ActorId.init -> void
