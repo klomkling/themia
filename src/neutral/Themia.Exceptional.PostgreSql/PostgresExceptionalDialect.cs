@@ -9,14 +9,6 @@ public sealed class PostgresExceptionalDialect : IExceptionalSqlDialect
 {
     private readonly string connectionString;
 
-    static PostgresExceptionalDialect()
-    {
-        // The shared FluentMigrator schema renders DateTime columns as `timestamp without time zone`
-        // on PostgreSQL while the engine stores UTC instants (DateTime.Kind=Utc). Enable legacy
-        // behavior so Npgsql maps UTC DateTimes to `timestamp` without throwing.
-        AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
-    }
-
     /// <summary>Creates the dialect over <paramref name="connectionString"/>.</summary>
     public PostgresExceptionalDialect(string connectionString) => this.connectionString = connectionString;
 

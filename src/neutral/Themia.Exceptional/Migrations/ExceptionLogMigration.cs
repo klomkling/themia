@@ -26,9 +26,9 @@ public sealed class ExceptionLogMigration : Migration
             .WithColumn("ErrorHash").AsString(64).NotNullable()
             .WithColumn("DuplicateCount").AsInt32().NotNullable().WithDefaultValue(1)
             .WithColumn("TenantId").AsString(256).Nullable()
-            .WithColumn("CreationDate").AsDateTime2().NotNullable()
-            .WithColumn("LastLogDate").AsDateTime2().NotNullable()
-            .WithColumn("DeletionDate").AsDateTime2().Nullable()
+            .WithColumn("CreationDate").AsDateTimeOffset().NotNullable()
+            .WithColumn("LastLogDate").AsDateTimeOffset().NotNullable()
+            .WithColumn("DeletionDate").AsDateTimeOffset().Nullable()
             .WithColumn("IsProtected").AsBoolean().NotNullable().WithDefaultValue(false);
 
         Create.Index("IX_Exceptions_App_Hash_Created")

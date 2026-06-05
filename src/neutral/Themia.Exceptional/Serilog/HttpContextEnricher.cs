@@ -8,6 +8,12 @@ namespace Themia.Exceptional.Serilog;
 /// Adds HTTP request context (Url/HttpMethod/Host/IpAddress) to log events. Never reads Cookie/Authorization
 /// (or configured scrub keys), so secrets cannot leak into stored exceptions.
 /// </summary>
+/// <remarks>
+/// The captured <c>Url</c> includes <see cref="Microsoft.AspNetCore.Http.HttpRequest.QueryString"/> verbatim.
+/// Query parameters may carry sensitive values (e.g. <c>?token=</c>, <c>?api_key=</c>). Query-param
+/// redaction via a configurable <c>ScrubKeys</c> list is a planned follow-up; until then, callers should
+/// be aware that stored URLs may expose query-string secrets.
+/// </remarks>
 public sealed class HttpContextEnricher : ILogEventEnricher
 {
     private readonly IHttpContextAccessor accessor;

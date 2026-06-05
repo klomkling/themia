@@ -101,5 +101,23 @@ public class ExceptionStoreEngineTests : IDisposable
         Assert.Null(await engine.GetAsync(entry.Guid));
     }
 
+    [Fact]
+    public async Task LogAsync_Inserts_NewRow_WhenExistingIsOlderThanRollupPeriod()
+    {
+        var shortWindow = new ExceptionStoreEngine(new SqliteExceptionalDialect(connString), TimeSpan.FromMinutes(5));
+
+        var old = NewEntry();
+        old.CreationDate = DateTime.UtcNow.AddMinutes(-10); // outside the 5-min window
+        old.LastLogDate = old.CreationDate;
+        await shortWindow.LogAsync(old);
+
+        var fresh = NewEntry(); // same hash, CreationDate = now
+        await shortWindow.LogAsync(fresh);
+
+        // RollupSince = fresh.CreationDate - 5min; old.CreationDate is 10min back → outside window → new insert
+        var count = await shortWindow.CountAsync(new ExceptionFilter());
+        Assert.Equal(2, count);
+    }
+
     public void Dispose() => keepAlive.Dispose();
 }

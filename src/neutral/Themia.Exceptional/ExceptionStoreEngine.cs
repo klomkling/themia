@@ -21,6 +21,10 @@ public sealed class ExceptionStoreEngine : IExceptionStore
     /// <inheritdoc />
     public async Task LogAsync(ExceptionEntry entry, CancellationToken cancellationToken = default)
     {
+        // UPDATE-then-(if-0)-INSERT is intentionally non-transactional. Under concurrent logging of
+        // the same ErrorHash, two callers can both see 0 rows updated and both insert, yielding
+        // split rollup rows. This is the accepted tradeoff: no data loss, no hot-path lock, and
+        // duplicates naturally merge into the next rollup window.
         await using var connection = dialect.CreateConnection();
         var rolledUp = await connection.ExecuteAsync(new CommandDefinition(dialect.RollupSql, new
         {
@@ -99,8 +103,8 @@ public sealed class ExceptionStoreEngine : IExceptionStore
         var args = new DynamicParameters();
         args.Add("ApplicationName", filter.ApplicationName, DbType.String);
         args.Add("TenantId", filter.TenantId, DbType.String);
-        args.Add("From", filter.From, DbType.DateTime2);
-        args.Add("To", filter.To, DbType.DateTime2);
+        args.Add("From", filter.From, DbType.DateTimeOffset);
+        args.Add("To", filter.To, DbType.DateTimeOffset);
         args.Add("Search", string.IsNullOrWhiteSpace(filter.Search) ? null : $"%{filter.Search}%", DbType.String);
         args.Add("IncludeDeleted", filter.IncludeDeleted);
         return args;

@@ -11,8 +11,18 @@ namespace Themia.Exceptional.PostgreSql;
 public static class ServiceCollectionExtensions
 {
     /// <summary>
-    /// Registers the PostgreSQL exception store: dialect, engine, options, Serilog sink + enricher, and runs the
+    /// Registers the PostgreSQL exception store: dialect, engine, options, and runs the
     /// FluentMigrator schema migration immediately so the <c>Exceptions</c> table exists.
+    /// <para>
+    /// Also registers <see cref="ExceptionalSerilogSink"/> and <see cref="HttpContextEnricher"/>
+    /// as singletons in the DI container <strong>for the host to wire into its own Serilog
+    /// <c>LoggerConfiguration</c></strong>. This package does not configure the global logger.
+    /// The host should resolve and attach them, for example:
+    /// <code>
+    /// .Enrich.With(sp.GetRequiredService&lt;HttpContextEnricher&gt;())
+    /// .WriteTo.Sink(sp.GetRequiredService&lt;ExceptionalSerilogSink&gt;())
+    /// </code>
+    /// </para>
     /// </summary>
     public static IServiceCollection AddThemiaExceptionalPostgres(
         this IServiceCollection services, string connectionString, Action<ExceptionalOptions>? configure = null)
@@ -24,6 +34,10 @@ public static class ServiceCollectionExtensions
 
         services.AddHttpContextAccessor();
         services.TryAddSingleton<HttpContextEnricher>();
+        services.TryAddSingleton<ExceptionalSerilogSink>(sp =>
+            new ExceptionalSerilogSink(
+                sp.GetRequiredService<IExceptionStore>(),
+                sp.GetRequiredService<ExceptionalOptions>()));
 
         RunMigration(connectionString);
         return services;

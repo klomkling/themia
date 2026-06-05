@@ -24,6 +24,8 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
   (`IExceptionStore`/`ExceptionStoreEngine`), `IExceptionalSqlDialect` strategy, FluentMigrator schema,
   Serilog sink + HTTP enricher (scrubs Cookie/Authorization), and an opt-in request-body middleware.
 - `Themia.Exceptional.PostgreSql` — PostgreSQL dialect (Npgsql) + `AddThemiaExceptionalPostgres(...)`.
+  Registers `ExceptionalSerilogSink` and `HttpContextEnricher` as DI singletons for the host to wire
+  into its own Serilog `LoggerConfiguration`; this package does not configure the global logger itself.
 
 ## 0.2.0 — 2026-06-05
 
