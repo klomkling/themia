@@ -9,16 +9,16 @@ public sealed class ExceptionStoreEngine : IExceptionStore
     private readonly IExceptionalSqlDialect dialect;
     private readonly TimeSpan rollupPeriod;
 
-    /// <summary>Creates the engine over <paramref name="dialect"/>.</summary>
+    /// <summary>Creates the engine over <paramref name="dialect"/> using <paramref name="options"/>.</summary>
     /// <param name="dialect">Provider strategy.</param>
-    /// <param name="rollupPeriod">Duplicate rollup window. Defaults to 10 minutes.</param>
-    public ExceptionStoreEngine(IExceptionalSqlDialect dialect, TimeSpan? rollupPeriod = null)
+    /// <param name="options">Configuration including the rollup window. Must not be <see langword="null"/>.</param>
+    public ExceptionStoreEngine(IExceptionalSqlDialect dialect, ExceptionalOptions options)
     {
         ArgumentNullException.ThrowIfNull(dialect);
-        var period = rollupPeriod ?? TimeSpan.FromMinutes(10);
-        ArgumentOutOfRangeException.ThrowIfLessThan(period, TimeSpan.Zero);
+        ArgumentNullException.ThrowIfNull(options);
+        ArgumentOutOfRangeException.ThrowIfLessThan(options.RollupPeriod, TimeSpan.Zero);
         this.dialect = dialect;
-        this.rollupPeriod = period;
+        this.rollupPeriod = options.RollupPeriod;
     }
 
     /// <inheritdoc />

@@ -18,7 +18,7 @@ public class SqlServerExceptionStoreTests : IAsyncLifetime
         new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-CU14-ubuntu-22.04").Build();
 
     private string ConnString => container.GetConnectionString();
-    private ExceptionStoreEngine Engine => new(new SqlServerExceptionalDialect(ConnString));
+    private ExceptionStoreEngine Engine => new(new SqlServerExceptionalDialect(ConnString), new ExceptionalOptions { ApplicationName = "App" });
 
     public async Task InitializeAsync()
     {

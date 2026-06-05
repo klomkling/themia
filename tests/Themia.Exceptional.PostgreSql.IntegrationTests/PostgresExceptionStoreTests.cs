@@ -15,7 +15,7 @@ public class PostgresExceptionStoreTests : IAsyncLifetime
         .Build();
 
     private string ConnString => container.GetConnectionString();
-    private ExceptionStoreEngine Engine => new(new PostgresExceptionalDialect(ConnString));
+    private ExceptionStoreEngine Engine => new(new PostgresExceptionalDialect(ConnString), new ExceptionalOptions { ApplicationName = "App" });
 
     public async Task InitializeAsync()
     {

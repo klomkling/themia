@@ -16,7 +16,7 @@ public class MySqlExceptionStoreTests : IAsyncLifetime
     // No GuidFormat suffix: MySqlExceptionalDialect applies GuidFormat=Char36 itself, so a plain
     // connection string round-trips System.Guid ↔ CHAR(36) — this exercises that behavior.
     private string ConnString => container.GetConnectionString();
-    private ExceptionStoreEngine Engine => new(new MySqlExceptionalDialect(ConnString));
+    private ExceptionStoreEngine Engine => new(new MySqlExceptionalDialect(ConnString), new ExceptionalOptions { ApplicationName = "App" });
 
     public async Task InitializeAsync()
     {

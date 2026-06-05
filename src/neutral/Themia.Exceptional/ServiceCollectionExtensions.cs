@@ -20,7 +20,7 @@ public static class ServiceCollectionExtensions
         services.TryAddSingleton(options);
 
         services.TryAddSingleton<IExceptionStore>(sp =>
-            new ExceptionStoreEngine(sp.GetRequiredService<IExceptionalSqlDialect>(), options.RollupPeriod));
+            new ExceptionStoreEngine(sp.GetRequiredService<IExceptionalSqlDialect>(), options));
 
         return services;
     }

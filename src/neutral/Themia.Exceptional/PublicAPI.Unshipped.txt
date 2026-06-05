@@ -86,7 +86,7 @@ Themia.Exceptional.ExceptionHash
 Themia.Exceptional.ExceptionStoreEngine
 Themia.Exceptional.ExceptionStoreEngine.CountAsync(Themia.Exceptional.ExceptionFilter! filter, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<int>!
 Themia.Exceptional.ExceptionStoreEngine.DeleteAsync(System.Guid guid, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!
-Themia.Exceptional.ExceptionStoreEngine.ExceptionStoreEngine(Themia.Exceptional.IExceptionalSqlDialect! dialect, System.TimeSpan? rollupPeriod = null) -> void
+Themia.Exceptional.ExceptionStoreEngine.ExceptionStoreEngine(Themia.Exceptional.IExceptionalSqlDialect! dialect, Themia.Exceptional.ExceptionalOptions! options) -> void
 Themia.Exceptional.ExceptionStoreEngine.GetAsync(System.Guid guid, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Exceptional.ExceptionEntry?>!
 Themia.Exceptional.ExceptionStoreEngine.HardDeleteAsync(System.Guid guid, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!
 Themia.Exceptional.ExceptionStoreEngine.ListAsync(Themia.Exceptional.ExceptionFilter! filter, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Exceptional.PagedResult<Themia.Exceptional.ExceptionEntry!>!>!
