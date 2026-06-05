@@ -1,1 +1,16 @@
 #nullable enable
+static Themia.Exceptional.MySql.ServiceCollectionExtensions.AddThemiaExceptionalMySql(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, string! connectionString, System.Action<Themia.Exceptional.ExceptionalOptions!>! configure) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+Themia.Exceptional.MySql.MySqlExceptionalDialect
+Themia.Exceptional.MySql.MySqlExceptionalDialect.CountSql.get -> string!
+Themia.Exceptional.MySql.MySqlExceptionalDialect.CreateConnection() -> System.Data.Common.DbConnection!
+Themia.Exceptional.MySql.MySqlExceptionalDialect.TemporalFilterDbType.get -> System.Data.DbType?
+Themia.Exceptional.MySql.MySqlExceptionalDialect.GetByGuidSql.get -> string!
+Themia.Exceptional.MySql.MySqlExceptionalDialect.HardDeleteSql.get -> string!
+Themia.Exceptional.MySql.MySqlExceptionalDialect.InsertSql.get -> string!
+Themia.Exceptional.MySql.MySqlExceptionalDialect.ListSql.get -> string!
+Themia.Exceptional.MySql.MySqlExceptionalDialect.MySqlExceptionalDialect(string! connectionString) -> void
+Themia.Exceptional.MySql.MySqlExceptionalDialect.ProtectSql.get -> string!
+Themia.Exceptional.MySql.MySqlExceptionalDialect.PurgeSql.get -> string!
+Themia.Exceptional.MySql.MySqlExceptionalDialect.RollupSql.get -> string!
+Themia.Exceptional.MySql.MySqlExceptionalDialect.SoftDeleteSql.get -> string!
+Themia.Exceptional.MySql.ServiceCollectionExtensions
