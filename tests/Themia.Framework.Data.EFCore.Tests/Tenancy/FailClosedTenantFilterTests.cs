@@ -39,6 +39,52 @@ public class FailClosedTenantFilterTests
         Assert.DoesNotContain(results, item => item.Name == "t2");
     }
 
+    [Fact]
+    public void Query_WithNullCurrentTenant_RuntimeAccess_ReturnsOnlyGlobalRows_NeverOtherTenants()
+    {
+        // Arrange: share one InMemory database between the seed context and the query context.
+        var dbName = Guid.NewGuid().ToString();
+        var options = new DbContextOptionsBuilder<RuntimeTestContext>()
+            .UseInMemoryDatabase(dbName)
+            .Options;
+
+        // Seed using a real tenant context so the accessor is non-null during SaveChanges
+        // (saves are not filtered, but this mirrors realistic production seeding).
+        using (var seedContext = new RuntimeTestContext(options, new TenantContext(new TenantId("t1"))))
+        {
+            seedContext.AddRange(
+                new TenantItem(null, "global"),
+                new TenantItem(new TenantId("t1"), "t1"),
+                new TenantItem(new TenantId("t2"), "t2"));
+            seedContext.SaveChanges();
+        }
+        // seedContext.Dispose() has restored TenantContextAccessor to its pre-seed value.
+
+        // Act: query with a null tenant context — the RuntimeTenantAccess filter reads the
+        // accessor at query time and must see null, yielding only global rows.
+        var previousTenantId = TenantContextAccessor.CurrentTenantId;
+        try
+        {
+            TenantContextAccessor.CurrentTenantId = null;
+
+            using var queryContext = new RuntimeTestContext(options, new TenantContext(null));
+            var results = queryContext.Items.AsNoTracking().ToList();
+
+            // Assert (a): global row IS returned.
+            Assert.Contains(results, item => item.Name == "global");
+
+            // Assert (b) — the critical fail-closed assertion:
+            // tenant-owned rows MUST NOT be returned when the current tenant is null.
+            Assert.DoesNotContain(results, item => item.Name == "t1");
+            Assert.DoesNotContain(results, item => item.Name == "t2");
+        }
+        finally
+        {
+            // Restore AsyncLocal state to avoid leaking into other tests.
+            TenantContextAccessor.CurrentTenantId = previousTenantId;
+        }
+    }
+
     private static TestContext CreateContext(TenantId? tenantId)
     {
         var options = new DbContextOptionsBuilder<TestContext>()
@@ -59,6 +105,19 @@ public class FailClosedTenantFilterTests
 
         protected override TenantIsolationStrategy TenantIsolationStrategy
             => TenantIsolationStrategy.PerTenantModel;
+    }
+
+    private sealed class RuntimeTestContext : ThemiaDbContext
+    {
+        public RuntimeTestContext(DbContextOptions options, ITenantContext? tenantContext)
+            : base(options, tenantContext)
+        {
+        }
+
+        public DbSet<TenantItem> Items => Set<TenantItem>();
+
+        protected override TenantIsolationStrategy TenantIsolationStrategy
+            => TenantIsolationStrategy.RuntimeTenantAccess;
     }
 
     private sealed class TenantItem : ITenantEntity

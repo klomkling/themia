@@ -8,7 +8,7 @@ namespace Themia.Framework.Data.EFCore.Infrastructure;
 /// Custom model cache key factory that includes tenant ID in the cache key.
 /// This ensures each tenant gets its own compiled model with correct query filters.
 /// </summary>
-public class TenantModelCacheKeyFactory : IModelCacheKeyFactory
+public sealed class TenantModelCacheKeyFactory : IModelCacheKeyFactory
 {
     /// <inheritdoc />
     public object Create(DbContext context, bool designTime)
