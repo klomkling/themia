@@ -71,6 +71,10 @@ public class SqlServerExceptionStoreTests : IAsyncLifetime
 
         Assert.NotNull(loaded);
         Assert.Equal(2, loaded!.DuplicateCount);
+
+        // Rollup must increment in place, not split into a second row.
+        var page = await engine.ListAsync(new ExceptionFilter());
+        Assert.Single(page.Items);
     }
 
     [Fact]
@@ -198,5 +202,40 @@ public class SqlServerExceptionStoreTests : IAsyncLifetime
 
         Assert.True(page.Items.Count >= 1);
         Assert.Contains(page.Items, i => i.ErrorHash == "local-kind");
+    }
+
+    [Fact]
+    public async Task GetAsync_ReturnsUtcKindTimestamps()
+    {
+        // Proves NormalizeKinds relabels SQL Server datetime2 reads to Utc without shifting the instant.
+        var engine = Engine;
+        var knownUtc = new DateTime(2026, 6, 5, 12, 0, 0, DateTimeKind.Utc);
+        var entry = NewEntry("utc-kind");
+        entry.CreationDate = knownUtc;
+        entry.LastLogDate = knownUtc;
+        await engine.LogAsync(entry);
+
+        var loaded = await engine.GetAsync(entry.Guid);
+
+        Assert.NotNull(loaded);
+        Assert.Equal(DateTimeKind.Utc, loaded!.CreationDate.Kind);
+        Assert.Equal(DateTimeKind.Utc, loaded.LastLogDate.Kind);
+        Assert.True((loaded.CreationDate - knownUtc).Duration() < TimeSpan.FromSeconds(1));
+        Assert.True((loaded.LastLogDate - knownUtc).Duration() < TimeSpan.FromSeconds(1));
+    }
+
+    [Fact]
+    public async Task LogAsync_DuplicateGuid_ViolatesUniqueIndex()
+    {
+        // Rollup keys on ErrorHash; a different hash forces an INSERT, so the same Guid must
+        // collide with the unique IX_Exceptions_Guid index.
+        var engine = Engine;
+        var first = NewEntry("guid-uniq-1");
+        await engine.LogAsync(first);
+
+        var duplicate = NewEntry("guid-uniq-2");
+        duplicate.Guid = first.Guid;
+
+        await Assert.ThrowsAnyAsync<System.Data.Common.DbException>(() => engine.LogAsync(duplicate));
     }
 }
