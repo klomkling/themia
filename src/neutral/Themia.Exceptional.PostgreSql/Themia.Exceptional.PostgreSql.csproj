@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <PackageId>Themia.Exceptional.PostgreSql</PackageId>
+    <Description>PostgreSQL dialect + Npgsql driver + FluentMigrator runner for Themia.Exceptional.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Npgsql" />
+    <PackageReference Include="FluentMigrator.Runner" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Themia.Exceptional/Themia.Exceptional.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <AdditionalFiles Include="PublicAPI.Shipped.txt" />
+    <AdditionalFiles Include="PublicAPI.Unshipped.txt" />
+  </ItemGroup>
+</Project>
