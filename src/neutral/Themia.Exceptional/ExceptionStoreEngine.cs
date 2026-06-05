@@ -14,8 +14,11 @@ public sealed class ExceptionStoreEngine : IExceptionStore
     /// <param name="rollupPeriod">Duplicate rollup window. Defaults to 10 minutes.</param>
     public ExceptionStoreEngine(IExceptionalSqlDialect dialect, TimeSpan? rollupPeriod = null)
     {
+        ArgumentNullException.ThrowIfNull(dialect);
+        var period = rollupPeriod ?? TimeSpan.FromMinutes(10);
+        ArgumentOutOfRangeException.ThrowIfLessThan(period, TimeSpan.Zero);
         this.dialect = dialect;
-        this.rollupPeriod = rollupPeriod ?? TimeSpan.FromMinutes(10);
+        this.rollupPeriod = period;
     }
 
     /// <inheritdoc />

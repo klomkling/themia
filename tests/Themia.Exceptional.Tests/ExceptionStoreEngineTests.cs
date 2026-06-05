@@ -246,5 +246,18 @@ public class ExceptionStoreEngineTests : IDisposable
         Assert.Equal("search-h1", page.Items[0].ErrorHash);
     }
 
+    [Fact]
+    public void Constructor_ThrowsArgumentNullException_WhenDialectIsNull()
+    {
+        Assert.Throws<ArgumentNullException>(() => new ExceptionStoreEngine(null!));
+    }
+
+    [Fact]
+    public void Constructor_ThrowsArgumentOutOfRange_WhenRollupPeriodNegative()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => new ExceptionStoreEngine(new SqliteExceptionalDialect(connString), TimeSpan.FromSeconds(-1)));
+    }
+
     public void Dispose() => keepAlive.Dispose();
 }

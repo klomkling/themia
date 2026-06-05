@@ -20,6 +20,8 @@ public sealed class ExceptionalSerilogSink : ILogEventSink
     /// <summary>Creates the sink.</summary>
     public ExceptionalSerilogSink(IExceptionStore store, ExceptionalOptions options)
     {
+        ArgumentNullException.ThrowIfNull(store);
+        ArgumentNullException.ThrowIfNull(options);
         this.store = store;
         this.options = options;
     }

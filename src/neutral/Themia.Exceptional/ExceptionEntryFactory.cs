@@ -13,6 +13,7 @@ public static class ExceptionEntryFactory
     /// <summary>Creates an entry for <paramref name="exception"/> stamped with <paramref name="applicationName"/>.</summary>
     public static ExceptionEntry FromException(Exception exception, string applicationName, DateTime? utcNow = null)
     {
+        ArgumentNullException.ThrowIfNull(exception);
         ArgumentException.ThrowIfNullOrWhiteSpace(applicationName);
 
         var now = utcNow ?? DateTime.UtcNow;

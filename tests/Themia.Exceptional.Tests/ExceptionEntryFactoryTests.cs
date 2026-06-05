@@ -54,4 +54,10 @@ public class ExceptionEntryFactoryTests
         var ex = new InvalidOperationException("x");
         Assert.Throws<ArgumentException>(() => ExceptionEntryFactory.FromException(ex, "   "));
     }
+
+    [Fact]
+    public void FromException_ThrowsArgumentNullException_WhenExceptionIsNull()
+    {
+        Assert.Throws<ArgumentNullException>(() => ExceptionEntryFactory.FromException(null!, "App"));
+    }
 }
