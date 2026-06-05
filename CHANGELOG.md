@@ -69,10 +69,10 @@ All packages share this version (single-version monorepo).
   base with a tenant-isolating global query filter that **fails closed** (a null current tenant
   returns only global rows, never another tenant's), soft-delete, and audit/concurrency stamping; a
   pluggable `IDatabaseProvider` (built-in PostgreSQL via Npgsql + snake-case naming) with DI
-  extensions (`AddThemiaPostgres`/`AddThemiaDbContext`). Supports **DB-per-tenant**: the provider
-  resolves the per-tenant connection string from `ITenantAccessor.Current.ConnectionString` per
-  scope, falling back to the `Default` connection string (shared-DB + tenant filter). (Ported from
-  Zenity-v2.)
+  extensions (`AddThemiaPostgres`/`AddThemiaDbContext`). Supports **DB-per-tenant**: when a tenant is
+  resolved and carries a connection string (`ITenantAccessor.Current?.ConnectionString`), the provider
+  uses it per scope; otherwise — including when no tenant accessor is registered — it falls back to the
+  `Default` connection string (shared-DB + tenant filter). (Ported from Zenity-v2.)
 - `Themia.Framework.AspNetCore` (`net10.0`) — ASP.NET Core host wiring: `AddThemiaAspNetCore()`
   registers the scoped `ITenantContext`, and `UseThemia()` composes the neutral
   `UseThemiaProblemDetails()` (RFC-7807, outermost) with the `Themia.MultiTenancy` tenant-resolution

@@ -5,7 +5,7 @@ A **.NET 10** application framework — a **framework core** plus a catalog of *
 non-Themia apps (e.g. a net8 Serenity app) can consume them. All packages ship under the
 `Themia.*` NuGet prefix.
 
-> **Status:** early implementation. `Themia.AspNetCore` shipped at `0.1.0`. **Phase 0 — the
+> **Status:** early implementation. `Themia.AspNetCore` first shipped at `0.1.0`. **Phase 0 — the
 > framework rename — is complete on `main` and released as `0.2.0`:** the build-time **tooling**
 > (`Themia.Generators.Abstractions`, `Themia.DependencyInjection`, `Themia.SourceGenerator`,
 > `Themia.Analyzers`), the **framework core** (`Themia.Framework.Core`, `Themia.Caching`,
