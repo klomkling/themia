@@ -18,12 +18,13 @@ public sealed class ExceptionLogMigration : Migration
         // migration time rather than a confusing "table does not exist" failure at runtime.
         // The predicate receives the processor's primary DatabaseType (e.g. "Postgres", "MySql8",
         // "SqlServer2016") — not the friendly aliases used by the string overload — so we match by
-        // prefix/equality to cover all versioned variants of each supported family.
+        // prefix to cover all versioned variants of each supported family. MariaDB runs on the MySql
+        // processor (DatabaseType "MySql8" → matches the "MySql" prefix and the mysql CreateTable
+        // branch); a literal "MariaDB" DatabaseType has no branch, so it correctly throws here.
         IfDatabase(p =>
                 !p.StartsWith("Postgres", System.StringComparison.OrdinalIgnoreCase) &&
                 !p.StartsWith("MySql", System.StringComparison.OrdinalIgnoreCase) &&
-                !p.StartsWith("SqlServer", System.StringComparison.OrdinalIgnoreCase) &&
-                !p.Equals("MariaDB", System.StringComparison.OrdinalIgnoreCase))
+                !p.StartsWith("SqlServer", System.StringComparison.OrdinalIgnoreCase))
             .Delegate(() => throw new System.NotSupportedException(
                 "Themia.Exceptional supports only PostgreSQL, MySQL/MariaDB, and SQL Server. " +
                 "The active database provider is not supported; add a migration branch for it."));
