@@ -90,8 +90,17 @@ public sealed class ServiceRegistrationGenerator : IIncrementalGenerator
 
             var registrations = new List<RegistrationRecord>();
 
+            // Dedup by fully-qualified type name before processing.
+            // A class annotated with more than one lifetime attribute (e.g. [Scoped][Singleton])
+            // appears once in EACH ForAttributeWithMetadataName pipeline, so typeInfos may contain
+            // multiple entries for the same type. CollectTypeInfoCore already reads ALL attributes
+            // on the type, so every duplicate entry is identical — the first one is sufficient.
+            var seenTypes = new System.Collections.Generic.HashSet<string>(System.StringComparer.Ordinal);
             foreach (var info in typeInfos)
             {
+                var fqn = info.Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+                if (!seenTypes.Add(fqn))
+                    continue;
                 ProcessTypeInfo(ctx, info, registrations);
             }
 
