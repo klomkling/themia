@@ -1,1 +1,16 @@
 #nullable enable
+static Themia.Exceptional.SqlServer.ServiceCollectionExtensions.AddThemiaExceptionalSqlServer(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, string! connectionString, System.Action<Themia.Exceptional.ExceptionalOptions!>! configure) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+Themia.Exceptional.SqlServer.ServiceCollectionExtensions
+Themia.Exceptional.SqlServer.SqlServerExceptionalDialect
+Themia.Exceptional.SqlServer.SqlServerExceptionalDialect.CountSql.get -> string!
+Themia.Exceptional.SqlServer.SqlServerExceptionalDialect.CreateConnection() -> System.Data.Common.DbConnection!
+Themia.Exceptional.SqlServer.SqlServerExceptionalDialect.TemporalFilterDbType.get -> System.Data.DbType?
+Themia.Exceptional.SqlServer.SqlServerExceptionalDialect.GetByGuidSql.get -> string!
+Themia.Exceptional.SqlServer.SqlServerExceptionalDialect.HardDeleteSql.get -> string!
+Themia.Exceptional.SqlServer.SqlServerExceptionalDialect.InsertSql.get -> string!
+Themia.Exceptional.SqlServer.SqlServerExceptionalDialect.ListSql.get -> string!
+Themia.Exceptional.SqlServer.SqlServerExceptionalDialect.SqlServerExceptionalDialect(string! connectionString) -> void
+Themia.Exceptional.SqlServer.SqlServerExceptionalDialect.ProtectSql.get -> string!
+Themia.Exceptional.SqlServer.SqlServerExceptionalDialect.PurgeSql.get -> string!
+Themia.Exceptional.SqlServer.SqlServerExceptionalDialect.RollupSql.get -> string!
+Themia.Exceptional.SqlServer.SqlServerExceptionalDialect.SoftDeleteSql.get -> string!
