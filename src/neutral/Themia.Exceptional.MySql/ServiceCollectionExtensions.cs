@@ -25,7 +25,10 @@ public static class ServiceCollectionExtensions
     /// </para>
     /// </summary>
     /// <param name="services">The service collection.</param>
-    /// <param name="connectionString">MySQL connection string.</param>
+    /// <param name="connectionString">
+    /// MySQL connection string. <c>GuidFormat=Char36</c> is applied automatically (the <c>Guid</c> column is
+    /// <c>CHAR(36)</c>), so callers don't need to set it for <see cref="System.Guid"/> round-tripping.
+    /// </param>
     /// <param name="configure">
     /// Required configuration callback. <see cref="ExceptionalOptions.ApplicationName"/> is mandatory and
     /// validated at startup, so this cannot be omitted.

@@ -13,9 +13,9 @@ public class MySqlExceptionStoreTests : IAsyncLifetime
 {
     private readonly MySqlContainer container = new MySqlBuilder("mysql:8.4").Build();
 
-    // GuidFormat=Char36: FluentMigrator renders AsGuid() as CHAR(36) for MySQL,
-    // and MySqlConnector's default does not auto-map System.Guid ↔ CHAR(36).
-    private string ConnString => container.GetConnectionString() + ";GuidFormat=Char36";
+    // No GuidFormat suffix: MySqlExceptionalDialect applies GuidFormat=Char36 itself, so a plain
+    // connection string round-trips System.Guid ↔ CHAR(36) — this exercises that behavior.
+    private string ConnString => container.GetConnectionString();
     private ExceptionStoreEngine Engine => new(new MySqlExceptionalDialect(ConnString));
 
     public async Task InitializeAsync()

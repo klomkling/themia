@@ -10,8 +10,19 @@ public sealed class MySqlExceptionalDialect : IExceptionalSqlDialect
 {
     private readonly string connectionString;
 
-    /// <summary>Creates the dialect over <paramref name="connectionString"/>.</summary>
-    public MySqlExceptionalDialect(string connectionString) => this.connectionString = connectionString;
+    /// <summary>
+    /// Creates the dialect over <paramref name="connectionString"/>. The <c>Exceptions.Guid</c> column is
+    /// <c>CHAR(36)</c> (FluentMigrator <c>AsGuid()</c> on MySQL), so <c>GuidFormat=Char36</c> is applied when
+    /// the caller hasn't set one — ensuring <see cref="System.Guid"/> round-trips without the caller needing
+    /// to know the storage format.
+    /// </summary>
+    public MySqlExceptionalDialect(string connectionString)
+    {
+        var builder = new MySqlConnectionStringBuilder(connectionString);
+        if (builder.GuidFormat == MySqlGuidFormat.Default)
+            builder.GuidFormat = MySqlGuidFormat.Char36;
+        this.connectionString = builder.ConnectionString;
+    }
 
     /// <inheritdoc />
     public DbConnection CreateConnection() => new MySqlConnection(connectionString);
