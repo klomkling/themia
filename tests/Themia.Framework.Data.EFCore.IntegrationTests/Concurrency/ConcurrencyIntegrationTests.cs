@@ -10,13 +10,12 @@ namespace Themia.Framework.Data.EFCore.IntegrationTests.Concurrency;
 /// Integration tests for optimistic concurrency control with real PostgreSQL.
 /// </summary>
 /// <remarks>
-/// Effective optimistic concurrency on PostgreSQL requires UseXminAsConcurrencyToken on the entity
-/// (or a trigger-backed rowversion column). Themia currently uses IsRowVersion() on a byte[] column,
-/// which creates a bytea column that is NOT server-populated by PostgreSQL — the database engine does
-/// not update it on each row write. As a result, DbUpdateConcurrencyException is NOT thrown at runtime
-/// on Npgsql. Tracked as a Tier-3 / 0.3.0 backlog item to switch to UseXminAsConcurrencyToken or an
-/// explicit trigger approach for effective PostgreSQL concurrency protection.
-/// These tests assert the current model-level configuration only.
+/// On Npgsql (PostgreSQL), <c>byte[] IsRowVersion()</c> maps to <c>bytea</c> which is not
+/// server-populated — EF Core never sees a changed value, so <c>DbUpdateConcurrencyException</c>
+/// would never fire. Themia fixes this by adding a shadow <c>uint</c> property configured as
+/// <c>IsRowVersion()</c>; Npgsql's convention then maps it to the system column <c>xmin</c>,
+/// which PostgreSQL increments on every row write. The <c>byte[] RowVersion</c> column is kept
+/// mapped as a plain column for schema compatibility; dropping it is a deferred cleanup.
 /// </remarks>
 [Trait("Category", "Integration")]
 public class ConcurrencyIntegrationTests : IClassFixture<ConcurrencyIntegrationTests.PostgresFixture>
@@ -29,11 +28,12 @@ public class ConcurrencyIntegrationTests : IClassFixture<ConcurrencyIntegrationT
     }
 
     /// <summary>
-    /// Verifies that the RowVersion property is configured as a concurrency token in the EF Core model.
-    /// Effective runtime concurrency on PostgreSQL requires UseXminAsConcurrencyToken (backlog item).
+    /// Verifies that the shadow <c>uint xmin</c> property is configured as the concurrency token
+    /// in the EF Core model on PostgreSQL, and that <c>byte[] RowVersion</c> is NOT the token
+    /// (it is kept mapped as a plain column for schema compatibility).
     /// </summary>
     [Fact]
-    public async Task RowVersion_IsConfiguredAsConcurrencyToken_InModel()
+    public async Task Xmin_IsConfiguredAsConcurrencyToken_InModel()
     {
         await fixture.ResetDataAsync();
 
@@ -42,14 +42,22 @@ public class ConcurrencyIntegrationTests : IClassFixture<ConcurrencyIntegrationT
         var entityType = context.Model.FindEntityType(typeof(InventoryItem));
         Assert.NotNull(entityType);
 
-        var property = entityType.FindProperty(nameof(InventoryItem.RowVersion));
-        Assert.NotNull(property);
-        Assert.True(property.IsConcurrencyToken, "RowVersion should be configured as a concurrency token.");
+        // xmin shadow property is the concurrency token on Npgsql.
+        var xminProperty = entityType.FindProperty("xmin");
+        Assert.NotNull(xminProperty);
+        Assert.True(xminProperty.IsConcurrencyToken, "xmin shadow property should be configured as a concurrency token on PostgreSQL.");
+        Assert.Equal(typeof(uint), xminProperty.ClrType);
+
+        // byte[] RowVersion stays mapped as a plain column, NOT as the concurrency token.
+        var rowVersionProperty = entityType.FindProperty(nameof(InventoryItem.RowVersion));
+        Assert.NotNull(rowVersionProperty);
+        Assert.False(rowVersionProperty.IsConcurrencyToken, "byte[] RowVersion should NOT be the concurrency token on PostgreSQL (it is a plain column).");
     }
 
     /// <summary>
-    /// Verifies that the RowVersion column is mapped to PostgreSQL bytea.
-    /// byte[] + IsRowVersion() maps to bytea on Npgsql (not timestamp/rowversion as on SQL Server).
+    /// Verifies that the <c>row_version</c> column is still present in the database as <c>bytea</c>.
+    /// The column is kept mapped for schema compatibility; it is NOT the active concurrency token
+    /// on PostgreSQL (xmin is). Removing it is a deferred migration-level cleanup.
     /// </summary>
     [Fact]
     public async Task RowVersion_IsMappedToBytea_InDatabase()
@@ -76,10 +84,7 @@ public class ConcurrencyIntegrationTests : IClassFixture<ConcurrencyIntegrationT
     }
 
     /// <summary>
-    /// Verifies that basic CRUD operations work correctly and that RowVersion is populated by EF Core
-    /// (client-side) after each save. Note: on PostgreSQL, EF does NOT re-fetch the bytea column
-    /// after insert/update (it is not server-populated), so RowVersion remains null after a save.
-    /// The model-level token is asserted separately; this test confirms the entity round-trips correctly.
+    /// Verifies that basic CRUD operations work correctly with the xmin-based concurrency setup.
     /// </summary>
     [Fact]
     public async Task InventoryItem_CanBeSavedAndRetrieved()
@@ -114,6 +119,46 @@ public class ConcurrencyIntegrationTests : IClassFixture<ConcurrencyIntegrationT
             Assert.NotNull(item);
             Assert.Equal(90, item.Quantity);
         }
+    }
+
+    /// <summary>
+    /// Verifies that a real concurrency conflict throws <see cref="DbUpdateConcurrencyException"/>
+    /// when two contexts load the same row and each tries to save a conflicting update.
+    /// Before the xmin fix this save would silently succeed (bytea was never server-updated).
+    /// After the fix, PostgreSQL's xmin increments on the first save, making the second save fail.
+    /// </summary>
+    [Fact]
+    public async Task Concurrency_ConflictingSave_ThrowsDbUpdateConcurrencyException()
+    {
+        await fixture.ResetDataAsync();
+
+        // Arrange: insert a row.
+        int itemId;
+        await using (var ctx = fixture.CreateContext())
+        {
+            var item = new InventoryItem { ProductName = "Gadget", Quantity = 50 };
+            ctx.Inventory.Add(item);
+            await ctx.SaveChangesAsync();
+            itemId = item.Id;
+        }
+
+        // Load the same row into two separate contexts.
+        await using var context1 = fixture.CreateContext();
+        await using var context2 = fixture.CreateContext();
+
+        var item1 = await context1.Inventory.FindAsync(itemId);
+        var item2 = await context2.Inventory.FindAsync(itemId);
+        Assert.NotNull(item1);
+        Assert.NotNull(item2);
+
+        // Act: context1 saves first — increments xmin.
+        item1.Quantity = 40;
+        await context1.SaveChangesAsync();
+
+        // context2 still holds the old xmin value — its save must fail.
+        item2.Quantity = 30;
+        await Assert.ThrowsAsync<DbUpdateConcurrencyException>(
+            () => context2.SaveChangesAsync());
     }
 
     public sealed class PostgresFixture : IAsyncLifetime

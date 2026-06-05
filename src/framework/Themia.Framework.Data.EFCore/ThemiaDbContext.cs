@@ -364,7 +364,7 @@ public abstract class ThemiaDbContext : DbContext
         base.OnModelCreating(modelBuilder);
 
         ApplyTenantIdConversions(modelBuilder);
-        ApplyConcurrencyTokens(modelBuilder);
+        ApplyConcurrencyTokens(modelBuilder, Database.IsNpgsql());
 
         if (EnableTenantFilters)
         {
@@ -465,9 +465,23 @@ public abstract class ThemiaDbContext : DbContext
     }
 
     /// <summary>
-    /// Configures RowVersion as a concurrency token for entities implementing IConcurrencyAware.
+    /// Configures optimistic concurrency for entities implementing <see cref="IConcurrencyAware"/>.
     /// </summary>
-    private static void ApplyConcurrencyTokens(ModelBuilder modelBuilder)
+    /// <remarks>
+    /// On SQL Server (and other non-Npgsql providers), <c>byte[] RowVersion</c> with
+    /// <c>IsRowVersion()</c> maps to a server-maintained <c>rowversion</c> column — correct.
+    ///
+    /// On Npgsql (PostgreSQL), <c>byte[] IsRowVersion()</c> maps to <c>bytea</c>, which is
+    /// <em>not</em> server-populated. PostgreSQL never updates it, so <c>DbUpdateConcurrencyException</c>
+    /// would never fire. The Npgsql EF Core convention maps a <c>uint</c> property marked
+    /// <c>IsRowVersion()</c> (concurrency token + OnAddOrUpdate) to the PostgreSQL system column
+    /// <c>xmin</c>, which is server-maintained and changes on every row write.
+    ///
+    /// Fix: on Npgsql, add a shadow <c>uint</c> property configured as <c>IsRowVersion()</c> so
+    /// Npgsql's convention routes it to <c>xmin</c>. The <c>byte[] RowVersion</c> column stays
+    /// mapped as a plain column; dropping it under Postgres is a deferred migration-level cleanup.
+    /// </remarks>
+    private static void ApplyConcurrencyTokens(ModelBuilder modelBuilder, bool isNpgsql)
     {
         foreach (var entityType in modelBuilder.Model.GetEntityTypes())
         {
@@ -476,11 +490,31 @@ public abstract class ThemiaDbContext : DbContext
                 continue;
             }
 
-            var property = entityType.FindProperty(nameof(IConcurrencyAware.RowVersion));
-            if (property is not null)
+            var builder = modelBuilder.Entity(entityType.ClrType);
+
+            if (isNpgsql)
             {
-                var builder = modelBuilder.Entity(entityType.ClrType);
-                builder.Property(nameof(IConcurrencyAware.RowVersion)).IsRowVersion();
+                // PostgreSQL: byte[] IsRowVersion() maps to non-server-populated bytea — concurrency
+                // check never fires. Instead, add a uint shadow property with IsRowVersion() so that
+                // Npgsql's NpgsqlPostgresModelFinalizingConvention maps it to the server-maintained
+                // system column xmin (which increments on every row write).
+                builder.Property<uint>("xmin").IsRowVersion();
+
+                // Keep the byte[] RowVersion column mapped as a plain column for schema compatibility.
+                // Dropping it under Postgres is a deferred migration-level cleanup.
+                var rowVersionProp = entityType.FindProperty(nameof(IConcurrencyAware.RowVersion));
+                if (rowVersionProp is not null)
+                {
+                    builder.Property(nameof(IConcurrencyAware.RowVersion));
+                }
+            }
+            else
+            {
+                var rowVersionProp = entityType.FindProperty(nameof(IConcurrencyAware.RowVersion));
+                if (rowVersionProp is not null)
+                {
+                    builder.Property(nameof(IConcurrencyAware.RowVersion)).IsRowVersion();
+                }
             }
         }
     }
