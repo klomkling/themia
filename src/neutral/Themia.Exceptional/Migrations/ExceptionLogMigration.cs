@@ -14,6 +14,10 @@ public sealed class ExceptionLogMigration : Migration
         IfDatabase("mysql").Delegate(() => CreateTable(c => c.AsCustom("DATETIME(6)")));
         IfDatabase("sqlserver").Delegate(() => CreateTable(c => c.AsDateTime2()));
 
+        // Guid is the lookup key for Get/Protect/SoftDelete/HardDelete; unique (one per stored error) + indexed.
+        Create.Index("IX_Exceptions_Guid")
+            .OnTable("Exceptions").OnColumn("Guid").Ascending()
+            .WithOptions().Unique();
         Create.Index("IX_Exceptions_App_Hash_Created")
             .OnTable("Exceptions")
             .OnColumn("ApplicationName").Ascending()
