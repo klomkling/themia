@@ -77,6 +77,21 @@ public abstract class ThemiaDbContext : DbContext
     protected TenantId? CurrentTenantId => tenantContext?.CurrentTenantId;
 
     /// <summary>
+    /// Gets the tenant identifier that the runtime query filter actually evaluates against, by strategy.
+    /// Find must read the same source as <see cref="GetCurrentTenantExpression"/> so they can never disagree.
+    /// </summary>
+    /// <remarks>
+    /// <list type="bullet">
+    /// <item><term>RuntimeTenantAccess</term><description>Reads <see cref="TenantContextAccessor.CurrentTenantId"/> — identical to the runtime filter expression.</description></item>
+    /// <item><term>PerTenantModel</term><description>Reads the injected <see cref="CurrentTenantId"/> — the filter bakes this value as a constant at model-build time.</description></item>
+    /// </list>
+    /// </remarks>
+    private TenantId? EffectiveFilterTenantId =>
+        TenantIsolationStrategy == TenantIsolationStrategy.RuntimeTenantAccess
+            ? TenantContextAccessor.CurrentTenantId   // same source as the runtime filter
+            : CurrentTenantId;                          // PerTenantModel: injected/constant (filter bakes a constant of this)
+
+    /// <summary>
     /// Gets the injected tenant context, when provided.
     /// </summary>
     protected ITenantContext? TenantContext => tenantContext;
@@ -258,7 +273,7 @@ public abstract class ThemiaDbContext : DbContext
         }
 
         var entityTenantId = tenantEntity.TenantId;
-        var currentTenantId = CurrentTenantId;
+        var currentTenantId = EffectiveFilterTenantId;
 
         // Check if entity belongs to current tenant
         if (currentTenantId is null)
@@ -304,7 +319,7 @@ public abstract class ThemiaDbContext : DbContext
 
         var tenantEntity = (ITenantEntity)entity;
         var entityTenantId = tenantEntity.TenantId;
-        var currentTenantId = CurrentTenantId;
+        var currentTenantId = EffectiveFilterTenantId;
 
         if (currentTenantId is null)
         {
