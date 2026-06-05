@@ -18,6 +18,11 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## 0.3.0 — 2026-06-05
+
+The **`Themia.Exceptional`** family: a framework-neutral exception-logging engine plus PostgreSQL,
+MySQL/MariaDB, and SQL Server dialects (each proven against the real engine via Testcontainers).
+
 ### Added
 
 - `Themia.Exceptional` — framework-neutral exception-logging engine: rollup-aware Dapper store
@@ -62,8 +67,8 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
   are created together per provider, so an unmatched provider produces an empty (no-op) migration and the first
   store call then fails with "Exceptions does not exist". Add a matching branch when adding a dialect (e.g. SQLite,
   Oracle); a migration-time fail-fast for unsupported providers would be a further improvement.
-- Integration suites are duplicated per engine (Postgres drifted to 9 tests vs 11). Introduce a shared
-  parameterized conformance fixture over `IExceptionalSqlDialect`.
+- Integration suites are duplicated per engine (counts drift: Postgres 11 vs MySQL/SqlServer 13). Introduce a
+  shared parameterized conformance fixture over `IExceptionalSqlDialect`.
 - `ListSql` uses `SELECT *` (pulls `Detail`/`RequestBody` per list row); project a summary column set for
   the dashboard list view. `PurgeSql`'s `(IsProtected, CreationDate)` predicate is unindexed.
 
