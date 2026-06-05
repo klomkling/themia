@@ -18,6 +18,12 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## 0.2.0 — 2026-06-05
+
+The complete **Phase 0** framework rename (zenity-v2 → `Themia.*`): build-time tooling, the
+framework core, the cross-cutting packages, and the EF Core data + ASP.NET Core host layers.
+All packages share this version (single-version monorepo).
+
 ### Added
 
 - `Themia.Generators.Abstractions` (`netstandard2.0`) — reusable Roslyn helpers (compilation
@@ -59,6 +65,18 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
   (email, SMS, push, storage, report export, background jobs, secrets, audit, tokens, event bus)
   as forward-seams for future modules. Business-domain contracts deliberately stay out (framework/app
   boundary).
+- `Themia.Framework.Data.EFCore` (`net10.0`) — canonical EF Core data layer: the `ThemiaDbContext`
+  base with a tenant-isolating global query filter that **fails closed** (a null current tenant
+  returns only global rows, never another tenant's), soft-delete, and audit/concurrency stamping; a
+  pluggable `IDatabaseProvider` (built-in PostgreSQL via Npgsql + snake-case naming) with DI
+  extensions (`AddThemiaPostgres`/`AddThemiaDbContext`). Supports **DB-per-tenant**: the provider
+  resolves the per-tenant connection string from `ITenantAccessor.Current.ConnectionString` per
+  scope, falling back to the `Default` connection string (shared-DB + tenant filter). (Ported from
+  Zenity-v2.)
+- `Themia.Framework.AspNetCore` (`net10.0`) — ASP.NET Core host wiring: `AddThemiaAspNetCore()`
+  registers the scoped `ITenantContext`, and `UseThemia()` composes the neutral
+  `UseThemiaProblemDetails()` (RFC-7807, outermost) with the `Themia.MultiTenancy` tenant-resolution
+  middleware.
 
 ## 0.1.0 — 2026-06-02
 
