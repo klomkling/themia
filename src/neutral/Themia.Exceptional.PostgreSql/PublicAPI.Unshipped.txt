@@ -1,0 +1,16 @@
+#nullable enable
+static Themia.Exceptional.PostgreSql.ServiceCollectionExtensions.AddThemiaExceptionalPostgres(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, string! connectionString, System.Action<Themia.Exceptional.ExceptionalOptions!>! configure) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+Themia.Exceptional.PostgreSql.PostgresExceptionalDialect
+Themia.Exceptional.PostgreSql.PostgresExceptionalDialect.CountSql.get -> string!
+Themia.Exceptional.PostgreSql.PostgresExceptionalDialect.CreateConnection() -> System.Data.Common.DbConnection!
+Themia.Exceptional.PostgreSql.PostgresExceptionalDialect.TemporalFilterDbType.get -> System.Data.DbType?
+Themia.Exceptional.PostgreSql.PostgresExceptionalDialect.GetByGuidSql.get -> string!
+Themia.Exceptional.PostgreSql.PostgresExceptionalDialect.HardDeleteSql.get -> string!
+Themia.Exceptional.PostgreSql.PostgresExceptionalDialect.InsertSql.get -> string!
+Themia.Exceptional.PostgreSql.PostgresExceptionalDialect.ListSql.get -> string!
+Themia.Exceptional.PostgreSql.PostgresExceptionalDialect.PostgresExceptionalDialect(string! connectionString) -> void
+Themia.Exceptional.PostgreSql.PostgresExceptionalDialect.ProtectSql.get -> string!
+Themia.Exceptional.PostgreSql.PostgresExceptionalDialect.PurgeSql.get -> string!
+Themia.Exceptional.PostgreSql.PostgresExceptionalDialect.RollupSql.get -> string!
+Themia.Exceptional.PostgreSql.PostgresExceptionalDialect.SoftDeleteSql.get -> string!
+Themia.Exceptional.PostgreSql.ServiceCollectionExtensions

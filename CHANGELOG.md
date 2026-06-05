@@ -18,6 +18,40 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+### Added
+
+- `Themia.Exceptional` — framework-neutral exception-logging engine: rollup-aware Dapper store
+  (`IExceptionStore`/`ExceptionStoreEngine`), `IExceptionalSqlDialect` strategy, FluentMigrator schema,
+  Serilog sink + HTTP enricher (scrubs Cookie/Authorization), and an opt-in request-body middleware.
+  Request body captured by the middleware is now persisted to a `RequestBody` column on the
+  `Exceptions` table and surfaced on `ExceptionEntry.RequestBody`.
+- `Themia.Exceptional.PostgreSql` — PostgreSQL dialect (Npgsql) + `AddThemiaExceptionalPostgres(...)`.
+  Registers `ExceptionalSerilogSink` and `HttpContextEnricher` as DI singletons for the host to wire
+  into its own Serilog `LoggerConfiguration`; this package does not configure the global logger itself.
+
+### Fixed
+
+- `Themia.Exceptional` — temporal filter parameters (`From`/`To`) now delegate their `DbType` to the
+  dialect (`IExceptionalSqlDialect.TemporalFilterDbType`), fixing text-comparison mismatches on SQLite
+  and `Kind=Unspecified` timestamp errors on PostgreSQL. All entry timestamps are coerced to `Kind=Utc`
+  on write so callers building `ExceptionEntry` with `Kind=Unspecified/Local` no longer throw.
+- `Themia.Exceptional` — `HttpContextEnricher` captures `StatusCode` whenever the response code
+  is non-200, not only after `Response.HasStarted`.
+- `Themia.Exceptional` — `ExceptionalSerilogSink.Emit` writes synchronously; high-throughput hosts
+  should wrap it with `Serilog.Sinks.Async`. (Documented in XML remarks, not a behavior change.)
+
+### Known limitations (0.3.x backlog)
+
+- `ExceptionHash` falls back to `Message` when `StackTrace` is null — distinct same-message errors
+  from different call sites can be rolled into one row.
+- `AddThemiaExceptionalPostgres` runs the FluentMigrator migration synchronously at DI-registration
+  time, requiring the database to be reachable at startup. Consider an explicit post-build migrate step.
+- `ListSql`/`CountSql` WHERE predicate is duplicated per dialect. Extract a shared fragment when adding
+  the MySql/SqlServer dialects.
+- `ExceptionStoreEngine` exposes the rollup period both through `ExceptionalOptions` (wired by
+  `AddThemiaExceptionalCore`) and a redundant constructor parameter; constructing the engine directly
+  bypasses the options value. Consider collapsing to a single source.
+
 ## 0.2.0 — 2026-06-05
 
 The complete **Phase 0** framework rename (zenity-v2 → `Themia.*`): build-time tooling, the
