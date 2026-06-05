@@ -88,6 +88,34 @@ public class HttpContextEnricherTests
         Assert.True(evt.Properties.TryGetValue("StatusCode", out var sc));
         Assert.Equal("404", sc.ToString());
     }
+
+    [Fact]
+    public void Enrich_DoesNotAddStatusCode_WhenResponseIs200AndNotStarted()
+    {
+        // DefaultHttpContext has StatusCode=200 and HasStarted=false — the enricher must suppress it.
+        var (enricher, evt) = Setup(http =>
+        {
+            http.Request.Method = "GET";
+            // StatusCode defaults to 200, HasStarted defaults to false — no changes needed.
+        });
+
+        enricher.Enrich(evt, new LogEventPropertyFactory());
+
+        Assert.False(evt.Properties.ContainsKey("StatusCode"));
+    }
+
+    [Fact]
+    public void Enrich_DoesNotThrow_WhenHttpContextIsNull()
+    {
+        var accessor = new HttpContextAccessor { HttpContext = null };
+        var options = new ExceptionalOptions { ApplicationName = "App" };
+        var enricher = new HttpContextEnricher(accessor, options);
+        var evt = NewEvent();
+
+        enricher.Enrich(evt, new LogEventPropertyFactory());
+
+        Assert.Empty(evt.Properties);
+    }
 }
 
 // Minimal property factory for unit testing enrichers.

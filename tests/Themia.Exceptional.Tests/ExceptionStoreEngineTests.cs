@@ -156,5 +156,95 @@ public class ExceptionStoreEngineTests : IDisposable
         Assert.Equal(expectedUtc, loaded!.CreationDate, TimeSpan.FromSeconds(1));
     }
 
+    [Fact]
+    public async Task ListAsync_ClampsPageSizeZeroToOne()
+    {
+        await engine.LogAsync(NewEntry("clamp-h1"));
+
+        var page = await engine.ListAsync(new ExceptionFilter { PageSize = 0 });
+
+        Assert.Single(page.Items);
+    }
+
+    [Fact]
+    public async Task LogAsync_ThrowsArgumentException_WhenErrorHashIsEmpty()
+    {
+        var entry = NewEntry();
+        entry.ErrorHash = "";
+
+        await Assert.ThrowsAsync<ArgumentException>(() => engine.LogAsync(entry));
+    }
+
+    [Fact]
+    public async Task ListAsync_Paging_ReturnsCorrectPageAndTotal()
+    {
+        await engine.LogAsync(NewEntry("pg-h1"));
+        await engine.LogAsync(NewEntry("pg-h2"));
+        await engine.LogAsync(NewEntry("pg-h3"));
+
+        var page1 = await engine.ListAsync(new ExceptionFilter { PageSize = 2, Page = 1 });
+        var page2 = await engine.ListAsync(new ExceptionFilter { PageSize = 2, Page = 2 });
+
+        Assert.Equal(2, page1.Items.Count);
+        Assert.Equal(3, page1.Total);
+        Assert.Single(page2.Items);
+        Assert.Equal(3, page2.Total);
+    }
+
+    [Fact]
+    public async Task PurgeAsync_RemovesOldUnprotected_LeavesRecent()
+    {
+        var old = NewEntry("purge-old");
+        old.CreationDate = DateTime.UtcNow.AddDays(-30);
+        old.LastLogDate = old.CreationDate;
+        await engine.LogAsync(old);
+
+        var recent = NewEntry("purge-recent");
+        await engine.LogAsync(recent);
+
+        var removed = await engine.PurgeAsync(DateTime.UtcNow.AddDays(-1));
+
+        Assert.Equal(1, removed);
+        Assert.NotNull(await engine.GetAsync(recent.Guid));
+        Assert.Null(await engine.GetAsync(old.Guid));
+    }
+
+    [Fact]
+    public async Task DeleteAsync_IsIdempotent_AndNewEntryWithSameHashIsActive()
+    {
+        var entry = NewEntry("idem-hash");
+        await engine.LogAsync(entry);
+
+        Assert.True(await engine.DeleteAsync(entry.Guid));
+        Assert.False(await engine.DeleteAsync(entry.Guid));
+
+        // A new entry with the same hash should insert a fresh active row.
+        var fresh = NewEntry("idem-hash");
+        await engine.LogAsync(fresh);
+
+        var nonDeletedCount = await engine.CountAsync(new ExceptionFilter());
+        Assert.Equal(1, nonDeletedCount);
+
+        var withDeletedCount = await engine.CountAsync(new ExceptionFilter { IncludeDeleted = true });
+        Assert.Equal(2, withDeletedCount);
+    }
+
+    [Fact]
+    public async Task ListAsync_FiltersBySearch_ReturnsMatchingRowOnly()
+    {
+        var matchEntry = NewEntry("search-h1");
+        matchEntry.Message = "UniqueSearchTerm42";
+        await engine.LogAsync(matchEntry);
+
+        var otherEntry = NewEntry("search-h2");
+        otherEntry.Message = "SomethingElse";
+        await engine.LogAsync(otherEntry);
+
+        var page = await engine.ListAsync(new ExceptionFilter { Search = "UniqueSearchTerm" });
+
+        Assert.Single(page.Items);
+        Assert.Equal("search-h1", page.Items[0].ErrorHash);
+    }
+
     public void Dispose() => keepAlive.Dispose();
 }

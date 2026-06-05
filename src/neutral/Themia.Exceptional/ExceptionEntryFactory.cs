@@ -13,6 +13,8 @@ public static class ExceptionEntryFactory
     /// <summary>Creates an entry for <paramref name="exception"/> stamped with <paramref name="applicationName"/>.</summary>
     public static ExceptionEntry FromException(Exception exception, string applicationName, DateTime? utcNow = null)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(applicationName);
+
         var now = utcNow ?? DateTime.UtcNow;
         var type = exception.GetType().FullName ?? exception.GetType().Name;
 
@@ -41,8 +43,16 @@ public static class ExceptionEntryFactory
             exception.Source,
             exception.StackTrace,
             Inner = exception.InnerException?.ToString(),
-            Data = exception.Data.Count > 0 ? exception.Data : null,
+            Data = exception.Data.Count > 0 ? ToStringMap(exception.Data) : null,
         };
         return JsonSerializer.Serialize(payload, JsonOptions);
+    }
+
+    private static Dictionary<string, string?> ToStringMap(System.Collections.IDictionary data)
+    {
+        var map = new Dictionary<string, string?>(data.Count);
+        foreach (System.Collections.DictionaryEntry e in data)
+            map[e.Key.ToString() ?? string.Empty] = e.Value?.ToString();
+        return map;
     }
 }

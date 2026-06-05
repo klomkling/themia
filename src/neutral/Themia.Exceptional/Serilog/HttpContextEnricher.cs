@@ -6,8 +6,8 @@ using Themia.Exceptional.Middleware;
 namespace Themia.Exceptional.Serilog;
 
 /// <summary>
-/// Adds HTTP request context (Url/HttpMethod/Host/IpAddress) to log events. Never reads Cookie/Authorization,
-/// so secrets cannot leak into stored exceptions.
+/// Adds HTTP request context (Url/HttpMethod/Host/IpAddress/StatusCode/RequestBody) to log events.
+/// Never reads Cookie/Authorization, so secrets cannot leak into stored exceptions.
 /// </summary>
 /// <remarks>
 /// The captured <c>Url</c> includes <see cref="Microsoft.AspNetCore.Http.HttpRequest.QueryString"/> verbatim.

@@ -35,4 +35,23 @@ public class ExceptionEntryFactoryTests
         using var doc = JsonDocument.Parse(entry.Detail);
         Assert.Equal("boom", doc.RootElement.GetProperty("Message").GetString());
     }
+
+    [Fact]
+    public void FromException_SerializesExceptionData_WithoutThrowing()
+    {
+        var ex = new InvalidOperationException("with data");
+        ex.Data["key"] = "value";
+
+        var entry = ExceptionEntryFactory.FromException(ex, "MyApp");
+
+        using var doc = JsonDocument.Parse(entry.Detail);
+        Assert.Equal("value", doc.RootElement.GetProperty("Data").GetProperty("key").GetString());
+    }
+
+    [Fact]
+    public void FromException_ThrowsArgumentException_WhenApplicationNameIsWhiteSpace()
+    {
+        var ex = new InvalidOperationException("x");
+        Assert.Throws<ArgumentException>(() => ExceptionEntryFactory.FromException(ex, "   "));
+    }
 }

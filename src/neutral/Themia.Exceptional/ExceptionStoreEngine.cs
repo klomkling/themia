@@ -26,6 +26,8 @@ public sealed class ExceptionStoreEngine : IExceptionStore
         entry.LastLogDate = ToUtc(entry.LastLogDate);
         if (entry.DeletionDate is { } del) entry.DeletionDate = ToUtc(del);
 
+        ArgumentException.ThrowIfNullOrWhiteSpace(entry.ErrorHash);
+
         // UPDATE-then-(if-0)-INSERT is intentionally non-transactional. Under concurrent logging of
         // the same ErrorHash, two callers can both see 0 rows updated and both insert, yielding
         // split rollup rows. This is the accepted tradeoff: no data loss, no hot-path lock, and
@@ -55,9 +57,10 @@ public sealed class ExceptionStoreEngine : IExceptionStore
     public async Task<PagedResult<ExceptionEntry>> ListAsync(ExceptionFilter filter, CancellationToken cancellationToken = default)
     {
         await using var connection = dialect.CreateConnection();
+        var pageSize = Math.Clamp(filter.PageSize, 1, 1000);
         var args = ToArgs(filter);
-        args.Add("Offset", Math.Max(0, (filter.Page - 1) * filter.PageSize));
-        args.Add("PageSize", filter.PageSize);
+        args.Add("Offset", (Math.Max(1, filter.Page) - 1) * pageSize);
+        args.Add("PageSize", pageSize);
 
         var items = (await connection.QueryAsync<ExceptionEntry>(
             new CommandDefinition(dialect.ListSql, args, cancellationToken: cancellationToken))).AsList();

@@ -149,4 +149,23 @@ public class PostgresExceptionStoreTests : IAsyncLifetime
         Assert.NotNull(loaded);
         Assert.Equal("{\"key\":\"value\"}", loaded!.RequestBody);
     }
+
+    [Fact]
+    public async Task ListAsync_FiltersByDateRange_KindLocal_DoesNotThrow_AndReturnsRow()
+    {
+        // Proves the Local→UTC conversion works against real Npgsql timestamptz.
+        var engine = Engine;
+        var knownUtc = new DateTime(2026, 6, 5, 12, 0, 0, DateTimeKind.Utc);
+        var entry = NewEntry("local-kind");
+        entry.CreationDate = knownUtc;
+        entry.LastLogDate = knownUtc;
+        await engine.LogAsync(entry);
+
+        // Build a Local-kind From that is earlier than the entry's CreationDate.
+        var localFrom = DateTime.SpecifyKind(knownUtc.AddHours(-1).ToLocalTime(), DateTimeKind.Local);
+        var page = await engine.ListAsync(new ExceptionFilter { From = localFrom });
+
+        Assert.True(page.Items.Count >= 1);
+        Assert.Contains(page.Items, i => i.ErrorHash == "local-kind");
+    }
 }

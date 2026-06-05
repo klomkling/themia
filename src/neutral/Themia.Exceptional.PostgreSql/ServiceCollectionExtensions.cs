@@ -61,6 +61,15 @@ public static class ServiceCollectionExtensions
             .BuildServiceProvider(false);
 
         using var scope = provider.CreateScope();
-        scope.ServiceProvider.GetRequiredService<IMigrationRunner>().MigrateUp();
+        try
+        {
+            scope.ServiceProvider.GetRequiredService<IMigrationRunner>().MigrateUp();
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException(
+                "Themia.Exceptional: failed to apply the Exceptions-table migration. " +
+                "Verify the PostgreSQL connection string and that the principal has DDL permissions.", ex);
+        }
     }
 }

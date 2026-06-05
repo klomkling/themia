@@ -49,7 +49,7 @@ public class RequestBodyLoggingMiddlewareTests
 
         await mw.InvokeAsync(ctx);
 
-        Assert.Equal("hell", ctx.Items[RequestBodyLoggingMiddleware.BodyItemKey]);
+        Assert.Equal("hell…[truncated]", ctx.Items[RequestBodyLoggingMiddleware.BodyItemKey]);
     }
 
     [Fact]
