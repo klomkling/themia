@@ -28,6 +28,8 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 - `Themia.Exceptional.PostgreSql` — PostgreSQL dialect (Npgsql) + `AddThemiaExceptionalPostgres(...)`.
   Registers `ExceptionalSerilogSink` and `HttpContextEnricher` as DI singletons for the host to wire
   into its own Serilog `LoggerConfiguration`; this package does not configure the global logger itself.
+- `Themia.Exceptional.MySql` — MySQL/MariaDB dialect (MySqlConnector) + `AddThemiaExceptionalMySql(...)`.
+- `Themia.Exceptional.SqlServer` — SQL Server dialect (Microsoft.Data.SqlClient) + `AddThemiaExceptionalSqlServer(...)`.
 
 ### Fixed
 
