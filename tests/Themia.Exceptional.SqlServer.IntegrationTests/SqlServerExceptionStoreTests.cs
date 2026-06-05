@@ -1,28 +1,31 @@
 using FluentMigrator.Runner;
 using Microsoft.Extensions.DependencyInjection;
-using Testcontainers.PostgreSql;
+using Testcontainers.MsSql;
 using Themia.Exceptional;
 using Themia.Exceptional.Migrations;
-using Themia.Exceptional.PostgreSql;
+using Themia.Exceptional.SqlServer;
 using Xunit;
 
-namespace Themia.Exceptional.PostgreSql.IntegrationTests;
+namespace Themia.Exceptional.SqlServer.IntegrationTests;
 
 [Trait("Category", "Integration")]
-public class PostgresExceptionStoreTests : IAsyncLifetime
+public class SqlServerExceptionStoreTests : IAsyncLifetime
 {
-    private readonly PostgreSqlContainer container = new PostgreSqlBuilder("postgres:16-alpine")
-        .Build();
+    // MsSqlBuilder 4.12.0: parameterless ctor is [Obsolete] as error — must pass image explicitly.
+    // Pinned (not :2022-latest) for reproducible CI; this is Testcontainers.MsSql 4.12.0's default image.
+    // No GuidFormat quirk — uniqueidentifier round-trips natively through Microsoft.Data.SqlClient.
+    private readonly MsSqlContainer container =
+        new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-CU14-ubuntu-22.04").Build();
 
     private string ConnString => container.GetConnectionString();
-    private ExceptionStoreEngine Engine => new(new PostgresExceptionalDialect(ConnString));
+    private ExceptionStoreEngine Engine => new(new SqlServerExceptionalDialect(ConnString));
 
     public async Task InitializeAsync()
     {
         await container.StartAsync();
         using var provider = new ServiceCollection()
             .AddFluentMigratorCore()
-            .ConfigureRunner(rb => rb.AddPostgres().WithGlobalConnectionString(ConnString)
+            .ConfigureRunner(rb => rb.AddSqlServer().WithGlobalConnectionString(ConnString)
                 .ScanIn(typeof(ExceptionLogMigration).Assembly).For.Migrations())
             .BuildServiceProvider(false);
         using var scope = provider.CreateScope();
@@ -43,7 +46,7 @@ public class PostgresExceptionStoreTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Insert_Then_Get_RoundTrips()
+    public async Task Log_And_Get_RoundTrip()
     {
         var entry = NewEntry();
         await Engine.LogAsync(entry);
@@ -52,30 +55,63 @@ public class PostgresExceptionStoreTests : IAsyncLifetime
 
         Assert.NotNull(loaded);
         Assert.Equal(entry.Guid, loaded!.Guid);
-        Assert.Equal("""{"Message":"boom"}""", loaded.Detail);
+        Assert.Equal("App", loaded.ApplicationName);
+        Assert.Equal("boom", loaded.Message);
     }
 
     [Fact]
-    public async Task Duplicate_RollsUp_DuplicateCount()
+    public async Task Log_Duplicate_Rollups()
     {
-        await Engine.LogAsync(NewEntry());
-        await Engine.LogAsync(NewEntry());
+        var engine = Engine;
+        var e1 = NewEntry("dup");
+        await engine.LogAsync(e1);
+        var e2 = NewEntry("dup");
+        e2.ApplicationName = "App";
+        await engine.LogAsync(e2);
 
-        var page = await Engine.ListAsync(new ExceptionFilter());
+        var loaded = await engine.GetAsync(e1.Guid);
 
+        Assert.NotNull(loaded);
+        Assert.Equal(2, loaded!.DuplicateCount);
+
+        // Rollup must increment in place, not split into a second row.
+        var page = await engine.ListAsync(new ExceptionFilter());
         Assert.Single(page.Items);
-        Assert.Equal(2, page.Items[0].DuplicateCount);
     }
 
     [Fact]
-    public async Task SoftDelete_HidesFromDefaultListButCountsWithIncludeDeleted()
+    public async Task SoftDelete_HidesFromList()
     {
         var entry = NewEntry("del");
         await Engine.LogAsync(entry);
+        await Engine.DeleteAsync(entry.Guid);
 
-        Assert.True(await Engine.DeleteAsync(entry.Guid));
-        Assert.Equal(0, await Engine.CountAsync(new ExceptionFilter { ApplicationName = "App" }));
-        Assert.True(await Engine.CountAsync(new ExceptionFilter { IncludeDeleted = true }) >= 1);
+        var page = await Engine.ListAsync(new ExceptionFilter());
+
+        Assert.DoesNotContain(page.Items, i => i.Guid == entry.Guid);
+    }
+
+    [Fact]
+    public async Task SoftDelete_VisibleWithIncludeDeleted()
+    {
+        var entry = NewEntry("del2");
+        await Engine.LogAsync(entry);
+        await Engine.DeleteAsync(entry.Guid);
+
+        var page = await Engine.ListAsync(new ExceptionFilter { IncludeDeleted = true });
+
+        Assert.Contains(page.Items, i => i.Guid == entry.Guid);
+    }
+
+    [Fact]
+    public async Task CountAsync_ReturnsCorrectCount()
+    {
+        var engine = Engine;
+        var e = NewEntry("cnt");
+        await engine.LogAsync(e);
+
+        Assert.True(await engine.CountAsync(new ExceptionFilter { ApplicationName = "App" }) >= 1);
+        Assert.True(await engine.CountAsync(new ExceptionFilter { IncludeDeleted = true }) >= 1);
     }
 
     [Fact]
@@ -103,8 +139,9 @@ public class PostgresExceptionStoreTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task ListAsync_FiltersByDateRange_Postgres()
+    public async Task ListAsync_FiltersByDateRange_SqlServer()
     {
+        // Proves datetime2 temporal filtering works against real SQL Server.
         var engine = Engine;
         var oldE = NewEntry("range-old");
         oldE.CreationDate = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
@@ -153,7 +190,7 @@ public class PostgresExceptionStoreTests : IAsyncLifetime
     [Fact]
     public async Task ListAsync_FiltersByDateRange_KindLocal_DoesNotThrow_AndReturnsRow()
     {
-        // Proves the Local→UTC conversion works against real Npgsql timestamptz.
+        // Proves the Local→UTC conversion works against real SQL Server datetime2.
         var engine = Engine;
         var knownUtc = new DateTime(2026, 6, 5, 12, 0, 0, DateTimeKind.Utc);
         var entry = NewEntry("local-kind");
@@ -172,8 +209,7 @@ public class PostgresExceptionStoreTests : IAsyncLifetime
     [Fact]
     public async Task GetAsync_ReturnsUtcKindTimestamps()
     {
-        // Postgres timestamptz returns Utc natively — parity/regression guard that NormalizeKinds
-        // relabels to Utc without shifting the instant.
+        // Proves NormalizeKinds relabels SQL Server datetime2 reads to Utc without shifting the instant.
         var engine = Engine;
         var knownUtc = new DateTime(2026, 6, 5, 12, 0, 0, DateTimeKind.Utc);
         var entry = NewEntry("utc-kind");

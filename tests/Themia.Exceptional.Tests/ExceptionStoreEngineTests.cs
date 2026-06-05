@@ -247,6 +247,21 @@ public class ExceptionStoreEngineTests : IDisposable
     }
 
     [Fact]
+    public async Task GetAsync_ReturnsUtcKindTimestamps()
+    {
+        // tz-naive stores (SQLite/MySQL/SqlServer) materialize DateTime as Kind=Unspecified; the engine
+        // must label read-back values as Utc so all engines return a consistent UTC instant.
+        var entry = NewEntry("kind");
+        await engine.LogAsync(entry);
+
+        var loaded = await engine.GetAsync(entry.Guid);
+
+        Assert.NotNull(loaded);
+        Assert.Equal(DateTimeKind.Utc, loaded!.CreationDate.Kind);
+        Assert.Equal(DateTimeKind.Utc, loaded.LastLogDate.Kind);
+    }
+
+    [Fact]
     public void Constructor_ThrowsArgumentNullException_WhenDialectIsNull()
     {
         Assert.Throws<ArgumentNullException>(() => new ExceptionStoreEngine(null!));

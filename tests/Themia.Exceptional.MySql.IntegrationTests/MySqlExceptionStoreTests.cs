@@ -1,28 +1,29 @@
 using FluentMigrator.Runner;
 using Microsoft.Extensions.DependencyInjection;
-using Testcontainers.PostgreSql;
+using Testcontainers.MySql;
 using Themia.Exceptional;
 using Themia.Exceptional.Migrations;
-using Themia.Exceptional.PostgreSql;
+using Themia.Exceptional.MySql;
 using Xunit;
 
-namespace Themia.Exceptional.PostgreSql.IntegrationTests;
+namespace Themia.Exceptional.MySql.IntegrationTests;
 
 [Trait("Category", "Integration")]
-public class PostgresExceptionStoreTests : IAsyncLifetime
+public class MySqlExceptionStoreTests : IAsyncLifetime
 {
-    private readonly PostgreSqlContainer container = new PostgreSqlBuilder("postgres:16-alpine")
-        .Build();
+    private readonly MySqlContainer container = new MySqlBuilder("mysql:8.4").Build();
 
+    // No GuidFormat suffix: MySqlExceptionalDialect applies GuidFormat=Char36 itself, so a plain
+    // connection string round-trips System.Guid ↔ CHAR(36) — this exercises that behavior.
     private string ConnString => container.GetConnectionString();
-    private ExceptionStoreEngine Engine => new(new PostgresExceptionalDialect(ConnString));
+    private ExceptionStoreEngine Engine => new(new MySqlExceptionalDialect(ConnString));
 
     public async Task InitializeAsync()
     {
         await container.StartAsync();
         using var provider = new ServiceCollection()
             .AddFluentMigratorCore()
-            .ConfigureRunner(rb => rb.AddPostgres().WithGlobalConnectionString(ConnString)
+            .ConfigureRunner(rb => rb.AddMySql8().WithGlobalConnectionString(ConnString)
                 .ScanIn(typeof(ExceptionLogMigration).Assembly).For.Migrations())
             .BuildServiceProvider(false);
         using var scope = provider.CreateScope();
@@ -43,7 +44,7 @@ public class PostgresExceptionStoreTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Insert_Then_Get_RoundTrips()
+    public async Task Log_And_Get_RoundTrip()
     {
         var entry = NewEntry();
         await Engine.LogAsync(entry);
@@ -52,30 +53,63 @@ public class PostgresExceptionStoreTests : IAsyncLifetime
 
         Assert.NotNull(loaded);
         Assert.Equal(entry.Guid, loaded!.Guid);
-        Assert.Equal("""{"Message":"boom"}""", loaded.Detail);
+        Assert.Equal("App", loaded.ApplicationName);
+        Assert.Equal("boom", loaded.Message);
     }
 
     [Fact]
-    public async Task Duplicate_RollsUp_DuplicateCount()
+    public async Task Log_Duplicate_Rollups()
     {
-        await Engine.LogAsync(NewEntry());
-        await Engine.LogAsync(NewEntry());
+        var engine = Engine;
+        var e1 = NewEntry("dup");
+        await engine.LogAsync(e1);
+        var e2 = NewEntry("dup");
+        e2.ApplicationName = "App";
+        await engine.LogAsync(e2);
 
-        var page = await Engine.ListAsync(new ExceptionFilter());
+        var loaded = await engine.GetAsync(e1.Guid);
 
+        Assert.NotNull(loaded);
+        Assert.Equal(2, loaded!.DuplicateCount);
+
+        // Rollup must increment in place, not split into a second row.
+        var page = await engine.ListAsync(new ExceptionFilter());
         Assert.Single(page.Items);
-        Assert.Equal(2, page.Items[0].DuplicateCount);
     }
 
     [Fact]
-    public async Task SoftDelete_HidesFromDefaultListButCountsWithIncludeDeleted()
+    public async Task SoftDelete_HidesFromList()
     {
         var entry = NewEntry("del");
         await Engine.LogAsync(entry);
+        await Engine.DeleteAsync(entry.Guid);
 
-        Assert.True(await Engine.DeleteAsync(entry.Guid));
-        Assert.Equal(0, await Engine.CountAsync(new ExceptionFilter { ApplicationName = "App" }));
-        Assert.True(await Engine.CountAsync(new ExceptionFilter { IncludeDeleted = true }) >= 1);
+        var page = await Engine.ListAsync(new ExceptionFilter());
+
+        Assert.DoesNotContain(page.Items, i => i.Guid == entry.Guid);
+    }
+
+    [Fact]
+    public async Task SoftDelete_VisibleWithIncludeDeleted()
+    {
+        var entry = NewEntry("del2");
+        await Engine.LogAsync(entry);
+        await Engine.DeleteAsync(entry.Guid);
+
+        var page = await Engine.ListAsync(new ExceptionFilter { IncludeDeleted = true });
+
+        Assert.Contains(page.Items, i => i.Guid == entry.Guid);
+    }
+
+    [Fact]
+    public async Task CountAsync_ReturnsCorrectCount()
+    {
+        var engine = Engine;
+        var e = NewEntry("cnt");
+        await engine.LogAsync(e);
+
+        Assert.True(await engine.CountAsync(new ExceptionFilter { ApplicationName = "App" }) >= 1);
+        Assert.True(await engine.CountAsync(new ExceptionFilter { IncludeDeleted = true }) >= 1);
     }
 
     [Fact]
@@ -103,7 +137,7 @@ public class PostgresExceptionStoreTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task ListAsync_FiltersByDateRange_Postgres()
+    public async Task ListAsync_FiltersByDateRange_MySql()
     {
         var engine = Engine;
         var oldE = NewEntry("range-old");
@@ -153,7 +187,7 @@ public class PostgresExceptionStoreTests : IAsyncLifetime
     [Fact]
     public async Task ListAsync_FiltersByDateRange_KindLocal_DoesNotThrow_AndReturnsRow()
     {
-        // Proves the Local→UTC conversion works against real Npgsql timestamptz.
+        // Proves the Local→UTC conversion works against real MySQL DATETIME(6).
         var engine = Engine;
         var knownUtc = new DateTime(2026, 6, 5, 12, 0, 0, DateTimeKind.Utc);
         var entry = NewEntry("local-kind");
@@ -172,8 +206,7 @@ public class PostgresExceptionStoreTests : IAsyncLifetime
     [Fact]
     public async Task GetAsync_ReturnsUtcKindTimestamps()
     {
-        // Postgres timestamptz returns Utc natively — parity/regression guard that NormalizeKinds
-        // relabels to Utc without shifting the instant.
+        // Proves NormalizeKinds relabels MySQL DATETIME(6) reads to Utc without shifting the instant.
         var engine = Engine;
         var knownUtc = new DateTime(2026, 6, 5, 12, 0, 0, DateTimeKind.Utc);
         var entry = NewEntry("utc-kind");

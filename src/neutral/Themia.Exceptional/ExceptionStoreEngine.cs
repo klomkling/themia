@@ -52,8 +52,9 @@ public sealed class ExceptionStoreEngine : IExceptionStore
     public async Task<ExceptionEntry?> GetAsync(Guid guid, CancellationToken cancellationToken = default)
     {
         await using var connection = dialect.CreateConnection();
-        return await connection.QuerySingleOrDefaultAsync<ExceptionEntry>(
+        var entry = await connection.QuerySingleOrDefaultAsync<ExceptionEntry>(
             new CommandDefinition(dialect.GetByGuidSql, new { Guid = guid }, cancellationToken: cancellationToken));
+        return entry is null ? null : NormalizeKinds(entry);
     }
 
     /// <inheritdoc />
@@ -67,6 +68,8 @@ public sealed class ExceptionStoreEngine : IExceptionStore
 
         var items = (await connection.QueryAsync<ExceptionEntry>(
             new CommandDefinition(dialect.ListSql, args, cancellationToken: cancellationToken))).AsList();
+        foreach (var item in items)
+            NormalizeKinds(item);
         var total = await connection.ExecuteScalarAsync<int>(
             new CommandDefinition(dialect.CountSql, args, cancellationToken: cancellationToken));
 
@@ -141,4 +144,15 @@ public sealed class ExceptionStoreEngine : IExceptionStore
     };
 
     private static DateTime? ToUtc(DateTime? value) => value is { } v ? ToUtc(v) : null;
+
+    // The store always persists UTC instants, but tz-naive columns (MySQL DATETIME, SqlServer datetime2)
+    // materialize as Kind=Unspecified while Postgres timestamptz returns Kind=Utc. Label read-back values
+    // as Utc so all engines return consistent Kind (callers can safely use the value as a UTC instant).
+    private static ExceptionEntry NormalizeKinds(ExceptionEntry entry)
+    {
+        entry.CreationDate = DateTime.SpecifyKind(entry.CreationDate, DateTimeKind.Utc);
+        entry.LastLogDate = DateTime.SpecifyKind(entry.LastLogDate, DateTimeKind.Utc);
+        if (entry.DeletionDate is { } del) entry.DeletionDate = DateTime.SpecifyKind(del, DateTimeKind.Utc);
+        return entry;
+    }
 }

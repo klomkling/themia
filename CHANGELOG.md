@@ -28,6 +28,8 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 - `Themia.Exceptional.PostgreSql` — PostgreSQL dialect (Npgsql) + `AddThemiaExceptionalPostgres(...)`.
   Registers `ExceptionalSerilogSink` and `HttpContextEnricher` as DI singletons for the host to wire
   into its own Serilog `LoggerConfiguration`; this package does not configure the global logger itself.
+- `Themia.Exceptional.MySql` — MySQL/MariaDB dialect (MySqlConnector) + `AddThemiaExceptionalMySql(...)`.
+- `Themia.Exceptional.SqlServer` — SQL Server dialect (Microsoft.Data.SqlClient) + `AddThemiaExceptionalSqlServer(...)`.
 
 ### Fixed
 
@@ -46,11 +48,24 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
   from different call sites can be rolled into one row.
 - `AddThemiaExceptionalPostgres` runs the FluentMigrator migration synchronously at DI-registration
   time, requiring the database to be reachable at startup. Consider an explicit post-build migrate step.
-- `ListSql`/`CountSql` WHERE predicate is duplicated per dialect. Extract a shared fragment when adding
-  the MySql/SqlServer dialects.
+- `ListSql`/`CountSql` WHERE predicate is duplicated per dialect (and across the 3 dialects). Extract a
+  shared predicate fragment with dialect-supplied leaf tokens (quote char, paging syntax, bool literal).
 - `ExceptionStoreEngine` exposes the rollup period both through `ExceptionalOptions` (wired by
   `AddThemiaExceptionalCore`) and a redundant constructor parameter; constructing the engine directly
   bypasses the options value. Consider collapsing to a single source.
+- The three provider DI extensions + their `RunMigration` are near-identical (only the dialect ctor and
+  the `.AddXxx()` runner differ). Extract a shared internal `AddThemiaExceptionalProvider` helper.
+- SqlServer write path: Dapper infers legacy `SqlDbType.DateTime` (~3.33 ms) for the `datetime2` timestamp
+  columns on INSERT/rollup, losing sub-3 ms precision. A clean fix needs per-parameter `datetime2` typing
+  without a process-global Dapper `DateTime` handler.
+- `ExceptionLogMigration.Up()` is a whitelist of three `IfDatabase` branches with no default; table + indexes
+  are created together per provider, so an unmatched provider produces an empty (no-op) migration and the first
+  store call then fails with "Exceptions does not exist". Add a matching branch when adding a dialect (e.g. SQLite,
+  Oracle); a migration-time fail-fast for unsupported providers would be a further improvement.
+- Integration suites are duplicated per engine (Postgres drifted to 9 tests vs 11). Introduce a shared
+  parameterized conformance fixture over `IExceptionalSqlDialect`.
+- `ListSql` uses `SELECT *` (pulls `Detail`/`RequestBody` per list row); project a summary column set for
+  the dashboard list view. `PurgeSql`'s `(IsProtected, CreationDate)` predicate is unindexed.
 
 ## 0.2.0 — 2026-06-05
 
