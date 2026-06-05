@@ -26,8 +26,9 @@ public static class ServiceCollectionExtensions
     /// </summary>
     /// <param name="services">The service collection.</param>
     /// <param name="connectionString">
-    /// MySQL connection string. <c>GuidFormat=Char36</c> is applied automatically (the <c>Guid</c> column is
-    /// <c>CHAR(36)</c>), so callers don't need to set it for <see cref="System.Guid"/> round-tripping.
+    /// MySQL connection string. The dialect always pins <c>GuidFormat=Char36</c> on its own connections (the
+    /// <c>Guid</c> column is <c>CHAR(36)</c>), so callers need not — and any conflicting <c>GuidFormat</c>/
+    /// <c>OldGuids</c> is overridden to keep <see cref="System.Guid"/> lookups correct.
     /// </param>
     /// <param name="configure">
     /// Required configuration callback. <see cref="ExceptionalOptions.ApplicationName"/> is mandatory and

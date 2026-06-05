@@ -12,15 +12,19 @@ public sealed class MySqlExceptionalDialect : IExceptionalSqlDialect
 
     /// <summary>
     /// Creates the dialect over <paramref name="connectionString"/>. The <c>Exceptions.Guid</c> column is
-    /// <c>CHAR(36)</c> (FluentMigrator <c>AsGuid()</c> on MySQL), so <c>GuidFormat=Char36</c> is applied when
-    /// the caller hasn't set one — ensuring <see cref="System.Guid"/> round-trips without the caller needing
-    /// to know the storage format.
+    /// always <c>CHAR(36)</c> (FluentMigrator <c>AsGuid()</c> on MySQL), so the dialect pins
+    /// <c>GuidFormat=Char36</c> on its own connections regardless of the caller's setting — guaranteeing
+    /// <see cref="System.Guid"/> round-trips. A caller-supplied <c>GuidFormat</c>/<c>OldGuids</c> that
+    /// disagreed with the column would otherwise silently corrupt Guid lookups (every by-Guid query matching
+    /// zero rows). The connection serves only this package's <c>Exceptions</c> table.
     /// </summary>
     public MySqlExceptionalDialect(string connectionString)
     {
-        var builder = new MySqlConnectionStringBuilder(connectionString);
-        if (builder.GuidFormat == MySqlGuidFormat.Default)
-            builder.GuidFormat = MySqlGuidFormat.Char36;
+        var builder = new MySqlConnectionStringBuilder(connectionString)
+        {
+            OldGuids = false, // clear the legacy flag first (OldGuids + GuidFormat are mutually exclusive)
+            GuidFormat = MySqlGuidFormat.Char36,
+        };
         this.connectionString = builder.ConnectionString;
     }
 
