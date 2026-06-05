@@ -1,0 +1,4 @@
+#nullable enable
+static Themia.Framework.AspNetCore.Extensions.ThemiaAspNetCoreExtensions.AddThemiaAspNetCore(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static Themia.Framework.AspNetCore.Extensions.ThemiaAspNetCoreExtensions.UseThemia(this Microsoft.AspNetCore.Builder.IApplicationBuilder! app) -> Microsoft.AspNetCore.Builder.IApplicationBuilder!
+Themia.Framework.AspNetCore.Extensions.ThemiaAspNetCoreExtensions

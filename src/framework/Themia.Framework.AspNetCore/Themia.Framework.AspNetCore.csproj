@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <PackageId>Themia.Framework.AspNetCore</PackageId>
+    <Description>Themia ASP.NET Core host wiring — AddThemiaAspNetCore() + UseThemia() composing the neutral ProblemDetails middleware and the Themia.MultiTenancy tenant resolution pipeline.</Description>
+    <PackageTags>themia;aspnetcore;multi-tenancy;problemdetails;middleware</PackageTags>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <ProjectReference Include="../Themia.Framework.Core/Themia.Framework.Core.csproj" />
+    <ProjectReference Include="../../neutral/Themia.AspNetCore/Themia.AspNetCore.csproj" />
+    <ProjectReference Include="../Themia.MultiTenancy/Themia.MultiTenancy.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+  <ItemGroup>
+    <AdditionalFiles Include="PublicAPI.Shipped.txt" />
+    <AdditionalFiles Include="PublicAPI.Unshipped.txt" />
+  </ItemGroup>
+</Project>
