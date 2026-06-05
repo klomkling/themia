@@ -10,21 +10,12 @@ public sealed class ExceptionLogMigration : Migration
     /// <inheritdoc />
     public override void Up()
     {
+        // Only the three supported providers create the table — and the indexes are created in the same
+        // per-provider block (CreateTable), so an unmatched provider produces no table AND no index attempt
+        // (rather than failing with a confusing "Exceptions does not exist" at unconditional index creation).
         IfDatabase("postgres").Delegate(() => CreateTable(c => c.AsDateTimeOffset()));
         IfDatabase("mysql").Delegate(() => CreateTable(c => c.AsCustom("DATETIME(6)")));
         IfDatabase("sqlserver").Delegate(() => CreateTable(c => c.AsDateTime2()));
-
-        // Guid is the lookup key for Get/Protect/SoftDelete/HardDelete; unique (one per stored error) + indexed.
-        Create.Index("IX_Exceptions_Guid")
-            .OnTable("Exceptions").OnColumn("Guid").Ascending()
-            .WithOptions().Unique();
-        Create.Index("IX_Exceptions_App_Hash_Created")
-            .OnTable("Exceptions")
-            .OnColumn("ApplicationName").Ascending()
-            .OnColumn("ErrorHash").Ascending()
-            .OnColumn("CreationDate").Ascending();
-        Create.Index("IX_Exceptions_DeletionDate")
-            .OnTable("Exceptions").OnColumn("DeletionDate").Ascending();
     }
 
     private void CreateTable(System.Func<ICreateTableColumnAsTypeSyntax, ICreateTableColumnOptionOrWithColumnSyntax> ts)
@@ -51,6 +42,18 @@ public sealed class ExceptionLogMigration : Migration
         ts(table.WithColumn("LastLogDate")).NotNullable();
         ts(table.WithColumn("DeletionDate")).Nullable();
         table.WithColumn("IsProtected").AsBoolean().NotNullable().WithDefaultValue(false);
+
+        // Guid is the lookup key for Get/Protect/SoftDelete/HardDelete; unique (one per stored error) + indexed.
+        Create.Index("IX_Exceptions_Guid")
+            .OnTable("Exceptions").OnColumn("Guid").Ascending()
+            .WithOptions().Unique();
+        Create.Index("IX_Exceptions_App_Hash_Created")
+            .OnTable("Exceptions")
+            .OnColumn("ApplicationName").Ascending()
+            .OnColumn("ErrorHash").Ascending()
+            .OnColumn("CreationDate").Ascending();
+        Create.Index("IX_Exceptions_DeletionDate")
+            .OnTable("Exceptions").OnColumn("DeletionDate").Ascending();
     }
 
     /// <inheritdoc />

@@ -58,9 +58,10 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 - SqlServer write path: Dapper infers legacy `SqlDbType.DateTime` (~3.33 ms) for the `datetime2` timestamp
   columns on INSERT/rollup, losing sub-3 ms precision. A clean fix needs per-parameter `datetime2` typing
   without a process-global Dapper `DateTime` handler.
-- `ExceptionLogMigration.Up()` is a whitelist of three `IfDatabase` branches with no default. An unmatched
-  provider creates no table, then fails at the unconditional index-creation step (missing table) — a loud
-  failure, but cryptic. Add an explicit branch (and ideally a clearer guard) when adding a dialect (e.g. SQLite, Oracle).
+- `ExceptionLogMigration.Up()` is a whitelist of three `IfDatabase` branches with no default; table + indexes
+  are created together per provider, so an unmatched provider produces an empty (no-op) migration and the first
+  store call then fails with "Exceptions does not exist". Add a matching branch when adding a dialect (e.g. SQLite,
+  Oracle); a migration-time fail-fast for unsupported providers would be a further improvement.
 - Integration suites are duplicated per engine (Postgres drifted to 9 tests vs 11). Introduce a shared
   parameterized conformance fixture over `IExceptionalSqlDialect`.
 - `ListSql` uses `SELECT *` (pulls `Detail`/`RequestBody` per list row); project a summary column set for

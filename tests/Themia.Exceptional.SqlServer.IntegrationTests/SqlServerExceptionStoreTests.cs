@@ -12,8 +12,10 @@ namespace Themia.Exceptional.SqlServer.IntegrationTests;
 public class SqlServerExceptionStoreTests : IAsyncLifetime
 {
     // MsSqlBuilder 4.12.0: parameterless ctor is [Obsolete] as error — must pass image explicitly.
+    // Pinned (not :2022-latest) for reproducible CI; this is Testcontainers.MsSql 4.12.0's default image.
     // No GuidFormat quirk — uniqueidentifier round-trips natively through Microsoft.Data.SqlClient.
-    private readonly MsSqlContainer container = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-latest").Build();
+    private readonly MsSqlContainer container =
+        new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-CU14-ubuntu-22.04").Build();
 
     private string ConnString => container.GetConnectionString();
     private ExceptionStoreEngine Engine => new(new SqlServerExceptionalDialect(ConnString));
