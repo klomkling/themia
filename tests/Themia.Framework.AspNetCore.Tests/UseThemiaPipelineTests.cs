@@ -72,4 +72,35 @@ public sealed class UseThemiaPipelineTests
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal("acme", observedIdentifier);
     }
+
+    // Covers ValidationException→400, ConflictException→409, ExternalServiceException→503,
+    // UnauthorizedException→401, ForbiddenException→403.
+    // A middleware-ordering regression (ProblemDetails no longer outermost) would cause these
+    // to surface as unhandled 500s and fail this theory.
+    [Theory]
+    [InlineData("validation", 400)]
+    [InlineData("conflict", 409)]
+    [InlineData("external", 503)]
+    [InlineData("unauthorized", 401)]
+    [InlineData("forbidden", 403)]
+    public async Task ProblemDetails_MapsTypedExceptions_FromDownstream(string exceptionKind, int expectedStatus)
+    {
+        using var host = await StartHostAsync(
+            configureServices: services => services.AddThemiaMultiTenancy(
+                configure: b => b.UseHeaderStrategy().SeedTenants([new TenantInfo("1", "acme")])),
+            terminal: _ => throw exceptionKind switch
+            {
+                "validation"   => (Exception)new ValidationException("Name", "Name is required"),
+                "conflict"     => new ConflictException("Duplicate entry"),
+                "external"     => new ExternalServiceException("PaymentGateway", "Gateway timeout"),
+                "unauthorized" => new UnauthorizedException("Token missing"),
+                "forbidden"    => new ForbiddenException("Insufficient permissions"),
+                _              => throw new InvalidOperationException($"Unknown kind: {exceptionKind}"),
+            });
+
+        var response = await host.GetTestClient().GetAsync("/");
+
+        Assert.Equal(expectedStatus, (int)response.StatusCode);
+        Assert.Contains("application/problem+json", response.Content.Headers.ContentType?.ToString());
+    }
 }

@@ -63,4 +63,29 @@ public sealed class TenantConnectionRoutingTests
 
         Assert.Contains("shared-db", context.Database.GetConnectionString());
     }
+
+    [Fact]
+    public void DbContext_UsesDefaultConnectionString_WhenTenantConnectionStringIsWhiteSpace()
+    {
+        var accessor = new MutableAccessor
+        {
+            Current = new TenantInfo("1", "acme", ConnectionString: "   "),
+        };
+        using var sp = BuildProvider(accessor);
+        using var scope = sp.CreateScope();
+
+        var context = scope.ServiceProvider.GetRequiredService<RoutingDbContext>();
+
+        Assert.Contains("shared-db", context.Database.GetConnectionString());
+    }
+
+    [Fact]
+    public void AddThemiaDbContextWithProvider_Throws_ForUnsupportedProviderName()
+    {
+        var configuration = new ConfigurationBuilder().Build();
+        var services = new ServiceCollection();
+
+        Assert.Throws<NotSupportedException>(
+            () => services.AddThemiaDbContextWithProvider<RoutingDbContext>(configuration, "sqlserver"));
+    }
 }
