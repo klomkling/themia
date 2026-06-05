@@ -1,5 +1,5 @@
 #nullable enable
-static Themia.Exceptional.PostgreSql.ServiceCollectionExtensions.AddThemiaExceptionalPostgres(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, string! connectionString, System.Action<Themia.Exceptional.ExceptionalOptions!>? configure = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static Themia.Exceptional.PostgreSql.ServiceCollectionExtensions.AddThemiaExceptionalPostgres(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, string! connectionString, System.Action<Themia.Exceptional.ExceptionalOptions!>! configure) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
 Themia.Exceptional.PostgreSql.PostgresExceptionalDialect
 Themia.Exceptional.PostgreSql.PostgresExceptionalDialect.CountSql.get -> string!
 Themia.Exceptional.PostgreSql.PostgresExceptionalDialect.CreateConnection() -> System.Data.Common.DbConnection!

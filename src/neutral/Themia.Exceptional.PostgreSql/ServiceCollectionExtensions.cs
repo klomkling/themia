@@ -24,13 +24,20 @@ public static class ServiceCollectionExtensions
     /// </code>
     /// </para>
     /// </summary>
+    /// <param name="services">The service collection.</param>
+    /// <param name="connectionString">PostgreSQL connection string.</param>
+    /// <param name="configure">
+    /// Required configuration callback. <see cref="ExceptionalOptions.ApplicationName"/> is mandatory and
+    /// validated at startup, so this cannot be omitted.
+    /// </param>
     public static IServiceCollection AddThemiaExceptionalPostgres(
-        this IServiceCollection services, string connectionString, Action<ExceptionalOptions>? configure = null)
+        this IServiceCollection services, string connectionString, Action<ExceptionalOptions> configure)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(connectionString);
+        ArgumentNullException.ThrowIfNull(configure);
 
         services.TryAddSingleton<IExceptionalSqlDialect>(new PostgresExceptionalDialect(connectionString));
-        services.AddThemiaExceptionalCore(o => configure?.Invoke(o));
+        services.AddThemiaExceptionalCore(configure);
 
         services.AddHttpContextAccessor();
         services.TryAddSingleton<HttpContextEnricher>();

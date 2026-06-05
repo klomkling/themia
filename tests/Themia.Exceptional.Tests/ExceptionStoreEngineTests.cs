@@ -137,5 +137,24 @@ public class ExceptionStoreEngineTests : IDisposable
         Assert.Equal("b", page.Items[0].ErrorHash);
     }
 
+    [Fact]
+    public async Task LogAsync_ConvertsLocalKindTimestampToUtcInstant()
+    {
+        // A Kind=Local timestamp must be CONVERTED (ToUniversalTime), not merely re-labeled, so the
+        // stored instant is correct. TZ-independent: on a UTC machine ToUniversalTime is a no-op and the
+        // assertion still holds; on an offset machine it catches a re-label (SpecifyKind) regression.
+        var local = DateTime.Now; // Kind=Local
+        var expectedUtc = local.ToUniversalTime();
+        var entry = NewEntry("local");
+        entry.CreationDate = local;
+        entry.LastLogDate = local;
+
+        await engine.LogAsync(entry);
+        var loaded = await engine.GetAsync(entry.Guid);
+
+        Assert.NotNull(loaded);
+        Assert.Equal(expectedUtc, loaded!.CreationDate, TimeSpan.FromSeconds(1));
+    }
+
     public void Dispose() => keepAlive.Dispose();
 }

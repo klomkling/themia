@@ -35,9 +35,8 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
   dialect (`IExceptionalSqlDialect.TemporalFilterDbType`), fixing text-comparison mismatches on SQLite
   and `Kind=Unspecified` timestamp errors on PostgreSQL. All entry timestamps are coerced to `Kind=Utc`
   on write so callers building `ExceptionEntry` with `Kind=Unspecified/Local` no longer throw.
-- `Themia.Exceptional` — `HttpContextEnricher` now captures `StatusCode` whenever the response code
-  is non-200, not only after `Response.HasStarted`. Removed unused `ScrubKeys` and `RedactBodyFields`
-  properties from `ExceptionalOptions`.
+- `Themia.Exceptional` — `HttpContextEnricher` captures `StatusCode` whenever the response code
+  is non-200, not only after `Response.HasStarted`.
 - `Themia.Exceptional` — `ExceptionalSerilogSink.Emit` writes synchronously; high-throughput hosts
   should wrap it with `Serilog.Sinks.Async`. (Documented in XML remarks, not a behavior change.)
 
