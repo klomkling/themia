@@ -10,12 +10,23 @@ public sealed class ExceptionLogMigration : Migration
     /// <inheritdoc />
     public override void Up()
     {
-        // Only the three supported providers create the table — and the indexes are created in the same
-        // per-provider block (CreateTable), so an unmatched provider produces no table AND no index attempt
-        // (rather than failing with a confusing "Exceptions does not exist" at unconditional index creation).
         IfDatabase("postgres").Delegate(() => CreateTable(c => c.AsDateTimeOffset()));
         IfDatabase("mysql").Delegate(() => CreateTable(c => c.AsCustom("DATETIME(6)")));
         IfDatabase("sqlserver").Delegate(() => CreateTable(c => c.AsDateTime2()));
+
+        // Fail fast if run against an unsupported provider so the caller gets a clear error at
+        // migration time rather than a confusing "table does not exist" failure at runtime.
+        // The predicate receives the processor's primary DatabaseType (e.g. "Postgres", "MySql8",
+        // "SqlServer2016") — not the friendly aliases used by the string overload — so we match by
+        // prefix/equality to cover all versioned variants of each supported family.
+        IfDatabase(p =>
+                !p.StartsWith("Postgres", System.StringComparison.OrdinalIgnoreCase) &&
+                !p.StartsWith("MySql", System.StringComparison.OrdinalIgnoreCase) &&
+                !p.StartsWith("SqlServer", System.StringComparison.OrdinalIgnoreCase) &&
+                !p.Equals("MariaDB", System.StringComparison.OrdinalIgnoreCase))
+            .Delegate(() => throw new System.NotSupportedException(
+                "Themia.Exceptional supports only PostgreSQL, MySQL/MariaDB, and SQL Server. " +
+                "The active database provider is not supported; add a migration branch for it."));
     }
 
     private void CreateTable(System.Func<ICreateTableColumnAsTypeSyntax, ICreateTableColumnOptionOrWithColumnSyntax> ts)
