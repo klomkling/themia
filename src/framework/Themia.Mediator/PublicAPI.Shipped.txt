@@ -111,5 +111,3 @@ Themia.Mediator.Infrastructure.DefaultCacheKeyFactory.CreateScopeRoot(System.Typ
 Themia.Mediator.Infrastructure.InMemoryDistributedLockProvider
 Themia.Mediator.Infrastructure.InMemoryDistributedLockProvider.InMemoryDistributedLockProvider() -> void
 Themia.Mediator.Infrastructure.InMemoryDistributedLockProvider.AcquireAsync(string! resource, System.TimeSpan timeout, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Mediator.Abstractions.IDistributedLock!>!
-Themia.Generated.ThemiaServiceRegistrations
-static Themia.Generated.ThemiaServiceRegistrations.AddThemiaServices(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!

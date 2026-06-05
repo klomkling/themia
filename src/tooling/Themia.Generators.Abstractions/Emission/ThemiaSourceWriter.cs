@@ -43,11 +43,16 @@ public sealed class ThemiaSourceWriter
         return this;
     }
 
-    /// <summary>Emits a public class declaration and opens its scope.</summary>
-    public ThemiaSourceWriter OpenClass(string name, bool isStatic = false, bool isPartial = false)
+    /// <summary>Emits a class declaration and opens its scope.</summary>
+    /// <param name="name">The class name.</param>
+    /// <param name="isStatic">When <see langword="true"/>, emits the <c>static</c> modifier.</param>
+    /// <param name="isPartial">When <see langword="true"/>, emits the <c>partial</c> modifier.</param>
+    /// <param name="isInternal">When <see langword="true"/>, emits <c>internal</c> accessibility; otherwise <c>public</c>.</param>
+    public ThemiaSourceWriter OpenClass(string name, bool isStatic = false, bool isPartial = false, bool isInternal = false)
     {
+        var accessibility = isInternal ? "internal" : "public";
         var modifiers = (isStatic ? "static " : "") + (isPartial ? "partial " : "");
-        AppendIndentedLine($"public {modifiers}class {name}");
+        AppendIndentedLine($"{accessibility} {modifiers}class {name}");
         AppendIndentedLine("{");
         _indent++;
         _scopeStack.Push("class");

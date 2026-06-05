@@ -49,7 +49,7 @@ public sealed class ServiceRegistrationGenerator : IIncrementalGenerator
                 .WithFileHeader()
                 .WithUsings("Microsoft.Extensions.DependencyInjection")
                 .WithNamespace("Themia.Generated")
-                .OpenClass("ThemiaServiceRegistrations", isStatic: true)
+                .OpenClass("ThemiaServiceRegistrations", isStatic: true, isInternal: true)
                 .OpenMethod("public static IServiceCollection AddThemiaServices(this IServiceCollection services)");
 
             var registrations = new List<RegistrationRecord>();
