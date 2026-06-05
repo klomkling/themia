@@ -18,6 +18,46 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+Hardening pass: unblock cross-assembly consumers of the DI generator, fix two EF Core correctness
+issues, and sweep cheap wins across Exceptional / Mediator / tooling.
+
+### Fixed
+
+- `Themia.SourceGenerator` — the generated DI registration class (`Themia.Generated.ThemiaServiceRegistrations`)
+  is now `internal`, fixing **CS0121** ambiguity when a consumer references a package that also uses the
+  generator (e.g. `Themia.Mediator`) and runs the DI generator itself. Each assembly registers its own services.
+- `Themia.Framework.Data.EFCore` — `Find`/`FindAsync` now read the **same tenant source as the runtime query
+  filter** (the static `TenantContextAccessor` under `RuntimeTenantAccess`), so a Find can no longer disagree
+  with the filter (and leak/hide a cross-tenant row) under non-standard wiring.
+- `Themia.Framework.Data.EFCore` — optimistic concurrency on **PostgreSQL** now uses the server-maintained
+  `xmin` system column (a `uint` rowversion shadow property), so a conflicting `SaveChanges` correctly throws
+  `DbUpdateConcurrencyException` (previously the `byte[]` rowversion mapped to non-server-populated `bytea` and
+  never fired).
+- `Themia.Exceptional` — `ExceptionHash` includes `Source` and the inner-exception type in its fallback when
+  `StackTrace` is null, reducing rollup collisions between distinct same-message errors.
+- `Themia.Exceptional` — added an index on the purge predicate `(IsProtected, CreationDate)`, and the migration
+  now throws a clear `NotSupportedException` for an unsupported database provider (instead of a silent no-op).
+
+### Changed
+
+- `Themia.SourceGenerator` — the DI registration generator uses `ForAttributeWithMetadataName` (attribute path)
+  and narrowed syntax predicates with the semantic model (marker/registrar paths) for incremental-generation
+  caching. Generated output is unchanged.
+- `Themia.Exceptional` — the **dialect now owns From/To temporal parameter binding**
+  (`IExceptionalSqlDialect.AddTemporalFilters` replaces `TemporalFilterDbType`); `ExceptionStoreEngine` takes
+  `ExceptionalOptions` (single source for the rollup period).
+- `Themia.Mediator` — `MediatorCachingOptions.KnownTypeSuffixes`/`KnownVerbPrefixes` are now
+  `IReadOnlyList<string>` (immutable element access); `CacheableAttribute` expiration defaults to `0`
+  ("not set") instead of `-1` (`int?` is not a valid attribute-argument type).
+
+### Known limitations (0.3.x backlog)
+
+- **Targeted for 0.3.2 (P3):** `Themia.Exceptional` — SqlServer `datetime2` write precision (Dapper infers
+  legacy `datetime` ~3.33 ms on INSERT/rollup); extract a shared internal `AddThemiaExceptionalProvider` helper
+  (DI/`RunMigration` triplicated ×3); shared parameterized conformance test harness over `IExceptionalSqlDialect`.
+- **Deferred (P4):** `Themia.Exceptional` — `ListSql` uses `SELECT *` (project a summary column set together
+  with the dashboard); the migration runs synchronously at DI-registration (consider a post-build migrate step).
+
 ## 0.3.0 — 2026-06-05
 
 The **`Themia.Exceptional`** family: a framework-neutral exception-logging engine plus PostgreSQL,
