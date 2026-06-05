@@ -18,6 +18,13 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+### Added
+
+- `Themia.Exceptional` — framework-neutral exception-logging engine: rollup-aware Dapper store
+  (`IExceptionStore`/`ExceptionStoreEngine`), `IExceptionalSqlDialect` strategy, FluentMigrator schema,
+  Serilog sink + HTTP enricher (scrubs Cookie/Authorization), and an opt-in request-body middleware.
+- `Themia.Exceptional.PostgreSql` — PostgreSQL dialect (Npgsql) + `AddThemiaExceptionalPostgres(...)`.
+
 ## 0.2.0 — 2026-06-05
 
 The complete **Phase 0** framework rename (zenity-v2 → `Themia.*`): build-time tooling, the

@@ -1,1 +1,132 @@
 #nullable enable
+const Themia.Exceptional.Middleware.RequestBodyLoggingMiddleware.BodyItemKey = "Themia.Exceptional.RequestBody" -> string!
+override Themia.Exceptional.Migrations.ExceptionLogMigration.Down() -> void
+override Themia.Exceptional.Migrations.ExceptionLogMigration.Up() -> void
+static Themia.Exceptional.ExceptionEntryFactory.FromException(System.Exception! exception, string! applicationName, System.DateTime? utcNow = null) -> Themia.Exceptional.ExceptionEntry!
+static Themia.Exceptional.ExceptionHash.Compute(string! type, string? signature) -> string!
+static Themia.Exceptional.ServiceCollectionExtensions.AddThemiaExceptionalCore(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Themia.Exceptional.ExceptionalOptions!>! configure) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static Themia.Exceptional.StringTruncateExtensions.Truncate(this string? value, int maxLength) -> string?
+Themia.Exceptional.ExceptionalOptions
+Themia.Exceptional.ExceptionalOptions.ApplicationName.get -> string!
+Themia.Exceptional.ExceptionalOptions.ApplicationName.set -> void
+Themia.Exceptional.ExceptionalOptions.CaptureRequestBody.get -> bool
+Themia.Exceptional.ExceptionalOptions.CaptureRequestBody.set -> void
+Themia.Exceptional.ExceptionalOptions.ExceptionalOptions() -> void
+Themia.Exceptional.ExceptionalOptions.MaxBodyBytes.get -> int
+Themia.Exceptional.ExceptionalOptions.MaxBodyBytes.set -> void
+Themia.Exceptional.ExceptionalOptions.RedactBodyFields.get -> System.Collections.Generic.IList<string!>!
+Themia.Exceptional.ExceptionalOptions.RollupPeriod.get -> System.TimeSpan
+Themia.Exceptional.ExceptionalOptions.RollupPeriod.set -> void
+Themia.Exceptional.ExceptionalOptions.ScrubKeys.get -> System.Collections.Generic.IList<string!>!
+Themia.Exceptional.ExceptionalOptions.Validate() -> void
+Themia.Exceptional.ExceptionEntry
+Themia.Exceptional.ExceptionEntry.ApplicationName.get -> string!
+Themia.Exceptional.ExceptionEntry.ApplicationName.set -> void
+Themia.Exceptional.ExceptionEntry.CreationDate.get -> System.DateTime
+Themia.Exceptional.ExceptionEntry.CreationDate.set -> void
+Themia.Exceptional.ExceptionEntry.DeletionDate.get -> System.DateTime?
+Themia.Exceptional.ExceptionEntry.DeletionDate.set -> void
+Themia.Exceptional.ExceptionEntry.Detail.get -> string!
+Themia.Exceptional.ExceptionEntry.Detail.set -> void
+Themia.Exceptional.ExceptionEntry.DuplicateCount.get -> int
+Themia.Exceptional.ExceptionEntry.DuplicateCount.set -> void
+Themia.Exceptional.ExceptionEntry.ErrorHash.get -> string!
+Themia.Exceptional.ExceptionEntry.ErrorHash.set -> void
+Themia.Exceptional.ExceptionEntry.ExceptionEntry() -> void
+Themia.Exceptional.ExceptionEntry.Guid.get -> System.Guid
+Themia.Exceptional.ExceptionEntry.Guid.set -> void
+Themia.Exceptional.ExceptionEntry.Host.get -> string?
+Themia.Exceptional.ExceptionEntry.Host.set -> void
+Themia.Exceptional.ExceptionEntry.HttpMethod.get -> string?
+Themia.Exceptional.ExceptionEntry.HttpMethod.set -> void
+Themia.Exceptional.ExceptionEntry.Id.get -> long
+Themia.Exceptional.ExceptionEntry.Id.set -> void
+Themia.Exceptional.ExceptionEntry.IpAddress.get -> string?
+Themia.Exceptional.ExceptionEntry.IpAddress.set -> void
+Themia.Exceptional.ExceptionEntry.IsProtected.get -> bool
+Themia.Exceptional.ExceptionEntry.IsProtected.set -> void
+Themia.Exceptional.ExceptionEntry.LastLogDate.get -> System.DateTime
+Themia.Exceptional.ExceptionEntry.LastLogDate.set -> void
+Themia.Exceptional.ExceptionEntry.MachineName.get -> string!
+Themia.Exceptional.ExceptionEntry.MachineName.set -> void
+Themia.Exceptional.ExceptionEntry.Message.get -> string!
+Themia.Exceptional.ExceptionEntry.Message.set -> void
+Themia.Exceptional.ExceptionEntry.Source.get -> string?
+Themia.Exceptional.ExceptionEntry.Source.set -> void
+Themia.Exceptional.ExceptionEntry.StatusCode.get -> int?
+Themia.Exceptional.ExceptionEntry.StatusCode.set -> void
+Themia.Exceptional.ExceptionEntry.TenantId.get -> string?
+Themia.Exceptional.ExceptionEntry.TenantId.set -> void
+Themia.Exceptional.ExceptionEntry.Type.get -> string!
+Themia.Exceptional.ExceptionEntry.Type.set -> void
+Themia.Exceptional.ExceptionEntry.Url.get -> string?
+Themia.Exceptional.ExceptionEntry.Url.set -> void
+Themia.Exceptional.ExceptionEntryFactory
+Themia.Exceptional.ExceptionFilter
+Themia.Exceptional.ExceptionFilter.ApplicationName.get -> string?
+Themia.Exceptional.ExceptionFilter.ApplicationName.set -> void
+Themia.Exceptional.ExceptionFilter.ExceptionFilter() -> void
+Themia.Exceptional.ExceptionFilter.From.get -> System.DateTime?
+Themia.Exceptional.ExceptionFilter.From.set -> void
+Themia.Exceptional.ExceptionFilter.IncludeDeleted.get -> bool
+Themia.Exceptional.ExceptionFilter.IncludeDeleted.set -> void
+Themia.Exceptional.ExceptionFilter.Page.get -> int
+Themia.Exceptional.ExceptionFilter.Page.set -> void
+Themia.Exceptional.ExceptionFilter.PageSize.get -> int
+Themia.Exceptional.ExceptionFilter.PageSize.set -> void
+Themia.Exceptional.ExceptionFilter.Search.get -> string?
+Themia.Exceptional.ExceptionFilter.Search.set -> void
+Themia.Exceptional.ExceptionFilter.TenantId.get -> string?
+Themia.Exceptional.ExceptionFilter.TenantId.set -> void
+Themia.Exceptional.ExceptionFilter.To.get -> System.DateTime?
+Themia.Exceptional.ExceptionFilter.To.set -> void
+Themia.Exceptional.ExceptionHash
+Themia.Exceptional.ExceptionStoreEngine
+Themia.Exceptional.ExceptionStoreEngine.CountAsync(Themia.Exceptional.ExceptionFilter! filter, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<int>!
+Themia.Exceptional.ExceptionStoreEngine.DeleteAsync(System.Guid guid, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!
+Themia.Exceptional.ExceptionStoreEngine.ExceptionStoreEngine(Themia.Exceptional.IExceptionalSqlDialect! dialect, System.TimeSpan? rollupPeriod = null) -> void
+Themia.Exceptional.ExceptionStoreEngine.GetAsync(System.Guid guid, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Exceptional.ExceptionEntry?>!
+Themia.Exceptional.ExceptionStoreEngine.HardDeleteAsync(System.Guid guid, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!
+Themia.Exceptional.ExceptionStoreEngine.ListAsync(Themia.Exceptional.ExceptionFilter! filter, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Exceptional.PagedResult<Themia.Exceptional.ExceptionEntry!>!>!
+Themia.Exceptional.ExceptionStoreEngine.LogAsync(Themia.Exceptional.ExceptionEntry! entry, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Exceptional.ExceptionStoreEngine.ProtectAsync(System.Guid guid, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!
+Themia.Exceptional.ExceptionStoreEngine.PurgeAsync(System.DateTime olderThanUtc, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<int>!
+Themia.Exceptional.IExceptionalSqlDialect
+Themia.Exceptional.IExceptionalSqlDialect.CountSql.get -> string!
+Themia.Exceptional.IExceptionalSqlDialect.CreateConnection() -> System.Data.Common.DbConnection!
+Themia.Exceptional.IExceptionalSqlDialect.GetByGuidSql.get -> string!
+Themia.Exceptional.IExceptionalSqlDialect.HardDeleteSql.get -> string!
+Themia.Exceptional.IExceptionalSqlDialect.InsertSql.get -> string!
+Themia.Exceptional.IExceptionalSqlDialect.ListSql.get -> string!
+Themia.Exceptional.IExceptionalSqlDialect.ProtectSql.get -> string!
+Themia.Exceptional.IExceptionalSqlDialect.PurgeSql.get -> string!
+Themia.Exceptional.IExceptionalSqlDialect.RollupSql.get -> string!
+Themia.Exceptional.IExceptionalSqlDialect.SoftDeleteSql.get -> string!
+Themia.Exceptional.IExceptionStore
+Themia.Exceptional.IExceptionStore.CountAsync(Themia.Exceptional.ExceptionFilter! filter, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<int>!
+Themia.Exceptional.IExceptionStore.DeleteAsync(System.Guid guid, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!
+Themia.Exceptional.IExceptionStore.GetAsync(System.Guid guid, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Exceptional.ExceptionEntry?>!
+Themia.Exceptional.IExceptionStore.HardDeleteAsync(System.Guid guid, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!
+Themia.Exceptional.IExceptionStore.ListAsync(Themia.Exceptional.ExceptionFilter! filter, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Exceptional.PagedResult<Themia.Exceptional.ExceptionEntry!>!>!
+Themia.Exceptional.IExceptionStore.LogAsync(Themia.Exceptional.ExceptionEntry! entry, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Exceptional.IExceptionStore.ProtectAsync(System.Guid guid, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!
+Themia.Exceptional.IExceptionStore.PurgeAsync(System.DateTime olderThanUtc, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<int>!
+Themia.Exceptional.Middleware.RequestBodyLoggingMiddleware
+Themia.Exceptional.Middleware.RequestBodyLoggingMiddleware.InvokeAsync(Microsoft.AspNetCore.Http.HttpContext! context) -> System.Threading.Tasks.Task!
+Themia.Exceptional.Middleware.RequestBodyLoggingMiddleware.RequestBodyLoggingMiddleware(Microsoft.AspNetCore.Http.RequestDelegate! next, Themia.Exceptional.ExceptionalOptions! options) -> void
+Themia.Exceptional.Migrations.ExceptionLogMigration
+Themia.Exceptional.Migrations.ExceptionLogMigration.ExceptionLogMigration() -> void
+Themia.Exceptional.PagedResult<T>
+Themia.Exceptional.PagedResult<T>.Items.get -> System.Collections.Generic.IReadOnlyList<T>!
+Themia.Exceptional.PagedResult<T>.Items.init -> void
+Themia.Exceptional.PagedResult<T>.PagedResult() -> void
+Themia.Exceptional.PagedResult<T>.Total.get -> int
+Themia.Exceptional.PagedResult<T>.Total.init -> void
+Themia.Exceptional.Serilog.ExceptionalSerilogSink
+Themia.Exceptional.Serilog.ExceptionalSerilogSink.Emit(Serilog.Events.LogEvent! logEvent) -> void
+Themia.Exceptional.Serilog.ExceptionalSerilogSink.ExceptionalSerilogSink(Themia.Exceptional.IExceptionStore! store, Themia.Exceptional.ExceptionalOptions! options) -> void
+Themia.Exceptional.Serilog.HttpContextEnricher
+Themia.Exceptional.Serilog.HttpContextEnricher.Enrich(Serilog.Events.LogEvent! logEvent, Serilog.Core.ILogEventPropertyFactory! propertyFactory) -> void
+Themia.Exceptional.Serilog.HttpContextEnricher.HttpContextEnricher(Microsoft.AspNetCore.Http.IHttpContextAccessor! accessor, Themia.Exceptional.ExceptionalOptions! options) -> void
+Themia.Exceptional.ServiceCollectionExtensions
+Themia.Exceptional.StringTruncateExtensions
