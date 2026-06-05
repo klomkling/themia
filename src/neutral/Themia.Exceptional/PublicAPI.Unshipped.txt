@@ -9,6 +9,8 @@ static Themia.Exceptional.StringTruncateExtensions.Truncate(this string? value, 
 Themia.Exceptional.ExceptionalOptions
 Themia.Exceptional.ExceptionalOptions.ApplicationName.get -> string!
 Themia.Exceptional.ExceptionalOptions.ApplicationName.set -> void
+Themia.Exceptional.ExceptionalOptions.CaptureQueryString.get -> bool
+Themia.Exceptional.ExceptionalOptions.CaptureQueryString.set -> void
 Themia.Exceptional.ExceptionalOptions.CaptureRequestBody.get -> bool
 Themia.Exceptional.ExceptionalOptions.CaptureRequestBody.set -> void
 Themia.Exceptional.ExceptionalOptions.ExceptionalOptions() -> void

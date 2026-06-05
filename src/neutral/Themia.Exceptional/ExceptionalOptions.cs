@@ -15,6 +15,12 @@ public sealed class ExceptionalOptions
     /// <summary>Maximum bytes of request body captured when <see cref="CaptureRequestBody"/> is enabled.</summary>
     public int MaxBodyBytes { get; set; } = 4096;
 
+    /// <summary>
+    /// Include the request query string in the captured <c>Url</c>. Off by default — query parameters
+    /// commonly carry secrets (<c>?token=</c>, <c>?api_key=</c>) that would otherwise be persisted.
+    /// </summary>
+    public bool CaptureQueryString { get; set; }
+
     /// <summary>Validates the options. Throws <see cref="InvalidOperationException"/> on invalid configuration.</summary>
     public void Validate()
     {

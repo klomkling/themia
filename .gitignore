@@ -4,6 +4,9 @@
 [Oo]ut/
 artifacts/
 
+# Local tool cache (e.g. Antigravity) — never commit
+cache/
+
 # Visual Studio / Rider / VS Code
 .vs/
 .vscode/

@@ -10,10 +10,9 @@ namespace Themia.Exceptional.Serilog;
 /// Never reads Cookie/Authorization, so secrets cannot leak into stored exceptions.
 /// </summary>
 /// <remarks>
-/// The captured <c>Url</c> includes <see cref="Microsoft.AspNetCore.Http.HttpRequest.QueryString"/> verbatim.
-/// Query parameters may carry sensitive values (e.g. <c>?token=</c>, <c>?api_key=</c>). Query-param
-/// redaction is a planned follow-up; until then, callers should be aware that stored URLs may expose
-/// query-string secrets.
+/// The captured <c>Url</c> omits the query string by default, since query parameters commonly carry
+/// secrets (e.g. <c>?token=</c>, <c>?api_key=</c>). Set <see cref="ExceptionalOptions.CaptureQueryString"/>
+/// to include it.
 /// </remarks>
 public sealed class HttpContextEnricher : ILogEventEnricher
 {
@@ -37,7 +36,8 @@ public sealed class HttpContextEnricher : ILogEventEnricher
         var request = http.Request;
         Add(logEvent, propertyFactory, "HttpMethod", request.Method);
         Add(logEvent, propertyFactory, "Host", request.Host.Value);
-        Add(logEvent, propertyFactory, "Url", $"{request.Scheme}://{request.Host}{request.Path}{request.QueryString}");
+        var query = options.CaptureQueryString ? request.QueryString.Value : null;
+        Add(logEvent, propertyFactory, "Url", $"{request.Scheme}://{request.Host}{request.Path}{query}");
         Add(logEvent, propertyFactory, "IpAddress", http.Connection.RemoteIpAddress?.ToString());
         // Capture status when it has been set (even before the response body starts streaming). The
         // neutral enricher can only see the status the host set by log time; mapping typed exceptions

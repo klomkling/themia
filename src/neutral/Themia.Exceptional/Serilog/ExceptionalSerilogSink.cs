@@ -36,9 +36,11 @@ public sealed class ExceptionalSerilogSink : ILogEventSink
             ApplyContext(entry, logEvent);
             store.LogAsync(entry).GetAwaiter().GetResult();
         }
-        catch (OperationCanceledException) { throw; }
         catch (Exception ex)
         {
+            // A logging sink is a terminal consumer with no awaiting caller, so it must never propagate —
+            // including OperationCanceledException (e.g. during host shutdown), which would otherwise
+            // destabilize the logging pipeline. All failures are isolated to SelfLog.
             SelfLog.WriteLine("ExceptionalSerilogSink failed to store an exception: {0}", ex);
         }
     }

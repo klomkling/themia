@@ -42,6 +42,42 @@ public class HttpContextEnricherTests
     }
 
     [Fact]
+    public void Enrich_OmitsQueryString_ByDefault()
+    {
+        var http = new DefaultHttpContext();
+        http.Request.Scheme = "https";
+        http.Request.Host = new HostString("example.com");
+        http.Request.Path = "/orders";
+        http.Request.QueryString = new QueryString("?token=secret");
+        var accessor = new HttpContextAccessor { HttpContext = http };
+        var enricher = new HttpContextEnricher(accessor, new ExceptionalOptions { ApplicationName = "App" });
+        var evt = NewEvent();
+
+        enricher.Enrich(evt, new LogEventPropertyFactory());
+
+        var url = evt.Properties["Url"].ToString();
+        Assert.DoesNotContain("token=secret", url);
+        Assert.Contains("/orders", url);
+    }
+
+    [Fact]
+    public void Enrich_IncludesQueryString_WhenEnabled()
+    {
+        var http = new DefaultHttpContext();
+        http.Request.Scheme = "https";
+        http.Request.Host = new HostString("example.com");
+        http.Request.Path = "/orders";
+        http.Request.QueryString = new QueryString("?page=2");
+        var accessor = new HttpContextAccessor { HttpContext = http };
+        var enricher = new HttpContextEnricher(accessor, new ExceptionalOptions { ApplicationName = "App", CaptureQueryString = true });
+        var evt = NewEvent();
+
+        enricher.Enrich(evt, new LogEventPropertyFactory());
+
+        Assert.Contains("page=2", evt.Properties["Url"].ToString());
+    }
+
+    [Fact]
     public void Enrich_DoesNotLeakAuthorizationOrCookie()
     {
         var (enricher, evt) = Setup(http =>

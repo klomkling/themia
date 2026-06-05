@@ -48,8 +48,9 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
   time, requiring the database to be reachable at startup. Consider an explicit post-build migrate step.
 - `ListSql`/`CountSql` WHERE predicate is duplicated per dialect. Extract a shared fragment when adding
   the MySql/SqlServer dialects.
-- `ExceptionStoreEngine` rollup period is available both via `ExceptionalOptions` and a constructor
-  parameter — the ctor param takes precedence; the options value is not automatically wired through.
+- `ExceptionStoreEngine` exposes the rollup period both through `ExceptionalOptions` (wired by
+  `AddThemiaExceptionalCore`) and a redundant constructor parameter; constructing the engine directly
+  bypasses the options value. Consider collapsing to a single source.
 
 ## 0.2.0 — 2026-06-05
 
