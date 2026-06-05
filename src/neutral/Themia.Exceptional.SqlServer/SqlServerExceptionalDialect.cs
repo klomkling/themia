@@ -1,5 +1,6 @@
 using System.Data;
 using System.Data.Common;
+using Dapper;
 using Microsoft.Data.SqlClient;
 using Themia.Exceptional;
 
@@ -17,7 +18,11 @@ public sealed class SqlServerExceptionalDialect : IExceptionalSqlDialect
     public DbConnection CreateConnection() => new SqlConnection(connectionString);
 
     /// <inheritdoc />
-    public DbType? TemporalFilterDbType => DbType.DateTime2;
+    public void AddTemporalFilters(DynamicParameters args, DateTime? from, DateTime? to)
+    {
+        args.Add("From", from, DbType.DateTime2);
+        args.Add("To", to, DbType.DateTime2);
+    }
 
     /// <inheritdoc />
     public string RollupSql => """

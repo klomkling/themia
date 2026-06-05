@@ -2,9 +2,9 @@
 static Themia.Exceptional.SqlServer.ServiceCollectionExtensions.AddThemiaExceptionalSqlServer(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, string! connectionString, System.Action<Themia.Exceptional.ExceptionalOptions!>! configure) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
 Themia.Exceptional.SqlServer.ServiceCollectionExtensions
 Themia.Exceptional.SqlServer.SqlServerExceptionalDialect
+Themia.Exceptional.SqlServer.SqlServerExceptionalDialect.AddTemporalFilters(Dapper.DynamicParameters! args, System.DateTime? from, System.DateTime? to) -> void
 Themia.Exceptional.SqlServer.SqlServerExceptionalDialect.CountSql.get -> string!
 Themia.Exceptional.SqlServer.SqlServerExceptionalDialect.CreateConnection() -> System.Data.Common.DbConnection!
-Themia.Exceptional.SqlServer.SqlServerExceptionalDialect.TemporalFilterDbType.get -> System.Data.DbType?
 Themia.Exceptional.SqlServer.SqlServerExceptionalDialect.GetByGuidSql.get -> string!
 Themia.Exceptional.SqlServer.SqlServerExceptionalDialect.HardDeleteSql.get -> string!
 Themia.Exceptional.SqlServer.SqlServerExceptionalDialect.InsertSql.get -> string!

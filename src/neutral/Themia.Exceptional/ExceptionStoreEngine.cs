@@ -112,23 +112,13 @@ public sealed class ExceptionStoreEngine : IExceptionStore
 
     private DynamicParameters ToArgs(ExceptionFilter filter)
     {
-        // Explicit DbType on nullable string/temporal parameters is required for Npgsql 6+: when a
+        // Explicit DbType on nullable string parameters is required for Npgsql 6+: when a
         // value is null Npgsql cannot infer the PostgreSQL column type and throws "could not determine
-        // data type". Temporal DbType is provider-specific (e.g. null for SQLite — infer from value).
+        // data type". Temporal binding is delegated to the dialect so each provider uses the correct DbType.
         var args = new DynamicParameters();
         args.Add("ApplicationName", filter.ApplicationName, DbType.String);
         args.Add("TenantId", filter.TenantId, DbType.String);
-        var temporalType = dialect.TemporalFilterDbType;
-        if (temporalType.HasValue)
-        {
-            args.Add("From", ToUtc(filter.From), temporalType.Value);
-            args.Add("To", ToUtc(filter.To), temporalType.Value);
-        }
-        else
-        {
-            args.Add("From", filter.From);
-            args.Add("To", filter.To);
-        }
+        dialect.AddTemporalFilters(args, ToUtc(filter.From), ToUtc(filter.To));
         args.Add("Search", string.IsNullOrWhiteSpace(filter.Search) ? null : $"%{filter.Search}%", DbType.String);
         args.Add("IncludeDeleted", filter.IncludeDeleted);
         return args;

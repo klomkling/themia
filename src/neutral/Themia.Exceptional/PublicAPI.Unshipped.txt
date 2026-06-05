@@ -94,9 +94,9 @@ Themia.Exceptional.ExceptionStoreEngine.LogAsync(Themia.Exceptional.ExceptionEnt
 Themia.Exceptional.ExceptionStoreEngine.ProtectAsync(System.Guid guid, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!
 Themia.Exceptional.ExceptionStoreEngine.PurgeAsync(System.DateTime olderThanUtc, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<int>!
 Themia.Exceptional.IExceptionalSqlDialect
+Themia.Exceptional.IExceptionalSqlDialect.AddTemporalFilters(Dapper.DynamicParameters! args, System.DateTime? from, System.DateTime? to) -> void
 Themia.Exceptional.IExceptionalSqlDialect.CountSql.get -> string!
 Themia.Exceptional.IExceptionalSqlDialect.CreateConnection() -> System.Data.Common.DbConnection!
-Themia.Exceptional.IExceptionalSqlDialect.TemporalFilterDbType.get -> System.Data.DbType?
 Themia.Exceptional.IExceptionalSqlDialect.GetByGuidSql.get -> string!
 Themia.Exceptional.IExceptionalSqlDialect.HardDeleteSql.get -> string!
 Themia.Exceptional.IExceptionalSqlDialect.InsertSql.get -> string!

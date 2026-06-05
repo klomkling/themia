@@ -1,4 +1,4 @@
-using System.Data;
+using Dapper;
 using System.Data.Common;
 
 namespace Themia.Exceptional;
@@ -13,13 +13,10 @@ public interface IExceptionalSqlDialect
     DbConnection CreateConnection();
 
     /// <summary>
-    /// DbType to apply to nullable temporal filter parameters (From/To) so the provider can resolve the
-    /// type when the value is null. Return null to let the data provider infer it (e.g. SQLite).
-    /// The engine binds From/To as UTC <see cref="DateTime"/> values under this <see cref="DbType"/>,
-    /// so a provider must return a <see cref="DbType"/> it accepts for a UTC <see cref="DateTime"/>
-    /// (PostgreSQL uses <see cref="DbType.DateTimeOffset"/>).
+    /// Binds the date-range filter parameters (<c>@From</c>/<c>@To</c>) onto <paramref name="args"/> using the
+    /// DbType appropriate for this provider's timestamp column type. Values are already UTC-coerced by the engine.
     /// </summary>
-    DbType? TemporalFilterDbType { get; }
+    void AddTemporalFilters(DynamicParameters args, DateTime? from, DateTime? to);
 
     /// <summary>
     /// Atomically rolls up a duplicate: increments DuplicateCount and refreshes LastLogDate for the most
