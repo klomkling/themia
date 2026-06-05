@@ -1,3 +1,4 @@
+using System.Data;
 using Dapper;
 
 namespace Themia.Exceptional;
@@ -93,12 +94,14 @@ public sealed class ExceptionStoreEngine : IExceptionStore
 
     private static DynamicParameters ToArgs(ExceptionFilter filter)
     {
+        // Explicit DbType on nullable parameters is required for Npgsql 6+: when a value is null
+        // Npgsql cannot infer the PostgreSQL column type and throws "could not determine data type".
         var args = new DynamicParameters();
-        args.Add("ApplicationName", filter.ApplicationName);
-        args.Add("TenantId", filter.TenantId);
-        args.Add("From", filter.From);
-        args.Add("To", filter.To);
-        args.Add("Search", string.IsNullOrWhiteSpace(filter.Search) ? null : $"%{filter.Search}%");
+        args.Add("ApplicationName", filter.ApplicationName, DbType.String);
+        args.Add("TenantId", filter.TenantId, DbType.String);
+        args.Add("From", filter.From, DbType.DateTime2);
+        args.Add("To", filter.To, DbType.DateTime2);
+        args.Add("Search", string.IsNullOrWhiteSpace(filter.Search) ? null : $"%{filter.Search}%", DbType.String);
         args.Add("IncludeDeleted", filter.IncludeDeleted);
         return args;
     }
