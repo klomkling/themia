@@ -43,21 +43,49 @@ public class QueryGenerationTests : IClassFixture<QueryGenerationTests.PostgresF
     }
 
     [Fact]
-    public async Task SoftDeleteFilter_GeneratesCorrectWhereClause()
+    public async Task SoftDeleteFilter_ExcludesDeletedRows()
     {
         await fixture.ResetDataAsync();
 
-        await using var context = fixture.CreateContext(null);
+        var tenantId = new TenantId("filter-test-tenant");
 
-        var query = context.Orders.Where(o => o.Name.Contains("Active"));
-        var sql = query.ToQueryString();
+        // Seed one active and one soft-deleted order.
+        await using (var seedCtx = fixture.CreateContext(tenantId))
+        {
+            seedCtx.Orders.Add(new QueryOrder
+            {
+                Id = 9001,
+                Name = "ActiveOrder",
+                Quantity = 1,
+                TenantId = tenantId,
+                IsDeleted = false
+            });
+            seedCtx.Orders.Add(new QueryOrder
+            {
+                Id = 9002,
+                Name = "DeletedOrder",
+                Quantity = 1,
+                TenantId = tenantId,
+                IsDeleted = true,
+                DeletedAt = DateTimeOffset.UtcNow
+            });
+            await seedCtx.SaveChangesAsync();
+        }
+
+        // Query through the filter — only the active row should be returned.
+        await using var context = fixture.CreateContext(tenantId);
+        var sql = context.Orders.ToQueryString();
 
         output.WriteLine("Generated SQL:");
         output.WriteLine(sql);
 
-        // Verify soft delete filter
+        // The generated SQL must reference is_deleted (filter is applied).
         Assert.Contains("is_deleted", sql.ToLowerInvariant());
-        Assert.Contains("false", sql.ToLowerInvariant());
+
+        // Behavioral check: only the non-deleted order is visible.
+        var visible = await context.Orders.ToListAsync();
+        Assert.Single(visible);
+        Assert.Equal("ActiveOrder", visible[0].Name);
     }
 
     [Fact]

@@ -25,17 +25,22 @@ public class DatabaseConstraintsTests : IClassFixture<DatabaseConstraintsTests.P
     {
         await fixture.ResetDataAsync();
 
-        await using var context = fixture.CreateContext();
+        // First context: insert id=1
+        await using (var context1 = fixture.CreateContext())
+        {
+            var product1 = new ConstraintProduct { Id = 1, Name = "Product 1", Sku = "SKU001" };
+            context1.Products.Add(product1);
+            await context1.SaveChangesAsync();
+        }
 
-        var product1 = new ConstraintProduct { Id = 1, Name = "Product 1", Sku = "SKU001" };
-        context.Products.Add(product1);
-        await context.SaveChangesAsync();
-
-        // Try to insert duplicate ID
+        // Second context: attempt to insert a second row with the same id=1.
+        // Using a separate context avoids the EF identity-map duplicate-key check,
+        // letting the actual PostgreSQL PK constraint fire.
+        await using var context2 = fixture.CreateContext();
         var product2 = new ConstraintProduct { Id = 1, Name = "Product 2", Sku = "SKU002" };
-        context.Products.Add(product2);
+        context2.Products.Add(product2);
 
-        var exception = await Assert.ThrowsAsync<DbUpdateException>(() => context.SaveChangesAsync());
+        var exception = await Assert.ThrowsAsync<DbUpdateException>(() => context2.SaveChangesAsync());
         Assert.IsType<PostgresException>(exception.InnerException);
         var pgException = (PostgresException)exception.InnerException!;
         Assert.Equal("23505", pgException.SqlState); // unique_violation
@@ -191,11 +196,12 @@ public class DatabaseConstraintsTests : IClassFixture<DatabaseConstraintsTests.P
         Assert.True(await reader.ReadAsync());
 
         var dataType = reader.GetString(0);
-        Assert.Equal("character varying", dataType);
+        // EF Core 10 GA + Npgsql maps unbounded string (no HasMaxLength) to PostgreSQL `text`.
+        Assert.Equal("text", dataType);
     }
 
     [Fact]
-    public async Task RowVersion_IsMappedToTimestamp()
+    public async Task RowVersion_IsMappedToBytea()
     {
         await fixture.ResetDataAsync();
 
@@ -215,7 +221,8 @@ public class DatabaseConstraintsTests : IClassFixture<DatabaseConstraintsTests.P
         Assert.True(await reader.ReadAsync());
 
         var dataType = reader.GetString(0);
-        Assert.Contains("timestamp", dataType.ToLowerInvariant());
+        // byte[] + IsRowVersion() maps to PostgreSQL bytea on Npgsql (not timestamp).
+        Assert.Equal("bytea", dataType);
     }
 
     public sealed class PostgresFixture : IAsyncLifetime
