@@ -9,17 +9,11 @@ public sealed class ExceptionalOptions
     /// <summary>Window within which a repeat of the same error is rolled up instead of inserted. Default 10 minutes.</summary>
     public TimeSpan RollupPeriod { get; set; } = TimeSpan.FromMinutes(10);
 
-    /// <summary>Header/property names scrubbed by the HTTP enricher (in addition to Cookie/Authorization).</summary>
-    public IList<string> ScrubKeys { get; } = new List<string>();
-
     /// <summary>Enable the request-body logging middleware. Off by default (PII/secret risk).</summary>
     public bool CaptureRequestBody { get; set; }
 
     /// <summary>Maximum bytes of request body captured when <see cref="CaptureRequestBody"/> is enabled.</summary>
     public int MaxBodyBytes { get; set; } = 4096;
-
-    /// <summary>Body field names redacted when request-body capture is enabled.</summary>
-    public IList<string> RedactBodyFields { get; } = new List<string>();
 
     /// <summary>Validates the options. Throws <see cref="InvalidOperationException"/> on invalid configuration.</summary>
     public void Validate()

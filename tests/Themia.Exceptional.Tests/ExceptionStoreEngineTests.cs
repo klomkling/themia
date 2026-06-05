@@ -119,5 +119,23 @@ public class ExceptionStoreEngineTests : IDisposable
         Assert.Equal(2, count);
     }
 
+    [Fact]
+    public async Task ListAsync_FiltersByDateRange()
+    {
+        var oldE = NewEntry("a");
+        oldE.CreationDate = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        oldE.LastLogDate = oldE.CreationDate;
+        var midE = NewEntry("b");
+        midE.CreationDate = new DateTime(2026, 6, 1, 0, 0, 0, DateTimeKind.Utc);
+        midE.LastLogDate = midE.CreationDate;
+        await engine.LogAsync(oldE);
+        await engine.LogAsync(midE);
+
+        var page = await engine.ListAsync(new ExceptionFilter { From = new DateTime(2026, 5, 1, 0, 0, 0, DateTimeKind.Utc) });
+
+        Assert.Single(page.Items);
+        Assert.Equal("b", page.Items[0].ErrorHash);
+    }
+
     public void Dispose() => keepAlive.Dispose();
 }

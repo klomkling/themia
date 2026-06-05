@@ -76,4 +76,20 @@ public class ExceptionalSerilogSinkTests
         // Must not propagate — a logging failure can't break the app.
         sink.Emit(Event(LogEventLevel.Error, new InvalidOperationException("boom")));
     }
+
+    [Fact]
+    public void Emit_CapturesRequestBody_FromLogEventProperty()
+    {
+        var store = new CapturingStore();
+        var sink = new ExceptionalSerilogSink(store, new ExceptionalOptions { ApplicationName = "App" });
+        var props = new[] { new LogEventProperty("RequestBody", new ScalarValue("payload")) };
+        var evt = new LogEvent(
+            DateTimeOffset.UtcNow, LogEventLevel.Error, new InvalidOperationException("boom"),
+            new MessageTemplate("m", Array.Empty<MessageTemplateToken>()), props);
+
+        sink.Emit(evt);
+
+        Assert.Single(store.Logged);
+        Assert.Equal("payload", store.Logged[0].RequestBody);
+    }
 }

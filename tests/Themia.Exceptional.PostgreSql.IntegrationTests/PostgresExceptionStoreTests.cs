@@ -101,4 +101,52 @@ public class PostgresExceptionStoreTests : IAsyncLifetime
         Assert.True(await Engine.HardDeleteAsync(entry.Guid));
         Assert.Null(await Engine.GetAsync(entry.Guid));
     }
+
+    [Fact]
+    public async Task ListAsync_FiltersByDateRange_Postgres()
+    {
+        var engine = Engine;
+        var oldE = NewEntry("range-old");
+        oldE.CreationDate = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        oldE.LastLogDate = oldE.CreationDate;
+        var midE = NewEntry("range-mid");
+        midE.CreationDate = new DateTime(2026, 6, 1, 0, 0, 0, DateTimeKind.Utc);
+        midE.LastLogDate = midE.CreationDate;
+        await engine.LogAsync(oldE);
+        await engine.LogAsync(midE);
+
+        var page = await engine.ListAsync(new ExceptionFilter { From = new DateTime(2026, 5, 1, 0, 0, 0, DateTimeKind.Utc) });
+
+        Assert.Single(page.Items);
+        Assert.Equal("range-mid", page.Items[0].ErrorHash);
+    }
+
+    [Fact]
+    public async Task ListAsync_FiltersByDateRange_KindUnspecified_DoesNotThrow()
+    {
+        var engine = Engine;
+        var entry = NewEntry("unspec");
+        entry.CreationDate = new DateTime(2026, 6, 1, 0, 0, 0, DateTimeKind.Utc);
+        entry.LastLogDate = entry.CreationDate;
+        await engine.LogAsync(entry);
+
+        // Kind=Unspecified should be coerced to Utc by AsUtc() — must not throw.
+        var page = await engine.ListAsync(new ExceptionFilter { From = new DateTime(2026, 5, 1) });
+
+        Assert.Single(page.Items);
+    }
+
+    [Fact]
+    public async Task Insert_Then_Get_RoundTrips_WithRequestBody()
+    {
+        var engine = Engine;
+        var entry = NewEntry("body");
+        entry.RequestBody = "{\"key\":\"value\"}";
+        await engine.LogAsync(entry);
+
+        var loaded = await engine.GetAsync(entry.Guid);
+
+        Assert.NotNull(loaded);
+        Assert.Equal("{\"key\":\"value\"}", loaded!.RequestBody);
+    }
 }

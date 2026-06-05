@@ -1,3 +1,4 @@
+using System.Data;
 using System.Data.Common;
 
 namespace Themia.Exceptional;
@@ -10,6 +11,12 @@ public interface IExceptionalSqlDialect
 {
     /// <summary>Creates a new, unopened connection to the exception store.</summary>
     DbConnection CreateConnection();
+
+    /// <summary>
+    /// DbType to apply to nullable temporal filter parameters (From/To) so the provider can resolve the
+    /// type when the value is null. Return null to let the data provider infer it (e.g. SQLite).
+    /// </summary>
+    DbType? TemporalFilterDbType { get; }
 
     /// <summary>
     /// Atomically rolls up a duplicate: increments DuplicateCount and refreshes LastLogDate for the most

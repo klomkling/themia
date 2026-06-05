@@ -18,6 +18,7 @@ public sealed class ExceptionLogMigration : Migration
             .WithColumn("Source").AsString(500).Nullable()
             .WithColumn("Message").AsString(1000).NotNullable()
             .WithColumn("Detail").AsString(int.MaxValue).NotNullable()
+            .WithColumn("RequestBody").AsString(int.MaxValue).Nullable()
             .WithColumn("Host").AsString(512).Nullable()
             .WithColumn("Url").AsString(2000).Nullable()
             .WithColumn("HttpMethod").AsString(16).Nullable()

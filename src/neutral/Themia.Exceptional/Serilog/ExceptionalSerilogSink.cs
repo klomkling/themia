@@ -8,6 +8,10 @@ namespace Themia.Exceptional.Serilog;
 /// Serilog sink that persists error-level events carrying an exception into the <see cref="IExceptionStore"/>.
 /// Failures are isolated to <see cref="SelfLog"/> — a store outage never breaks the application.
 /// </summary>
+/// <remarks>
+/// <see cref="Emit"/> writes synchronously (one DB round-trip per error). High-throughput hosts should
+/// wrap this sink with <c>Serilog.Sinks.Async</c> to avoid blocking the logging path under error storms.
+/// </remarks>
 public sealed class ExceptionalSerilogSink : ILogEventSink
 {
     private readonly IExceptionStore store;
@@ -45,6 +49,7 @@ public sealed class ExceptionalSerilogSink : ILogEventSink
         entry.Host = Read(logEvent, "Host");
         entry.IpAddress = Read(logEvent, "IpAddress");
         entry.TenantId = Read(logEvent, "TenantId");
+        entry.RequestBody = Read(logEvent, "RequestBody");
         if (logEvent.Properties.TryGetValue("StatusCode", out var sc) && sc is ScalarValue { Value: int code })
             entry.StatusCode = code;
     }

@@ -33,6 +33,8 @@ internal sealed class SqliteExceptionalDialect : IExceptionalSqlDialect
 
     public DbConnection CreateConnection() => new SqliteConnection(connectionString);
 
+    public DbType? TemporalFilterDbType => null;
+
     public static string CreateTableSql => """
         CREATE TABLE IF NOT EXISTS "Exceptions" (
             "Id" INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -54,7 +56,8 @@ internal sealed class SqliteExceptionalDialect : IExceptionalSqlDialect
             "CreationDate" TEXT NOT NULL,
             "LastLogDate" TEXT NOT NULL,
             "DeletionDate" TEXT NULL,
-            "IsProtected" INTEGER NOT NULL
+            "IsProtected" INTEGER NOT NULL,
+            "RequestBody" TEXT NULL
         );
         """;
 
@@ -70,8 +73,8 @@ internal sealed class SqliteExceptionalDialect : IExceptionalSqlDialect
 
     public string InsertSql => """
         INSERT INTO "Exceptions"
-        ("Guid","ApplicationName","MachineName","Type","Source","Message","Detail","Host","Url","HttpMethod","IpAddress","StatusCode","ErrorHash","DuplicateCount","TenantId","CreationDate","LastLogDate","DeletionDate","IsProtected")
-        VALUES (@Guid,@ApplicationName,@MachineName,@Type,@Source,@Message,@Detail,@Host,@Url,@HttpMethod,@IpAddress,@StatusCode,@ErrorHash,@DuplicateCount,@TenantId,@CreationDate,@LastLogDate,@DeletionDate,@IsProtected);
+        ("Guid","ApplicationName","MachineName","Type","Source","Message","Detail","Host","Url","HttpMethod","IpAddress","StatusCode","ErrorHash","DuplicateCount","TenantId","CreationDate","LastLogDate","DeletionDate","IsProtected","RequestBody")
+        VALUES (@Guid,@ApplicationName,@MachineName,@Type,@Source,@Message,@Detail,@Host,@Url,@HttpMethod,@IpAddress,@StatusCode,@ErrorHash,@DuplicateCount,@TenantId,@CreationDate,@LastLogDate,@DeletionDate,@IsProtected,@RequestBody);
         """;
 
     public string GetByGuidSql => """SELECT * FROM "Exceptions" WHERE "Guid" = @Guid;""";

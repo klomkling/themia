@@ -1,3 +1,4 @@
+using System.Data;
 using System.Data.Common;
 using Npgsql;
 using Themia.Exceptional;
@@ -16,6 +17,9 @@ public sealed class PostgresExceptionalDialect : IExceptionalSqlDialect
     public DbConnection CreateConnection() => new NpgsqlConnection(connectionString);
 
     /// <inheritdoc />
+    public DbType? TemporalFilterDbType => DbType.DateTimeOffset;
+
+    /// <inheritdoc />
     public string RollupSql => """
         UPDATE "Exceptions"
         SET "DuplicateCount" = "DuplicateCount" + 1, "LastLogDate" = @LastLogDate
@@ -29,8 +33,8 @@ public sealed class PostgresExceptionalDialect : IExceptionalSqlDialect
     /// <inheritdoc />
     public string InsertSql => """
         INSERT INTO "Exceptions"
-        ("Guid","ApplicationName","MachineName","Type","Source","Message","Detail","Host","Url","HttpMethod","IpAddress","StatusCode","ErrorHash","DuplicateCount","TenantId","CreationDate","LastLogDate","DeletionDate","IsProtected")
-        VALUES (@Guid,@ApplicationName,@MachineName,@Type,@Source,@Message,@Detail,@Host,@Url,@HttpMethod,@IpAddress,@StatusCode,@ErrorHash,@DuplicateCount,@TenantId,@CreationDate,@LastLogDate,@DeletionDate,@IsProtected);
+        ("Guid","ApplicationName","MachineName","Type","Source","Message","Detail","Host","Url","HttpMethod","IpAddress","StatusCode","ErrorHash","DuplicateCount","TenantId","CreationDate","LastLogDate","DeletionDate","IsProtected","RequestBody")
+        VALUES (@Guid,@ApplicationName,@MachineName,@Type,@Source,@Message,@Detail,@Host,@Url,@HttpMethod,@IpAddress,@StatusCode,@ErrorHash,@DuplicateCount,@TenantId,@CreationDate,@LastLogDate,@DeletionDate,@IsProtected,@RequestBody);
         """;
 
     /// <inheritdoc />

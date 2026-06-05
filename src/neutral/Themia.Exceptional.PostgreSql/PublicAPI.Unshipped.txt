@@ -3,6 +3,7 @@ static Themia.Exceptional.PostgreSql.ServiceCollectionExtensions.AddThemiaExcept
 Themia.Exceptional.PostgreSql.PostgresExceptionalDialect
 Themia.Exceptional.PostgreSql.PostgresExceptionalDialect.CountSql.get -> string!
 Themia.Exceptional.PostgreSql.PostgresExceptionalDialect.CreateConnection() -> System.Data.Common.DbConnection!
+Themia.Exceptional.PostgreSql.PostgresExceptionalDialect.TemporalFilterDbType.get -> System.Data.DbType?
 Themia.Exceptional.PostgreSql.PostgresExceptionalDialect.GetByGuidSql.get -> string!
 Themia.Exceptional.PostgreSql.PostgresExceptionalDialect.HardDeleteSql.get -> string!
 Themia.Exceptional.PostgreSql.PostgresExceptionalDialect.InsertSql.get -> string!

@@ -21,6 +21,11 @@ public sealed class ExceptionStoreEngine : IExceptionStore
     /// <inheritdoc />
     public async Task LogAsync(ExceptionEntry entry, CancellationToken cancellationToken = default)
     {
+        // Normalize DateTime kinds to Utc so Npgsql accepts them as timestamptz without throwing.
+        entry.CreationDate = DateTime.SpecifyKind(entry.CreationDate, DateTimeKind.Utc);
+        entry.LastLogDate = DateTime.SpecifyKind(entry.LastLogDate, DateTimeKind.Utc);
+        if (entry.DeletionDate is { } del) entry.DeletionDate = DateTime.SpecifyKind(del, DateTimeKind.Utc);
+
         // UPDATE-then-(if-0)-INSERT is intentionally non-transactional. Under concurrent logging of
         // the same ErrorHash, two callers can both see 0 rows updated and both insert, yielding
         // split rollup rows. This is the accepted tradeoff: no data loss, no hot-path lock, and
@@ -87,7 +92,7 @@ public sealed class ExceptionStoreEngine : IExceptionStore
     {
         await using var connection = dialect.CreateConnection();
         return await connection.ExecuteAsync(
-            new CommandDefinition(dialect.PurgeSql, new { OlderThan = olderThanUtc }, cancellationToken: cancellationToken));
+            new CommandDefinition(dialect.PurgeSql, new { OlderThan = DateTime.SpecifyKind(olderThanUtc, DateTimeKind.Utc) }, cancellationToken: cancellationToken));
     }
 
     private async Task<bool> ExecuteAffectsRow(string sql, object args, CancellationToken cancellationToken)
@@ -96,17 +101,30 @@ public sealed class ExceptionStoreEngine : IExceptionStore
         return await connection.ExecuteAsync(new CommandDefinition(sql, args, cancellationToken: cancellationToken)) > 0;
     }
 
-    private static DynamicParameters ToArgs(ExceptionFilter filter)
+    private DynamicParameters ToArgs(ExceptionFilter filter)
     {
-        // Explicit DbType on nullable parameters is required for Npgsql 6+: when a value is null
-        // Npgsql cannot infer the PostgreSQL column type and throws "could not determine data type".
+        // Explicit DbType on nullable string/temporal parameters is required for Npgsql 6+: when a
+        // value is null Npgsql cannot infer the PostgreSQL column type and throws "could not determine
+        // data type". Temporal DbType is provider-specific (e.g. null for SQLite — infer from value).
         var args = new DynamicParameters();
         args.Add("ApplicationName", filter.ApplicationName, DbType.String);
         args.Add("TenantId", filter.TenantId, DbType.String);
-        args.Add("From", filter.From, DbType.DateTimeOffset);
-        args.Add("To", filter.To, DbType.DateTimeOffset);
+        var temporalType = dialect.TemporalFilterDbType;
+        if (temporalType.HasValue)
+        {
+            args.Add("From", AsUtc(filter.From), temporalType.Value);
+            args.Add("To", AsUtc(filter.To), temporalType.Value);
+        }
+        else
+        {
+            args.Add("From", filter.From);
+            args.Add("To", filter.To);
+        }
         args.Add("Search", string.IsNullOrWhiteSpace(filter.Search) ? null : $"%{filter.Search}%", DbType.String);
         args.Add("IncludeDeleted", filter.IncludeDeleted);
         return args;
     }
+
+    private static DateTime? AsUtc(DateTime? value)
+        => value is null ? null : DateTime.SpecifyKind(value.Value, DateTimeKind.Utc);
 }

@@ -14,10 +14,8 @@ Themia.Exceptional.ExceptionalOptions.CaptureRequestBody.set -> void
 Themia.Exceptional.ExceptionalOptions.ExceptionalOptions() -> void
 Themia.Exceptional.ExceptionalOptions.MaxBodyBytes.get -> int
 Themia.Exceptional.ExceptionalOptions.MaxBodyBytes.set -> void
-Themia.Exceptional.ExceptionalOptions.RedactBodyFields.get -> System.Collections.Generic.IList<string!>!
 Themia.Exceptional.ExceptionalOptions.RollupPeriod.get -> System.TimeSpan
 Themia.Exceptional.ExceptionalOptions.RollupPeriod.set -> void
-Themia.Exceptional.ExceptionalOptions.ScrubKeys.get -> System.Collections.Generic.IList<string!>!
 Themia.Exceptional.ExceptionalOptions.Validate() -> void
 Themia.Exceptional.ExceptionEntry
 Themia.Exceptional.ExceptionEntry.ApplicationName.get -> string!
@@ -59,6 +57,8 @@ Themia.Exceptional.ExceptionEntry.TenantId.get -> string?
 Themia.Exceptional.ExceptionEntry.TenantId.set -> void
 Themia.Exceptional.ExceptionEntry.Type.get -> string!
 Themia.Exceptional.ExceptionEntry.Type.set -> void
+Themia.Exceptional.ExceptionEntry.RequestBody.get -> string?
+Themia.Exceptional.ExceptionEntry.RequestBody.set -> void
 Themia.Exceptional.ExceptionEntry.Url.get -> string?
 Themia.Exceptional.ExceptionEntry.Url.set -> void
 Themia.Exceptional.ExceptionEntryFactory
@@ -94,6 +94,7 @@ Themia.Exceptional.ExceptionStoreEngine.PurgeAsync(System.DateTime olderThanUtc,
 Themia.Exceptional.IExceptionalSqlDialect
 Themia.Exceptional.IExceptionalSqlDialect.CountSql.get -> string!
 Themia.Exceptional.IExceptionalSqlDialect.CreateConnection() -> System.Data.Common.DbConnection!
+Themia.Exceptional.IExceptionalSqlDialect.TemporalFilterDbType.get -> System.Data.DbType?
 Themia.Exceptional.IExceptionalSqlDialect.GetByGuidSql.get -> string!
 Themia.Exceptional.IExceptionalSqlDialect.HardDeleteSql.get -> string!
 Themia.Exceptional.IExceptionalSqlDialect.InsertSql.get -> string!

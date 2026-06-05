@@ -62,4 +62,7 @@ public sealed class ExceptionEntry
 
     /// <summary>When true, the row is exempt from purge/soft-delete sweeps.</summary>
     public bool IsProtected { get; set; }
+
+    /// <summary>Captured request body, when the request-body middleware is enabled.</summary>
+    public string? RequestBody { get; set; }
 }

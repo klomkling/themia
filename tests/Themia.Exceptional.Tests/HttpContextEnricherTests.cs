@@ -3,6 +3,7 @@ using Serilog.Core;
 using Serilog.Events;
 using Serilog.Parsing;
 using Themia.Exceptional;
+using Themia.Exceptional.Middleware;
 using Themia.Exceptional.Serilog;
 using Xunit;
 
@@ -55,6 +56,37 @@ public class HttpContextEnricherTests
         var all = string.Join("|", evt.Properties.Values.Select(v => v.ToString()));
         Assert.DoesNotContain("secret", all);
         Assert.DoesNotContain("session=abc", all);
+    }
+
+    [Fact]
+    public void Enrich_AddsRequestBody_WhenPresentInItems()
+    {
+        var (enricher, evt) = Setup(http =>
+        {
+            http.Request.Method = "POST";
+            http.Items[RequestBodyLoggingMiddleware.BodyItemKey] = "{\"key\":\"value\"}";
+        });
+
+        enricher.Enrich(evt, new LogEventPropertyFactory());
+
+        Assert.True(evt.Properties.TryGetValue("RequestBody", out var bodyProp));
+        var raw = Assert.IsType<ScalarValue>(bodyProp).Value;
+        Assert.Equal("{\"key\":\"value\"}", raw);
+    }
+
+    [Fact]
+    public void Enrich_CapturesStatusCode_WhenSetButResponseNotStarted()
+    {
+        var (enricher, evt) = Setup(http =>
+        {
+            http.Request.Method = "GET";
+            http.Response.StatusCode = 404;
+        });
+
+        enricher.Enrich(evt, new LogEventPropertyFactory());
+
+        Assert.True(evt.Properties.TryGetValue("StatusCode", out var sc));
+        Assert.Equal("404", sc.ToString());
     }
 }
 
