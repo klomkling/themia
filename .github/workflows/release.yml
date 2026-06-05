@@ -145,9 +145,14 @@ jobs:
       - name: Pack
         # Packs every packable project in the solution (test projects set
         # IsPackable=false). Auto-includes new packages as they are added.
+        # NOTE: do NOT pass --no-build. The netstandard2.0 analyzer / source-generator
+        # packages (Themia.SourceGenerator, Themia.Analyzers) stage their analyzer assembly
+        # via a target that re-invokes Build during pack, which NoBuild rejects with
+        # NETSDK1085. --no-restore is safe (Restore ran above); pack's build is incremental
+        # over the preceding Build step.
         run: |
           mkdir -p ./artifacts
-          dotnet pack Themia.sln --configuration Release --no-build --output ./artifacts
+          dotnet pack Themia.sln --configuration Release --no-restore --output ./artifacts
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v7
