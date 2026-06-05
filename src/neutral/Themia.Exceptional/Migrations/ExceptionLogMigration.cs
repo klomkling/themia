@@ -54,6 +54,11 @@ public sealed class ExceptionLogMigration : Migration
             .OnColumn("CreationDate").Ascending();
         Create.Index("IX_Exceptions_DeletionDate")
             .OnTable("Exceptions").OnColumn("DeletionDate").Ascending();
+        // Purge query: WHERE IsProtected = FALSE AND CreationDate < @OlderThan
+        Create.Index("IX_Exceptions_Protected_Created")
+            .OnTable("Exceptions")
+            .OnColumn("IsProtected").Ascending()
+            .OnColumn("CreationDate").Ascending();
     }
 
     /// <inheritdoc />
