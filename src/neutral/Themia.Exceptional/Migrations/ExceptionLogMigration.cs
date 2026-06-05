@@ -1,15 +1,31 @@
 using FluentMigrator;
+using FluentMigrator.Builders.Create.Table;
 
 namespace Themia.Exceptional.Migrations;
 
-/// <summary>Creates the provider-agnostic <c>Exceptions</c> table. FluentMigrator renders it per provider.</summary>
+/// <summary>Creates the <c>Exceptions</c> table. Timestamp column types are rendered per provider.</summary>
 [Migration(202606060001, "Themia.Exceptional: create Exceptions table")]
 public sealed class ExceptionLogMigration : Migration
 {
     /// <inheritdoc />
     public override void Up()
     {
-        Create.Table("Exceptions")
+        IfDatabase("postgres").Delegate(() => CreateTable(c => c.AsDateTimeOffset()));
+        IfDatabase("mysql").Delegate(() => CreateTable(c => c.AsCustom("DATETIME(6)")));
+        IfDatabase("sqlserver").Delegate(() => CreateTable(c => c.AsDateTime2()));
+
+        Create.Index("IX_Exceptions_App_Hash_Created")
+            .OnTable("Exceptions")
+            .OnColumn("ApplicationName").Ascending()
+            .OnColumn("ErrorHash").Ascending()
+            .OnColumn("CreationDate").Ascending();
+        Create.Index("IX_Exceptions_DeletionDate")
+            .OnTable("Exceptions").OnColumn("DeletionDate").Ascending();
+    }
+
+    private void CreateTable(System.Func<ICreateTableColumnAsTypeSyntax, ICreateTableColumnOptionOrWithColumnSyntax> ts)
+    {
+        var table = Create.Table("Exceptions")
             .WithColumn("Id").AsInt64().PrimaryKey().Identity()
             .WithColumn("Guid").AsGuid().NotNullable()
             .WithColumn("ApplicationName").AsString(256).NotNullable()
@@ -26,20 +42,11 @@ public sealed class ExceptionLogMigration : Migration
             .WithColumn("StatusCode").AsInt32().Nullable()
             .WithColumn("ErrorHash").AsString(64).NotNullable()
             .WithColumn("DuplicateCount").AsInt32().NotNullable().WithDefaultValue(1)
-            .WithColumn("TenantId").AsString(256).Nullable()
-            .WithColumn("CreationDate").AsDateTimeOffset().NotNullable()
-            .WithColumn("LastLogDate").AsDateTimeOffset().NotNullable()
-            .WithColumn("DeletionDate").AsDateTimeOffset().Nullable()
-            .WithColumn("IsProtected").AsBoolean().NotNullable().WithDefaultValue(false);
-
-        Create.Index("IX_Exceptions_App_Hash_Created")
-            .OnTable("Exceptions")
-            .OnColumn("ApplicationName").Ascending()
-            .OnColumn("ErrorHash").Ascending()
-            .OnColumn("CreationDate").Ascending();
-
-        Create.Index("IX_Exceptions_DeletionDate")
-            .OnTable("Exceptions").OnColumn("DeletionDate").Ascending();
+            .WithColumn("TenantId").AsString(256).Nullable();
+        ts(table.WithColumn("CreationDate")).NotNullable();
+        ts(table.WithColumn("LastLogDate")).NotNullable();
+        ts(table.WithColumn("DeletionDate")).Nullable();
+        table.WithColumn("IsProtected").AsBoolean().NotNullable().WithDefaultValue(false);
     }
 
     /// <inheritdoc />
