@@ -113,9 +113,9 @@ public sealed class ServiceRegistrationGenerator : IIncrementalGenerator
                 foreach (var diag in info.Diagnostics)
                     ctx.ReportDiagnostic(diag.ToDiagnostic());
 
-                if (info.HasRegistration)
+                if (info.Registration is { } reg)
                     registrations.Add(new RegistrationRecord(
-                        info.TypeFullName, info.ServiceFullName!, info.Lifetime!, info.ServiceKey));
+                        info.TypeFullName, reg.ServiceFullName, reg.Lifetime, reg.ServiceKey));
             }
 
             // De-dup by (impl, service, key) and sort for deterministic output.
@@ -330,7 +330,7 @@ public sealed class ServiceRegistrationGenerator : IIncrementalGenerator
         var typeFullDisplayName = type.ToDisplayString();
 
         DiscoveredRegistration DiagnosticsOnly() =>
-            new(typeFullName, null, null, null, new EquatableArray<DiagnosticInfo>(diagnostics.ToImmutableArray()));
+            new(typeFullName, null, new EquatableArray<DiagnosticInfo>(diagnostics.ToImmutableArray()));
 
         // THEMIA001: Multiple lifetime attributes.
         if (lifetimeAttrs.Count > 1)
@@ -498,9 +498,7 @@ public sealed class ServiceRegistrationGenerator : IIncrementalGenerator
 
         return new DiscoveredRegistration(
             typeFullName,
-            ToGlobalQualified(serviceType),
-            resolvedLifetimeStr!,
-            serviceKey,
+            new RegistrationData(ToGlobalQualified(serviceType), resolvedLifetimeStr!, serviceKey),
             new EquatableArray<DiagnosticInfo>(diagnostics.ToImmutableArray()));
     }
 

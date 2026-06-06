@@ -13,14 +13,22 @@ namespace Themia.SourceGenerator.Generators;
 /// once per attribute.
 /// </remarks>
 internal sealed record DiscoveredRegistration(
-    string TypeFullName,              // global::-qualified implementation type; also the dedup key
-    string? ServiceFullName,          // global::-qualified service type
-    string? Lifetime,                 // "Scoped" | "Singleton" | "Transient"
-    string? ServiceKey,
+    string TypeFullName,                  // global::-qualified implementation type; also the dedup key
+    RegistrationData? Registration,       // present XOR diagnostics-only — the correlated registration fields
     EquatableArray<DiagnosticInfo> Diagnostics)
 {
-    public bool HasRegistration => ServiceFullName is not null && Lifetime is not null;
+    public bool HasRegistration => Registration is not null;
 }
+
+/// <summary>
+/// The correlated payload of a resolved registration. Bundled into one optional value on
+/// <see cref="DiscoveredRegistration"/> so a half-populated state (e.g. a service type without a
+/// lifetime) is unrepresentable: a registration is either fully present or absent.
+/// </summary>
+internal sealed record RegistrationData(
+    string ServiceFullName,           // global::-qualified service type
+    string Lifetime,                  // "Scoped" | "Singleton" | "Transient"
+    string? ServiceKey);
 
 /// <summary>
 /// Equatable, compilation-free description of an <c>IThemiaServiceRegistrar</c> candidate. Carries

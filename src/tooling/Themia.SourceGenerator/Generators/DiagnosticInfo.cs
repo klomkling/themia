@@ -49,7 +49,7 @@ internal readonly record struct EquatableArray<T>(ImmutableArray<T> Array) where
 
     public override int GetHashCode()
     {
-        // Manual FNV-style accumulate — System.HashCode is unavailable on netstandard2.0.
+        // Manual prime-multiply (Bloch ×31) accumulate — System.HashCode is unavailable on netstandard2.0.
         unchecked
         {
             var hash = 17;
@@ -59,7 +59,7 @@ internal readonly record struct EquatableArray<T>(ImmutableArray<T> Array) where
         }
     }
 
-    public int Length => Array.Length;
+    public int Length => Array.IsDefaultOrEmpty ? 0 : Array.Length;
     public ImmutableArray<T>.Enumerator GetEnumerator() => Array.GetEnumerator();
     public static EquatableArray<T> Empty => new(ImmutableArray<T>.Empty);
 }

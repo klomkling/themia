@@ -156,7 +156,7 @@ public abstract class ExceptionStoreConformanceTests
         entry.LastLogDate = entry.CreationDate;
         await store.LogAsync(entry);
 
-        // Kind=Unspecified should be coerced to Utc by AsUtc() — must not throw.
+        // Kind=Unspecified should be coerced to Utc by ToUtc() — must not throw.
         var page = await store.ListAsync(new ExceptionFilter { From = new DateTime(2026, 5, 1) });
 
         Assert.Single(page.Items);
