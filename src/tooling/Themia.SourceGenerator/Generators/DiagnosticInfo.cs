@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using Microsoft.CodeAnalysis;
@@ -53,7 +54,7 @@ internal readonly record struct EquatableArray<T>(ImmutableArray<T> Array) where
         {
             var hash = 17;
             foreach (var item in Array)
-                hash = (hash * 31) ^ (item?.GetHashCode() ?? 0);
+                hash = (hash * 31) ^ EqualityComparer<T>.Default.GetHashCode(item);
             return hash;
         }
     }
