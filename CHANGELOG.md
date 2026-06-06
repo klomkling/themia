@@ -42,7 +42,8 @@ issues, and sweep cheap wins across Exceptional / Mediator / tooling.
 
 - `Themia.SourceGenerator` — the DI registration generator now filters at the syntax level via
   `ForAttributeWithMetadataName` (attribute path) and narrowed syntax predicates with the semantic model
-  (marker/registrar paths). Generated output is unchanged. **Note:** full incremental-generation *caching* is
+  (marker/registrar paths). This pipeline refactor does not alter generated output — the only output change in
+  this release is the `internal` visibility fix listed above under Fixed. **Note:** full incremental-generation *caching* is
   not yet achieved — the pipeline data model still carries Roslyn symbols/syntax nodes across the
   `Collect()`/`Combine()` boundary (non-equatable, roots the compilation), so the output stage re-runs on every
   edit. Output-stage cache equality is tracked as a 0.3.2 follow-up (see Known limitations).
