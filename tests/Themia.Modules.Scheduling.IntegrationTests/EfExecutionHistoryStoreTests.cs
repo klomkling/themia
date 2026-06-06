@@ -1,0 +1,200 @@
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
+using Npgsql;
+using Testcontainers.PostgreSql;
+using Themia.Modules.Scheduling;
+using Themia.Quartz;
+using Xunit;
+
+namespace Themia.Modules.Scheduling.IntegrationTests;
+
+/// <summary>
+/// Integration tests for <see cref="EfExecutionHistoryStore"/> against a real PostgreSQL instance.
+/// Schema is created via <c>EnsureCreatedAsync</c> (acceptable for tests; the module ships
+/// EF Core migrations for production use — run <c>dotnet ef migrations add Initial</c>
+/// against the <see cref="SchedulingDbContext"/> to generate them).
+/// </summary>
+[Trait("Category", "Integration")]
+public class EfExecutionHistoryStoreTests : IAsyncLifetime
+{
+    private readonly PostgreSqlContainer container =
+        new PostgreSqlBuilder("postgres:16-alpine")
+            .WithDatabase("themia_scheduling_tests")
+            .WithUsername("postgres")
+            .WithPassword("postgres")
+            .WithCleanUp(true)
+            .Build();
+
+    private SchedulingDbContext context = null!;
+
+    private string ConnectionString => container.GetConnectionString();
+
+    public async Task InitializeAsync()
+    {
+        await container.StartAsync();
+
+        // Create the 'scheduling' schema before EnsureCreated so EF can place tables there.
+        await using var connection = new NpgsqlConnection(ConnectionString);
+        await connection.OpenAsync();
+        await using var cmd = connection.CreateCommand();
+        cmd.CommandText = "CREATE SCHEMA IF NOT EXISTS scheduling";
+        await cmd.ExecuteNonQueryAsync();
+
+        context = BuildContext();
+        await context.Database.EnsureCreatedAsync();
+    }
+
+    public async Task DisposeAsync()
+    {
+        await context.DisposeAsync();
+        await container.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task Save_ThenGet_RoundTrips()
+    {
+        var store = BuildStore();
+        var entry = MakeEntry("fire-1", "trigger-a", "job-a");
+
+        await store.Save(entry);
+        var retrieved = await store.Get("fire-1");
+
+        Assert.NotNull(retrieved);
+        Assert.Equal("fire-1", retrieved!.FireInstanceId);
+        Assert.Equal("trigger-a", retrieved.Trigger);
+        Assert.Equal("job-a", retrieved.Job);
+        Assert.Equal(entry.ActualFireTimeUtc, retrieved.ActualFireTimeUtc);
+        Assert.Equal("test-scheduler", retrieved.SchedulerName);
+    }
+
+    [Fact]
+    public async Task Save_IsUpsert_UpdatesExistingEntry()
+    {
+        var store = BuildStore();
+        var entry = MakeEntry("fire-2", "trigger-b", "job-b");
+        await store.Save(entry);
+
+        entry.ExceptionMessage = "boom";
+        entry.FinishedTimeUtc = DateTimeOffset.UtcNow;
+        await store.Save(entry);
+
+        var retrieved = await store.Get("fire-2");
+        Assert.Equal("boom", retrieved!.ExceptionMessage);
+        Assert.NotNull(retrieved.FinishedTimeUtc);
+    }
+
+    [Fact]
+    public async Task FilterLast_ReturnsRecentEntries()
+    {
+        // Use a distinct scheduler name to avoid cross-test interference.
+        var store = BuildStore("sched-filterlast");
+        var t = DateTimeOffset.UtcNow;
+
+        await store.Save(MakeEntry("fl-1", "t1", "j1", firedAt: t.AddMinutes(-3), scheduler: "sched-filterlast"));
+        await store.Save(MakeEntry("fl-2", "t1", "j1", firedAt: t.AddMinutes(-2), scheduler: "sched-filterlast"));
+        await store.Save(MakeEntry("fl-3", "t1", "j1", firedAt: t.AddMinutes(-1), scheduler: "sched-filterlast"));
+
+        var results = (await store.FilterLast(2)).ToList();
+
+        Assert.Equal(2, results.Count);
+        // Most-recent two: fl-3, fl-2 (order not guaranteed by spec, just count)
+        Assert.Contains(results, r => r.FireInstanceId == "fl-3");
+        Assert.Contains(results, r => r.FireInstanceId == "fl-2");
+        Assert.DoesNotContain(results, r => r.FireInstanceId == "fl-1");
+    }
+
+    [Fact]
+    public async Task FilterLastOfEveryTrigger_GroupsCorrectly()
+    {
+        var store = BuildStore("sched-per-trigger");
+        var t = DateTimeOffset.UtcNow;
+
+        await store.Save(MakeEntry("pt-1", "trigger-x", "j1", firedAt: t.AddMinutes(-5), scheduler: "sched-per-trigger"));
+        await store.Save(MakeEntry("pt-2", "trigger-x", "j1", firedAt: t.AddMinutes(-3), scheduler: "sched-per-trigger"));
+        await store.Save(MakeEntry("pt-3", "trigger-y", "j2", firedAt: t.AddMinutes(-2), scheduler: "sched-per-trigger"));
+
+        var results = (await store.FilterLastOfEveryTrigger(1)).ToList();
+
+        // limit=1 per trigger → one from trigger-x and one from trigger-y
+        Assert.Equal(2, results.Count);
+        Assert.Contains(results, r => r.Trigger == "trigger-x");
+        Assert.Contains(results, r => r.Trigger == "trigger-y");
+        // trigger-x: most recent is pt-2
+        Assert.Contains(results, r => r.FireInstanceId == "pt-2");
+    }
+
+    [Fact]
+    public async Task FilterLastOfEveryJob_GroupsCorrectly()
+    {
+        var store = BuildStore("sched-per-job");
+        var t = DateTimeOffset.UtcNow;
+
+        await store.Save(MakeEntry("pj-1", "trigger-a", "job-x", firedAt: t.AddMinutes(-5), scheduler: "sched-per-job"));
+        await store.Save(MakeEntry("pj-2", "trigger-a", "job-x", firedAt: t.AddMinutes(-3), scheduler: "sched-per-job"));
+        await store.Save(MakeEntry("pj-3", "trigger-b", "job-y", firedAt: t.AddMinutes(-2), scheduler: "sched-per-job"));
+
+        var results = (await store.FilterLastOfEveryJob(1)).ToList();
+
+        // limit=1 per job → one from job-x and one from job-y
+        Assert.Equal(2, results.Count);
+        Assert.Contains(results, r => r.Job == "job-x");
+        Assert.Contains(results, r => r.Job == "job-y");
+        // job-x: most recent is pj-2
+        Assert.Contains(results, r => r.FireInstanceId == "pj-2");
+    }
+
+    [Fact]
+    public async Task Counters_IncrementAndRead()
+    {
+        var store = BuildStore("sched-counters");
+
+        Assert.Equal(0, await store.GetTotalJobsExecuted());
+        Assert.Equal(0, await store.GetTotalJobsFailed());
+
+        await store.IncrementTotalJobsExecuted();
+        await store.IncrementTotalJobsExecuted();
+        await store.IncrementTotalJobsFailed();
+
+        Assert.Equal(2, await store.GetTotalJobsExecuted());
+        Assert.Equal(1, await store.GetTotalJobsFailed());
+    }
+
+    [Fact]
+    public async Task Get_UnknownFireInstanceId_ReturnsNull()
+    {
+        var store = BuildStore();
+        var result = await store.Get("does-not-exist");
+        Assert.Null(result);
+    }
+
+    // ── Helpers ──────────────────────────────────────────────────────────────
+
+    private SchedulingDbContext BuildContext() =>
+        new(new DbContextOptionsBuilder<SchedulingDbContext>()
+            .UseNpgsql(ConnectionString)
+            .UseSnakeCaseNamingConvention()
+            .Options);
+
+    private EfExecutionHistoryStore BuildStore(string schedulerName = "test-scheduler") =>
+        new(BuildContext(), NullLogger<EfExecutionHistoryStore>.Instance)
+        {
+            SchedulerName = schedulerName,
+        };
+
+    private static ExecutionHistoryEntry MakeEntry(
+        string fireInstanceId,
+        string trigger,
+        string job,
+        DateTimeOffset? firedAt = null,
+        string? scheduler = null) =>
+        new()
+        {
+            FireInstanceId = fireInstanceId,
+            SchedulerName = scheduler ?? "test-scheduler",
+            SchedulerInstanceId = "instance-1",
+            Job = job,
+            Trigger = trigger,
+            ActualFireTimeUtc = firedAt ?? DateTimeOffset.UtcNow,
+            ScheduledFireTimeUtc = firedAt ?? DateTimeOffset.UtcNow,
+        };
+}
