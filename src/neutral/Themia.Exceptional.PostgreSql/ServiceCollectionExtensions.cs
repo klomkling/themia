@@ -1,9 +1,6 @@
 using FluentMigrator.Runner;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 using Themia.Exceptional;
-using Themia.Exceptional.Migrations;
-using Themia.Exceptional.Serilog;
 
 namespace Themia.Exceptional.PostgreSql;
 
@@ -14,7 +11,8 @@ public static class ServiceCollectionExtensions
     /// Registers the PostgreSQL exception store: dialect, engine, options, and runs the
     /// FluentMigrator schema migration immediately so the <c>Exceptions</c> table exists.
     /// <para>
-    /// Also registers <see cref="ExceptionalSerilogSink"/> and <see cref="HttpContextEnricher"/>
+    /// Also registers <see cref="Themia.Exceptional.Serilog.ExceptionalSerilogSink"/> and
+    /// <see cref="Themia.Exceptional.Serilog.HttpContextEnricher"/>
     /// as singletons in the DI container <strong>for the host to wire into its own Serilog
     /// <c>LoggerConfiguration</c></strong>. This package does not configure the global logger.
     /// The host should resolve and attach them, for example:
@@ -36,40 +34,11 @@ public static class ServiceCollectionExtensions
         ArgumentException.ThrowIfNullOrWhiteSpace(connectionString);
         ArgumentNullException.ThrowIfNull(configure);
 
-        services.TryAddSingleton<IExceptionalSqlDialect>(new PostgresExceptionalDialect(connectionString));
-        services.AddThemiaExceptionalCore(configure);
-
-        services.AddHttpContextAccessor();
-        services.TryAddSingleton<HttpContextEnricher>();
-        services.TryAddSingleton<ExceptionalSerilogSink>(sp =>
-            new ExceptionalSerilogSink(
-                sp.GetRequiredService<IExceptionStore>(),
-                sp.GetRequiredService<ExceptionalOptions>()));
-
-        RunMigration(connectionString);
-        return services;
-    }
-
-    private static void RunMigration(string connectionString)
-    {
-        using var provider = new ServiceCollection()
-            .AddFluentMigratorCore()
-            .ConfigureRunner(rb => rb
-                .AddPostgres()
-                .WithGlobalConnectionString(connectionString)
-                .ScanIn(typeof(ExceptionLogMigration).Assembly).For.Migrations())
-            .BuildServiceProvider(false);
-
-        using var scope = provider.CreateScope();
-        try
-        {
-            scope.ServiceProvider.GetRequiredService<IMigrationRunner>().MigrateUp();
-        }
-        catch (Exception ex)
-        {
-            throw new InvalidOperationException(
-                "Themia.Exceptional: failed to apply the Exceptions-table migration. " +
-                "Verify the PostgreSQL connection string and that the principal has DDL permissions.", ex);
-        }
+        return services.AddThemiaExceptionalProvider(
+            dialect: new PostgresExceptionalDialect(connectionString),
+            configure: configure,
+            configureRunner: rb => rb.AddPostgres(),
+            connectionString: connectionString,
+            databaseDisplayName: "PostgreSQL");
     }
 }
