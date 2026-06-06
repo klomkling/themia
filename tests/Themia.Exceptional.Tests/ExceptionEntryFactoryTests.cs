@@ -60,4 +60,35 @@ public class ExceptionEntryFactoryTests
     {
         Assert.Throws<ArgumentNullException>(() => ExceptionEntryFactory.FromException(null!, "App"));
     }
+
+    [Fact]
+    public void FromException_ErrorHash_DiffersForSameTypeAndMessage_WhenSourceDiffers_AndStackTraceIsNull()
+    {
+        // Un-thrown exceptions have null StackTrace, so the fallback signature is used.
+        // Two exceptions that share Type+Message but differ in Source must produce different hashes
+        // (otherwise every un-thrown InvalidOperationException("x") from different callers rolls up into one row).
+        var ex1 = new InvalidOperationException("same message") { Source = "ModuleA" };
+        var ex2 = new InvalidOperationException("same message") { Source = "ModuleB" };
+
+        // Confirm both have null StackTrace (pre-condition for the fallback path being exercised).
+        Assert.Null(ex1.StackTrace);
+        Assert.Null(ex2.StackTrace);
+
+        var entry1 = ExceptionEntryFactory.FromException(ex1, "App");
+        var entry2 = ExceptionEntryFactory.FromException(ex2, "App");
+
+        Assert.NotEqual(entry1.ErrorHash, entry2.ErrorHash);
+    }
+
+    [Fact]
+    public void FromException_ErrorHash_IsDeterministic_ForSameInputsWithNullStackTrace()
+    {
+        var ex1 = new InvalidOperationException("same message") { Source = "ModuleA" };
+        var ex2 = new InvalidOperationException("same message") { Source = "ModuleA" };
+
+        var entry1 = ExceptionEntryFactory.FromException(ex1, "App");
+        var entry2 = ExceptionEntryFactory.FromException(ex2, "App");
+
+        Assert.Equal(entry1.ErrorHash, entry2.ErrorHash);
+    }
 }

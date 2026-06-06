@@ -9,7 +9,7 @@ Themia.Generators.Abstractions.Emission.ThemiaSourceWriter.AppendLine(string! li
 Themia.Generators.Abstractions.Emission.ThemiaSourceWriter.AppendRaw(string! raw) -> Themia.Generators.Abstractions.Emission.ThemiaSourceWriter!
 Themia.Generators.Abstractions.Emission.ThemiaSourceWriter.CloseClass() -> Themia.Generators.Abstractions.Emission.ThemiaSourceWriter!
 Themia.Generators.Abstractions.Emission.ThemiaSourceWriter.CloseMethod() -> Themia.Generators.Abstractions.Emission.ThemiaSourceWriter!
-Themia.Generators.Abstractions.Emission.ThemiaSourceWriter.OpenClass(string! name, bool isStatic = false, bool isPartial = false) -> Themia.Generators.Abstractions.Emission.ThemiaSourceWriter!
+Themia.Generators.Abstractions.Emission.ThemiaSourceWriter.OpenClass(string! name, bool isStatic = false, bool isPartial = false, bool isInternal = false) -> Themia.Generators.Abstractions.Emission.ThemiaSourceWriter!
 Themia.Generators.Abstractions.Emission.ThemiaSourceWriter.OpenMethod(string! signature) -> Themia.Generators.Abstractions.Emission.ThemiaSourceWriter!
 Themia.Generators.Abstractions.Emission.ThemiaSourceWriter.ThemiaSourceWriter() -> void
 Themia.Generators.Abstractions.Emission.ThemiaSourceWriter.ToSourceText() -> Microsoft.CodeAnalysis.Text.SourceText!

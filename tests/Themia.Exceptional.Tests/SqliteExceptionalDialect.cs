@@ -33,7 +33,11 @@ internal sealed class SqliteExceptionalDialect : IExceptionalSqlDialect
 
     public DbConnection CreateConnection() => new SqliteConnection(connectionString);
 
-    public DbType? TemporalFilterDbType => null;
+    public void AddTemporalFilters(DynamicParameters args, DateTime? from, DateTime? to)
+    {
+        args.Add("From", from);
+        args.Add("To", to);
+    }
 
     public static string CreateTableSql => """
         CREATE TABLE IF NOT EXISTS "Exceptions" (

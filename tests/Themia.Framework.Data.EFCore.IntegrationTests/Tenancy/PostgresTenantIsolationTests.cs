@@ -86,6 +86,50 @@ public class PostgresTenantIsolationTests : IClassFixture<PostgresTenantIsolatio
         Assert.DoesNotContain(orders, o => o.IsDeleted);
     }
 
+    [Fact]
+    public async Task RuntimeTenantAccess_FindMirrorsFilter_WhenStaticAccessorDifferFromInjected()
+    {
+        // Verifies that Find/FindAsync reads the SAME tenant source (TenantContextAccessor — the static
+        // ambient accessor) as the runtime query filter. If they diverged, a context injected with
+        // tenant-A but whose static accessor was subsequently overridden to tenant-B would allow
+        // cross-tenant access via Find, contradicting what the filter enforces on LINQ queries.
+
+        await fixture.ResetDataAsync();
+
+        int tenantAId;
+        int tenantBId;
+
+        // Seed one row per tenant using an unfiltered context.
+        await using (var seed = fixture.CreateRuntimeContext(null))
+        {
+            var orderA = new TenantOrder { Name = "MirrorTestA", TenantId = new TenantId("tenant-a") };
+            var orderB = new TenantOrder { Name = "MirrorTestB", TenantId = new TenantId("tenant-b") };
+            seed.Orders.Add(orderA);
+            seed.Orders.Add(orderB);
+            await seed.SaveChangesAsync();
+            tenantAId = orderA.Id;
+            tenantBId = orderB.Id;
+        }
+
+        // Create a RuntimeTenantAccess context injected with tenant-A.
+        // The ctor sets TenantContextAccessor.CurrentTenantId = "tenant-a".
+        await using var context = fixture.CreateRuntimeContext(new TenantId("tenant-a"));
+
+        // Now simulate divergence: override the static accessor to tenant-B AFTER construction.
+        // The injected ITenantContext still says "tenant-a", but the filter source says "tenant-b".
+        // Find must follow the static accessor (the filter's actual source), not the injected context.
+        TenantContextAccessor.CurrentTenantId = new TenantId("tenant-b");
+
+        // tenant-B row: static accessor = "tenant-b" → filter allows it → Find must return it.
+        var foundB = await context.Orders.FindAsync(tenantBId);
+        Assert.NotNull(foundB);
+        Assert.Equal("MirrorTestB", foundB!.Name);
+
+        // tenant-A row: static accessor = "tenant-b" → filter blocks it → Find must return null.
+        var foundA = await context.Orders.FindAsync(tenantAId);
+        Assert.Null(foundA);
+    }
+
     private async Task SeedAsync()
     {
         await using var context = fixture.CreateRuntimeContext(null);

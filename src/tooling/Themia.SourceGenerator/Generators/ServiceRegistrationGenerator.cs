@@ -17,26 +17,62 @@ namespace Themia.SourceGenerator.Generators;
 [Generator]
 public sealed class ServiceRegistrationGenerator : IIncrementalGenerator
 {
+    // Fully-qualified metadata names for the three DI lifetime attributes.
+    private const string ScopedAttributeFqn     = "Themia.DependencyInjection.ScopedAttribute";
+    private const string SingletonAttributeFqn  = "Themia.DependencyInjection.SingletonAttribute";
+    private const string TransientAttributeFqn  = "Themia.DependencyInjection.TransientAttribute";
+
     /// <inheritdoc />
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
-        // Pipeline 1: collect all candidate class info for registration + diagnostics.
-        var discoveredTypes = context.SyntaxProvider
-            .CreateSyntaxProvider(
-                predicate: (node, _) => node is ClassDeclarationSyntax,
-                transform: (ctx, _) => (ClassDeclarationSyntax)ctx.Node)
-            .Combine(context.CompilationProvider)
-            .SelectMany((pair, _) => CollectTypeInfo(pair.Right, pair.Left));
+        // Pipeline 1a: attribute-bearing classes — discovered via ForAttributeWithMetadataName,
+        // which filters by attribute FQN up-front and caches per-class; no CompilationProvider needed.
+        // Each pipeline covers one attribute; we merge all three into a single stream.
+        var scopedAttrs    = context.SyntaxProvider
+            .ForAttributeWithMetadataName(ScopedAttributeFqn,
+                predicate:  (node, _) => node is ClassDeclarationSyntax,
+                transform:  (ctx, _)  => CollectTypeInfoFromAttributeContext(ctx))
+            .SelectMany((items, _) => items);
 
-        var collectedTypes = discoveredTypes.Collect();
+        var singletonAttrs = context.SyntaxProvider
+            .ForAttributeWithMetadataName(SingletonAttributeFqn,
+                predicate:  (node, _) => node is ClassDeclarationSyntax,
+                transform:  (ctx, _)  => CollectTypeInfoFromAttributeContext(ctx))
+            .SelectMany((items, _) => items);
+
+        var transientAttrs = context.SyntaxProvider
+            .ForAttributeWithMetadataName(TransientAttributeFqn,
+                predicate:  (node, _) => node is ClassDeclarationSyntax,
+                transform:  (ctx, _)  => CollectTypeInfoFromAttributeContext(ctx))
+            .SelectMany((items, _) => items);
+
+        // Pipeline 1b: marker-interface-only classes (no DI attribute).
+        // Narrowed predicate: only classes that declare a base list (implements/inherits something).
+        // Uses the per-node SemanticModel — no CompilationProvider needed.
+        var markerOnly = context.SyntaxProvider
+            .CreateSyntaxProvider(
+                predicate:  (node, _) => node is ClassDeclarationSyntax { BaseList: not null },
+                transform:  (ctx, _)  => CollectMarkerOnlyTypeInfo(ctx))
+            .SelectMany((items, _) => items);
+
+        // Merge attribute + marker-only pipelines into one collected provider.
+        // Chain: scoped ++ singleton ++ transient ++ markerOnly, all flattened.
+        var collectedTypes = scopedAttrs
+            .Collect()
+            .Combine(singletonAttrs.Collect())
+            .Select((pair, _) => pair.Left.AddRange(pair.Right))
+            .Combine(transientAttrs.Collect())
+            .Select((pair, _) => pair.Left.AddRange(pair.Right))
+            .Combine(markerOnly.Collect())
+            .Select((pair, _) => pair.Left.AddRange(pair.Right));
 
         // Pipeline 2: discover IThemiaServiceRegistrar implementations.
+        // Narrowed to classes with a base list; uses per-node SemanticModel.
         var registrarSyntax = context.SyntaxProvider
             .CreateSyntaxProvider(
-                predicate: (node, _) => node is ClassDeclarationSyntax,
-                transform: (ctx, _) => (ClassDeclarationSyntax)ctx.Node)
-            .Combine(context.CompilationProvider)
-            .SelectMany((pair, _) => DiscoverRegistrarCandidates(pair.Right, pair.Left));
+                predicate:  (node, _) => node is ClassDeclarationSyntax { BaseList: not null },
+                transform:  (ctx, _)  => DiscoverRegistrarCandidatesFromContext(ctx))
+            .SelectMany((items, _) => items);
 
         var collectedRegistrars = registrarSyntax.Collect();
 
@@ -49,13 +85,22 @@ public sealed class ServiceRegistrationGenerator : IIncrementalGenerator
                 .WithFileHeader()
                 .WithUsings("Microsoft.Extensions.DependencyInjection")
                 .WithNamespace("Themia.Generated")
-                .OpenClass("ThemiaServiceRegistrations", isStatic: true)
+                .OpenClass("ThemiaServiceRegistrations", isStatic: true, isInternal: true)
                 .OpenMethod("public static IServiceCollection AddThemiaServices(this IServiceCollection services)");
 
             var registrations = new List<RegistrationRecord>();
 
+            // Dedup by fully-qualified type name before processing.
+            // A class annotated with more than one lifetime attribute (e.g. [Scoped][Singleton])
+            // appears once in EACH ForAttributeWithMetadataName pipeline, so typeInfos may contain
+            // multiple entries for the same type. CollectTypeInfoCore already reads ALL attributes
+            // on the type, so every duplicate entry is identical — the first one is sufficient.
+            var seenTypes = new System.Collections.Generic.HashSet<string>(System.StringComparer.Ordinal);
             foreach (var info in typeInfos)
             {
+                var fqn = info.Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+                if (!seenTypes.Add(fqn))
+                    continue;
                 ProcessTypeInfo(ctx, info, registrations);
             }
 
@@ -129,17 +174,57 @@ public sealed class ServiceRegistrationGenerator : IIncrementalGenerator
     }
 
     // -------------------------------------------------------------------------
-    // CollectTypeInfo: gathers all info needed for conflict detection + emission
+    // CollectTypeInfoFromAttributeContext: attribute path (ForAttributeWithMetadataName)
+    // TargetSymbol is already resolved — no CompilationProvider needed.
     // -------------------------------------------------------------------------
 
-    private static IEnumerable<DiscoveredTypeInfo> CollectTypeInfo(
-        Compilation compilation,
+    private static ImmutableArray<DiscoveredTypeInfo> CollectTypeInfoFromAttributeContext(
+        GeneratorAttributeSyntaxContext ctx)
+    {
+        if (ctx.TargetSymbol is not INamedTypeSymbol type) return ImmutableArray<DiscoveredTypeInfo>.Empty;
+        if (ctx.TargetNode is not ClassDeclarationSyntax classDecl) return ImmutableArray<DiscoveredTypeInfo>.Empty;
+        if (type.IsAbstract || type.TypeKind != TypeKind.Class) return ImmutableArray<DiscoveredTypeInfo>.Empty;
+
+        return CollectTypeInfoCore(type, classDecl);
+    }
+
+    // -------------------------------------------------------------------------
+    // CollectMarkerOnlyTypeInfo: marker-interface path (CreateSyntaxProvider).
+    // Skips classes that already have a DI attribute (handled by the attribute pipeline).
+    // Uses per-node SemanticModel — no CompilationProvider needed.
+    // -------------------------------------------------------------------------
+
+    private static ImmutableArray<DiscoveredTypeInfo> CollectMarkerOnlyTypeInfo(
+        GeneratorSyntaxContext ctx)
+    {
+        if (ctx.Node is not ClassDeclarationSyntax classDecl) return ImmutableArray<DiscoveredTypeInfo>.Empty;
+        if (ctx.SemanticModel.GetDeclaredSymbol(classDecl) is not INamedTypeSymbol type)
+            return ImmutableArray<DiscoveredTypeInfo>.Empty;
+        if (type.IsAbstract || type.TypeKind != TypeKind.Class) return ImmutableArray<DiscoveredTypeInfo>.Empty;
+
+        // Skip if already handled by the attribute pipeline.
+        foreach (var attr in type.GetAttributes())
+        {
+            if (attr.AttributeClass is null) continue;
+            var (lifetime, _) = ResolveAttributeLifetimeWithLegacyFlag(attr.AttributeClass);
+            if (lifetime is not null) return ImmutableArray<DiscoveredTypeInfo>.Empty;
+        }
+
+        // Only emit if there is at least one marker lifetime.
+        var markerLifetimes = CollectMarkerLifetimes(type);
+        if (markerLifetimes.Count == 0) return ImmutableArray<DiscoveredTypeInfo>.Empty;
+
+        return CollectTypeInfoCore(type, classDecl);
+    }
+
+    // -------------------------------------------------------------------------
+    // CollectTypeInfoCore: shared logic for both attribute and marker paths.
+    // -------------------------------------------------------------------------
+
+    private static ImmutableArray<DiscoveredTypeInfo> CollectTypeInfoCore(
+        INamedTypeSymbol type,
         ClassDeclarationSyntax classDecl)
     {
-        var model = compilation.GetSemanticModel(classDecl.SyntaxTree);
-        if (model.GetDeclaredSymbol(classDecl) is not INamedTypeSymbol type) yield break;
-        if (type.IsAbstract || type.TypeKind != TypeKind.Class) yield break;
-
         // Collect all lifetime attributes on the type.
         var lifetimeAttrs = new List<(AttributeData Attr, string Lifetime, bool IsLegacy)>();
         foreach (var attr in type.GetAttributes())
@@ -153,6 +238,10 @@ public sealed class ServiceRegistrationGenerator : IIncrementalGenerator
 
         // Collect marker interface lifetimes.
         var markerLifetimes = CollectMarkerLifetimes(type);
+
+        // Guard: nothing to emit.
+        if (lifetimeAttrs.Count == 0 && markerLifetimes.Count == 0)
+            return ImmutableArray<DiscoveredTypeInfo>.Empty;
 
         // Collect generic marker service type(s). A class may implement multiple generic markers
         // with different TService arguments — detect that as ambiguous rather than silently
@@ -182,28 +271,20 @@ public sealed class ServiceRegistrationGenerator : IIncrementalGenerator
         INamedTypeSymbol? attributeServiceType = null;
         var allowSelfRegistration = false;
         string? serviceKey = null;
-        switch (lifetimeAttrs.Count)
+        if (lifetimeAttrs.Count == 1)
         {
-            case 1:
+            foreach (var kv in lifetimeAttrs[0].Attr.NamedArguments)
             {
-                foreach (var kv in lifetimeAttrs[0].Attr.NamedArguments)
-                {
-                    if (kv is { Key: "ServiceType", Value.Value: INamedTypeSymbol svc })
-                        attributeServiceType = svc;
-                    else if (kv is { Key: "AllowSelfRegistration", Value.Value: bool allow })
-                        allowSelfRegistration = allow;
-                    else if (kv is { Key: "ServiceKey", Value.Value: string key })
-                        serviceKey = key;
-                }
-
-                break;
+                if (kv is { Key: "ServiceType", Value.Value: INamedTypeSymbol svc })
+                    attributeServiceType = svc;
+                else if (kv is { Key: "AllowSelfRegistration", Value.Value: bool allow })
+                    allowSelfRegistration = allow;
+                else if (kv is { Key: "ServiceKey", Value.Value: string key })
+                    serviceKey = key;
             }
-            // Only yield if there's something to process.
-            case 0 when markerLifetimes.Count == 0:
-                yield break;
         }
 
-        yield return new DiscoveredTypeInfo(
+        return ImmutableArray.Create(new DiscoveredTypeInfo(
             type: type,
             classDecl: classDecl,
             lifetimeAttrs: lifetimeAttrs,
@@ -212,7 +293,7 @@ public sealed class ServiceRegistrationGenerator : IIncrementalGenerator
             multipleGenericMarkerServiceTypes: multipleGenericMarkerServiceTypes,
             attributeServiceType: attributeServiceType,
             allowSelfRegistration: allowSelfRegistration,
-            serviceKey: serviceKey);
+            serviceKey: serviceKey));
     }
 
     private static List<string> CollectMarkerLifetimes(INamedTypeSymbol type)
@@ -464,30 +545,53 @@ public sealed class ServiceRegistrationGenerator : IIncrementalGenerator
         _ => null
     };
 
-    private static IEnumerable<RegistrarCandidate> DiscoverRegistrarCandidates(
-        Compilation compilation,
-        ClassDeclarationSyntax classDecl)
+    // -------------------------------------------------------------------------
+    // DiscoverRegistrarCandidatesFromContext: registrar path (CreateSyntaxProvider).
+    // Uses per-node SemanticModel — no CompilationProvider needed.
+    // -------------------------------------------------------------------------
+
+    private static ImmutableArray<RegistrarCandidate> DiscoverRegistrarCandidatesFromContext(
+        GeneratorSyntaxContext ctx)
     {
-        var model = compilation.GetSemanticModel(classDecl.SyntaxTree);
-        if (model.GetDeclaredSymbol(classDecl) is not INamedTypeSymbol type) yield break;
-        if (type.IsAbstract || type.TypeKind != TypeKind.Class) yield break;
+        if (ctx.Node is not ClassDeclarationSyntax classDecl)
+            return ImmutableArray<RegistrarCandidate>.Empty;
+        if (ctx.SemanticModel.GetDeclaredSymbol(classDecl) is not INamedTypeSymbol type)
+            return ImmutableArray<RegistrarCandidate>.Empty;
+        if (type.IsAbstract || type.TypeKind != TypeKind.Class)
+            return ImmutableArray<RegistrarCandidate>.Empty;
 
-        if (!type.AllInterfaces.Any(i =>
-                i.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
-                    == "global::Themia.DependencyInjection.IThemiaServiceRegistrar"))
-            yield break;
+        var isRegistrar = false;
+        foreach (var iface in type.AllInterfaces)
+        {
+            if (iface.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
+                    == "global::Themia.DependencyInjection.IThemiaServiceRegistrar")
+            {
+                isRegistrar = true;
+                break;
+            }
+        }
 
-        var hasParameterlessCtor = type.Constructors.Any(c =>
-            c.Parameters.Length == 0 && c.DeclaredAccessibility == Accessibility.Public);
+        if (!isRegistrar) return ImmutableArray<RegistrarCandidate>.Empty;
+
+        var hasParameterlessCtor = false;
+        foreach (var ctor in type.Constructors)
+        {
+            if (ctor.Parameters.Length == 0 && ctor.DeclaredAccessibility == Accessibility.Public)
+            {
+                hasParameterlessCtor = true;
+                break;
+            }
+        }
+
         var isInternal = type.DeclaredAccessibility == Accessibility.Internal;
         var location = type.Locations.FirstOrDefault() ?? Location.None;
 
-        yield return new RegistrarCandidate(
+        return ImmutableArray.Create(new RegistrarCandidate(
             name: type.Name,
             globalQualifiedName: ToGlobalQualified(type),
             hasPublicParameterlessCtor: hasParameterlessCtor,
             isInternal: isInternal,
-            location: location);
+            location: location));
     }
 
     // IsLegacy / THEMIA010 are reserved scaffolding: Themia is a clean brand with no superseded

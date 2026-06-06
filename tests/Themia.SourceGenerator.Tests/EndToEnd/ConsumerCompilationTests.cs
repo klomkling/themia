@@ -59,4 +59,79 @@ public class ConsumerCompilationTests
         Assert.True(compileErrors.Count == 0,
             "Generated code did not compile cleanly: " + string.Join("; ", compileErrors));
     }
+
+    /// <summary>
+    /// Regression gate for CS0121: a consumer that references an upstream assembly which
+    /// already emitted a <c>public Themia.Generated.ThemiaServiceRegistrations</c> must NOT
+    /// get an ambiguous-extension-method error when the generator also runs in its own
+    /// compilation. After the fix the generated class is <c>internal</c>, so the two types
+    /// exist in different assemblies and never collide.
+    /// </summary>
+    [Fact]
+    public void Di_generator_emits_internal_class_no_CS0121_when_upstream_has_public_ThemiaServiceRegistrations()
+    {
+        // Simulate an upstream assembly that already contains a PUBLIC ThemiaServiceRegistrations
+        // with AddThemiaServices — this is the exact scenario that caused CS0121 before the fix.
+        const string upstreamSource = """
+            using Microsoft.Extensions.DependencyInjection;
+            namespace Themia.Generated;
+            public static class ThemiaServiceRegistrations
+            {
+                public static IServiceCollection AddThemiaServices(this IServiceCollection services)
+                    => services;
+            }
+            """;
+
+        IEnumerable<MetadataReference> baseReferences = AppDomain.CurrentDomain.GetAssemblies()
+            .Where(a => !a.IsDynamic && !string.IsNullOrEmpty(a.Location))
+            .Select(a => (MetadataReference)MetadataReference.CreateFromFile(a.Location))
+            .Append(MetadataReference.CreateFromFile(
+                typeof(Themia.DependencyInjection.ScopedAttribute).Assembly.Location))
+            .Append(MetadataReference.CreateFromFile(
+                typeof(Microsoft.Extensions.DependencyInjection.IServiceCollection).Assembly.Location));
+
+        // Build the upstream assembly that contains the public class.
+        var upstreamCompilation = CSharpCompilation.Create(
+            "Upstream",
+            [CSharpSyntaxTree.ParseText(upstreamSource)],
+            baseReferences,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+        var upstreamRef = upstreamCompilation.ToMetadataReference();
+
+        // Consumer compilation references the upstream assembly (with its public
+        // ThemiaServiceRegistrations) and also runs the DI generator.
+        const string consumerSource = """
+            using Themia.DependencyInjection;
+            namespace Consumer;
+            public interface IBarService { }
+            [Scoped]
+            public class BarService : IBarService { }
+            """;
+
+        var consumerCompilation = CSharpCompilation.Create(
+            "Consumer",
+            [CSharpSyntaxTree.ParseText(consumerSource)],
+            baseReferences.Append(upstreamRef),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+        GeneratorDriver driver = CSharpGeneratorDriver.Create(new ServiceRegistrationGenerator());
+        driver = driver.RunGeneratorsAndUpdateCompilation(
+            consumerCompilation, out var outputCompilation, out var generatorDiagnostics);
+
+        // Generator itself must not error.
+        Assert.DoesNotContain(generatorDiagnostics, d => d.Severity == DiagnosticSeverity.Error);
+
+        // The generated source must use "internal static class", not "public static class".
+        var generated = string.Join("\n", outputCompilation.SyntaxTrees.Select(t => t.ToString()));
+        Assert.Contains("internal static class ThemiaServiceRegistrations", generated);
+        Assert.DoesNotContain("public static class ThemiaServiceRegistrations", generated);
+
+        // The output compilation must compile without errors — in particular no CS0121.
+        var compileErrors = outputCompilation.GetDiagnostics()
+            .Where(d => d.Severity == DiagnosticSeverity.Error)
+            .ToList();
+        Assert.True(compileErrors.Count == 0,
+            "CS0121 or other compile error after fix: " + string.Join("; ", compileErrors));
+    }
 }

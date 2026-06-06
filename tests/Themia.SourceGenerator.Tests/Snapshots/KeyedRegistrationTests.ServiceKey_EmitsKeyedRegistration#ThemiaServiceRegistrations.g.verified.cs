@@ -6,7 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Themia.Generated;
 
-public static class ThemiaServiceRegistrations
+internal static class ThemiaServiceRegistrations
 {
     public static IServiceCollection AddThemiaServices(this IServiceCollection services)
     {

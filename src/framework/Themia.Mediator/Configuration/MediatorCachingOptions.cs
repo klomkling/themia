@@ -34,14 +34,14 @@ public sealed class MediatorCachingOptions
     /// These suffixes are used to identify request types and compute their scope roots.
     /// Default values: ["Query", "Command", "Request"]
     /// </summary>
-    public string[] KnownTypeSuffixes { get; set; } = ["Query", "Command", "Request"];
+    public IReadOnlyList<string> KnownTypeSuffixes { get; set; } = ["Query", "Command", "Request"];
 
     /// <summary>
     /// Gets or sets the known verb prefixes used for automatic scope invalidation.
     /// These prefixes are used to extract the entity/resource name from request types.
     /// Default values: ["Get", "List", "Find", "Create", "Update", "Delete", "Remove", "Add", "Set"]
     /// </summary>
-    public string[] KnownVerbPrefixes { get; set; } =
+    public IReadOnlyList<string> KnownVerbPrefixes { get; set; } =
     [
         "Get",
         "List",

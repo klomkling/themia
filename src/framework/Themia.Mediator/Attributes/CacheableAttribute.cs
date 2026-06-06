@@ -10,14 +10,16 @@ public sealed class CacheableAttribute : Attribute
 {
     /// <summary>
     /// Gets or sets the absolute expiration time in seconds.
-    /// Use a value > 0 to enable, or -1 to indicate not set (fallback to interface/global default).
+    /// Use a positive value to enable. Leave at the default (0) to fall back to the interface
+    /// or global default. Zero and negative values are treated as "not set".
     /// </summary>
-    public int AbsoluteExpirationSeconds { get; set; } = -1;
+    public int AbsoluteExpirationSeconds { get; set; }
 
     /// <summary>
     /// Gets or sets the sliding expiration time in seconds.
     /// The cache entry will be removed if not accessed within this timespan.
-    /// Use a value > 0 to enable, or -1 to indicate not set (fallback to interface/global default).
+    /// Use a positive value to enable. Leave at the default (0) to fall back to the interface
+    /// or global default. Zero and negative values are treated as "not set".
     /// </summary>
-    public int SlidingExpirationSeconds { get; set; } = -1;
+    public int SlidingExpirationSeconds { get; set; }
 }

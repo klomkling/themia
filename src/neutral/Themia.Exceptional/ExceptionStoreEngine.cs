@@ -9,16 +9,16 @@ public sealed class ExceptionStoreEngine : IExceptionStore
     private readonly IExceptionalSqlDialect dialect;
     private readonly TimeSpan rollupPeriod;
 
-    /// <summary>Creates the engine over <paramref name="dialect"/>.</summary>
+    /// <summary>Creates the engine over <paramref name="dialect"/> using <paramref name="options"/>.</summary>
     /// <param name="dialect">Provider strategy.</param>
-    /// <param name="rollupPeriod">Duplicate rollup window. Defaults to 10 minutes.</param>
-    public ExceptionStoreEngine(IExceptionalSqlDialect dialect, TimeSpan? rollupPeriod = null)
+    /// <param name="options">Configuration including the rollup window. Must not be <see langword="null"/>.</param>
+    public ExceptionStoreEngine(IExceptionalSqlDialect dialect, ExceptionalOptions options)
     {
         ArgumentNullException.ThrowIfNull(dialect);
-        var period = rollupPeriod ?? TimeSpan.FromMinutes(10);
-        ArgumentOutOfRangeException.ThrowIfLessThan(period, TimeSpan.Zero);
+        ArgumentNullException.ThrowIfNull(options);
+        ArgumentOutOfRangeException.ThrowIfLessThan(options.RollupPeriod, TimeSpan.Zero);
         this.dialect = dialect;
-        this.rollupPeriod = period;
+        this.rollupPeriod = options.RollupPeriod;
     }
 
     /// <inheritdoc />
@@ -112,23 +112,13 @@ public sealed class ExceptionStoreEngine : IExceptionStore
 
     private DynamicParameters ToArgs(ExceptionFilter filter)
     {
-        // Explicit DbType on nullable string/temporal parameters is required for Npgsql 6+: when a
+        // Explicit DbType on nullable string parameters is required for Npgsql 6+: when a
         // value is null Npgsql cannot infer the PostgreSQL column type and throws "could not determine
-        // data type". Temporal DbType is provider-specific (e.g. null for SQLite — infer from value).
+        // data type". Temporal binding is delegated to the dialect so each provider uses the correct DbType.
         var args = new DynamicParameters();
         args.Add("ApplicationName", filter.ApplicationName, DbType.String);
         args.Add("TenantId", filter.TenantId, DbType.String);
-        var temporalType = dialect.TemporalFilterDbType;
-        if (temporalType.HasValue)
-        {
-            args.Add("From", ToUtc(filter.From), temporalType.Value);
-            args.Add("To", ToUtc(filter.To), temporalType.Value);
-        }
-        else
-        {
-            args.Add("From", filter.From);
-            args.Add("To", filter.To);
-        }
+        dialect.AddTemporalFilters(args, ToUtc(filter.From), ToUtc(filter.To));
         args.Add("Search", string.IsNullOrWhiteSpace(filter.Search) ? null : $"%{filter.Search}%", DbType.String);
         args.Add("IncludeDeleted", filter.IncludeDeleted);
         return args;

@@ -10,12 +10,28 @@ public sealed class ExceptionLogMigration : Migration
     /// <inheritdoc />
     public override void Up()
     {
-        // Only the three supported providers create the table — and the indexes are created in the same
-        // per-provider block (CreateTable), so an unmatched provider produces no table AND no index attempt
-        // (rather than failing with a confusing "Exceptions does not exist" at unconditional index creation).
+        // LOCKSTEP: this per-provider list and the unsupported-provider guard below are two parallel
+        // whitelists that MUST agree. Adding a provider here (a CreateTable branch) without adding its
+        // prefix to the guard leaves it throwing NotSupportedException; adding it to the guard without a
+        // branch here lets it through to a column-type failure. Edit BOTH when adding a provider.
         IfDatabase("postgres").Delegate(() => CreateTable(c => c.AsDateTimeOffset()));
         IfDatabase("mysql").Delegate(() => CreateTable(c => c.AsCustom("DATETIME(6)")));
         IfDatabase("sqlserver").Delegate(() => CreateTable(c => c.AsDateTime2()));
+
+        // Fail fast if run against an unsupported provider so the caller gets a clear error at
+        // migration time rather than a confusing "table does not exist" failure at runtime.
+        // The predicate receives the processor's primary DatabaseType (e.g. "Postgres", "MySql8",
+        // "SqlServer2016") — not the friendly aliases used by the string overload — so we match by
+        // prefix to cover all versioned variants of each supported family. MariaDB runs on the MySql
+        // processor (DatabaseType "MySql8" → matches the "MySql" prefix and the mysql CreateTable
+        // branch); a literal "MariaDB" DatabaseType has no branch, so it correctly throws here.
+        IfDatabase(p =>
+                !p.StartsWith("Postgres", System.StringComparison.OrdinalIgnoreCase) &&
+                !p.StartsWith("MySql", System.StringComparison.OrdinalIgnoreCase) &&
+                !p.StartsWith("SqlServer", System.StringComparison.OrdinalIgnoreCase))
+            .Delegate(() => throw new System.NotSupportedException(
+                "Themia.Exceptional supports only PostgreSQL, MySQL/MariaDB, and SQL Server. " +
+                "The active database provider is not supported; add a migration branch for it."));
     }
 
     private void CreateTable(System.Func<ICreateTableColumnAsTypeSyntax, ICreateTableColumnOptionOrWithColumnSyntax> ts)
@@ -54,6 +70,11 @@ public sealed class ExceptionLogMigration : Migration
             .OnColumn("CreationDate").Ascending();
         Create.Index("IX_Exceptions_DeletionDate")
             .OnTable("Exceptions").OnColumn("DeletionDate").Ascending();
+        // Purge query: WHERE IsProtected = FALSE AND CreationDate < @OlderThan
+        Create.Index("IX_Exceptions_Protected_Created")
+            .OnTable("Exceptions")
+            .OnColumn("IsProtected").Ascending()
+            .OnColumn("CreationDate").Ascending();
     }
 
     /// <inheritdoc />

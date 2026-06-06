@@ -66,6 +66,27 @@ public class ConflictDiagnosticTests
     }
 
     [Fact]
+    public void THEMIA001_MultipleAttributes_DiagnosticReportedExactlyOnce()
+    {
+        // Regression: with three separate ForAttributeWithMetadataName pipelines (Scoped,
+        // Singleton, Transient), a class with [Scoped][Singleton] enters BOTH the Scoped
+        // and Singleton pipelines and is processed twice → THEMIA001 fires twice. The fix
+        // must dedup discovered types before processing so the diagnostic fires exactly once.
+        const string source = """
+            using Themia.DependencyInjection;
+            namespace Demo;
+            public interface IFoo { }
+            [Scoped][Singleton]
+            public class Foo : IFoo { }
+            """;
+
+        var result = RunGenerator(source);
+
+        var themia001Count = result.Diagnostics.Count(d => d.Id == "THEMIA001");
+        Assert.Equal(1, themia001Count);
+    }
+
+    [Fact]
     public void THEMIA006_AttributeOnly_NoInterface_IsDiagnosed()
     {
         // [Scoped] with no I{ClassName} interface and AllowSelfRegistration=false: the

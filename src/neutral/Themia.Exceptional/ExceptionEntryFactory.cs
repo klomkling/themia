@@ -28,7 +28,7 @@ public static class ExceptionEntryFactory
             Source = exception.Source.Truncate(SourceMax),
             Message = (exception.Message ?? string.Empty).Truncate(MessageMax)!,
             Detail = Serialize(exception),
-            ErrorHash = ExceptionHash.Compute(type, exception.StackTrace ?? exception.Message),
+            ErrorHash = ExceptionHash.Compute(type, exception.StackTrace ?? $"{exception.Source}|{exception.Message}|{exception.InnerException?.GetType().FullName}"),
             DuplicateCount = 1,
             CreationDate = now,
             LastLogDate = now,

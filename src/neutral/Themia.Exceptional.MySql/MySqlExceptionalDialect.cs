@@ -1,5 +1,6 @@
 using System.Data;
 using System.Data.Common;
+using Dapper;
 using MySqlConnector;
 using Themia.Exceptional;
 
@@ -32,7 +33,11 @@ public sealed class MySqlExceptionalDialect : IExceptionalSqlDialect
     public DbConnection CreateConnection() => new MySqlConnection(connectionString);
 
     /// <inheritdoc />
-    public DbType? TemporalFilterDbType => DbType.DateTime;
+    public void AddTemporalFilters(DynamicParameters args, DateTime? from, DateTime? to)
+    {
+        args.Add("From", from, DbType.DateTime);
+        args.Add("To", to, DbType.DateTime);
+    }
 
     /// <inheritdoc />
     public string RollupSql => """

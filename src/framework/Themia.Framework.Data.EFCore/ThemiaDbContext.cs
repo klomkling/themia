@@ -77,6 +77,21 @@ public abstract class ThemiaDbContext : DbContext
     protected TenantId? CurrentTenantId => tenantContext?.CurrentTenantId;
 
     /// <summary>
+    /// Gets the tenant identifier that the runtime query filter actually evaluates against, by strategy.
+    /// Find must read the same source as <see cref="GetCurrentTenantExpression"/> so they can never disagree.
+    /// </summary>
+    /// <remarks>
+    /// <list type="bullet">
+    /// <item><term>RuntimeTenantAccess</term><description>Reads <see cref="TenantContextAccessor.CurrentTenantId"/> — identical to the runtime filter expression.</description></item>
+    /// <item><term>PerTenantModel</term><description>Reads the injected <see cref="CurrentTenantId"/> — the filter bakes this value as a constant at model-build time.</description></item>
+    /// </list>
+    /// </remarks>
+    private TenantId? EffectiveFilterTenantId =>
+        TenantIsolationStrategy == TenantIsolationStrategy.RuntimeTenantAccess
+            ? TenantContextAccessor.CurrentTenantId   // same source as the runtime filter
+            : CurrentTenantId;                          // PerTenantModel: injected/constant (filter bakes a constant of this)
+
+    /// <summary>
     /// Gets the injected tenant context, when provided.
     /// </summary>
     protected ITenantContext? TenantContext => tenantContext;
@@ -258,7 +273,7 @@ public abstract class ThemiaDbContext : DbContext
         }
 
         var entityTenantId = tenantEntity.TenantId;
-        var currentTenantId = CurrentTenantId;
+        var currentTenantId = EffectiveFilterTenantId;
 
         // Check if entity belongs to current tenant
         if (currentTenantId is null)
@@ -304,7 +319,7 @@ public abstract class ThemiaDbContext : DbContext
 
         var tenantEntity = (ITenantEntity)entity;
         var entityTenantId = tenantEntity.TenantId;
-        var currentTenantId = CurrentTenantId;
+        var currentTenantId = EffectiveFilterTenantId;
 
         if (currentTenantId is null)
         {
@@ -349,7 +364,7 @@ public abstract class ThemiaDbContext : DbContext
         base.OnModelCreating(modelBuilder);
 
         ApplyTenantIdConversions(modelBuilder);
-        ApplyConcurrencyTokens(modelBuilder);
+        ApplyConcurrencyTokens(modelBuilder, Database.IsNpgsql());
 
         if (EnableTenantFilters)
         {
@@ -450,9 +465,32 @@ public abstract class ThemiaDbContext : DbContext
     }
 
     /// <summary>
-    /// Configures RowVersion as a concurrency token for entities implementing IConcurrencyAware.
+    /// Configures optimistic concurrency for entities implementing <see cref="IConcurrencyAware"/>.
     /// </summary>
-    private static void ApplyConcurrencyTokens(ModelBuilder modelBuilder)
+    /// <remarks>
+    /// On SQL Server (and other non-Npgsql providers), <c>byte[] RowVersion</c> with
+    /// <c>IsRowVersion()</c> maps to a server-maintained <c>rowversion</c> column — correct.
+    ///
+    /// On Npgsql (PostgreSQL), <c>byte[] IsRowVersion()</c> maps to <c>bytea</c>, which is
+    /// <em>not</em> server-populated. PostgreSQL never updates it, so <c>DbUpdateConcurrencyException</c>
+    /// would never fire. The Npgsql EF Core convention maps a <c>uint</c> property marked
+    /// <c>IsRowVersion()</c> (concurrency token + OnAddOrUpdate) to the PostgreSQL system column
+    /// <c>xmin</c>, which is server-maintained and changes on every row write.
+    ///
+    /// Fix: on Npgsql, add a shadow <c>uint</c> property configured as <c>IsRowVersion()</c> so
+    /// Npgsql's convention routes it to <c>xmin</c>. The <c>byte[] RowVersion</c> column stays
+    /// mapped as a plain column; dropping it under Postgres is a deferred migration-level cleanup.
+    ///
+    /// <para><b>LANDMINE for future providers:</b> the <c>else</c> branch (<c>byte[] IsRowVersion()</c>)
+    /// is correct <em>only</em> for SQL Server's server-maintained <c>rowversion</c>. <b>MySQL/MariaDB
+    /// fall into this branch too and silently break</b> — MySQL has no <c>rowversion</c> concept, so the
+    /// <c>byte[]</c> token is never server-updated and concurrency never fires (the exact Npgsql trap
+    /// above). It is not branched here because this project references only Npgsql; <c>Database.IsMySql()</c>
+    /// needs the Pomelo package. The correct per-provider concurrency mapping must ship in the MySQL
+    /// <c>IDatabaseProvider</c> package when it lands (e.g. a regular <c>IsConcurrencyToken()</c> column
+    /// the app updates), and add an explicit branch here at that time.</para>
+    /// </remarks>
+    private static void ApplyConcurrencyTokens(ModelBuilder modelBuilder, bool isNpgsql)
     {
         foreach (var entityType in modelBuilder.Model.GetEntityTypes())
         {
@@ -461,11 +499,35 @@ public abstract class ThemiaDbContext : DbContext
                 continue;
             }
 
-            var property = entityType.FindProperty(nameof(IConcurrencyAware.RowVersion));
-            if (property is not null)
+            var builder = modelBuilder.Entity(entityType.ClrType);
+
+            if (isNpgsql)
             {
-                var builder = modelBuilder.Entity(entityType.ClrType);
-                builder.Property(nameof(IConcurrencyAware.RowVersion)).IsRowVersion();
+                // PostgreSQL: byte[] IsRowVersion() maps to non-server-populated bytea — concurrency
+                // check never fires. Instead, add a uint shadow property with IsRowVersion() so that
+                // Npgsql's NpgsqlPostgresModelFinalizingConvention maps it to the server-maintained
+                // system column xmin (which increments on every row write).
+                builder.Property<uint>("xmin").IsRowVersion();
+
+                // Keep the byte[] RowVersion column mapped as a plain column for schema compatibility.
+                // Dropping it under Postgres is a deferred migration-level cleanup.
+                var rowVersionProp = entityType.FindProperty(nameof(IConcurrencyAware.RowVersion));
+                if (rowVersionProp is not null)
+                {
+                    builder.Property(nameof(IConcurrencyAware.RowVersion));
+                }
+            }
+            else
+            {
+                // SQL Server: byte[] IsRowVersion() → server-maintained `rowversion` (correct).
+                // InMemory test provider also relies on this path.
+                // WARNING: MySQL/MariaDB also land here and are SILENTLY WRONG — see the <remarks>
+                // on this method. Add an explicit provider branch when the MySQL provider ships.
+                var rowVersionProp = entityType.FindProperty(nameof(IConcurrencyAware.RowVersion));
+                if (rowVersionProp is not null)
+                {
+                    builder.Property(nameof(IConcurrencyAware.RowVersion)).IsRowVersion();
+                }
             }
         }
     }
@@ -508,6 +570,11 @@ public abstract class ThemiaDbContext : DbContext
     /// Resolves the current tenant expression for query filters based on the configured strategy.
     /// </summary>
     /// <returns>An expression that yields the current tenant id.</returns>
+    /// <remarks>
+    /// LOCKSTEP: this strategy switch and <see cref="EffectiveFilterTenantId"/> must read the same
+    /// tenant source per strategy — the query filter (this) and Find's post-check (that) disagreeing
+    /// re-opens the cross-tenant Find leak. Add any new <see cref="TenantIsolationStrategy"/> to BOTH.
+    /// </remarks>
     private Expression GetCurrentTenantExpression() =>
         TenantIsolationStrategy == TenantIsolationStrategy.PerTenantModel
             ? Expression.Constant(CurrentTenantId, typeof(TenantId?))

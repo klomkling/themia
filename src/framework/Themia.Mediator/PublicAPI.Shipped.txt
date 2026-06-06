@@ -54,10 +54,6 @@ Themia.Mediator.Configuration.MediatorCachingOptions.DefaultSlidingExpiration.ge
 Themia.Mediator.Configuration.MediatorCachingOptions.DefaultSlidingExpiration.set -> void
 Themia.Mediator.Configuration.MediatorCachingOptions.EnableAutomaticScopeInvalidation.get -> bool
 Themia.Mediator.Configuration.MediatorCachingOptions.EnableAutomaticScopeInvalidation.set -> void
-Themia.Mediator.Configuration.MediatorCachingOptions.KnownTypeSuffixes.get -> string![]!
-Themia.Mediator.Configuration.MediatorCachingOptions.KnownTypeSuffixes.set -> void
-Themia.Mediator.Configuration.MediatorCachingOptions.KnownVerbPrefixes.get -> string![]!
-Themia.Mediator.Configuration.MediatorCachingOptions.KnownVerbPrefixes.set -> void
 Themia.Mediator.Configuration.MediatorCachingOptions.MediatorCachingOptions() -> void
 Themia.Mediator.GenerateMediatorHandlersAttribute
 Themia.Mediator.GenerateMediatorHandlersAttribute.GenerateMediatorHandlersAttribute() -> void
@@ -111,5 +107,3 @@ Themia.Mediator.Infrastructure.DefaultCacheKeyFactory.CreateScopeRoot(System.Typ
 Themia.Mediator.Infrastructure.InMemoryDistributedLockProvider
 Themia.Mediator.Infrastructure.InMemoryDistributedLockProvider.InMemoryDistributedLockProvider() -> void
 Themia.Mediator.Infrastructure.InMemoryDistributedLockProvider.AcquireAsync(string! resource, System.TimeSpan timeout, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Mediator.Abstractions.IDistributedLock!>!
-Themia.Generated.ThemiaServiceRegistrations
-static Themia.Generated.ThemiaServiceRegistrations.AddThemiaServices(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!

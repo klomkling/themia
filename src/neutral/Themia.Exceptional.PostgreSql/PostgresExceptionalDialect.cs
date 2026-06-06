@@ -1,5 +1,6 @@
 using System.Data;
 using System.Data.Common;
+using Dapper;
 using Npgsql;
 using Themia.Exceptional;
 
@@ -17,7 +18,11 @@ public sealed class PostgresExceptionalDialect : IExceptionalSqlDialect
     public DbConnection CreateConnection() => new NpgsqlConnection(connectionString);
 
     /// <inheritdoc />
-    public DbType? TemporalFilterDbType => DbType.DateTimeOffset;
+    public void AddTemporalFilters(DynamicParameters args, DateTime? from, DateTime? to)
+    {
+        args.Add("From", from, DbType.DateTimeOffset);
+        args.Add("To", to, DbType.DateTimeOffset);
+    }
 
     /// <inheritdoc />
     public string RollupSql => """

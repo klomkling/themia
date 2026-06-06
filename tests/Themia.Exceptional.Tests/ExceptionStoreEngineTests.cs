@@ -18,7 +18,7 @@ public class ExceptionStoreEngineTests : IDisposable
         keepAlive = new SqliteConnection(connString);
         keepAlive.Open();
         keepAlive.Execute(SqliteExceptionalDialect.CreateTableSql);
-        engine = new ExceptionStoreEngine(new SqliteExceptionalDialect(connString));
+        engine = new ExceptionStoreEngine(new SqliteExceptionalDialect(connString), new ExceptionalOptions { ApplicationName = "App" });
     }
 
     private static ExceptionEntry NewEntry(string hash = "h1", string app = "App")
@@ -104,7 +104,7 @@ public class ExceptionStoreEngineTests : IDisposable
     [Fact]
     public async Task LogAsync_Inserts_NewRow_WhenExistingIsOlderThanRollupPeriod()
     {
-        var shortWindow = new ExceptionStoreEngine(new SqliteExceptionalDialect(connString), TimeSpan.FromMinutes(5));
+        var shortWindow = new ExceptionStoreEngine(new SqliteExceptionalDialect(connString), new ExceptionalOptions { ApplicationName = "App", RollupPeriod = TimeSpan.FromMinutes(5) });
 
         var old = NewEntry();
         old.CreationDate = DateTime.UtcNow.AddMinutes(-10); // outside the 5-min window
@@ -264,14 +264,20 @@ public class ExceptionStoreEngineTests : IDisposable
     [Fact]
     public void Constructor_ThrowsArgumentNullException_WhenDialectIsNull()
     {
-        Assert.Throws<ArgumentNullException>(() => new ExceptionStoreEngine(null!));
+        Assert.Throws<ArgumentNullException>(() => new ExceptionStoreEngine(null!, new ExceptionalOptions { ApplicationName = "App" }));
+    }
+
+    [Fact]
+    public void Constructor_ThrowsArgumentNullException_WhenOptionsIsNull()
+    {
+        Assert.Throws<ArgumentNullException>(() => new ExceptionStoreEngine(new SqliteExceptionalDialect(connString), null!));
     }
 
     [Fact]
     public void Constructor_ThrowsArgumentOutOfRange_WhenRollupPeriodNegative()
     {
         Assert.Throws<ArgumentOutOfRangeException>(
-            () => new ExceptionStoreEngine(new SqliteExceptionalDialect(connString), TimeSpan.FromSeconds(-1)));
+            () => new ExceptionStoreEngine(new SqliteExceptionalDialect(connString), new ExceptionalOptions { ApplicationName = "App", RollupPeriod = TimeSpan.FromSeconds(-1) }));
     }
 
     public void Dispose() => keepAlive.Dispose();
