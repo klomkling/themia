@@ -61,5 +61,10 @@
     <PackageVersion Include="Microsoft.Data.SqlClient" Version="6.0.1" />
     <PackageVersion Include="Testcontainers.MySql" Version="4.12.0" />
     <PackageVersion Include="Testcontainers.MsSql" Version="4.12.0" />
+    <!-- Quartz (Themia.Quartz neutral core): scheduler + SilkierQuartz vendored dashboard deps -->
+    <PackageVersion Include="Handlebars.Net" Version="2.1.6" />
+    <PackageVersion Include="JsonSubTypes" Version="2.0.1" />
+    <PackageVersion Include="Newtonsoft.Json" Version="13.0.4" />
+    <PackageVersion Include="Quartz" Version="3.18.0" />
   </ItemGroup>
 </Project>
