@@ -18,6 +18,8 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## 0.3.2 — 2026-06-07
+
 P3 hardening: SqlServer write precision, de-duplicated provider registration, a shared engine
 conformance test suite, and real DI-generator incrementality (clearing two 0.3.1 known limitations).
 
