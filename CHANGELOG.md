@@ -18,6 +18,33 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+P3 hardening: SqlServer write precision, de-duplicated provider registration, a shared engine
+conformance test suite, and real DI-generator incrementality (clearing two 0.3.1 known limitations).
+
+### Fixed
+
+- `Themia.Exceptional` — write-side temporal parameters (INSERT/rollup/soft-delete/purge) are now bound
+  with the provider's correct `DbType` via dialect-owned write parameters, so **SqlServer `datetime2`
+  columns keep sub-3.33 ms precision** (Dapper's default `DateTime` inference rounded to legacy `datetime`,
+  silently truncating on write). Postgres/MySQL behavior is unchanged.
+- `Themia.SourceGenerator` — the DI registration generator is now **genuinely incremental**: all semantic
+  analysis runs in the `transform` and the pipeline carries only equatable, compilation-free data (a
+  registration record + a replayable `DiagnosticInfo`), so the output node caches across unrelated edits
+  instead of re-running. Generated output and every diagnostic are byte-identical. Resolves the 0.3.1
+  known limitation.
+
+### Changed
+
+- `Themia.Exceptional` — provider packages (`PostgreSql`/`MySql`/`SqlServer`) now delegate to a shared
+  neutral `AddThemiaExceptionalProvider` helper; each provider package retains only its four deltas
+  (method name, dialect, FluentMigrator runner call, display name). No behavior change.
+
+### Tests
+
+- `Themia.Exceptional` — the three engine integration suites now share an `ExceptionStoreConformanceTests`
+  base (one `IExceptionStore` contract asserted identically on PostgreSQL/MySQL/SQL Server), replacing
+  ~640 lines of triplicated tests; engine-specific tests (e.g. SqlServer `datetime2` precision) stay local.
+
 ## 0.3.1 — 2026-06-06
 
 Hardening pass: unblock cross-assembly consumers of the DI generator, fix two EF Core correctness
