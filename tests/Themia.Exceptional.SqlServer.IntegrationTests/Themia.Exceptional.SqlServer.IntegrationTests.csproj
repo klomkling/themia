@@ -20,5 +20,6 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/neutral/Themia.Exceptional.SqlServer/Themia.Exceptional.SqlServer.csproj" />
+    <ProjectReference Include="../Themia.Exceptional.Conformance/Themia.Exceptional.Conformance.csproj" />
   </ItemGroup>
 </Project>
