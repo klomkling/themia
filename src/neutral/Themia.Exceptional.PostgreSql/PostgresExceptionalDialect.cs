@@ -79,4 +79,20 @@ public sealed class PostgresExceptionalDialect : IExceptionalSqlDialect
 
     /// <inheritdoc />
     public string PurgeSql => """DELETE FROM "Exceptions" WHERE "IsProtected" = FALSE AND "CreationDate" < @OlderThan;""";
+
+    /// <inheritdoc />
+    public DynamicParameters BuildInsertParameters(ExceptionEntry entry)
+        => ExceptionStoreParameters.Insert(entry, temporalDbType: null);
+
+    /// <inheritdoc />
+    public DynamicParameters BuildRollupParameters(ExceptionEntry entry, TimeSpan rollupPeriod)
+        => ExceptionStoreParameters.Rollup(entry, rollupPeriod, temporalDbType: null);
+
+    /// <inheritdoc />
+    public DynamicParameters BuildSoftDeleteParameters(Guid guid, DateTime deletionDateUtc)
+        => ExceptionStoreParameters.SoftDelete(guid, deletionDateUtc, temporalDbType: null);
+
+    /// <inheritdoc />
+    public DynamicParameters BuildPurgeParameters(DateTime olderThanUtc)
+        => ExceptionStoreParameters.Purge(olderThanUtc, temporalDbType: null);
 }

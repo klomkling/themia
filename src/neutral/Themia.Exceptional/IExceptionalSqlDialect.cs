@@ -48,4 +48,16 @@ public interface IExceptionalSqlDialect
 
     /// <summary>Deletes unprotected rows with CreationDate &lt; @OlderThan. Returns rows affected.</summary>
     string PurgeSql { get; }
+
+    /// <summary>Builds INSERT parameters for <paramref name="entry"/>, binding temporal columns with the provider's correct DbType.</summary>
+    DynamicParameters BuildInsertParameters(ExceptionEntry entry);
+
+    /// <summary>Builds rollup-UPDATE parameters for <paramref name="entry"/> over <paramref name="rollupPeriod"/>.</summary>
+    DynamicParameters BuildRollupParameters(ExceptionEntry entry, TimeSpan rollupPeriod);
+
+    /// <summary>Builds soft-delete-UPDATE parameters.</summary>
+    DynamicParameters BuildSoftDeleteParameters(Guid guid, DateTime deletionDateUtc);
+
+    /// <summary>Builds purge-DELETE parameters.</summary>
+    DynamicParameters BuildPurgeParameters(DateTime olderThanUtc);
 }

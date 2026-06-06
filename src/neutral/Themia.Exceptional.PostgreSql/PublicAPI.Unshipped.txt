@@ -2,6 +2,10 @@
 static Themia.Exceptional.PostgreSql.ServiceCollectionExtensions.AddThemiaExceptionalPostgres(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, string! connectionString, System.Action<Themia.Exceptional.ExceptionalOptions!>! configure) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
 Themia.Exceptional.PostgreSql.PostgresExceptionalDialect
 Themia.Exceptional.PostgreSql.PostgresExceptionalDialect.AddTemporalFilters(Dapper.DynamicParameters! args, System.DateTime? from, System.DateTime? to) -> void
+Themia.Exceptional.PostgreSql.PostgresExceptionalDialect.BuildInsertParameters(Themia.Exceptional.ExceptionEntry! entry) -> Dapper.DynamicParameters!
+Themia.Exceptional.PostgreSql.PostgresExceptionalDialect.BuildPurgeParameters(System.DateTime olderThanUtc) -> Dapper.DynamicParameters!
+Themia.Exceptional.PostgreSql.PostgresExceptionalDialect.BuildRollupParameters(Themia.Exceptional.ExceptionEntry! entry, System.TimeSpan rollupPeriod) -> Dapper.DynamicParameters!
+Themia.Exceptional.PostgreSql.PostgresExceptionalDialect.BuildSoftDeleteParameters(System.Guid guid, System.DateTime deletionDateUtc) -> Dapper.DynamicParameters!
 Themia.Exceptional.PostgreSql.PostgresExceptionalDialect.CountSql.get -> string!
 Themia.Exceptional.PostgreSql.PostgresExceptionalDialect.CreateConnection() -> System.Data.Common.DbConnection!
 Themia.Exceptional.PostgreSql.PostgresExceptionalDialect.GetByGuidSql.get -> string!

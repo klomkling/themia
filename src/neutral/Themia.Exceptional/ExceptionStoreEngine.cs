@@ -36,16 +36,12 @@ public sealed class ExceptionStoreEngine : IExceptionStore
         // split rollup rows. This is the accepted tradeoff: no data loss, no hot-path lock, and
         // duplicates naturally merge into the next rollup window.
         await using var connection = dialect.CreateConnection();
-        var rolledUp = await connection.ExecuteAsync(new CommandDefinition(dialect.RollupSql, new
-        {
-            entry.ErrorHash,
-            entry.ApplicationName,
-            RollupSince = entry.CreationDate - rollupPeriod,
-            entry.LastLogDate,
-        }, cancellationToken: cancellationToken));
+        var rolledUp = await connection.ExecuteAsync(new CommandDefinition(
+            dialect.RollupSql, dialect.BuildRollupParameters(entry, rollupPeriod), cancellationToken: cancellationToken));
 
         if (rolledUp == 0)
-            await connection.ExecuteAsync(new CommandDefinition(dialect.InsertSql, entry, cancellationToken: cancellationToken));
+            await connection.ExecuteAsync(new CommandDefinition(
+                dialect.InsertSql, dialect.BuildInsertParameters(entry), cancellationToken: cancellationToken));
     }
 
     /// <inheritdoc />
@@ -90,7 +86,7 @@ public sealed class ExceptionStoreEngine : IExceptionStore
 
     /// <inheritdoc />
     public Task<bool> DeleteAsync(Guid guid, CancellationToken cancellationToken = default)
-        => ExecuteAffectsRow(dialect.SoftDeleteSql, new { Guid = guid, DeletionDate = DateTime.UtcNow }, cancellationToken);
+        => ExecuteAffectsRow(dialect.SoftDeleteSql, dialect.BuildSoftDeleteParameters(guid, DateTime.UtcNow), cancellationToken);
 
     /// <inheritdoc />
     public Task<bool> HardDeleteAsync(Guid guid, CancellationToken cancellationToken = default)
@@ -100,8 +96,8 @@ public sealed class ExceptionStoreEngine : IExceptionStore
     public async Task<int> PurgeAsync(DateTime olderThanUtc, CancellationToken cancellationToken = default)
     {
         await using var connection = dialect.CreateConnection();
-        return await connection.ExecuteAsync(
-            new CommandDefinition(dialect.PurgeSql, new { OlderThan = ToUtc(olderThanUtc) }, cancellationToken: cancellationToken));
+        return await connection.ExecuteAsync(new CommandDefinition(
+            dialect.PurgeSql, dialect.BuildPurgeParameters(ToUtc(olderThanUtc)), cancellationToken: cancellationToken));
     }
 
     private async Task<bool> ExecuteAffectsRow(string sql, object args, CancellationToken cancellationToken)

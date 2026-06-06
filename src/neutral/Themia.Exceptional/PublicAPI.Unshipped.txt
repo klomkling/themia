@@ -4,6 +4,10 @@ override Themia.Exceptional.Migrations.ExceptionLogMigration.Down() -> void
 override Themia.Exceptional.Migrations.ExceptionLogMigration.Up() -> void
 static Themia.Exceptional.ExceptionEntryFactory.FromException(System.Exception! exception, string! applicationName, System.DateTime? utcNow = null) -> Themia.Exceptional.ExceptionEntry!
 static Themia.Exceptional.ExceptionHash.Compute(string! type, string? signature) -> string!
+static Themia.Exceptional.ExceptionStoreParameters.Insert(Themia.Exceptional.ExceptionEntry! entry, System.Data.DbType? temporalDbType) -> Dapper.DynamicParameters!
+static Themia.Exceptional.ExceptionStoreParameters.Purge(System.DateTime olderThanUtc, System.Data.DbType? temporalDbType) -> Dapper.DynamicParameters!
+static Themia.Exceptional.ExceptionStoreParameters.Rollup(Themia.Exceptional.ExceptionEntry! entry, System.TimeSpan rollupPeriod, System.Data.DbType? temporalDbType) -> Dapper.DynamicParameters!
+static Themia.Exceptional.ExceptionStoreParameters.SoftDelete(System.Guid guid, System.DateTime deletionDateUtc, System.Data.DbType? temporalDbType) -> Dapper.DynamicParameters!
 static Themia.Exceptional.ServiceCollectionExtensions.AddThemiaExceptionalCore(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Themia.Exceptional.ExceptionalOptions!>! configure) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
 static Themia.Exceptional.StringTruncateExtensions.Truncate(this string? value, int maxLength) -> string?
 Themia.Exceptional.ExceptionalOptions
@@ -83,6 +87,7 @@ Themia.Exceptional.ExceptionFilter.TenantId.set -> void
 Themia.Exceptional.ExceptionFilter.To.get -> System.DateTime?
 Themia.Exceptional.ExceptionFilter.To.set -> void
 Themia.Exceptional.ExceptionHash
+Themia.Exceptional.ExceptionStoreParameters
 Themia.Exceptional.ExceptionStoreEngine
 Themia.Exceptional.ExceptionStoreEngine.CountAsync(Themia.Exceptional.ExceptionFilter! filter, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<int>!
 Themia.Exceptional.ExceptionStoreEngine.DeleteAsync(System.Guid guid, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!
@@ -95,6 +100,10 @@ Themia.Exceptional.ExceptionStoreEngine.ProtectAsync(System.Guid guid, System.Th
 Themia.Exceptional.ExceptionStoreEngine.PurgeAsync(System.DateTime olderThanUtc, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<int>!
 Themia.Exceptional.IExceptionalSqlDialect
 Themia.Exceptional.IExceptionalSqlDialect.AddTemporalFilters(Dapper.DynamicParameters! args, System.DateTime? from, System.DateTime? to) -> void
+Themia.Exceptional.IExceptionalSqlDialect.BuildInsertParameters(Themia.Exceptional.ExceptionEntry! entry) -> Dapper.DynamicParameters!
+Themia.Exceptional.IExceptionalSqlDialect.BuildPurgeParameters(System.DateTime olderThanUtc) -> Dapper.DynamicParameters!
+Themia.Exceptional.IExceptionalSqlDialect.BuildRollupParameters(Themia.Exceptional.ExceptionEntry! entry, System.TimeSpan rollupPeriod) -> Dapper.DynamicParameters!
+Themia.Exceptional.IExceptionalSqlDialect.BuildSoftDeleteParameters(System.Guid guid, System.DateTime deletionDateUtc) -> Dapper.DynamicParameters!
 Themia.Exceptional.IExceptionalSqlDialect.CountSql.get -> string!
 Themia.Exceptional.IExceptionalSqlDialect.CreateConnection() -> System.Data.Common.DbConnection!
 Themia.Exceptional.IExceptionalSqlDialect.GetByGuidSql.get -> string!

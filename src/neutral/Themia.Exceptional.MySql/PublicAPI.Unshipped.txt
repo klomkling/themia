@@ -2,6 +2,10 @@
 static Themia.Exceptional.MySql.ServiceCollectionExtensions.AddThemiaExceptionalMySql(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, string! connectionString, System.Action<Themia.Exceptional.ExceptionalOptions!>! configure) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
 Themia.Exceptional.MySql.MySqlExceptionalDialect
 Themia.Exceptional.MySql.MySqlExceptionalDialect.AddTemporalFilters(Dapper.DynamicParameters! args, System.DateTime? from, System.DateTime? to) -> void
+Themia.Exceptional.MySql.MySqlExceptionalDialect.BuildInsertParameters(Themia.Exceptional.ExceptionEntry! entry) -> Dapper.DynamicParameters!
+Themia.Exceptional.MySql.MySqlExceptionalDialect.BuildPurgeParameters(System.DateTime olderThanUtc) -> Dapper.DynamicParameters!
+Themia.Exceptional.MySql.MySqlExceptionalDialect.BuildRollupParameters(Themia.Exceptional.ExceptionEntry! entry, System.TimeSpan rollupPeriod) -> Dapper.DynamicParameters!
+Themia.Exceptional.MySql.MySqlExceptionalDialect.BuildSoftDeleteParameters(System.Guid guid, System.DateTime deletionDateUtc) -> Dapper.DynamicParameters!
 Themia.Exceptional.MySql.MySqlExceptionalDialect.CountSql.get -> string!
 Themia.Exceptional.MySql.MySqlExceptionalDialect.CreateConnection() -> System.Data.Common.DbConnection!
 Themia.Exceptional.MySql.MySqlExceptionalDialect.GetByGuidSql.get -> string!

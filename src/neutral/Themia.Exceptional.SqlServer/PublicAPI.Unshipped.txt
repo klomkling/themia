@@ -3,6 +3,10 @@ static Themia.Exceptional.SqlServer.ServiceCollectionExtensions.AddThemiaExcepti
 Themia.Exceptional.SqlServer.ServiceCollectionExtensions
 Themia.Exceptional.SqlServer.SqlServerExceptionalDialect
 Themia.Exceptional.SqlServer.SqlServerExceptionalDialect.AddTemporalFilters(Dapper.DynamicParameters! args, System.DateTime? from, System.DateTime? to) -> void
+Themia.Exceptional.SqlServer.SqlServerExceptionalDialect.BuildInsertParameters(Themia.Exceptional.ExceptionEntry! entry) -> Dapper.DynamicParameters!
+Themia.Exceptional.SqlServer.SqlServerExceptionalDialect.BuildPurgeParameters(System.DateTime olderThanUtc) -> Dapper.DynamicParameters!
+Themia.Exceptional.SqlServer.SqlServerExceptionalDialect.BuildRollupParameters(Themia.Exceptional.ExceptionEntry! entry, System.TimeSpan rollupPeriod) -> Dapper.DynamicParameters!
+Themia.Exceptional.SqlServer.SqlServerExceptionalDialect.BuildSoftDeleteParameters(System.Guid guid, System.DateTime deletionDateUtc) -> Dapper.DynamicParameters!
 Themia.Exceptional.SqlServer.SqlServerExceptionalDialect.CountSql.get -> string!
 Themia.Exceptional.SqlServer.SqlServerExceptionalDialect.CreateConnection() -> System.Data.Common.DbConnection!
 Themia.Exceptional.SqlServer.SqlServerExceptionalDialect.GetByGuidSql.get -> string!
