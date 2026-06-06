@@ -15,6 +15,7 @@ public class AddThemiaExceptionalProviderTests
             dialect: new SqliteExceptionalDialect("Data Source=:memory:"),
             configure: o => o.ApplicationName = "App",
             configureRunner: _ => { },
+            databaseDisplayName: "SQLite",
             runMigration: false);
 
         var sp = services.BuildServiceProvider();

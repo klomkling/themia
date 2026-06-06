@@ -38,16 +38,16 @@ public static class ServiceCollectionExtensions
     /// <param name="dialect">The provider dialect (already carries its connection string).</param>
     /// <param name="configure">Required options callback; <see cref="ExceptionalOptions.ApplicationName"/> is validated at startup.</param>
     /// <param name="configureRunner">Provider-specific FluentMigrator runner configuration (e.g. <c>rb =&gt; rb.AddPostgres()</c>).</param>
+    /// <param name="databaseDisplayName">Human-readable engine name used in the migration failure message (e.g. "PostgreSQL"). Required so the message is never ambiguous.</param>
     /// <param name="connectionString">Connection string passed to the migration runner. Required when <paramref name="runMigration"/> is <see langword="true"/>.</param>
-    /// <param name="databaseDisplayName">Human-readable engine name used in the migration failure message (e.g. "PostgreSQL").</param>
     /// <param name="runMigration">When <see langword="true"/> (default), runs the schema migration immediately.</param>
     public static IServiceCollection AddThemiaExceptionalProvider(
         this IServiceCollection services,
         IExceptionalSqlDialect dialect,
         Action<ExceptionalOptions> configure,
         Action<IMigrationRunnerBuilder> configureRunner,
+        string databaseDisplayName,
         string? connectionString = null,
-        string databaseDisplayName = "the configured database",
         bool runMigration = true)
     {
         ArgumentNullException.ThrowIfNull(dialect);
