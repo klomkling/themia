@@ -40,9 +40,12 @@ issues, and sweep cheap wins across Exceptional / Mediator / tooling.
 
 ### Changed
 
-- `Themia.SourceGenerator` — the DI registration generator uses `ForAttributeWithMetadataName` (attribute path)
-  and narrowed syntax predicates with the semantic model (marker/registrar paths) for incremental-generation
-  caching. Generated output is unchanged.
+- `Themia.SourceGenerator` — the DI registration generator now filters at the syntax level via
+  `ForAttributeWithMetadataName` (attribute path) and narrowed syntax predicates with the semantic model
+  (marker/registrar paths). Generated output is unchanged. **Note:** full incremental-generation *caching* is
+  not yet achieved — the pipeline data model still carries Roslyn symbols/syntax nodes across the
+  `Collect()`/`Combine()` boundary (non-equatable, roots the compilation), so the output stage re-runs on every
+  edit. Output-stage cache equality is tracked as a 0.3.2 follow-up (see Known limitations).
 - `Themia.Exceptional` — the **dialect now owns From/To temporal parameter binding**
   (`IExceptionalSqlDialect.AddTemporalFilters` replaces `TemporalFilterDbType`); `ExceptionStoreEngine` takes
   `ExceptionalOptions` (single source for the rollup period).
@@ -55,6 +58,11 @@ issues, and sweep cheap wins across Exceptional / Mediator / tooling.
 - **Targeted for 0.3.2 (P3):** `Themia.Exceptional` — SqlServer `datetime2` write precision (Dapper infers
   legacy `datetime` ~3.33 ms on INSERT/rollup); extract a shared internal `AddThemiaExceptionalProvider` helper
   (DI/`RunMigration` triplicated ×3); shared parameterized conformance test harness over `IExceptionalSqlDialect`.
+- **Targeted for 0.3.2 (P3):** `Themia.SourceGenerator` — complete DI-generator incrementality. The pipeline
+  model (`DiscoveredTypeInfo`) carries `INamedTypeSymbol`/`ClassDeclarationSyntax`/`AttributeData` into the
+  output node, defeating cache equality. Fix relocates all semantic analysis into the `transform` and emits
+  equatable record types (registration record + a replayable `DiagnosticInfo`); snapshot/diagnostic tests pin
+  the unchanged output. All-or-nothing (one symbol in the model defeats the cache), so it is its own task.
 - **Deferred (P4):** `Themia.Exceptional` — `ListSql` uses `SELECT *` (project a summary column set together
   with the dashboard); the migration runs synchronously at DI-registration (consider a post-build migrate step).
 

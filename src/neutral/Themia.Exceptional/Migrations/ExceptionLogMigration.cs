@@ -10,6 +10,10 @@ public sealed class ExceptionLogMigration : Migration
     /// <inheritdoc />
     public override void Up()
     {
+        // LOCKSTEP: this per-provider list and the unsupported-provider guard below are two parallel
+        // whitelists that MUST agree. Adding a provider here (a CreateTable branch) without adding its
+        // prefix to the guard leaves it throwing NotSupportedException; adding it to the guard without a
+        // branch here lets it through to a column-type failure. Edit BOTH when adding a provider.
         IfDatabase("postgres").Delegate(() => CreateTable(c => c.AsDateTimeOffset()));
         IfDatabase("mysql").Delegate(() => CreateTable(c => c.AsCustom("DATETIME(6)")));
         IfDatabase("sqlserver").Delegate(() => CreateTable(c => c.AsDateTime2()));
