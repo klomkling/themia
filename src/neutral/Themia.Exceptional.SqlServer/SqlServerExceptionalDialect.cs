@@ -79,4 +79,20 @@ public sealed class SqlServerExceptionalDialect : IExceptionalSqlDialect
 
     /// <inheritdoc />
     public string PurgeSql => "DELETE FROM [Exceptions] WHERE [IsProtected] = 0 AND [CreationDate] < @OlderThan;";
+
+    /// <inheritdoc />
+    public DynamicParameters BuildInsertParameters(ExceptionEntry entry)
+        => ExceptionStoreParameters.Insert(entry, DbType.DateTime2);
+
+    /// <inheritdoc />
+    public DynamicParameters BuildRollupParameters(ExceptionEntry entry, TimeSpan rollupPeriod)
+        => ExceptionStoreParameters.Rollup(entry, rollupPeriod, DbType.DateTime2);
+
+    /// <inheritdoc />
+    public DynamicParameters BuildSoftDeleteParameters(Guid guid, DateTime deletionDateUtc)
+        => ExceptionStoreParameters.SoftDelete(guid, deletionDateUtc, DbType.DateTime2);
+
+    /// <inheritdoc />
+    public DynamicParameters BuildPurgeParameters(DateTime olderThanUtc)
+        => ExceptionStoreParameters.Purge(olderThanUtc, DbType.DateTime2);
 }

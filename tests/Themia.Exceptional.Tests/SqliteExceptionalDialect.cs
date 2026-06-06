@@ -111,4 +111,16 @@ internal sealed class SqliteExceptionalDialect : IExceptionalSqlDialect
     public string HardDeleteSql => """DELETE FROM "Exceptions" WHERE "Guid" = @Guid;""";
 
     public string PurgeSql => """DELETE FROM "Exceptions" WHERE "IsProtected" = 0 AND "CreationDate" < @OlderThan;""";
+
+    public DynamicParameters BuildInsertParameters(ExceptionEntry entry)
+        => ExceptionStoreParameters.Insert(entry, temporalDbType: null);
+
+    public DynamicParameters BuildRollupParameters(ExceptionEntry entry, TimeSpan rollupPeriod)
+        => ExceptionStoreParameters.Rollup(entry, rollupPeriod, temporalDbType: null);
+
+    public DynamicParameters BuildSoftDeleteParameters(Guid guid, DateTime deletionDateUtc)
+        => ExceptionStoreParameters.SoftDelete(guid, deletionDateUtc, temporalDbType: null);
+
+    public DynamicParameters BuildPurgeParameters(DateTime olderThanUtc)
+        => ExceptionStoreParameters.Purge(olderThanUtc, temporalDbType: null);
 }
