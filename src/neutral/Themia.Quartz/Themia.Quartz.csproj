@@ -22,6 +22,8 @@
     <PackageReference Include="Handlebars.Net" />
     <PackageReference Include="JsonSubTypes" />
     <PackageReference Include="Newtonsoft.Json" />
+    <!-- MVC Newtonsoft formatter for the dashboard controllers (AddNewtonsoftJson). -->
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.NewtonsoftJson" />
   </ItemGroup>
 
   <ItemGroup>

@@ -1,4 +1,9 @@
 #nullable enable
+Microsoft.AspNetCore.Builder.ThemiaQuartzApplicationBuilderExtensions
+Microsoft.Extensions.DependencyInjection.ThemiaQuartzServiceCollectionExtensions
+static Microsoft.AspNetCore.Builder.ThemiaQuartzApplicationBuilderExtensions.MapThemiaQuartz(this Microsoft.AspNetCore.Routing.IEndpointRouteBuilder! endpoints) -> Microsoft.AspNetCore.Routing.IEndpointRouteBuilder!
+static Microsoft.AspNetCore.Builder.ThemiaQuartzApplicationBuilderExtensions.UseThemiaQuartz(this Microsoft.AspNetCore.Builder.IApplicationBuilder! app) -> Microsoft.AspNetCore.Builder.IApplicationBuilder!
+static Microsoft.Extensions.DependencyInjection.ThemiaQuartzServiceCollectionExtensions.AddThemiaQuartz(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Themia.Quartz.ThemiaQuartzOptions!>! configure) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
 static Themia.Quartz.SchedulerContextExtensions.GetExecutionHistoryStore(this Quartz.SchedulerContext! context) -> Themia.Quartz.IExecutionHistoryStore?
 static Themia.Quartz.SchedulerContextExtensions.SetExecutionHistoryStore(this Quartz.SchedulerContext! context, Themia.Quartz.IExecutionHistoryStore! store) -> void
 Themia.Quartz.ExecutionHistoryEntry

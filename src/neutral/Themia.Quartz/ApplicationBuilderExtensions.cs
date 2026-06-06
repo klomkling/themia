@@ -1,0 +1,145 @@
+using System;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.FileProviders;
+using Quartz;
+using Themia.Quartz;
+using Themia.Quartz.Dashboard;
+
+namespace Microsoft.AspNetCore.Builder;
+
+/// <summary>
+/// Application-builder entry points for the Themia Quartz dashboard. Ported from SilkierQuartz's
+/// <c>UseSilkierQuartz</c>, minus the dropped cookie-authentication route and <c>[SilkierQuartz]</c>
+/// job auto-discovery. Authorization is enforced by the host-supplied
+/// <see cref="ThemiaQuartzOptions.Authorize"/> gate.
+/// </summary>
+public static class ThemiaQuartzApplicationBuilderExtensions
+{
+    /// <summary>
+    /// Maps the Themia Quartz dashboard endpoints under <see cref="ThemiaQuartzOptions.VirtualPathRoot"/>
+    /// and, when <paramref name="endpoints"/> is also an <see cref="IApplicationBuilder"/> (as
+    /// <c>WebApplication</c> is), wires the per-request middleware (deny-all authorize gate, dashboard
+    /// <see cref="Services"/> bridge, embedded content static files, execution-history store bridge).
+    /// </summary>
+    /// <remarks>
+    /// For hosts that separate the middleware pipeline from endpoint routing, call
+    /// <see cref="UseThemiaQuartz(IApplicationBuilder)"/> on the application builder and then
+    /// <see cref="MapThemiaQuartz(IEndpointRouteBuilder)"/> inside <c>UseEndpoints</c>; the middleware
+    /// is registered only once even if both are called.
+    /// </remarks>
+    /// <param name="endpoints">The endpoint route builder to map the dashboard routes on.</param>
+    /// <returns>The same <paramref name="endpoints"/> instance for chaining.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="endpoints"/> is <see langword="null"/>.</exception>
+    public static IEndpointRouteBuilder MapThemiaQuartz(this IEndpointRouteBuilder endpoints)
+    {
+        ArgumentNullException.ThrowIfNull(endpoints);
+
+        if (endpoints is IApplicationBuilder app)
+        {
+            app.UseThemiaQuartz();
+        }
+
+        var options = endpoints.ServiceProvider.GetRequiredService<ThemiaQuartzOptions>();
+        var root = NormalizeRoot(options.VirtualPathRoot);
+        endpoints.MapControllerRoute(
+            "ThemiaQuartz",
+            $"{root}{{controller=Scheduler}}/{{action=Index}}");
+
+        return endpoints;
+    }
+
+    /// <summary>
+    /// Registers the Themia Quartz dashboard request middleware: the deny-all
+    /// <see cref="ThemiaQuartzOptions.Authorize"/> gate, the dashboard <see cref="Services"/> bridge
+    /// into <c>HttpContext.Items</c>, the embedded content static-file server, and the bridge of a
+    /// DI-registered <see cref="IExecutionHistoryStore"/> into the scheduler context.
+    /// </summary>
+    /// <remarks>
+    /// Idempotent: calling this more than once (for example via <see cref="MapThemiaQuartz"/>) registers
+    /// the middleware only once. The host owns the Quartz <see cref="IScheduler"/>; it is resolved from
+    /// <see cref="ThemiaQuartzOptions.Scheduler"/> or the container's <see cref="IScheduler"/>.
+    /// </remarks>
+    /// <param name="app">The application builder to register the middleware on.</param>
+    /// <returns>The same <paramref name="app"/> instance for chaining.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="app"/> is <see langword="null"/>.</exception>
+    public static IApplicationBuilder UseThemiaQuartz(this IApplicationBuilder app)
+    {
+        ArgumentNullException.ThrowIfNull(app);
+
+        const string registeredKey = "Themia.Quartz.MiddlewareRegistered";
+        if (app.Properties.ContainsKey(registeredKey))
+        {
+            return app;
+        }
+
+        app.Properties[registeredKey] = true;
+
+        var options = app.ApplicationServices.GetRequiredService<ThemiaQuartzOptions>();
+
+        var scheduler = options.Scheduler ?? app.ApplicationServices.GetService<IScheduler>();
+        options.Scheduler = scheduler;
+
+        // Store bridge: surface a DI-registered execution-history store to the dashboard via the
+        // scheduler context. Guarded — the scheduler may be unavailable at map time.
+        var store = app.ApplicationServices.GetService<IExecutionHistoryStore>();
+        if (store is not null && scheduler is not null)
+        {
+            scheduler.Context.SetExecutionHistoryStore(store);
+        }
+
+        var services = Services.Create(options);
+        var root = NormalizeRoot(options.VirtualPathRoot);
+        var rootPath = "/" + root.TrimEnd('/').TrimStart('/');
+
+        // Deny-all authorize gate over the dashboard path. null Authorize => always 403.
+        app.Use(async (context, next) =>
+        {
+            if (context.Request.Path.StartsWithSegments(rootPath, StringComparison.OrdinalIgnoreCase))
+            {
+                var allowed = options.Authorize is null
+                    ? false
+                    : await options.Authorize(context).ConfigureAwait(false);
+                if (!allowed)
+                {
+                    context.Response.StatusCode = StatusCodes.Status403Forbidden;
+                    return;
+                }
+            }
+
+            await next().ConfigureAwait(false);
+        });
+
+        // Embedded content static files at {VirtualPathRoot}/Content.
+        var contentProvider = new EmbeddedFileProvider(
+            typeof(ThemiaQuartzOptions).Assembly,
+            "Themia.Quartz.Dashboard.Content");
+        app.UseFileServer(new FileServerOptions
+        {
+            RequestPath = new PathString($"{rootPath}/Content"),
+            EnableDefaultFiles = false,
+            EnableDirectoryBrowsing = false,
+            FileProvider = contentProvider,
+        });
+
+        // Bridge the dashboard Services instance into per-request items for the controllers.
+        app.Use(async (context, next) =>
+        {
+            context.Items[typeof(Services)] = services;
+            await next().ConfigureAwait(false);
+        });
+
+        return app;
+    }
+
+    private static string NormalizeRoot(string virtualPathRoot)
+    {
+        if (string.IsNullOrEmpty(virtualPathRoot))
+        {
+            return "/";
+        }
+
+        return virtualPathRoot.EndsWith('/') ? virtualPathRoot : virtualPathRoot + "/";
+    }
+}
