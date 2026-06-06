@@ -8,6 +8,10 @@
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <PackageReference Include="Quartz" />
+    <!-- Handlebars.Net + Newtonsoft.Json are transitive requirements of the vendored SilkierQuartz
+         dashboard (view engine + view models). Themia is System.Text.Json-first; per the scheduling
+         design spec this is an ACCEPTED vendoring trade-off — Newtonsoft stays an INTERNAL detail and
+         must never appear on Themia.Quartz's public API. Do NOT migrate the vendored dashboard off it. -->
     <PackageReference Include="Handlebars.Net" />
     <PackageReference Include="JsonSubTypes" />
     <PackageReference Include="Newtonsoft.Json" />
@@ -18,5 +22,17 @@
     <EmbeddedResource Include="Dashboard\Views\**" />
     <EmbeddedResource Include="Dashboard\TypeHandlers\*.hbs" />
     <EmbeddedResource Include="Dashboard\TypeHandlers\*.js" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <AdditionalFiles Include="PublicAPI.Shipped.txt" />
+    <AdditionalFiles Include="PublicAPI.Unshipped.txt" />
   </ItemGroup>
 </Project>

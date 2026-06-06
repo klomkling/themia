@@ -89,6 +89,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Themia.Exceptional.Conforma
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Themia.Quartz", "src\neutral\Themia.Quartz\Themia.Quartz.csproj", "{D2D8A460-B9AE-472D-B2C3-76BBBDCAC8DC}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Themia.Quartz.Tests", "tests\Themia.Quartz.Tests\Themia.Quartz.Tests.csproj", "{01F12B55-BE06-44F3-9936-12942AF681DF}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -543,6 +545,18 @@ Global
 		{D2D8A460-B9AE-472D-B2C3-76BBBDCAC8DC}.Release|x64.Build.0 = Release|Any CPU
 		{D2D8A460-B9AE-472D-B2C3-76BBBDCAC8DC}.Release|x86.ActiveCfg = Release|Any CPU
 		{D2D8A460-B9AE-472D-B2C3-76BBBDCAC8DC}.Release|x86.Build.0 = Release|Any CPU
+		{01F12B55-BE06-44F3-9936-12942AF681DF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{01F12B55-BE06-44F3-9936-12942AF681DF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{01F12B55-BE06-44F3-9936-12942AF681DF}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{01F12B55-BE06-44F3-9936-12942AF681DF}.Debug|x64.Build.0 = Debug|Any CPU
+		{01F12B55-BE06-44F3-9936-12942AF681DF}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{01F12B55-BE06-44F3-9936-12942AF681DF}.Debug|x86.Build.0 = Debug|Any CPU
+		{01F12B55-BE06-44F3-9936-12942AF681DF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{01F12B55-BE06-44F3-9936-12942AF681DF}.Release|Any CPU.Build.0 = Release|Any CPU
+		{01F12B55-BE06-44F3-9936-12942AF681DF}.Release|x64.ActiveCfg = Release|Any CPU
+		{01F12B55-BE06-44F3-9936-12942AF681DF}.Release|x64.Build.0 = Release|Any CPU
+		{01F12B55-BE06-44F3-9936-12942AF681DF}.Release|x86.ActiveCfg = Release|Any CPU
+		{01F12B55-BE06-44F3-9936-12942AF681DF}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -588,5 +602,6 @@ Global
 		{3E212804-5203-4E8D-A0F0-E483CA448AF8} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 		{DAB28637-D0D6-4165-A7E8-A3022D5A915C} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 		{D2D8A460-B9AE-472D-B2C3-76BBBDCAC8DC} = {1F655D57-935D-D295-E882-5052ED9A6376}
+		{01F12B55-BE06-44F3-9936-12942AF681DF} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 	EndGlobalSection
 EndGlobal

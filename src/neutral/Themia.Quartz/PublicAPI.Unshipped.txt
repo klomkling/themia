@@ -1,1 +1,73 @@
 #nullable enable
+static Themia.Quartz.SchedulerContextExtensions.GetExecutionHistoryStore(this Quartz.SchedulerContext! context) -> Themia.Quartz.IExecutionHistoryStore?
+static Themia.Quartz.SchedulerContextExtensions.SetExecutionHistoryStore(this Quartz.SchedulerContext! context, Themia.Quartz.IExecutionHistoryStore! store) -> void
+Themia.Quartz.ExecutionHistoryEntry
+Themia.Quartz.ExecutionHistoryEntry.ActualFireTimeUtc.get -> System.DateTimeOffset
+Themia.Quartz.ExecutionHistoryEntry.ActualFireTimeUtc.set -> void
+Themia.Quartz.ExecutionHistoryEntry.ExceptionMessage.get -> string?
+Themia.Quartz.ExecutionHistoryEntry.ExceptionMessage.set -> void
+Themia.Quartz.ExecutionHistoryEntry.ExecutionHistoryEntry() -> void
+Themia.Quartz.ExecutionHistoryEntry.FinishedTimeUtc.get -> System.DateTimeOffset?
+Themia.Quartz.ExecutionHistoryEntry.FinishedTimeUtc.set -> void
+Themia.Quartz.ExecutionHistoryEntry.FireInstanceId.get -> string?
+Themia.Quartz.ExecutionHistoryEntry.FireInstanceId.set -> void
+Themia.Quartz.ExecutionHistoryEntry.Job.get -> string?
+Themia.Quartz.ExecutionHistoryEntry.Job.set -> void
+Themia.Quartz.ExecutionHistoryEntry.Recovering.get -> bool
+Themia.Quartz.ExecutionHistoryEntry.Recovering.set -> void
+Themia.Quartz.ExecutionHistoryEntry.ScheduledFireTimeUtc.get -> System.DateTimeOffset?
+Themia.Quartz.ExecutionHistoryEntry.ScheduledFireTimeUtc.set -> void
+Themia.Quartz.ExecutionHistoryEntry.SchedulerInstanceId.get -> string?
+Themia.Quartz.ExecutionHistoryEntry.SchedulerInstanceId.set -> void
+Themia.Quartz.ExecutionHistoryEntry.SchedulerName.get -> string?
+Themia.Quartz.ExecutionHistoryEntry.SchedulerName.set -> void
+Themia.Quartz.ExecutionHistoryEntry.Trigger.get -> string?
+Themia.Quartz.ExecutionHistoryEntry.Trigger.set -> void
+Themia.Quartz.ExecutionHistoryEntry.Vetoed.get -> bool
+Themia.Quartz.ExecutionHistoryEntry.Vetoed.set -> void
+Themia.Quartz.ExecutionHistoryPlugin
+Themia.Quartz.ExecutionHistoryPlugin.ExecutionHistoryPlugin() -> void
+Themia.Quartz.ExecutionHistoryPlugin.Initialize(string! pluginName, Quartz.IScheduler! scheduler, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Quartz.ExecutionHistoryPlugin.JobExecutionVetoed(Quartz.IJobExecutionContext! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Quartz.ExecutionHistoryPlugin.JobToBeExecuted(Quartz.IJobExecutionContext! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Quartz.ExecutionHistoryPlugin.JobWasExecuted(Quartz.IJobExecutionContext! context, Quartz.JobExecutionException? jobException, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Quartz.ExecutionHistoryPlugin.Name.get -> string!
+Themia.Quartz.ExecutionHistoryPlugin.Name.set -> void
+Themia.Quartz.ExecutionHistoryPlugin.Shutdown(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Quartz.ExecutionHistoryPlugin.Start(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Quartz.ExecutionHistoryPlugin.StoreType.get -> System.Type?
+Themia.Quartz.ExecutionHistoryPlugin.StoreType.set -> void
+Themia.Quartz.IExecutionHistoryStore
+Themia.Quartz.IExecutionHistoryStore.FilterLast(int limit) -> System.Threading.Tasks.Task<System.Collections.Generic.IEnumerable<Themia.Quartz.ExecutionHistoryEntry!>!>!
+Themia.Quartz.IExecutionHistoryStore.FilterLastOfEveryJob(int limitPerJob) -> System.Threading.Tasks.Task<System.Collections.Generic.IEnumerable<Themia.Quartz.ExecutionHistoryEntry!>!>!
+Themia.Quartz.IExecutionHistoryStore.FilterLastOfEveryTrigger(int limitPerTrigger) -> System.Threading.Tasks.Task<System.Collections.Generic.IEnumerable<Themia.Quartz.ExecutionHistoryEntry!>!>!
+Themia.Quartz.IExecutionHistoryStore.Get(string! fireInstanceId) -> System.Threading.Tasks.Task<Themia.Quartz.ExecutionHistoryEntry?>!
+Themia.Quartz.IExecutionHistoryStore.GetTotalJobsExecuted() -> System.Threading.Tasks.Task<int>!
+Themia.Quartz.IExecutionHistoryStore.GetTotalJobsFailed() -> System.Threading.Tasks.Task<int>!
+Themia.Quartz.IExecutionHistoryStore.IncrementTotalJobsExecuted() -> System.Threading.Tasks.Task!
+Themia.Quartz.IExecutionHistoryStore.IncrementTotalJobsFailed() -> System.Threading.Tasks.Task!
+Themia.Quartz.IExecutionHistoryStore.Purge() -> System.Threading.Tasks.Task!
+Themia.Quartz.IExecutionHistoryStore.Save(Themia.Quartz.ExecutionHistoryEntry! entry) -> System.Threading.Tasks.Task!
+Themia.Quartz.IExecutionHistoryStore.SchedulerName.get -> string!
+Themia.Quartz.IExecutionHistoryStore.SchedulerName.set -> void
+Themia.Quartz.InProcExecutionHistoryStore
+Themia.Quartz.InProcExecutionHistoryStore.FilterLast(int limit) -> System.Threading.Tasks.Task<System.Collections.Generic.IEnumerable<Themia.Quartz.ExecutionHistoryEntry!>!>!
+Themia.Quartz.InProcExecutionHistoryStore.FilterLastOfEveryJob(int limitPerJob) -> System.Threading.Tasks.Task<System.Collections.Generic.IEnumerable<Themia.Quartz.ExecutionHistoryEntry!>!>!
+Themia.Quartz.InProcExecutionHistoryStore.FilterLastOfEveryTrigger(int limitPerTrigger) -> System.Threading.Tasks.Task<System.Collections.Generic.IEnumerable<Themia.Quartz.ExecutionHistoryEntry!>!>!
+Themia.Quartz.InProcExecutionHistoryStore.Get(string! fireInstanceId) -> System.Threading.Tasks.Task<Themia.Quartz.ExecutionHistoryEntry?>!
+Themia.Quartz.InProcExecutionHistoryStore.GetTotalJobsExecuted() -> System.Threading.Tasks.Task<int>!
+Themia.Quartz.InProcExecutionHistoryStore.GetTotalJobsFailed() -> System.Threading.Tasks.Task<int>!
+Themia.Quartz.InProcExecutionHistoryStore.IncrementTotalJobsExecuted() -> System.Threading.Tasks.Task!
+Themia.Quartz.InProcExecutionHistoryStore.IncrementTotalJobsFailed() -> System.Threading.Tasks.Task!
+Themia.Quartz.InProcExecutionHistoryStore.InProcExecutionHistoryStore() -> void
+Themia.Quartz.InProcExecutionHistoryStore.Purge() -> System.Threading.Tasks.Task!
+Themia.Quartz.InProcExecutionHistoryStore.Save(Themia.Quartz.ExecutionHistoryEntry! entry) -> System.Threading.Tasks.Task!
+Themia.Quartz.InProcExecutionHistoryStore.SchedulerName.get -> string!
+Themia.Quartz.InProcExecutionHistoryStore.SchedulerName.set -> void
+Themia.Quartz.JobStats
+Themia.Quartz.JobStats.JobStats() -> void
+Themia.Quartz.JobStats.TotalJobsExecuted.get -> int
+Themia.Quartz.JobStats.TotalJobsExecuted.set -> void
+Themia.Quartz.JobStats.TotalJobsFailed.get -> int
+Themia.Quartz.JobStats.TotalJobsFailed.set -> void
+Themia.Quartz.SchedulerContextExtensions
