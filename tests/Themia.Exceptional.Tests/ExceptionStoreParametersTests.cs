@@ -21,8 +21,11 @@ public class ExceptionStoreParametersTests
         LastLogDate = new DateTime(2026, 6, 6, 1, 2, 3, DateTimeKind.Utc),
     };
 
+    // Note: Dapper does not expose per-parameter DbType publicly, so these tests assert the full
+    // column set is bound; the actual DateTime2 binding behavior is covered by the SqlServer
+    // integration test Insert_PreservesSubMillisecondPrecision_OnDateTime2.
     [Fact]
-    public void Insert_WithDateTime2_SetsDateTime2OnTemporalColumns()
+    public void Insert_WithDateTime2_BindsAllColumns()
     {
         var p = ExceptionStoreParameters.Insert(SampleEntry(), DbType.DateTime2);
         var names = p.ParameterNames.ToHashSet();
