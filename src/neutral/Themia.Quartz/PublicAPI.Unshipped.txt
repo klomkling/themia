@@ -71,3 +71,35 @@ Themia.Quartz.JobStats.TotalJobsExecuted.set -> void
 Themia.Quartz.JobStats.TotalJobsFailed.get -> int
 Themia.Quartz.JobStats.TotalJobsFailed.set -> void
 Themia.Quartz.SchedulerContextExtensions
+Themia.Quartz.ThemiaQuartzOptions
+Themia.Quartz.ThemiaQuartzOptions.Authorize.get -> System.Func<Microsoft.AspNetCore.Http.HttpContext!, System.Threading.Tasks.Task<bool>!>?
+Themia.Quartz.ThemiaQuartzOptions.Authorize.set -> void
+Themia.Quartz.ThemiaQuartzOptions.BasePath.get -> string!
+Themia.Quartz.ThemiaQuartzOptions.BasePath.set -> void
+Themia.Quartz.ThemiaQuartzOptions.CronExpressionOptions.get -> CronExpressionDescriptor.Options!
+Themia.Quartz.ThemiaQuartzOptions.CronExpressionOptions.set -> void
+Themia.Quartz.ThemiaQuartzOptions.CustomFavicon.get -> string!
+Themia.Quartz.ThemiaQuartzOptions.CustomFavicon.set -> void
+Themia.Quartz.ThemiaQuartzOptions.CustomStyleSheet.get -> string!
+Themia.Quartz.ThemiaQuartzOptions.CustomStyleSheet.set -> void
+Themia.Quartz.ThemiaQuartzOptions.DefaultDateFormat.get -> string!
+Themia.Quartz.ThemiaQuartzOptions.DefaultDateFormat.set -> void
+Themia.Quartz.ThemiaQuartzOptions.DefaultSelectedType.get -> Themia.Quartz.Dashboard.TypeHandlers.TypeHandlerBase!
+Themia.Quartz.ThemiaQuartzOptions.DefaultSelectedType.set -> void
+Themia.Quartz.ThemiaQuartzOptions.DefaultTimeFormat.get -> string!
+Themia.Quartz.ThemiaQuartzOptions.DefaultTimeFormat.set -> void
+Themia.Quartz.ThemiaQuartzOptions.EnableEdit.get -> bool
+Themia.Quartz.ThemiaQuartzOptions.EnableEdit.set -> void
+Themia.Quartz.ThemiaQuartzOptions.Logo.get -> string!
+Themia.Quartz.ThemiaQuartzOptions.Logo.set -> void
+Themia.Quartz.ThemiaQuartzOptions.ProductName.get -> string!
+Themia.Quartz.ThemiaQuartzOptions.ProductName.set -> void
+Themia.Quartz.ThemiaQuartzOptions.Scheduler.get -> Quartz.IScheduler?
+Themia.Quartz.ThemiaQuartzOptions.Scheduler.set -> void
+Themia.Quartz.ThemiaQuartzOptions.StandardTypes.get -> System.Collections.Generic.List<Themia.Quartz.Dashboard.TypeHandlers.TypeHandlerBase!>!
+Themia.Quartz.ThemiaQuartzOptions.ThemiaQuartzOptions() -> void
+Themia.Quartz.ThemiaQuartzOptions.UseLocalTime.get -> bool
+Themia.Quartz.ThemiaQuartzOptions.UseLocalTime.set -> void
+Themia.Quartz.ThemiaQuartzOptions.VirtualPathRoot.get -> string!
+Themia.Quartz.ThemiaQuartzOptions.VirtualPathRoot.set -> void
+Themia.Quartz.ThemiaQuartzOptions.VirtualPathRootUrlEncode.get -> string!

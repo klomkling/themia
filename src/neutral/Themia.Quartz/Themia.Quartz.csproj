@@ -3,6 +3,13 @@
     <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
     <RootNamespace>Themia.Quartz</RootNamespace>
     <GenerateEmbeddedFilesManifest>true</GenerateEmbeddedFilesManifest>
+    <!-- Concessions for vendored SilkierQuartz dashboard source (Dashboard/**) — authored Themia.Quartz
+         code (History/, ThemiaQuartzOptions, extensions) remains fully warning-clean.
+         CS8600-CS8765: nullable-reference family (vendored source predates Nullable=enable).
+         CS1591: missing XML docs on vendored public controllers/models.
+         RS0016: vendored public MVC controllers are discovered by ApplicationPart, not a curated
+         public API; authored types (ThemiaQuartzOptions, History/*) ARE tracked in PublicAPI.Unshipped.txt. -->
+    <NoWarn>$(NoWarn);CS8600;CS8601;CS8602;CS8603;CS8604;CS8618;CS8625;CS8629;CS8765;CS1591;RS0016</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
