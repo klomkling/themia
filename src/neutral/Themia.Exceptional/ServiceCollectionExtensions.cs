@@ -53,6 +53,7 @@ public static class ServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(dialect);
         ArgumentNullException.ThrowIfNull(configure);
         ArgumentNullException.ThrowIfNull(configureRunner);
+        ArgumentException.ThrowIfNullOrWhiteSpace(databaseDisplayName);
 
         services.TryAddSingleton<IExceptionalSqlDialect>(dialect);
         services.AddThemiaExceptionalCore(configure);
