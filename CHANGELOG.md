@@ -18,6 +18,8 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## 0.3.1 — 2026-06-06
+
 Hardening pass: unblock cross-assembly consumers of the DI generator, fix two EF Core correctness
 issues, and sweep cheap wins across Exceptional / Mediator / tooling.
 
