@@ -14,10 +14,11 @@ public static class ThemiaQuartzServiceCollectionExtensions
 {
     /// <summary>
     /// Registers the Themia Quartz dashboard services: the configured
-    /// <see cref="ThemiaQuartzOptions"/> singleton plus the MVC controllers, Newtonsoft JSON
-    /// formatter, and the dashboard assembly as an application part. The host owns the Quartz
-    /// <see cref="global::Quartz.IScheduler"/>; supply it via <see cref="ThemiaQuartzOptions.Scheduler"/>
-    /// or register an <see cref="global::Quartz.IScheduler"/> in the container.
+    /// <see cref="ThemiaQuartzOptions"/> singleton plus the MVC controllers (using the default
+    /// System.Text.Json formatter) and the dashboard assembly as an application part. The host owns
+    /// the Quartz <see cref="global::Quartz.IScheduler"/>; supply it via
+    /// <see cref="ThemiaQuartzOptions.Scheduler"/> or register an
+    /// <see cref="global::Quartz.IScheduler"/> in the container.
     /// </summary>
     /// <param name="services">The service collection to add the dashboard services to.</param>
     /// <param name="configure">Configures the dashboard options. Must set
@@ -39,7 +40,6 @@ public static class ThemiaQuartzServiceCollectionExtensions
 
         services
             .AddControllersWithViews()
-            .AddNewtonsoftJson()
             .AddApplicationPart(typeof(ThemiaQuartzOptions).Assembly);
 
         return services;

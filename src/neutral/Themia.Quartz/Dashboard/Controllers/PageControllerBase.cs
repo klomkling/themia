@@ -1,10 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.Infrastructure;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Primitives;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Serialization;
 using Quartz;
+using Themia.Quartz.Dashboard.Json;
 using Themia.Quartz.Dashboard.Models;
 using System;
 using System.Collections.Generic;
@@ -16,21 +13,19 @@ namespace Themia.Quartz.Dashboard.Controllers
 {
     public abstract partial class PageControllerBase : ControllerBase
     {
-        private static readonly JsonSerializerSettings _serializerSettings = new JsonSerializerSettings()
-        {
-            ContractResolver = new DefaultContractResolver(), // PascalCase as default
-        };
-        private static readonly object _systemTextSerializerOptions = new JsonSerializerOptions();
-
         protected Services Services => (Services)Request.HttpContext.Items[typeof(Services)];
         protected string GetRouteData(string key) => RouteData.Values[key].ToString();
         protected IActionResult Json(object content)
         {
-            var executor = HttpContext.RequestServices.GetRequiredService<IActionResultExecutor<JsonResult>>();
-            var serializerOptions = executor.GetType().FullName.Contains("SystemTextJson")
-                ? _systemTextSerializerOptions
-                : _serializerSettings;
-            return new JsonResult(content, serializerOptions);
+            // Serialize with STJ ourselves and return a ContentResult instead of a JsonResult so the
+            // dashboard's JSON endpoints don't depend on the host's MVC JSON stack. A host that calls
+            // AddNewtonsoftJson() swaps in a JsonResult executor that expects JsonSerializerSettings and
+            // throws on our JsonSerializerOptions at response time. ContentResult sidesteps that entirely.
+            return new ContentResult
+            {
+                Content = JsonSerializer.Serialize(content, DashboardJsonOptions.Default),
+                ContentType = "application/json",
+            };
         }
 
 

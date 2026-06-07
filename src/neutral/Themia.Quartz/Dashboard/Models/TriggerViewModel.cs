@@ -1,13 +1,14 @@
-﻿using Newtonsoft.Json;
-using Quartz;
+﻿using Quartz;
 using Quartz.Impl.Matchers;
 using Quartz.Impl.Triggers;
 using Themia.Quartz.Dashboard.Helpers;
+using Themia.Quartz.Dashboard.Json;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Globalization;
 using System.Linq;
+using System.Text.Json;
 using System.Threading.Tasks;
 
 using static Quartz.MisfireInstruction;
@@ -521,7 +522,9 @@ namespace Themia.Quartz.Dashboard.Models
                 },
             };
 
-            return JsonConvert.SerializeObject(validMisfireInstructions, Formatting.None);
+            // RawInject: this string is injected RAW via triple-stache into JS (no JSON.parse), so it
+            // uses UnsafeRelaxedJsonEscaping to match the pre-migration Newtonsoft output.
+            return JsonSerializer.Serialize(validMisfireInstructions, DashboardJsonOptions.RawInject);
         }
 
         public static async Task<TriggerPropertiesViewModel> Create(IScheduler scheduler)

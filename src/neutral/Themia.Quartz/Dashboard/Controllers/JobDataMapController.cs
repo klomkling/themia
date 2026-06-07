@@ -1,11 +1,11 @@
 using Microsoft.AspNetCore.Mvc;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
-using Themia.Quartz.Dashboard.Helpers;
-using Themia.Quartz.Dashboard.TypeHandlers;
 using System.Linq;
 using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
+using Themia.Quartz.Dashboard.Helpers;
+using Themia.Quartz.Dashboard.Json;
+using Themia.Quartz.Dashboard.TypeHandlers;
 
 namespace Themia.Quartz.Dashboard.Controllers
 {
@@ -22,8 +22,11 @@ namespace Themia.Quartz.Dashboard.Controllers
                 selectedType = Services.TypeHandlers.Deserialize((string)formData.First(x => x.Key == "selected-type").Value);
                 targetType = Services.TypeHandlers.Deserialize((string)formData.First(x => x.Key == "target-type").Value);
             }
-            catch (JsonSerializationException ex) when (ex.Message.StartsWith("Could not create an instance of type"))
+            catch (UnknownTypeHandlerException)
             {
+                // A client token referencing a missing/unknown TypeId maps to an empty BadRequest.
+                // All other exceptions (malformed payload, bind failure, etc.) propagate to the
+                // [JsonErrorResponse] filter, which returns 400 with the exception message.
                 return new BadRequestResult();
             }
 
@@ -59,11 +62,24 @@ namespace Themia.Quartz.Dashboard.Controllers
 
             var execStub = execStubBuilder.ToString();
 
-            var js = Services.TypeHandlers.GetScripts().ToDictionary(x => x.Key,
-                x => new JRaw("function(f) {" + x.Value + execStub + "}"));
+            var scripts = Services.TypeHandlers.GetScripts();
+            var sb = new StringBuilder("var $typeHandlerScripts = {");
+            var first = true;
+            foreach (var kvp in scripts)
+            {
+                if (!first) sb.Append(',');
+                first = false;
+                // Raw-injected into the .js object literal → RawInject (literal chars), like every
+                // other raw-injection site. TypeIds are CLR FullNames so this is byte-identical today.
+                sb.Append(JsonSerializer.Serialize(kvp.Key, DashboardJsonOptions.RawInject));
+                sb.Append(":function(f) {");
+                sb.Append(kvp.Value);
+                sb.Append(execStub);
+                sb.Append('}');
+            }
+            sb.Append("};");
 
-            return TextFile("var $typeHandlerScripts = " + JsonConvert.SerializeObject(js) + ";",
-                "application/javascript", Services.TypeHandlers.LastModified, etag);
+            return TextFile(sb.ToString(), "application/javascript", Services.TypeHandlers.LastModified, etag);
         }
     }
 }
