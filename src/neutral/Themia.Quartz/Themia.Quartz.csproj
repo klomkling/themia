@@ -15,10 +15,16 @@
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <PackageReference Include="Quartz" />
-    <!-- Handlebars.Net + Newtonsoft.Json are transitive requirements of the vendored SilkierQuartz
-         dashboard (view engine + view models). Themia is System.Text.Json-first; per the scheduling
-         design spec this is an ACCEPTED vendoring trade-off — Newtonsoft stays an INTERNAL detail and
-         must never appear on Themia.Quartz's public API. Do NOT migrate the vendored dashboard off it. -->
+    <!-- Dependencies of the vendored SilkierQuartz dashboard (Dashboard/** subtree):
+           - Handlebars.Net: the dashboard's view engine (direct).
+           - Newtonsoft.Json: used DIRECTLY by the vendored dashboard code (controllers, view models,
+             HandlebarsHelpers, TypeHandlerService) — NOT just transitive; also pulled transitively by
+             JsonSubTypes + Microsoft.AspNetCore.Mvc.NewtonsoftJson.
+           - JsonSubTypes: polymorphic (de)serialization of the job-data type handlers (needs Newtonsoft).
+         Themia is System.Text.Json-first; per the scheduling design spec, Newtonsoft here is an ACCEPTED
+         vendoring trade-off — confined to the vendored dashboard, kept OFF Themia.Quartz's public API, and
+         used by NO authored code (History store / options / extensions / the Scheduling module use STJ or
+         none). Removing it would require rewriting the vendored dashboard's JSON layer (deferred). -->
     <PackageReference Include="Handlebars.Net" />
     <PackageReference Include="JsonSubTypes" />
     <PackageReference Include="Newtonsoft.Json" />
