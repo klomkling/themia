@@ -74,22 +74,23 @@ public sealed class EfExecutionHistoryStore : IExecutionHistoryStore
         if (existing is null)
         {
             context.ExecutionHistory.Add(ToRecord(entry));
+            try
+            {
+                await context.SaveChangesAsync().ConfigureAwait(false);
+            }
+            catch (DbUpdateException)
+            {
+                // Narrow race between the FirstOrDefault check and this insert (two threads saving the
+                // same FireInstanceId). The row now exists; discard tracked state — already persisted.
+                context.ChangeTracker.Clear();
+            }
         }
         else
         {
             UpdateRecord(existing, entry);
-        }
-
-        try
-        {
+            // Let UPDATE failures propagate: this path writes the job's finished-time/exception result,
+            // and swallowing a genuine DbUpdateException here would silently lose it.
             await context.SaveChangesAsync().ConfigureAwait(false);
-        }
-        catch (DbUpdateException)
-        {
-            // Narrow race between the FirstOrDefault check and the insert (two threads saving the same
-            // FireInstanceId). The row now exists; discard tracked state — the entry is already persisted.
-            // Mirrors EnsureStatsRowAsync's concurrent-insert handling.
-            context.ChangeTracker.Clear();
         }
     }
 
@@ -99,14 +100,20 @@ public sealed class EfExecutionHistoryStore : IExecutionHistoryStore
         await using var context = contextFactory.CreateDbContext();
 
         // Retain the top-10 most recent entries per trigger for this scheduler (matching InProcExecutionHistoryStore).
-        // Delete everything else belonging to this scheduler.
-        var keepIds = await context.ExecutionHistory
+        // Compute the keep-set in memory: EF Core cannot translate per-group TAKE ("top-N per trigger") to SQL
+        // portably — the same reason FilterLastOf* materialize first. Project only the columns needed so the
+        // pull is light; it is bounded by 10×triggers after the first purge.
+        var rows = await context.ExecutionHistory
             .AsNoTracking()
             .Where(r => r.SchedulerName == SchedulerName)
-            .GroupBy(r => r.Trigger)
-            .SelectMany(g => g.OrderByDescending(r => r.ActualFireTimeUtc).Take(10).Select(r => r.FireInstanceId))
+            .Select(r => new { r.FireInstanceId, r.Trigger, r.ActualFireTimeUtc })
             .ToListAsync()
             .ConfigureAwait(false);
+
+        var keepIds = rows
+            .GroupBy(r => r.Trigger)
+            .SelectMany(g => g.OrderByDescending(r => r.ActualFireTimeUtc).Take(10).Select(r => r.FireInstanceId))
+            .ToHashSet();
 
         var deleted = await context.ExecutionHistory
             .Where(r => r.SchedulerName == SchedulerName && !keepIds.Contains(r.FireInstanceId))

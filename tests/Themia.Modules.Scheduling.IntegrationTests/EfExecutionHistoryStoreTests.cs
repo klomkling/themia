@@ -169,6 +169,27 @@ public class EfExecutionHistoryStoreTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Purge_RetainsTop10PerTrigger_AndDoesNotThrow()
+    {
+        // Regression test: Purge must translate to SQL (it builds the keep-set per trigger). It retains
+        // the 10 most recent entries per trigger and deletes the rest.
+        var store = BuildStore("sched-purge");
+        var t = DateTimeOffset.UtcNow;
+        for (var i = 0; i < 13; i++)
+        {
+            await store.Save(MakeEntry($"pg-{i}", "trigger-p", "job-p", firedAt: t.AddMinutes(i), scheduler: "sched-purge"));
+        }
+
+        await store.Purge();
+
+        var remaining = (await store.FilterLast(100)).ToList();
+        Assert.Equal(10, remaining.Count);
+        // The 10 most recent survive (pg-3..pg-12); the 3 oldest (pg-0..pg-2) are purged.
+        Assert.DoesNotContain(remaining, r => r.FireInstanceId == "pg-0");
+        Assert.Contains(remaining, r => r.FireInstanceId == "pg-12");
+    }
+
+    [Fact]
     public async Task Save_ConcurrentCalls_NeverThrowsAndAllPersist()
     {
         // Regression test for the concurrency bug: EfExecutionHistoryStore must be safe to call
