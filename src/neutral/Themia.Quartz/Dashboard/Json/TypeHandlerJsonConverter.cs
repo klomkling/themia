@@ -52,14 +52,15 @@ namespace Themia.Quartz.Dashboard.Json
                 throw new JsonException($"Expected a JSON object for {nameof(TypeHandlerBase)}, got {root.ValueKind}.");
 
             if (!root.TryGetProperty(nameof(TypeHandlerBase.TypeId), out var discriminatorElement))
-                throw new JsonException($"Missing '{nameof(TypeHandlerBase.TypeId)}' discriminator for {nameof(TypeHandlerBase)}.");
+                throw new UnknownTypeHandlerException($"Missing '{nameof(TypeHandlerBase.TypeId)}' discriminator for {nameof(TypeHandlerBase)}.");
 
             var discriminator = discriminatorElement.GetString();
             if (discriminator == null || !_typesByDiscriminator.TryGetValue(discriminator, out var concreteType))
-                throw new JsonException($"Unknown {nameof(TypeHandlerBase.TypeId)} discriminator '{discriminator}'.");
+                throw new UnknownTypeHandlerException($"Unknown {nameof(TypeHandlerBase.TypeId)} discriminator '{discriminator}'.");
 
-            var raw = root.GetRawText();
-            return (TypeHandlerBase)JsonSerializer.Deserialize(raw, concreteType, _innerOptions)
+            // Deserialize straight from the JsonElement (no GetRawText()+re-parse) using the inner
+            // options, which carry SystemTypeJsonConverter but NOT this converter (recursion guard).
+            return (TypeHandlerBase)root.Deserialize(concreteType, _innerOptions)
                 ?? throw new JsonException($"Deserialization of {nameof(TypeHandlerBase.TypeId)} '{discriminator}' yielded null.");
         }
 

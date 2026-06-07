@@ -11,21 +11,24 @@ namespace Themia.Quartz.Dashboard.Json
     /// write AQN string, read back via <see cref="Type.GetType(string, bool)"/>.
     /// </summary>
     /// <remarks>
-    /// <para><b>Read behavior:</b> returns <c>null</c> for a JSON <c>null</c> token or an empty string.
-    /// For a present, non-empty string that cannot be resolved to a CLR type,
-    /// <see cref="Type.GetType(string, bool)"/> is called with <c>throwOnError: true</c>
-    /// and the exception propagates to the caller.</para>
+    /// <para><b>Read behavior:</b> a normal round-trip never yields a null/empty token — a null
+    /// <see cref="Type"/> is omitted by <c>WhenWritingNull</c>, so the property is simply absent and
+    /// this converter is not invoked. A null/empty token therefore only arises from a malformed or
+    /// tampered payload; we fail fast with a <see cref="JsonException"/> rather than return <c>null</c>,
+    /// which callers (e.g. <c>EnumHandler.EnumType</c>) dereference and would otherwise hit a
+    /// <see cref="System.NullReferenceException"/>. A present, non-empty string that cannot be resolved
+    /// throws via <see cref="Type.GetType(string, bool)"/> with <c>throwOnError: true</c>.</para>
     /// </remarks>
     internal sealed class SystemTypeJsonConverter : JsonConverter<Type>
     {
         public override Type Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
             if (reader.TokenType == JsonTokenType.Null)
-                return null;
+                throw new JsonException($"Expected an assembly-qualified type name for {nameof(Type)}, got a JSON null.");
 
             var name = reader.GetString();
             if (string.IsNullOrEmpty(name))
-                return null;
+                throw new JsonException($"Expected a non-empty assembly-qualified type name for {nameof(Type)}.");
 
             return Type.GetType(name, throwOnError: true);
         }

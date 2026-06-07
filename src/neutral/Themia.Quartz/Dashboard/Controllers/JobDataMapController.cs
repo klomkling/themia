@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Themia.Quartz.Dashboard.Helpers;
+using Themia.Quartz.Dashboard.Json;
 using Themia.Quartz.Dashboard.TypeHandlers;
 
 namespace Themia.Quartz.Dashboard.Controllers
@@ -21,13 +22,11 @@ namespace Themia.Quartz.Dashboard.Controllers
                 selectedType = Services.TypeHandlers.Deserialize((string)formData.First(x => x.Key == "selected-type").Value);
                 targetType = Services.TypeHandlers.Deserialize((string)formData.First(x => x.Key == "target-type").Value);
             }
-            catch (JsonException ex) when (ex.Message.StartsWith("Unknown ", StringComparison.Ordinal)
-                                        || ex.Message.StartsWith("Missing ", StringComparison.Ordinal))
+            catch (UnknownTypeHandlerException)
             {
-                // Only the unknown/missing-discriminator cases (from TypeHandlerJsonConverter)
-                // map to an empty BadRequest here. All other exceptions (malformed payload, bind
-                // failure, etc.) propagate to the [JsonErrorResponse] filter, which returns 400 with
-                // the exception message.
+                // A client token referencing a missing/unknown TypeId maps to an empty BadRequest.
+                // All other exceptions (malformed payload, bind failure, etc.) propagate to the
+                // [JsonErrorResponse] filter, which returns 400 with the exception message.
                 return new BadRequestResult();
             }
 
