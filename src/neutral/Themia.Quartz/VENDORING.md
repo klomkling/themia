@@ -47,6 +47,14 @@ The dashboard namespace (Task 3) will follow: `SilkierQuartz` → `Themia.Quartz
 3. **Nullable-clean**: All vendored files have nullable reference types enabled and are
    warning-free under `TreatWarningsAsErrors=true`.
 
+4. **JSON layer migrated to System.Text.Json**: The vendored dashboard's JSON serialization
+   (`Dashboard/TypeHandlers/`, `Dashboard/Controllers/`) was rewritten from Newtonsoft.Json +
+   JsonSubTypes to `System.Text.Json`. A polymorphic type-handler converter replaces JsonSubTypes'
+   discriminator logic; a `System.Type` converter replaces `TypeNameHandling`. Wire-format
+   compatibility is pinned by 52 regression tests (both `net8.0` and `net10.0` TFMs).
+   `Newtonsoft.Json`, `JsonSubTypes`, and `Microsoft.AspNetCore.Mvc.NewtonsoftJson` are no longer
+   dependencies of this package.
+
 ## Known upstream issues (deferred to a future vendored-dashboard cleanup)
 
 These pre-existing SilkierQuartz issues are low-impact for the admin dashboard and are tracked

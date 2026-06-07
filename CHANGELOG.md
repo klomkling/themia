@@ -37,9 +37,10 @@ Scheduling capability: a framework-neutral Quartz dashboard core + an EF-backed 
 
 ### Notes
 
-- **Newtonsoft.Json vendoring trade-off:** `Themia.Quartz` carries Handlebars.Net + Newtonsoft.Json as
-  transitive requirements of the vendored dashboard. Themia is `System.Text.Json`-first; per the
-  scheduling design this is an accepted trade-off — Newtonsoft stays an internal detail, off the public API.
+- **`Themia.Quartz` is now System.Text.Json-only** — `Newtonsoft.Json`, `JsonSubTypes`, and
+  `Microsoft.AspNetCore.Mvc.NewtonsoftJson` have been removed. The vendored SilkierQuartz dashboard's JSON
+  layer was migrated to STJ: a polymorphic type-handler converter (replaces `JsonSubTypes`) + a
+  `System.Type` converter, with wire-format-pinning regression tests (52 tests, both TFMs).
 - **`Themia.Modules.Scheduling` is PostgreSQL-only in this phase** (hardcoded Npgsql provider + `scheduling`
   schema); generalizing to the framework's multi-provider story is deferred. Its dashboard `Authorize`
   default is authenticated-only — hosts should tighten it to an admin check (the dashboard is platform-admin).
