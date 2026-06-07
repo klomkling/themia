@@ -60,11 +60,15 @@ function getErrorMessage(e) {
     if (e.status > 0)
         statusNum = ' (' + e.status + ')';
 
+    // HTML-escape statusText: it can carry server exception messages (user-influenced) and is
+    // injected into the DOM below — escape to avoid XSS in the dashboard error UI.
+    var escapeHtml = function (s) { return $('<div>').text(s == null ? '' : s).html(); };
+
     const msg =
         '<div class="ui negative message">' +
         '<i class="close icon"></i>' +
         '<div class="header">An error occurred' + statusNum +
-        '</div><p>' + statusText + '</p></div>';
+        '</div><p>' + escapeHtml(statusText) + '</p></div>';
 
     return msg;
 }

@@ -420,8 +420,12 @@ namespace Themia.Quartz.Dashboard
 
         public static TriggerBuilder ForJob(this TriggerBuilder builder, string jobKey)
         {
-            var parts = jobKey.Split('.');
-            return builder.ForJob(new JobKey(parts[1], parts[0]));
+            // Split on the first '.' only ("group.name"); tolerate a delimiter-less key (default group)
+            // instead of throwing IndexOutOfRange.
+            var parts = jobKey.Split('.', 2);
+            return parts.Length == 2
+                ? builder.ForJob(new JobKey(parts[1], parts[0]))
+                : builder.ForJob(new JobKey(parts[0]));
         }
 
         public static TimeOfDay ToTimeOfDay(this TimeSpan timeSpan)
@@ -465,7 +469,7 @@ namespace Themia.Quartz.Dashboard
                 {
                     state = "Failed";
                     cssClass = "failed";
-                    errorHtml = $"<br>Error: <b>{entry.ExceptionMessage}</b>";
+                    errorHtml = $"<br>Error: <b>{System.Net.WebUtility.HtmlEncode(entry.ExceptionMessage)}</b>";
                 }
 
                 if (duration != null)
@@ -475,7 +479,7 @@ namespace Themia.Quartz.Dashboard
                     delayHtml = $"<br>Delay: <b>{(entry.ActualFireTimeUtc - entry.ScheduledFireTimeUtc).ToNiceFormat()}</b>";
 
                 if (detailed)
-                    detailsHtml = $"Job: <b>{entry.Job}</b><br>Trigger: <b>{entry.Trigger}</b><br>";
+                    detailsHtml = $"Job: <b>{System.Net.WebUtility.HtmlEncode(entry.Job)}</b><br>Trigger: <b>{System.Net.WebUtility.HtmlEncode(entry.Trigger)}</b><br>";
 
                 hst.AddBar(duration?.TotalSeconds ?? 1,
                     $"{detailsHtml}Fired: <b>{entry.ActualFireTimeUtc.ToDefaultFormat()} UTC</b>{durationHtml}{delayHtml}" +

@@ -65,6 +65,10 @@ public sealed class EfExecutionHistoryStore : IExecutionHistoryStore
     /// <inheritdoc/>
     public async Task Save(ExecutionHistoryEntry entry)
     {
+        ArgumentNullException.ThrowIfNull(entry);
+        // FireInstanceId is the primary key; null/empty would insert an empty-string PK and collide.
+        ArgumentException.ThrowIfNullOrEmpty(entry.FireInstanceId);
+
         await using var context = contextFactory.CreateDbContext();
 
         var existing = await context.ExecutionHistory
