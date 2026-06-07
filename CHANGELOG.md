@@ -18,6 +18,8 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## 0.4.0 — 2026-06-07
+
 Scheduling capability: a framework-neutral Quartz dashboard core + an EF-backed scheduling module.
 
 ### Added
