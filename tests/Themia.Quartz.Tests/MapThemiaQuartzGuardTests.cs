@@ -61,32 +61,39 @@ public sealed class MapThemiaQuartzGuardTests
         });
         var scheduler = await factory.GetScheduler();
         await scheduler.Start();
-
-        var builder = new HostBuilder()
-            .ConfigureWebHost(web =>
-            {
-                web.UseTestServer();
-                web.ConfigureServices(services =>
+        try
+        {
+            var builder = new HostBuilder()
+                .ConfigureWebHost(web =>
                 {
-                    services.AddThemiaQuartz(o =>
+                    web.UseTestServer();
+                    web.ConfigureServices(services =>
                     {
-                        o.Scheduler = scheduler;
-                        o.VirtualPathRoot = "";   // collapses to "/" — must be rejected
-                        o.Authorize = _ => Task.FromResult(true);
+                        services.AddThemiaQuartz(o =>
+                        {
+                            o.Scheduler = scheduler;
+                            o.VirtualPathRoot = "";   // collapses to "/" — must be rejected
+                            o.Authorize = _ => Task.FromResult(true);
+                        });
+                        services.AddSingleton<IExecutionHistoryStore>(new InProcExecutionHistoryStore());
                     });
-                    services.AddSingleton<IExecutionHistoryStore>(new InProcExecutionHistoryStore());
+                    web.Configure(app =>
+                    {
+                        app.UseThemiaQuartz();
+                        app.UseRouting();
+                        app.UseEndpoints(e => e.MapThemiaQuartz());
+                    });
                 });
-                web.Configure(app =>
-                {
-                    app.UseThemiaQuartz();
-                    app.UseRouting();
-                    app.UseEndpoints(e => e.MapThemiaQuartz());
-                });
-            });
 
-        var ex = await Assert.ThrowsAnyAsync<Exception>(async () => await builder.StartAsync());
-        var message = UnwrapMessage(ex);
-        Assert.Contains("VirtualPathRoot", message);
+            var ex = await Assert.ThrowsAnyAsync<Exception>(async () => await builder.StartAsync());
+            var message = UnwrapMessage(ex);
+            Assert.Contains("VirtualPathRoot", message);
+        }
+        finally
+        {
+            // Don't leak the started scheduler's background threads across tests.
+            await scheduler.Shutdown(waitForJobsToComplete: false);
+        }
     }
 
     // Walk the exception chain (may be wrapped by host startup) for the first InvalidOperationException.
