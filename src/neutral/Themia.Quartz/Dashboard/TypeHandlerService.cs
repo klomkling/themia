@@ -1,11 +1,12 @@
 ﻿using HandlebarsDotNet;
-using JsonSubTypes;
-using Newtonsoft.Json;
+using Themia.Quartz.Dashboard.Json;
 using Themia.Quartz.Dashboard.TypeHandlers;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace Themia.Quartz.Dashboard
 {
@@ -15,30 +16,46 @@ namespace Themia.Quartz.Dashboard
 
         readonly Services _services;
 
-        readonly JsonSubtypesConverterBuilder _builder;
+        // Discriminator (TypeId) -> concrete CLR type, mirroring JsonSubTypes' runtime registration.
+        readonly Dictionary<string, Type> _typesByDiscriminator = new Dictionary<string, Type>();
 
         public DateTime LastModified { get; private set; }
 
-        JsonSerializerSettings _jsonSerializerSettings = null;
-        private JsonSerializerSettings JsonSerializerSettings
+        JsonSerializerOptions _jsonSerializerOptions = null;
+        private JsonSerializerOptions JsonSerializerOptions
         {
             get
             {
-                if (_jsonSerializerSettings == null)
+                if (_jsonSerializerOptions == null)
                 {
                     lock (this)
                     {
-                        if (_jsonSerializerSettings == null)
-                        {
-                            var jss = new JsonSerializerSettings() { NullValueHandling = NullValueHandling.Ignore };
-                            jss.Converters.Add(_builder.Build());
-                            _jsonSerializerSettings = jss;
-                        }
+                        if (_jsonSerializerOptions == null)
+                            _jsonSerializerOptions = BuildOptions();
                     }
                 }
 
-                return _jsonSerializerSettings;
+                return _jsonSerializerOptions;
             }
+        }
+
+        // Inner options resolve concrete handler types (and System.Type via AQN) WITHOUT the polymorphic
+        // converter, so the polymorphic converter does not re-enter itself. The outer options add the
+        // polymorphic converter on top for the TypeHandlerBase entry point.
+        JsonSerializerOptions BuildOptions()
+        {
+            var inner = new JsonSerializerOptions
+            {
+                DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+                PropertyNamingPolicy = null, // PascalCase
+            };
+            inner.Converters.Add(new SystemTypeJsonConverter());
+
+            var map = new Dictionary<string, Type>(_typesByDiscriminator);
+
+            var outer = new JsonSerializerOptions(inner);
+            outer.Converters.Add(new TypeHandlerJsonConverter(map, inner));
+            return outer;
         }
 
         class TypeHandlerDescriptor
@@ -56,8 +73,6 @@ namespace Themia.Quartz.Dashboard
         {
             _services = services;
 
-            _builder = JsonSubtypesConverterBuilder.Of(typeof(TypeHandlerBase), nameof(TypeHandlerBase.TypeId));
-            
             if (services?.Options?.StandardTypes != null)
             {
                 foreach (var typeHandler in services.Options.StandardTypes.Select(x => x.GetType()).Distinct())
@@ -83,17 +98,16 @@ namespace Themia.Quartz.Dashboard
 
             _handlers.Add(type, desc);
 
-            _builder.RegisterSubtype(type, desc.TypeId);
+            _typesByDiscriminator[desc.TypeId] = type;
 
-
-            _jsonSerializerSettings = null; // reset cached json converters
+            _jsonSerializerOptions = null; // reset cached json options
 
             LastModified = DateTime.UtcNow;
         }
 
-        public TypeHandlerBase Deserialize(string str) => JsonConvert.DeserializeObject<TypeHandlerBase>(Encoding.UTF8.GetString(Convert.FromBase64String(str)), JsonSerializerSettings);
+        public TypeHandlerBase Deserialize(string str) => JsonSerializer.Deserialize<TypeHandlerBase>(Encoding.UTF8.GetString(Convert.FromBase64String(str)), JsonSerializerOptions);
 
-        public string Serialize(TypeHandlerBase typeHandler) => Convert.ToBase64String(Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(typeHandler, JsonSerializerSettings)));
+        public string Serialize(TypeHandlerBase typeHandler) => Convert.ToBase64String(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(typeHandler, JsonSerializerOptions)));
 
         public string Render(TypeHandlerBase typeHandler, object model)
         {
