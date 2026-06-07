@@ -147,9 +147,11 @@ public sealed class EfExecutionHistoryStore : IExecutionHistoryStore
             .ToListAsync()
             .ConfigureAwait(false);
 
+        // Per group: most-recent N, then reversed to oldest→newest — matching InProcExecutionHistoryStore
+        // so the dashboard histogram renders the time axis identically regardless of the backing store.
         return records
             .GroupBy(r => r.Job)
-            .SelectMany(g => g.Take(limitPerJob))
+            .SelectMany(g => g.Take(limitPerJob).Reverse())
             .Select(ToEntry)
             .ToList();
     }
@@ -166,9 +168,10 @@ public sealed class EfExecutionHistoryStore : IExecutionHistoryStore
             .ToListAsync()
             .ConfigureAwait(false);
 
+        // Per group: most-recent N, then reversed to oldest→newest — matching InProcExecutionHistoryStore.
         return records
             .GroupBy(r => r.Trigger)
-            .SelectMany(g => g.Take(limitPerTrigger))
+            .SelectMany(g => g.Take(limitPerTrigger).Reverse())
             .Select(ToEntry)
             .ToList();
     }
@@ -186,6 +189,8 @@ public sealed class EfExecutionHistoryStore : IExecutionHistoryStore
             .ToListAsync()
             .ConfigureAwait(false);
 
+        // Most-recent N, reversed to oldest→newest — matching InProcExecutionHistoryStore's contract.
+        records.Reverse();
         return records.Select(ToEntry).ToList();
     }
 

@@ -98,9 +98,10 @@ public class EfExecutionHistoryStoreTests : IAsyncLifetime
         var results = (await store.FilterLast(2)).ToList();
 
         Assert.Equal(2, results.Count);
-        // Most-recent two: fl-3, fl-2 (order not guaranteed by spec, just count)
-        Assert.Contains(results, r => r.FireInstanceId == "fl-3");
-        Assert.Contains(results, r => r.FireInstanceId == "fl-2");
+        // Most-recent two, returned oldest→newest to match InProcExecutionHistoryStore (the order the
+        // dashboard histogram expects): [fl-2, fl-3].
+        Assert.Equal("fl-2", results[0].FireInstanceId);
+        Assert.Equal("fl-3", results[1].FireInstanceId);
         Assert.DoesNotContain(results, r => r.FireInstanceId == "fl-1");
     }
 
