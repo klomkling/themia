@@ -46,3 +46,18 @@ The dashboard namespace (Task 3) will follow: `SilkierQuartz` → `Themia.Quartz
 
 3. **Nullable-clean**: All vendored files have nullable reference types enabled and are
    warning-free under `TreatWarningsAsErrors=true`.
+
+## Known upstream issues (deferred to a future vendored-dashboard cleanup)
+
+These pre-existing SilkierQuartz issues are low-impact for the admin dashboard and are tracked
+rather than reworked now (the vendoring policy is to fix/evolve on our own schedule):
+
+- **`Dashboard/Cache.cs`** — populates its cache by blocking on async Quartz APIs
+  (`GetJobKeys`/`GetJobDetail`) under a lock (sync-over-async). Low traffic (admin dashboard),
+  but could cause thread-pool pressure under load. Reworking to async is a future cleanup.
+- **`Dashboard/Controllers/HistoryController.cs`** — splits `Job`/`Trigger` on a `.` delimiter
+  assuming the `group.name` shape. Quartz always supplies that shape, so it does not throw in
+  practice, but it is not defensively null/format guarded.
+
+Small user-facing typos and undeclared-global JS variables flagged in review have been fixed in
+place (we own the vendored source).

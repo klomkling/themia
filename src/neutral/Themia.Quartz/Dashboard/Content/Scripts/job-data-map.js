@@ -46,7 +46,7 @@ function jobDataMapItem() {
         function setUniqueInputNames() {
             var rowIndex = row.data('row-index');
             $(this).find('[name]').each(function () {
-                $name = $(this).attr('name');
+                var $name = $(this).attr('name');
 
                 var n = $name.lastIndexOf(':');
                 if (n !== -1)

@@ -98,6 +98,16 @@ public static class ThemiaQuartzApplicationBuilderExtensions
         var root = NormalizeRoot(options.VirtualPathRoot);
         var rootPath = "/" + root.TrimEnd('/').TrimStart('/');
 
+        // VirtualPathRoot must be a real sub-path. Empty or "/" collapses rootPath to "/", which would
+        // make the authorize gate match every request and the content path become "//Content" — almost
+        // always a misconfiguration. Fail fast rather than silently gating the whole application.
+        if (rootPath == "/")
+        {
+            throw new InvalidOperationException(
+                "Themia.Quartz: ThemiaQuartzOptions.VirtualPathRoot must be a non-root path segment " +
+                "(e.g. \"/jobs\"). An empty or \"/\" value would mount the dashboard at the application root.");
+        }
+
         // Deny-all authorize gate over the dashboard path. null Authorize => always 403.
         app.Use(async (context, next) =>
         {

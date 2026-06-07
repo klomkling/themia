@@ -52,6 +52,11 @@ public class InProcExecutionHistoryStore : IExecutionHistoryStore
     /// <inheritdoc/>
     public async Task Save(ExecutionHistoryEntry entry)
     {
+        ArgumentNullException.ThrowIfNull(entry);
+        // FireInstanceId is the dictionary key; a null would otherwise throw an opaque
+        // ArgumentNullException from Dictionary internals. Surface a clear message instead.
+        ArgumentException.ThrowIfNullOrEmpty(entry.FireInstanceId);
+
         // Save can be called concurrently from Quartz job listeners. Decide whether to purge under a
         // lock so the counter/next-purge state isn't raced, but run Purge() OUTSIDE the lock (it takes
         // its own _data lock and we must not hold a lock across an await).

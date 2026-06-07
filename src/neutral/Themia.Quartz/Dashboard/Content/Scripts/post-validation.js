@@ -11,7 +11,7 @@ function processValidationResponse(data, segmentRoot) {
 
     if (data.Success === false) {
 
-        for (i = 0; i < data.Errors.length; i++) {
+        for (var i = 0; i < data.Errors.length; i++) {
             var
                 err = data.Errors[i],
                 field = err.Field,

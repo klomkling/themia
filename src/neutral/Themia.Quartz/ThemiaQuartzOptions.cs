@@ -26,8 +26,8 @@ public sealed class ThemiaQuartzOptions
     /// <summary>Path to a custom favicon used by the dashboard layout.</summary>
     public string CustomFavicon { get; set; } = "";
 
-    /// <summary>Product name shown in the dashboard header alongside the logo.</summary>
-    public string ProductName { get; set; } = "";
+    /// <summary>Product name shown in the dashboard header and page title. Defaults to "Themia Scheduler".</summary>
+    public string ProductName { get; set; } = "Themia Scheduler";
 
     /// <summary>The virtual path the dashboard is mounted under. Defaults to <c>/jobs</c>.</summary>
     public string VirtualPathRoot { get; set; } = "/jobs";
