@@ -18,6 +18,32 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+Scheduling capability: a framework-neutral Quartz dashboard core + an EF-backed scheduling module.
+
+### Added
+
+- `Themia.Quartz` (`net8.0;net10.0`) — framework-neutral Quartz.NET dashboard, vendored from SilkierQuartz
+  (re-namespaced `Themia.Quartz.Dashboard`) for full ownership. Provides `AddThemiaQuartz(...)` +
+  `MapThemiaQuartz()`/`UseThemiaQuartz()`, a host-supplied `ThemiaQuartzOptions.Authorize` delegate
+  (**deny-all when unset** — the cookie/login `AuthenticateController` is dropped; the host owns auth),
+  the vendored `RecentHistory` execution-history contract (`IExecutionHistoryStore`) + an in-memory store,
+  and a DI→scheduler-context store bridge. Validated end-to-end (routes, 403-when-denied, embedded
+  dashboard content) on net8 + net10.
+- `Themia.Modules.Scheduling` (`net10.0`) — `SchedulingModule : ThemiaModuleBase` wiring the dashboard +
+  an **EF-backed global execution-history store** (`EfExecutionHistoryStore`, **not tenant-scoped** — the
+  scheduler is process-wide admin infrastructure). Schema is created via an EF Core migration on
+  `InitializeAsync`. The store creates a short-lived `DbContext` per operation via `IDbContextFactory`,
+  so it is safe under concurrent Quartz job listener callbacks.
+
+### Notes
+
+- **Newtonsoft.Json vendoring trade-off:** `Themia.Quartz` carries Handlebars.Net + Newtonsoft.Json as
+  transitive requirements of the vendored dashboard. Themia is `System.Text.Json`-first; per the
+  scheduling design this is an accepted trade-off — Newtonsoft stays an internal detail, off the public API.
+- **`Themia.Modules.Scheduling` is PostgreSQL-only in this phase** (hardcoded Npgsql provider + `scheduling`
+  schema); generalizing to the framework's multi-provider story is deferred. Its dashboard `Authorize`
+  default is authenticated-only — hosts should tighten it to an admin check (the dashboard is platform-admin).
+
 ## 0.3.2 — 2026-06-07
 
 P3 hardening: SqlServer write precision, de-duplicated provider registration, a shared engine

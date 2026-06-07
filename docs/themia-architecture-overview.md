@@ -110,7 +110,7 @@ you the target: `neutral/` = net8.0;net10.0, everything else = net10.0 (tooling 
 
 | Themia module | sources (best-of merge) | status |
 |---|---|---|
-| `Themia.Modules.Scheduling` (+ `Themia.Quartz`) | PowerACC SilkierQuartz | **✅ specced** |
+| `Themia.Modules.Scheduling` (+ `Themia.Quartz`) | PowerACC SilkierQuartz | **✅ built** (`Themia.Quartz` neutral core + `Themia.Modules.Scheduling`; dashboard smoke + EF store integration green) |
 | `Themia.Modules.ExceptionLogging` (+ `Themia.Exceptional.*`) | PowerACC/Idevs custom Dapper dialect engine (3 DB). *typed-exceptions + ProblemDetails split out to standalone neutral `Themia.AspNetCore`* | **✅ specced** |
 | `Themia.Modules.Identity` | ezy-assets `Jwt/Authentication/RoleAccess/TenantContext/LineLogin` + claims/policies + Zenity Identity.Example | ⬜ **P1 — next to spec** |
 | `Themia.Modules.Storage` | **ezy-assets** S3/Local + **Idevs** `CloudUploadStorage` + **PowerACC** ClamAV scan | ⬜ **P1 — next to spec** |
