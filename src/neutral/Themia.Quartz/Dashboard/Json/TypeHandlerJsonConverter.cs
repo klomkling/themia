@@ -29,6 +29,16 @@ namespace Themia.Quartz.Dashboard.Json
         {
             _typesByDiscriminator = typesByDiscriminator ?? throw new ArgumentNullException(nameof(typesByDiscriminator));
             _innerOptions = innerOptions ?? throw new ArgumentNullException(nameof(innerOptions));
+
+            // Fail fast: if innerOptions already contains a TypeHandlerJsonConverter, calling
+            // Read/Write would recurse infinitely into this same converter path → StackOverflow.
+            foreach (var converter in innerOptions.Converters)
+            {
+                if (converter is TypeHandlerJsonConverter)
+                    throw new ArgumentException(
+                        "innerOptions must not contain a TypeHandlerJsonConverter (would recurse).",
+                        nameof(innerOptions));
+            }
         }
 
         public override TypeHandlerBase Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)

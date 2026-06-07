@@ -10,6 +10,12 @@ namespace Themia.Quartz.Dashboard.Json
     /// System.Text.Json has no built-in Type converter, so this reproduces the round-trip:
     /// write AQN string, read back via <see cref="Type.GetType(string, bool)"/>.
     /// </summary>
+    /// <remarks>
+    /// <para><b>Read behavior:</b> returns <c>null</c> for a JSON <c>null</c> token or an empty string.
+    /// For a present, non-empty string that cannot be resolved to a CLR type,
+    /// <see cref="Type.GetType(string, bool)"/> is called with <c>throwOnError: true</c>
+    /// and the exception propagates to the caller.</para>
+    /// </remarks>
     internal sealed class SystemTypeJsonConverter : JsonConverter<Type>
     {
         public override Type Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)

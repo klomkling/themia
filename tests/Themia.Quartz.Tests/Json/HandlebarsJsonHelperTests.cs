@@ -115,4 +115,23 @@ public sealed class HandlebarsJsonHelperTests
         // Nested TypeHandler object has its own TypeId
         Assert.Contains("Themia.Quartz.Dashboard.TypeHandlers.StringHandler", output);
     }
+
+    [Fact]
+    public void JsonHelper_DoesNotEscapeNonAsciiOrPlus()
+    {
+        // Pins the UnsafeRelaxedJsonEscaping encoder on _jsonHelperOptions.
+        // The {{json}} helper output is injected RAW into HTML/JS templates (WriteSafeString /
+        // triple-stache). Newtonsoft emitted + and non-ASCII chars literally; STJ's default
+        // encoder would escape them to \uXXXX. This test fails with the default encoder and
+        // passes only with UnsafeRelaxedJsonEscaping — proving the divergence is fixed.
+        var svc = CreateServices();
+        var model = new { Label = "(UTC+07:00) Café" };
+        var output = Render(svc, "{{json this}}", model);
+
+        // Must contain literal + (not +) and literal é (not é).
+        Assert.Contains("+", output);
+        Assert.Contains("é", output);
+        // Full value check
+        Assert.Contains("(UTC+07:00) Café", output);
+    }
 }

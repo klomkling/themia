@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Globalization;
 using System.Linq;
+using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Threading.Tasks;
 
@@ -521,7 +522,13 @@ namespace Themia.Quartz.Dashboard.Models
                 },
             };
 
-            return JsonSerializer.Serialize(validMisfireInstructions);
+            // UnsafeRelaxedJsonEscaping: this string is injected RAW via triple-stache into JS.
+            // Newtonsoft emitted + and non-ASCII literally; we restore that behavior here.
+            // Admin-only dashboard — parity with pre-existing Newtonsoft behavior, not a new XSS surface.
+            return JsonSerializer.Serialize(validMisfireInstructions, new JsonSerializerOptions
+            {
+                Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+            });
         }
 
         public static async Task<TriggerPropertiesViewModel> Create(IScheduler scheduler)

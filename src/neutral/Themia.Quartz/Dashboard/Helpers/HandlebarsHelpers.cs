@@ -8,6 +8,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Text;
+using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Web;
 
@@ -20,7 +21,16 @@ namespace Themia.Quartz.Dashboard.Helpers
         // PascalCase (PropertyNamingPolicy = null) + nulls included (default) — matches the
         // Newtonsoft default behavior the {{json}} helper relied on. Distinct from
         // TypeHandlerService which omits nulls via WhenWritingNull.
-        private static readonly JsonSerializerOptions _jsonHelperOptions = new JsonSerializerOptions();
+        //
+        // UnsafeRelaxedJsonEscaping: the {{json}} helper output is injected RAW into HTML/JS
+        // templates (via WriteSafeString / triple-stache), not consumed through JSON.parse.
+        // Newtonsoft emitted +, non-ASCII, etc. literally; we restore that behavior here.
+        // This is an admin-only dashboard — parity with the pre-existing Newtonsoft behavior,
+        // not a new XSS surface.
+        private static readonly JsonSerializerOptions _jsonHelperOptions = new JsonSerializerOptions
+        {
+            Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+        };
 
         Services _services;
         private readonly string baseUrl;

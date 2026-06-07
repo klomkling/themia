@@ -83,6 +83,9 @@ namespace Themia.Quartz.Dashboard
             Register(typeof(UnsupportedTypeHandler));
         }
 
+        // Registration is expected to complete at startup before the first Serialize/Deserialize call.
+        // The discriminator map (_typesByDiscriminator) and options reset are not guarded by a lock,
+        // so concurrent registration after first use is not safe.
         public void Register(Type type)
         {
             if (!typeof(TypeHandlerBase).IsAssignableFrom(type))

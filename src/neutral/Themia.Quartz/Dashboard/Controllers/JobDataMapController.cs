@@ -21,8 +21,12 @@ namespace Themia.Quartz.Dashboard.Controllers
                 selectedType = Services.TypeHandlers.Deserialize((string)formData.First(x => x.Key == "selected-type").Value);
                 targetType = Services.TypeHandlers.Deserialize((string)formData.First(x => x.Key == "target-type").Value);
             }
-            catch (JsonException)
+            catch (JsonException ex) when (ex.Message.StartsWith("Unknown ", StringComparison.Ordinal)
+                                        || ex.Message.StartsWith("Missing ", StringComparison.Ordinal))
             {
+                // Only the unknown/missing-discriminator cases (from TypeHandlerJsonConverter)
+                // map to BadRequest. All other JsonExceptions (malformed payload, bind failure,
+                // etc.) propagate so they surface as 500 via the JsonErrorResponse filter.
                 return new BadRequestResult();
             }
 
