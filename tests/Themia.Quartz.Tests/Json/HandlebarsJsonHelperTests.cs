@@ -128,7 +128,7 @@ public sealed class HandlebarsJsonHelperTests
         var model = new { Label = "(UTC+07:00) Café" };
         var output = Render(svc, "{{json this}}", model);
 
-        // Must contain literal + (not +) and literal é (not é).
+        // Must contain literal + (not the escaped +) and literal é (not the escaped é).
         Assert.Contains("+", output);
         Assert.Contains("é", output);
         // Full value check

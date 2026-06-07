@@ -40,7 +40,8 @@ Scheduling capability: a framework-neutral Quartz dashboard core + an EF-backed 
 - **`Themia.Quartz` is now System.Text.Json-only** — `Newtonsoft.Json`, `JsonSubTypes`, and
   `Microsoft.AspNetCore.Mvc.NewtonsoftJson` have been removed. The vendored SilkierQuartz dashboard's JSON
   layer was migrated to STJ: a polymorphic type-handler converter (replaces `JsonSubTypes`) + a
-  `System.Type` converter, with 39 new wire-format regression tests (full `Themia.Quartz.Tests` suite: 52 per TFM), both `net8.0` and `net10.0`.
+  `System.Type` converter, with a wire-format regression suite pinning the exact JSON output on both
+  `net8.0` and `net10.0`.
 - **`Themia.Modules.Scheduling` is PostgreSQL-only in this phase** (hardcoded Npgsql provider + `scheduling`
   schema); generalizing to the framework's multi-provider story is deferred. Its dashboard `Authorize`
   default is authenticated-only — hosts should tighten it to an admin check (the dashboard is platform-admin).

@@ -65,13 +65,28 @@ public sealed class DeserializeErrorPathTests
         Assert.ThrowsAny<JsonException>(() => svc.Deserialize(Encode("{\"TypeId\":\"Not.A.Registered.Type\"}")));
     }
 
-    [Fact]
-    public void Deserialize_EnumHandler_WithEmptyEnumType_ThrowsJsonException()
+    [Theory]
+    [InlineData("123")]   // number
+    [InlineData("{}")]    // object
+    [InlineData("[]")]    // array
+    [InlineData("true")]  // bool
+    public void Deserialize_NonStringTypeId_ThrowsJsonException(string typeIdToken)
     {
-        // SystemTypeJsonConverter.Read fails fast on an empty Type token rather than returning null,
+        // A non-string TypeId must map to the discriminator error contract, not let GetString() throw
+        // InvalidOperationException (which would escape as the wrong exception type).
+        var svc = CreateService();
+        Assert.ThrowsAny<JsonException>(() => svc.Deserialize(Encode($"{{\"TypeId\":{typeIdToken}}}")));
+    }
+
+    [Theory]
+    [InlineData("null")] // reachable now that SystemTypeJsonConverter.HandleNull => true
+    [InlineData("\"\"")]
+    public void Deserialize_EnumHandler_WithNullOrEmptyEnumType_ThrowsJsonException(string enumTypeToken)
+    {
+        // SystemTypeJsonConverter.Read fails fast on a null/empty Type token rather than returning null,
         // which EnumHandler.EnumType would later dereference into a NullReferenceException.
         var svc = CreateService(o => o.StandardTypes.Add(new EnumHandler(typeof(DayOfWeek))));
-        var json = "{\"TypeId\":\"Themia.Quartz.Dashboard.TypeHandlers.EnumHandler\",\"EnumType\":\"\"}";
+        var json = $"{{\"TypeId\":\"Themia.Quartz.Dashboard.TypeHandlers.EnumHandler\",\"EnumType\":{enumTypeToken}}}";
         Assert.ThrowsAny<JsonException>(() => svc.Deserialize(Encode(json)));
     }
 }

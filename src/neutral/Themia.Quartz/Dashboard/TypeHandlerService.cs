@@ -104,9 +104,13 @@ namespace Themia.Quartz.Dashboard
 
             _handlers.Add(type, desc);
 
-            _typesByDiscriminator[desc.TypeId] = type;
-
-            _jsonSerializerOptions = null; // reset cached json options
+            // Mutate the discriminator map + reset the cached options under the same lock the options
+            // getter uses, so a late Register() can't race BuildOptions() copying _typesByDiscriminator.
+            lock (_optionsLock)
+            {
+                _typesByDiscriminator[desc.TypeId] = type;
+                _jsonSerializerOptions = null; // reset cached json options
+            }
 
             LastModified = DateTime.UtcNow;
         }

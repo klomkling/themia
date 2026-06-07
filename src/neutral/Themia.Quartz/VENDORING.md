@@ -51,7 +51,9 @@ The dashboard namespace (Task 3) will follow: `SilkierQuartz` → `Themia.Quartz
    (`Dashboard/TypeHandlers/`, `Dashboard/Controllers/`) was rewritten from Newtonsoft.Json +
    JsonSubTypes to `System.Text.Json`. A polymorphic type-handler converter replaces JsonSubTypes'
    discriminator logic; a `System.Type` converter replaces `TypeNameHandling`. Wire-format
-   compatibility is pinned by 39 new wire-format regression tests (full `Themia.Quartz.Tests` suite: 52 per TFM), both `net8.0` and `net10.0`.
+   compatibility is pinned by a regression suite (exact base64+JSON pins per handler type, the
+   misfire JSON, the `{{json}}` helper, the JobDataMap endpoints, and `Deserialize` error paths)
+   running on both `net8.0` and `net10.0`.
    `Newtonsoft.Json`, `JsonSubTypes`, and `Microsoft.AspNetCore.Mvc.NewtonsoftJson` are no longer
    dependencies of this package.
 

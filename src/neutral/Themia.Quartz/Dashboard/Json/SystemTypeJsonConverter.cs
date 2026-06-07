@@ -21,6 +21,11 @@ namespace Themia.Quartz.Dashboard.Json
     /// </remarks>
     internal sealed class SystemTypeJsonConverter : JsonConverter<Type>
     {
+        // Opt in to null handling: STJ bypasses reference-type converters for a JSON null token by
+        // default, which would let an "EnumType": null payload deserialize to a null Type and make the
+        // null-token fail-fast below dead code. With this, Read is invoked for null and throws.
+        public override bool HandleNull => true;
+
         public override Type Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
             if (reader.TokenType == JsonTokenType.Null)

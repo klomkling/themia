@@ -57,7 +57,11 @@ namespace Themia.Quartz.Dashboard.Json
             if (!root.TryGetProperty(nameof(TypeHandlerBase.TypeId), out var discriminatorElement))
                 throw new UnknownTypeHandlerException($"Missing '{nameof(TypeHandlerBase.TypeId)}' discriminator for {nameof(TypeHandlerBase)}.");
 
-            var discriminator = discriminatorElement.GetString();
+            // Guard the token kind: GetString() throws InvalidOperationException for a non-string
+            // (number/object/etc.), which would escape the UnknownTypeHandlerException error contract.
+            var discriminator = discriminatorElement.ValueKind == JsonValueKind.String
+                ? discriminatorElement.GetString()
+                : null;
             if (discriminator == null || !_typesByDiscriminator.TryGetValue(discriminator, out var concreteType))
                 throw new UnknownTypeHandlerException($"Unknown {nameof(TypeHandlerBase.TypeId)} discriminator '{discriminator}'.");
 
