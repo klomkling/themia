@@ -40,4 +40,27 @@ public class InProcExecutionHistoryStoreTests
         Assert.Equal(2, await store.GetTotalJobsExecuted());
         Assert.Equal(1, await store.GetTotalJobsFailed());
     }
+
+    [Fact]
+    public async Task Save_NullEntry_Throws()
+    {
+        var store = new InProcExecutionHistoryStore { SchedulerName = "S" };
+        await Assert.ThrowsAsync<ArgumentNullException>(() => store.Save(null!));
+    }
+
+    [Fact]
+    public async Task Save_NullOrEmptyFireInstanceId_Throws()
+    {
+        var store = new InProcExecutionHistoryStore { SchedulerName = "S" };
+        var entry = new ExecutionHistoryEntry
+        {
+            FireInstanceId = "",
+            SchedulerName = "S",
+            SchedulerInstanceId = "I",
+            Job = "g.j",
+            Trigger = "g.t",
+            ActualFireTimeUtc = DateTimeOffset.UtcNow,
+        };
+        await Assert.ThrowsAnyAsync<ArgumentException>(() => store.Save(entry));
+    }
 }

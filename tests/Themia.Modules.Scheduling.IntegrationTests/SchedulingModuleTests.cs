@@ -1,3 +1,5 @@
+using System.Security.Claims;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -81,6 +83,23 @@ public class SchedulingModuleTests : IAsyncLifetime
         var quartzOptions = provider.GetRequiredService<ThemiaQuartzOptions>();
         Assert.Equal("/jobs", quartzOptions.VirtualPathRoot);
         Assert.NotNull(quartzOptions.Authorize);
+    }
+
+    [Fact]
+    public async Task DefaultAuthorize_AllowsAuthenticated_DeniesAnonymous()
+    {
+        var provider = BuildModuleServices();
+        var authorize = provider.GetRequiredService<ThemiaQuartzOptions>().Authorize;
+        Assert.NotNull(authorize);
+
+        // Authenticated context → true.
+        var authenticatedCtx = new DefaultHttpContext();
+        authenticatedCtx.User = new ClaimsPrincipal(new ClaimsIdentity(authenticationType: "test"));
+        Assert.True(await authorize!(authenticatedCtx));
+
+        // Anonymous context (no identity / not authenticated) → false.
+        var anonymousCtx = new DefaultHttpContext();
+        Assert.False(await authorize(anonymousCtx));
     }
 
     private ServiceProvider BuildModuleServices()

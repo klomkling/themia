@@ -216,11 +216,18 @@ public sealed class EfExecutionHistoryStore : IExecutionHistoryStore
         await EnsureStatsRowAsync(context, SchedulerName).ConfigureAwait(false);
 
         // Raw SQL increment avoids optimistic-concurrency conflicts under concurrent job completion.
-        await context.Database
+        var rows = await context.Database
             .ExecuteSqlRawAsync(
                 "UPDATE scheduling.scheduler_stats SET total_jobs_executed = total_jobs_executed + 1 WHERE scheduler_name = {0}",
                 SchedulerName)
             .ConfigureAwait(false);
+
+        if (rows == 0)
+        {
+            logger.LogWarning(
+                "Counter increment matched no scheduler_stats row for {SchedulerName}; increment lost.",
+                SchedulerName);
+        }
     }
 
     /// <inheritdoc/>
@@ -230,11 +237,18 @@ public sealed class EfExecutionHistoryStore : IExecutionHistoryStore
 
         await EnsureStatsRowAsync(context, SchedulerName).ConfigureAwait(false);
 
-        await context.Database
+        var rows = await context.Database
             .ExecuteSqlRawAsync(
                 "UPDATE scheduling.scheduler_stats SET total_jobs_failed = total_jobs_failed + 1 WHERE scheduler_name = {0}",
                 SchedulerName)
             .ConfigureAwait(false);
+
+        if (rows == 0)
+        {
+            logger.LogWarning(
+                "Counter increment matched no scheduler_stats row for {SchedulerName}; increment lost.",
+                SchedulerName);
+        }
     }
 
     // ── Private helpers ──────────────────────────────────────────────────────

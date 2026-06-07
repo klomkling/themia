@@ -191,6 +191,38 @@ public class EfExecutionHistoryStoreTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Save_NullOrEmptyFireInstanceId_Throws()
+    {
+        // Guard fires before any DB access, so no container query is needed.
+        var entry = MakeEntry("", "trigger-guard", "job-guard");
+        await Assert.ThrowsAnyAsync<ArgumentException>(() => BuildStore().Save(entry));
+    }
+
+    [Fact]
+    public async Task FilterLastOfEveryTrigger_WithLimit2_ReturnsOldestToNewest()
+    {
+        // Pins the .Reverse() on the grouping path: the 2 most-recent entries per trigger
+        // must come back ordered oldest→newest (matching InProcExecutionHistoryStore's contract).
+        var store = BuildStore("sched-trigger-limit2");
+        var t = DateTimeOffset.UtcNow;
+
+        var o1 = MakeEntry("o1", "trigger-rev", "job-rev", firedAt: t.AddMinutes(-3), scheduler: "sched-trigger-limit2");
+        var o2 = MakeEntry("o2", "trigger-rev", "job-rev", firedAt: t.AddMinutes(-2), scheduler: "sched-trigger-limit2");
+        var o3 = MakeEntry("o3", "trigger-rev", "job-rev", firedAt: t.AddMinutes(-1), scheduler: "sched-trigger-limit2");
+
+        await store.Save(o1);
+        await store.Save(o2);
+        await store.Save(o3);
+
+        // limit=2 → the 2 most-recent are o2 and o3; returned oldest→newest = [o2, o3].
+        var results = (await store.FilterLastOfEveryTrigger(2)).ToList();
+
+        Assert.Equal(2, results.Count);
+        Assert.Equal("o2", results[0].FireInstanceId);
+        Assert.Equal("o3", results[1].FireInstanceId);
+    }
+
+    [Fact]
     public async Task Save_ConcurrentCalls_NeverThrowsAndAllPersist()
     {
         // Regression test for the concurrency bug: EfExecutionHistoryStore must be safe to call
