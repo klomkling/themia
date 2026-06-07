@@ -64,7 +64,9 @@ public class EfExecutionHistoryStoreTests : IAsyncLifetime
         Assert.Equal("fire-1", retrieved!.FireInstanceId);
         Assert.Equal("trigger-a", retrieved.Trigger);
         Assert.Equal("job-a", retrieved.Job);
-        Assert.Equal(entry.ActualFireTimeUtc, retrieved.ActualFireTimeUtc);
+        // PostgreSQL timestamptz stores microsecond precision; .NET DateTimeOffset has 100ns ticks, so a
+        // round-trip truncates the sub-microsecond tick. Compare with a tolerance instead of tick-exact.
+        Assert.Equal(entry.ActualFireTimeUtc, retrieved.ActualFireTimeUtc, TimeSpan.FromMilliseconds(1));
         Assert.Equal("test-scheduler", retrieved.SchedulerName);
     }
 
