@@ -1,14 +1,12 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
 using System.Text.Json;
+using Themia.Quartz.Dashboard.Json;
 
 namespace Themia.Quartz.Dashboard.Helpers
 {
     public class JsonErrorResponseAttribute : ActionFilterAttribute
     {
-        // PascalCase (PropertyNamingPolicy = null is the default) — templates/JS expect PascalCase.
-        private static readonly JsonSerializerOptions _serializerOptions = new JsonSerializerOptions();
-
         public override void OnActionExecuted(ActionExecutedContext context)
         {
             if (context.Exception != null)
@@ -17,7 +15,7 @@ namespace Themia.Quartz.Dashboard.Helpers
                 // stack — a host using AddNewtonsoftJson() would otherwise throw on our JsonSerializerOptions.
                 context.Result = new ContentResult
                 {
-                    Content = JsonSerializer.Serialize(new { ExceptionMessage = context.Exception.Message }, _serializerOptions),
+                    Content = JsonSerializer.Serialize(new { ExceptionMessage = context.Exception.Message }, DashboardJsonOptions.Default),
                     ContentType = "application/json",
                     StatusCode = 400,
                 };

@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Primitives;
 using Quartz;
+using Themia.Quartz.Dashboard.Json;
 using Themia.Quartz.Dashboard.Models;
 using System;
 using System.Collections.Generic;
@@ -12,9 +13,6 @@ namespace Themia.Quartz.Dashboard.Controllers
 {
     public abstract partial class PageControllerBase : ControllerBase
     {
-        // PascalCase (PropertyNamingPolicy = null is the default) — templates/JS expect PascalCase.
-        private static readonly JsonSerializerOptions _serializerOptions = new JsonSerializerOptions();
-
         protected Services Services => (Services)Request.HttpContext.Items[typeof(Services)];
         protected string GetRouteData(string key) => RouteData.Values[key].ToString();
         protected IActionResult Json(object content)
@@ -25,7 +23,7 @@ namespace Themia.Quartz.Dashboard.Controllers
             // throws on our JsonSerializerOptions at response time. ContentResult sidesteps that entirely.
             return new ContentResult
             {
-                Content = JsonSerializer.Serialize(content, _serializerOptions),
+                Content = JsonSerializer.Serialize(content, DashboardJsonOptions.Default),
                 ContentType = "application/json",
             };
         }

@@ -21,7 +21,9 @@ namespace Themia.Quartz.Dashboard
 
         public DateTime LastModified { get; private set; }
 
-        JsonSerializerOptions _jsonSerializerOptions = null;
+        // volatile: paired with the double-checked lock below so the lock-free outer read in the
+        // getter (and the reset in Register) publishes/observes the reference with acquire/release.
+        volatile JsonSerializerOptions _jsonSerializerOptions = null;
         readonly object _optionsLock = new object();
         private JsonSerializerOptions JsonSerializerOptions
         {

@@ -8,30 +8,16 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Text;
-using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Web;
 
 using static Themia.Quartz.Dashboard.Controllers.PageControllerBase;
+using Themia.Quartz.Dashboard.Json;
 
 namespace Themia.Quartz.Dashboard.Helpers
 {
     internal class HandlebarsHelpers
     {
-        // PascalCase (PropertyNamingPolicy = null) + nulls included (default) — matches the
-        // Newtonsoft default behavior the {{json}} helper relied on. Distinct from
-        // TypeHandlerService which omits nulls via WhenWritingNull.
-        //
-        // UnsafeRelaxedJsonEscaping: the {{json}} helper output is injected RAW into HTML/JS
-        // templates (via WriteSafeString / triple-stache), not consumed through JSON.parse.
-        // Newtonsoft emitted +, non-ASCII, etc. literally; we restore that behavior here.
-        // This is an admin-only dashboard — parity with the pre-existing Newtonsoft behavior,
-        // not a new XSS surface.
-        private static readonly JsonSerializerOptions _jsonHelperOptions = new JsonSerializerOptions
-        {
-            Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
-        };
-
         Services _services;
         private readonly string baseUrl;
 
@@ -210,7 +196,7 @@ namespace Themia.Quartz.Dashboard.Helpers
         {
             if (arguments.Length > 0)
             {
-                output.WriteSafeString(JsonSerializer.Serialize(arguments[0], arguments[0]?.GetType() ?? typeof(object), _jsonHelperOptions));
+                output.WriteSafeString(JsonSerializer.Serialize(arguments[0], arguments[0]?.GetType() ?? typeof(object), DashboardJsonOptions.RawInject));
             }
 
             if (args.Length <= 0)
@@ -218,7 +204,7 @@ namespace Themia.Quartz.Dashboard.Helpers
                 return;
             }
 
-            output.WriteSafeString(JsonSerializer.Serialize(args[0], args[0]?.GetType() ?? typeof(object), _jsonHelperOptions));
+            output.WriteSafeString(JsonSerializer.Serialize(args[0], args[0]?.GetType() ?? typeof(object), DashboardJsonOptions.RawInject));
         }
 
         void RenderJobDataMapValue(EncodedTextWriter output, Context context, Arguments arguments)
