@@ -69,7 +69,9 @@ namespace Themia.Quartz.Dashboard.Controllers
             {
                 if (!first) sb.Append(',');
                 first = false;
-                sb.Append(JsonSerializer.Serialize(kvp.Key));
+                // Raw-injected into the .js object literal → RawInject (literal chars), like every
+                // other raw-injection site. TypeIds are CLR FullNames so this is byte-identical today.
+                sb.Append(JsonSerializer.Serialize(kvp.Key, DashboardJsonOptions.RawInject));
                 sb.Append(":function(f) {");
                 sb.Append(kvp.Value);
                 sb.Append(execStub);

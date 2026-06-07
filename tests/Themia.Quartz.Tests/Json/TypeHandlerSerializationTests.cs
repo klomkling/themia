@@ -77,8 +77,9 @@ public sealed class TypeHandlerSerializationTests
     public void StringHandler_ExactWireJson_MatchesExpected()
     {
         // This is the canonical wire format. The STJ migration MUST produce an identical string.
-        // PROPERTY ORDER: JsonSubTypes injects TypeId discriminator AFTER subclass properties but
-        // BEFORE base-class properties. So the order is: StringHandler props → TypeId → TypeHandlerBase props.
+        // PROPERTY ORDER: STJ serializes the concrete subtype's members first, then the base
+        // TypeHandlerBase members; TypeId (a base getter) lands between them. Order: StringHandler
+        // props → TypeId → TypeHandlerBase props. (Matches the legacy JsonSubTypes layout this pins.)
         var svc = CreateServices().TypeHandlers;
         var handler = new StringHandler { Name = "String" };
         handler.DisplayName = "String"; // ThemiaQuartzOptions ctor sets DisplayName via Name setter
@@ -87,7 +88,7 @@ public sealed class TypeHandlerSerializationTests
         var json = DecodeJson(token);
 
         // DefaultIgnoreCondition.WhenWritingNull: nulls omitted. IsMultiline=false is a bool (non-null) → included.
-        // Property order: IsMultiline (subclass) → TypeId (injected by JsonSubTypes) → Name → DisplayName (base).
+        // Property order: IsMultiline (subclass) → TypeId (base getter) → Name → DisplayName (base).
         Assert.Equal(
             "{\"IsMultiline\":false,\"TypeId\":\"Themia.Quartz.Dashboard.TypeHandlers.StringHandler\",\"Name\":\"String\",\"DisplayName\":\"String\"}",
             json);

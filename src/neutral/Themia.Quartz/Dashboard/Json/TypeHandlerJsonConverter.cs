@@ -22,6 +22,9 @@ namespace Themia.Quartz.Dashboard.Json
     /// </remarks>
     internal sealed class TypeHandlerJsonConverter : JsonConverter<TypeHandlerBase>
     {
+        // Caller must pass a stable snapshot — this is treated as immutable for the converter's
+        // lifetime. BuildOptions copies _typesByDiscriminator before handing it in; passing the live
+        // dictionary instead would race registration mutations against deserialization.
         private readonly IReadOnlyDictionary<string, Type> _typesByDiscriminator;
         private readonly JsonSerializerOptions _innerOptions;
 

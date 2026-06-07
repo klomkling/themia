@@ -21,11 +21,18 @@ namespace Themia.Quartz.Dashboard.Json
     /// </summary>
     internal static class DashboardJsonOptions
     {
-        public static readonly JsonSerializerOptions Default = new JsonSerializerOptions();
+        public static readonly JsonSerializerOptions Default = CreateFrozen(JavaScriptEncoder.Default);
 
-        public static readonly JsonSerializerOptions RawInject = new JsonSerializerOptions
+        public static readonly JsonSerializerOptions RawInject = CreateFrozen(JavaScriptEncoder.UnsafeRelaxedJsonEscaping);
+
+        // MakeReadOnly() up front so these shared instances can't be mutated by a caller before first
+        // use (which would silently break wire-format parity for every consumer). A mutation attempt
+        // now fails fast with InvalidOperationException instead.
+        private static JsonSerializerOptions CreateFrozen(JavaScriptEncoder encoder)
         {
-            Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
-        };
+            var options = new JsonSerializerOptions { Encoder = encoder };
+            options.MakeReadOnly(populateMissingResolver: true);
+            return options;
+        }
     }
 }

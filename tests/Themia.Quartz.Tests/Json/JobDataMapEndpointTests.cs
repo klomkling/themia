@@ -125,12 +125,12 @@ public sealed class JobDataMapEndpointTests : IAsyncDisposable
     [Fact]
     public async Task TypeHandlersJs_KeysAreWrappedInFunctionBody()
     {
-        // Each value in $typeHandlerScripts is a function(f){...} — the JRaw wrapping.
-        // This is critical for the migration: the value must NOT be a JSON string but raw JS.
+        // Each value in $typeHandlerScripts is a raw function(f){...} body (built via StringBuilder
+        // in TypeHandlersScript). Critical for the migration: the value must be raw JS, NOT a JSON string.
         var response = await CreateClient().GetAsync("/jobs/JobDataMap/TypeHandlers.js");
         var content = await response.Content.ReadAsStringAsync();
 
-        // Values are wrapped in function(f){...} via JRaw — not quoted strings
+        // Values are emitted as raw function(f){...} bodies — not quoted strings
         Assert.Contains("function(f)", content);
 
         // The exec stub that calls init
@@ -203,5 +203,46 @@ public sealed class JobDataMapEndpointTests : IAsyncDisposable
         var response = await CreateClient().PostAsync("/jobs/JobDataMap/ChangeType", formContent);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ChangeType_UnknownTypeId_Returns400_WithEmptyBody()
+    {
+        // The controller's two-way split: UnknownTypeHandlerException → empty BadRequestResult (no body).
+        // Pins the catch-by-type behavior — widening the catch to JsonException/Exception would still
+        // return 400 but would change the body, so the body assertion is what locks the contract.
+        var formContent = new FormUrlEncodedContent(new[]
+        {
+            new KeyValuePair<string, string>("selected-type", Convert.ToBase64String(
+                System.Text.Encoding.UTF8.GetBytes("{\"TypeId\":\"Unknown.Type\"}"))),
+            new KeyValuePair<string, string>("target-type", Convert.ToBase64String(
+                System.Text.Encoding.UTF8.GetBytes("{\"TypeId\":\"Unknown.Type\"}"))),
+        });
+
+        var response = await CreateClient().PostAsync("/jobs/JobDataMap/ChangeType", formContent);
+        var content = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Empty(content);
+    }
+
+    [Fact]
+    public async Task ChangeType_MalformedBase64Token_Returns400_WithExceptionMessageBody()
+    {
+        // The other arm of the split: a non-UnknownTypeHandlerException (here FormatException from
+        // Convert.FromBase64String) propagates to the [JsonErrorResponse] filter, which returns 400
+        // WITH an {"ExceptionMessage":...} body. This is the test that distinguishes the two arms.
+        var formContent = new FormUrlEncodedContent(new[]
+        {
+            new KeyValuePair<string, string>("selected-type", "!!!not-valid-base64!!!"),
+            new KeyValuePair<string, string>("target-type", "!!!not-valid-base64!!!"),
+        });
+
+        var response = await CreateClient().PostAsync("/jobs/JobDataMap/ChangeType", formContent);
+        var content = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Contains("application/json", response.Content.Headers.ContentType!.ToString());
+        Assert.Contains("ExceptionMessage", content);
     }
 }

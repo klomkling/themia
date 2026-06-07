@@ -8,9 +8,9 @@ namespace Themia.Quartz.Tests.Json;
 
 /// <summary>
 /// Pins the JSON produced by the Handlebars <c>{{json}}</c> helper registered in
-/// <see cref="HandlebarsHelpers"/>. The helper calls <c>JsonSerializer.Serialize(argument)</c>
-/// with default options (PascalCase, nulls included). These tests lock that casing + null-inclusion
-/// contract that the dashboard templates depend on — a permanent compatibility pin.
+/// <see cref="HandlebarsHelpers"/>. The helper serializes with <c>DashboardJsonOptions.RawInject</c>
+/// (PascalCase, nulls included, <c>UnsafeRelaxedJsonEscaping</c> for raw template injection). These
+/// tests lock that casing + null-inclusion + literal-escaping contract the templates depend on.
 /// </summary>
 public sealed class HandlebarsJsonHelperTests
 {
@@ -28,7 +28,7 @@ public sealed class HandlebarsJsonHelperTests
     public void JsonHelper_SerializesAnonymousObject_WithPascalCaseKeys()
     {
         var svc = CreateServices();
-        // The helper uses default STJ options: PascalCase, nulls included
+        // The helper uses DashboardJsonOptions.RawInject: PascalCase, nulls included
         var model = new { Name = "hello", Value = 42 };
         var output = Render(svc, "{{json this}}", model);
 
@@ -39,7 +39,7 @@ public sealed class HandlebarsJsonHelperTests
     public void JsonHelper_IncludesNullValues_UnlikeTypeHandlerService()
     {
         // Critical distinction: TypeHandlerService uses DefaultIgnoreCondition.WhenWritingNull (omits
-        // nulls), but the {{json}} helper uses DEFAULT options which INCLUDE nulls.
+        // nulls), but the {{json}} helper (DashboardJsonOptions.RawInject) INCLUDES nulls.
         var svc = CreateServices();
         var model = new { Name = (string?)null, Value = 1 };
         var output = Render(svc, "{{json this}}", model);
@@ -119,7 +119,7 @@ public sealed class HandlebarsJsonHelperTests
     [Fact]
     public void JsonHelper_DoesNotEscapeNonAsciiOrPlus()
     {
-        // Pins the UnsafeRelaxedJsonEscaping encoder on _jsonHelperOptions.
+        // Pins the UnsafeRelaxedJsonEscaping encoder on DashboardJsonOptions.RawInject (used by {{json}}).
         // The {{json}} helper output is injected RAW into HTML/JS templates (WriteSafeString /
         // triple-stache). Newtonsoft emitted + and non-ASCII chars literally; STJ's default
         // encoder would escape them to \uXXXX. This test fails with the default encoder and
