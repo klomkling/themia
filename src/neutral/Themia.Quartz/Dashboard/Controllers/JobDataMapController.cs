@@ -25,8 +25,9 @@ namespace Themia.Quartz.Dashboard.Controllers
                                         || ex.Message.StartsWith("Missing ", StringComparison.Ordinal))
             {
                 // Only the unknown/missing-discriminator cases (from TypeHandlerJsonConverter)
-                // map to BadRequest. All other JsonExceptions (malformed payload, bind failure,
-                // etc.) propagate so they surface as 500 via the JsonErrorResponse filter.
+                // map to an empty BadRequest here. All other exceptions (malformed payload, bind
+                // failure, etc.) propagate to the [JsonErrorResponse] filter, which returns 400 with
+                // the exception message.
                 return new BadRequestResult();
             }
 

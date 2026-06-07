@@ -46,6 +46,11 @@ namespace Themia.Quartz.Dashboard.Json
             using var doc = JsonDocument.ParseValue(ref reader);
             var root = doc.RootElement;
 
+            // Guard non-object payloads (null/array/string/number): TryGetProperty would otherwise
+            // throw InvalidOperationException, not the JsonException callers expect.
+            if (root.ValueKind != JsonValueKind.Object)
+                throw new JsonException($"Expected a JSON object for {nameof(TypeHandlerBase)}, got {root.ValueKind}.");
+
             if (!root.TryGetProperty(nameof(TypeHandlerBase.TypeId), out var discriminatorElement))
                 throw new JsonException($"Missing '{nameof(TypeHandlerBase.TypeId)}' discriminator for {nameof(TypeHandlerBase)}.");
 
@@ -54,7 +59,8 @@ namespace Themia.Quartz.Dashboard.Json
                 throw new JsonException($"Unknown {nameof(TypeHandlerBase.TypeId)} discriminator '{discriminator}'.");
 
             var raw = root.GetRawText();
-            return (TypeHandlerBase)JsonSerializer.Deserialize(raw, concreteType, _innerOptions);
+            return (TypeHandlerBase)JsonSerializer.Deserialize(raw, concreteType, _innerOptions)
+                ?? throw new JsonException($"Deserialization of {nameof(TypeHandlerBase.TypeId)} '{discriminator}' yielded null.");
         }
 
         public override void Write(Utf8JsonWriter writer, TypeHandlerBase value, JsonSerializerOptions options)

@@ -13,7 +13,14 @@ namespace Themia.Quartz.Dashboard.Helpers
         {
             if (context.Exception != null)
             {
-                context.Result = new JsonResult(new { ExceptionMessage = context.Exception.Message }, _serializerOptions) { StatusCode = 400 };
+                // ContentResult (not JsonResult) so the response doesn't depend on the host's MVC JSON
+                // stack — a host using AddNewtonsoftJson() would otherwise throw on our JsonSerializerOptions.
+                context.Result = new ContentResult
+                {
+                    Content = JsonSerializer.Serialize(new { ExceptionMessage = context.Exception.Message }, _serializerOptions),
+                    ContentType = "application/json",
+                    StatusCode = 400,
+                };
                 context.ExceptionHandled = true;
             }
         }

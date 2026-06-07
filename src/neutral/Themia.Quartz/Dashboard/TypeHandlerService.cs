@@ -109,7 +109,11 @@ namespace Themia.Quartz.Dashboard
             LastModified = DateTime.UtcNow;
         }
 
-        public TypeHandlerBase Deserialize(string str) => JsonSerializer.Deserialize<TypeHandlerBase>(Encoding.UTF8.GetString(Convert.FromBase64String(str)), JsonSerializerOptions);
+        // A top-level JSON "null" bypasses the polymorphic converter (STJ returns null for null tokens),
+        // so guard here too — callers (e.g. ChangeType) dereference the result.
+        public TypeHandlerBase Deserialize(string str) =>
+            JsonSerializer.Deserialize<TypeHandlerBase>(Encoding.UTF8.GetString(Convert.FromBase64String(str)), JsonSerializerOptions)
+                ?? throw new JsonException("Deserialized TypeHandler payload was null.");
 
         public string Serialize(TypeHandlerBase typeHandler) => Convert.ToBase64String(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(typeHandler, JsonSerializerOptions)));
 

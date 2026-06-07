@@ -19,7 +19,15 @@ namespace Themia.Quartz.Dashboard.Controllers
         protected string GetRouteData(string key) => RouteData.Values[key].ToString();
         protected IActionResult Json(object content)
         {
-            return new JsonResult(content, _serializerOptions);
+            // Serialize with STJ ourselves and return a ContentResult instead of a JsonResult so the
+            // dashboard's JSON endpoints don't depend on the host's MVC JSON stack. A host that calls
+            // AddNewtonsoftJson() swaps in a JsonResult executor that expects JsonSerializerSettings and
+            // throws on our JsonSerializerOptions at response time. ContentResult sidesteps that entirely.
+            return new ContentResult
+            {
+                Content = JsonSerializer.Serialize(content, _serializerOptions),
+                ContentType = "application/json",
+            };
         }
 
 
