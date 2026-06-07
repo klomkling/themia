@@ -1,9 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.Infrastructure;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Primitives;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Serialization;
 using Quartz;
 using Themia.Quartz.Dashboard.Models;
 using System;
@@ -16,21 +12,14 @@ namespace Themia.Quartz.Dashboard.Controllers
 {
     public abstract partial class PageControllerBase : ControllerBase
     {
-        private static readonly JsonSerializerSettings _serializerSettings = new JsonSerializerSettings()
-        {
-            ContractResolver = new DefaultContractResolver(), // PascalCase as default
-        };
-        private static readonly object _systemTextSerializerOptions = new JsonSerializerOptions();
+        // PascalCase (PropertyNamingPolicy = null is the default) — templates/JS expect PascalCase.
+        private static readonly JsonSerializerOptions _serializerOptions = new JsonSerializerOptions();
 
         protected Services Services => (Services)Request.HttpContext.Items[typeof(Services)];
         protected string GetRouteData(string key) => RouteData.Values[key].ToString();
         protected IActionResult Json(object content)
         {
-            var executor = HttpContext.RequestServices.GetRequiredService<IActionResultExecutor<JsonResult>>();
-            var serializerOptions = executor.GetType().FullName.Contains("SystemTextJson")
-                ? _systemTextSerializerOptions
-                : _serializerSettings;
-            return new JsonResult(content, serializerOptions);
+            return new JsonResult(content, _serializerOptions);
         }
 
 

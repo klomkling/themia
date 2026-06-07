@@ -1,5 +1,4 @@
 ﻿using HandlebarsDotNet;
-using Newtonsoft.Json;
 using Themia.Quartz.Dashboard.Models;
 using Themia.Quartz.Dashboard.TypeHandlers;
 using System;
@@ -9,6 +8,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Text;
+using System.Text.Json;
 using System.Web;
 
 using static Themia.Quartz.Dashboard.Controllers.PageControllerBase;
@@ -17,6 +17,11 @@ namespace Themia.Quartz.Dashboard.Helpers
 {
     internal class HandlebarsHelpers
     {
+        // PascalCase (PropertyNamingPolicy = null) + nulls included (default) — matches the
+        // Newtonsoft default behavior the {{json}} helper relied on. Distinct from
+        // TypeHandlerService which omits nulls via WhenWritingNull.
+        private static readonly JsonSerializerOptions _jsonHelperOptions = new JsonSerializerOptions();
+
         Services _services;
         private readonly string baseUrl;
 
@@ -195,7 +200,7 @@ namespace Themia.Quartz.Dashboard.Helpers
         {
             if (arguments.Length > 0)
             {
-                output.WriteSafeString(JsonConvert.SerializeObject(arguments[0]));
+                output.WriteSafeString(JsonSerializer.Serialize(arguments[0], arguments[0]?.GetType() ?? typeof(object), _jsonHelperOptions));
             }
 
             if (args.Length <= 0)
@@ -203,7 +208,7 @@ namespace Themia.Quartz.Dashboard.Helpers
                 return;
             }
 
-            output.WriteSafeString(JsonConvert.SerializeObject(args[0]));
+            output.WriteSafeString(JsonSerializer.Serialize(args[0], args[0]?.GetType() ?? typeof(object), _jsonHelperOptions));
         }
 
         void RenderJobDataMapValue(EncodedTextWriter output, Context context, Arguments arguments)
