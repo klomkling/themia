@@ -18,7 +18,7 @@ Themia.Modules.Scheduling.SchedulingDbContextFactory
 Themia.Modules.Scheduling.SchedulingDbContextFactory.SchedulingDbContextFactory() -> void
 Themia.Modules.Scheduling.SchedulingDbContextFactory.CreateDbContext(string![]! args) -> Themia.Modules.Scheduling.SchedulingDbContext!
 Themia.Modules.Scheduling.EfExecutionHistoryStore
-Themia.Modules.Scheduling.EfExecutionHistoryStore.EfExecutionHistoryStore(Themia.Modules.Scheduling.SchedulingDbContext! context, Microsoft.Extensions.Logging.ILogger<Themia.Modules.Scheduling.EfExecutionHistoryStore!>! logger) -> void
+Themia.Modules.Scheduling.EfExecutionHistoryStore.EfExecutionHistoryStore(Microsoft.EntityFrameworkCore.IDbContextFactory<Themia.Modules.Scheduling.SchedulingDbContext!>! contextFactory, Microsoft.Extensions.Logging.ILogger<Themia.Modules.Scheduling.EfExecutionHistoryStore!>! logger) -> void
 Themia.Modules.Scheduling.EfExecutionHistoryStore.FilterLast(int limit) -> System.Threading.Tasks.Task<System.Collections.Generic.IEnumerable<Themia.Quartz.ExecutionHistoryEntry!>!>!
 Themia.Modules.Scheduling.EfExecutionHistoryStore.FilterLastOfEveryJob(int limitPerJob) -> System.Threading.Tasks.Task<System.Collections.Generic.IEnumerable<Themia.Quartz.ExecutionHistoryEntry!>!>!
 Themia.Modules.Scheduling.EfExecutionHistoryStore.FilterLastOfEveryTrigger(int limitPerTrigger) -> System.Threading.Tasks.Task<System.Collections.Generic.IEnumerable<Themia.Quartz.ExecutionHistoryEntry!>!>!

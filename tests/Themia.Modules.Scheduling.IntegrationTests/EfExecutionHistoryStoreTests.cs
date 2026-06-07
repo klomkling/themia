@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.Logging.Abstractions;
 using Npgsql;
 using Testcontainers.PostgreSql;
@@ -167,16 +168,43 @@ public class EfExecutionHistoryStoreTests : IAsyncLifetime
         Assert.Null(result);
     }
 
+    [Fact]
+    public async Task Save_ConcurrentCalls_NeverThrowsAndAllPersist()
+    {
+        // Regression test for the concurrency bug: EfExecutionHistoryStore must be safe to call
+        // from multiple threads simultaneously (Quartz runs jobs on up to 10 worker threads).
+        var store = BuildStore("sched-concurrent");
+        const int count = 20;
+
+        var tasks = Enumerable
+            .Range(1, count)
+            .Select(i => store.Save(MakeEntry($"conc-{i}", "trigger-conc", "job-conc", scheduler: "sched-concurrent")));
+
+        // No InvalidOperationException ("A second operation was started on this context instance")
+        // should be thrown here.
+        await Task.WhenAll(tasks);
+
+        // All 20 entries must be persisted.
+        var results = (await store.FilterLastOfEveryTrigger(count)).ToList();
+        Assert.Equal(count, results.Count);
+    }
+
     // ── Helpers ──────────────────────────────────────────────────────────────
 
-    private SchedulingDbContext BuildContext() =>
-        new(new DbContextOptionsBuilder<SchedulingDbContext>()
+    private DbContextOptions<SchedulingDbContext> BuildOptions() =>
+        new DbContextOptionsBuilder<SchedulingDbContext>()
             .UseNpgsql(ConnectionString)
             .UseSnakeCaseNamingConvention()
-            .Options);
+            .Options;
+
+    private SchedulingDbContext BuildContext() =>
+        new(BuildOptions());
+
+    private IDbContextFactory<SchedulingDbContext> BuildContextFactory() =>
+        new PooledDbContextFactory<SchedulingDbContext>(BuildOptions());
 
     private EfExecutionHistoryStore BuildStore(string schedulerName = "test-scheduler") =>
-        new(BuildContext(), NullLogger<EfExecutionHistoryStore>.Instance)
+        new(BuildContextFactory(), NullLogger<EfExecutionHistoryStore>.Instance)
         {
             SchedulerName = schedulerName,
         };

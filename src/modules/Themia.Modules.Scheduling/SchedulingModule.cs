@@ -25,12 +25,15 @@ namespace Themia.Modules.Scheduling;
 /// by supplying <see cref="SchedulingModuleOptions.Authorize"/> with an admin check before production.
 /// </para>
 /// <para>
-/// <b>DbContext lifetime.</b> <see cref="SchedulingDbContext"/> is registered as a singleton and the
-/// store as a singleton, because the <c>MapThemiaQuartz</c> bridge resolves
-/// <see cref="IExecutionHistoryStore"/> once from the root service provider. Execution-history writes
-/// originate from the Quartz history plugin (low concurrency, serialized per scheduler), so a single
-/// long-lived context is acceptable here; the store's increment paths use raw SQL to avoid tracked-entity
-/// contention. Do not reuse this context for high-concurrency request work.
+/// <b>DbContext lifetime.</b> <see cref="SchedulingDbContext"/> is registered via
+/// <c>AddDbContextFactory</c>, and <see cref="EfExecutionHistoryStore"/> is a singleton that creates
+/// a short-lived context per operation. This makes concurrent Quartz listener callbacks (multiple
+/// worker threads calling <c>Save</c>/<c>Increment*</c> simultaneously) safe — no shared
+/// <c>DbContext</c> state exists between calls.
+/// </para>
+/// <para>
+/// <b>PostgreSQL only (this phase).</b> The module hard-codes <c>UseNpgsql</c> and the
+/// <c>scheduling</c> schema. Generalizing to the framework's multi-provider strategy is deferred.
 /// </para>
 /// </remarks>
 public sealed class SchedulingModule : ThemiaModuleBase
@@ -67,27 +70,26 @@ public sealed class SchedulingModule : ThemiaModuleBase
     {
         ArgumentNullException.ThrowIfNull(services);
 
-        // Register the scheduling DbContext as a singleton (see remarks on lifetime). Only if the
-        // host has not already registered one, so an app that owns the context wins.
-        services.TryAddSingleton(sp =>
+        // Register the scheduling DbContext factory. Each operation in EfExecutionHistoryStore
+        // creates a short-lived context via the factory, keeping concurrent Quartz callbacks safe.
+        // AddDbContextFactory also registers SchedulingDbContext as a scoped service, which
+        // InitializeAsync uses when running EF migrations from a DI scope.
+        services.AddDbContextFactory<SchedulingDbContext>((sp, dbOptions) =>
         {
             var configuration = sp.GetRequiredService<IConfiguration>();
             var connectionString = configuration.GetConnectionString(ConnectionStringName)
                 ?? throw new InvalidOperationException(
                     $"Connection string '{ConnectionStringName}' was not found; the scheduling module requires it.");
 
-            var dbOptions = new DbContextOptionsBuilder<SchedulingDbContext>()
+            dbOptions
                 .UseNpgsql(connectionString)
-                .UseSnakeCaseNamingConvention()
-                .Options;
-
-            return new SchedulingDbContext(dbOptions);
+                .UseSnakeCaseNamingConvention();
         });
 
         var schedulerName = options.SchedulerName;
         services.TryAddSingleton<IExecutionHistoryStore>(sp =>
             new EfExecutionHistoryStore(
-                sp.GetRequiredService<SchedulingDbContext>(),
+                sp.GetRequiredService<IDbContextFactory<SchedulingDbContext>>(),
                 sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<EfExecutionHistoryStore>>())
             {
                 SchedulerName = schedulerName,

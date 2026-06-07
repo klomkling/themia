@@ -10,9 +10,10 @@ namespace Themia.Modules.Scheduling;
 /// </summary>
 /// <remarks>
 /// <para>
-/// Register this store as a scoped service and inject it into the Quartz scheduler via
-/// <c>ExecutionHistoryPlugin.StoreType</c> or by setting it on the
-/// <c>SchedulerContext</c> after the scheduler is built.
+/// This store is registered as a singleton. Each public operation creates a short-lived
+/// <see cref="SchedulingDbContext"/> via <see cref="IDbContextFactory{TContext}"/> and disposes it
+/// before returning, so concurrent Quartz listener callbacks (multiple worker threads) are safe —
+/// no shared <c>DbContext</c> state exists between calls.
 /// </para>
 /// <para>
 /// <b>Counter mechanism:</b> Executed/failed totals are stored in a separate
@@ -29,17 +30,19 @@ namespace Themia.Modules.Scheduling;
 /// </remarks>
 public sealed class EfExecutionHistoryStore : IExecutionHistoryStore
 {
-    private readonly SchedulingDbContext context;
+    private readonly IDbContextFactory<SchedulingDbContext> contextFactory;
     private readonly ILogger<EfExecutionHistoryStore> logger;
 
     /// <summary>
     /// Initializes a new instance of <see cref="EfExecutionHistoryStore"/>.
     /// </summary>
-    /// <param name="context">The scheduling database context.</param>
+    /// <param name="contextFactory">
+    /// Factory used to create a short-lived <see cref="SchedulingDbContext"/> per operation.
+    /// </param>
     /// <param name="logger">Logger for diagnostic messages.</param>
-    public EfExecutionHistoryStore(SchedulingDbContext context, ILogger<EfExecutionHistoryStore> logger)
+    public EfExecutionHistoryStore(IDbContextFactory<SchedulingDbContext> contextFactory, ILogger<EfExecutionHistoryStore> logger)
     {
-        this.context = context;
+        this.contextFactory = contextFactory;
         this.logger = logger;
     }
 
@@ -49,6 +52,8 @@ public sealed class EfExecutionHistoryStore : IExecutionHistoryStore
     /// <inheritdoc/>
     public async Task<ExecutionHistoryEntry?> Get(string fireInstanceId)
     {
+        await using var context = contextFactory.CreateDbContext();
+
         var record = await context.ExecutionHistory
             .AsNoTracking()
             .FirstOrDefaultAsync(r => r.FireInstanceId == fireInstanceId)
@@ -60,6 +65,8 @@ public sealed class EfExecutionHistoryStore : IExecutionHistoryStore
     /// <inheritdoc/>
     public async Task Save(ExecutionHistoryEntry entry)
     {
+        await using var context = contextFactory.CreateDbContext();
+
         var existing = await context.ExecutionHistory
             .FirstOrDefaultAsync(r => r.FireInstanceId == entry.FireInstanceId)
             .ConfigureAwait(false);
@@ -89,6 +96,8 @@ public sealed class EfExecutionHistoryStore : IExecutionHistoryStore
     /// <inheritdoc/>
     public async Task Purge()
     {
+        await using var context = contextFactory.CreateDbContext();
+
         // Retain the top-10 most recent entries per trigger for this scheduler (matching InProcExecutionHistoryStore).
         // Delete everything else belonging to this scheduler.
         var keepIds = await context.ExecutionHistory
@@ -116,6 +125,8 @@ public sealed class EfExecutionHistoryStore : IExecutionHistoryStore
     /// <inheritdoc/>
     public async Task<IEnumerable<ExecutionHistoryEntry>> FilterLastOfEveryJob(int limitPerJob)
     {
+        await using var context = contextFactory.CreateDbContext();
+
         // Fetch all history for this scheduler then group in memory — EF Core cannot translate
         // per-group TAKE in a single SQL query portably across SQL Server / MySQL / PostgreSQL.
         var records = await context.ExecutionHistory
@@ -135,6 +146,8 @@ public sealed class EfExecutionHistoryStore : IExecutionHistoryStore
     /// <inheritdoc/>
     public async Task<IEnumerable<ExecutionHistoryEntry>> FilterLastOfEveryTrigger(int limitPerTrigger)
     {
+        await using var context = contextFactory.CreateDbContext();
+
         var records = await context.ExecutionHistory
             .AsNoTracking()
             .Where(r => r.SchedulerName == SchedulerName)
@@ -152,6 +165,8 @@ public sealed class EfExecutionHistoryStore : IExecutionHistoryStore
     /// <inheritdoc/>
     public async Task<IEnumerable<ExecutionHistoryEntry>> FilterLast(int limit)
     {
+        await using var context = contextFactory.CreateDbContext();
+
         var records = await context.ExecutionHistory
             .AsNoTracking()
             .Where(r => r.SchedulerName == SchedulerName)
@@ -180,7 +195,9 @@ public sealed class EfExecutionHistoryStore : IExecutionHistoryStore
     /// <inheritdoc/>
     public async Task IncrementTotalJobsExecuted()
     {
-        await EnsureStatsRowAsync().ConfigureAwait(false);
+        await using var context = contextFactory.CreateDbContext();
+
+        await EnsureStatsRowAsync(context, SchedulerName).ConfigureAwait(false);
 
         // Raw SQL increment avoids optimistic-concurrency conflicts under concurrent job completion.
         await context.Database
@@ -193,7 +210,9 @@ public sealed class EfExecutionHistoryStore : IExecutionHistoryStore
     /// <inheritdoc/>
     public async Task IncrementTotalJobsFailed()
     {
-        await EnsureStatsRowAsync().ConfigureAwait(false);
+        await using var context = contextFactory.CreateDbContext();
+
+        await EnsureStatsRowAsync(context, SchedulerName).ConfigureAwait(false);
 
         await context.Database
             .ExecuteSqlRawAsync(
@@ -204,21 +223,25 @@ public sealed class EfExecutionHistoryStore : IExecutionHistoryStore
 
     // ── Private helpers ──────────────────────────────────────────────────────
 
-    private async Task<SchedulerStatsRecord?> GetOrDefaultStatsAsync() =>
-        await context.SchedulerStats
+    private async Task<SchedulerStatsRecord?> GetOrDefaultStatsAsync()
+    {
+        await using var context = contextFactory.CreateDbContext();
+
+        return await context.SchedulerStats
             .AsNoTracking()
             .FirstOrDefaultAsync(s => s.SchedulerName == SchedulerName)
             .ConfigureAwait(false);
+    }
 
-    private async Task EnsureStatsRowAsync()
+    private static async Task EnsureStatsRowAsync(SchedulingDbContext context, string schedulerName)
     {
         var exists = await context.SchedulerStats
-            .AnyAsync(s => s.SchedulerName == SchedulerName)
+            .AnyAsync(s => s.SchedulerName == schedulerName)
             .ConfigureAwait(false);
 
         if (!exists)
         {
-            context.SchedulerStats.Add(new SchedulerStatsRecord { SchedulerName = SchedulerName });
+            context.SchedulerStats.Add(new SchedulerStatsRecord { SchedulerName = schedulerName });
             try
             {
                 await context.SaveChangesAsync().ConfigureAwait(false);
