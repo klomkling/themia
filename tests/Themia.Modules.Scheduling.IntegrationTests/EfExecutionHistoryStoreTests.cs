@@ -10,9 +10,9 @@ namespace Themia.Modules.Scheduling.IntegrationTests;
 
 /// <summary>
 /// Integration tests for <see cref="EfExecutionHistoryStore"/> against a real PostgreSQL instance.
-/// Schema is created via <c>EnsureCreatedAsync</c> (acceptable for tests; the module ships
-/// EF Core migrations for production use — run <c>dotnet ef migrations add Initial</c>
-/// against the <see cref="SchedulingDbContext"/> to generate them).
+/// These tests create the schema via <c>EnsureCreatedAsync</c> for isolation; production schema
+/// creation goes through the EF Core migration applied by <c>SchedulingModule.InitializeAsync</c>
+/// (covered by <see cref="SchedulingModuleTests"/>).
 /// </summary>
 [Trait("Category", "Integration")]
 public class EfExecutionHistoryStoreTests : IAsyncLifetime

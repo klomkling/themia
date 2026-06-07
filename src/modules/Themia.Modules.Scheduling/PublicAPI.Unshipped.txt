@@ -1,4 +1,22 @@
 #nullable enable
+Themia.Modules.Scheduling.SchedulingModule
+Themia.Modules.Scheduling.SchedulingModule.SchedulingModule() -> void
+Themia.Modules.Scheduling.SchedulingModule.SchedulingModule(Themia.Modules.Scheduling.SchedulingModuleOptions! options) -> void
+const Themia.Modules.Scheduling.SchedulingModule.ConnectionStringName = "Default" -> string!
+override Themia.Modules.Scheduling.SchedulingModule.Descriptor.get -> Themia.Framework.Core.Modules.ModuleDescriptor!
+override Themia.Modules.Scheduling.SchedulingModule.ConfigureServices(Microsoft.Extensions.DependencyInjection.IServiceCollection! services) -> void
+override Themia.Modules.Scheduling.SchedulingModule.InitializeAsync(System.IServiceProvider! serviceProvider, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+Themia.Modules.Scheduling.SchedulingModuleOptions
+Themia.Modules.Scheduling.SchedulingModuleOptions.SchedulingModuleOptions() -> void
+Themia.Modules.Scheduling.SchedulingModuleOptions.VirtualPathRoot.get -> string!
+Themia.Modules.Scheduling.SchedulingModuleOptions.VirtualPathRoot.set -> void
+Themia.Modules.Scheduling.SchedulingModuleOptions.SchedulerName.get -> string!
+Themia.Modules.Scheduling.SchedulingModuleOptions.SchedulerName.set -> void
+Themia.Modules.Scheduling.SchedulingModuleOptions.Authorize.get -> System.Func<Microsoft.AspNetCore.Http.HttpContext!, System.Threading.Tasks.Task<bool>!>?
+Themia.Modules.Scheduling.SchedulingModuleOptions.Authorize.set -> void
+Themia.Modules.Scheduling.SchedulingDbContextFactory
+Themia.Modules.Scheduling.SchedulingDbContextFactory.SchedulingDbContextFactory() -> void
+Themia.Modules.Scheduling.SchedulingDbContextFactory.CreateDbContext(string![]! args) -> Themia.Modules.Scheduling.SchedulingDbContext!
 Themia.Modules.Scheduling.EfExecutionHistoryStore
 Themia.Modules.Scheduling.EfExecutionHistoryStore.EfExecutionHistoryStore(Themia.Modules.Scheduling.SchedulingDbContext! context, Microsoft.Extensions.Logging.ILogger<Themia.Modules.Scheduling.EfExecutionHistoryStore!>! logger) -> void
 Themia.Modules.Scheduling.EfExecutionHistoryStore.FilterLast(int limit) -> System.Threading.Tasks.Task<System.Collections.Generic.IEnumerable<Themia.Quartz.ExecutionHistoryEntry!>!>!
