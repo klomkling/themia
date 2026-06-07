@@ -7,7 +7,7 @@ namespace CronExpressionDescriptor
         private static readonly Dictionary<string, string> _strings = new Dictionary<string, string>()
         {
             ["AMPeriod"] = "AM",
-            ["AnErrorOccuredWhenGeneratingTheExpressionD"] = "An error occured when generating the expression description.  Check the cron expression syntax.",
+            ["AnErrorOccuredWhenGeneratingTheExpressionD"] = "An error occurred when generating the expression description.  Check the cron expression syntax.",
             ["At"] = "At",
             ["AtSpace"] = "At ",
             ["AtX0"] = "at {0}",

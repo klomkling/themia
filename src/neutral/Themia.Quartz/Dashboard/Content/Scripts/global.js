@@ -63,7 +63,7 @@ function getErrorMessage(e) {
     const msg =
         '<div class="ui negative message">' +
         '<i class="close icon"></i>' +
-        '<div class="header">An error occured' + statusNum +
+        '<div class="header">An error occurred' + statusNum +
         '</div><p>' + statusText + '</p></div>';
 
     return msg;
@@ -146,13 +146,13 @@ function initCronLiveDescription(url, $cronInput, $cronDesc, $nextCronDates) {
                     $nextCronDates.popup({ html: '<div class="header">Scheduled dates</div><div class="content">' + nextHtml + '</div>' });
                 }
             },
-            error: function (e) { $cronDesc.text('Error occured.'); }
+            error: function (e) { $cronDesc.text('Error occurred.'); }
         });
     }
     var cronDescTimer;
     $cronInput.on('input', function (e) {
         window.clearTimeout(cronDescTimer);
-        searchcronDescTimerTimer = window.setTimeout(function () {
+        cronDescTimer = window.setTimeout(function () {
             cronDescTimer = null;
             describeCron();
         }, 250);

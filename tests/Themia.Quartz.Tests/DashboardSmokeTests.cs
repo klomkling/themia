@@ -56,7 +56,8 @@ public sealed class DashboardSmokeTests
     [Fact]
     public async Task DeniedByDefault_Returns403()
     {
-        using var host = await StartHostAsync(authorize: _ => Task.FromResult(false));
+        // Unset Authorize (null) is the documented deny-all default — validate THAT, not an explicit false.
+        using var host = await StartHostAsync(authorize: null);
         var response = await host.GetTestClient().GetAsync("/jobs");
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }

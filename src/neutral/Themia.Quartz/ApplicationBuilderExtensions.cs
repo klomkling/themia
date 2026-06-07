@@ -78,13 +78,18 @@ public static class ThemiaQuartzApplicationBuilderExtensions
 
         var options = app.ApplicationServices.GetRequiredService<ThemiaQuartzOptions>();
 
-        var scheduler = options.Scheduler ?? app.ApplicationServices.GetService<IScheduler>();
+        // Fail fast: the dashboard controllers dereference the scheduler, so a missing one must
+        // surface here with a clear message rather than as an opaque NRE on the first request.
+        var scheduler = options.Scheduler ?? app.ApplicationServices.GetService<IScheduler>()
+            ?? throw new InvalidOperationException(
+                "Themia.Quartz: no Quartz IScheduler is available. Set ThemiaQuartzOptions.Scheduler " +
+                "or register an IScheduler in DI before calling MapThemiaQuartz/UseThemiaQuartz.");
         options.Scheduler = scheduler;
 
         // Store bridge: surface a DI-registered execution-history store to the dashboard via the
-        // scheduler context. Guarded — the scheduler may be unavailable at map time.
+        // scheduler context.
         var store = app.ApplicationServices.GetService<IExecutionHistoryStore>();
-        if (store is not null && scheduler is not null)
+        if (store is not null)
         {
             scheduler.Context.SetExecutionHistoryStore(store);
         }

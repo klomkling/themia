@@ -17,6 +17,7 @@ public class InProcExecutionHistoryStore : IExecutionHistoryStore
     public string SchedulerName { get; set; } = string.Empty;
 
     private readonly Dictionary<string, ExecutionHistoryEntry> _data = new();
+    private readonly object _purgeLock = new();
     private DateTime _nextPurgeTime = DateTime.UtcNow;
     private int _updatesFromLastPurge;
     private int _totalJobsExecuted;
@@ -51,12 +52,23 @@ public class InProcExecutionHistoryStore : IExecutionHistoryStore
     /// <inheritdoc/>
     public async Task Save(ExecutionHistoryEntry entry)
     {
-        _updatesFromLastPurge++;
-
-        if (_updatesFromLastPurge >= 10 || _nextPurgeTime < DateTime.UtcNow)
+        // Save can be called concurrently from Quartz job listeners. Decide whether to purge under a
+        // lock so the counter/next-purge state isn't raced, but run Purge() OUTSIDE the lock (it takes
+        // its own _data lock and we must not hold a lock across an await).
+        bool shouldPurge;
+        lock (_purgeLock)
         {
-            _nextPurgeTime = DateTime.UtcNow.AddMinutes(1);
-            _updatesFromLastPurge = 0;
+            _updatesFromLastPurge++;
+            shouldPurge = _updatesFromLastPurge >= 10 || _nextPurgeTime < DateTime.UtcNow;
+            if (shouldPurge)
+            {
+                _nextPurgeTime = DateTime.UtcNow.AddMinutes(1);
+                _updatesFromLastPurge = 0;
+            }
+        }
+
+        if (shouldPurge)
+        {
             await Purge();
         }
 
