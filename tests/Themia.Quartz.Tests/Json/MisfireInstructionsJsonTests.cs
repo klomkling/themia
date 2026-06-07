@@ -4,9 +4,9 @@ using Xunit;
 namespace Themia.Quartz.Tests.Json;
 
 /// <summary>
-/// Pins the JSON produced by <see cref="TriggerPropertiesViewModel.MisfireInstructionsJson"/>.
-/// This string is serialized once (static readonly) by Newtonsoft and embedded in HTML templates.
-/// The STJ migration must produce an identical string so the JS templates keep working.
+/// Pins the JSON produced by <see cref="TriggerPropertiesViewModel.MisfireInstructionsJson"/>
+/// (now System.Text.Json) — embedded in HTML templates and consumed as a JS object. A permanent
+/// compatibility pin: this exact string must not change, or the JS templates break.
 /// </summary>
 public sealed class MisfireInstructionsJsonTests
 {
@@ -50,15 +50,14 @@ public sealed class MisfireInstructionsJsonTests
     }
 
     [Fact]
-    public void MisfireInstructionsJson_KeysAreIntegersNotStrings()
+    public void MisfireInstructionsJson_KeysAreQuotedNumericStrings()
     {
-        // The misfire instruction values are serialized as JSON integer keys (Dictionary<int,string>),
-        // NOT as quoted strings. The JS templates parse these as number keys.
-        // Newtonsoft: Dictionary<int,string> → keys are quoted ints: {"0":"...", "-1":"..."}
-        // (JSON requires string keys, so Newtonsoft quotes the int — but the value is numeric text.)
+        // The inner maps are Dictionary<int,string>; JSON object keys are always strings, so the int
+        // keys serialize as quoted numeric strings ({"0":"...","-1":"..."}). The JS templates parse
+        // these and use them as numeric instruction codes. This must stay stable across serializers.
         var json = MisfireJson;
 
-        // Keys should appear as quoted numeric strings within the nested objects
+        // Keys appear as quoted numeric strings within the nested objects
         // e.g. {"cron":{"0":"Instruction Not Set","-1":"Ignore Misfire Policy",...}}
         Assert.Contains("\"0\":", json);  // InstructionNotSet = 0
         Assert.Contains("\"-1\":", json); // IgnoreMisfirePolicy = -1
@@ -74,7 +73,7 @@ public sealed class MisfireInstructionsJsonTests
         // SimpleTrigger.FireNow = 1, RescheduleNowWithExistingRepeatCount = 2,
         //   RescheduleNowWithRemainingRepeatCount = 3, RescheduleNextWithRemainingCount = 4,
         //   RescheduleNextWithExistingCount = 5
-        // KEY ORDER: Dictionary insertion order is preserved by Newtonsoft.
+        // KEY ORDER: Dictionary insertion order is preserved by System.Text.Json.
         // IgnoreMisfirePolicy (-1) is inserted first → serialized first.
         var json = MisfireJson;
 

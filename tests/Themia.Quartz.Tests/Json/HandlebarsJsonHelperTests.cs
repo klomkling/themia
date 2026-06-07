@@ -8,9 +8,9 @@ namespace Themia.Quartz.Tests.Json;
 
 /// <summary>
 /// Pins the JSON produced by the Handlebars <c>{{json}}</c> helper registered in
-/// <see cref="HandlebarsHelpers"/>. The helper calls <c>JsonConvert.SerializeObject(argument)</c>
-/// with default settings (PascalCase, nulls included). These tests lock that casing + null-inclusion
-/// contract, which the STJ migration must preserve exactly for the dashboard templates.
+/// <see cref="HandlebarsHelpers"/>. The helper calls <c>JsonSerializer.Serialize(argument)</c>
+/// with default options (PascalCase, nulls included). These tests lock that casing + null-inclusion
+/// contract that the dashboard templates depend on — a permanent compatibility pin.
 /// </summary>
 public sealed class HandlebarsJsonHelperTests
 {
@@ -28,7 +28,7 @@ public sealed class HandlebarsJsonHelperTests
     public void JsonHelper_SerializesAnonymousObject_WithPascalCaseKeys()
     {
         var svc = CreateServices();
-        // The helper uses default Newtonsoft settings: PascalCase, nulls included
+        // The helper uses default STJ options: PascalCase, nulls included
         var model = new { Name = "hello", Value = 42 };
         var output = Render(svc, "{{json this}}", model);
 
@@ -38,8 +38,8 @@ public sealed class HandlebarsJsonHelperTests
     [Fact]
     public void JsonHelper_IncludesNullValues_UnlikeTypeHandlerService()
     {
-        // Critical distinction: TypeHandlerService uses NullValueHandling.Ignore,
-        // but the {{json}} helper uses DEFAULT settings which INCLUDE nulls.
+        // Critical distinction: TypeHandlerService uses DefaultIgnoreCondition.WhenWritingNull (omits
+        // nulls), but the {{json}} helper uses DEFAULT options which INCLUDE nulls.
         var svc = CreateServices();
         var model = new { Name = (string?)null, Value = 1 };
         var output = Render(svc, "{{json this}}", model);
@@ -90,7 +90,7 @@ public sealed class HandlebarsJsonHelperTests
     }
 
     [Fact]
-    public void JsonHelper_SerializesTypeHandlerAndStringValue_ReflectsNewtonsoftDefaults()
+    public void JsonHelper_SerializesTypeHandlerAndStringValue_ReflectsDefaultSerialization()
     {
         // Mirrors the RenderView model: { Value, StringValue, TypeHandler }
         // Used in .hbs templates to emit type-handler state as a JS object.

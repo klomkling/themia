@@ -8,10 +8,10 @@ using Xunit;
 namespace Themia.Quartz.Tests.Json;
 
 /// <summary>
-/// Pins the Newtonsoft.Json wire format produced by <see cref="TypeHandlerService.Serialize"/> /
-/// <see cref="TypeHandlerService.Deserialize"/> for every concrete <see cref="TypeHandlerBase"/>
-/// subtype. These tests MUST stay green against the current (Newtonsoft) code. When the STJ
-/// migration runs, this class is the regression gate: all assertions must still pass.
+/// Pins the wire format produced by <see cref="TypeHandlerService.Serialize"/> /
+/// <see cref="TypeHandlerService.Deserialize"/> (now System.Text.Json) for every concrete
+/// <see cref="TypeHandlerBase"/> subtype. Originally captured against the Newtonsoft implementation;
+/// this class is the permanent compatibility gate — the format must not drift across serializers.
 /// </summary>
 public sealed class TypeHandlerSerializationTests
 {
@@ -67,7 +67,7 @@ public sealed class TypeHandlerSerializationTests
         Assert.Contains("\"TypeId\":", json);
         Assert.Contains("Themia.Quartz.Dashboard.TypeHandlers.StringHandler", json);
 
-        // Properties must be PascalCase (Newtonsoft default contract resolver)
+        // Properties must be PascalCase (PropertyNamingPolicy = null)
         Assert.Contains("\"Name\":", json);
         Assert.Contains("\"DisplayName\":", json);
         Assert.Contains("\"IsMultiline\":", json);
@@ -86,7 +86,7 @@ public sealed class TypeHandlerSerializationTests
         var token = svc.Serialize(handler);
         var json = DecodeJson(token);
 
-        // NullValueHandling.Ignore: nulls omitted. IsMultiline=false is a bool (non-null) → included.
+        // DefaultIgnoreCondition.WhenWritingNull: nulls omitted. IsMultiline=false is a bool (non-null) → included.
         // Property order: IsMultiline (subclass) → TypeId (injected by JsonSubTypes) → Name → DisplayName (base).
         Assert.Equal(
             "{\"IsMultiline\":false,\"TypeId\":\"Themia.Quartz.Dashboard.TypeHandlers.StringHandler\",\"Name\":\"String\",\"DisplayName\":\"String\"}",
@@ -145,7 +145,7 @@ public sealed class TypeHandlerSerializationTests
         // Discriminator
         Assert.Contains("\"TypeId\":\"Themia.Quartz.Dashboard.TypeHandlers.EnumHandler\"", json);
 
-        // Newtonsoft serializes System.Type as assembly-qualified name — this is the critical
+        // System.Type is serialized as its assembly-qualified name (via SystemTypeJsonConverter) — the critical
         // format the STJ custom converter must reproduce. The value must start with the CLR
         // full name and include the assembly name (version-sensitive part intentionally left out).
         Assert.Contains("\"EnumType\":", json);
@@ -156,7 +156,7 @@ public sealed class TypeHandlerSerializationTests
     [Fact]
     public void EnumHandler_EnumType_SerializedAs_AssemblyQualifiedName_NotSimpleName()
     {
-        // Pin the KEY structural fact: Newtonsoft writes Type as its AssemblyQualifiedName string,
+        // Pin the KEY structural fact: Type is written as its AssemblyQualifiedName string,
         // NOT as a simple name. The STJ migration must use a matching custom converter.
         var svc = CreateServices(o =>
         {
@@ -306,7 +306,7 @@ public sealed class TypeHandlerSerializationTests
     [Fact]
     public void UnsupportedTypeHandler_NullValues_AreOmitted_FromJson()
     {
-        // NullValueHandling.Ignore: null AssemblyQualifiedName and StringValue must be absent.
+        // WhenWritingNull: null AssemblyQualifiedName and StringValue must be absent.
         var svc = CreateServices().TypeHandlers;
         var handler = new UnsupportedTypeHandler { Name = "Unsupported" };
 

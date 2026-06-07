@@ -21,7 +21,7 @@ namespace Themia.Quartz.Tests.Json;
 
 /// <summary>
 /// HTTP-level pins for the JobDataMap endpoints that depend on JSON serialization.
-/// Tests run against the current Newtonsoft implementation and must stay green after STJ migration.
+/// A permanent compatibility pin for the dashboard endpoints (now System.Text.Json).
 /// </summary>
 public sealed class JobDataMapEndpointTests : IAsyncDisposable
 {

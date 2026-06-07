@@ -22,13 +22,14 @@ namespace Themia.Quartz.Dashboard
         public DateTime LastModified { get; private set; }
 
         JsonSerializerOptions _jsonSerializerOptions = null;
+        readonly object _optionsLock = new object();
         private JsonSerializerOptions JsonSerializerOptions
         {
             get
             {
                 if (_jsonSerializerOptions == null)
                 {
-                    lock (this)
+                    lock (_optionsLock)
                     {
                         if (_jsonSerializerOptions == null)
                             _jsonSerializerOptions = BuildOptions();
