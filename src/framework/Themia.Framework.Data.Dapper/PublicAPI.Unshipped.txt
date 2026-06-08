@@ -15,3 +15,11 @@ Themia.Framework.Data.Dapper.Mapping.EntityMappingRegistry.Register<T>(Themia.Fr
 static Themia.Framework.Data.Dapper.Mapping.EntityMapping.ForConvention(System.Type! type) -> Themia.Framework.Data.Dapper.Mapping.EntityMapping!
 static Themia.Framework.Data.Dapper.Mapping.EntityMapping.ForConvention<T>() -> Themia.Framework.Data.Dapper.Mapping.EntityMapping!
 static Themia.Framework.Data.Dapper.Mapping.EntityMapping.ToSnakeCase(string! name) -> string!
+Themia.Framework.Data.Dapper.Sql.CompiledSql
+Themia.Framework.Data.Dapper.Sql.CompiledSql.CompiledSql(string! Sql, System.Collections.Generic.IReadOnlyDictionary<string!, object?>! Parameters) -> void
+Themia.Framework.Data.Dapper.Sql.CompiledSql.Parameters.get -> System.Collections.Generic.IReadOnlyDictionary<string!, object?>!
+Themia.Framework.Data.Dapper.Sql.CompiledSql.Parameters.init -> void
+Themia.Framework.Data.Dapper.Sql.CompiledSql.Sql.get -> string!
+Themia.Framework.Data.Dapper.Sql.CompiledSql.Sql.init -> void
+Themia.Framework.Data.Dapper.Sql.ISqlCompiler
+Themia.Framework.Data.Dapper.Sql.ISqlCompiler.Compile(SqlKata.Query! query) -> Themia.Framework.Data.Dapper.Sql.CompiledSql!
