@@ -1,1 +1,11 @@
 #nullable enable
+Themia.Framework.Data.Abstractions.Paging.PagedResult<T>
+Themia.Framework.Data.Abstractions.Paging.PagedResult<T>.Items.get -> System.Collections.Generic.IReadOnlyList<T>!
+Themia.Framework.Data.Abstractions.Paging.PagedResult<T>.Items.init -> void
+Themia.Framework.Data.Abstractions.Paging.PagedResult<T>.PagedResult(System.Collections.Generic.IReadOnlyList<T>! Items, long Total, int? Skip, int? Take) -> void
+Themia.Framework.Data.Abstractions.Paging.PagedResult<T>.Skip.get -> int?
+Themia.Framework.Data.Abstractions.Paging.PagedResult<T>.Skip.init -> void
+Themia.Framework.Data.Abstractions.Paging.PagedResult<T>.Take.get -> int?
+Themia.Framework.Data.Abstractions.Paging.PagedResult<T>.Take.init -> void
+Themia.Framework.Data.Abstractions.Paging.PagedResult<T>.Total.get -> long
+Themia.Framework.Data.Abstractions.Paging.PagedResult<T>.Total.init -> void
