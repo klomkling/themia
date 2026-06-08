@@ -21,3 +21,18 @@ Themia.Framework.Data.Abstractions.Specifications.OrderExpression<T>.Descending.
 Themia.Framework.Data.Abstractions.Specifications.OrderExpression<T>.KeySelector.get -> System.Linq.Expressions.Expression<System.Func<T, object?>!>!
 Themia.Framework.Data.Abstractions.Specifications.OrderExpression<T>.KeySelector.init -> void
 Themia.Framework.Data.Abstractions.Specifications.OrderExpression<T>.OrderExpression(System.Linq.Expressions.Expression<System.Func<T, object?>!>! KeySelector, bool Descending) -> void
+Themia.Framework.Data.Abstractions.Specifications.Specification<T>
+Themia.Framework.Data.Abstractions.Specifications.Specification<T>.Criteria.get -> System.Linq.Expressions.Expression<System.Func<T, bool>!>?
+Themia.Framework.Data.Abstractions.Specifications.Specification<T>.IgnoreTenantFilter.get -> bool
+Themia.Framework.Data.Abstractions.Specifications.Specification<T>.OrderBy(System.Linq.Expressions.Expression<System.Func<T, object?>!>! keySelector) -> Themia.Framework.Data.Abstractions.Specifications.Specification<T>!
+Themia.Framework.Data.Abstractions.Specifications.Specification<T>.OrderByDescending(System.Linq.Expressions.Expression<System.Func<T, object?>!>! keySelector) -> Themia.Framework.Data.Abstractions.Specifications.Specification<T>!
+Themia.Framework.Data.Abstractions.Specifications.Specification<T>.Page(int? skip, int? take) -> Themia.Framework.Data.Abstractions.Specifications.Specification<T>!
+Themia.Framework.Data.Abstractions.Specifications.Specification<T>.Skip.get -> int?
+Themia.Framework.Data.Abstractions.Specifications.Specification<T>.Specification() -> void
+Themia.Framework.Data.Abstractions.Specifications.Specification<T>.Take.get -> int?
+Themia.Framework.Data.Abstractions.Specifications.Specification<T>.Where(System.Linq.Expressions.Expression<System.Func<T, bool>!>! criteria) -> Themia.Framework.Data.Abstractions.Specifications.Specification<T>!
+Themia.Framework.Data.Abstractions.Specifications.Specification<T>.WithoutTenantFilter() -> Themia.Framework.Data.Abstractions.Specifications.Specification<T>!
+static Themia.Framework.Data.Abstractions.Specifications.SpecificationExtensions.And<T>(this Themia.Framework.Data.Abstractions.Specifications.ISpecification<T>! spec, System.Linq.Expressions.Expression<System.Func<T, bool>!>! extra) -> Themia.Framework.Data.Abstractions.Specifications.ISpecification<T>!
+static Themia.Framework.Data.Abstractions.Specifications.SpecificationExtensions.Not<T>(this Themia.Framework.Data.Abstractions.Specifications.ISpecification<T>! spec) -> Themia.Framework.Data.Abstractions.Specifications.ISpecification<T>!
+static Themia.Framework.Data.Abstractions.Specifications.SpecificationExtensions.Or<T>(this Themia.Framework.Data.Abstractions.Specifications.ISpecification<T>! spec, System.Linq.Expressions.Expression<System.Func<T, bool>!>! extra) -> Themia.Framework.Data.Abstractions.Specifications.ISpecification<T>!
+Themia.Framework.Data.Abstractions.Specifications.SpecificationExtensions
