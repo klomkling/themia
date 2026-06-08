@@ -99,6 +99,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Themia.Modules.Scheduling.I
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Themia.Framework.Data.Abstractions", "src\framework\Themia.Framework.Data.Abstractions\Themia.Framework.Data.Abstractions.csproj", "{BB5C98B5-25C2-4BF3-A20E-6581B0740F82}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Themia.Framework.Data.Dapper", "src\framework\Themia.Framework.Data.Dapper\Themia.Framework.Data.Dapper.csproj", "{8E03E8AA-D7F7-41F3-BF9B-325A04E013A9}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Themia.Framework.Data.Dapper.PostgreSql", "src\framework\Themia.Framework.Data.Dapper.PostgreSql\Themia.Framework.Data.Dapper.PostgreSql.csproj", "{11FBEF69-4FBB-47F5-B496-72F2A30E2C89}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -601,6 +605,30 @@ Global
 		{BB5C98B5-25C2-4BF3-A20E-6581B0740F82}.Release|x64.Build.0 = Release|Any CPU
 		{BB5C98B5-25C2-4BF3-A20E-6581B0740F82}.Release|x86.ActiveCfg = Release|Any CPU
 		{BB5C98B5-25C2-4BF3-A20E-6581B0740F82}.Release|x86.Build.0 = Release|Any CPU
+		{8E03E8AA-D7F7-41F3-BF9B-325A04E013A9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8E03E8AA-D7F7-41F3-BF9B-325A04E013A9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8E03E8AA-D7F7-41F3-BF9B-325A04E013A9}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{8E03E8AA-D7F7-41F3-BF9B-325A04E013A9}.Debug|x64.Build.0 = Debug|Any CPU
+		{8E03E8AA-D7F7-41F3-BF9B-325A04E013A9}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{8E03E8AA-D7F7-41F3-BF9B-325A04E013A9}.Debug|x86.Build.0 = Debug|Any CPU
+		{8E03E8AA-D7F7-41F3-BF9B-325A04E013A9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8E03E8AA-D7F7-41F3-BF9B-325A04E013A9}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8E03E8AA-D7F7-41F3-BF9B-325A04E013A9}.Release|x64.ActiveCfg = Release|Any CPU
+		{8E03E8AA-D7F7-41F3-BF9B-325A04E013A9}.Release|x64.Build.0 = Release|Any CPU
+		{8E03E8AA-D7F7-41F3-BF9B-325A04E013A9}.Release|x86.ActiveCfg = Release|Any CPU
+		{8E03E8AA-D7F7-41F3-BF9B-325A04E013A9}.Release|x86.Build.0 = Release|Any CPU
+		{11FBEF69-4FBB-47F5-B496-72F2A30E2C89}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{11FBEF69-4FBB-47F5-B496-72F2A30E2C89}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{11FBEF69-4FBB-47F5-B496-72F2A30E2C89}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{11FBEF69-4FBB-47F5-B496-72F2A30E2C89}.Debug|x64.Build.0 = Debug|Any CPU
+		{11FBEF69-4FBB-47F5-B496-72F2A30E2C89}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{11FBEF69-4FBB-47F5-B496-72F2A30E2C89}.Debug|x86.Build.0 = Debug|Any CPU
+		{11FBEF69-4FBB-47F5-B496-72F2A30E2C89}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{11FBEF69-4FBB-47F5-B496-72F2A30E2C89}.Release|Any CPU.Build.0 = Release|Any CPU
+		{11FBEF69-4FBB-47F5-B496-72F2A30E2C89}.Release|x64.ActiveCfg = Release|Any CPU
+		{11FBEF69-4FBB-47F5-B496-72F2A30E2C89}.Release|x64.Build.0 = Release|Any CPU
+		{11FBEF69-4FBB-47F5-B496-72F2A30E2C89}.Release|x86.ActiveCfg = Release|Any CPU
+		{11FBEF69-4FBB-47F5-B496-72F2A30E2C89}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -651,5 +679,7 @@ Global
 		{74DFAB0A-609A-42BE-AC55-132ABC9BE17E} = {EC447DCF-ABFA-6E24-52A5-D7FD48A5C558}
 		{BEDD8956-DB09-4CAA-9A10-CAFF74E11D6F} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 		{BB5C98B5-25C2-4BF3-A20E-6581B0740F82} = {E0AD1809-C64F-3D39-45E0-E424261CE16D}
+		{8E03E8AA-D7F7-41F3-BF9B-325A04E013A9} = {E0AD1809-C64F-3D39-45E0-E424261CE16D}
+		{11FBEF69-4FBB-47F5-B496-72F2A30E2C89} = {E0AD1809-C64F-3D39-45E0-E424261CE16D}
 	EndGlobalSection
 EndGlobal
