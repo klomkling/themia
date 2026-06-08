@@ -36,3 +36,32 @@ static Themia.Framework.Data.Abstractions.Specifications.SpecificationExtensions
 static Themia.Framework.Data.Abstractions.Specifications.SpecificationExtensions.Not<T>(this Themia.Framework.Data.Abstractions.Specifications.ISpecification<T>! spec) -> Themia.Framework.Data.Abstractions.Specifications.ISpecification<T>!
 static Themia.Framework.Data.Abstractions.Specifications.SpecificationExtensions.Or<T>(this Themia.Framework.Data.Abstractions.Specifications.ISpecification<T>! spec, System.Linq.Expressions.Expression<System.Func<T, bool>!>! extra) -> Themia.Framework.Data.Abstractions.Specifications.ISpecification<T>!
 Themia.Framework.Data.Abstractions.Specifications.SpecificationExtensions
+Themia.Framework.Data.Abstractions.Auditing.ICurrentUserAccessor
+Themia.Framework.Data.Abstractions.Auditing.ICurrentUserAccessor.UserId.get -> string?
+Themia.Framework.Data.Abstractions.Exceptions.UnsupportedSpecificationException
+Themia.Framework.Data.Abstractions.Exceptions.UnsupportedSpecificationException.UnsupportedSpecificationException(string! message) -> void
+Themia.Framework.Data.Abstractions.Filtering.DataFilterScope
+Themia.Framework.Data.Abstractions.Filtering.DataFilterScope.BypassTenantFilter() -> System.IDisposable!
+Themia.Framework.Data.Abstractions.Filtering.DataFilterScope.DataFilterScope() -> void
+Themia.Framework.Data.Abstractions.Filtering.DataFilterScope.IsTenantFilterBypassed.get -> bool
+Themia.Framework.Data.Abstractions.Filtering.IDataFilterScope
+Themia.Framework.Data.Abstractions.Filtering.IDataFilterScope.BypassTenantFilter() -> System.IDisposable!
+Themia.Framework.Data.Abstractions.Filtering.IDataFilterScope.IsTenantFilterBypassed.get -> bool
+Themia.Framework.Data.Abstractions.Repositories.IReadRepository<T, TKey>
+Themia.Framework.Data.Abstractions.Repositories.IReadRepository<T, TKey>.AnyAsync(Themia.Framework.Data.Abstractions.Specifications.ISpecification<T!>! specification, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!
+Themia.Framework.Data.Abstractions.Repositories.IReadRepository<T, TKey>.CountAsync(Themia.Framework.Data.Abstractions.Specifications.ISpecification<T!>! specification, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<long>!
+Themia.Framework.Data.Abstractions.Repositories.IReadRepository<T, TKey>.FirstOrDefaultAsync(Themia.Framework.Data.Abstractions.Specifications.ISpecification<T!>! specification, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<T?>!
+Themia.Framework.Data.Abstractions.Repositories.IReadRepository<T, TKey>.GetByIdAsync(TKey id, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<T?>!
+Themia.Framework.Data.Abstractions.Repositories.IReadRepository<T, TKey>.ListAsync(Themia.Framework.Data.Abstractions.Specifications.ISpecification<T!>! specification, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<T!>!>!
+Themia.Framework.Data.Abstractions.Repositories.IReadRepository<T, TKey>.PageAsync(Themia.Framework.Data.Abstractions.Specifications.ISpecification<T!>! specification, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Framework.Data.Abstractions.Paging.PagedResult<T!>!>!
+Themia.Framework.Data.Abstractions.Repositories.IRepository<T, TKey>
+Themia.Framework.Data.Abstractions.Repositories.IRepository<T, TKey>.AddAsync(T! entity, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Framework.Data.Abstractions.Repositories.IRepository<T, TKey>.Remove(T! entity) -> void
+Themia.Framework.Data.Abstractions.Repositories.IRepository<T, TKey>.Update(T! entity) -> void
+Themia.Framework.Data.Abstractions.UnitOfWork.ITransactionScope
+Themia.Framework.Data.Abstractions.UnitOfWork.ITransactionScope.CommitAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Framework.Data.Abstractions.UnitOfWork.ITransactionScope.RollbackAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Framework.Data.Abstractions.UnitOfWork.IUnitOfWork
+Themia.Framework.Data.Abstractions.UnitOfWork.IUnitOfWork.BeginTransactionAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Framework.Data.Abstractions.UnitOfWork.ITransactionScope!>!
+Themia.Framework.Data.Abstractions.UnitOfWork.IUnitOfWork.ExecuteInTransactionAsync(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task!>! work, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Framework.Data.Abstractions.UnitOfWork.IUnitOfWork.SaveChangesAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<int>!
