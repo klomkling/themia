@@ -9,3 +9,15 @@ Themia.Framework.Data.Abstractions.Paging.PagedResult<T>.Take.get -> int?
 Themia.Framework.Data.Abstractions.Paging.PagedResult<T>.Take.init -> void
 Themia.Framework.Data.Abstractions.Paging.PagedResult<T>.Total.get -> long
 Themia.Framework.Data.Abstractions.Paging.PagedResult<T>.Total.init -> void
+Themia.Framework.Data.Abstractions.Specifications.ISpecification<T>
+Themia.Framework.Data.Abstractions.Specifications.ISpecification<T>.Criteria.get -> System.Linq.Expressions.Expression<System.Func<T, bool>!>?
+Themia.Framework.Data.Abstractions.Specifications.ISpecification<T>.IgnoreTenantFilter.get -> bool
+Themia.Framework.Data.Abstractions.Specifications.ISpecification<T>.OrderBy.get -> System.Collections.Generic.IReadOnlyList<Themia.Framework.Data.Abstractions.Specifications.OrderExpression<T>!>!
+Themia.Framework.Data.Abstractions.Specifications.ISpecification<T>.Skip.get -> int?
+Themia.Framework.Data.Abstractions.Specifications.ISpecification<T>.Take.get -> int?
+Themia.Framework.Data.Abstractions.Specifications.OrderExpression<T>
+Themia.Framework.Data.Abstractions.Specifications.OrderExpression<T>.Descending.get -> bool
+Themia.Framework.Data.Abstractions.Specifications.OrderExpression<T>.Descending.init -> void
+Themia.Framework.Data.Abstractions.Specifications.OrderExpression<T>.KeySelector.get -> System.Linq.Expressions.Expression<System.Func<T, object?>!>!
+Themia.Framework.Data.Abstractions.Specifications.OrderExpression<T>.KeySelector.init -> void
+Themia.Framework.Data.Abstractions.Specifications.OrderExpression<T>.OrderExpression(System.Linq.Expressions.Expression<System.Func<T, object?>!>! KeySelector, bool Descending) -> void
