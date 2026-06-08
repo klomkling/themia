@@ -33,6 +33,11 @@ public abstract class Specification<T> : ISpecification<T>
     }
 
     /// <summary>Adds an ascending ordering term.</summary>
+    /// <remarks>
+    /// Intentionally shares its name with the explicitly-implemented <see cref="ISpecification{T}.OrderBy"/>
+    /// property (the accumulated ordering list). On a <see cref="Specification{T}"/> reference this name binds
+    /// to this fluent method; cast to <see cref="ISpecification{T}"/> to read the ordering list. Do not "merge" them.
+    /// </remarks>
     public Specification<T> OrderBy(Expression<Func<T, object?>> keySelector) => AddOrderBy(keySelector, false);
 
     /// <summary>Adds a descending ordering term.</summary>
