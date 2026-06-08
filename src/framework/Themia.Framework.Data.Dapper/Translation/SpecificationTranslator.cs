@@ -74,7 +74,12 @@ internal static class SpecificationTranslator
 
     private static (Expression member, Expression value, ExpressionType op) Orient(BinaryExpression b, ParameterExpression root)
     {
-        if (RefersTo(b.Left, root)) return (b.Left, b.Right, b.NodeType);
+        if (RefersTo(b.Left, root))
+        {
+            if (RefersTo(b.Right, root))
+                throw new UnsupportedSpecificationException($"Column-to-column comparisons are not supported ('{b}'). Use provider-native (tier-2) SqlKata.");
+            return (b.Left, b.Right, b.NodeType);
+        }
         if (RefersTo(b.Right, root)) return (b.Right, b.Left, Flip(b.NodeType));
         throw new UnsupportedSpecificationException($"Comparison '{b}' does not reference the entity.");
     }
@@ -85,6 +90,9 @@ internal static class SpecificationTranslator
         {
             var column = ColumnOf(m.Object, root, map);
             var arg = Evaluate(m.Arguments[0])?.ToString() ?? "";
+            // LIKE metacharacters ('%', '_') in arg are treated as wildcards (matches EF Core's default
+            // Contains/StartsWith/EndsWith semantics). Not auto-escaped: the escape char differs per engine
+            // and escaping here would diverge from EF. Callers needing literal matching should use tier-2.
             return m.Method.Name switch
             {
                 nameof(string.Contains) => q.WhereLike(column, $"%{arg}%"),

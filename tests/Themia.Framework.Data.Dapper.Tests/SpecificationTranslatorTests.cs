@@ -81,8 +81,13 @@ public sealed class SpecificationTranslatorTests
     {
         var r = Compile(Spec().Filter(a => a.Quantity > 0 && (a.Status == "x" || a.Name == "y")));
         var sql = r.Sql.ToLowerInvariant();
-        Assert.Contains("and", sql);
-        Assert.Contains("or", sql);
+        // Precedence must be preserved: the OR must stay nested inside its own parenthesized group
+        // that is then ANDed with the quantity predicate. A flattened "a and b or c" would NOT contain
+        // the "and ((... or ...))" shape. Pin the exact compiled WHERE clause.
+        Assert.Equal(
+            "select * from \"assets\" where ((\"quantity\" > @p0) and ((\"status\" = @p1) or (\"name\" = @p2)))",
+            sql);
+        Assert.Contains("and ((\"status\" = @p1) or (\"name\" = @p2))", sql);
     }
 
     [Fact] public void Not_Negates()
@@ -118,5 +123,12 @@ public sealed class SpecificationTranslatorTests
     {
         Assert.Throws<UnsupportedSpecificationException>(() =>
             Compile(Spec().Filter(a => a.Name.Length == 3)));   // member-of-member, not a direct entity column
+    }
+
+    [Fact] public void ColumnToColumn_Throws()
+    {
+        // Both sides reference the entity: the right side is not a value to parameterize.
+        Assert.Throws<UnsupportedSpecificationException>(() =>
+            Compile(Spec().Filter(a => a.Quantity == a.Id)));
     }
 }
