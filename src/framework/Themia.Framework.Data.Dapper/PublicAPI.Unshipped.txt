@@ -1,1 +1,17 @@
 #nullable enable
+Themia.Framework.Data.Dapper.Mapping.EntityMapping
+Themia.Framework.Data.Dapper.Mapping.EntityMapping.Column(string! propertyName) -> string!
+Themia.Framework.Data.Dapper.Mapping.EntityMapping.Columns.get -> System.Collections.Generic.IReadOnlyDictionary<string!, string!>!
+Themia.Framework.Data.Dapper.Mapping.EntityMapping.KeyColumn.get -> string!
+Themia.Framework.Data.Dapper.Mapping.EntityMapping.KeyProperty.get -> string!
+Themia.Framework.Data.Dapper.Mapping.EntityMapping.KeySetter.get -> System.Action<object!, object?>!
+Themia.Framework.Data.Dapper.Mapping.EntityMapping.KeyType.get -> System.Type!
+Themia.Framework.Data.Dapper.Mapping.EntityMapping.Table.get -> string!
+Themia.Framework.Data.Dapper.Mapping.EntityMappingRegistry
+Themia.Framework.Data.Dapper.Mapping.EntityMappingRegistry.EntityMappingRegistry() -> void
+Themia.Framework.Data.Dapper.Mapping.EntityMappingRegistry.For(System.Type! type) -> Themia.Framework.Data.Dapper.Mapping.EntityMapping!
+Themia.Framework.Data.Dapper.Mapping.EntityMappingRegistry.For<T>() -> Themia.Framework.Data.Dapper.Mapping.EntityMapping!
+Themia.Framework.Data.Dapper.Mapping.EntityMappingRegistry.Register<T>(Themia.Framework.Data.Dapper.Mapping.EntityMapping! mapping) -> void
+static Themia.Framework.Data.Dapper.Mapping.EntityMapping.ForConvention(System.Type! type) -> Themia.Framework.Data.Dapper.Mapping.EntityMapping!
+static Themia.Framework.Data.Dapper.Mapping.EntityMapping.ForConvention<T>() -> Themia.Framework.Data.Dapper.Mapping.EntityMapping!
+static Themia.Framework.Data.Dapper.Mapping.EntityMapping.ToSnakeCase(string! name) -> string!
