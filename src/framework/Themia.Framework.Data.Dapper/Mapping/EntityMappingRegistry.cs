@@ -8,7 +8,7 @@ namespace Themia.Framework.Data.Dapper.Mapping;
 public sealed class EntityMappingRegistry
 {
     private readonly ConcurrentDictionary<Type, EntityMapping> _cache = new();
-    private readonly Dictionary<Type, EntityMapping> _overrides = new();
+    private readonly ConcurrentDictionary<Type, EntityMapping> _overrides = new();
 
     /// <summary>Registers an explicit mapping for <typeparamref name="T"/>, overriding the convention.</summary>
     public void Register<T>(EntityMapping mapping) => _overrides[typeof(T)] = mapping;

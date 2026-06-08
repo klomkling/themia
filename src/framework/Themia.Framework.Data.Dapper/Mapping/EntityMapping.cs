@@ -43,7 +43,11 @@ public sealed class EntityMapping
     public Action<object, object?> KeySetter { get; }
 
     /// <summary>Returns the column name for the given property name.</summary>
-    public string Column(string propertyName) => _columnByProperty[propertyName];
+    public string Column(string propertyName) =>
+        _columnByProperty.TryGetValue(propertyName, out var column)
+            ? column
+            : throw new InvalidOperationException(
+                $"No column mapping for property '{propertyName}' on '{Table}'. Provide an EntityMapping override.");
 
     /// <summary>All property-to-column mappings.</summary>
     public IReadOnlyDictionary<string, string> Columns => _columnByProperty;
@@ -99,7 +103,9 @@ public sealed class EntityMapping
                 if (i > 0
                     && (char.IsLower(name[i - 1])
                         || char.IsDigit(name[i - 1])
-                        || (i + 1 < name.Length && char.IsLower(name[i + 1]))))
+                        || (char.IsUpper(name[i - 1])
+                            && i + 1 < name.Length
+                            && char.IsLower(name[i + 1]))))
                 {
                     sb.Append('_');
                 }

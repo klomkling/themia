@@ -16,11 +16,16 @@ public sealed class EntityMappingTests
         Assert.Equal("display_name", map.Column(nameof(AssetCategory.DisplayName)));
     }
 
-    [Fact]
-    public void ToSnakeCase_HandlesAcronymsAndDigits()
+    [Theory]
+    [InlineData("CreatedAt", "created_at")]
+    [InlineData("TenantId", "tenant_id")]
+    [InlineData("HtmlUrl", "html_url")]
+    [InlineData("APIUrl", "api_url")]
+    [InlineData("IOStream", "io_stream")]
+    [InlineData("Address1", "address1")]
+    [InlineData("Line2Total", "line2_total")]
+    public void ToSnakeCase_HandlesAcronymsAndDigits(string input, string expected)
     {
-        Assert.Equal("created_at", EntityMapping.ToSnakeCase("CreatedAt"));
-        Assert.Equal("tenant_id", EntityMapping.ToSnakeCase("TenantId"));
-        Assert.Equal("html_url", EntityMapping.ToSnakeCase("HtmlUrl"));
+        Assert.Equal(expected, EntityMapping.ToSnakeCase(input));
     }
 }
