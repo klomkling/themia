@@ -25,7 +25,8 @@ public abstract class Specification<T> : ISpecification<T>
         return this;
     }
 
-    private Specification<T> AddOrderBy(Expression<Func<T, object?>> keySelector, bool descending)
+    /// <summary>Adds an ordering term.</summary>
+    protected Specification<T> AddOrderBy(Expression<Func<T, object?>> keySelector, bool descending)
     {
         orderBy.Add(new OrderExpression<T>(keySelector, descending));
         return this;

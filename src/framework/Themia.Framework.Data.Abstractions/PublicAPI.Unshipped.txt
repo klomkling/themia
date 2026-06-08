@@ -22,6 +22,7 @@ Themia.Framework.Data.Abstractions.Specifications.OrderExpression<T>.KeySelector
 Themia.Framework.Data.Abstractions.Specifications.OrderExpression<T>.KeySelector.init -> void
 Themia.Framework.Data.Abstractions.Specifications.OrderExpression<T>.OrderExpression(System.Linq.Expressions.Expression<System.Func<T, object?>!>! KeySelector, bool Descending) -> void
 Themia.Framework.Data.Abstractions.Specifications.Specification<T>
+Themia.Framework.Data.Abstractions.Specifications.Specification<T>.AddOrderBy(System.Linq.Expressions.Expression<System.Func<T, object?>!>! keySelector, bool descending) -> Themia.Framework.Data.Abstractions.Specifications.Specification<T>!
 Themia.Framework.Data.Abstractions.Specifications.Specification<T>.Criteria.get -> System.Linq.Expressions.Expression<System.Func<T, bool>!>?
 Themia.Framework.Data.Abstractions.Specifications.Specification<T>.IgnoreTenantFilter.get -> bool
 Themia.Framework.Data.Abstractions.Specifications.Specification<T>.OrderBy(System.Linq.Expressions.Expression<System.Func<T, object?>!>! keySelector) -> Themia.Framework.Data.Abstractions.Specifications.Specification<T>!
