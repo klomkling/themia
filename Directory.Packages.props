@@ -19,6 +19,8 @@
     <PackageVersion Include="Microsoft.Extensions.Caching.Memory" Version="10.0.8" />
     <!-- MultiTenancy (Tier 2): Dapper catalog store + ASP.NET Core middleware -->
     <PackageVersion Include="Dapper" Version="2.1.66" />
+    <!-- Framework.Data.Dapper: SqlKata query builder -->
+    <PackageVersion Include="SqlKata" Version="2.4.0" />
     <!-- Exceptional (0.3.0): raw Npgsql driver + FluentMigrator schema + System.Text.Json store -->
     <PackageVersion Include="Npgsql" Version="10.0.2" />
     <PackageVersion Include="FluentMigrator" Version="6.2.0" />

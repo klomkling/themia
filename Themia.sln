@@ -97,6 +97,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Themia.Modules.Scheduling",
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Themia.Modules.Scheduling.IntegrationTests", "tests\Themia.Modules.Scheduling.IntegrationTests\Themia.Modules.Scheduling.IntegrationTests.csproj", "{BEDD8956-DB09-4CAA-9A10-CAFF74E11D6F}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Themia.Framework.Data.Abstractions", "src\framework\Themia.Framework.Data.Abstractions\Themia.Framework.Data.Abstractions.csproj", "{BB5C98B5-25C2-4BF3-A20E-6581B0740F82}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -587,6 +589,18 @@ Global
 		{BEDD8956-DB09-4CAA-9A10-CAFF74E11D6F}.Release|x64.Build.0 = Release|Any CPU
 		{BEDD8956-DB09-4CAA-9A10-CAFF74E11D6F}.Release|x86.ActiveCfg = Release|Any CPU
 		{BEDD8956-DB09-4CAA-9A10-CAFF74E11D6F}.Release|x86.Build.0 = Release|Any CPU
+		{BB5C98B5-25C2-4BF3-A20E-6581B0740F82}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BB5C98B5-25C2-4BF3-A20E-6581B0740F82}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BB5C98B5-25C2-4BF3-A20E-6581B0740F82}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{BB5C98B5-25C2-4BF3-A20E-6581B0740F82}.Debug|x64.Build.0 = Debug|Any CPU
+		{BB5C98B5-25C2-4BF3-A20E-6581B0740F82}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{BB5C98B5-25C2-4BF3-A20E-6581B0740F82}.Debug|x86.Build.0 = Debug|Any CPU
+		{BB5C98B5-25C2-4BF3-A20E-6581B0740F82}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BB5C98B5-25C2-4BF3-A20E-6581B0740F82}.Release|Any CPU.Build.0 = Release|Any CPU
+		{BB5C98B5-25C2-4BF3-A20E-6581B0740F82}.Release|x64.ActiveCfg = Release|Any CPU
+		{BB5C98B5-25C2-4BF3-A20E-6581B0740F82}.Release|x64.Build.0 = Release|Any CPU
+		{BB5C98B5-25C2-4BF3-A20E-6581B0740F82}.Release|x86.ActiveCfg = Release|Any CPU
+		{BB5C98B5-25C2-4BF3-A20E-6581B0740F82}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -636,5 +650,6 @@ Global
 		{EC447DCF-ABFA-6E24-52A5-D7FD48A5C558} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{74DFAB0A-609A-42BE-AC55-132ABC9BE17E} = {EC447DCF-ABFA-6E24-52A5-D7FD48A5C558}
 		{BEDD8956-DB09-4CAA-9A10-CAFF74E11D6F} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
+		{BB5C98B5-25C2-4BF3-A20E-6581B0740F82} = {E0AD1809-C64F-3D39-45E0-E424261CE16D}
 	EndGlobalSection
 EndGlobal
