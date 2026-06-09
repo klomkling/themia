@@ -263,6 +263,97 @@ public abstract class DataLayerConformanceTests
     }
 
     [Fact]
+    public async Task CrossTenantWrite_UnderBypass_Succeeds()
+    {
+        await ResetAsync();
+
+        Guid id;
+        await using (var a = await NewScopeAsync(new TenantId("a")))
+        {
+            var w = NewWidget("shared", 1);
+            id = w.Id;
+            await a.Repo.AddAsync(w);
+            await a.Uow.SaveChangesAsync();
+        }
+
+        await using (var b = await NewScopeAsync(new TenantId("b")))
+        using (b.Filter.BypassTenantFilter())
+        {
+            var loaded = await b.Repo.GetByIdAsync(id);   // bypass reveals tenant A's row
+            Assert.NotNull(loaded);
+            loaded!.Quantity = 42;
+            b.Repo.Update(loaded);
+            await b.Uow.SaveChangesAsync();               // bypass => cross-tenant write permitted
+        }
+
+        await using var check = await NewScopeAsync(new TenantId("a"));
+        var after = await check.Repo.GetByIdAsync(id);
+        Assert.NotNull(after);
+        Assert.Equal(42, after!.Quantity);
+    }
+
+    [Fact]
+    public async Task CrossTenantWrite_WithoutBypass_Throws()
+    {
+        await ResetAsync();
+
+        Guid id;
+        await using (var a = await NewScopeAsync(new TenantId("a")))
+        {
+            var w = NewWidget("owned", 1);
+            id = w.Id;
+            await a.Repo.AddAsync(w);
+            await a.Uow.SaveChangesAsync();
+        }
+
+        await using (var b = await NewScopeAsync(new TenantId("b")))
+        {
+            var detached = NewWidget("hijack", 99);
+            detached.SetId(id);              // tenant B targets tenant A's row by primary key
+            b.Repo.Update(detached);
+            await Assert.ThrowsAsync<ConcurrencyException>(() => b.Uow.SaveChangesAsync());
+        }
+
+        await using var check = await NewScopeAsync(new TenantId("a"));
+        var loaded = await check.Repo.GetByIdAsync(id);
+        Assert.NotNull(loaded);
+        Assert.Equal("owned", loaded!.Name);   // tenant A's row is untouched
+        Assert.Equal(1, loaded.Quantity);
+    }
+
+    [Fact]
+    public async Task NoTenantContext_CannotWrite_TenantOwnedRow()
+    {
+        await ResetAsync();
+
+        Guid id;
+        await using (var a = await NewScopeAsync(new TenantId("a")))
+        {
+            var w = NewWidget("owned", 1);
+            id = w.Id;
+            await a.Repo.AddAsync(w);
+            await a.Uow.SaveChangesAsync();
+        }
+
+        // A no-tenant (system) context may write only global (null-tenant) rows; updating a tenant-owned
+        // row must fail loud on both providers (EF: stored tenant 'a' != null ambient; Dapper: WHERE
+        // tenant_id IS NULL matches 0 rows).
+        await using (var system = await NewScopeAsync(null))
+        {
+            var detached = NewWidget("hijack", 99);
+            detached.SetId(id);
+            system.Repo.Update(detached);
+            await Assert.ThrowsAsync<ConcurrencyException>(() => system.Uow.SaveChangesAsync());
+        }
+
+        await using var check = await NewScopeAsync(new TenantId("a"));
+        var loaded = await check.Repo.GetByIdAsync(id);
+        Assert.NotNull(loaded);
+        Assert.Equal("owned", loaded!.Name);
+        Assert.Equal(1, loaded.Quantity);
+    }
+
+    [Fact]
     public async Task CollectionContains_List_Filters()
     {
         await ResetAsync();

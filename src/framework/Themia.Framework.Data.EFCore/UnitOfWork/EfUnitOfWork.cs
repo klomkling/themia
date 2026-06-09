@@ -1,12 +1,20 @@
 using Microsoft.EntityFrameworkCore;
 using Themia.Framework.Data.Abstractions.Exceptions;
+using Themia.Framework.Data.Abstractions.Filtering;
 using Themia.Framework.Data.Abstractions.UnitOfWork;
 
 namespace Themia.Framework.Data.EFCore.UnitOfWork;
 
 /// <summary>EF Core unit of work over <see cref="ThemiaDbContext"/>.</summary>
-public sealed class EfUnitOfWork(ThemiaDbContext context) : IUnitOfWork
+public sealed class EfUnitOfWork(ThemiaDbContext context, IDataFilterScope filterScope) : IUnitOfWork
 {
+    /// <summary>
+    /// Back-compatible overload matching the original signature. The tenant-filter bypass state is
+    /// process-ambient (a static <see cref="DataFilterScope"/> async-local), so a fresh instance observes the
+    /// same bypass as the DI-registered one. DI selects the two-parameter constructor (greediest resolvable).
+    /// </summary>
+    public EfUnitOfWork(ThemiaDbContext context) : this(context, new DataFilterScope()) { }
+
     /// <inheritdoc />
     public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default) => SaveAsync(cancellationToken);
 
@@ -14,6 +22,11 @@ public sealed class EfUnitOfWork(ThemiaDbContext context) : IUnitOfWork
     // framework's provider-agnostic ConcurrencyException so both data layers surface a lost write the same way.
     private async Task<int> SaveAsync(CancellationToken cancellationToken)
     {
+        if (!filterScope.IsTenantFilterBypassed)
+        {
+            await context.ValidateTenantWritesAsync(cancellationToken);
+        }
+
         try
         {
             return await context.SaveChangesAsync(cancellationToken);
