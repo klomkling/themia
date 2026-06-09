@@ -55,15 +55,15 @@ specifications, repository/UoW usage) is written once and can run on either laye
 |---|---|---|
 | `Themia.Framework.Data.Abstractions` (new) | Provider-agnostic contracts only | `Themia.Framework.Core` |
 | `Themia.Framework.Data.Dapper` (new) | Engine-agnostic core: `ISqlCompiler` seam, spec→SqlKata translator, tenant-seeded query factory, repository/UoW, audit/soft-delete, connection/tx context, mapping, DI | Abstractions, Core, `Dapper`, `SqlKata` |
-| `Themia.Framework.Data.Dapper.PostgreSql` (new, 0.4.1) | `PostgresCompiler` + Npgsql connection factory + `IDapperDatabaseProvider` impl | Dapper core, `Npgsql` |
+| `Themia.Framework.Data.Dapper.PostgreSql` (new, 0.4.1) | `PostgresCompiler` (`ISqlCompiler`) + Npgsql connection factory + DI extension | Dapper core, `Npgsql` |
 | `Themia.Framework.Data.Dapper.MySql` (0.4.2) | MySql compiler + `MySqlConnector` | Dapper core |
 | `Themia.Framework.Data.Dapper.SqlServer` (0.4.3) | SqlServer compiler + `Microsoft.Data.SqlClient` | Dapper core |
 | `Themia.Framework.Data.EFCore` (existing) | Implement the shared contracts (adapters) | + Abstractions |
 
 Build constraints inherited repo-wide: `Nullable=enable`, `TreatWarningsAsErrors=true`,
 `GenerateDocumentationFile=true`, central package management. Each cross-cutting package tracks PublicAPI
-(`PublicAPI.Shipped.txt` / `PublicAPI.Unshipped.txt`). `Dapper 2.1.66` is already pinned; `SqlKata`,
-`Npgsql` (and later `MySqlConnector`, `Microsoft.Data.SqlClient`) get pinned in `Directory.Packages.props`.
+(`PublicAPI.Shipped.txt` / `PublicAPI.Unshipped.txt`). `Dapper` is already pinned (`2.1.79` as of this PR);
+`SqlKata`, `Npgsql` (and later `MySqlConnector`, `Microsoft.Data.SqlClient`) get pinned in `Directory.Packages.props`.
 
 ---
 
@@ -196,7 +196,7 @@ Walks `ISpecification<T>.Criteria` and emits SqlKata `Where` clauses. **Supporte
 | `==, !=, >, >=, <, <=` (member vs constant / captured var) | `Where`, `WhereNot`, comparison ops |
 | `&&, \|\|, !` | nested `Where`/`OrWhere`/`WhereNot` |
 | `x.Prop == null` / `!= null` | `WhereNull` / `WhereNotNull` |
-| `string.Contains/StartsWith/EndsWith` | `WhereLike` (LIKE with `%`, escaped) |
+| `string.Contains/StartsWith/EndsWith` | `WhereLike` (LIKE; the framework adds the `%` wildcards but does NOT escape `%`/`_` in the user value — they act as wildcards, matching EF Core) |
 | `coll.Contains(x.Id)` | `WhereIn` |
 | member access on entity root | column ref |
 | `OrderBy` member selectors | `OrderBy` / `OrderByDesc` |

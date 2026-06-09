@@ -40,6 +40,7 @@ public sealed class StoreGeneratedKeyTests(PostgresContainerFixture fixture) : I
             await setup.OpenAsync();
             await using var cmd = setup.CreateCommand();
             cmd.CommandText = """
+                CREATE EXTENSION IF NOT EXISTS pgcrypto;
                 CREATE TABLE IF NOT EXISTS gizmos (
                     id               uuid          PRIMARY KEY DEFAULT gen_random_uuid(),
                     tenant_id        varchar(100)  NULL,
