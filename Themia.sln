@@ -113,6 +113,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Themia.Framework.Data.Dappe
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Themia.Framework.Data.Dapper.MySql", "src\framework\Themia.Framework.Data.Dapper.MySql\Themia.Framework.Data.Dapper.MySql.csproj", "{173FE180-4C6A-4BAA-BA3B-A9EA2141D485}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Themia.Framework.Data.Dapper.MySql.IntegrationTests", "tests\Themia.Framework.Data.Dapper.MySql.IntegrationTests\Themia.Framework.Data.Dapper.MySql.IntegrationTests.csproj", "{8C5AE32B-E714-4B74-96C0-2081A4A2E85F}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -699,6 +701,18 @@ Global
 		{173FE180-4C6A-4BAA-BA3B-A9EA2141D485}.Release|x64.Build.0 = Release|Any CPU
 		{173FE180-4C6A-4BAA-BA3B-A9EA2141D485}.Release|x86.ActiveCfg = Release|Any CPU
 		{173FE180-4C6A-4BAA-BA3B-A9EA2141D485}.Release|x86.Build.0 = Release|Any CPU
+		{8C5AE32B-E714-4B74-96C0-2081A4A2E85F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8C5AE32B-E714-4B74-96C0-2081A4A2E85F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8C5AE32B-E714-4B74-96C0-2081A4A2E85F}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{8C5AE32B-E714-4B74-96C0-2081A4A2E85F}.Debug|x64.Build.0 = Debug|Any CPU
+		{8C5AE32B-E714-4B74-96C0-2081A4A2E85F}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{8C5AE32B-E714-4B74-96C0-2081A4A2E85F}.Debug|x86.Build.0 = Debug|Any CPU
+		{8C5AE32B-E714-4B74-96C0-2081A4A2E85F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8C5AE32B-E714-4B74-96C0-2081A4A2E85F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8C5AE32B-E714-4B74-96C0-2081A4A2E85F}.Release|x64.ActiveCfg = Release|Any CPU
+		{8C5AE32B-E714-4B74-96C0-2081A4A2E85F}.Release|x64.Build.0 = Release|Any CPU
+		{8C5AE32B-E714-4B74-96C0-2081A4A2E85F}.Release|x86.ActiveCfg = Release|Any CPU
+		{8C5AE32B-E714-4B74-96C0-2081A4A2E85F}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -756,5 +770,6 @@ Global
 		{CD48789F-92A1-4D39-8848-0BF9B8D26CEC} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 		{A1F56395-A2A6-48EC-BDC6-C859678A0F64} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 		{173FE180-4C6A-4BAA-BA3B-A9EA2141D485} = {E0AD1809-C64F-3D39-45E0-E424261CE16D}
+		{8C5AE32B-E714-4B74-96C0-2081A4A2E85F} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 	EndGlobalSection
 EndGlobal
