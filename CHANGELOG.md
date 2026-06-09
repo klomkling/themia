@@ -18,6 +18,12 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## 0.4.1 — 2026-06-09
+
+A Dapper (+ SqlKata) data layer as a first-class sibling to EF Core, behind a shared,
+provider-agnostic abstraction (specifications, repositories, unit of work) with multi-tenant
+isolation, audit, soft-delete, and a dual-provider conformance suite — PostgreSQL first.
+
 ### Added
 
 - **`Themia.Framework.Data.Abstractions`** — provider-agnostic data-access contracts: `ISpecification<T>`
