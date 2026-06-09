@@ -1,4 +1,26 @@
 #nullable enable
+Themia.Framework.Data.EFCore.Repositories.EfReadRepository<T, TKey>
+Themia.Framework.Data.EFCore.Repositories.EfReadRepository<T, TKey>.AnyAsync(Themia.Framework.Data.Abstractions.Specifications.ISpecification<T!>! spec, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!
+Themia.Framework.Data.EFCore.Repositories.EfReadRepository<T, TKey>.Context.get -> Themia.Framework.Data.EFCore.ThemiaDbContext!
+Themia.Framework.Data.EFCore.Repositories.EfReadRepository<T, TKey>.CountAsync(Themia.Framework.Data.Abstractions.Specifications.ISpecification<T!>! spec, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<long>!
+Themia.Framework.Data.EFCore.Repositories.EfReadRepository<T, TKey>.EfReadRepository(Themia.Framework.Data.EFCore.ThemiaDbContext! context, Themia.Framework.Data.Abstractions.Filtering.IDataFilterScope! filterScope) -> void
+Themia.Framework.Data.EFCore.Repositories.EfReadRepository<T, TKey>.FirstOrDefaultAsync(Themia.Framework.Data.Abstractions.Specifications.ISpecification<T!>! spec, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<T?>!
+Themia.Framework.Data.EFCore.Repositories.EfReadRepository<T, TKey>.GetByIdAsync(TKey id, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<T?>!
+Themia.Framework.Data.EFCore.Repositories.EfReadRepository<T, TKey>.ListAsync(Themia.Framework.Data.Abstractions.Specifications.ISpecification<T!>! spec, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<T!>!>!
+Themia.Framework.Data.EFCore.Repositories.EfReadRepository<T, TKey>.PageAsync(Themia.Framework.Data.Abstractions.Specifications.ISpecification<T!>! spec, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Framework.Data.Abstractions.Paging.PagedResult<T!>!>!
+Themia.Framework.Data.EFCore.Repositories.EfReadRepository<T, TKey>.Query(Themia.Framework.Data.Abstractions.Specifications.ISpecification<T!>! spec) -> System.Linq.IQueryable<T!>!
+Themia.Framework.Data.EFCore.Repositories.EfRepository<T, TKey>
+Themia.Framework.Data.EFCore.Repositories.EfRepository<T, TKey>.AddAsync(T! entity, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Framework.Data.EFCore.Repositories.EfRepository<T, TKey>.EfRepository(Themia.Framework.Data.EFCore.ThemiaDbContext! context, Themia.Framework.Data.Abstractions.Filtering.IDataFilterScope! filterScope) -> void
+Themia.Framework.Data.EFCore.Repositories.EfRepository<T, TKey>.Remove(T! entity) -> void
+Themia.Framework.Data.EFCore.Repositories.EfRepository<T, TKey>.Update(T! entity) -> void
+Themia.Framework.Data.EFCore.UnitOfWork.EfUnitOfWork
+Themia.Framework.Data.EFCore.UnitOfWork.EfUnitOfWork.BeginTransactionAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Framework.Data.Abstractions.UnitOfWork.ITransactionScope!>!
+Themia.Framework.Data.EFCore.UnitOfWork.EfUnitOfWork.EfUnitOfWork(Themia.Framework.Data.EFCore.ThemiaDbContext! context) -> void
+Themia.Framework.Data.EFCore.UnitOfWork.EfUnitOfWork.ExecuteInTransactionAsync(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task!>! work, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Framework.Data.EFCore.UnitOfWork.EfUnitOfWork.SaveChangesAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<int>!
+Themia.Framework.Data.EFCore.Extensions.RepositoryServiceCollectionExtensions
+static Themia.Framework.Data.EFCore.Extensions.RepositoryServiceCollectionExtensions.AddThemiaDataRepositories<TContext>(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
 const Themia.Framework.Data.EFCore.Abstractions.DatabaseProviderNames.MySql = "mysql" -> string!
 Themia.Framework.Data.EFCore.Abstractions.IDatabaseProvider
 Themia.Framework.Data.EFCore.Abstractions.IDatabaseProvider.Configure(Microsoft.EntityFrameworkCore.DbContextOptionsBuilder! optionsBuilder, Microsoft.Extensions.Configuration.IConfiguration! configuration, System.IServiceProvider! serviceProvider) -> void

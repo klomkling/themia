@@ -1,0 +1,50 @@
+#nullable enable
+Themia.Framework.Data.Dapper.Mapping.EntityMapping
+Themia.Framework.Data.Dapper.Mapping.EntityMapping.Column(string! propertyName) -> string!
+Themia.Framework.Data.Dapper.Mapping.EntityMapping.Columns.get -> System.Collections.Generic.IReadOnlyDictionary<string!, string!>!
+Themia.Framework.Data.Dapper.Mapping.EntityMapping.KeyColumn.get -> string!
+Themia.Framework.Data.Dapper.Mapping.EntityMapping.KeyProperty.get -> string!
+Themia.Framework.Data.Dapper.Mapping.EntityMapping.KeySetter.get -> System.Action<object!, object?>!
+Themia.Framework.Data.Dapper.Mapping.EntityMapping.KeyType.get -> System.Type!
+Themia.Framework.Data.Dapper.Mapping.EntityMapping.Table.get -> string!
+Themia.Framework.Data.Dapper.Mapping.EntityMappingRegistry
+Themia.Framework.Data.Dapper.Mapping.EntityMappingRegistry.EntityMappingRegistry() -> void
+Themia.Framework.Data.Dapper.Mapping.EntityMappingRegistry.For(System.Type! type) -> Themia.Framework.Data.Dapper.Mapping.EntityMapping!
+Themia.Framework.Data.Dapper.Mapping.EntityMappingRegistry.For<T>() -> Themia.Framework.Data.Dapper.Mapping.EntityMapping!
+Themia.Framework.Data.Dapper.Mapping.EntityMappingRegistry.Register<T>(Themia.Framework.Data.Dapper.Mapping.EntityMapping! mapping) -> void
+static Themia.Framework.Data.Dapper.Mapping.EntityMapping.ForConvention(System.Type! type) -> Themia.Framework.Data.Dapper.Mapping.EntityMapping!
+static Themia.Framework.Data.Dapper.Mapping.EntityMapping.ForConvention(System.Type! type, string? table, System.Collections.Generic.IReadOnlyDictionary<string!, string!>? columnOverrides) -> Themia.Framework.Data.Dapper.Mapping.EntityMapping!
+static Themia.Framework.Data.Dapper.Mapping.EntityMapping.ForConvention<T>() -> Themia.Framework.Data.Dapper.Mapping.EntityMapping!
+static Themia.Framework.Data.Dapper.Mapping.EntityMapping.ForConvention<T>(string? table, System.Collections.Generic.IReadOnlyDictionary<string!, string!>? columnOverrides) -> Themia.Framework.Data.Dapper.Mapping.EntityMapping!
+static Themia.Framework.Data.Dapper.Mapping.EntityMapping.ToSnakeCase(string! name) -> string!
+Themia.Framework.Data.Dapper.Sql.CompiledSql
+Themia.Framework.Data.Dapper.Sql.CompiledSql.CompiledSql(string! Sql, System.Collections.Generic.IReadOnlyDictionary<string!, object?>! Parameters) -> void
+Themia.Framework.Data.Dapper.Sql.CompiledSql.Parameters.get -> System.Collections.Generic.IReadOnlyDictionary<string!, object?>!
+Themia.Framework.Data.Dapper.Sql.CompiledSql.Parameters.init -> void
+Themia.Framework.Data.Dapper.Sql.CompiledSql.Sql.get -> string!
+Themia.Framework.Data.Dapper.Sql.CompiledSql.Sql.init -> void
+Themia.Framework.Data.Dapper.Sql.ISqlCompiler
+Themia.Framework.Data.Dapper.Sql.ISqlCompiler.Compile(SqlKata.Query! query) -> Themia.Framework.Data.Dapper.Sql.CompiledSql!
+Themia.Framework.Data.Dapper.Auditing.NullCurrentUserAccessor
+Themia.Framework.Data.Dapper.Auditing.NullCurrentUserAccessor.NullCurrentUserAccessor() -> void
+Themia.Framework.Data.Dapper.Auditing.NullCurrentUserAccessor.UserId.get -> string?
+Themia.Framework.Data.Dapper.Connection.IDapperConnectionContext
+Themia.Framework.Data.Dapper.Connection.IDapperConnectionContext.BeginTransactionAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<System.Data.Common.DbTransaction!>!
+Themia.Framework.Data.Dapper.Connection.IDapperConnectionContext.DisposeTransactionAsync() -> System.Threading.Tasks.ValueTask
+Themia.Framework.Data.Dapper.Connection.IDapperConnectionContext.CurrentTransaction.get -> System.Data.Common.DbTransaction?
+Themia.Framework.Data.Dapper.Connection.IDapperConnectionContext.GetOpenConnectionAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<System.Data.Common.DbConnection!>!
+Themia.Framework.Data.Dapper.Connection.IDapperConnectionFactory
+Themia.Framework.Data.Dapper.Connection.IDapperConnectionFactory.Create() -> System.Data.Common.DbConnection!
+Themia.Framework.Data.Dapper.DapperDataOptions
+Themia.Framework.Data.Dapper.DapperDataOptions.ConfigureMappings.get -> System.Action<Themia.Framework.Data.Dapper.EntityMappingRegistryConfigurator!>?
+Themia.Framework.Data.Dapper.DapperDataOptions.ConfigureMappings.set -> void
+Themia.Framework.Data.Dapper.DapperDataOptions.DapperDataOptions() -> void
+Themia.Framework.Data.Dapper.DapperDataOptions.IncludeGlobalRecordsForTenants.get -> bool
+Themia.Framework.Data.Dapper.DapperDataOptions.IncludeGlobalRecordsForTenants.set -> void
+Themia.Framework.Data.Dapper.DependencyInjection.DapperDataServiceCollectionExtensions
+Themia.Framework.Data.Dapper.EntityMappingRegistryConfigurator
+Themia.Framework.Data.Dapper.EntityMappingRegistryConfigurator.EntityMappingRegistryConfigurator(Themia.Framework.Data.Dapper.Mapping.EntityMappingRegistry! registry) -> void
+Themia.Framework.Data.Dapper.EntityMappingRegistryConfigurator.Map<T>(Themia.Framework.Data.Dapper.Mapping.EntityMapping! mapping) -> Themia.Framework.Data.Dapper.EntityMappingRegistryConfigurator!
+Themia.Framework.Data.Dapper.Tenancy.ITenantQueryFactory
+Themia.Framework.Data.Dapper.Tenancy.ITenantQueryFactory.For<T>() -> SqlKata.Query!
+static Themia.Framework.Data.Dapper.DependencyInjection.DapperDataServiceCollectionExtensions.AddThemiaDapperCore(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Themia.Framework.Data.Dapper.DapperDataOptions!>? configure = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!

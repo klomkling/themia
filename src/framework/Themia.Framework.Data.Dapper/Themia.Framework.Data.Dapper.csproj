@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <PackageId>Themia.Framework.Data.Dapper</PackageId>
+    <Description>Dapper + SqlKata implementation of the Themia data-access contracts: tenant isolation, audit, soft-delete, unit of work. Engine-agnostic core; add a Themia.Framework.Data.Dapper.&lt;Engine&gt; package for a database.</Description>
+    <PackageTags>themia;dapper;sqlkata;data;multi-tenancy;audit;soft-delete</PackageTags>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Themia.Framework.Data.Abstractions/Themia.Framework.Data.Abstractions.csproj" />
+    <ProjectReference Include="../Themia.Framework.Core/Themia.Framework.Core.csproj" />
+    <ProjectReference Include="../Themia.MultiTenancy/Themia.MultiTenancy.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Dapper" />
+    <PackageReference Include="SqlKata" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+    <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+  <ItemGroup>
+    <AdditionalFiles Include="PublicAPI.Shipped.txt" />
+    <AdditionalFiles Include="PublicAPI.Unshipped.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Themia.Framework.Data.Dapper.Tests" />
+    <InternalsVisibleTo Include="Themia.Framework.Data.Dapper.Conformance" />
+    <InternalsVisibleTo Include="Themia.Framework.Data.Dapper.PostgreSql.IntegrationTests" />
+  </ItemGroup>
+</Project>

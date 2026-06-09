@@ -48,7 +48,12 @@ public sealed class PostgresDatabaseProvider : IDatabaseProvider
 
     private static void ConfigureNpgsqlOptions(NpgsqlDbContextOptionsBuilder builder)
     {
-        builder.EnableRetryOnFailure();
+        // Automatic transient-fault retry (EnableRetryOnFailure) is intentionally NOT configured: a
+        // retrying execution strategy is incompatible with the user-initiated transactions exposed by
+        // IUnitOfWork.BeginTransactionAsync (EF throws on BeginTransaction under a retrying strategy).
+        // Hosts that need transient-fault resilience and do NOT use manual transactions can re-enable it
+        // via the configureOptions delegate of AddThemiaPostgres, accepting that BeginTransactionAsync
+        // will then throw.
     }
 
     /// <summary>

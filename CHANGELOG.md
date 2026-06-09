@@ -18,6 +18,34 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+### Added
+
+- **`Themia.Framework.Data.Abstractions`** — provider-agnostic data-access contracts: `ISpecification<T>`
+  (+ `Specification<T>` base and And/Or/Not combinators), `IReadRepository`/`IRepository`, `IUnitOfWork`/
+  `ITransactionScope`, `IDataFilterScope` (tenant-filter bypass), `ICurrentUserAccessor`, `PagedResult<T>`,
+  and a `ConcurrencyException` raised when a single-entity update/delete affects no rows (a lost write —
+  missing row, concurrent delete, or outside the tenant scope) on both the Dapper and EF Core layers.
+- **`Themia.Framework.Data.Dapper`** + **`Themia.Framework.Data.Dapper.PostgreSql`** — a Dapper + SqlKata
+  data layer implementing the shared contracts with multi-tenant isolation, audit, soft-delete, and a
+  deferred-write unit of work, plus a tenant-seeded native-SqlKata path (`ITenantQueryFactory`) and an
+  `ISpecification<T>`→SqlKata translator. PostgreSQL via `AddThemiaDapperPostgres`. (PostgreSQL this release;
+  MySQL/SQL Server are planned 0.4.x follow-ups.)
+- **`Themia.Framework.Data.EFCore`** now also implements the shared contracts via
+  `AddThemiaDataRepositories<TContext>()` (`EfReadRepository`/`EfRepository`/`EfUnitOfWork`), so application
+  code written against the abstraction runs on either the EF Core or the Dapper data layer. A Testcontainers
+  conformance suite runs the same behavioural tests against both providers.
+
+### Changed
+
+- **`Themia.Framework.Data.EFCore` (PostgreSQL): automatic transient-fault retry (`EnableRetryOnFailure`)
+  is no longer enabled.** A retrying EF execution strategy is incompatible with the user-initiated
+  transactions now exposed via `IUnitOfWork.BeginTransactionAsync`. Hosts needing retry and not using
+  manual transactions can re-enable it through the `configureOptions` delegate of `AddThemiaPostgres`.
+- The Dapper data layer auto-stamps the ambient tenant on insert (matching the EF layer); the EF
+  repository adapter now does the same. Inserting a global (null-tenant) row through the repository is
+  therefore not possible while a tenant is ambient — seed global/shared rows via migrations or direct
+  `DbSet`/raw SQL.
+
 ## 0.4.0 — 2026-06-07
 
 Scheduling capability: a framework-neutral Quartz dashboard core + an EF-backed scheduling module.
