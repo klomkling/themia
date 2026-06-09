@@ -18,6 +18,11 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## 0.4.2 — 2026-06-10
+
+Write-path tenant isolation: both data layers now reject a cross-tenant `UPDATE`/`DELETE`, closing the EF
+write gap where a detached entity with a foreign key could mutate another tenant's row.
+
 ### Changed
 
 - **Write-path tenant isolation is now enforced on both data layers.** A tenant-scoped `UPDATE`/`DELETE`
