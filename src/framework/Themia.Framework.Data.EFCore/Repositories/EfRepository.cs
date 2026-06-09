@@ -8,8 +8,11 @@ public sealed class EfRepository<T, TKey>(ThemiaDbContext context, IDataFilterSc
     : EfReadRepository<T, TKey>(context, filterScope), IRepository<T, TKey> where T : class
 {
     /// <inheritdoc />
-    public async Task AddAsync(T entity, CancellationToken cancellationToken = default)
-        => await Context.Set<T>().AddAsync(entity, cancellationToken);
+    public Task AddAsync(T entity, CancellationToken cancellationToken = default)
+    {
+        Context.Set<T>().Add(entity);
+        return Task.CompletedTask;
+    }
 
     /// <inheritdoc />
     public void Update(T entity) => Context.Set<T>().Update(entity);
