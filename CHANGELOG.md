@@ -18,6 +18,13 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+### Changed
+
+- **Write-path tenant isolation is now enforced on both data layers.** A tenant-scoped `UPDATE`/`DELETE`
+  that targets a row outside the current tenant throws `ConcurrencyException` (EF verifies the stored row's
+  tenant by primary key; Dapper scopes the SQL predicate). `IDataFilterScope.BypassTenantFilter()` now also
+  applies to writes as an admin/migration escape hatch on both layers.
+
 ## 0.4.1 — 2026-06-09
 
 A Dapper (+ SqlKata) data layer as a first-class sibling to EF Core, behind a shared,
