@@ -263,6 +263,36 @@ public abstract class DataLayerConformanceTests
     }
 
     [Fact]
+    public async Task CrossTenantWrite_UnderBypass_Succeeds()
+    {
+        await ResetAsync();
+
+        Guid id;
+        await using (var a = await NewScopeAsync(new TenantId("a")))
+        {
+            var w = NewWidget("shared", 1);
+            id = w.Id;
+            await a.Repo.AddAsync(w);
+            await a.Uow.SaveChangesAsync();
+        }
+
+        await using (var b = await NewScopeAsync(new TenantId("b")))
+        using (b.Filter.BypassTenantFilter())
+        {
+            var loaded = await b.Repo.GetByIdAsync(id);   // bypass reveals tenant A's row
+            Assert.NotNull(loaded);
+            loaded!.Quantity = 42;
+            b.Repo.Update(loaded);
+            await b.Uow.SaveChangesAsync();               // bypass => cross-tenant write permitted
+        }
+
+        await using var check = await NewScopeAsync(new TenantId("a"));
+        var after = await check.Repo.GetByIdAsync(id);
+        Assert.NotNull(after);
+        Assert.Equal(42, after!.Quantity);
+    }
+
+    [Fact]
     public async Task CollectionContains_List_Filters()
     {
         await ResetAsync();

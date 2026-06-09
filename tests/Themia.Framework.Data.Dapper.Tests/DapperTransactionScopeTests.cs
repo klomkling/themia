@@ -45,7 +45,7 @@ public sealed class DapperTransactionScopeTests
 
     // Only the connection context is exercised on the BeginTransaction -> Commit/Dispose path.
     private static DapperUnitOfWork NewUnitOfWork(IDapperConnectionContext ctx) =>
-        new(ctx, registry: null!, compiler: null!, tenantContext: null!, currentUser: null!, timeProvider: TimeProvider.System);
+        new(ctx, registry: null!, compiler: null!, tenantContext: null!, currentUser: null!, filterScope: null!, timeProvider: TimeProvider.System);
 
     private sealed class FakeConnectionContext(DbTransaction tx) : IDapperConnectionContext
     {

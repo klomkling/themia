@@ -4,6 +4,7 @@ using Themia.Framework.Core.Abstractions.Entities;
 using Themia.Framework.Core.Abstractions.Tenancy;
 using Themia.Framework.Data.Abstractions.Auditing;
 using Themia.Framework.Data.Abstractions.Exceptions;
+using Themia.Framework.Data.Abstractions.Filtering;
 using Themia.Framework.Data.Abstractions.UnitOfWork;
 using Themia.Framework.Data.Dapper.Connection;
 using Themia.Framework.Data.Dapper.Mapping;
@@ -17,6 +18,7 @@ internal sealed class DapperUnitOfWork(
     ISqlCompiler compiler,
     ITenantContext tenantContext,
     ICurrentUserAccessor currentUser,
+    IDataFilterScope filterScope,
     TimeProvider timeProvider) : IUnitOfWork, IPendingOperationSink
 {
     private readonly List<PendingOperation> pending = [];
@@ -174,10 +176,10 @@ internal sealed class DapperUnitOfWork(
 
     // Scope the write to the ambient tenant's rows; with no ambient tenant, restrict to global
     // (tenant_id IS NULL) rows so a system context cannot mutate a tenant-owned row by primary key.
-    // Mirrors the read path (TenantPredicate) and EF's ValidateTenantAccess (no tenant => global only).
+    // Under an active bypass scope the predicate is dropped (admin/migration cross-tenant write).
     private Query TenantScoped(Query q, object entity, EntityMapping map)
     {
-        if (entity is ITenantEntity)
+        if (entity is ITenantEntity && !filterScope.IsTenantFilterBypassed)
         {
             var column = map.Column(nameof(ITenantEntity.TenantId));
             if (tenantContext.CurrentTenantId is { } t)
