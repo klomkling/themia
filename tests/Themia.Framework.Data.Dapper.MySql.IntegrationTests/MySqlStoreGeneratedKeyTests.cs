@@ -26,6 +26,8 @@ public class Gadget : AuditableEntity<int>, ITenantEntity
 /// <summary>
 /// Verifies the MySQL store-generated-key path: an AUTO_INCREMENT int key is populated back onto the entity
 /// after save via SqlKata's native LAST_INSERT_ID() (store-generated UUID is PostgreSQL-only — no MySQL RETURNING).
+/// The <c>gadgets</c> table intentionally omits soft-delete columns because <see cref="Gadget"/> extends
+/// <see cref="AuditableEntity{TKey}"/>, not <c>SoftDeletableEntity</c>.
 /// </summary>
 [Trait("Category", "Integration")]
 public sealed class MySqlStoreGeneratedKeyTests(MySqlContainerFixture fixture) : IClassFixture<MySqlContainerFixture>
@@ -39,7 +41,7 @@ public sealed class MySqlStoreGeneratedKeyTests(MySqlContainerFixture fixture) :
             await using var cmd = setup.CreateCommand();
             cmd.CommandText = """
                 CREATE TABLE IF NOT EXISTS gadgets (
-                    id               BIGINT        NOT NULL AUTO_INCREMENT PRIMARY KEY,
+                    id               INT           NOT NULL AUTO_INCREMENT PRIMARY KEY,
                     tenant_id        VARCHAR(100)  NULL,
                     name             VARCHAR(200)  NOT NULL,
                     created_at       DATETIME(6)   NOT NULL,
