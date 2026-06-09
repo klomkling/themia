@@ -19,6 +19,6 @@ public interface IDapperConnectionContext : IAsyncDisposable
     /// <summary>Begins a transaction on the shared connection.</summary>
     Task<DbTransaction> BeginTransactionAsync(CancellationToken cancellationToken);
 
-    /// <summary>Clears the ambient transaction reference (after commit/rollback).</summary>
-    void ClearTransaction();
+    /// <summary>Disposes and clears the ambient transaction (after commit/rollback).</summary>
+    ValueTask DisposeTransactionAsync();
 }

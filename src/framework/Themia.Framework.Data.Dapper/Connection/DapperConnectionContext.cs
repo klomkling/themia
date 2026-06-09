@@ -24,7 +24,14 @@ internal sealed class DapperConnectionContext(IDapperConnectionFactory factory) 
         return CurrentTransaction;
     }
 
-    public void ClearTransaction() => CurrentTransaction = null;
+    public async ValueTask DisposeTransactionAsync()
+    {
+        if (CurrentTransaction is not null)
+        {
+            await CurrentTransaction.DisposeAsync();
+            CurrentTransaction = null;
+        }
+    }
 
     public async ValueTask DisposeAsync()
     {

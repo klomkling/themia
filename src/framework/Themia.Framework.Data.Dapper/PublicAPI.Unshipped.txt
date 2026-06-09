@@ -28,7 +28,7 @@ Themia.Framework.Data.Dapper.Auditing.NullCurrentUserAccessor.NullCurrentUserAcc
 Themia.Framework.Data.Dapper.Auditing.NullCurrentUserAccessor.UserId.get -> string?
 Themia.Framework.Data.Dapper.Connection.IDapperConnectionContext
 Themia.Framework.Data.Dapper.Connection.IDapperConnectionContext.BeginTransactionAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<System.Data.Common.DbTransaction!>!
-Themia.Framework.Data.Dapper.Connection.IDapperConnectionContext.ClearTransaction() -> void
+Themia.Framework.Data.Dapper.Connection.IDapperConnectionContext.DisposeTransactionAsync() -> System.Threading.Tasks.ValueTask
 Themia.Framework.Data.Dapper.Connection.IDapperConnectionContext.CurrentTransaction.get -> System.Data.Common.DbTransaction?
 Themia.Framework.Data.Dapper.Connection.IDapperConnectionContext.GetOpenConnectionAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<System.Data.Common.DbConnection!>!
 Themia.Framework.Data.Dapper.Connection.IDapperConnectionFactory

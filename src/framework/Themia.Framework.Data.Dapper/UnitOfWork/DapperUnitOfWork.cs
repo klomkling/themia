@@ -37,7 +37,7 @@ internal sealed class DapperUnitOfWork(
             if (ownsTransaction && tx is not null)
             {
                 await tx.CommitAsync(cancellationToken);
-                connection.ClearTransaction();
+                await connection.DisposeTransactionAsync();
             }
             pending.Clear();
             return affected;
@@ -47,7 +47,7 @@ internal sealed class DapperUnitOfWork(
             if (ownsTransaction && tx is not null)
             {
                 await tx.RollbackAsync(cancellationToken);
-                connection.ClearTransaction();
+                await connection.DisposeTransactionAsync();
             }
             pending.Clear();
             throw;
@@ -97,7 +97,7 @@ internal sealed class DapperUnitOfWork(
                     var newId = await conn.ExecuteScalarAsync<object>(new CommandDefinition(sql.Sql, sql.Parameters, tx, cancellationToken: ct));
                     if (newId is null or System.DBNull)
                         throw new InvalidOperationException($"INSERT into '{map.Table}' requested a store-generated key (the '{map.KeyProperty}' was unassigned) but the database returned no id. Assign the key before AddAsync, or ensure the key column is auto-generated.");
-                    map.KeySetter(op.Entity, System.Convert.ChangeType(newId, map.KeyType));
+                    map.KeySetter(op.Entity, ConvertKey(newId, map.KeyType));
                     return 1;
                 }
                 return await conn.ExecuteAsync(new CommandDefinition(sql.Sql, sql.Parameters, tx, cancellationToken: ct));
@@ -173,6 +173,14 @@ internal sealed class DapperUnitOfWork(
         _ => value
     };
 
+    private static object ConvertKey(object value, System.Type keyType)
+    {
+        if (value.GetType() == keyType) return value;                       // e.g. Npgsql returns uuid as Guid, int4 as int
+        if (keyType == typeof(System.Guid))
+            return value is System.Guid g ? g : System.Guid.Parse(value.ToString()!);
+        return System.Convert.ChangeType(value, keyType);                   // numeric widening etc.
+    }
+
     private static bool IsDefault(object value) => value switch
     {
         int i => i == 0,
@@ -189,7 +197,7 @@ internal sealed class DapperUnitOfWork(
             if (connection.CurrentTransaction is { } tx)
             {
                 await tx.CommitAsync(cancellationToken);
-                connection.ClearTransaction();
+                await connection.DisposeTransactionAsync();
             }
         }
 
@@ -198,7 +206,7 @@ internal sealed class DapperUnitOfWork(
             if (connection.CurrentTransaction is { } tx)
             {
                 await tx.RollbackAsync(cancellationToken);
-                connection.ClearTransaction();
+                await connection.DisposeTransactionAsync();
             }
         }
 
@@ -207,7 +215,7 @@ internal sealed class DapperUnitOfWork(
             if (connection.CurrentTransaction is { } tx)
             {
                 await tx.RollbackAsync();
-                connection.ClearTransaction();
+                await connection.DisposeTransactionAsync();
             }
         }
     }
