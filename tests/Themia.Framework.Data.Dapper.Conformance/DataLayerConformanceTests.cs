@@ -293,6 +293,35 @@ public abstract class DataLayerConformanceTests
     }
 
     [Fact]
+    public async Task CrossTenantWrite_WithoutBypass_Throws()
+    {
+        await ResetAsync();
+
+        Guid id;
+        await using (var a = await NewScopeAsync(new TenantId("a")))
+        {
+            var w = NewWidget("owned", 1);
+            id = w.Id;
+            await a.Repo.AddAsync(w);
+            await a.Uow.SaveChangesAsync();
+        }
+
+        await using (var b = await NewScopeAsync(new TenantId("b")))
+        {
+            var detached = NewWidget("hijack", 99);
+            detached.SetId(id);              // tenant B targets tenant A's row by primary key
+            b.Repo.Update(detached);
+            await Assert.ThrowsAsync<ConcurrencyException>(() => b.Uow.SaveChangesAsync());
+        }
+
+        await using var check = await NewScopeAsync(new TenantId("a"));
+        var loaded = await check.Repo.GetByIdAsync(id);
+        Assert.NotNull(loaded);
+        Assert.Equal("owned", loaded!.Name);   // tenant A's row is untouched
+        Assert.Equal(1, loaded.Quantity);
+    }
+
+    [Fact]
     public async Task CollectionContains_List_Filters()
     {
         await ResetAsync();

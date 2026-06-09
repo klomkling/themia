@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Themia.Framework.Core.Abstractions.Entities;
 using Themia.Framework.Core.Abstractions.Tenancy;
+using Themia.Framework.Data.Abstractions.Exceptions;
 using Themia.Framework.Data.EFCore.Infrastructure;
 
 namespace Themia.Framework.Data.EFCore;
@@ -337,6 +338,45 @@ public abstract class ThemiaDbContext : DbContext
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// Verifies that every pending tenant-scoped update/delete targets a row owned by the current tenant,
+    /// by reading the stored row's tenant by primary key (bypassing query filters so soft-deleted rows are
+    /// still visible and the row's real tenant is read). Throws <see cref="ConcurrencyException"/> on a
+    /// missing row or a tenant mismatch. The rule is strict: a tenant writes only its own rows; a no-tenant
+    /// context writes only global (null-tenant) rows — matching the Dapper layer's <c>WHERE tenant_id = …</c>.
+    /// </summary>
+    internal async Task ValidateTenantWritesAsync(CancellationToken cancellationToken)
+    {
+        if (!EnableTenantFilters)
+        {
+            return;
+        }
+
+        var ambient = EffectiveFilterTenantId;
+
+        foreach (var entry in ChangeTracker.Entries<ITenantEntity>())
+        {
+            if (entry.State is not (EntityState.Modified or EntityState.Deleted))
+            {
+                continue;
+            }
+
+            var stored = await entry.GetDatabaseValuesAsync(cancellationToken);
+            if (stored is null)
+            {
+                throw new ConcurrencyException(
+                    "A tracked update or delete affected no rows: the row does not exist or was concurrently deleted.");
+            }
+
+            var owner = stored.GetValue<TenantId?>(nameof(ITenantEntity.TenantId));
+            if (owner != ambient)
+            {
+                throw new ConcurrencyException(
+                    "A tracked update or delete targets a row outside the current tenant scope.");
+            }
+        }
     }
 
     /// <inheritdoc />

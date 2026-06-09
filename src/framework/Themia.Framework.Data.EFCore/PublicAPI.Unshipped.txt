@@ -16,7 +16,7 @@ Themia.Framework.Data.EFCore.Repositories.EfRepository<T, TKey>.Remove(T! entity
 Themia.Framework.Data.EFCore.Repositories.EfRepository<T, TKey>.Update(T! entity) -> void
 Themia.Framework.Data.EFCore.UnitOfWork.EfUnitOfWork
 Themia.Framework.Data.EFCore.UnitOfWork.EfUnitOfWork.BeginTransactionAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Framework.Data.Abstractions.UnitOfWork.ITransactionScope!>!
-Themia.Framework.Data.EFCore.UnitOfWork.EfUnitOfWork.EfUnitOfWork(Themia.Framework.Data.EFCore.ThemiaDbContext! context) -> void
+Themia.Framework.Data.EFCore.UnitOfWork.EfUnitOfWork.EfUnitOfWork(Themia.Framework.Data.EFCore.ThemiaDbContext! context, Themia.Framework.Data.Abstractions.Filtering.IDataFilterScope! filterScope) -> void
 Themia.Framework.Data.EFCore.UnitOfWork.EfUnitOfWork.ExecuteInTransactionAsync(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task!>! work, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
 Themia.Framework.Data.EFCore.UnitOfWork.EfUnitOfWork.SaveChangesAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<int>!
 Themia.Framework.Data.EFCore.Extensions.RepositoryServiceCollectionExtensions

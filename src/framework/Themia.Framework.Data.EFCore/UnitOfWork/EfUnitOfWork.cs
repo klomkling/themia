@@ -1,11 +1,12 @@
 using Microsoft.EntityFrameworkCore;
 using Themia.Framework.Data.Abstractions.Exceptions;
+using Themia.Framework.Data.Abstractions.Filtering;
 using Themia.Framework.Data.Abstractions.UnitOfWork;
 
 namespace Themia.Framework.Data.EFCore.UnitOfWork;
 
 /// <summary>EF Core unit of work over <see cref="ThemiaDbContext"/>.</summary>
-public sealed class EfUnitOfWork(ThemiaDbContext context) : IUnitOfWork
+public sealed class EfUnitOfWork(ThemiaDbContext context, IDataFilterScope filterScope) : IUnitOfWork
 {
     /// <inheritdoc />
     public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default) => SaveAsync(cancellationToken);
@@ -14,6 +15,11 @@ public sealed class EfUnitOfWork(ThemiaDbContext context) : IUnitOfWork
     // framework's provider-agnostic ConcurrencyException so both data layers surface a lost write the same way.
     private async Task<int> SaveAsync(CancellationToken cancellationToken)
     {
+        if (!filterScope.IsTenantFilterBypassed)
+        {
+            await context.ValidateTenantWritesAsync(cancellationToken);
+        }
+
         try
         {
             return await context.SaveChangesAsync(cancellationToken);
