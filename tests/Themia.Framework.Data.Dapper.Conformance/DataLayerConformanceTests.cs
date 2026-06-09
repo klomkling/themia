@@ -103,9 +103,10 @@ public abstract class DataLayerConformanceTests
         await ResetAsync();
         await using var s = await NewScopeAsync(new TenantId("acme"));
 
-        for (var i = 0; i < 5; i++)
+        // Insert in reverse order to prove the OrderBy term drives the result, not insert order.
+        for (var i = 4; i >= 0; i--)
         {
-            await s.Repo.AddAsync(NewWidget($"p{i}", i));
+            await s.Repo.AddAsync(NewWidget($"w{i}", i));
         }
 
         await s.Uow.SaveChangesAsync();
@@ -114,6 +115,9 @@ public abstract class DataLayerConformanceTests
 
         Assert.Equal(5, page.Total);
         Assert.Equal(2, page.Items.Count);
+        // Ordered-identity: ascending by name, first page must be "w0" then "w1".
+        Assert.Equal("w0", page.Items[0].Name);
+        Assert.Equal("w1", page.Items[1].Name);
     }
 
     [Fact]
