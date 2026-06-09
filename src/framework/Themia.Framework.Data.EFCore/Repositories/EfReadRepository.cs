@@ -34,7 +34,12 @@ public class EfReadRepository<T, TKey>(ThemiaDbContext context, IDataFilterScope
 
     /// <inheritdoc />
     public async Task<T?> GetByIdAsync(TKey id, CancellationToken cancellationToken = default)
-        => await Context.Set<T>().FindAsync([id!], cancellationToken);
+        // Route through the context's guarded FindAsync (not DbSet.FindAsync): for an entity already
+        // tracked in this scope, DbSet.FindAsync returns the tracked instance without re-applying the
+        // tenant/soft-delete query filter. ThemiaDbContext.FindAsync<T> re-checks tenant + IsDeleted via
+        // ValidateTenantAccess, so a soft-deleted or cross-tenant row tracked in-scope is hidden here —
+        // matching the Dapper layer, which always re-queries with the filter.
+        => await Context.FindAsync<T>([id!], cancellationToken);
 
     /// <inheritdoc />
     public async Task<IReadOnlyList<T>> ListAsync(ISpecification<T> spec, CancellationToken cancellationToken = default)

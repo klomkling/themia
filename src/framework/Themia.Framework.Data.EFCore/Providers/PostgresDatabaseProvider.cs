@@ -48,7 +48,12 @@ public sealed class PostgresDatabaseProvider : IDatabaseProvider
 
     private static void ConfigureNpgsqlOptions(NpgsqlDbContextOptionsBuilder builder)
     {
-        builder.EnableRetryOnFailure();
+        // Deliberately NOT calling EnableRetryOnFailure(): a retrying execution strategy forbids
+        // user-initiated transactions (BeginTransactionAsync throws "does not support user-initiated
+        // transactions"). IUnitOfWork.BeginTransactionAsync is a published, first-class contract, so the
+        // retrying strategy and that contract are mutually exclusive in EF Core. Callers that want
+        // automatic retry should use IUnitOfWork.ExecuteInTransactionAsync, which wraps the work in the
+        // provider's execution strategy explicitly.
     }
 
     /// <summary>
