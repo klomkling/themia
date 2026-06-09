@@ -33,6 +33,17 @@ public sealed class WidgetByNameSpec : Specification<Widget>
     public WidgetByNameSpec(string name) => Where(w => w.Name == name);
 }
 
+/// <summary>Matches widgets by exact name with the tenant filter disabled (spec-level cross-tenant access).</summary>
+public sealed class WidgetByNameNoTenantSpec : Specification<Widget>
+{
+    /// <summary>Creates a spec matching widgets named <paramref name="name"/> across all tenants.</summary>
+    public WidgetByNameNoTenantSpec(string name)
+    {
+        Where(w => w.Name == name);
+        WithoutTenantFilter();
+    }
+}
+
 /// <summary>
 /// A resolved DI scope plus the three shared data contracts under test. Disposing the record disposes the
 /// underlying async scope.

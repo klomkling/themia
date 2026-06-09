@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Themia.Framework.Core.Abstractions.Entities;
 using Themia.Framework.Data.Abstractions.Filtering;
 using Themia.Framework.Data.Abstractions.Paging;
 using Themia.Framework.Data.Abstractions.Repositories;
@@ -17,7 +18,7 @@ public class EfReadRepository<T, TKey>(ThemiaDbContext context, IDataFilterScope
     protected IQueryable<T> Query(ISpecification<T> spec)
     {
         IQueryable<T> q = Context.Set<T>();
-        if (spec.IgnoreTenantFilter || filterScope.IsTenantFilterBypassed) q = q.IgnoreQueryFilters();
+        if (spec.IgnoreTenantFilter || filterScope.IsTenantFilterBypassed) q = WithSoftDeleteOnly(q);
         if (spec.Criteria is not null) q = q.Where(spec.Criteria);
 
         IOrderedQueryable<T>? ordered = null;
@@ -34,12 +35,24 @@ public class EfReadRepository<T, TKey>(ThemiaDbContext context, IDataFilterScope
 
     /// <inheritdoc />
     public async Task<T?> GetByIdAsync(TKey id, CancellationToken cancellationToken = default)
+    {
+        // Under an ambient tenant-filter bypass, GetById must reveal other tenants' LIVE rows (but not
+        // soft-deleted ones) — matching the Dapper layer's GetById. Query by key with the tenant filter
+        // dropped and soft-delete re-applied; otherwise route through the guarded FindAsync path below.
+        if (filterScope.IsTenantFilterBypassed)
+        {
+            var keyName = Context.Model.FindEntityType(typeof(T))!.FindPrimaryKey()!.Properties[0].Name;
+            return await WithSoftDeleteOnly(Context.Set<T>())
+                .FirstOrDefaultAsync(e => EF.Property<TKey>(e, keyName)!.Equals(id), cancellationToken);
+        }
+
         // Route through the context's guarded FindAsync (not DbSet.FindAsync): for an entity already
         // tracked in this scope, DbSet.FindAsync returns the tracked instance without re-applying the
         // tenant/soft-delete query filter. ThemiaDbContext.FindAsync<T> re-checks tenant + IsDeleted via
         // ValidateTenantAccess, so a soft-deleted or cross-tenant row tracked in-scope is hidden here —
         // matching the Dapper layer, which always re-queries with the filter.
-        => await Context.FindAsync<T>([id!], cancellationToken);
+        return await Context.FindAsync<T>([id!], cancellationToken);
+    }
 
     /// <inheritdoc />
     public async Task<IReadOnlyList<T>> ListAsync(ISpecification<T> spec, CancellationToken cancellationToken = default)
@@ -68,8 +81,19 @@ public class EfReadRepository<T, TKey>(ThemiaDbContext context, IDataFilterScope
     private IQueryable<T> CountQuery(ISpecification<T> spec)
     {
         IQueryable<T> q = Context.Set<T>();
-        if (spec.IgnoreTenantFilter || filterScope.IsTenantFilterBypassed) q = q.IgnoreQueryFilters();
+        if (spec.IgnoreTenantFilter || filterScope.IsTenantFilterBypassed) q = WithSoftDeleteOnly(q);
         if (spec.Criteria is not null) q = q.Where(spec.Criteria);
+        return q;
+    }
+
+    // Drops ALL global query filters (the tenant + soft-delete combined filter), then RE-APPLIES the
+    // soft-delete predicate for soft-deletable entities. Tenant bypass must reveal other tenants' LIVE
+    // rows only — never soft-deleted ones — matching the Dapper layer, which keeps soft-delete on bypass.
+    private static IQueryable<T> WithSoftDeleteOnly(IQueryable<T> q)
+    {
+        q = q.IgnoreQueryFilters();
+        if (typeof(ISoftDeletable).IsAssignableFrom(typeof(T)))
+            q = q.Where(e => !EF.Property<bool>(e!, nameof(ISoftDeletable.IsDeleted)));
         return q;
     }
 }

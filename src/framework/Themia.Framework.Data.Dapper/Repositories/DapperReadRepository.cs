@@ -1,5 +1,7 @@
 using global::Dapper;
 using SqlKata;
+using Themia.Framework.Core.Abstractions.Tenancy;
+using Themia.Framework.Data.Abstractions.Filtering;
 using Themia.Framework.Data.Abstractions.Paging;
 using Themia.Framework.Data.Abstractions.Repositories;
 using Themia.Framework.Data.Abstractions.Specifications;
@@ -13,7 +15,9 @@ namespace Themia.Framework.Data.Dapper.Repositories;
 
 internal class DapperReadRepository<T, TKey>(
     IDapperConnectionContext connection,
-    ITenantQueryFactory queryFactory,
+    ITenantContext tenantContext,
+    IDataFilterScope filterScope,
+    DapperDataOptions options,
     EntityMappingRegistry registry,
     ISqlCompiler compiler) : IReadRepository<T, TKey> where T : class
 {
@@ -23,14 +27,27 @@ internal class DapperReadRepository<T, TKey>(
 
     protected EntityMapping Map => Registry.For<T>();
 
-    private Query Seeded() => queryFactory.For<T>();
+    // Seeds a query with the tenant predicate + soft-delete filter. The tenant predicate is omitted when
+    // either the ambient scope bypasses it or the spec opts out (ignoreTenantFilter); soft-delete always stays.
+    private Query Seeded(bool ignoreTenantFilter)
+    {
+        var map = Map;
+        var q = new Query(map.Table);
+        TenantPredicate.Apply<T>(
+            q,
+            tenantContext.CurrentTenantId,
+            options.IncludeGlobalRecordsForTenants,
+            filterScope.IsTenantFilterBypassed || ignoreTenantFilter,
+            map);
+        return q;
+    }
 
     public async Task<T?> GetByIdAsync(TKey id, CancellationToken cancellationToken = default)
-        => await QuerySingleAsync(Seeded().Where(Map.KeyColumn, id).Limit(1), cancellationToken);
+        => await QuerySingleAsync(Seeded(false).Where(Map.KeyColumn, id).Limit(1), cancellationToken);
 
     public async Task<IReadOnlyList<T>> ListAsync(ISpecification<T> spec, CancellationToken cancellationToken = default)
     {
-        var query = Seeded();
+        var query = Seeded(spec.IgnoreTenantFilter);
         SpecificationTranslator.Apply(query, spec, Map);
         var sql = Compiler.Compile(query);
         var conn = await Connection.GetOpenConnectionAsync(cancellationToken);
@@ -40,14 +57,14 @@ internal class DapperReadRepository<T, TKey>(
 
     public async Task<T?> FirstOrDefaultAsync(ISpecification<T> spec, CancellationToken cancellationToken = default)
     {
-        var query = Seeded();
+        var query = Seeded(spec.IgnoreTenantFilter);
         SpecificationTranslator.Apply(query, spec, Map);
         return await QuerySingleAsync(query.Limit(1), cancellationToken);
     }
 
     public async Task<long> CountAsync(ISpecification<T> spec, CancellationToken cancellationToken = default)
     {
-        var query = Seeded();
+        var query = Seeded(spec.IgnoreTenantFilter);
         if (spec.Criteria is not null)
             SpecificationTranslator.Apply(query, OnlyCriteria(spec), Map);
         var sql = Compiler.Compile(query.AsCount());

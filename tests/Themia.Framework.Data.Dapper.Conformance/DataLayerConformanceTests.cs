@@ -98,6 +98,74 @@ public abstract class DataLayerConformanceTests
     }
 
     [Fact]
+    public async Task Spec_IgnoreTenantFilter_RevealsOtherTenants()
+    {
+        await ResetAsync();
+
+        await using (var a = await NewScopeAsync(new TenantId("a")))
+        {
+            await a.Repo.AddAsync(NewWidget("x", 1));
+            await a.Uow.SaveChangesAsync();
+        }
+
+        await using var b = await NewScopeAsync(new TenantId("b"));
+
+        // Spec-level bypass (no ambient scope) must reveal the other tenant's live row on both providers.
+        var visible = await b.Repo.ListAsync(new WidgetByNameNoTenantSpec("x"));
+
+        Assert.Single(visible);
+    }
+
+    [Fact]
+    public async Task BypassTenantFilter_StillHidesSoftDeleted()
+    {
+        await ResetAsync();
+
+        await using (var a = await NewScopeAsync(new TenantId("a")))
+        {
+            var w = NewWidget("s", 1);
+            await a.Repo.AddAsync(w);
+            await a.Uow.SaveChangesAsync();
+
+            a.Repo.Remove(w);
+            await a.Uow.SaveChangesAsync();
+        }
+
+        await using var b = await NewScopeAsync(new TenantId("b"));
+
+        // Bypass reveals other tenants' LIVE rows but never soft-deleted ones.
+        using (b.Filter.BypassTenantFilter())
+        {
+            var visible = await b.Repo.ListAsync(new WidgetByNameSpec("s"));
+            Assert.Empty(visible);
+        }
+    }
+
+    [Fact]
+    public async Task GetById_UnderBypass_FindsCrossTenant()
+    {
+        await ResetAsync();
+
+        Guid id;
+        await using (var a = await NewScopeAsync(new TenantId("a")))
+        {
+            var w = NewWidget("g", 1);
+            id = w.Id;
+            await a.Repo.AddAsync(w);
+            await a.Uow.SaveChangesAsync();
+        }
+
+        await using var b = await NewScopeAsync(new TenantId("b"));
+
+        // GetById (no spec) must honour the ambient scope bypass on both providers.
+        using (b.Filter.BypassTenantFilter())
+        {
+            var loaded = await b.Repo.GetByIdAsync(id);
+            Assert.NotNull(loaded);
+        }
+    }
+
+    [Fact]
     public async Task Page_ReturnsItemsAndTotal()
     {
         await ResetAsync();
