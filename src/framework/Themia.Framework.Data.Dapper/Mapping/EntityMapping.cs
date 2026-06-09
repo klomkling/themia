@@ -10,12 +10,14 @@ namespace Themia.Framework.Data.Dapper.Mapping;
 public sealed class EntityMapping
 {
     private readonly Dictionary<string, string> _columnByProperty;
+    private readonly Dictionary<string, PropertyInfo> _propertyByName;
 
     private EntityMapping(
         string table,
         string keyColumn,
         string keyProperty,
         Dictionary<string, string> columns,
+        Dictionary<string, PropertyInfo> properties,
         Action<object, object?> keySetter,
         Type keyType)
     {
@@ -23,6 +25,7 @@ public sealed class EntityMapping
         KeyColumn = keyColumn;
         KeyProperty = keyProperty;
         _columnByProperty = columns;
+        _propertyByName = properties;
         KeySetter = keySetter;
         KeyType = keyType;
     }
@@ -67,6 +70,7 @@ public sealed class EntityMapping
             .ToArray();
 
         var columns = props.ToDictionary(p => p.Name, p => ToSnakeCase(p.Name));
+        var properties = props.ToDictionary(p => p.Name);
 
         var key = props.FirstOrDefault(p => p.Name == "Id")
                   ?? throw new InvalidOperationException(
@@ -79,8 +83,36 @@ public sealed class EntityMapping
             ToSnakeCase(key.Name),
             key.Name,
             columns,
+            properties,
             setter,
             key.PropertyType);
+    }
+
+    /// <summary>Reads a mapped property via cached metadata (no per-call <c>GetProperty</c> lookup).</summary>
+    internal object? GetValue(object entity, string property) =>
+        _propertyByName.TryGetValue(property, out var pi)
+            ? pi.GetValue(entity)
+            : throw new InvalidOperationException($"No property '{property}' mapped on '{Table}'.");
+
+    /// <summary>Tries to read a mapped property via cached metadata; returns false when it is not mapped.</summary>
+    internal bool TryGetValue(object entity, string property, out object? value)
+    {
+        if (_propertyByName.TryGetValue(property, out var pi))
+        {
+            value = pi.GetValue(entity);
+            return true;
+        }
+        value = null;
+        return false;
+    }
+
+    // Best-effort: audit/soft-delete properties are settable on the concrete base entities
+    // (AuditableEntity&lt;TId&gt;/SoftDeletableEntity&lt;TId&gt;); an unmapped or get-only property is silently skipped.
+    /// <summary>Writes a mapped, writable property via cached metadata; unmapped or get-only properties are skipped.</summary>
+    internal void SetValue(object entity, string property, object? value)
+    {
+        if (_propertyByName.TryGetValue(property, out var pi) && pi.CanWrite)
+            pi.SetValue(entity, value);
     }
 
     private static Action<object, object?> BuildSetter(PropertyInfo key)

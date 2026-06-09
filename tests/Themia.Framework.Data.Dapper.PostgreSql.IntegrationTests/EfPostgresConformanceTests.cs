@@ -37,7 +37,7 @@ public sealed class EfPostgresConformanceTests(PostgresContainerFixture fixture)
         var uow = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
         var filter = scope.ServiceProvider.GetRequiredService<IDataFilterScope>();
 
-        return Task.FromResult(new ConformanceScope(scope, repo, uow, filter));
+        return Task.FromResult(new ConformanceScope(provider, scope, repo, uow, filter));
     }
 
     /// <inheritdoc />

@@ -45,15 +45,20 @@ public sealed class WidgetByNameNoTenantSpec : Specification<Widget>
 }
 
 /// <summary>
-/// A resolved DI scope plus the three shared data contracts under test. Disposing the record disposes the
-/// underlying async scope.
+/// The root DI container, a resolved scope from it, and the three shared data contracts under test.
+/// Disposing the record disposes the scope and then the root container that owns it.
 /// </summary>
 public sealed record ConformanceScope(
+    IAsyncDisposable Root,
     IAsyncDisposable Scope,
     IRepository<Widget, Guid> Repo,
     IUnitOfWork Uow,
     IDataFilterScope Filter) : IAsyncDisposable
 {
     /// <inheritdoc />
-    public ValueTask DisposeAsync() => Scope.DisposeAsync();
+    public async ValueTask DisposeAsync()
+    {
+        await Scope.DisposeAsync();
+        await Root.DisposeAsync();
+    }
 }

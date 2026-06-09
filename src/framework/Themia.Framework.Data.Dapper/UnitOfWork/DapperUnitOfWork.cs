@@ -35,22 +35,25 @@ internal sealed class DapperUnitOfWork(
             foreach (var op in pending)
                 affected += await ExecuteAsync(conn, tx, op, cancellationToken);
             if (ownsTransaction && tx is not null)
-            {
                 await tx.CommitAsync(cancellationToken);
-                await connection.DisposeTransactionAsync();
-            }
             pending.Clear();
             return affected;
         }
         catch
         {
+            pending.Clear();
             if (ownsTransaction && tx is not null)
             {
-                await tx.RollbackAsync(cancellationToken);
-                await connection.DisposeTransactionAsync();
+                // Rolling back after a failed commit can itself throw; swallow that so the
+                // original failure (rethrown below) is the exception the caller sees.
+                try { await tx.RollbackAsync(cancellationToken); }
+                catch { /* preserve the original exception */ }
             }
-            pending.Clear();
             throw;
+        }
+        finally
+        {
+            if (ownsTransaction) await connection.DisposeTransactionAsync();
         }
     }
 
@@ -87,8 +90,8 @@ internal sealed class DapperUnitOfWork(
             {
                 if (op.Entity is ITenantEntity te && te.TenantId is null)
                     te.TenantId = tenantContext.CurrentTenantId;
-                Stamp(op.Entity, nameof(IAuditableEntity.CreatedAt), now);
-                if (userId is not null) Stamp(op.Entity, nameof(IAuditableEntity.CreatedBy), userId);
+                map.SetValue(op.Entity, nameof(IAuditableEntity.CreatedAt), now);
+                if (userId is not null) map.SetValue(op.Entity, nameof(IAuditableEntity.CreatedBy), userId);
                 var values = ColumnValues(op.Entity, map, out var keyAssigned);
                 var query = new Query(map.Table).AsInsert(values, returnId: !keyAssigned);
                 var sql = compiler.Compile(query);
@@ -104,8 +107,8 @@ internal sealed class DapperUnitOfWork(
             }
             case PendingKind.Update:
             {
-                Stamp(op.Entity, nameof(IAuditableEntity.LastModifiedAt), now);
-                if (userId is not null) Stamp(op.Entity, nameof(IAuditableEntity.LastModifiedBy), userId);
+                map.SetValue(op.Entity, nameof(IAuditableEntity.LastModifiedAt), now);
+                if (userId is not null) map.SetValue(op.Entity, nameof(IAuditableEntity.LastModifiedBy), userId);
                 var values = ColumnValues(op.Entity, map, out _);
                 values.Remove(map.KeyColumn);   // never update the key
                 var query = TenantScoped(new Query(map.Table), op.Entity, map).Where(map.KeyColumn, KeyOf(op.Entity, map)).AsUpdate(values);
@@ -143,20 +146,15 @@ internal sealed class DapperUnitOfWork(
         return q;
     }
 
-    private static object KeyOf(object entity, EntityMapping map) => entity.GetType().GetProperty(map.KeyProperty)!.GetValue(entity)!;
+    private static object KeyOf(object entity, EntityMapping map) => map.GetValue(entity, map.KeyProperty)!;
 
-    // Best-effort: audit/soft-delete properties are set-able on the concrete base entities (AuditableEntity<TId>/SoftDeletableEntity<TId>); a get-only impl is silently skipped.
-    private static void Stamp(object entity, string property, object? value) => entity.GetType().GetProperty(property)?.SetValue(entity, value);
-
-    private Dictionary<string, object?> ColumnValues(object entity, EntityMapping map, out bool keyAssigned)
+    private static Dictionary<string, object?> ColumnValues(object entity, EntityMapping map, out bool keyAssigned)
     {
         var values = new Dictionary<string, object?>();
         keyAssigned = false;
         foreach (var (prop, column) in map.Columns)
         {
-            var pi = entity.GetType().GetProperty(prop);
-            if (pi is null) continue;
-            var value = pi.GetValue(entity);
+            if (!map.TryGetValue(entity, prop, out var value)) continue;
             if (prop == map.KeyProperty)
             {
                 keyAssigned = value is not null && !IsDefault(value);
@@ -192,31 +190,30 @@ internal sealed class DapperUnitOfWork(
 
     private sealed class TransactionScope(IDapperConnectionContext connection) : ITransactionScope
     {
-        public async Task CommitAsync(CancellationToken cancellationToken = default)
-        {
-            if (connection.CurrentTransaction is { } tx)
-            {
-                await tx.CommitAsync(cancellationToken);
-                await connection.DisposeTransactionAsync();
-            }
-        }
+        public Task CommitAsync(CancellationToken cancellationToken = default) =>
+            CompleteAsync(tx => tx.CommitAsync(cancellationToken));
 
-        public async Task RollbackAsync(CancellationToken cancellationToken = default)
+        public Task RollbackAsync(CancellationToken cancellationToken = default) =>
+            CompleteAsync(tx => tx.RollbackAsync(cancellationToken));
+
+        // Always dispose the ambient transaction, even when commit/rollback throws, so a failed
+        // commit leaves nothing for DisposeAsync to roll back (which would mask the original error).
+        private async Task CompleteAsync(Func<System.Data.Common.DbTransaction, Task> complete)
         {
-            if (connection.CurrentTransaction is { } tx)
-            {
-                await tx.RollbackAsync(cancellationToken);
-                await connection.DisposeTransactionAsync();
-            }
+            if (connection.CurrentTransaction is not { } tx) return;
+            try { await complete(tx); }
+            finally { await connection.DisposeTransactionAsync(); }
         }
 
         public async ValueTask DisposeAsync()
         {
-            if (connection.CurrentTransaction is { } tx)
-            {
-                await tx.RollbackAsync();
-                await connection.DisposeTransactionAsync();
-            }
+            // Safety net for a scope that was never explicitly committed/rolled back. After an
+            // explicit Commit/Rollback the transaction is already disposed, so this is a no-op.
+            // The rollback is best-effort: DisposeAsync must not throw and mask an in-flight exception.
+            if (connection.CurrentTransaction is not { } tx) return;
+            try { await tx.RollbackAsync(); }
+            catch { /* best-effort cleanup; an in-flight exception takes precedence */ }
+            finally { await connection.DisposeTransactionAsync(); }
         }
     }
 }
