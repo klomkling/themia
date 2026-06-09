@@ -8,6 +8,7 @@
   <ItemGroup>
     <ProjectReference Include="../Themia.Framework.Core/Themia.Framework.Core.csproj" />
     <ProjectReference Include="../Themia.MultiTenancy/Themia.MultiTenancy.csproj" />
+    <ProjectReference Include="../Themia.Framework.Data.Abstractions/Themia.Framework.Data.Abstractions.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.EntityFrameworkCore" />
