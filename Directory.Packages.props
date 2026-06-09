@@ -46,7 +46,7 @@
     <!-- Roslyn SDK test harness -->
     <PackageVersion Include="Microsoft.CodeAnalysis.CSharp.SourceGenerators.Testing.XUnit" Version="1.1.2" />
     <PackageVersion Include="Microsoft.CodeAnalysis.CSharp.Analyzer.Testing.XUnit" Version="1.1.2" />
-    <PackageVersion Include="Verify.Xunit" Version="28.16.0" />
+    <PackageVersion Include="Verify.Xunit" Version="31.12.5" />
     <PackageVersion Include="Verify.SourceGenerators" Version="2.5.0" />
     <PackageVersion Include="coverlet.collector" Version="10.0.1" />
     <!-- Framework.Data.EFCore (Tier 3): EF Core 10 + Npgsql provider + snake_case naming -->
