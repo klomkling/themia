@@ -1,5 +1,6 @@
 using System.Data;
 using System.Data.Common;
+using Themia.Framework.Data.Abstractions.Filtering;
 using Themia.Framework.Data.Dapper.Connection;
 using Themia.Framework.Data.Dapper.UnitOfWork;
 using Xunit;
@@ -43,9 +44,12 @@ public sealed class DapperTransactionScopeTests
         Assert.Equal(1, ctx.DisposeTransactionCalls);
     }
 
-    // Only the connection context is exercised on the BeginTransaction -> Commit/Dispose path.
+    // Only the connection context is exercised on the BeginTransaction -> Commit/Dispose path; the remaining
+    // dependencies are null! because they are never touched there. filterScope gets a real instance so the
+    // helper stays safe to reuse on a path that reaches TenantScoped.
     private static DapperUnitOfWork NewUnitOfWork(IDapperConnectionContext ctx) =>
-        new(ctx, registry: null!, compiler: null!, tenantContext: null!, currentUser: null!, filterScope: null!, timeProvider: TimeProvider.System);
+        new(ctx, registry: null!, compiler: null!, tenantContext: null!, currentUser: null!,
+            filterScope: new DataFilterScope(), timeProvider: TimeProvider.System);
 
     private sealed class FakeConnectionContext(DbTransaction tx) : IDapperConnectionContext
     {
