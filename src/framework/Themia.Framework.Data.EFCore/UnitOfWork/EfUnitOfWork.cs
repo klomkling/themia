@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Themia.Framework.Data.Abstractions.Exceptions;
 using Themia.Framework.Data.Abstractions.UnitOfWork;
 
 namespace Themia.Framework.Data.EFCore.UnitOfWork;
@@ -7,7 +8,23 @@ namespace Themia.Framework.Data.EFCore.UnitOfWork;
 public sealed class EfUnitOfWork(ThemiaDbContext context) : IUnitOfWork
 {
     /// <inheritdoc />
-    public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default) => context.SaveChangesAsync(cancellationToken);
+    public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default) => SaveAsync(cancellationToken);
+
+    // Translate EF's optimistic-concurrency failure (a tracked update/delete that affected no rows) into the
+    // framework's provider-agnostic ConcurrencyException so both data layers surface a lost write the same way.
+    private async Task<int> SaveAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await context.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException ex)
+        {
+            throw new ConcurrencyException(
+                "A tracked update or delete affected no rows: the row does not exist, was concurrently deleted, " +
+                "or is outside the current tenant scope.", ex);
+        }
+    }
 
     /// <inheritdoc />
     public async Task<ITransactionScope> BeginTransactionAsync(CancellationToken cancellationToken = default)
@@ -21,7 +38,7 @@ public sealed class EfUnitOfWork(ThemiaDbContext context) : IUnitOfWork
         {
             await using var tx = await context.Database.BeginTransactionAsync(cancellationToken);
             await work(cancellationToken);
-            await context.SaveChangesAsync(cancellationToken);
+            await SaveAsync(cancellationToken);
             await tx.CommitAsync(cancellationToken);
         });
     }

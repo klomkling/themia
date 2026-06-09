@@ -1,4 +1,5 @@
 using Themia.Framework.Core.Abstractions.Tenancy;
+using Themia.Framework.Data.Abstractions.Exceptions;
 using Themia.Framework.Data.Abstractions.Specifications;
 using Xunit;
 
@@ -244,6 +245,21 @@ public abstract class DataLayerConformanceTests
         Assert.NotNull(loaded);
         Assert.Equal(42, loaded!.Quantity);
         Assert.NotNull(loaded.LastModifiedAt);
+    }
+
+    [Fact]
+    public async Task Update_MissingRow_Throws_NotSilentlyLost()
+    {
+        await ResetAsync();
+        await using var s = await NewScopeAsync(new TenantId("acme"));
+
+        // Never inserted: a single-entity update that matches 0 rows must fail loud on both providers,
+        // not commit an empty change set and report success.
+        var ghost = NewWidget("ghost", 1);
+        ghost.Quantity = 99;
+        s.Repo.Update(ghost);
+
+        await Assert.ThrowsAsync<ConcurrencyException>(() => s.Uow.SaveChangesAsync());
     }
 
     [Fact]

@@ -39,6 +39,9 @@ static Themia.Framework.Data.Abstractions.Specifications.SpecificationExtensions
 Themia.Framework.Data.Abstractions.Specifications.SpecificationExtensions
 Themia.Framework.Data.Abstractions.Auditing.ICurrentUserAccessor
 Themia.Framework.Data.Abstractions.Auditing.ICurrentUserAccessor.UserId.get -> string?
+Themia.Framework.Data.Abstractions.Exceptions.ConcurrencyException
+Themia.Framework.Data.Abstractions.Exceptions.ConcurrencyException.ConcurrencyException(string! message) -> void
+Themia.Framework.Data.Abstractions.Exceptions.ConcurrencyException.ConcurrencyException(string! message, System.Exception! innerException) -> void
 Themia.Framework.Data.Abstractions.Exceptions.UnsupportedSpecificationException
 Themia.Framework.Data.Abstractions.Exceptions.UnsupportedSpecificationException.UnsupportedSpecificationException(string! message) -> void
 Themia.Framework.Data.Abstractions.Filtering.DataFilterScope

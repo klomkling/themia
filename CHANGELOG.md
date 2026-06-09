@@ -22,7 +22,9 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 - **`Themia.Framework.Data.Abstractions`** — provider-agnostic data-access contracts: `ISpecification<T>`
   (+ `Specification<T>` base and And/Or/Not combinators), `IReadRepository`/`IRepository`, `IUnitOfWork`/
-  `ITransactionScope`, `IDataFilterScope` (tenant-filter bypass), `ICurrentUserAccessor`, `PagedResult<T>`.
+  `ITransactionScope`, `IDataFilterScope` (tenant-filter bypass), `ICurrentUserAccessor`, `PagedResult<T>`,
+  and a `ConcurrencyException` raised when a single-entity update/delete affects no rows (a lost write —
+  missing row, concurrent delete, or outside the tenant scope) on both the Dapper and EF Core layers.
 - **`Themia.Framework.Data.Dapper`** + **`Themia.Framework.Data.Dapper.PostgreSql`** — a Dapper + SqlKata
   data layer implementing the shared contracts with multi-tenant isolation, audit, soft-delete, and a
   deferred-write unit of work, plus a tenant-seeded native-SqlKata path (`ITenantQueryFactory`) and an

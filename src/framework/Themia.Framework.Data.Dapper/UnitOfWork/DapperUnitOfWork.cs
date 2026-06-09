@@ -3,6 +3,7 @@ using SqlKata;
 using Themia.Framework.Core.Abstractions.Entities;
 using Themia.Framework.Core.Abstractions.Tenancy;
 using Themia.Framework.Data.Abstractions.Auditing;
+using Themia.Framework.Data.Abstractions.Exceptions;
 using Themia.Framework.Data.Abstractions.UnitOfWork;
 using Themia.Framework.Data.Dapper.Connection;
 using Themia.Framework.Data.Dapper.Mapping;
@@ -96,6 +97,10 @@ internal sealed class DapperUnitOfWork(
                 map.SetValue(op.Entity, nameof(IAuditableEntity.CreatedAt), now);
                 if (userId is not null) map.SetValue(op.Entity, nameof(IAuditableEntity.CreatedBy), userId);
                 var values = ColumnValues(op.Entity, map, out var keyAssigned);
+                if (!keyAssigned && !string.Equals(map.KeyColumn, "id", StringComparison.Ordinal))
+                    throw new NotSupportedException(
+                        $"Store-generated keys require the key column on '{map.Table}' to be named 'id' (found '{map.KeyColumn}'). " +
+                        "Assign the key client-side before AddAsync, or keep the conventional 'id' key column.");
                 var query = new Query(map.Table).AsInsert(values, returnId: !keyAssigned);
                 var sql = compiler.Compile(query);
                 if (!keyAssigned)
@@ -114,9 +119,14 @@ internal sealed class DapperUnitOfWork(
                 if (userId is not null) map.SetValue(op.Entity, nameof(IAuditableEntity.LastModifiedBy), userId);
                 var values = ColumnValues(op.Entity, map, out _);
                 values.Remove(map.KeyColumn);   // never update the key
+                // Creation + tenant columns are immutable after insert; don't let a partial entity clobber
+                // them (EF only writes changed columns, so this keeps the two providers consistent).
+                RemoveColumn(values, map, nameof(IAuditableEntity.CreatedAt));
+                RemoveColumn(values, map, nameof(IAuditableEntity.CreatedBy));
+                RemoveColumn(values, map, nameof(ITenantEntity.TenantId));
                 var query = TenantScoped(new Query(map.Table), op.Entity, map).Where(map.KeyColumn, KeyOf(op.Entity, map)).AsUpdate(values);
                 var sql = compiler.Compile(query);
-                return await conn.ExecuteAsync(new CommandDefinition(sql.Sql, sql.Parameters, tx, cancellationToken: ct));
+                return await ExecuteSingleAsync(conn, tx, sql, op, map, "Update", ct);
             }
             case PendingKind.Remove:
             {
@@ -136,10 +146,30 @@ internal sealed class DapperUnitOfWork(
                     query = TenantScoped(new Query(map.Table), op.Entity, map).Where(map.KeyColumn, KeyOf(op.Entity, map)).AsDelete();
                 }
                 var sql = compiler.Compile(query);
-                return await conn.ExecuteAsync(new CommandDefinition(sql.Sql, sql.Parameters, tx, cancellationToken: ct));
+                return await ExecuteSingleAsync(conn, tx, sql, op, map, "Remove", ct);
             }
             default: return 0;
         }
+    }
+
+    // A single-entity Update/Remove that matches no row is a lost write (missing row, concurrent delete, or
+    // outside the tenant scope). Fail loud with the same contract as EF's optimistic-concurrency failure.
+    private static async Task<int> ExecuteSingleAsync(
+        System.Data.Common.DbConnection conn, System.Data.Common.DbTransaction? tx, CompiledSql sql,
+        PendingOperation op, EntityMapping map, string operation, CancellationToken ct)
+    {
+        var affected = await conn.ExecuteAsync(new CommandDefinition(sql.Sql, sql.Parameters, tx, cancellationToken: ct));
+        if (affected == 0)
+            throw new ConcurrencyException(
+                $"{operation} of '{map.Table}' (key '{KeyOf(op.Entity, map)}') affected no rows: the row does not exist, " +
+                "was concurrently deleted, or is outside the current tenant scope.");
+        return affected;
+    }
+
+    private static void RemoveColumn(Dictionary<string, object?> values, EntityMapping map, string property)
+    {
+        if (map.Columns.TryGetValue(property, out var column))
+            values.Remove(column);
     }
 
     // Scope the write to the ambient tenant's rows; with no ambient tenant, restrict to global
