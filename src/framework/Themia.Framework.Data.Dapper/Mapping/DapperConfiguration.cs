@@ -6,20 +6,27 @@ namespace Themia.Framework.Data.Dapper.Mapping;
 
 internal static class DapperConfiguration
 {
-    private static bool _configured;
+    private static readonly object Gate = new();
+    private static volatile bool _configured;
 
     public static void EnsureConfigured()
     {
         if (_configured) return;
-        DapperLib.DefaultTypeMap.MatchNamesWithUnderscores = true;
+        // Mutates process-global Dapper state (DefaultTypeMap + the type-handler registry); a lock keeps
+        // concurrent AddThemiaDapperCore calls from registering the handler more than once.
+        lock (Gate)
+        {
+            if (_configured) return;
+            DapperLib.DefaultTypeMap.MatchNamesWithUnderscores = true;
 
-        // Dapper has no built-in mapping between the TenantId value object and the varchar tenant column,
-        // so materializing an ITenantEntity row would throw "Invalid cast from 'System.String' to TenantId".
-        // Register a handler so reads (string -> TenantId) and writes (TenantId -> string) round-trip. The
-        // handler covers the non-null TenantId; Dapper assigns null directly to a nullable TenantId? member.
-        DapperLib.SqlMapper.AddTypeHandler(new TenantIdTypeHandler());
+            // Dapper has no built-in mapping between the TenantId value object and the varchar tenant column,
+            // so materializing an ITenantEntity row would throw "Invalid cast from 'System.String' to TenantId".
+            // Register a handler so reads (string -> TenantId) and writes (TenantId -> string) round-trip. The
+            // handler covers the non-null TenantId; Dapper assigns null directly to a nullable TenantId? member.
+            DapperLib.SqlMapper.AddTypeHandler(new TenantIdTypeHandler());
 
-        _configured = true;
+            _configured = true;
+        }
     }
 
     private sealed class TenantIdTypeHandler : DapperLib.SqlMapper.TypeHandler<TenantId>

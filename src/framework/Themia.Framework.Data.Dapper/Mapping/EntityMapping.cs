@@ -56,10 +56,26 @@ public sealed class EntityMapping
     public IReadOnlyDictionary<string, string> Columns => _columnByProperty;
 
     /// <summary>Builds a convention-based mapping for <typeparamref name="T"/>.</summary>
-    public static EntityMapping ForConvention<T>() => ForConvention(typeof(T));
+    public static EntityMapping ForConvention<T>() => ForConvention(typeof(T), null, null);
 
     /// <summary>Builds a convention-based mapping for the given entity type.</summary>
-    public static EntityMapping ForConvention(Type type)
+    public static EntityMapping ForConvention(Type type) => ForConvention(type, null, null);
+
+    /// <summary>
+    /// Builds a convention-based mapping for <typeparamref name="T"/>, overriding the table name and individual
+    /// column names (keyed by property name); pass null to keep the snake_case convention for that part.
+    /// </summary>
+    public static EntityMapping ForConvention<T>(string? table, IReadOnlyDictionary<string, string>? columnOverrides) =>
+        ForConvention(typeof(T), table, columnOverrides);
+
+    /// <summary>
+    /// Builds a convention-based mapping for the given entity type, overriding the table name and individual
+    /// column names (keyed by property name); pass null to keep the snake_case convention for that part.
+    /// </summary>
+    public static EntityMapping ForConvention(
+        Type type,
+        string? table,
+        IReadOnlyDictionary<string, string>? columnOverrides)
     {
         var props = type
             .GetProperties(BindingFlags.Public | BindingFlags.Instance)
@@ -72,6 +88,17 @@ public sealed class EntityMapping
         var columns = props.ToDictionary(p => p.Name, p => ToSnakeCase(p.Name));
         var properties = props.ToDictionary(p => p.Name);
 
+        if (columnOverrides is not null)
+        {
+            foreach (var (property, column) in columnOverrides)
+            {
+                if (!columns.ContainsKey(property))
+                    throw new InvalidOperationException(
+                        $"Column override for '{property}' does not match any mapped property on '{type.Name}'.");
+                columns[property] = column;
+            }
+        }
+
         var key = props.FirstOrDefault(p => p.Name == "Id")
                   ?? throw new InvalidOperationException(
                       $"Entity '{type.Name}' has no 'Id' property; provide an EntityMapping override.");
@@ -79,8 +106,8 @@ public sealed class EntityMapping
         var setter = BuildSetter(key);
 
         return new EntityMapping(
-            Pluralize(ToSnakeCase(type.Name)),
-            ToSnakeCase(key.Name),
+            table ?? Pluralize(ToSnakeCase(type.Name)),
+            columns[key.Name],   // respects a column override on the key property
             key.Name,
             columns,
             properties,

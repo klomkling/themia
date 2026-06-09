@@ -19,6 +19,9 @@ internal sealed class DapperConnectionContext(IDapperConnectionFactory factory) 
 
     public async Task<DbTransaction> BeginTransactionAsync(CancellationToken cancellationToken)
     {
+        if (CurrentTransaction is not null)
+            throw new InvalidOperationException(
+                "A transaction is already active on this connection scope; nested transactions are not supported.");
         var conn = await GetOpenConnectionAsync(cancellationToken);
         CurrentTransaction = await conn.BeginTransactionAsync(cancellationToken);
         return CurrentTransaction;

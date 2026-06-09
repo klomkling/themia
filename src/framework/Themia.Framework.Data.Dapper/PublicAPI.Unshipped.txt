@@ -13,7 +13,9 @@ Themia.Framework.Data.Dapper.Mapping.EntityMappingRegistry.For(System.Type! type
 Themia.Framework.Data.Dapper.Mapping.EntityMappingRegistry.For<T>() -> Themia.Framework.Data.Dapper.Mapping.EntityMapping!
 Themia.Framework.Data.Dapper.Mapping.EntityMappingRegistry.Register<T>(Themia.Framework.Data.Dapper.Mapping.EntityMapping! mapping) -> void
 static Themia.Framework.Data.Dapper.Mapping.EntityMapping.ForConvention(System.Type! type) -> Themia.Framework.Data.Dapper.Mapping.EntityMapping!
+static Themia.Framework.Data.Dapper.Mapping.EntityMapping.ForConvention(System.Type! type, string? table, System.Collections.Generic.IReadOnlyDictionary<string!, string!>? columnOverrides) -> Themia.Framework.Data.Dapper.Mapping.EntityMapping!
 static Themia.Framework.Data.Dapper.Mapping.EntityMapping.ForConvention<T>() -> Themia.Framework.Data.Dapper.Mapping.EntityMapping!
+static Themia.Framework.Data.Dapper.Mapping.EntityMapping.ForConvention<T>(string? table, System.Collections.Generic.IReadOnlyDictionary<string!, string!>? columnOverrides) -> Themia.Framework.Data.Dapper.Mapping.EntityMapping!
 static Themia.Framework.Data.Dapper.Mapping.EntityMapping.ToSnakeCase(string! name) -> string!
 Themia.Framework.Data.Dapper.Sql.CompiledSql
 Themia.Framework.Data.Dapper.Sql.CompiledSql.CompiledSql(string! Sql, System.Collections.Generic.IReadOnlyDictionary<string!, object?>! Parameters) -> void
