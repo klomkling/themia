@@ -111,6 +111,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Themia.Framework.Data.Dappe
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Themia.Framework.Data.Dapper.PostgreSql.IntegrationTests", "tests\Themia.Framework.Data.Dapper.PostgreSql.IntegrationTests\Themia.Framework.Data.Dapper.PostgreSql.IntegrationTests.csproj", "{A1F56395-A2A6-48EC-BDC6-C859678A0F64}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Themia.Framework.Data.Dapper.MySql", "src\framework\Themia.Framework.Data.Dapper.MySql\Themia.Framework.Data.Dapper.MySql.csproj", "{173FE180-4C6A-4BAA-BA3B-A9EA2141D485}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -685,6 +687,18 @@ Global
 		{A1F56395-A2A6-48EC-BDC6-C859678A0F64}.Release|x64.Build.0 = Release|Any CPU
 		{A1F56395-A2A6-48EC-BDC6-C859678A0F64}.Release|x86.ActiveCfg = Release|Any CPU
 		{A1F56395-A2A6-48EC-BDC6-C859678A0F64}.Release|x86.Build.0 = Release|Any CPU
+		{173FE180-4C6A-4BAA-BA3B-A9EA2141D485}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{173FE180-4C6A-4BAA-BA3B-A9EA2141D485}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{173FE180-4C6A-4BAA-BA3B-A9EA2141D485}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{173FE180-4C6A-4BAA-BA3B-A9EA2141D485}.Debug|x64.Build.0 = Debug|Any CPU
+		{173FE180-4C6A-4BAA-BA3B-A9EA2141D485}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{173FE180-4C6A-4BAA-BA3B-A9EA2141D485}.Debug|x86.Build.0 = Debug|Any CPU
+		{173FE180-4C6A-4BAA-BA3B-A9EA2141D485}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{173FE180-4C6A-4BAA-BA3B-A9EA2141D485}.Release|Any CPU.Build.0 = Release|Any CPU
+		{173FE180-4C6A-4BAA-BA3B-A9EA2141D485}.Release|x64.ActiveCfg = Release|Any CPU
+		{173FE180-4C6A-4BAA-BA3B-A9EA2141D485}.Release|x64.Build.0 = Release|Any CPU
+		{173FE180-4C6A-4BAA-BA3B-A9EA2141D485}.Release|x86.ActiveCfg = Release|Any CPU
+		{173FE180-4C6A-4BAA-BA3B-A9EA2141D485}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -741,5 +755,6 @@ Global
 		{B0F3681A-CDD2-4C56-A220-E1F2F4228510} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 		{CD48789F-92A1-4D39-8848-0BF9B8D26CEC} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 		{A1F56395-A2A6-48EC-BDC6-C859678A0F64} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
+		{173FE180-4C6A-4BAA-BA3B-A9EA2141D485} = {E0AD1809-C64F-3D39-45E0-E424261CE16D}
 	EndGlobalSection
 EndGlobal
