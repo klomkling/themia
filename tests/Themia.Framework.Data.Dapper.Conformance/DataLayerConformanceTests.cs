@@ -207,6 +207,25 @@ public abstract class DataLayerConformanceTests
     }
 
     [Fact]
+    public async Task ExecuteInTransaction_WhenWorkThrows_DiscardsWrites_AndSurfacesOriginalError()
+    {
+        await ResetAsync();
+        await using var s = await NewScopeAsync(new TenantId("acme"));
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            s.Uow.ExecuteInTransactionAsync(async ct =>
+            {
+                await s.Repo.AddAsync(NewWidget("ghost", 1));
+                await s.Uow.SaveChangesAsync(ct);   // flush into the ambient transaction, then fail
+                throw new InvalidOperationException("boom");
+            }));
+
+        Assert.Equal("boom", ex.Message);   // the work's error, not a masking rollback error
+        var visible = await s.Repo.ListAsync(new WidgetByNameSpec("ghost"));
+        Assert.Empty(visible);
+    }
+
+    [Fact]
     public async Task Update_ModifiesRow_AndStampsLastModified()
     {
         await ResetAsync();

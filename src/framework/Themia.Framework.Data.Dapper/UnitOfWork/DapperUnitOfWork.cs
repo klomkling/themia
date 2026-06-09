@@ -44,9 +44,9 @@ internal sealed class DapperUnitOfWork(
             pending.Clear();
             if (ownsTransaction && tx is not null)
             {
-                // Rolling back after a failed commit can itself throw; swallow that so the
-                // original failure (rethrown below) is the exception the caller sees.
-                try { await tx.RollbackAsync(cancellationToken); }
+                // Roll back with CancellationToken.None so a cancelled token can't abort the cleanup,
+                // and swallow a rollback failure so it doesn't mask the original error (rethrown below).
+                try { await tx.RollbackAsync(CancellationToken.None); }
                 catch { /* preserve the original exception */ }
             }
             throw;
@@ -74,7 +74,10 @@ internal sealed class DapperUnitOfWork(
         }
         catch
         {
-            await scope.RollbackAsync(cancellationToken);
+            // Roll back with CancellationToken.None so a cancelled token can't abort the cleanup, and
+            // swallow a rollback failure so it doesn't mask the original exception (rethrown below).
+            try { await scope.RollbackAsync(CancellationToken.None); }
+            catch { /* preserve the original exception */ }
             throw;
         }
     }
