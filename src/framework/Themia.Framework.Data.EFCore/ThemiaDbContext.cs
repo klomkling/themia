@@ -347,6 +347,12 @@ public abstract class ThemiaDbContext : DbContext
     /// missing row or a tenant mismatch. The rule is strict: a tenant writes only its own rows; a no-tenant
     /// context writes only global (null-tenant) rows — matching the Dapper layer's <c>WHERE tenant_id = …</c>.
     /// </summary>
+    /// <remarks>
+    /// This is a per-write backstop, not a serializable guarantee: the verify read and the subsequent save are
+    /// not atomic, so a concurrent tenant reassignment between them is not detected (tenant ids are effectively
+    /// immutable, so the window is theoretical). It is invoked by <c>EfUnitOfWork</c> for writes flushed through
+    /// the unit of work; a direct <c>DbContext.SaveChanges</c> call outside the unit of work is not guarded.
+    /// </remarks>
     internal async Task ValidateTenantWritesAsync(CancellationToken cancellationToken)
     {
         if (!EnableTenantFilters)
