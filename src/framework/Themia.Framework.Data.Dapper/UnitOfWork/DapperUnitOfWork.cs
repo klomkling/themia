@@ -95,7 +95,9 @@ internal sealed class DapperUnitOfWork(
                 if (!keyAssigned)
                 {
                     var newId = await conn.ExecuteScalarAsync<object>(new CommandDefinition(sql.Sql, sql.Parameters, tx, cancellationToken: ct));
-                    map.KeySetter(op.Entity, System.Convert.ChangeType(newId!, map.KeyType));
+                    if (newId is null or System.DBNull)
+                        throw new InvalidOperationException($"INSERT into '{map.Table}' requested a store-generated key (the '{map.KeyProperty}' was unassigned) but the database returned no id. Assign the key before AddAsync, or ensure the key column is auto-generated.");
+                    map.KeySetter(op.Entity, System.Convert.ChangeType(newId, map.KeyType));
                     return 1;
                 }
                 return await conn.ExecuteAsync(new CommandDefinition(sql.Sql, sql.Parameters, tx, cancellationToken: ct));
@@ -143,6 +145,7 @@ internal sealed class DapperUnitOfWork(
 
     private static object KeyOf(object entity, EntityMapping map) => entity.GetType().GetProperty(map.KeyProperty)!.GetValue(entity)!;
 
+    // Best-effort: audit/soft-delete properties are set-able on the concrete base entities (AuditableEntity<TId>/SoftDeletableEntity<TId>); a get-only impl is silently skipped.
     private static void Stamp(object entity, string property, object? value) => entity.GetType().GetProperty(property)?.SetValue(entity, value);
 
     private Dictionary<string, object?> ColumnValues(object entity, EntityMapping map, out bool keyAssigned)
@@ -199,6 +202,13 @@ internal sealed class DapperUnitOfWork(
             }
         }
 
-        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+        public async ValueTask DisposeAsync()
+        {
+            if (connection.CurrentTransaction is { } tx)
+            {
+                await tx.RollbackAsync();
+                connection.ClearTransaction();
+            }
+        }
     }
 }
