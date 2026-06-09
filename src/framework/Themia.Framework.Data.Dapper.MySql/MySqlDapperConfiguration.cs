@@ -14,6 +14,9 @@ internal static class MySqlDapperConfiguration
         lock (Gate)
         {
             if (_configured) return;
+            // SqlMapper.AddTypeHandler is process-global. This handler is registered by the MySQL engine
+            // only; the PostgreSQL engine has none (Npgsql surfaces DateTimeOffset natively). Engines run in
+            // separate processes, so there is no cross-engine interference.
             // MySQL DATETIME is tz-naive: MySqlConnector returns DateTime, not DateTimeOffset. Map the audit
             // DateTimeOffset properties by treating the stored value as UTC; write the UTC instant back.
             DapperLib.SqlMapper.AddTypeHandler(new DateTimeOffsetTypeHandler());
@@ -32,7 +35,7 @@ internal static class MySqlDapperConfiguration
 
         public override void SetValue(IDbDataParameter parameter, DateTimeOffset value)
         {
-            parameter.DbType = DbType.DateTime2;
+            parameter.DbType = DbType.DateTime;
             parameter.Value = value.UtcDateTime;
         }
     }
