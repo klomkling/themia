@@ -139,10 +139,19 @@ internal sealed class DapperUnitOfWork(
         }
     }
 
+    // Scope the write to the ambient tenant's rows; with no ambient tenant, restrict to global
+    // (tenant_id IS NULL) rows so a system context cannot mutate a tenant-owned row by primary key.
+    // Mirrors the read path (TenantPredicate) and EF's ValidateTenantAccess (no tenant => global only).
     private Query TenantScoped(Query q, object entity, EntityMapping map)
     {
-        if (entity is ITenantEntity && tenantContext.CurrentTenantId is { } t)
-            q.Where(map.Column(nameof(ITenantEntity.TenantId)), t.Value);
+        if (entity is ITenantEntity)
+        {
+            var column = map.Column(nameof(ITenantEntity.TenantId));
+            if (tenantContext.CurrentTenantId is { } t)
+                q.Where(column, t.Value);
+            else
+                q.WhereNull(column);
+        }
         return q;
     }
 
