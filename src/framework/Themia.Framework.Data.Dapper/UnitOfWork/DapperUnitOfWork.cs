@@ -167,7 +167,6 @@ internal sealed class DapperUnitOfWork(
     private static object? UnwrapTenantId(object? value) => value switch
     {
         TenantId tid => tid.Value,
-        TenantId? ntid => ntid?.Value,
         _ => value
     };
 
