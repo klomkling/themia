@@ -92,7 +92,8 @@ internal static class DapperConfiguration
     /// engine's configured <see cref="DbType"/>. PostgreSQL/Npgsql surface <see cref="DateTimeOffset"/> natively
     /// and register no handler. Process-global (Dapper requirement) — see <see cref="ConfigureEngine"/>.
     /// </summary>
-    private sealed class UtcDateTimeOffsetTypeHandler(DbType dbType) : DapperLib.SqlMapper.TypeHandler<DateTimeOffset>
+    // internal (not private) so a container-free unit test can exercise Parse, including the defensive throw.
+    internal sealed class UtcDateTimeOffsetTypeHandler(DbType dbType) : DapperLib.SqlMapper.TypeHandler<DateTimeOffset>
     {
         public override DateTimeOffset Parse(object value) => value switch
         {
