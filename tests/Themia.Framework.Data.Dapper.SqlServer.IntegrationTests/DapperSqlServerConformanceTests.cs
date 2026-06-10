@@ -12,7 +12,7 @@ using Xunit;
 
 namespace Themia.Framework.Data.Dapper.SqlServer.IntegrationTests;
 
-/// <summary>Runs the shared data-layer contract against the Dapper-on-MySQL provider.</summary>
+/// <summary>Runs the shared data-layer contract against the Dapper-on-SQL-Server provider.</summary>
 [Trait("Category", "Integration")]
 public sealed class DapperSqlServerConformanceTests(SqlServerContainerFixture fixture)
     : DataLayerConformanceTests, IClassFixture<SqlServerContainerFixture>
