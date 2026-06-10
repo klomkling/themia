@@ -18,6 +18,11 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## 0.4.3 — 2026-06-10
+
+MySQL engine for the Dapper data layer — the sibling to the PostgreSQL engine, so a Dapper-first app on MySQL
+gets the framework's tenant isolation, audit, soft-delete, and unit-of-work guarantees.
+
 ### Added
 
 - **`Themia.Framework.Data.Dapper.MySql`** — MySQL engine for the Dapper data layer (`MySqlConnector` +
