@@ -1,8 +1,10 @@
+using System.Data;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Themia.Framework.Data.Dapper;
 using Themia.Framework.Data.Dapper.Connection;
 using Themia.Framework.Data.Dapper.DependencyInjection;
+using Themia.Framework.Data.Dapper.Mapping;
 using Themia.Framework.Data.Dapper.Sql;
 
 namespace Themia.Framework.Data.Dapper.SqlServer.DependencyInjection;
@@ -18,7 +20,7 @@ public static class SqlServerDapperServiceCollectionExtensions
         IConfiguration configuration,
         Action<DapperDataOptions>? configure = null)
     {
-        SqlServerDapperConfiguration.EnsureConfigured();
+        DapperConfiguration.ConfigureEngine("SQL Server", DbType.DateTime2);
         services.AddThemiaDapperCore(configure);
         services.AddScoped<IDapperConnectionFactory>(sp => new SqlServerConnectionFactory(configuration, sp));
         services.AddSingleton<ISqlCompiler, SqlServerSqlCompiler>();

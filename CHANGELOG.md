@@ -34,6 +34,13 @@ unit-of-work guarantees.
   Conformance is Dapper-only (the EF data layer remains PostgreSQL-only), proven against a real SQL Server
   container.
 
+### Changed
+
+- The per-engine `DateTimeOffset` type-handler registration is now a single shared mechanism in the Dapper core
+  (`DapperConfiguration.ConfigureEngine`). Because Dapper's type-handler registry is process-global, registering
+  two engines in one process now **fails fast** with a clear error instead of silently corrupting one engine's
+  timestamp writes — a single Themia Dapper engine per process was always the contract; it is now enforced.
+
 ## 0.4.3 — 2026-06-10
 
 MySQL engine for the Dapper data layer — the sibling to the PostgreSQL engine, so a Dapper-first app on MySQL

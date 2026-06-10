@@ -1,8 +1,10 @@
+using System.Data;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Themia.Framework.Data.Dapper;
 using Themia.Framework.Data.Dapper.Connection;
 using Themia.Framework.Data.Dapper.DependencyInjection;
+using Themia.Framework.Data.Dapper.Mapping;
 using Themia.Framework.Data.Dapper.Sql;
 
 namespace Themia.Framework.Data.Dapper.MySql.DependencyInjection;
@@ -18,7 +20,7 @@ public static class MySqlDapperServiceCollectionExtensions
         IConfiguration configuration,
         Action<DapperDataOptions>? configure = null)
     {
-        MySqlDapperConfiguration.EnsureConfigured();
+        DapperConfiguration.ConfigureEngine("MySQL", DbType.DateTime);
         services.AddThemiaDapperCore(configure);
         services.AddScoped<IDapperConnectionFactory>(sp => new MySqlConnectionFactory(configuration, sp));
         services.AddSingleton<ISqlCompiler, MySqlSqlCompiler>();

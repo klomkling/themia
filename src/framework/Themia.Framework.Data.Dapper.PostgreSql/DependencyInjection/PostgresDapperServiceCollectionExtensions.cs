@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Themia.Framework.Data.Dapper;
 using Themia.Framework.Data.Dapper.Connection;
 using Themia.Framework.Data.Dapper.DependencyInjection;
+using Themia.Framework.Data.Dapper.Mapping;
 using Themia.Framework.Data.Dapper.Sql;
 
 namespace Themia.Framework.Data.Dapper.PostgreSql.DependencyInjection;
@@ -18,6 +19,9 @@ public static class PostgresDapperServiceCollectionExtensions
         IConfiguration configuration,
         Action<DapperDataOptions>? configure = null)
     {
+        // Npgsql surfaces DateTimeOffset natively, so PostgreSQL needs no DateTimeOffset handler — but it still
+        // claims the single per-process engine slot so a Postgres + MySQL/SqlServer mix is rejected loudly.
+        DapperConfiguration.ConfigureEngine("PostgreSQL", dateTimeOffsetDbType: null);
         services.AddThemiaDapperCore(configure);
         services.AddScoped<IDapperConnectionFactory>(sp => new NpgsqlConnectionFactory(configuration, sp));
         services.AddSingleton<ISqlCompiler, PostgresSqlCompiler>();

@@ -7,7 +7,7 @@ namespace Themia.Framework.Data.Dapper.SqlServer.IntegrationTests;
 /// <summary>
 /// Spins up a real SQL Server container and creates the shared <c>widgets</c> table the Dapper provider maps to.
 /// Tables live in the default <c>master</c> database (the mssql image creates no custom database).
-/// <see cref="ResetAsync"/> truncates between facts.
+/// <see cref="ResetAsync"/> clears the table between facts.
 /// </summary>
 public sealed class SqlServerContainerFixture : IAsyncLifetime
 {
@@ -35,7 +35,9 @@ public sealed class SqlServerContainerFixture : IAsyncLifetime
         await using var connection = new SqlConnection(ConnectionString);
         await connection.OpenAsync();
         await using var command = connection.CreateCommand();
-        command.CommandText = "TRUNCATE TABLE widgets";
+        // DELETE rather than TRUNCATE: TRUNCATE fails on FK-referenced or system-versioned tables, so DELETE
+        // keeps Reset working if the schema later grows such a dependency. The table is small (per-fact rows).
+        command.CommandText = "DELETE FROM widgets";
         await command.ExecuteNonQueryAsync();
     }
 
