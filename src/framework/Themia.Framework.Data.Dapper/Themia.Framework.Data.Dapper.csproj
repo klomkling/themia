@@ -27,6 +27,8 @@
   <ItemGroup>
     <InternalsVisibleTo Include="Themia.Framework.Data.Dapper.Tests" />
     <InternalsVisibleTo Include="Themia.Framework.Data.Dapper.Conformance" />
+    <InternalsVisibleTo Include="Themia.Framework.Data.Dapper.PostgreSql" />
     <InternalsVisibleTo Include="Themia.Framework.Data.Dapper.PostgreSql.IntegrationTests" />
+    <InternalsVisibleTo Include="Themia.Framework.Data.Dapper.MySql" />
   </ItemGroup>
 </Project>

@@ -114,8 +114,55 @@ public sealed class DapperMySqlConformanceTests(MySqlContainerFixture fixture)
         Assert.NotNull(await check.Repo.GetByIdAsync(id));   // the tenant row survived the cross-tenant delete attempt
     }
 
+    /// <summary>
+    /// The <c>DateTimeOffset</c> ⇄ <c>DATETIME(6)</c> handler round-trips a known UTC instant with microsecond
+    /// precision and re-labels it UTC — guarding against offset corruption (e.g. on a non-UTC agent) and
+    /// sub-second precision loss that the existence-only audit facts would not catch.
+    /// </summary>
+    [Fact]
+    public async Task AuditTimestamp_RoundTripsUtc_WithMicrosecondPrecision()
+    {
+        await ResetAsync();
+
+        // A fixed UTC instant whose fractional part is exactly microsecond-aligned (6_543_210 ticks = 654_321 µs).
+        var stamped = new DateTimeOffset(2026, 6, 10, 9, 8, 7, TimeSpan.Zero).AddTicks(6_543_210);
+
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ConnectionStrings:Default"] = fixture.ConnectionString,
+            })
+            .Build();
+
+        var services = new ServiceCollection();
+        services.AddScoped<ITenantContext>(_ => new TenantContext(new TenantId("acme")));
+        services.AddSingleton<TimeProvider>(new FixedTimeProvider(stamped));   // stamps audit fields deterministically
+        services.AddThemiaDapperMySql(configuration);
+        await using var provider = services.BuildServiceProvider();
+        await using var scope = provider.CreateAsyncScope();
+        var repo = scope.ServiceProvider.GetRequiredService<IRepository<Widget, Guid>>();
+        var uow = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+
+        var widget = new Widget { Name = "ts", Quantity = 1 };
+        widget.SetId(Guid.NewGuid());
+        await repo.AddAsync(widget);
+        await uow.SaveChangesAsync();
+
+        var loaded = await repo.GetByIdAsync(widget.Id);
+        Assert.NotNull(loaded);
+        Assert.Equal(TimeSpan.Zero, loaded!.CreatedAt.Offset);   // the handler re-labels the stored value UTC
+        var deltaTicks = Math.Abs((loaded.CreatedAt.UtcDateTime - stamped.UtcDateTime).Ticks);
+        Assert.True(deltaTicks <= TimeSpan.TicksPerMicrosecond,
+            $"CreatedAt round-trip lost precision: expected ~{stamped.UtcDateTime:O}, got {loaded.CreatedAt.UtcDateTime:O}");
+    }
+
     private sealed class StubCurrentUser(string? userId) : ICurrentUserAccessor
     {
         public string? UserId { get; } = userId;
+    }
+
+    private sealed class FixedTimeProvider(DateTimeOffset now) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => now;
     }
 }
