@@ -7,9 +7,18 @@
 Add a MySQL engine package for the Dapper data layer — the sibling to the existing
 `Themia.Framework.Data.Dapper.PostgreSql` — so a Dapper-first app on MySQL gets the same framework
 guarantees (tenant isolation, audit, soft-delete, UoW/transactions) that the PostgreSQL engine already
-delivers. The engine-agnostic core (`Themia.Framework.Data.Dapper`) is unchanged; only the two engine seams
-(`IDapperConnectionFactory`, `ISqlCompiler`) are implemented for MySQL. Second of the three staged engines
-(PostgreSQL 0.4.1 → **MySQL 0.4.3** → SQL Server 0.4.4).
+delivers. The engine-agnostic core (`Themia.Framework.Data.Dapper`) is essentially unchanged — only the two
+engine seams (`IDapperConnectionFactory`, `ISqlCompiler`) are implemented for MySQL. (One small core addition
+was made during review: a shared `DapperConnectionString.Resolve(...)` helper, extracted so both the
+PostgreSQL and MySQL connection factories share one tenant-CS resolution rule — see "Implementation note"
+below.) Second of the three staged engines (PostgreSQL 0.4.1 → **MySQL 0.4.3** → SQL Server 0.4.4).
+
+> **Implementation note (added during review):** to avoid a third copy of the tenant connection-string
+> resolution when the SQL Server engine lands, the duplicated logic was extracted into a public
+> `Themia.Framework.Data.Dapper.Connection.DapperConnectionString.Resolve(IConfiguration, IServiceProvider)`
+> in the core, and `NpgsqlConnectionFactory` was refactored to use it (the core gains a
+> `Microsoft.Extensions.Configuration.Abstractions` reference + one PublicAPI entry). This is the only core
+> change; the rest of the work is purely additive in the new MySQL package.
 
 ## Context
 

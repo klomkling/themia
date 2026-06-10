@@ -4,7 +4,7 @@
 
 **Goal:** Add a MySQL engine package for the Dapper data layer — the sibling to `Themia.Framework.Data.Dapper.PostgreSql` — so a Dapper-first app on MySQL gets the framework's tenant isolation, audit, soft-delete, and UoW guarantees.
 
-**Architecture:** Mirror the three-file PostgreSQL engine (connection factory + SqlKata compiler + DI extension) against the unchanged engine-agnostic `Themia.Framework.Data.Dapper` core. MySQL specifics: `MySqlConnector` driver, `GuidFormat=Char36` (else phantom-empty Guids), a `DateTimeOffset` Dapper type handler (MySqlConnector returns `DateTime` for `DATETIME`), and `LAST_INSERT_ID()` store-gen keys (SqlKata-native). Conformance is Dapper-only (the EF data layer is PostgreSQL-only).
+**Architecture:** Mirror the three-file PostgreSQL engine (connection factory + SqlKata compiler + DI extension) against the engine-agnostic `Themia.Framework.Data.Dapper` core. MySQL specifics: `MySqlConnector` driver, `GuidFormat=Char36` (else phantom-empty Guids), a `DateTimeOffset` Dapper type handler (MySqlConnector returns `DateTime` for `DATETIME`), and `LAST_INSERT_ID()` store-gen keys (SqlKata-native). Conformance is Dapper-only (the EF data layer is PostgreSQL-only). (During review one small core addition was made — a shared `DapperConnectionString.Resolve(...)` helper that both the PostgreSQL and MySQL factories use — so the SQL Server engine starts from one source of truth rather than a third copy.)
 
 **Tech Stack:** .NET 10, Dapper, SqlKata (`MySqlCompiler`), MySqlConnector 2.6.0, xUnit, Testcontainers.MySql 4.12.0 (`mysql:8.4`). Branch: `feat/dapper-mysql-engine`. Spec: `docs/superpowers/specs/2026-06-10-themia-dapper-mysql-engine-design.md`.
 
