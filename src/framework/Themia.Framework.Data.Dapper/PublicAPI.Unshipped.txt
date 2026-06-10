@@ -28,6 +28,9 @@ Themia.Framework.Data.Dapper.Sql.ISqlCompiler.Compile(SqlKata.Query! query) -> T
 Themia.Framework.Data.Dapper.Auditing.NullCurrentUserAccessor
 Themia.Framework.Data.Dapper.Auditing.NullCurrentUserAccessor.NullCurrentUserAccessor() -> void
 Themia.Framework.Data.Dapper.Auditing.NullCurrentUserAccessor.UserId.get -> string?
+Themia.Framework.Data.Dapper.Connection.DapperConnectionString
+const Themia.Framework.Data.Dapper.Connection.DapperConnectionString.DefaultConnectionName = "Default" -> string!
+static Themia.Framework.Data.Dapper.Connection.DapperConnectionString.Resolve(Microsoft.Extensions.Configuration.IConfiguration! configuration, System.IServiceProvider! serviceProvider) -> string!
 Themia.Framework.Data.Dapper.Connection.IDapperConnectionContext
 Themia.Framework.Data.Dapper.Connection.IDapperConnectionContext.BeginTransactionAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<System.Data.Common.DbTransaction!>!
 Themia.Framework.Data.Dapper.Connection.IDapperConnectionContext.DisposeTransactionAsync() -> System.Threading.Tasks.ValueTask

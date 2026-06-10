@@ -13,6 +13,7 @@
   <ItemGroup>
     <PackageReference Include="Dapper" />
     <PackageReference Include="SqlKata" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
     <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers">
       <PrivateAssets>all</PrivateAssets>

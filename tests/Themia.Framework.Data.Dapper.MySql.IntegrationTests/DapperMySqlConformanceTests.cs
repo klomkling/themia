@@ -2,6 +2,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Themia.Framework.Core.Abstractions.Tenancy;
 using Themia.Framework.Data.Abstractions.Auditing;
+using Themia.Framework.Data.Abstractions.Exceptions;
 using Themia.Framework.Data.Abstractions.Filtering;
 using Themia.Framework.Data.Abstractions.Repositories;
 using Themia.Framework.Data.Abstractions.UnitOfWork;
@@ -78,6 +79,39 @@ public sealed class DapperMySqlConformanceTests(MySqlContainerFixture fixture)
         repo.Update(widget);
         await uow.SaveChangesAsync();
         Assert.Equal("user-42", (await repo.GetByIdAsync(widget.Id))!.LastModifiedBy);
+    }
+
+    /// <summary>
+    /// A no-tenant (system) scope cannot soft-delete a tenant-owned row: Dapper scopes the soft-delete to
+    /// global (tenant_id IS NULL) rows when no tenant is ambient, so the cross-tenant delete matches 0 rows
+    /// and throws <see cref="ConcurrencyException"/>. Parity with the PostgreSQL integration project.
+    /// </summary>
+    [Fact]
+    public async Task NoTenantScope_CannotSoftDelete_TenantOwnedRow()
+    {
+        await ResetAsync();
+
+        Guid id;
+        await using (var a = await NewScopeAsync(new TenantId("a")))
+        {
+            var w = new Widget { Name = "owned", Quantity = 1 };
+            w.SetId(Guid.NewGuid());
+            id = w.Id;
+            await a.Repo.AddAsync(w);
+            await a.Uow.SaveChangesAsync();
+        }
+
+        await using (var system = await NewScopeAsync(null))
+        {
+            var detached = new Widget { Name = "owned", Quantity = 1 };
+            detached.SetId(id);
+            system.Repo.Remove(detached);
+            // WHERE id = @id AND tenant_id IS NULL matches 0 rows, so the cross-tenant delete fails loud.
+            await Assert.ThrowsAsync<ConcurrencyException>(() => system.Uow.SaveChangesAsync());
+        }
+
+        await using var check = await NewScopeAsync(new TenantId("a"));
+        Assert.NotNull(await check.Repo.GetByIdAsync(id));   // the tenant row survived the cross-tenant delete attempt
     }
 
     private sealed class StubCurrentUser(string? userId) : ICurrentUserAccessor
