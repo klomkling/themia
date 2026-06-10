@@ -14,11 +14,13 @@ internal static class MySqlDapperConfiguration
         lock (Gate)
         {
             if (_configured) return;
-            // SqlMapper.AddTypeHandler is process-global. This handler is registered by the MySQL engine
-            // only; the PostgreSQL engine has none (Npgsql surfaces DateTimeOffset natively). Engines run in
-            // separate processes, so there is no cross-engine interference.
             // MySQL DATETIME is tz-naive: MySqlConnector returns DateTime, not DateTimeOffset. Map the audit
             // DateTimeOffset properties by treating the stored value as UTC; write the UTC instant back.
+            // Assumption — ONE Dapper engine per application/process: SqlMapper.AddTypeHandler is process-global,
+            // registered only here by AddThemiaDapperMySql. The PostgreSQL engine registers no DateTimeOffset
+            // handler (Npgsql surfaces DateTimeOffset natively). Loading the MySQL and PostgreSQL Dapper engines
+            // in the same process is NOT supported: this handler's MySQL-specific SetValue (DbType.DateTime +
+            // UtcDateTime) would then also apply to PostgreSQL writes, which is incorrect for timestamptz.
             DapperLib.SqlMapper.AddTypeHandler(new DateTimeOffsetTypeHandler());
             _configured = true;
         }
