@@ -18,6 +18,14 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+### Added
+
+- **`Themia.Framework.Data.Dapper.MySql`** — MySQL engine for the Dapper data layer (`MySqlConnector` +
+  SqlKata `MySqlCompiler`), registered via `AddThemiaDapperMySql`. Honours the full shared data-layer contract
+  (tenant isolation, audit, soft-delete, unit of work) — proven by the conformance suite against `mysql:8.4`.
+  `GuidFormat=Char36` is enforced for Guid keys; store-generated keys use `LAST_INSERT_ID()` (AUTO_INCREMENT
+  integers; store-generated UUID remains PostgreSQL-only).
+
 ## 0.4.2 — 2026-06-10
 
 Write-path tenant isolation: both data layers now reject a cross-tenant `UPDATE`/`DELETE`, closing the EF

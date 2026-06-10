@@ -12,10 +12,14 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
+    <PackageReference Include="Testcontainers.MySql" />
+    <PackageReference Include="MySqlConnector" />
     <PackageReference Include="Microsoft.Extensions.Configuration" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="../../src/framework/Themia.Framework.Data.Dapper/Themia.Framework.Data.Dapper.csproj" />
+    <ProjectReference Include="../Themia.Framework.Data.Dapper.Conformance/Themia.Framework.Data.Dapper.Conformance.csproj" />
+    <ProjectReference Include="../../src/framework/Themia.Framework.Data.Dapper.MySql/Themia.Framework.Data.Dapper.MySql.csproj" />
+    <ProjectReference Include="../../src/framework/Themia.MultiTenancy/Themia.MultiTenancy.csproj" />
   </ItemGroup>
 </Project>
