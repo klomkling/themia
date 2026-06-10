@@ -79,7 +79,8 @@ staged engines (PostgreSQL 0.4.1 → MySQL 0.4.3 → **SQL Server 0.4.4**).
   `SqlServerDapperConfiguration.EnsureConfigured()`, `AddThemiaDapperCore(configure)`, registers
   `SqlServerConnectionFactory` (scoped) and `SqlServerSqlCompiler` (singleton `ISqlCompiler`) — the exact
   analogue of `AddThemiaDapperMySql`.
-- **`.csproj`** — `net8.0;net10.0`; `PackageId Themia.Framework.Data.Dapper.SqlServer`; refs the Dapper core
+- **`.csproj`** — `net10.0` (Framework layer, matching the PostgreSql/MySql engines); `PackageId
+  Themia.Framework.Data.Dapper.SqlServer`; refs the Dapper core
   project + `Microsoft.Data.SqlClient`, `SqlKata`, `Microsoft.Extensions.Configuration.Abstractions`,
   `Microsoft.Extensions.DependencyInjection.Abstractions`, `Dapper`, and the PublicApiAnalyzer;
   `PublicAPI.Shipped.txt` / `PublicAPI.Unshipped.txt` (only `AddThemiaDapperSqlServer` is public surface).
