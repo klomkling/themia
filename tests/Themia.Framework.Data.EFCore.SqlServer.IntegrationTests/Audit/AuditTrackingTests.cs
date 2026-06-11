@@ -1,5 +1,4 @@
 using Microsoft.EntityFrameworkCore;
-using Testcontainers.MsSql;
 using Themia.Framework.Core.Abstractions.Entities;
 using Themia.Framework.Data.EFCore;
 using Xunit;
@@ -10,6 +9,7 @@ namespace Themia.Framework.Data.EFCore.SqlServer.IntegrationTests.Audit;
 /// Integration tests for audit tracking functionality with real SQL Server.
 /// </summary>
 [Trait("Category", "Integration")]
+[Collection(SqlServerIntegrationCollection.Name)]
 public class AuditTrackingTests : IClassFixture<AuditTrackingTests.SqlServerFixture>
 {
     private readonly SqlServerFixture fixture;
@@ -24,18 +24,17 @@ public class AuditTrackingTests : IClassFixture<AuditTrackingTests.SqlServerFixt
     {
         await fixture.ResetDataAsync();
 
-        var beforeCreate = DateTimeOffset.UtcNow;
+        var clock = new TestTimeProvider();
+        var beforeCreate = clock.Now;
 
-        await using (var context = fixture.CreateContext())
+        await using (var context = fixture.CreateContext(clock: clock))
         {
             var product = new AuditableProduct { Name = "Test Product", Price = 99.99m };
             context.Products.Add(product);
             await context.SaveChangesAsync();
 
-            var afterCreate = DateTimeOffset.UtcNow;
-
             Assert.True(product.CreatedAt >= beforeCreate);
-            Assert.True(product.CreatedAt <= afterCreate);
+            Assert.True(product.CreatedAt <= clock.Now);
             Assert.Null(product.LastModifiedAt);
         }
     }
@@ -60,9 +59,10 @@ public class AuditTrackingTests : IClassFixture<AuditTrackingTests.SqlServerFixt
     {
         await fixture.ResetDataAsync();
 
+        var clock = new TestTimeProvider();
         int productId;
 
-        await using (var context = fixture.CreateContext())
+        await using (var context = fixture.CreateContext(clock: clock))
         {
             var product = new AuditableProduct { Name = "Test Product", Price = 99.99m };
             context.Products.Add(product);
@@ -70,9 +70,9 @@ public class AuditTrackingTests : IClassFixture<AuditTrackingTests.SqlServerFixt
             productId = product.Id;
         }
 
-        await Task.Delay(100); // Ensure time passes
+        clock.Now = clock.Now.AddMinutes(1);
 
-        await using (var context = fixture.CreateContext())
+        await using (var context = fixture.CreateContext(clock: clock))
         {
             var product = await context.Products.FindAsync(productId);
             Assert.NotNull(product);
@@ -120,10 +120,11 @@ public class AuditTrackingTests : IClassFixture<AuditTrackingTests.SqlServerFixt
     {
         await fixture.ResetDataAsync();
 
+        var clock = new TestTimeProvider();
         int productId;
         DateTimeOffset originalCreatedAt;
 
-        await using (var context = fixture.CreateContext())
+        await using (var context = fixture.CreateContext(clock: clock))
         {
             var product = new AuditableProduct { Name = "Test Product", Price = 99.99m };
             context.Products.Add(product);
@@ -132,9 +133,9 @@ public class AuditTrackingTests : IClassFixture<AuditTrackingTests.SqlServerFixt
             originalCreatedAt = product.CreatedAt;
         }
 
-        await Task.Delay(50);
+        clock.Now = clock.Now.AddMinutes(1);
 
-        await using (var context = fixture.CreateContext())
+        await using (var context = fixture.CreateContext(clock: clock))
         {
             var product = await context.Products.FindAsync(productId);
             Assert.NotNull(product);
@@ -142,9 +143,9 @@ public class AuditTrackingTests : IClassFixture<AuditTrackingTests.SqlServerFixt
             await context.SaveChangesAsync();
         }
 
-        await Task.Delay(50);
+        clock.Now = clock.Now.AddMinutes(1);
 
-        await using (var context = fixture.CreateContext())
+        await using (var context = fixture.CreateContext(clock: clock))
         {
             var product = await context.Products.FindAsync(productId);
             Assert.NotNull(product);
@@ -159,23 +160,25 @@ public class AuditTrackingTests : IClassFixture<AuditTrackingTests.SqlServerFixt
 
     public sealed class SqlServerFixture : IAsyncLifetime
     {
-        private readonly MsSqlContainer container = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-CU14-ubuntu-22.04")
-            .WithCleanUp(true)
-            .Build();
-
+        private readonly SharedSqlServerContainerFixture sharedContainer;
         private string connectionString = string.Empty;
+
+        public SqlServerFixture(SharedSqlServerContainerFixture sharedContainer)
+        {
+            this.sharedContainer = sharedContainer;
+        }
 
         public async Task InitializeAsync()
         {
-            await container.StartAsync();
-            connectionString = container.GetConnectionString();
-            await EnsureSchemaAsync();
+            connectionString = sharedContainer.GetConnectionString("ef_audit");
+            await using var context = CreateContext();
+            await context.Database.EnsureCreatedAsync();
         }
 
-        public async Task DisposeAsync() => await container.DisposeAsync();
+        public Task DisposeAsync() => Task.CompletedTask;
 
-        public TestAuditDbContext CreateContext(string? userId = null) =>
-            new(GetOptions(), userId);
+        public TestAuditDbContext CreateContext(string? userId = null, TimeProvider? clock = null) =>
+            new(GetOptions(), userId, clock);
 
         public TestAuditDbContext CreateContextWithUser(string userId) =>
             new(GetOptions(), userId);
@@ -183,7 +186,6 @@ public class AuditTrackingTests : IClassFixture<AuditTrackingTests.SqlServerFixt
         public async Task ResetDataAsync()
         {
             await using var context = CreateContext();
-            await context.Database.EnsureCreatedAsync();
             await context.Products.ExecuteDeleteAsync();
         }
 
@@ -191,12 +193,6 @@ public class AuditTrackingTests : IClassFixture<AuditTrackingTests.SqlServerFixt
             new DbContextOptionsBuilder<TestAuditDbContext>()
                 .UseSqlServer(connectionString)
                 .Options;
-
-        private async Task EnsureSchemaAsync()
-        {
-            await using var context = CreateContext();
-            await context.Database.EnsureCreatedAsync();
-        }
     }
 
     // ── Test context ──────────────────────────────────────────────────────────
@@ -205,8 +201,8 @@ public class AuditTrackingTests : IClassFixture<AuditTrackingTests.SqlServerFixt
     {
         private readonly string? userId;
 
-        public TestAuditDbContext(DbContextOptions options, string? userId = null)
-            : base(options, null, null)
+        public TestAuditDbContext(DbContextOptions options, string? userId = null, TimeProvider? timeProvider = null)
+            : base(options, null, timeProvider)
         {
             this.userId = userId;
         }
@@ -226,6 +222,14 @@ public class AuditTrackingTests : IClassFixture<AuditTrackingTests.SqlServerFixt
             });
             base.OnModelCreating(modelBuilder);
         }
+    }
+
+    // ── Time provider ─────────────────────────────────────────────────────────
+
+    private sealed class TestTimeProvider : TimeProvider
+    {
+        public DateTimeOffset Now { get; set; } = new(2026, 6, 11, 12, 0, 0, TimeSpan.Zero);
+        public override DateTimeOffset GetUtcNow() => Now;
     }
 
     // ── Entity ────────────────────────────────────────────────────────────────

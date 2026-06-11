@@ -1,5 +1,4 @@
 using Microsoft.EntityFrameworkCore;
-using Testcontainers.MsSql;
 using Themia.Framework.Core.Abstractions.Entities;
 using Themia.Framework.Data.EFCore;
 using Xunit;
@@ -11,6 +10,7 @@ namespace Themia.Framework.Data.EFCore.SqlServer.IntegrationTests.Concurrency;
 /// SQL Server uses a server-maintained <c>rowversion</c> column — correct for <c>byte[] IsRowVersion()</c>.
 /// </summary>
 [Trait("Category", "Integration")]
+[Collection(SqlServerIntegrationCollection.Name)]
 public class ConcurrencyTests : IClassFixture<ConcurrencyTests.SqlServerFixture>
 {
     private readonly SqlServerFixture fixture;
@@ -136,27 +136,28 @@ public class ConcurrencyTests : IClassFixture<ConcurrencyTests.SqlServerFixture>
 
     public sealed class SqlServerFixture : IAsyncLifetime
     {
-        private readonly MsSqlContainer container = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-CU14-ubuntu-22.04")
-            .WithCleanUp(true)
-            .Build();
-
+        private readonly SharedSqlServerContainerFixture sharedContainer;
         private string connectionString = string.Empty;
+
+        public SqlServerFixture(SharedSqlServerContainerFixture sharedContainer)
+        {
+            this.sharedContainer = sharedContainer;
+        }
 
         public async Task InitializeAsync()
         {
-            await container.StartAsync();
-            connectionString = container.GetConnectionString();
-            await EnsureSchemaAsync();
+            connectionString = sharedContainer.GetConnectionString("ef_concurrency");
+            await using var context = CreateContext();
+            await context.Database.EnsureCreatedAsync();
         }
 
-        public async Task DisposeAsync() => await container.DisposeAsync();
+        public Task DisposeAsync() => Task.CompletedTask;
 
         public TestConcurrencyDbContext CreateContext() => new(GetOptions());
 
         public async Task ResetDataAsync()
         {
             await using var context = CreateContext();
-            await context.Database.EnsureCreatedAsync();
             await context.Inventory.ExecuteDeleteAsync();
         }
 
@@ -164,12 +165,6 @@ public class ConcurrencyTests : IClassFixture<ConcurrencyTests.SqlServerFixture>
             new DbContextOptionsBuilder<TestConcurrencyDbContext>()
                 .UseSqlServer(connectionString)
                 .Options;
-
-        private async Task EnsureSchemaAsync()
-        {
-            await using var context = CreateContext();
-            await context.Database.EnsureCreatedAsync();
-        }
     }
 
     // ── Test context ──────────────────────────────────────────────────────────

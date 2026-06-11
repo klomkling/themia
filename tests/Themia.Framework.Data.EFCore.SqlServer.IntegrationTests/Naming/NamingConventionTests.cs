@@ -1,5 +1,4 @@
 using Microsoft.EntityFrameworkCore;
-using Testcontainers.MsSql;
 using Themia.Framework.Core.Abstractions.Entities;
 using Themia.Framework.Core.Abstractions.Tenancy;
 using Themia.Framework.Data.EFCore;
@@ -12,6 +11,7 @@ namespace Themia.Framework.Data.EFCore.SqlServer.IntegrationTests.Naming;
 /// keep EF SQL Server defaults (PascalCase). Schema is built via <c>EnsureCreatedAsync</c>.
 /// </summary>
 [Trait("Category", "Integration")]
+[Collection(SqlServerIntegrationCollection.Name)]
 public class NamingConventionTests : IClassFixture<NamingConventionTests.SqlServerFixture>
 {
     private readonly SqlServerFixture fixture;
@@ -55,21 +55,22 @@ public class NamingConventionTests : IClassFixture<NamingConventionTests.SqlServ
 
     public sealed class SqlServerFixture : IAsyncLifetime
     {
-        private readonly MsSqlContainer container = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-CU14-ubuntu-22.04")
-            .WithCleanUp(true)
-            .Build();
-
+        private readonly SharedSqlServerContainerFixture sharedContainer;
         private string connectionString = string.Empty;
+
+        public SqlServerFixture(SharedSqlServerContainerFixture sharedContainer)
+        {
+            this.sharedContainer = sharedContainer;
+        }
 
         public async Task InitializeAsync()
         {
-            await container.StartAsync();
-            connectionString = container.GetConnectionString();
+            connectionString = sharedContainer.GetConnectionString("ef_naming");
             await using var ctx = CreateContext();
             await ctx.Database.EnsureCreatedAsync();
         }
 
-        public async Task DisposeAsync() => await container.DisposeAsync();
+        public Task DisposeAsync() => Task.CompletedTask;
 
         public TestWidgetDbContext CreateContext() =>
             new(new DbContextOptionsBuilder<TestWidgetDbContext>()

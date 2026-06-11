@@ -1,5 +1,4 @@
 using Microsoft.EntityFrameworkCore;
-using Testcontainers.MsSql;
 using Themia.Framework.Core.Abstractions.Entities;
 using Themia.Framework.Core.Abstractions.Tenancy;
 using Themia.Framework.Data.EFCore;
@@ -11,6 +10,7 @@ namespace Themia.Framework.Data.EFCore.SqlServer.IntegrationTests.Tenancy;
 /// Integration coverage against a real SQL Server instance to validate tenant filters and soft delete behavior.
 /// </summary>
 [Trait("Category", "Integration")]
+[Collection(SqlServerIntegrationCollection.Name)]
 public class TenantIsolationTests : IClassFixture<TenantIsolationTests.SqlServerFixture>
 {
     private readonly SqlServerFixture fixture;
@@ -160,20 +160,22 @@ public class TenantIsolationTests : IClassFixture<TenantIsolationTests.SqlServer
 
     public sealed class SqlServerFixture : IAsyncLifetime
     {
-        private readonly MsSqlContainer container = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-CU14-ubuntu-22.04")
-            .WithCleanUp(true)
-            .Build();
-
+        private readonly SharedSqlServerContainerFixture sharedContainer;
         private string connectionString = string.Empty;
+
+        public SqlServerFixture(SharedSqlServerContainerFixture sharedContainer)
+        {
+            this.sharedContainer = sharedContainer;
+        }
 
         public async Task InitializeAsync()
         {
-            await container.StartAsync();
-            connectionString = container.GetConnectionString();
-            await EnsureSchemaAsync();
+            connectionString = sharedContainer.GetConnectionString("ef_tenancy");
+            await using var context = CreateRuntimeContext(null);
+            await context.Database.EnsureCreatedAsync();
         }
 
-        public async Task DisposeAsync() => await container.DisposeAsync();
+        public Task DisposeAsync() => Task.CompletedTask;
 
         public RuntimeTenantDbContext CreateRuntimeContext(TenantId? tenantId) =>
             new(GetOptions(), new TenantContext(tenantId));
@@ -184,7 +186,6 @@ public class TenantIsolationTests : IClassFixture<TenantIsolationTests.SqlServer
         public async Task ResetDataAsync()
         {
             await using var context = CreateRuntimeContext(null);
-            await context.Database.EnsureCreatedAsync();
             await context.Orders.IgnoreQueryFilters().ExecuteDeleteAsync();
         }
 
@@ -192,12 +193,6 @@ public class TenantIsolationTests : IClassFixture<TenantIsolationTests.SqlServer
             new DbContextOptionsBuilder<TestTenantDbContext>()
                 .UseSqlServer(connectionString)
                 .Options;
-
-        private async Task EnsureSchemaAsync()
-        {
-            await using var context = CreateRuntimeContext(null);
-            await context.Database.EnsureCreatedAsync();
-        }
     }
 
     // ── Test context hierarchy ────────────────────────────────────────────────

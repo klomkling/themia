@@ -1,5 +1,4 @@
 using Microsoft.EntityFrameworkCore;
-using Testcontainers.MsSql;
 using Themia.Framework.Core.Abstractions.Entities;
 using Themia.Framework.Data.EFCore;
 using Xunit;
@@ -10,6 +9,7 @@ namespace Themia.Framework.Data.EFCore.SqlServer.IntegrationTests.SoftDelete;
 /// Integration tests for soft delete and restore functionality with real SQL Server.
 /// </summary>
 [Trait("Category", "Integration")]
+[Collection(SqlServerIntegrationCollection.Name)]
 public class SoftDeleteTests : IClassFixture<SoftDeleteTests.SqlServerFixture>
 {
     private readonly SqlServerFixture fixture;
@@ -154,20 +154,22 @@ public class SoftDeleteTests : IClassFixture<SoftDeleteTests.SqlServerFixture>
 
     public sealed class SqlServerFixture : IAsyncLifetime
     {
-        private readonly MsSqlContainer container = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-CU14-ubuntu-22.04")
-            .WithCleanUp(true)
-            .Build();
-
+        private readonly SharedSqlServerContainerFixture sharedContainer;
         private string connectionString = string.Empty;
+
+        public SqlServerFixture(SharedSqlServerContainerFixture sharedContainer)
+        {
+            this.sharedContainer = sharedContainer;
+        }
 
         public async Task InitializeAsync()
         {
-            await container.StartAsync();
-            connectionString = container.GetConnectionString();
-            await EnsureSchemaAsync();
+            connectionString = sharedContainer.GetConnectionString("ef_softdelete");
+            await using var context = CreateContext();
+            await context.Database.EnsureCreatedAsync();
         }
 
-        public async Task DisposeAsync() => await container.DisposeAsync();
+        public Task DisposeAsync() => Task.CompletedTask;
 
         public TestSoftDeleteDbContext CreateContext(string? userId = null) =>
             new(GetOptions(), userId);
@@ -178,7 +180,6 @@ public class SoftDeleteTests : IClassFixture<SoftDeleteTests.SqlServerFixture>
         public async Task ResetDataAsync()
         {
             await using var context = CreateContext();
-            await context.Database.EnsureCreatedAsync();
             await context.Documents.IgnoreQueryFilters().ExecuteDeleteAsync();
         }
 
@@ -186,12 +187,6 @@ public class SoftDeleteTests : IClassFixture<SoftDeleteTests.SqlServerFixture>
             new DbContextOptionsBuilder<TestSoftDeleteDbContext>()
                 .UseSqlServer(connectionString)
                 .Options;
-
-        private async Task EnsureSchemaAsync()
-        {
-            await using var context = CreateContext();
-            await context.Database.EnsureCreatedAsync();
-        }
     }
 
     // ── Test context ──────────────────────────────────────────────────────────
