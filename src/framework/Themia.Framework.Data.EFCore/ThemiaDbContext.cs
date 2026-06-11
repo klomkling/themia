@@ -691,6 +691,22 @@ public abstract class ThemiaDbContext : DbContext
     }
 
     /// <summary>
+    /// The tenant id the runtime query filter evaluates, exposed as an instance member so the filter
+    /// expression is rooted at the context. It reads the SAME ambient source as
+    /// <see cref="EffectiveFilterTenantId"/> (the static accessor) — only the routing differs.
+    /// </summary>
+    /// <remarks>
+    /// Rooting the filter at the context instance (instead of a static property access) is load-bearing:
+    /// EF rewrites DbContext-typed constants inside query filters to the CURRENT context at query time,
+    /// so this member is re-evaluated per execution in every code path. A static property access is only
+    /// re-extracted for ad-hoc LINQ queries; EF's internal entity finder (DbSet.Find/FindAsync) uses a
+    /// PRE-COMPILED per-entity-type query that bakes non-context-rooted values as constants at first
+    /// compilation — which froze the first-seen tenant into the by-PK query and leaked rows across
+    /// tenants once the ambient tenant changed.
+    /// </remarks>
+    private TenantId? AmbientFilterTenantId => TenantContextAccessor.CurrentTenantId;
+
+    /// <summary>
     /// Resolves the current tenant expression for query filters based on the configured strategy.
     /// </summary>
     /// <returns>An expression that yields the current tenant id.</returns>
@@ -698,14 +714,17 @@ public abstract class ThemiaDbContext : DbContext
     /// LOCKSTEP: this strategy switch and <see cref="EffectiveFilterTenantId"/> must read the same
     /// tenant source per strategy — the query filter (this) and Find's post-check (that) disagreeing
     /// re-opens the cross-tenant Find leak. Add any new <see cref="TenantIsolationStrategy"/> to BOTH.
+    /// (RuntimeTenantAccess: both read <see cref="TenantContextAccessor.CurrentTenantId"/> — the filter
+    /// via <see cref="AmbientFilterTenantId"/>, whose context rooting is required; see its remarks.)
     /// </remarks>
     private Expression GetCurrentTenantExpression() =>
         TenantIsolationStrategy == TenantIsolationStrategy.PerTenantModel
             ? Expression.Constant(CurrentTenantId, typeof(TenantId?))
             : Expression.Property(
-                null,
-                typeof(TenantContextAccessor),
-                nameof(TenantContextAccessor.CurrentTenantId));
+                Expression.Constant(this, typeof(ThemiaDbContext)),
+                typeof(ThemiaDbContext).GetProperty(
+                    nameof(AmbientFilterTenantId),
+                    System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!);
 
     /// <summary>
     /// Builds the tenant predicate that enforces tenant isolation and optional global record inclusion.
