@@ -16,6 +16,11 @@ namespace Themia.Framework.Data.EFCore;
 /// </summary>
 public abstract class ThemiaDbContext : DbContext
 {
+    // EF Core infrastructure provider name reported by Npgsql — distinct from the Themia routing token
+    // DatabaseProviderNames.Postgres ("postgres"). Used to select the xmin (Postgres) vs rowversion
+    // concurrency mapping. Core no longer references the Npgsql package, so detection is by name.
+    private const string NpgsqlEfCoreProviderName = "Npgsql.EntityFrameworkCore.PostgreSQL";
+
     private static readonly ValueConverter<TenantId, string> TenantIdConverter =
         new(id => id.Value, value => new TenantId(value));
 
@@ -411,7 +416,7 @@ public abstract class ThemiaDbContext : DbContext
 
         ApplyTenantIdConversions(modelBuilder);
         ApplyFrameworkColumnNames(modelBuilder);
-        ApplyConcurrencyTokens(modelBuilder, Database.IsNpgsql());
+        ApplyConcurrencyTokens(modelBuilder, Database.ProviderName == NpgsqlEfCoreProviderName);
 
         if (EnableTenantFilters)
         {
@@ -605,8 +610,7 @@ public abstract class ThemiaDbContext : DbContext
     /// is correct <em>only</em> for SQL Server's server-maintained <c>rowversion</c>. <b>MySQL/MariaDB
     /// fall into this branch too and silently break</b> — MySQL has no <c>rowversion</c> concept, so the
     /// <c>byte[]</c> token is never server-updated and concurrency never fires (the exact Npgsql trap
-    /// above). It is not branched here because this project references only Npgsql; <c>Database.IsMySql()</c>
-    /// needs the Pomelo package. The correct per-provider concurrency mapping must ship in the MySQL
+    /// above). The correct per-provider concurrency mapping must ship in the MySQL
     /// <c>IDatabaseProvider</c> package when it lands (e.g. a regular <c>IsConcurrencyToken()</c> column
     /// the app updates), and add an explicit branch here at that time.</para>
     /// </remarks>

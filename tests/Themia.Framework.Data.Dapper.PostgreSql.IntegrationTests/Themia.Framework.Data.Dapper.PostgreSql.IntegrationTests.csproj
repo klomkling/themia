@@ -21,6 +21,7 @@
     <ProjectReference Include="../Themia.Framework.Data.Dapper.Conformance/Themia.Framework.Data.Dapper.Conformance.csproj" />
     <ProjectReference Include="../../src/framework/Themia.Framework.Data.Dapper.PostgreSql/Themia.Framework.Data.Dapper.PostgreSql.csproj" />
     <ProjectReference Include="../../src/framework/Themia.Framework.Data.EFCore/Themia.Framework.Data.EFCore.csproj" />
+    <ProjectReference Include="../../src/framework/Themia.Framework.Data.EFCore.PostgreSql/Themia.Framework.Data.EFCore.PostgreSql.csproj" />
     <ProjectReference Include="../../src/framework/Themia.MultiTenancy/Themia.MultiTenancy.csproj" />
   </ItemGroup>
 </Project>

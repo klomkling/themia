@@ -3,7 +3,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Themia.Framework.Core.Abstractions.Tenancy;
 using Themia.Framework.Data.EFCore;
-using Themia.Framework.Data.EFCore.Extensions;
+using Themia.Framework.Data.EFCore.PostgreSql;
 using Themia.MultiTenancy.Abstractions;
 using Xunit;
 
@@ -79,13 +79,4 @@ public sealed class TenantConnectionRoutingTests
         Assert.Contains("shared-db", context.Database.GetConnectionString());
     }
 
-    [Fact]
-    public void AddThemiaDbContextWithProvider_Throws_ForUnsupportedProviderName()
-    {
-        var configuration = new ConfigurationBuilder().Build();
-        var services = new ServiceCollection();
-
-        Assert.Throws<NotSupportedException>(
-            () => services.AddThemiaDbContextWithProvider<RoutingDbContext>(configuration, "sqlserver"));
-    }
 }

@@ -6,6 +6,7 @@ using Themia.Framework.Data.Abstractions.Repositories;
 using Themia.Framework.Data.Abstractions.UnitOfWork;
 using Themia.Framework.Data.Dapper.Conformance;
 using Themia.Framework.Data.EFCore.Extensions;
+using Themia.Framework.Data.EFCore.PostgreSql;
 using Xunit;
 
 namespace Themia.Framework.Data.Dapper.PostgreSql.IntegrationTests;
