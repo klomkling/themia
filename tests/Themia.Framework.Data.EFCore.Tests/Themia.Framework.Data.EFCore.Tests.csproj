@@ -18,6 +18,7 @@
     </PackageReference>
     <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" />
+    <PackageReference Include="EFCore.NamingConventions" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/framework/Themia.Framework.Data.EFCore/Themia.Framework.Data.EFCore.csproj" />
