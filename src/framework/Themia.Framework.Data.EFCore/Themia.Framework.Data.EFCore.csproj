@@ -27,7 +27,5 @@
   <ItemGroup>
     <InternalsVisibleTo Include="Themia.Framework.Data.EFCore.Tests" />
     <InternalsVisibleTo Include="Themia.Framework.Data.EFCore.IntegrationTests" />
-    <InternalsVisibleTo Include="Themia.Framework.Data.EFCore.PostgreSql" />
-    <InternalsVisibleTo Include="Themia.Framework.Data.EFCore.SqlServer" />
   </ItemGroup>
 </Project>
