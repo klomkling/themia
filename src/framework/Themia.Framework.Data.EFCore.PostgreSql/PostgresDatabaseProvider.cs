@@ -12,12 +12,13 @@ namespace Themia.Framework.Data.EFCore.PostgreSql;
 /// string when the resolved tenant carries one (DB-per-tenant), otherwise the <c>Default</c> connection
 /// string (shared DB + the global tenant query filter).
 /// </summary>
-/// <param name="useGlobalSnakeCaseNaming">
-/// When <c>true</c>, applies <c>UseSnakeCaseNamingConvention()</c> to the whole model (legacy behavior,
-/// snake_cases the adopter's own columns too). Default <c>false</c>: only Themia's framework columns are
-/// snake_case (mapped explicitly in <c>ThemiaDbContext</c>); the adopter's columns follow EF defaults.
-/// </param>
-public sealed class PostgresDatabaseProvider(bool useGlobalSnakeCaseNaming = false) : IDatabaseProvider
+/// <remarks>
+/// Themia's framework columns are explicitly snake_case (mapped in <c>ThemiaDbContext</c>); the
+/// adopter's own columns follow EF defaults. To snake_case the whole model (legacy behavior), reference
+/// <c>EFCore.NamingConventions</c> and apply it via the registration delegate:
+/// <c>AddThemiaPostgres&lt;TContext&gt;(config, configureOptions: o =&gt; o.UseSnakeCaseNamingConvention())</c>.
+/// </remarks>
+public sealed class PostgresDatabaseProvider : IDatabaseProvider
 {
     /// <inheritdoc />
     public string ProviderName => DatabaseProviderNames.Postgres;
@@ -32,11 +33,6 @@ public sealed class PostgresDatabaseProvider(bool useGlobalSnakeCaseNaming = fal
         var connectionString = DatabaseConnectionStringResolver.Resolve(configuration, serviceProvider);
 
         optionsBuilder.UseNpgsql(connectionString, ConfigureNpgsqlOptions);
-
-        if (useGlobalSnakeCaseNaming)
-        {
-            optionsBuilder.UseSnakeCaseNamingConvention();
-        }
     }
 
     /// <inheritdoc />

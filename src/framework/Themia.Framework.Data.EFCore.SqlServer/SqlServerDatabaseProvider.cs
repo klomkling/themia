@@ -12,12 +12,13 @@ namespace Themia.Framework.Data.EFCore.SqlServer;
 /// carries one (DB-per-tenant), otherwise the <c>Default</c> connection string (shared DB + the global
 /// tenant query filter).
 /// </summary>
-/// <param name="useGlobalSnakeCaseNaming">
-/// When <c>true</c>, applies <c>UseSnakeCaseNamingConvention()</c> to the whole model. Default
-/// <c>false</c>: only Themia's framework columns are snake_case (mapped in <c>ThemiaDbContext</c>); the
-/// adopter's own columns follow EF defaults (PascalCase on SQL Server).
-/// </param>
-public sealed class SqlServerDatabaseProvider(bool useGlobalSnakeCaseNaming = false) : IDatabaseProvider
+/// <remarks>
+/// Themia's framework columns are explicitly snake_case (mapped in <c>ThemiaDbContext</c>); the
+/// adopter's own columns follow EF defaults (PascalCase on SQL Server). To snake_case the whole model,
+/// reference <c>EFCore.NamingConventions</c> and apply it via the registration delegate:
+/// <c>AddThemiaSqlServer&lt;TContext&gt;(config, configureOptions: o =&gt; o.UseSnakeCaseNamingConvention())</c>.
+/// </remarks>
+public sealed class SqlServerDatabaseProvider : IDatabaseProvider
 {
     /// <inheritdoc />
     public string ProviderName => DatabaseProviderNames.SqlServer;
@@ -32,11 +33,6 @@ public sealed class SqlServerDatabaseProvider(bool useGlobalSnakeCaseNaming = fa
         var connectionString = DatabaseConnectionStringResolver.Resolve(configuration, serviceProvider);
 
         optionsBuilder.UseSqlServer(connectionString, ConfigureSqlServerOptions);
-
-        if (useGlobalSnakeCaseNaming)
-        {
-            optionsBuilder.UseSnakeCaseNamingConvention();
-        }
     }
 
     /// <inheritdoc />

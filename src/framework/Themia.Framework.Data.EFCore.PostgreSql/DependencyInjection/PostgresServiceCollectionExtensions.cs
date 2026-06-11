@@ -17,20 +17,19 @@ public static class PostgresServiceCollectionExtensions
     /// <typeparam name="TContext">DbContext type derived from <see cref="ThemiaDbContext"/>.</typeparam>
     /// <param name="services">Service collection.</param>
     /// <param name="configuration">Application configuration.</param>
-    /// <param name="useGlobalSnakeCaseNaming">
-    /// When <c>true</c>, snake_cases the entire model (legacy). Default <c>false</c>: only framework columns
-    /// are snake_case; adopter columns follow EF defaults.
+    /// <param name="configureOptions">
+    /// Optional DbContext options configuration — e.g. apply a global naming convention here
+    /// (<c>o =&gt; o.UseSnakeCaseNamingConvention()</c>, with your own <c>EFCore.NamingConventions</c>
+    /// reference) to restore legacy whole-model snake_case.
     /// </param>
-    /// <param name="configureOptions">Optional DbContext options configuration.</param>
     /// <returns>Service collection for chaining.</returns>
     public static IServiceCollection AddThemiaPostgres<TContext>(
         this IServiceCollection services,
         IConfiguration configuration,
-        bool useGlobalSnakeCaseNaming = false,
         Action<DbContextOptionsBuilder>? configureOptions = null)
         where TContext : ThemiaDbContext
     {
-        var provider = new PostgresDatabaseProvider(useGlobalSnakeCaseNaming);
+        var provider = new PostgresDatabaseProvider();
         return services.AddThemiaDbContext<TContext>(provider, configuration, configureOptions);
     }
 }

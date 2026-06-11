@@ -61,11 +61,15 @@ FluentMigrator schema across engines) but should not dictate the adopter's app-t
 **How to upgrade:**
 
 - If your existing PostgreSQL schema has snake_case **app** columns (the previous forced behavior),
-  opt back in:
+  reference `EFCore.NamingConventions` in your app and re-apply the convention via the registration
+  delegate:
   ```csharp
-  services.AddThemiaPostgres<AppDbContext>(configuration, useGlobalSnakeCaseNaming: true);
+  services.AddThemiaPostgres<AppDbContext>(
+      configuration,
+      configureOptions: o => o.UseSnakeCaseNamingConvention());
   ```
-- New apps (and SQL Server apps wanting idiomatic PascalCase) need no change — the default is off.
+- New apps (and SQL Server apps wanting idiomatic PascalCase) need no change — no global convention
+  is applied by default, and the provider packages no longer depend on `EFCore.NamingConventions`.
 
 ## Template
 

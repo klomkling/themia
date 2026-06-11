@@ -42,9 +42,11 @@ idiomatic casing for their own tables.
   moved to `Themia.Framework.Data.EFCore.PostgreSql`, and core no longer references Npgsql or
   EFCore.NamingConventions.
 - **(breaking)** Framework columns (entity key + audit/tenant/soft-delete/concurrency) are mapped to
-  explicit snake_case in `ThemiaDbContext`, and the global snake_case naming convention is now
-  **opt-in** (`useGlobalSnakeCaseNaming`, default `false`) — adopter columns follow the EF provider
-  default (PascalCase on SQL Server).
+  explicit snake_case in `ThemiaDbContext`; the providers no longer force a global naming convention,
+  so adopter columns follow the EF provider default (PascalCase on SQL Server). Whole-model
+  snake_case remains available via the standard EF mechanism: reference `EFCore.NamingConventions`
+  and pass `configureOptions: o => o.UseSnakeCaseNamingConvention()` — the provider packages no
+  longer carry that dependency.
 
 ### Removed
 

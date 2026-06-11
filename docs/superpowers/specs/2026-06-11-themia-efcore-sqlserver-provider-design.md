@@ -152,6 +152,13 @@ framework's own columns are only correct as a side effect of a global setting â€
 
 - **Remove the global `.UseSnakeCaseNamingConvention()` from the providers.** Replace it with an
   opt-in flag so the legacy behavior is recoverable:
+
+  > **Amended post-review (2026-06-11):** the bool flag was dropped before release. Whole-model
+  > snake_case is opted into via the standard EF mechanism instead â€” the adopter references
+  > `EFCore.NamingConventions` themselves and passes
+  > `configureOptions: o => o.UseSnakeCaseNamingConvention()`. This removes both the boolean public-API
+  > parameter (repo code-quality rule) and the providers' unconditional `EFCore.NamingConventions`
+  > dependency. See CHANGELOG 0.4.5. The text below documents the as-designed (superseded) shape.
   - Carry the flag on the provider itself: `PostgresDatabaseProvider` / `SqlServerDatabaseProvider`
     gain a `bool useGlobalSnakeCaseNaming = false` constructor argument, surfaced through an optional
     parameter on `AddThemiaPostgres` / `AddThemiaSqlServer`

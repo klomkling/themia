@@ -17,20 +17,19 @@ public static class SqlServerServiceCollectionExtensions
     /// <typeparam name="TContext">DbContext type derived from <see cref="ThemiaDbContext"/>.</typeparam>
     /// <param name="services">Service collection.</param>
     /// <param name="configuration">Application configuration.</param>
-    /// <param name="useGlobalSnakeCaseNaming">
-    /// When <c>true</c>, snake_cases the entire model. Default <c>false</c>: only framework columns are
-    /// snake_case; adopter columns follow EF defaults (PascalCase on SQL Server).
+    /// <param name="configureOptions">
+    /// Optional DbContext options configuration — e.g. apply a global naming convention here
+    /// (<c>o =&gt; o.UseSnakeCaseNamingConvention()</c>, with your own <c>EFCore.NamingConventions</c>
+    /// reference) to snake_case the whole model.
     /// </param>
-    /// <param name="configureOptions">Optional DbContext options configuration.</param>
     /// <returns>Service collection for chaining.</returns>
     public static IServiceCollection AddThemiaSqlServer<TContext>(
         this IServiceCollection services,
         IConfiguration configuration,
-        bool useGlobalSnakeCaseNaming = false,
         Action<DbContextOptionsBuilder>? configureOptions = null)
         where TContext : ThemiaDbContext
     {
-        var provider = new SqlServerDatabaseProvider(useGlobalSnakeCaseNaming);
+        var provider = new SqlServerDatabaseProvider();
         return services.AddThemiaDbContext<TContext>(provider, configuration, configureOptions);
     }
 }
