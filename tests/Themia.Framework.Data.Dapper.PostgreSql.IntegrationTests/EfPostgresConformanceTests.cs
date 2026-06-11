@@ -28,7 +28,10 @@ public sealed class EfPostgresConformanceTests(PostgresContainerFixture fixture)
 
         var services = new ServiceCollection();
         services.AddScoped<ITenantContext>(_ => new TenantContext(tenant));
-        services.AddThemiaPostgres<WidgetDbContext>(configuration);
+        // The conformance schema (created by the Dapper fixture's raw SQL) is snake_case throughout,
+        // including the adopter column "name" — opt in to the global convention so EF maps Widget.Name
+        // to it. (Framework columns are explicitly snake_case either way; only app columns need this.)
+        services.AddThemiaPostgres<WidgetDbContext>(configuration, useGlobalSnakeCaseNaming: true);
         services.AddThemiaDataRepositories<WidgetDbContext>();
 
         var provider = services.BuildServiceProvider();
