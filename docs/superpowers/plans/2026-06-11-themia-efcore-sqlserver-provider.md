@@ -10,6 +10,12 @@
 
 **Spec:** `docs/superpowers/specs/2026-06-11-themia-efcore-sqlserver-provider-design.md`
 
+> **Amended post-review (2026-06-11):** the `useGlobalSnakeCaseNaming` bool flag described in Tasks 3/4
+> below was dropped before release (see the spec's §3 amendment). Whole-model snake_case is opted into
+> via `configureOptions: o => o.UseSnakeCaseNamingConvention()` with the adopter's own
+> `EFCore.NamingConventions` reference; the provider packages carry neither the flag nor the dependency.
+> The task text below documents the as-planned (superseded) shape — execution history, not the shipped API.
+
 **Working directory:** all paths are relative to `Packages/themia/`. Build/test from there. The build enforces `TreatWarningsAsErrors=true`, `Nullable`, `GenerateDocumentationFile=true`, and tracks PublicAPI surface (`RS0016` for undocumented public members). Run `dotnet build Themia.sln --no-incremental` to surface PublicAPI diagnostics.
 
 ---

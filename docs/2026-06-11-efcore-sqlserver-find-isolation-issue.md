@@ -61,6 +61,9 @@ Expression.Property(
         BindingFlags.Instance | BindingFlags.NonPublic)!);
 ```
 
+(The final code hardens this further: the `PropertyInfo` is cached in a `static readonly` field with a
+fail-fast `?? throw`, so a broken lookup surfaces at type initialization rather than via the `!`.)
+
 EF rewrites `DbContext`-typed constants inside query filters to the **current** context at query
 time, so a context-rooted member is re-evaluated per execution in *every* path — including the
 pre-compiled entity-finder query. (This is the same mechanism behind EF's documented multi-tenant
