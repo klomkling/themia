@@ -519,6 +519,10 @@ public abstract class ThemiaDbContext : DbContext
                 continue;
             }
 
+            // NOT dead code: no in-repo entity hits this branch (they all implement ITenantEntity above),
+            // but adopters may declare a TenantId-typed REFERENCE column on an entity that is deliberately
+            // not tenant-scoped (e.g. an audit-log row pointing at a tenant). Such a property still needs
+            // the value converter; removing this scan would break those entities at query/migration time.
             foreach (var property in entityType.GetProperties().Where(p => p.ClrType == typeof(TenantId)))
             {
                 ConfigureTenantIdProperty(property);
@@ -706,6 +710,16 @@ public abstract class ThemiaDbContext : DbContext
     /// </remarks>
     private TenantId? AmbientFilterTenantId => TenantContextAccessor.CurrentTenantId;
 
+    // Cached + fail-fast: a visibility or declaration change that breaks the reflection lookup surfaces
+    // as a clear type-initialization error, not a deferred NullReferenceException inside OnModelCreating.
+    private static readonly System.Reflection.PropertyInfo AmbientFilterTenantIdProperty =
+        typeof(ThemiaDbContext).GetProperty(
+            nameof(AmbientFilterTenantId),
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
+        ?? throw new InvalidOperationException(
+            $"Property '{nameof(AmbientFilterTenantId)}' not found on {nameof(ThemiaDbContext)}; " +
+            "the runtime tenant query filter cannot be built.");
+
     /// <summary>
     /// Resolves the current tenant expression for query filters based on the configured strategy.
     /// </summary>
@@ -722,9 +736,7 @@ public abstract class ThemiaDbContext : DbContext
             ? Expression.Constant(CurrentTenantId, typeof(TenantId?))
             : Expression.Property(
                 Expression.Constant(this, typeof(ThemiaDbContext)),
-                typeof(ThemiaDbContext).GetProperty(
-                    nameof(AmbientFilterTenantId),
-                    System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!);
+                AmbientFilterTenantIdProperty);
 
     /// <summary>
     /// Builds the tenant predicate that enforces tenant isolation and optional global record inclusion.
