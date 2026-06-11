@@ -47,6 +47,8 @@ override Themia.Framework.Data.EFCore.ThemiaDbContext.OnModelCreating(Microsoft.
 override Themia.Framework.Data.EFCore.ThemiaDbContext.SaveChanges(bool acceptAllChangesOnSuccess) -> int
 override Themia.Framework.Data.EFCore.ThemiaDbContext.SaveChangesAsync(bool acceptAllChangesOnSuccess, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<int>!
 Themia.Framework.Data.EFCore.Abstractions.DatabaseProviderNames
+Themia.Framework.Data.EFCore.Infrastructure.DatabaseConnectionStringResolver
+static Themia.Framework.Data.EFCore.Infrastructure.DatabaseConnectionStringResolver.Resolve(Microsoft.Extensions.Configuration.IConfiguration! configuration, System.IServiceProvider! serviceProvider) -> string!
 Themia.Framework.Data.EFCore.Infrastructure.TenantModelCacheKeyFactory
 Themia.Framework.Data.EFCore.Infrastructure.TenantModelCacheKeyFactory.Create(Microsoft.EntityFrameworkCore.DbContext! context, bool designTime) -> object!
 Themia.Framework.Data.EFCore.Infrastructure.TenantModelCacheKeyFactory.TenantModelCacheKeyFactory() -> void
