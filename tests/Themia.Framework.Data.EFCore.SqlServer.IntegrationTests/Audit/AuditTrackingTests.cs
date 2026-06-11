@@ -228,7 +228,9 @@ public class AuditTrackingTests : IClassFixture<AuditTrackingTests.SqlServerFixt
 
     private sealed class TestTimeProvider : TimeProvider
     {
-        public DateTimeOffset Now { get; set; } = new(2026, 6, 11, 12, 0, 0, TimeSpan.Zero);
+        // Deliberately synthetic (far from the wall clock): if ThemiaDbContext ever regressed from the
+        // injected TimeProvider to DateTimeOffset.UtcNow, every assertion fails deterministically.
+        public DateTimeOffset Now { get; set; } = new(2000, 1, 1, 0, 0, 0, TimeSpan.Zero);
         public override DateTimeOffset GetUtcNow() => Now;
     }
 

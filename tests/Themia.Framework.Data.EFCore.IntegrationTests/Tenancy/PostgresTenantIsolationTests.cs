@@ -39,11 +39,21 @@ public class PostgresTenantIsolationTests : IClassFixture<PostgresTenantIsolatio
     public async Task RuntimeTenantAccess_BlocksFindAcrossTenants()
     {
         await fixture.ResetDataAsync();
-        await SeedAsync();
+
+        // Capture the real tenant-b row id from the tracked entity — a hardcoded id can silently dodge
+        // the assertion (FindAsync of a nonexistent id returns null for the wrong reason).
+        int tenantBId;
+        await using (var seed = fixture.CreateRuntimeContext(null))
+        {
+            var orderB = new TenantOrder { Name = "B", TenantId = new TenantId("tenant-b") };
+            seed.Orders.Add(orderB);
+            await seed.SaveChangesAsync();
+            tenantBId = orderB.Id;
+        }
 
         await using var context = fixture.CreateRuntimeContext(new TenantId("tenant-a"));
 
-        var otherTenant = await context.Orders.FindAsync(2);
+        var otherTenant = await context.Orders.FindAsync(tenantBId);
 
         Assert.Null(otherTenant);
     }

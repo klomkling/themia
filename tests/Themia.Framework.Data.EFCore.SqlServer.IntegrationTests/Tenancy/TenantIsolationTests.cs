@@ -63,6 +63,58 @@ public class TenantIsolationTests : IClassFixture<TenantIsolationTests.SqlServer
     }
 
     [Fact]
+    public async Task RuntimeTenantAccess_Find_FollowsCurrentTenant_AcrossContexts()
+    {
+        // Deterministic, self-contained guard for the compiled-finder tenant bake: compile the by-PK
+        // finder under tenant-a, then prove a tenant-b context gets tenant-b's view from the SAME cached
+        // plan. Under the old static-rooted filter, step 2 returned A's row (leak) and missed B's row.
+        await fixture.ResetDataAsync();
+
+        int rowAId, rowBId;
+        await using (var seed = fixture.CreateRuntimeContext(null))
+        {
+            var orderA = new TenantOrder { Name = "A", TenantId = new TenantId("tenant-a") };
+            var orderB = new TenantOrder { Name = "B", TenantId = new TenantId("tenant-b") };
+            seed.Orders.AddRange(orderA, orderB);
+            await seed.SaveChangesAsync();
+            rowAId = orderA.Id;
+            rowBId = orderB.Id;
+        }
+
+        // Step 1: compile the finder under tenant-a; it must see its own row.
+        await using (var contextA = fixture.CreateRuntimeContext(new TenantId("tenant-a")))
+        {
+            Assert.NotNull(await contextA.Orders.FindAsync(rowAId));
+        }
+
+        // Step 2: from a tenant-b context, the cached finder must re-evaluate the tenant per execution.
+        await using var contextB = fixture.CreateRuntimeContext(new TenantId("tenant-b"));
+        Assert.Null(await contextB.Orders.FindAsync(rowAId));      // leak direction
+        Assert.NotNull(await contextB.Orders.FindAsync(rowBId));   // availability direction
+    }
+
+    [Fact]
+    public async Task PerTenantModel_BlocksFindAcrossTenants()
+    {
+        // LOCKSTEP coverage for the PerTenantModel strategy: its baked-constant filter and the Find
+        // post-check must agree just like RuntimeTenantAccess's accessor-driven pair.
+        await fixture.ResetDataAsync();
+
+        int tenantBId;
+        await using (var seed = fixture.CreateRuntimeContext(null))
+        {
+            var orderB = new TenantOrder { Name = "B", TenantId = new TenantId("tenant-b") };
+            seed.Orders.Add(orderB);
+            await seed.SaveChangesAsync();
+            tenantBId = orderB.Id;
+        }
+
+        await using var context = fixture.CreatePerTenantModelContext(new TenantId("tenant-a"));
+
+        Assert.Null(await context.Orders.FindAsync(tenantBId));
+    }
+
+    [Fact]
     public async Task PerTenantModel_UsesIsolatedModelsPerTenant()
     {
         await fixture.ResetDataAsync();

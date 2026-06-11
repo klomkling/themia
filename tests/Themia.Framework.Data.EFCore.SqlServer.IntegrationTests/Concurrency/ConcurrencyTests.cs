@@ -42,6 +42,10 @@ public class ConcurrencyTests : IClassFixture<ConcurrencyTests.SqlServerFixture>
             Assert.Equal("Widget", item.ProductName);
             Assert.Equal(100, item.Quantity);
 
+            // The named purpose of this test: the server-generated rowversion token is populated.
+            Assert.NotNull(item.RowVersion);
+            Assert.NotEmpty(item.RowVersion);
+
             item.Quantity = 90;
             await context.SaveChangesAsync();
         }
