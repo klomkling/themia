@@ -42,6 +42,19 @@ public sealed class FrameworkModelConventionTests
     }
 
     [Fact]
+    public void ImplicitManyToMany_SharedTypeJoinEntity_ModelBuilds()
+    {
+        // Regression guard: EF maps an implicit many-to-many through a SHARED-TYPE join entity
+        // (Dictionary<string, object>). modelBuilder.Entity(clrType) THROWS for shared types, so the
+        // framework convention loops must skip them or any adopter with a skip-navigation pair crashes
+        // at model build.
+        using var ctx = NewContext();
+
+        var join = ctx.Model.GetEntityTypes().FirstOrDefault(t => t.HasSharedClrType);
+        Assert.NotNull(join); // the implicit CourseStudent join entity exists and the model built
+    }
+
+    [Fact]
     public void AdopterKey_NotEntityDerived_KeepsItsName()
     {
         using var ctx = NewContext();
@@ -84,11 +97,26 @@ public sealed class FrameworkModelConventionTests
         public string Street { get; set; } = string.Empty;
     }
 
+    // Skip-navigation pair producing an implicit shared-type (Dictionary<string, object>) join entity.
+    private sealed class Student
+    {
+        public int Id { get; set; }
+        public List<Course> Courses { get; set; } = [];
+    }
+
+    private sealed class Course
+    {
+        public int Id { get; set; }
+        public List<Student> Students { get; set; } = [];
+    }
+
     private sealed class ConventionContext(DbContextOptions options) : ThemiaDbContext(options)
     {
         public DbSet<TenantLink> Links => Set<TenantLink>();
         public DbSet<ScopedDoc> Docs => Set<ScopedDoc>();
         public DbSet<Owner> Owners => Set<Owner>();
+        public DbSet<Student> Students => Set<Student>();
+        public DbSet<Course> Courses => Set<Course>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

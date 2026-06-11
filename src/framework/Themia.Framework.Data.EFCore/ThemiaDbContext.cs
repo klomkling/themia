@@ -457,7 +457,10 @@ public abstract class ThemiaDbContext : DbContext
     {
         foreach (var entityType in modelBuilder.Model.GetEntityTypes())
         {
-            if (entityType.IsOwned())
+            // Owned types are configured through their owner; shared-CLR-type entities (e.g. the
+            // Dictionary<string, object> join entity EF creates for an implicit many-to-many) cannot be
+            // addressed via modelBuilder.Entity(Type) — it throws — and can carry no framework marker.
+            if (entityType.IsOwned() || entityType.HasSharedClrType)
             {
                 continue;
             }
@@ -517,9 +520,11 @@ public abstract class ThemiaDbContext : DbContext
     {
         foreach (var entityType in modelBuilder.Model.GetEntityTypes())
         {
-            if (entityType.IsOwned())
+            // Owned types are configured through their owner's builder; shared-CLR-type entities
+            // (implicit many-to-many join entities) cannot be addressed via modelBuilder.Entity(Type).
+            if (entityType.IsOwned() || entityType.HasSharedClrType)
             {
-                continue; // owned types are configured through their owner's builder
+                continue;
             }
 
             var clrType = entityType.ClrType;
