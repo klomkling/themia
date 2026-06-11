@@ -410,6 +410,7 @@ public abstract class ThemiaDbContext : DbContext
         base.OnModelCreating(modelBuilder);
 
         ApplyTenantIdConversions(modelBuilder);
+        ApplyFrameworkColumnNames(modelBuilder);
         ApplyConcurrencyTokens(modelBuilder, Database.IsNpgsql());
 
         if (EnableTenantFilters)
@@ -423,20 +424,99 @@ public abstract class ThemiaDbContext : DbContext
         }
     }
 
+    // Framework columns Themia OWNS, mapped to fixed snake_case names so the EF and Dapper peers agree
+    // per engine (Dapper's EntityMapping.ToSnakeCase produces the same names) and a single FluentMigrator
+    // migration can serve both. Adopter-declared columns are never touched here.
+    private static readonly (Type Marker, (string Property, string Column)[] Columns)[] FrameworkColumnMaps =
+    [
+        (typeof(ITenantEntity), [(nameof(ITenantEntity.TenantId), "tenant_id")]),
+        (typeof(IAuditableEntity),
+        [
+            (nameof(IAuditableEntity.CreatedAt), "created_at"),
+            (nameof(IAuditableEntity.CreatedBy), "created_by"),
+            (nameof(IAuditableEntity.LastModifiedAt), "last_modified_at"),
+            (nameof(IAuditableEntity.LastModifiedBy), "last_modified_by"),
+        ]),
+        (typeof(ISoftDeletable),
+        [
+            (nameof(ISoftDeletable.IsDeleted), "is_deleted"),
+            (nameof(ISoftDeletable.DeletedAt), "deleted_at"),
+            (nameof(ISoftDeletable.DeletedBy), "deleted_by"),
+            (nameof(ISoftDeletable.RestoredAt), "restored_at"),
+            (nameof(ISoftDeletable.RestoredBy), "restored_by"),
+        ]),
+        (typeof(IConcurrencyAware), [(nameof(IConcurrencyAware.RowVersion), "row_version")]),
+    ];
+
+    private static void ApplyFrameworkColumnNames(ModelBuilder modelBuilder)
+    {
+        foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+        {
+            if (entityType.IsOwned())
+            {
+                continue;
+            }
+
+            var clrType = entityType.ClrType;
+            var entity = modelBuilder.Entity(clrType);
+
+            // The key 'Id' is declared on the abstract base class Entity<TId> (there is no IEntity
+            // interface), so map it only for entities that derive from Entity<>.
+            if (DerivesFromEntityBase(clrType) && entityType.FindProperty("Id") is not null)
+            {
+                entity.Property("Id").HasColumnName("id");
+            }
+
+            foreach (var (marker, columns) in FrameworkColumnMaps)
+            {
+                if (!marker.IsAssignableFrom(clrType))
+                {
+                    continue;
+                }
+
+                foreach (var (property, column) in columns)
+                {
+                    if (entityType.FindProperty(property) is not null)
+                    {
+                        entity.Property(property).HasColumnName(column);
+                    }
+                }
+            }
+        }
+    }
+
+    // Walks the base-type chain looking for the open generic Themia base entity Entity<TId>.
+    private static bool DerivesFromEntityBase(Type type)
+    {
+        for (var current = type.BaseType; current is not null; current = current.BaseType)
+        {
+            if (current.IsGenericType && current.GetGenericTypeDefinition() == typeof(Entity<>))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private static void ApplyTenantIdConversions(ModelBuilder modelBuilder)
     {
         foreach (var entityType in modelBuilder.Model.GetEntityTypes())
         {
-            foreach (var property in entityType.GetProperties().Where(p => p.ClrType == typeof(TenantId) || p.ClrType == typeof(TenantId?)))
+            // TenantId always arrives via ITenantEntity (declared as TenantId?). Register + convert it
+            // explicitly through the builder API so relational providers (e.g. SQLite) include and
+            // validate the value-object property, then skip the legacy scan for this entity.
+            if (typeof(ITenantEntity).IsAssignableFrom(entityType.ClrType))
             {
-                if (property.ClrType == typeof(TenantId))
-                {
-                    ConfigureTenantIdProperty(property);
-                }
-                else
-                {
-                    ConfigureNullableTenantIdProperty(property);
-                }
+                modelBuilder.Entity(entityType.ClrType)
+                    .Property<TenantId?>(nameof(ITenantEntity.TenantId))
+                    .HasConversion(NullableTenantIdConverter, NullableTenantIdComparer);
+                continue;
+            }
+
+            foreach (var property in entityType.GetProperties().Where(p => p.ClrType == typeof(TenantId)))
+            {
+                ConfigureTenantIdProperty(property);
             }
         }
     }
@@ -502,12 +582,6 @@ public abstract class ThemiaDbContext : DbContext
     {
         property.SetValueConverter(TenantIdConverter);
         property.SetValueComparer(TenantIdComparer);
-    }
-
-    private static void ConfigureNullableTenantIdProperty(IMutableProperty property)
-    {
-        property.SetValueConverter(NullableTenantIdConverter);
-        property.SetValueComparer(NullableTenantIdComparer);
     }
 
     /// <summary>
