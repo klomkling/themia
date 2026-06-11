@@ -1,92 +1,85 @@
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Themia.Framework.Data.EFCore.Providers;
-using Themia.MultiTenancy.Abstractions;
+using Themia.Framework.Core.Abstractions.Entities;
+using Themia.Framework.Core.Abstractions.Tenancy;
+using Themia.Framework.Data.EFCore.Abstractions;
+using Themia.Framework.Data.EFCore.PostgreSql;
 using Xunit;
 
 namespace Themia.Framework.Data.EFCore.Tests.Providers;
 
 public sealed class PostgresDatabaseProviderTests
 {
-    private static IConfiguration ConfigWithDefault(string? value) =>
-        new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?> { ["ConnectionStrings:Default"] = value })
-            .Build();
-
-    private sealed class StubAccessor(TenantInfo? current) : ITenantAccessor
+    [Fact]
+    public void ProviderName_IsPostgres()
     {
-        public TenantInfo? Current { get; } = current;
+        Assert.Equal(DatabaseProviderNames.Postgres, new PostgresDatabaseProvider().ProviderName);
     }
 
-    private static IServiceProvider ProviderWith(ITenantAccessor? accessor)
+    [Fact]
+    public void AddThemiaPostgres_RegistersContext()
     {
         var services = new ServiceCollection();
-        if (accessor is not null)
-        {
-            services.AddSingleton(accessor);
-        }
-        return services.BuildServiceProvider();
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ConnectionStrings:Default"] = "Host=localhost;Database=themia;Username=themia",
+            })
+            .Build();
+
+        services.AddThemiaPostgres<ProbeContext>(configuration);
+
+        using var provider = services.BuildServiceProvider();
+        Assert.NotNull(provider.GetRequiredService<ProbeContext>());
     }
 
     [Fact]
-    public void ResolveConnectionString_PrefersTenantConnectionString_WhenPresent()
+    public void NamingSplit_FrameworkSnakeCase_AdopterNameKept_OnPostgres()
     {
-        var tenant = new TenantInfo("1", "acme", ConnectionString: "Host=tenant-db;Database=acme");
-        var sp = ProviderWith(new StubAccessor(tenant));
+        // Offline model introspection against the Npgsql provider (no connection opened). With no global
+        // convention, framework columns are explicitly snake_case and the adopter column keeps its name.
+        var options = new DbContextOptionsBuilder<ProbeContext>()
+            .UseNpgsql("Host=localhost;Database=themia;Username=themia")
+            .Options;
+        using var ctx = new ProbeContext(options);
 
-        var result = PostgresDatabaseProvider.ResolveConnectionString(ConfigWithDefault("Host=shared"), sp);
+        var entityType = ctx.Model.FindEntityType(typeof(Probe))!;
+        var store = StoreObjectIdentifier.Create(entityType, StoreObjectType.Table)!.Value;
 
-        Assert.Equal("Host=tenant-db;Database=acme", result);
+        Assert.Equal("tenant_id", entityType.FindProperty(nameof(Probe.TenantId))!.GetColumnName(store));
+        Assert.Equal("created_at", entityType.FindProperty("CreatedAt")!.GetColumnName(store));
+        Assert.Equal("AppName", entityType.FindProperty(nameof(Probe.AppName))!.GetColumnName(store));
     }
 
     [Fact]
-    public void ResolveConnectionString_FallsBackToDefault_WhenTenantHasNoConnectionString()
+    public void GlobalSnakeCase_ViaConfigureOptions_SnakeCasesAdopterColumns()
     {
-        var tenant = new TenantInfo("1", "acme", ConnectionString: null);
-        var sp = ProviderWith(new StubAccessor(tenant));
+        // The legacy whole-model behavior is opted into through the standard EF mechanism: the adopter
+        // references EFCore.NamingConventions and applies it via configureOptions (here: directly on the
+        // options builder, which is what AddThemiaPostgres's configureOptions delegate receives).
+        var options = new DbContextOptionsBuilder<ProbeContext>()
+            .UseNpgsql("Host=localhost;Database=themia;Username=themia")
+            .UseSnakeCaseNamingConvention()
+            .Options;
+        using var ctx = new ProbeContext(options);
 
-        var result = PostgresDatabaseProvider.ResolveConnectionString(ConfigWithDefault("Host=shared"), sp);
+        var entityType = ctx.Model.FindEntityType(typeof(Probe))!;
+        var store = StoreObjectIdentifier.Create(entityType, StoreObjectType.Table)!.Value;
 
-        Assert.Equal("Host=shared", result);
+        Assert.Equal("tenant_id", entityType.FindProperty(nameof(Probe.TenantId))!.GetColumnName(store));
+        Assert.Equal("app_name", entityType.FindProperty(nameof(Probe.AppName))!.GetColumnName(store));
     }
 
-    [Fact]
-    public void ResolveConnectionString_FallsBackToDefault_WhenNoTenantAccessorRegistered()
+    private sealed class Probe : SoftDeletableEntity<int>, ITenantEntity
     {
-        var sp = ProviderWith(accessor: null);
-
-        var result = PostgresDatabaseProvider.ResolveConnectionString(ConfigWithDefault("Host=shared"), sp);
-
-        Assert.Equal("Host=shared", result);
+        public TenantId? TenantId { get; set; }
+        public string AppName { get; set; } = string.Empty;
     }
 
-    [Fact]
-    public void ResolveConnectionString_Throws_WhenNoTenantConnectionStringAndNoDefault()
+    private sealed class ProbeContext(DbContextOptions options) : ThemiaDbContext(options)
     {
-        var sp = ProviderWith(new StubAccessor(new TenantInfo("1", "acme", ConnectionString: null)));
-
-        Assert.Throws<InvalidOperationException>(
-            () => PostgresDatabaseProvider.ResolveConnectionString(ConfigWithDefault(null), sp));
-    }
-
-    [Fact]
-    public void ResolveConnectionString_FallsBackToDefault_WhenTenantConnectionStringIsWhiteSpace()
-    {
-        var tenant = new TenantInfo("1", "acme", ConnectionString: "   ");
-        var sp = ProviderWith(new StubAccessor(tenant));
-
-        var result = PostgresDatabaseProvider.ResolveConnectionString(ConfigWithDefault("Host=shared"), sp);
-
-        Assert.Equal("Host=shared", result);
-    }
-
-    [Fact]
-    public void ResolveConnectionString_FallsBackToDefault_WhenTenantAccessorReturnsNullCurrent()
-    {
-        var sp = ProviderWith(new StubAccessor(current: null));
-
-        var result = PostgresDatabaseProvider.ResolveConnectionString(ConfigWithDefault("Host=shared"), sp);
-
-        Assert.Equal("Host=shared", result);
+        public DbSet<Probe> Probes => Set<Probe>();
     }
 }

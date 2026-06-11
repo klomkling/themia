@@ -27,11 +27,6 @@ Themia.Framework.Data.EFCore.Abstractions.IDatabaseProvider
 Themia.Framework.Data.EFCore.Abstractions.IDatabaseProvider.Configure(Microsoft.EntityFrameworkCore.DbContextOptionsBuilder! optionsBuilder, Microsoft.Extensions.Configuration.IConfiguration! configuration, System.IServiceProvider! serviceProvider) -> void
 Themia.Framework.Data.EFCore.Abstractions.IDatabaseProvider.ConfigureServices(Microsoft.Extensions.DependencyInjection.IServiceCollection! services, Microsoft.Extensions.Configuration.IConfiguration! configuration) -> void
 Themia.Framework.Data.EFCore.Abstractions.IDatabaseProvider.ProviderName.get -> string!
-Themia.Framework.Data.EFCore.Providers.PostgresDatabaseProvider
-Themia.Framework.Data.EFCore.Providers.PostgresDatabaseProvider.Configure(Microsoft.EntityFrameworkCore.DbContextOptionsBuilder! optionsBuilder, Microsoft.Extensions.Configuration.IConfiguration! configuration, System.IServiceProvider! serviceProvider) -> void
-Themia.Framework.Data.EFCore.Providers.PostgresDatabaseProvider.ConfigureServices(Microsoft.Extensions.DependencyInjection.IServiceCollection! services, Microsoft.Extensions.Configuration.IConfiguration! configuration) -> void
-Themia.Framework.Data.EFCore.Providers.PostgresDatabaseProvider.PostgresDatabaseProvider() -> void
-Themia.Framework.Data.EFCore.Providers.PostgresDatabaseProvider.ProviderName.get -> string!
 const Themia.Framework.Data.EFCore.Abstractions.DatabaseProviderNames.Postgres = "postgres" -> string!
 const Themia.Framework.Data.EFCore.Abstractions.DatabaseProviderNames.SqlServer = "sqlserver" -> string!
 override Themia.Framework.Data.EFCore.ThemiaDbContext.Dispose() -> void
@@ -47,6 +42,8 @@ override Themia.Framework.Data.EFCore.ThemiaDbContext.OnModelCreating(Microsoft.
 override Themia.Framework.Data.EFCore.ThemiaDbContext.SaveChanges(bool acceptAllChangesOnSuccess) -> int
 override Themia.Framework.Data.EFCore.ThemiaDbContext.SaveChangesAsync(bool acceptAllChangesOnSuccess, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<int>!
 Themia.Framework.Data.EFCore.Abstractions.DatabaseProviderNames
+Themia.Framework.Data.EFCore.Infrastructure.DatabaseConnectionStringResolver
+static Themia.Framework.Data.EFCore.Infrastructure.DatabaseConnectionStringResolver.Resolve(Microsoft.Extensions.Configuration.IConfiguration! configuration, System.IServiceProvider! serviceProvider) -> string!
 Themia.Framework.Data.EFCore.Infrastructure.TenantModelCacheKeyFactory
 Themia.Framework.Data.EFCore.Infrastructure.TenantModelCacheKeyFactory.Create(Microsoft.EntityFrameworkCore.DbContext! context, bool designTime) -> object!
 Themia.Framework.Data.EFCore.Infrastructure.TenantModelCacheKeyFactory.TenantModelCacheKeyFactory() -> void
@@ -63,7 +60,5 @@ virtual Themia.Framework.Data.EFCore.ThemiaDbContext.IncludeGlobalRecordsForTena
 virtual Themia.Framework.Data.EFCore.ThemiaDbContext.TenantIsolationStrategy.get -> Themia.Framework.Data.EFCore.TenantIsolationStrategy
 Themia.Framework.Data.EFCore.ThemiaDbContext.ThemiaDbContext(Microsoft.EntityFrameworkCore.DbContextOptions! options, Themia.Framework.Core.Abstractions.Tenancy.ITenantContext? tenantContext = null, System.TimeProvider? timeProvider = null) -> void
 Themia.Framework.Data.EFCore.Extensions.ServiceCollectionExtensions
-static Themia.Framework.Data.EFCore.Extensions.ServiceCollectionExtensions.AddThemiaPostgres<TContext>(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, Microsoft.Extensions.Configuration.IConfiguration! configuration, System.Action<Microsoft.EntityFrameworkCore.DbContextOptionsBuilder!>? configureOptions = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
 static Themia.Framework.Data.EFCore.Extensions.ServiceCollectionExtensions.AddThemiaDbContext<TContext>(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, Themia.Framework.Data.EFCore.Abstractions.IDatabaseProvider! provider, Microsoft.Extensions.Configuration.IConfiguration! configuration, System.Action<Microsoft.EntityFrameworkCore.DbContextOptionsBuilder!>? configureOptions = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
 static Themia.Framework.Data.EFCore.Extensions.ServiceCollectionExtensions.AddThemiaDbContext<TContext>(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Microsoft.EntityFrameworkCore.DbContextOptionsBuilder!>! optionsAction) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
-static Themia.Framework.Data.EFCore.Extensions.ServiceCollectionExtensions.AddThemiaDbContextWithProvider<TContext>(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, Microsoft.Extensions.Configuration.IConfiguration! configuration, string! providerName, System.Action<Microsoft.EntityFrameworkCore.DbContextOptionsBuilder!>? configureOptions = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!

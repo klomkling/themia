@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Themia.Framework.Core.Abstractions.Tenancy;
@@ -6,6 +7,7 @@ using Themia.Framework.Data.Abstractions.Repositories;
 using Themia.Framework.Data.Abstractions.UnitOfWork;
 using Themia.Framework.Data.Dapper.Conformance;
 using Themia.Framework.Data.EFCore.Extensions;
+using Themia.Framework.Data.EFCore.PostgreSql;
 using Xunit;
 
 namespace Themia.Framework.Data.Dapper.PostgreSql.IntegrationTests;
@@ -27,7 +29,13 @@ public sealed class EfPostgresConformanceTests(PostgresContainerFixture fixture)
 
         var services = new ServiceCollection();
         services.AddScoped<ITenantContext>(_ => new TenantContext(tenant));
-        services.AddThemiaPostgres<WidgetDbContext>(configuration);
+        // The conformance schema (created by the Dapper fixture's raw SQL) is snake_case throughout,
+        // including the adopter column "name" — apply the global convention via configureOptions (with
+        // this test project's own EFCore.NamingConventions reference) so EF maps Widget.Name to it.
+        // (Framework columns are explicitly snake_case either way; only app columns need this.)
+        services.AddThemiaPostgres<WidgetDbContext>(
+            configuration,
+            configureOptions: o => o.UseSnakeCaseNamingConvention());
         services.AddThemiaDataRepositories<WidgetDbContext>();
 
         var provider = services.BuildServiceProvider();

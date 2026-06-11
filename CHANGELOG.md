@@ -18,6 +18,50 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## 0.4.5 — 2026-06-11
+
+SQL Server provider for the EF Core data layer — the EF side starts catching up with the three-engine
+Dapper set (DECISION #6: EF and Dapper are selectable first-class peers). The EF layer is restructured
+into per-engine provider packages, and framework-column naming is now explicit so adopters keep
+idiomatic casing for their own tables.
+
+### Added
+
+- **`Themia.Framework.Data.EFCore.SqlServer`** — SQL Server EF Core provider (`AddThemiaSqlServer`,
+  `SqlServerDatabaseProvider`) with DB-per-tenant connection routing, plus a full integration suite
+  (Testcontainers mssql 2022) covering tenant isolation, audit, soft delete, `rowversion`
+  concurrency, and the naming split.
+- **`Themia.Framework.Data.EFCore.PostgreSql`** — the PostgreSQL provider, extracted from the core
+  package into its own per-engine package (mirrors the Dapper layer topology).
+- `DatabaseConnectionStringResolver` — shared tenant-or-default connection-string resolution in core,
+  used by both providers so the resolution rule cannot drift between engines.
+
+### Changed
+
+- **(breaking)** `Themia.Framework.Data.EFCore` is now **provider-agnostic**: `AddThemiaPostgres`
+  moved to `Themia.Framework.Data.EFCore.PostgreSql`, and core no longer references Npgsql or
+  EFCore.NamingConventions.
+- **(breaking)** Framework columns (entity key + audit/tenant/soft-delete/concurrency) are mapped to
+  explicit snake_case in `ThemiaDbContext`; the providers no longer force a global naming convention,
+  so adopter columns follow the EF provider default (PascalCase on SQL Server). Whole-model
+  snake_case remains available via the standard EF mechanism: reference `EFCore.NamingConventions`
+  and pass `configureOptions: o => o.UseSnakeCaseNamingConvention()` — the provider packages no
+  longer carry that dependency.
+
+### Removed
+
+- **(breaking)** `AddThemiaDbContextWithProvider` (string-name provider factory) — call the
+  per-engine `AddThemiaPostgres` / `AddThemiaSqlServer` entry points instead.
+
+### Fixed
+
+- **Cross-tenant leak via `DbSet.Find`/`FindAsync`** — EF's pre-compiled entity-finder query baked
+  the first-seen ambient tenant into the cached by-PK plan (the runtime filter was rooted at a static
+  property). The filter is now rooted at the context instance, so every path — including `Find` —
+  parameterizes the tenant per execution. Pre-existing since the EF data layer shipped; exposed by
+  the new SQL Server integration suite. Analysis:
+  `docs/2026-06-11-efcore-sqlserver-find-isolation-issue.md`.
+
 ## 0.4.4 — 2026-06-10
 
 SQL Server engine for the Dapper data layer — completes the three-engine set (PostgreSQL, MySQL, SQL Server),

@@ -1,20 +1,21 @@
 using Microsoft.EntityFrameworkCore;
-using Testcontainers.PostgreSql;
 using Themia.Framework.Core.Abstractions.Entities;
 using Themia.Framework.Core.Abstractions.Tenancy;
+using Themia.Framework.Data.EFCore;
 using Xunit;
 
-namespace Themia.Framework.Data.EFCore.IntegrationTests.Tenancy;
+namespace Themia.Framework.Data.EFCore.SqlServer.IntegrationTests.Tenancy;
 
 /// <summary>
-/// Integration coverage against a real PostgreSQL instance to validate tenant filters and soft delete behavior.
+/// Integration coverage against a real SQL Server instance to validate tenant filters and soft delete behavior.
 /// </summary>
 [Trait("Category", "Integration")]
-public class PostgresTenantIsolationTests : IClassFixture<PostgresTenantIsolationTests.PostgresFixture>
+[Collection(SqlServerIntegrationCollection.Name)]
+public class TenantIsolationTests : IClassFixture<TenantIsolationTests.SqlServerFixture>
 {
-    private readonly PostgresFixture fixture;
+    private readonly SqlServerFixture fixture;
 
-    public PostgresTenantIsolationTests(PostgresFixture fixture)
+    public TenantIsolationTests(SqlServerFixture fixture)
     {
         this.fixture = fixture;
     }
@@ -40,8 +41,8 @@ public class PostgresTenantIsolationTests : IClassFixture<PostgresTenantIsolatio
     {
         await fixture.ResetDataAsync();
 
-        // Capture the real tenant-b row id from the tracked entity — a hardcoded id can silently dodge
-        // the assertion (FindAsync of a nonexistent id returns null for the wrong reason).
+        // Seed a tenant-b row and capture its id from the tracked entity — no extra lookup context,
+        // which would churn the ambient tenant accessor. Mirrors RuntimeTenantAccess_FindMirrorsFilter.
         int tenantBId;
         await using (var seed = fixture.CreateRuntimeContext(null))
         {
@@ -51,11 +52,66 @@ public class PostgresTenantIsolationTests : IClassFixture<PostgresTenantIsolatio
             tenantBId = orderB.Id;
         }
 
+        // A tenant-a context must not see the tenant-b row by primary key — the DbSet.Find path included.
+        // (Regression guard: the runtime tenant filter must be context-rooted so EF's pre-compiled
+        // entity-finder query parameterizes the tenant instead of baking the first-seen value.)
         await using var context = fixture.CreateRuntimeContext(new TenantId("tenant-a"));
 
         var otherTenant = await context.Orders.FindAsync(tenantBId);
 
         Assert.Null(otherTenant);
+    }
+
+    [Fact]
+    public async Task RuntimeTenantAccess_Find_FollowsCurrentTenant_AcrossContexts()
+    {
+        // Deterministic, self-contained guard for the compiled-finder tenant bake: compile the by-PK
+        // finder under tenant-a, then prove a tenant-b context gets tenant-b's view from the SAME cached
+        // plan. Under the old static-rooted filter, step 2 returned A's row (leak) and missed B's row.
+        await fixture.ResetDataAsync();
+
+        int rowAId, rowBId;
+        await using (var seed = fixture.CreateRuntimeContext(null))
+        {
+            var orderA = new TenantOrder { Name = "A", TenantId = new TenantId("tenant-a") };
+            var orderB = new TenantOrder { Name = "B", TenantId = new TenantId("tenant-b") };
+            seed.Orders.AddRange(orderA, orderB);
+            await seed.SaveChangesAsync();
+            rowAId = orderA.Id;
+            rowBId = orderB.Id;
+        }
+
+        // Step 1: compile the finder under tenant-a; it must see its own row.
+        await using (var contextA = fixture.CreateRuntimeContext(new TenantId("tenant-a")))
+        {
+            Assert.NotNull(await contextA.Orders.FindAsync(rowAId));
+        }
+
+        // Step 2: from a tenant-b context, the cached finder must re-evaluate the tenant per execution.
+        await using var contextB = fixture.CreateRuntimeContext(new TenantId("tenant-b"));
+        Assert.Null(await contextB.Orders.FindAsync(rowAId));      // leak direction
+        Assert.NotNull(await contextB.Orders.FindAsync(rowBId));   // availability direction
+    }
+
+    [Fact]
+    public async Task PerTenantModel_BlocksFindAcrossTenants()
+    {
+        // LOCKSTEP coverage for the PerTenantModel strategy: its baked-constant filter and the Find
+        // post-check must agree just like RuntimeTenantAccess's accessor-driven pair.
+        await fixture.ResetDataAsync();
+
+        int tenantBId;
+        await using (var seed = fixture.CreateRuntimeContext(null))
+        {
+            var orderB = new TenantOrder { Name = "B", TenantId = new TenantId("tenant-b") };
+            seed.Orders.Add(orderB);
+            await seed.SaveChangesAsync();
+            tenantBId = orderB.Id;
+        }
+
+        await using var context = fixture.CreatePerTenantModelContext(new TenantId("tenant-a"));
+
+        Assert.Null(await context.Orders.FindAsync(tenantBId));
     }
 
     [Fact]
@@ -67,7 +123,7 @@ public class PostgresTenantIsolationTests : IClassFixture<PostgresTenantIsolatio
         await using var contextA = fixture.CreatePerTenantModelContext(new TenantId("tenant-a"));
         await using var contextB = fixture.CreatePerTenantModelContext(new TenantId("tenant-b"));
 
-        // Models should be compiled per-tenant when strategy is PerTenantModel
+        // Models should be compiled per-tenant when strategy is PerTenantModel.
         Assert.NotSame(contextA.Model, contextB.Model);
 
         var ordersA = await contextA.Orders.AsNoTracking().OrderBy(o => o.Id).ToListAsync();
@@ -97,13 +153,8 @@ public class PostgresTenantIsolationTests : IClassFixture<PostgresTenantIsolatio
     }
 
     [Fact]
-    public async Task RuntimeTenantAccess_FindMirrorsFilter_WhenStaticAccessorDifferFromInjected()
+    public async Task RuntimeTenantAccess_FindMirrorsFilter_WhenStaticAccessorDiffersFromInjectedContext()
     {
-        // Verifies that Find/FindAsync reads the SAME tenant source (TenantContextAccessor — the static
-        // ambient accessor) as the runtime query filter. If they diverged, a context injected with
-        // tenant-A but whose static accessor was subsequently overridden to tenant-B would allow
-        // cross-tenant access via Find, contradicting what the filter enforces on LINQ queries.
-
         await fixture.ResetDataAsync();
 
         int tenantAId;
@@ -128,16 +179,24 @@ public class PostgresTenantIsolationTests : IClassFixture<PostgresTenantIsolatio
         // Now simulate divergence: override the static accessor to tenant-B AFTER construction.
         // The injected ITenantContext still says "tenant-a", but the filter source says "tenant-b".
         // Find must follow the static accessor (the filter's actual source), not the injected context.
+        // Save and restore so this manual override does not leak into subsequent tests.
+        var savedTenantId = TenantContextAccessor.CurrentTenantId;
         TenantContextAccessor.CurrentTenantId = new TenantId("tenant-b");
+        try
+        {
+            // tenant-B row: static accessor = "tenant-b" → filter allows it → Find must return it.
+            var foundB = await context.Orders.FindAsync(tenantBId);
+            Assert.NotNull(foundB);
+            Assert.Equal("MirrorTestB", foundB!.Name);
 
-        // tenant-B row: static accessor = "tenant-b" → filter allows it → Find must return it.
-        var foundB = await context.Orders.FindAsync(tenantBId);
-        Assert.NotNull(foundB);
-        Assert.Equal("MirrorTestB", foundB!.Name);
-
-        // tenant-A row: static accessor = "tenant-b" → filter blocks it → Find must return null.
-        var foundA = await context.Orders.FindAsync(tenantAId);
-        Assert.Null(foundA);
+            // tenant-A row: static accessor = "tenant-b" → filter blocks it → Find must return null.
+            var foundA = await context.Orders.FindAsync(tenantAId);
+            Assert.Null(foundA);
+        }
+        finally
+        {
+            TenantContextAccessor.CurrentTenantId = savedTenantId;
+        }
     }
 
     private async Task SeedAsync()
@@ -149,29 +208,26 @@ public class PostgresTenantIsolationTests : IClassFixture<PostgresTenantIsolatio
         await context.SaveChangesAsync();
     }
 
-    public sealed class PostgresFixture : IAsyncLifetime
+    // ── Fixture ──────────────────────────────────────────────────────────────
+
+    public sealed class SqlServerFixture : IAsyncLifetime
     {
-        private readonly PostgreSqlContainer container;
+        private readonly SharedSqlServerContainerFixture sharedContainer;
         private string connectionString = string.Empty;
 
-        public PostgresFixture()
+        public SqlServerFixture(SharedSqlServerContainerFixture sharedContainer)
         {
-            container = new PostgreSqlBuilder("postgres:16-alpine")
-                .WithDatabase("themia_tests")
-                .WithUsername("postgres")
-                .WithPassword("postgres")
-                .WithCleanUp(true)
-                .Build();
+            this.sharedContainer = sharedContainer;
         }
 
         public async Task InitializeAsync()
         {
-            await container.StartAsync();
-            connectionString = container.GetConnectionString();
-            await EnsureSchemaAsync();
+            connectionString = sharedContainer.GetConnectionString("ef_tenancy");
+            await using var context = CreateRuntimeContext(null);
+            await context.Database.EnsureCreatedAsync();
         }
 
-        public async Task DisposeAsync() => await container.DisposeAsync();
+        public Task DisposeAsync() => Task.CompletedTask;
 
         public RuntimeTenantDbContext CreateRuntimeContext(TenantId? tenantId) =>
             new(GetOptions(), new TenantContext(tenantId));
@@ -182,27 +238,16 @@ public class PostgresTenantIsolationTests : IClassFixture<PostgresTenantIsolatio
         public async Task ResetDataAsync()
         {
             await using var context = CreateRuntimeContext(null);
-            await context.Database.EnsureCreatedAsync();
             await context.Orders.IgnoreQueryFilters().ExecuteDeleteAsync();
         }
 
-        private DbContextOptions<TestTenantDbContext> GetOptions()
-        {
-            return new DbContextOptionsBuilder<TestTenantDbContext>()
-                .UseNpgsql(connectionString)
-                .UseSnakeCaseNamingConvention()
+        private DbContextOptions<TestTenantDbContext> GetOptions() =>
+            new DbContextOptionsBuilder<TestTenantDbContext>()
+                .UseSqlServer(connectionString)
                 .Options;
-        }
-
-        private async Task EnsureSchemaAsync()
-        {
-            await using var connection = new Npgsql.NpgsqlConnection(connectionString);
-            await connection.OpenAsync();
-            await using var command = connection.CreateCommand();
-            command.CommandText = "CREATE SCHEMA IF NOT EXISTS themia";
-            await command.ExecuteNonQueryAsync();
-        }
     }
+
+    // ── Test context hierarchy ────────────────────────────────────────────────
 
     public abstract class TestTenantDbContext : ThemiaDbContext
     {
@@ -245,6 +290,8 @@ public class PostgresTenantIsolationTests : IClassFixture<PostgresTenantIsolatio
 
         protected override TenantIsolationStrategy TenantIsolationStrategy => TenantIsolationStrategy.PerTenantModel;
     }
+
+    // ── Entity ────────────────────────────────────────────────────────────────
 
     public sealed class TenantOrder : ITenantEntity, ISoftDeletable
     {

@@ -1,0 +1,8 @@
+#nullable enable
+Themia.Framework.Data.EFCore.PostgreSql.PostgresDatabaseProvider
+Themia.Framework.Data.EFCore.PostgreSql.PostgresDatabaseProvider.PostgresDatabaseProvider() -> void
+Themia.Framework.Data.EFCore.PostgreSql.PostgresDatabaseProvider.Configure(Microsoft.EntityFrameworkCore.DbContextOptionsBuilder! optionsBuilder, Microsoft.Extensions.Configuration.IConfiguration! configuration, System.IServiceProvider! serviceProvider) -> void
+Themia.Framework.Data.EFCore.PostgreSql.PostgresDatabaseProvider.ConfigureServices(Microsoft.Extensions.DependencyInjection.IServiceCollection! services, Microsoft.Extensions.Configuration.IConfiguration! configuration) -> void
+Themia.Framework.Data.EFCore.PostgreSql.PostgresDatabaseProvider.ProviderName.get -> string!
+Themia.Framework.Data.EFCore.PostgreSql.PostgresServiceCollectionExtensions
+static Themia.Framework.Data.EFCore.PostgreSql.PostgresServiceCollectionExtensions.AddThemiaPostgres<TContext>(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, Microsoft.Extensions.Configuration.IConfiguration! configuration, System.Action<Microsoft.EntityFrameworkCore.DbContextOptionsBuilder!>? configureOptions = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!

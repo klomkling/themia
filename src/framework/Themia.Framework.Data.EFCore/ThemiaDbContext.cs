@@ -16,6 +16,11 @@ namespace Themia.Framework.Data.EFCore;
 /// </summary>
 public abstract class ThemiaDbContext : DbContext
 {
+    // EF Core infrastructure provider name reported by Npgsql — distinct from the Themia routing token
+    // DatabaseProviderNames.Postgres ("postgres"). Used to select the xmin (Postgres) vs rowversion
+    // concurrency mapping. Core no longer references the Npgsql package, so detection is by name.
+    private const string NpgsqlEfCoreProviderName = "Npgsql.EntityFrameworkCore.PostgreSQL";
+
     private static readonly ValueConverter<TenantId, string> TenantIdConverter =
         new(id => id.Value, value => new TenantId(value));
 
@@ -78,7 +83,7 @@ public abstract class ThemiaDbContext : DbContext
     protected TenantId? CurrentTenantId => tenantContext?.CurrentTenantId;
 
     /// <summary>
-    /// Gets the tenant identifier that the runtime query filter actually evaluates against, by strategy.
+    /// Gets the tenant identifier the query filter evaluates against, per the active strategy.
     /// Find must read the same source as <see cref="GetCurrentTenantExpression"/> so they can never disagree.
     /// </summary>
     /// <remarks>
@@ -410,7 +415,8 @@ public abstract class ThemiaDbContext : DbContext
         base.OnModelCreating(modelBuilder);
 
         ApplyTenantIdConversions(modelBuilder);
-        ApplyConcurrencyTokens(modelBuilder, Database.IsNpgsql());
+        ApplyFrameworkColumnNames(modelBuilder);
+        ApplyConcurrencyTokens(modelBuilder, Database.ProviderName == NpgsqlEfCoreProviderName);
 
         if (EnableTenantFilters)
         {
@@ -423,19 +429,129 @@ public abstract class ThemiaDbContext : DbContext
         }
     }
 
+    // Framework columns Themia OWNS, mapped to fixed snake_case names so the EF and Dapper peers agree
+    // per engine (Dapper's EntityMapping.ToSnakeCase produces the same names) and a single FluentMigrator
+    // migration can serve both. Adopter-declared columns are never touched here.
+    private static readonly (Type Marker, (string Property, string Column)[] Columns)[] FrameworkColumnMaps =
+    [
+        (typeof(ITenantEntity), [(nameof(ITenantEntity.TenantId), "tenant_id")]),
+        (typeof(IAuditableEntity),
+        [
+            (nameof(IAuditableEntity.CreatedAt), "created_at"),
+            (nameof(IAuditableEntity.CreatedBy), "created_by"),
+            (nameof(IAuditableEntity.LastModifiedAt), "last_modified_at"),
+            (nameof(IAuditableEntity.LastModifiedBy), "last_modified_by"),
+        ]),
+        (typeof(ISoftDeletable),
+        [
+            (nameof(ISoftDeletable.IsDeleted), "is_deleted"),
+            (nameof(ISoftDeletable.DeletedAt), "deleted_at"),
+            (nameof(ISoftDeletable.DeletedBy), "deleted_by"),
+            (nameof(ISoftDeletable.RestoredAt), "restored_at"),
+            (nameof(ISoftDeletable.RestoredBy), "restored_by"),
+        ]),
+        (typeof(IConcurrencyAware), [(nameof(IConcurrencyAware.RowVersion), "row_version")]),
+    ];
+
+    private static void ApplyFrameworkColumnNames(ModelBuilder modelBuilder)
+    {
+        foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+        {
+            // Owned types are configured through their owner; shared-CLR-type entities (e.g. the
+            // Dictionary<string, object> join entity EF creates for an implicit many-to-many) cannot be
+            // addressed via modelBuilder.Entity(Type) — it throws — and can carry no framework marker.
+            if (entityType.IsOwned() || entityType.HasSharedClrType)
+            {
+                continue;
+            }
+
+            var clrType = entityType.ClrType;
+            var entity = modelBuilder.Entity(clrType);
+
+            // The key 'Id' is declared on the abstract base class Entity<TId> (there is no IEntity
+            // interface), so map it only for entities that derive from Entity<>.
+            if (DerivesFromEntityBase(clrType) && entityType.FindProperty("Id") is not null)
+            {
+                entity.Property("Id").HasColumnName("id");
+            }
+
+            foreach (var (marker, columns) in FrameworkColumnMaps)
+            {
+                if (!marker.IsAssignableFrom(clrType))
+                {
+                    continue;
+                }
+
+                foreach (var (property, column) in columns)
+                {
+                    // Default-deny: an entity that implements a framework marker but excludes the
+                    // property from the model ([NotMapped]/Ignore/explicit interface implementation)
+                    // would silently break the EF↔Dapper shared-schema contract — fail loudly instead.
+                    if (entityType.FindProperty(property) is null)
+                    {
+                        throw new InvalidOperationException(
+                            $"Entity '{clrType.Name}' implements {marker.Name} but its '{property}' property " +
+                            $"is not mapped in the EF model. Themia requires framework columns in the model so " +
+                            $"the EF and Dapper peers share one schema (column '{column}'). Map the property, " +
+                            "or remove the marker interface from the entity.");
+                    }
+
+                    entity.Property(property).HasColumnName(column);
+                }
+            }
+        }
+    }
+
+    // Walks the base-type chain looking for the open generic Themia base entity Entity<TId>.
+    private static bool DerivesFromEntityBase(Type type)
+    {
+        for (var current = type.BaseType; current is not null; current = current.BaseType)
+        {
+            if (current.IsGenericType && current.GetGenericTypeDefinition() == typeof(Entity<>))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private static void ApplyTenantIdConversions(ModelBuilder modelBuilder)
     {
         foreach (var entityType in modelBuilder.Model.GetEntityTypes())
         {
-            foreach (var property in entityType.GetProperties().Where(p => p.ClrType == typeof(TenantId) || p.ClrType == typeof(TenantId?)))
+            // Owned types are configured through their owner's builder; shared-CLR-type entities
+            // (implicit many-to-many join entities) cannot be addressed via modelBuilder.Entity(Type).
+            if (entityType.IsOwned() || entityType.HasSharedClrType)
             {
-                if (property.ClrType == typeof(TenantId))
+                continue;
+            }
+
+            var clrType = entityType.ClrType;
+
+            // EF does not discover custom value-object struct properties by convention, so EVERY
+            // TenantId-typed CLR property — ITenantEntity.TenantId and adopter REFERENCE columns alike
+            // (e.g. an audit-log row pointing at a tenant) — must be registered + converted through the
+            // builder API, or the relational model validator rejects it as unmapped.
+            foreach (var clrProperty in clrType.GetProperties(
+                         System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance))
+            {
+                if (entityType.IsIgnored(clrProperty.Name))
                 {
-                    ConfigureTenantIdProperty(property);
+                    continue; // respect an adopter's explicit Ignore/[NotMapped]
                 }
-                else
+
+                if (clrProperty.PropertyType == typeof(TenantId?))
                 {
-                    ConfigureNullableTenantIdProperty(property);
+                    modelBuilder.Entity(clrType)
+                        .Property<TenantId?>(clrProperty.Name)
+                        .HasConversion(NullableTenantIdConverter, NullableTenantIdComparer);
+                }
+                else if (clrProperty.PropertyType == typeof(TenantId))
+                {
+                    modelBuilder.Entity(clrType)
+                        .Property<TenantId>(clrProperty.Name)
+                        .HasConversion(TenantIdConverter, TenantIdComparer);
                 }
             }
         }
@@ -498,18 +614,6 @@ public abstract class ThemiaDbContext : DbContext
         }
     }
 
-    private static void ConfigureTenantIdProperty(IMutableProperty property)
-    {
-        property.SetValueConverter(TenantIdConverter);
-        property.SetValueComparer(TenantIdComparer);
-    }
-
-    private static void ConfigureNullableTenantIdProperty(IMutableProperty property)
-    {
-        property.SetValueConverter(NullableTenantIdConverter);
-        property.SetValueComparer(NullableTenantIdComparer);
-    }
-
     /// <summary>
     /// Configures optimistic concurrency for entities implementing <see cref="IConcurrencyAware"/>.
     /// </summary>
@@ -531,8 +635,7 @@ public abstract class ThemiaDbContext : DbContext
     /// is correct <em>only</em> for SQL Server's server-maintained <c>rowversion</c>. <b>MySQL/MariaDB
     /// fall into this branch too and silently break</b> — MySQL has no <c>rowversion</c> concept, so the
     /// <c>byte[]</c> token is never server-updated and concurrency never fires (the exact Npgsql trap
-    /// above). It is not branched here because this project references only Npgsql; <c>Database.IsMySql()</c>
-    /// needs the Pomelo package. The correct per-provider concurrency mapping must ship in the MySQL
+    /// above). The correct per-provider concurrency mapping must ship in the MySQL
     /// <c>IDatabaseProvider</c> package when it lands (e.g. a regular <c>IsConcurrencyToken()</c> column
     /// the app updates), and add an explicit branch here at that time.</para>
     /// </remarks>
@@ -551,7 +654,7 @@ public abstract class ThemiaDbContext : DbContext
             {
                 // PostgreSQL: byte[] IsRowVersion() maps to non-server-populated bytea — concurrency
                 // check never fires. Instead, add a uint shadow property with IsRowVersion() so that
-                // Npgsql's NpgsqlPostgresModelFinalizingConvention maps it to the server-maintained
+                // Npgsql's model-finalizing convention (as of Npgsql 10) maps it to the server-maintained
                 // system column xmin (which increments on every row write).
                 builder.Property<uint>("xmin").IsRowVersion();
 
@@ -613,6 +716,33 @@ public abstract class ThemiaDbContext : DbContext
     }
 
     /// <summary>
+    /// The tenant id the runtime query filter evaluates, exposed as an instance member so the filter
+    /// expression is rooted at the context. It reads the SAME ambient source as
+    /// <see cref="EffectiveFilterTenantId"/> (the static accessor) — only the routing differs.
+    /// </summary>
+    /// <remarks>
+    /// Rooting the filter at the context instance (instead of a static property access) is load-bearing:
+    /// EF rewrites DbContext-typed constants inside query filters to the CURRENT context at query time,
+    /// so this member is re-evaluated per execution in every code path. A static property access is only
+    /// re-extracted for ad-hoc LINQ queries; EF's internal entity finder (DbSet.Find/FindAsync) uses a
+    /// PRE-COMPILED per-entity-type query that bakes non-context-rooted values as constants at first
+    /// compilation — which froze the first-seen tenant into the by-PK query and leaked rows across
+    /// tenants once the ambient tenant changed.
+    /// </remarks>
+    private TenantId? AmbientFilterTenantId => TenantContextAccessor.CurrentTenantId;
+
+    // Cached + fail-fast: a visibility or declaration change that breaks the reflection lookup surfaces
+    // as a clear type-initialization error (a TypeInitializationException wrapping this message — unwrap
+    // the InnerException), not a deferred NullReferenceException inside OnModelCreating.
+    private static readonly System.Reflection.PropertyInfo AmbientFilterTenantIdProperty =
+        typeof(ThemiaDbContext).GetProperty(
+            nameof(AmbientFilterTenantId),
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
+        ?? throw new InvalidOperationException(
+            $"Property '{nameof(AmbientFilterTenantId)}' not found on {nameof(ThemiaDbContext)}; " +
+            "the runtime tenant query filter cannot be built.");
+
+    /// <summary>
     /// Resolves the current tenant expression for query filters based on the configured strategy.
     /// </summary>
     /// <returns>An expression that yields the current tenant id.</returns>
@@ -620,14 +750,15 @@ public abstract class ThemiaDbContext : DbContext
     /// LOCKSTEP: this strategy switch and <see cref="EffectiveFilterTenantId"/> must read the same
     /// tenant source per strategy — the query filter (this) and Find's post-check (that) disagreeing
     /// re-opens the cross-tenant Find leak. Add any new <see cref="TenantIsolationStrategy"/> to BOTH.
+    /// (RuntimeTenantAccess: both read <see cref="TenantContextAccessor.CurrentTenantId"/> — the filter
+    /// via <see cref="AmbientFilterTenantId"/>, whose context rooting is required; see its remarks.)
     /// </remarks>
     private Expression GetCurrentTenantExpression() =>
         TenantIsolationStrategy == TenantIsolationStrategy.PerTenantModel
             ? Expression.Constant(CurrentTenantId, typeof(TenantId?))
             : Expression.Property(
-                null,
-                typeof(TenantContextAccessor),
-                nameof(TenantContextAccessor.CurrentTenantId));
+                Expression.Constant(this, typeof(ThemiaDbContext)),
+                AmbientFilterTenantIdProperty);
 
     /// <summary>
     /// Builds the tenant predicate that enforces tenant isolation and optional global record inclusion.

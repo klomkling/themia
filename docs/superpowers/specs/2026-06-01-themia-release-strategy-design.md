@@ -26,13 +26,21 @@ than a "feature." Do not force `Phase N = v0.N`. The build order maps onto versi
 |---|---|
 | `0.x` = unstable API | Public surface may change between minors. |
 | **MINOR** bump (`0.1`→`0.2`) | One *release milestone* — a coherent batch of new packages/capabilities. |
-| **PATCH** bump (`0.1.0`→`0.1.1`) | Bug-fix-only release between milestones. |
+| **PATCH** bump (`0.1.0`→`0.1.1`) | Bug-fix release **or a sub-milestone capability increment** within an in-progress milestone. |
 | **1.0.0** | First *stable, API-committed* release (framework core + Phase-1 modules solid). |
 | Single shared version | Every `Themia.*` carries the same number (`<Version>` in `Directory.Build.props`); unchanged packages re-publish at the new number. Normal for this layout. |
 
 **Cadence:** publish **incrementally — one MINOR per milestone**. Don't batch many milestones
 behind a single big release; ship each coherent set as it lands. Bug fixes between milestones go
 out as PATCH releases.
+
+**Sub-milestone increments ship as PATCH** (observed practice, ratified 2026-06-11). A milestone
+that builds out incrementally — e.g. the **0.4.x data layer** (`0.4.1` PostgreSQL Dapper → `0.4.2`
+EF write-path → `0.4.3` MySQL → `0.4.4` SQL Server → `0.4.5+` EF multi-provider + FluentMigrator
+standardization) — ships each engine/capability as a PATCH **within** the milestone's MINOR rather
+than spending a new MINOR per package. The MINOR (`0.5.0`) is reserved for the *next* milestone
+(Phase 2 modules). Pre-1.0, the occasional behavior/contract change inside such a PATCH is
+acceptable (`0.x` allows it) provided it's noted in `CHANGELOG.md` / `MIGRATION.md`.
 
 Breaking changes during `0.x` are allowed (that's what `0.x` signals) but should still be noted in
 `CHANGELOG.md` and `MIGRATION.md`. The `1.0.0` line is where the public API is committed and SemVer

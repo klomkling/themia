@@ -40,7 +40,7 @@ Two structural rules drive nearly every design choice:
    infra or app domain?" — domain stays out.
 
 2. **Three-layer pattern for cross-cutting concerns:** neutral core (`Themia.X`, no framework
-   dependency) → Themia module (`Themia.Modules.X`, `IThemiaModule`, tenant-aware, EF-backed) →
+   dependency) → Themia module (`Themia.Modules.X`, `IThemiaModule`, tenant-aware, EF- or Dapper-backed) →
    **[deferred]** Serenity adapter (`Idevs.Net.CoreLib.X`). The neutral core is kept Serenity-free
    to preserve PowerACC reuse, **but PowerACC is never a design driver** — the Serenity adapter is
    built only if/when PowerACC actually migrates (YAGNI).
@@ -55,11 +55,17 @@ Two structural rules drive nearly every design choice:
 
 ## Key resolved decisions (don't relitigate)
 
-- **Data layer:** `Themia.Framework.Data.EFCore` (EF Core) is the **canonical, default** layer — it
-  centrally enforces tenant isolation (global query filters) + audit + UoW across SQL Server, MySQL,
-  and PostgreSQL. Raw Dapper is allowed **only** as a controlled read-only escape-hatch that shares
-  EF's connection/transaction and forces the tenant predicate. Start EF-only; open the hatch only
-  with profiling data — raw Dapper risks tenant-isolation bypass.
+- **Data layer (UPDATED 2026-06-11 — supersedes the original EF-default / Dapper-read-only-hatch
+  decision):** EF Core (`Themia.Framework.Data.EFCore`) and Dapper (`Themia.Framework.Data.Dapper(.*)`)
+  are **selectable first-class peers** — an adopter picks one and the whole system runs on it; both
+  enforce tenant isolation + audit + soft-delete + UoW over the **same schema**. **Schema/DDL is owned
+  by FluentMigrator** (one migration, `IfDatabase(...)` per engine) as the single authority for *both*
+  layers — **no module uses `dotnet ef migrations add`.** **Gate on Dapper-as-peer:** tenant-isolation
+  parity with EF — the raw-connection escape hatch (`IDapperConnectionContext`) must be made
+  conspicuous/reviewable and **analyzer-enforced** (a `Themia.Analyzers` rule flags raw-connection use
+  outside the data layer), so isolation holds by construction, not just by convention. The sanctioned
+  ad-hoc query path is `ITenantQueryFactory.For<T>()` (pre-seeds the tenant predicate). Full rationale +
+  acceptance criteria: DECISION #6 in `docs/themia-architecture-overview.md`.
 - **Multi-DB Phase 1:** SQL Server, MySQL (incl. MariaDB), PostgreSQL via a dialect strategy +
   per-provider packages.
 - **Exception logging engine** is a custom Dapper store with an `IExceptionalSqlDialect` strategy
