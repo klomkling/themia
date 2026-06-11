@@ -83,7 +83,7 @@ public abstract class ThemiaDbContext : DbContext
     protected TenantId? CurrentTenantId => tenantContext?.CurrentTenantId;
 
     /// <summary>
-    /// Gets the tenant identifier that the runtime query filter actually evaluates against, by strategy.
+    /// Gets the tenant identifier the query filter evaluates against, per the active strategy.
     /// Find must read the same source as <see cref="GetCurrentTenantExpression"/> so they can never disagree.
     /// </summary>
     /// <remarks>
@@ -481,10 +481,19 @@ public abstract class ThemiaDbContext : DbContext
 
                 foreach (var (property, column) in columns)
                 {
-                    if (entityType.FindProperty(property) is not null)
+                    // Default-deny: an entity that implements a framework marker but excludes the
+                    // property from the model ([NotMapped]/Ignore/explicit interface implementation)
+                    // would silently break the EF↔Dapper shared-schema contract — fail loudly instead.
+                    if (entityType.FindProperty(property) is null)
                     {
-                        entity.Property(property).HasColumnName(column);
+                        throw new InvalidOperationException(
+                            $"Entity '{clrType.Name}' implements {marker.Name} but its '{property}' property " +
+                            $"is not mapped in the EF model. Themia requires framework columns in the model so " +
+                            $"the EF and Dapper peers share one schema (column '{column}'). Map the property, " +
+                            "or remove the marker interface from the entity.");
                     }
+
+                    entity.Property(property).HasColumnName(column);
                 }
             }
         }
@@ -508,24 +517,37 @@ public abstract class ThemiaDbContext : DbContext
     {
         foreach (var entityType in modelBuilder.Model.GetEntityTypes())
         {
-            // TenantId always arrives via ITenantEntity (declared as TenantId?). Register + convert it
-            // explicitly through the builder API so relational providers (e.g. SQLite) include and
-            // validate the value-object property, then skip the legacy scan for this entity.
-            if (typeof(ITenantEntity).IsAssignableFrom(entityType.ClrType))
+            if (entityType.IsOwned())
             {
-                modelBuilder.Entity(entityType.ClrType)
-                    .Property<TenantId?>(nameof(ITenantEntity.TenantId))
-                    .HasConversion(NullableTenantIdConverter, NullableTenantIdComparer);
-                continue;
+                continue; // owned types are configured through their owner's builder
             }
 
-            // NOT dead code: no in-repo entity hits this branch (they all implement ITenantEntity above),
-            // but adopters may declare a TenantId-typed REFERENCE column on an entity that is deliberately
-            // not tenant-scoped (e.g. an audit-log row pointing at a tenant). Such a property still needs
-            // the value converter; removing this scan would break those entities at query/migration time.
-            foreach (var property in entityType.GetProperties().Where(p => p.ClrType == typeof(TenantId)))
+            var clrType = entityType.ClrType;
+
+            // EF does not discover custom value-object struct properties by convention, so EVERY
+            // TenantId-typed CLR property — ITenantEntity.TenantId and adopter REFERENCE columns alike
+            // (e.g. an audit-log row pointing at a tenant) — must be registered + converted through the
+            // builder API, or the relational model validator rejects it as unmapped.
+            foreach (var clrProperty in clrType.GetProperties(
+                         System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance))
             {
-                ConfigureTenantIdProperty(property);
+                if (entityType.IsIgnored(clrProperty.Name))
+                {
+                    continue; // respect an adopter's explicit Ignore/[NotMapped]
+                }
+
+                if (clrProperty.PropertyType == typeof(TenantId?))
+                {
+                    modelBuilder.Entity(clrType)
+                        .Property<TenantId?>(clrProperty.Name)
+                        .HasConversion(NullableTenantIdConverter, NullableTenantIdComparer);
+                }
+                else if (clrProperty.PropertyType == typeof(TenantId))
+                {
+                    modelBuilder.Entity(clrType)
+                        .Property<TenantId>(clrProperty.Name)
+                        .HasConversion(TenantIdConverter, TenantIdComparer);
+                }
             }
         }
     }
@@ -587,12 +609,6 @@ public abstract class ThemiaDbContext : DbContext
         }
     }
 
-    private static void ConfigureTenantIdProperty(IMutableProperty property)
-    {
-        property.SetValueConverter(TenantIdConverter);
-        property.SetValueComparer(TenantIdComparer);
-    }
-
     /// <summary>
     /// Configures optimistic concurrency for entities implementing <see cref="IConcurrencyAware"/>.
     /// </summary>
@@ -633,7 +649,7 @@ public abstract class ThemiaDbContext : DbContext
             {
                 // PostgreSQL: byte[] IsRowVersion() maps to non-server-populated bytea — concurrency
                 // check never fires. Instead, add a uint shadow property with IsRowVersion() so that
-                // Npgsql's NpgsqlPostgresModelFinalizingConvention maps it to the server-maintained
+                // Npgsql's model-finalizing convention (as of Npgsql 10) maps it to the server-maintained
                 // system column xmin (which increments on every row write).
                 builder.Property<uint>("xmin").IsRowVersion();
 
@@ -711,7 +727,8 @@ public abstract class ThemiaDbContext : DbContext
     private TenantId? AmbientFilterTenantId => TenantContextAccessor.CurrentTenantId;
 
     // Cached + fail-fast: a visibility or declaration change that breaks the reflection lookup surfaces
-    // as a clear type-initialization error, not a deferred NullReferenceException inside OnModelCreating.
+    // as a clear type-initialization error (a TypeInitializationException wrapping this message — unwrap
+    // the InnerException), not a deferred NullReferenceException inside OnModelCreating.
     private static readonly System.Reflection.PropertyInfo AmbientFilterTenantIdProperty =
         typeof(ThemiaDbContext).GetProperty(
             nameof(AmbientFilterTenantId),
