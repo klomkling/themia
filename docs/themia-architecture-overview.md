@@ -98,7 +98,7 @@ you the target: `neutral/` = net8.0;net10.0, everything else = net10.0 (tooling 
 | Themia | from Zenity | capability |
 |---|---|---|
 | `Themia.Framework.Core` | Framework.Core | Entity/ValueObject/Result, Domain Events, multi-tenant |
-| `Themia.Framework.Data.EFCore` | Framework.Data.EFCore | EF Core + tenant isolation + audit + provider abstraction (**canonical data layer**) |
+| `Themia.Framework.Data.EFCore` | Framework.Data.EFCore | EF Core + tenant isolation + audit + provider abstraction (**a first-class data-access peer** — see DECISION #6) |
 | `Themia.Framework.AspNetCore` | Framework.AspNetCore | ASP.NET integration |
 | `Themia.MultiTenancy` | MultiTenancy | tenant resolution/DI |
 | `Themia.Mediator` + `Themia.SourceGenerator` | Mediator/SourceGenerator | CQRS dispatch, compile-time, reflection-free |
@@ -186,6 +186,9 @@ convention) — kept apart from the allocator.
 
 ## Data layer (DECISION #1 — EF-default + sanctioned read-only Dapper hatch)
 
+> ⚠️ **SUPERSEDED 2026-06-11** by **DECISION #6 — Data-access peers & schema authority** (below).
+> Dapper is now a write-capable first-class peer, not a read-only hatch. Retained here for rationale/history.
+
 `Themia.Framework.Data.EFCore` (EF Core) is the **canonical, default** data layer — it enforces
 tenant isolation (global query filters) + audit + UoW centrally and abstracts the 3-DB SQL.
 **Dapper is allowed only as a controlled read-only escape-hatch** through a framework-sanctioned
@@ -196,6 +199,40 @@ Dapper risks **tenant-isolation bypass** (a critical leak) and **multiplies the 
 that EF hides. ezy-assets (Dapper) / Idevs (`SqlServiceBase`) implementations are not lifted
 wholesale — only their *patterns* (UoW, optimistic concurrency, row-lock, sequences) inform the
 abstractions.
+
+## Data-access peers & schema authority (DECISION #6 — 2026-06-11, supersedes #1)
+
+The 0.4.x work gave Dapper a full write path (`DapperUnitOfWork`, store-generated keys) and three
+engines (PostgreSQL · MySQL · SQL Server), so the original "EF-default, Dapper = read-only hatch"
+framing no longer matches the code. Resolved direction:
+
+1. **EF Core and Dapper are selectable first-class peers.** An adopter chooses one; the whole
+   framework runs on that choice. Modules stay access-agnostic — they code to
+   `Themia.Framework.Data.Abstractions` (`IRepository`/`IReadRepository`/`IUnitOfWork`); the host
+   registers either `Themia.Framework.Data.EFCore` or `Themia.Framework.Data.Dapper(.<engine>)`.
+   **One implementation app-wide** — not per-module EF/Dapper variants.
+2. **FluentMigrator is the single schema/DDL authority for all framework-owned tables**, across
+   both access layers and all engines (one migration with `IfDatabase(...)` branches — as
+   `Themia.Exceptional` already does). **No module uses `dotnet ef migrations add`.** Consequence:
+   `Themia.Modules.Scheduling`'s EF-generated, Postgres-typed `InitialScheduling` migration is
+   rewritten as FluentMigrator (and reconciled with Quartz.NET's own `qrtz_*` schema); a single
+   aggregating FluentMigrator runner collects every module's migrations and runs them per provider.
+3. **The gate on calling Dapper "first-class" is tenant-isolation parity with EF.** Through the
+   repositories/UoW, Dapper already matches EF (reads seed `WHERE tenant_id …`; writes put the tenant
+   predicate *inside* the UPDATE/DELETE and throw on 0 rows — tighter than EF's read-then-write). The
+   gap is structural: EF enforces isolation **by construction** (model-level query filters, default-safe),
+   Dapper enforces it **by convention** (only when access flows through the repo). The raw connection
+   (`IDapperConnectionContext.GetOpenConnectionAsync`) is an ambient, unguarded bypass. Acceptance
+   criteria to close it: (a) `ITenantQueryFactory.For<T>()` — already tenant-seeded — is the blessed
+   path for ad-hoc queries; (b) the raw connection becomes a conspicuous, reviewable escape hatch
+   (explicit bypass scope / segregated API); (c) a **`Themia.Analyzers` build-time rule** flags
+   raw-connection use outside the data-access assembly, making the safe path inescapable without
+   runtime reflection (per the project's `dotnet.md` "avoid reflection; prefer analyzers" rule).
+
+**Per-provider concurrency token** is the cross-cutting follow-up (the `ApplyConcurrencyTokens`
+landmine in `ThemiaDbContext`): Postgres `xmin` (no DDL), SQL Server `rowversion`, MySQL an
+app-updated token — FluentMigrator provisions the right column per engine, and the Dapper layer
+needs a matching concurrency story (it has none yet).
 
 ## Multi-database requirement
 
@@ -230,8 +267,8 @@ spec). Later phases extend (SQLite, Oracle) without public-surface breaks.
 ## Decisions
 
 **Resolved (2026-06-01):**
-1. ✅ **Data layer** — EF-default (canonical) + sanctioned **read-only** Dapper escape-hatch
-   (shares EF tx, tenant-safe); Phase 1 EF-only, open the hatch only on profiling. See Data layer §.
+1. ⚠️ **Data layer** — EF-default (canonical) + sanctioned **read-only** Dapper escape-hatch.
+   **SUPERSEDED by #6 (2026-06-11).** See Data layer §.
 2. ✅ **Sequences** — port `ISequenceProvider` into `Themia.Framework.Data` (tenant-aware,
    table-based, 3-DB, separate-tx semantic) + optional formatter. See §F.
 3. ✅ **Tooling** — move to Themia as a build-time family (`Themia.SourceGenerator` +
@@ -241,4 +278,12 @@ spec). Later phases extend (SQLite, Oracle) without public-surface breaks.
 5. ✅ **Phase-1 module set** — **Scheduling, ExceptionLogging, Identity, Storage** (the two
    specced + Identity + Storage). Identity + Storage next to be specced.
 
-_All open decisions resolved._
+**Resolved (2026-06-11):**
+6. ✅ **Data-access peers & schema authority** (supersedes #1) — EF Core and Dapper are **selectable
+   first-class peers** (one app-wide; modules code to `Data.Abstractions`); **FluentMigrator is the
+   single schema/DDL authority** for all framework-owned tables (no `dotnet ef migrations add`);
+   **gate on Dapper-as-peer = tenant-isolation parity with EF**, enforced by making the raw-connection
+   bypass conspicuous + an analyzer build-time rule. See Data-access peers & schema authority §.
+
+_All decisions resolved; #6 spawns implementation follow-ups (EF multi-provider, Scheduling
+FluentMigrator rewrite, raw-connection analyzer, per-provider concurrency token) — to be specced._
