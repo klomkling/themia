@@ -228,6 +228,11 @@ framing no longer matches the code. Resolved direction:
    (explicit bypass scope / segregated API); (c) a **`Themia.Analyzers` build-time rule** flags
    raw-connection use outside the data-access assembly, making the safe path inescapable without
    runtime reflection (per the project's `dotnet.md` "avoid reflection; prefer analyzers" rule).
+   The same analyzer work must also cover the **EF side's residual hole**: `DbSet<T>.Find/FindAsync`
+   bypasses `ThemiaDbContext`'s tenant post-check for already-tracked entities (EF identity-map
+   semantics; the guarded path is `DbContext.FindAsync<T>` / `EfReadRepository.GetByIdAsync` — see
+   `docs/2026-06-11-efcore-sqlserver-find-isolation-issue.md`). Rule: flag direct `DbSet.Find*` and
+   `Set<T>().Find*` calls outside the data layer, steering callers to the guarded APIs.
 
 **Per-provider concurrency token** is the cross-cutting follow-up (the `ApplyConcurrencyTokens`
 landmine in `ThemiaDbContext`): Postgres `xmin` (no DDL), SQL Server `rowversion`, MySQL an
