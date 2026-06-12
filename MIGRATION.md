@@ -10,6 +10,43 @@ with the *why* and concrete upgrade steps.
 - Each entry states: **What changed**, **Why**, and **How to upgrade** (before → after).
 - Non-breaking changes are *not* listed here — see the CHANGELOG.
 
+## 0.4.6
+
+### `AddThemiaExceptionalProvider` takes a `MigrationEngine`
+
+**What changed:** the provider-author extension `AddThemiaExceptionalProvider` (in `Themia.Exceptional`)
+replaced its `Action<IMigrationRunnerBuilder> configureRunner` + `string databaseDisplayName` parameters
+with a single `Themia.Data.Migrations.MigrationEngine engine`.
+
+**Why:** the FluentMigrator runner moved into the neutral `Themia.Data.Migrations` package so every
+neutral core and framework module shares one runner (DECISION #6). The engine enum replaces the
+per-call runner-builder callback.
+
+**Who is affected:** only third parties that call `AddThemiaExceptionalProvider` directly to back a
+custom dialect. Adopters using `AddThemiaExceptionalPostgres` / `…MySql` / `…SqlServer` are unaffected.
+
+**How to upgrade:**
+
+- Before:
+  ```csharp
+  services.AddThemiaExceptionalProvider(
+      dialect: myDialect,
+      configure: opt => opt.ApplicationName = "App",
+      configureRunner: rb => rb.AddPostgres(),
+      connectionString: connString,
+      databaseDisplayName: "PostgreSQL");
+  ```
+- After:
+  ```csharp
+  using Themia.Data.Migrations;
+
+  services.AddThemiaExceptionalProvider(
+      dialect: myDialect,
+      configure: opt => opt.ApplicationName = "App",
+      engine: MigrationEngine.Postgres,
+      connectionString: connString);
+  ```
+
 ## 0.4.5
 
 ### `AddThemiaPostgres` moved to `Themia.Framework.Data.EFCore.PostgreSql`
