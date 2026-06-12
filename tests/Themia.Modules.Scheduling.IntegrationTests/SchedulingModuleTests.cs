@@ -144,21 +144,17 @@ public abstract class SchedulingModuleTestsBase
         return services.BuildServiceProvider();
     }
 
-    private string DropHistoryIndexSql => ProviderName == DatabaseProviderNames.Postgres
-        ? "DROP INDEX scheduling.ix_execution_history_scheduler_trigger_fired"
-        : "DROP INDEX ix_execution_history_scheduler_trigger_fired ON scheduling.execution_history";
-
-    private string ClearVersionInfoSql => ProviderName == DatabaseProviderNames.Postgres
-        ? "DELETE FROM \"VersionInfo\""
-        : "DELETE FROM [VersionInfo]";
+    // Engine-specific maintenance SQL for the cutover test. Declared abstract so each engine supplies all of
+    // them — the compiler enforces completeness when a new engine is added, instead of a ternary silently
+    // falling through to the wrong dialect. Each must be schema-qualified and scoped to the scheduling objects.
+    protected abstract string DropHistoryIndexSql { get; }
+    protected abstract string ClearVersionInfoSql { get; }
+    protected abstract string HistoryIndexCountSql { get; }
 
     private async Task<bool> HistoryIndexExistsAsync(SchedulingDbContext context)
     {
         // SqlQueryRaw<int> maps a single-column result whose column is aliased "Value".
-        var sql = ProviderName == DatabaseProviderNames.Postgres
-            ? "SELECT COUNT(*) AS \"Value\" FROM pg_indexes WHERE schemaname = 'scheduling' AND indexname = 'ix_execution_history_scheduler_trigger_fired'"
-            : "SELECT COUNT(*) AS Value FROM sys.indexes WHERE name = 'ix_execution_history_scheduler_trigger_fired'";
-        var counts = await context.Database.SqlQueryRaw<int>(sql).ToListAsync();
+        var counts = await context.Database.SqlQueryRaw<int>(HistoryIndexCountSql).ToListAsync();
         return counts[0] > 0;
     }
 }
@@ -177,6 +173,13 @@ public sealed class PostgresSchedulingModuleTests : SchedulingModuleTestsBase, I
     protected override string ConnectionString => container.GetConnectionString();
     protected override string ProviderName => DatabaseProviderNames.Postgres;
 
+    protected override string DropHistoryIndexSql =>
+        "DROP INDEX scheduling.ix_execution_history_scheduler_trigger_fired";
+    protected override string ClearVersionInfoSql =>
+        "DELETE FROM public.\"VersionInfo\"";
+    protected override string HistoryIndexCountSql =>
+        "SELECT COUNT(*) AS \"Value\" FROM pg_indexes WHERE schemaname = 'scheduling' AND indexname = 'ix_execution_history_scheduler_trigger_fired'";
+
     public Task InitializeAsync() => container.StartAsync();
     public Task DisposeAsync() => container.DisposeAsync().AsTask();
 }
@@ -189,6 +192,16 @@ public sealed class SqlServerSchedulingModuleTests : SchedulingModuleTestsBase, 
 
     protected override string ConnectionString => container.GetConnectionString();
     protected override string ProviderName => DatabaseProviderNames.SqlServer;
+
+    protected override string DropHistoryIndexSql =>
+        "DROP INDEX ix_execution_history_scheduler_trigger_fired ON scheduling.execution_history";
+    protected override string ClearVersionInfoSql =>
+        "DELETE FROM [dbo].[VersionInfo]";
+    // sys.indexes names are unique per-table, not per-database — scope by object_id so an identically-named
+    // index on another table cannot produce a false positive.
+    protected override string HistoryIndexCountSql =>
+        "SELECT COUNT(*) AS Value FROM sys.indexes WHERE name = 'ix_execution_history_scheduler_trigger_fired' " +
+        "AND object_id = OBJECT_ID('scheduling.execution_history')";
 
     public Task InitializeAsync() => container.StartAsync();
     public Task DisposeAsync() => container.DisposeAsync().AsTask();
@@ -225,6 +238,10 @@ public sealed class SchedulingModuleConfigurationTests
 
         var module = new SchedulingModule();
 
+        // This exercises the module-level fail-fast in ToMigrationEngine, which throws before the runner is
+        // ever invoked. The migration's own IfDatabase unsupported-engine guard is defense-in-depth, kept in
+        // lockstep with ToMigrationEngine by the LOCKSTEP comment in SchedulingSchemaMigration; reaching it
+        // would require a live unsupported-engine database, which is out of scope until EF MySQL exists.
         await Assert.ThrowsAsync<NotSupportedException>(async () => await module.InitializeAsync(sp));
     }
 }

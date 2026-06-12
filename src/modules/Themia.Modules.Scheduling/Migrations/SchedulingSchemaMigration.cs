@@ -40,6 +40,11 @@ public sealed class SchedulingSchemaMigration : Migration
     // rather than left incomplete. Existence is captured up front, before any CREATE, so the checks read the
     // pre-migration state and never depend on statement ordering within Up(). On a fresh database every guard
     // is false and all objects are created; on subsequent runs VersionInfo skips this migration entirely.
+    //
+    // These existence guards are needed ONLY because this schema was previously managed by EF Core migrations
+    // (the EF→FM cutover). A greenfield FM-from-inception migration — e.g. Themia.Exceptional's
+    // ExceptionLogMigration — never has pre-existing objects without a VersionInfo row, so it does not (and
+    // need not) carry these guards.
     private void CreateSchemaAndTables()
     {
         var schemaExists = Schema.Schema(SchemaName).Exists();
