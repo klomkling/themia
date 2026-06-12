@@ -1,5 +1,7 @@
 using System.Reflection;
 using FluentMigrator.Runner;
+using FluentMigrator.Runner.Exceptions;
+using FluentMigrator.Runner.Initialization;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Themia.Data.Migrations;
@@ -19,8 +21,12 @@ public static class ThemiaMigrations
     /// </summary>
     /// <param name="engine">The target database engine.</param>
     /// <param name="connectionString">Connection string for the migration runner. Required.</param>
-    /// <param name="migrationAssemblies">One or more assemblies scanned for <c>[Migration]</c> types. At least one is required.</param>
-    /// <exception cref="ArgumentException">The connection string is null/whitespace, or no assemblies were supplied.</exception>
+    /// <param name="migrationAssemblies">
+    /// One or more assemblies scanned for <c>[Migration]</c> types. At least one is required, and the
+    /// supplied set must contain at least one migration — passing assemblies with no <c>[Migration]</c>
+    /// types is rejected rather than silently applying nothing.
+    /// </param>
+    /// <exception cref="ArgumentException">The connection string is null/whitespace, no assemblies were supplied, or the assemblies contain no <c>[Migration]</c> types.</exception>
     /// <exception cref="ArgumentNullException"><paramref name="migrationAssemblies"/> is null.</exception>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="engine"/> is not a known engine.</exception>
     /// <exception cref="InvalidOperationException">The migration failed to apply; the message names the engine.</exception>
@@ -31,45 +37,61 @@ public static class ThemiaMigrations
         if (migrationAssemblies.Length == 0)
             throw new ArgumentException("At least one migration assembly is required.", nameof(migrationAssemblies));
 
+        // One source of truth for per-engine knowledge (processor + display name). Resolved up front so an
+        // unknown engine fails as a clean guard before any infrastructure is built.
+        var (addProcessor, displayName) = Describe(engine);
+
         using var provider = new ServiceCollection()
             .AddFluentMigratorCore()
             .ConfigureRunner(rb =>
             {
-                AddProcessor(rb, engine);
+                addProcessor(rb);
                 rb.WithGlobalConnectionString(connectionString)
                   .ScanIn(migrationAssemblies).For.Migrations();
             })
             .BuildServiceProvider(false);
 
         using var scope = provider.CreateScope();
+        var serviceProvider = scope.ServiceProvider;
+
+        // Fail fast if the supplied assemblies carry no migrations: scanning happens in memory (no DB
+        // connection), so a wrong/empty assembly is caught before MigrateUp would silently no-op and leave
+        // the schema uncreated. This is independent of applied state, so idempotent re-runs still pass.
+        if (!HasMigrations(serviceProvider))
+            throw new ArgumentException(
+                "The supplied assemblies contain no FluentMigrator [Migration] types; nothing would be applied.",
+                nameof(migrationAssemblies));
+
         try
         {
-            scope.ServiceProvider.GetRequiredService<IMigrationRunner>().MigrateUp();
+            serviceProvider.GetRequiredService<IMigrationRunner>().MigrateUp();
         }
         catch (Exception ex)
         {
             throw new InvalidOperationException(
-                $"Themia.Data.Migrations: failed to apply migrations against {DisplayName(engine)}. " +
+                $"Themia.Data.Migrations: failed to apply migrations against {displayName}. " +
                 "Verify the connection string and that the principal has DDL permissions.", ex);
         }
     }
 
-    private static void AddProcessor(IMigrationRunnerBuilder rb, MigrationEngine engine)
+    private static bool HasMigrations(IServiceProvider serviceProvider)
     {
-        switch (engine)
+        var loader = serviceProvider.GetRequiredService<IMigrationInformationLoader>();
+        try
         {
-            case MigrationEngine.Postgres: rb.AddPostgres(); break;
-            case MigrationEngine.MySql: rb.AddMySql8(); break;
-            case MigrationEngine.SqlServer: rb.AddSqlServer(); break;
-            default: throw new ArgumentOutOfRangeException(nameof(engine), engine, "Unknown migration engine.");
+            return loader.LoadMigrations().Count > 0;
+        }
+        catch (MissingMigrationsException)
+        {
+            return false;
         }
     }
 
-    private static string DisplayName(MigrationEngine engine) => engine switch
+    private static (Action<IMigrationRunnerBuilder> AddProcessor, string DisplayName) Describe(MigrationEngine engine) => engine switch
     {
-        MigrationEngine.Postgres => "PostgreSQL",
-        MigrationEngine.MySql => "MySQL",
-        MigrationEngine.SqlServer => "SQL Server",
-        _ => engine.ToString(),
+        MigrationEngine.Postgres => (rb => rb.AddPostgres(), "PostgreSQL"),
+        MigrationEngine.MySql => (rb => rb.AddMySql8(), "MySQL"),
+        MigrationEngine.SqlServer => (rb => rb.AddSqlServer(), "SQL Server"),
+        _ => throw new ArgumentOutOfRangeException(nameof(engine), engine, "Unknown migration engine."),
     };
 }

@@ -38,4 +38,13 @@ public class ThemiaMigrationsGuardTests
         Assert.Throws<ArgumentOutOfRangeException>(
             () => ThemiaMigrations.Run((MigrationEngine)999, "Host=localhost", OneAssembly));
     }
+
+    [Fact]
+    public void Run_ShouldThrowArgumentException_WhenAssembliesContainNoMigrations()
+    {
+        // OneAssembly is this unit-test assembly, which has no [Migration] types. Discovery happens in
+        // memory (no DB), so Run must fail fast here rather than silently applying nothing at MigrateUp.
+        Assert.Throws<ArgumentException>(
+            () => ThemiaMigrations.Run(MigrationEngine.Postgres, "Host=localhost;Database=x", OneAssembly));
+    }
 }

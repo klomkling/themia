@@ -37,7 +37,14 @@ public static class ServiceCollectionExtensions
     /// <param name="services">The service collection.</param>
     /// <param name="dialect">The provider dialect (already carries its connection string).</param>
     /// <param name="configure">Required options callback; <see cref="ExceptionalOptions.ApplicationName"/> is validated at startup.</param>
-    /// <param name="engine">The database engine whose FluentMigrator processor applies the schema migration.</param>
+    /// <param name="engine">
+    /// The database engine whose FluentMigrator processor applies the schema migration. This <strong>must</strong>
+    /// correspond to the <paramref name="dialect"/>'s engine — they are supplied independently and are not
+    /// cross-checked, so a mismatch (e.g. <see cref="MigrationEngine.MySql"/> with a PostgreSQL dialect) would run
+    /// the wrong processor. Prefer the per-engine entry points (<c>AddThemiaExceptionalPostgres</c>/<c>…MySql</c>/
+    /// <c>…SqlServer</c>), which pair the dialect and engine for you; call this overload directly only when backing
+    /// a custom dialect.
+    /// </param>
     /// <param name="connectionString">Connection string passed to the migration runner. Required when <paramref name="runMigration"/> is <see langword="true"/>.</param>
     /// <param name="runMigration">When <see langword="true"/> (default), runs the schema migration immediately.</param>
     public static IServiceCollection AddThemiaExceptionalProvider(

@@ -1,6 +1,5 @@
-using FluentMigrator.Runner;
-using Microsoft.Extensions.DependencyInjection;
 using Testcontainers.PostgreSql;
+using Themia.Data.Migrations;
 using Themia.Exceptional;
 using Themia.Exceptional.Conformance;
 using Themia.Exceptional.Migrations;
@@ -23,13 +22,7 @@ public class PostgresExceptionStoreTests : ExceptionStoreConformanceTests, IAsyn
     public async Task InitializeAsync()
     {
         await container.StartAsync();
-        using var provider = new ServiceCollection()
-            .AddFluentMigratorCore()
-            .ConfigureRunner(rb => rb.AddPostgres().WithGlobalConnectionString(ConnString)
-                .ScanIn(typeof(ExceptionLogMigration).Assembly).For.Migrations())
-            .BuildServiceProvider(false);
-        using var scope = provider.CreateScope();
-        scope.ServiceProvider.GetRequiredService<IMigrationRunner>().MigrateUp();
+        ThemiaMigrations.Run(MigrationEngine.Postgres, ConnString, typeof(ExceptionLogMigration).Assembly);
     }
 
     public async Task DisposeAsync() => await container.DisposeAsync();

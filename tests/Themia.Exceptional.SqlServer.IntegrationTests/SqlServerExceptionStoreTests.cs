@@ -1,6 +1,5 @@
-using FluentMigrator.Runner;
-using Microsoft.Extensions.DependencyInjection;
 using Testcontainers.MsSql;
+using Themia.Data.Migrations;
 using Themia.Exceptional;
 using Themia.Exceptional.Conformance;
 using Themia.Exceptional.Migrations;
@@ -26,13 +25,7 @@ public class SqlServerExceptionStoreTests : ExceptionStoreConformanceTests, IAsy
     public async Task InitializeAsync()
     {
         await container.StartAsync();
-        using var provider = new ServiceCollection()
-            .AddFluentMigratorCore()
-            .ConfigureRunner(rb => rb.AddSqlServer().WithGlobalConnectionString(ConnString)
-                .ScanIn(typeof(ExceptionLogMigration).Assembly).For.Migrations())
-            .BuildServiceProvider(false);
-        using var scope = provider.CreateScope();
-        scope.ServiceProvider.GetRequiredService<IMigrationRunner>().MigrateUp();
+        ThemiaMigrations.Run(MigrationEngine.SqlServer, ConnString, typeof(ExceptionLogMigration).Assembly);
     }
 
     public async Task DisposeAsync() => await container.DisposeAsync();
