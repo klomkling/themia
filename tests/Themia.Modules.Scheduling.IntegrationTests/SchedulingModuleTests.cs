@@ -3,7 +3,9 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Testcontainers.MsSql;
 using Testcontainers.PostgreSql;
+using Themia.Framework.Data.EFCore.Abstractions;
 using Themia.Modules.Scheduling;
 using Themia.Quartz;
 using Xunit;
@@ -11,46 +13,31 @@ using Xunit;
 namespace Themia.Modules.Scheduling.IntegrationTests;
 
 /// <summary>
-/// Lifecycle integration tests for <see cref="SchedulingModule"/> against a real PostgreSQL instance:
-/// running the module's EF migration on <see cref="SchedulingModule.InitializeAsync"/> creates the
-/// scheduling schema, and the registered <see cref="IExecutionHistoryStore"/> resolves to the
-/// EF-backed store and round-trips data.
+/// Lifecycle integration tests for <see cref="SchedulingModule"/> against a real database:
+/// <see cref="SchedulingModule.InitializeAsync"/> applies the FluentMigrator schema migration, and the
+/// registered <see cref="IExecutionHistoryStore"/> resolves to the EF-backed store and round-trips data.
+/// Run once per engine via the derived classes.
 /// </summary>
-[Trait("Category", "Integration")]
-public class SchedulingModuleTests : IAsyncLifetime
+public abstract class SchedulingModuleTestsBase
 {
-    private readonly PostgreSqlContainer container =
-        new PostgreSqlBuilder("postgres:16-alpine")
-            .WithDatabase("themia_scheduling_module_tests")
-            .WithUsername("postgres")
-            .WithPassword("postgres")
-            .WithCleanUp(true)
-            .Build();
-
-    public Task InitializeAsync() => container.StartAsync();
-
-    public Task DisposeAsync() => container.DisposeAsync().AsTask();
+    protected abstract string ConnectionString { get; }
+    protected abstract string ProviderName { get; }
 
     [Fact]
-    public async Task InitializeAsync_RunsMigration_AndStoreRoundTrips()
+    public async Task InitializeAsync_RunsFmMigration_AndStoreRoundTrips()
     {
         var provider = BuildModuleServices();
         var module = new SchedulingModule(new SchedulingModuleOptions { SchedulerName = "module-test" });
 
-        // Act: run module startup → applies the InitialScheduling migration.
         await module.InitializeAsync(provider);
 
-        // Assert (a): the scheduling schema/tables exist — the migration ran.
         await using var scope = provider.CreateAsyncScope();
         var context = scope.ServiceProvider.GetRequiredService<SchedulingDbContext>();
-        var pendingMigrations = await context.Database.GetPendingMigrationsAsync();
-        Assert.Empty(pendingMigrations);
 
-        // A query against the migrated table succeeds (would throw if the table were absent).
+        // The table exists (FM migration applied) — CountAsync would throw if it were absent.
         var existingCount = await context.ExecutionHistory.CountAsync();
         Assert.Equal(0, existingCount);
 
-        // Assert (b): IExecutionHistoryStore resolves to the EF-backed store and round-trips.
         var store = scope.ServiceProvider.GetRequiredService<IExecutionHistoryStore>();
         Assert.IsType<EfExecutionHistoryStore>(store);
 
@@ -92,12 +79,12 @@ public class SchedulingModuleTests : IAsyncLifetime
         var authorize = provider.GetRequiredService<ThemiaQuartzOptions>().Authorize;
         Assert.NotNull(authorize);
 
-        // Authenticated context → true.
-        var authenticatedCtx = new DefaultHttpContext();
-        authenticatedCtx.User = new ClaimsPrincipal(new ClaimsIdentity(authenticationType: "test"));
+        var authenticatedCtx = new DefaultHttpContext
+        {
+            User = new ClaimsPrincipal(new ClaimsIdentity(authenticationType: "test")),
+        };
         Assert.True(await authorize!(authenticatedCtx));
 
-        // Anonymous context (no identity / not authenticated) → false.
         var anonymousCtx = new DefaultHttpContext();
         Assert.False(await authorize(anonymousCtx));
     }
@@ -107,17 +94,49 @@ public class SchedulingModuleTests : IAsyncLifetime
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["ConnectionStrings:Default"] = container.GetConnectionString(),
+                ["ConnectionStrings:Default"] = ConnectionString,
             })
             .Build();
 
         var services = new ServiceCollection();
         services.AddSingleton<IConfiguration>(configuration);
         services.AddLogging();
+        services.AddSingleton<IDatabaseProvider>(new FakeDatabaseProvider(ProviderName));
 
-        var module = new SchedulingModule(new SchedulingModuleOptions { SchedulerName = "module-test" });
-        module.ConfigureServices(services);
+        new SchedulingModule(new SchedulingModuleOptions { SchedulerName = "module-test" })
+            .ConfigureServices(services);
 
         return services.BuildServiceProvider();
     }
+}
+
+[Trait("Category", "Integration")]
+public sealed class PostgresSchedulingModuleTests : SchedulingModuleTestsBase, IAsyncLifetime
+{
+    private readonly PostgreSqlContainer container =
+        new PostgreSqlBuilder("postgres:16-alpine")
+            .WithDatabase("themia_scheduling_module_tests")
+            .WithUsername("postgres")
+            .WithPassword("postgres")
+            .WithCleanUp(true)
+            .Build();
+
+    protected override string ConnectionString => container.GetConnectionString();
+    protected override string ProviderName => DatabaseProviderNames.Postgres;
+
+    public Task InitializeAsync() => container.StartAsync();
+    public Task DisposeAsync() => container.DisposeAsync().AsTask();
+}
+
+[Trait("Category", "Integration")]
+public sealed class SqlServerSchedulingModuleTests : SchedulingModuleTestsBase, IAsyncLifetime
+{
+    private readonly MsSqlContainer container =
+        new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-CU14-ubuntu-22.04").Build();
+
+    protected override string ConnectionString => container.GetConnectionString();
+    protected override string ProviderName => DatabaseProviderNames.SqlServer;
+
+    public Task InitializeAsync() => container.StartAsync();
+    public Task DisposeAsync() => container.DisposeAsync().AsTask();
 }
