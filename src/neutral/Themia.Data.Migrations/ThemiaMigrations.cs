@@ -29,7 +29,7 @@ public static class ThemiaMigrations
     /// <exception cref="ArgumentException">The connection string is null/whitespace, no assemblies were supplied, or the assemblies contain no <c>[Migration]</c> types.</exception>
     /// <exception cref="ArgumentNullException"><paramref name="migrationAssemblies"/> is null.</exception>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="engine"/> is not a known engine.</exception>
-    /// <exception cref="InvalidOperationException">The migration failed to apply; the message names the engine.</exception>
+    /// <exception cref="InvalidOperationException">The migrations could not be loaded (e.g. duplicate version numbers) or failed to apply; the message names the engine.</exception>
     public static void Run(MigrationEngine engine, string connectionString, params Assembly[] migrationAssemblies)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(connectionString);
@@ -54,10 +54,29 @@ public static class ThemiaMigrations
         using var scope = provider.CreateScope();
         var serviceProvider = scope.ServiceProvider;
 
-        // Fail fast if the supplied assemblies carry no migrations: scanning happens in memory (no DB
+        // Fail fast if the supplied assemblies carry no migrations: discovery happens in memory (no DB
         // connection), so a wrong/empty assembly is caught before MigrateUp would silently no-op and leave
-        // the schema uncreated. This is independent of applied state, so idempotent re-runs still pass.
-        if (!HasMigrations(serviceProvider))
+        // the schema uncreated. Discovery is independent of applied state, so idempotent re-runs still pass.
+        // (MigrateUp re-enumerates internally; this extra in-memory pass is startup-once and negligible.)
+        int migrationCount;
+        try
+        {
+            migrationCount = serviceProvider.GetRequiredService<IMigrationInformationLoader>().LoadMigrations().Count;
+        }
+        catch (MissingMigrationsException)
+        {
+            migrationCount = 0;
+        }
+        catch (Exception ex)
+        {
+            // Duplicate version numbers and other discovery failures are real migration errors — surface
+            // them through a wrap (not raw), with a message that fits the load stage rather than DDL/permissions.
+            throw new InvalidOperationException(
+                $"Themia.Data.Migrations: failed to load migrations for {displayName}. " +
+                "The supplied migration assemblies could not be enumerated (e.g. duplicate migration version numbers).", ex);
+        }
+
+        if (migrationCount == 0)
             throw new ArgumentException(
                 "The supplied assemblies contain no FluentMigrator [Migration] types; nothing would be applied.",
                 nameof(migrationAssemblies));
@@ -71,19 +90,6 @@ public static class ThemiaMigrations
             throw new InvalidOperationException(
                 $"Themia.Data.Migrations: failed to apply migrations against {displayName}. " +
                 "Verify the connection string and that the principal has DDL permissions.", ex);
-        }
-    }
-
-    private static bool HasMigrations(IServiceProvider serviceProvider)
-    {
-        var loader = serviceProvider.GetRequiredService<IMigrationInformationLoader>();
-        try
-        {
-            return loader.LoadMigrations().Count > 0;
-        }
-        catch (MissingMigrationsException)
-        {
-            return false;
         }
     }
 
