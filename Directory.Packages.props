@@ -32,7 +32,7 @@
     <PackageVersion Include="FluentValidation" Version="12.1.1" />
     <!-- Caching providers -->
     <PackageVersion Include="StackExchange.Redis" Version="2.13.17" />
-    <PackageVersion Include="MessagePack" Version="3.1.6" />
+    <PackageVersion Include="MessagePack" Version="3.1.7" />
     <!-- Logging (Serilog) -->
     <PackageVersion Include="Serilog" Version="4.3.1" />
     <PackageVersion Include="Serilog.Extensions.Logging" Version="10.0.0" />
