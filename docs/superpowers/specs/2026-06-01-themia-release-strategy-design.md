@@ -36,8 +36,10 @@ out as PATCH releases.
 
 **Sub-milestone increments ship as PATCH** (observed practice, ratified 2026-06-11). A milestone
 that builds out incrementally — e.g. the **0.4.x data layer** (`0.4.1` PostgreSQL Dapper → `0.4.2`
-EF write-path → `0.4.3` MySQL → `0.4.4` SQL Server → `0.4.5+` EF multi-provider + FluentMigrator
-standardization) — ships each engine/capability as a PATCH **within** the milestone's MINOR rather
+EF write-path → `0.4.3` MySQL → `0.4.4` SQL Server (Dapper) → `0.4.5` EF SQL Server → `0.4.6`
+FluentMigrator-authority foundation → `0.4.7` Scheduling EF→FM + persistent Quartz → `0.4.8`
+raw-connection analyzer gate; EF MySQL deferred on Pomelo's EF Core 10 build) — ships each
+engine/capability as a PATCH **within** the milestone's MINOR rather
 than spending a new MINOR per package. The MINOR (`0.5.0`) is reserved for the *next* milestone
 (Phase 2 modules). Pre-1.0, the occasional behavior/contract change inside such a PATCH is
 acceptable (`0.x` allows it) provided it's noted in `CHANGELOG.md` / `MIGRATION.md`.
