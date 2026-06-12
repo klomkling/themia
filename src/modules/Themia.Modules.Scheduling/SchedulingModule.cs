@@ -3,7 +3,9 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
 using Quartz;
+using Quartz.Logging;
 using Themia.Data.Migrations;
 using Themia.Framework.Core.Modules;
 using Themia.Framework.Data.EFCore.Abstractions;
@@ -182,7 +184,7 @@ public sealed class SchedulingModule : ThemiaModuleBase
                 // plugin via the scheduler context by UseThemiaQuartz at dashboard-map time.
                 q.SetProperty(
                     "quartz.plugin.recentHistory.type",
-                    "Themia.Quartz.ExecutionHistoryPlugin, Themia.Quartz");
+                    $"{typeof(ExecutionHistoryPlugin).FullName}, {typeof(ExecutionHistoryPlugin).Assembly.GetName().Name}");
             });
 
             services.AddQuartzHostedService(h => h.WaitForJobsToComplete = true);
@@ -194,24 +196,51 @@ public sealed class SchedulingModule : ThemiaModuleBase
     /// The schema migration runs synchronously via <c>ThemiaMigrations.Run</c> (FluentMigrator's runner is
     /// synchronous), so <paramref name="cancellationToken"/> is honored at the boundary — observed before the
     /// migration starts — but cannot interrupt an in-flight <c>MigrateUp</c>.
+    /// <para>
+    /// When <see cref="SchedulingModuleOptions.UsePersistentStore"/> is enabled, after the migration this also
+    /// seeds the EF-backed <see cref="IExecutionHistoryStore"/> onto the scheduler context. This runs before the
+    /// Quartz hosted service starts the scheduler, so <see cref="ExecutionHistoryPlugin"/>'s <c>Start</c> caches
+    /// the EF store rather than its in-proc fallback — avoiding the split-brain where execution history would be
+    /// silently written to a discarded in-memory store.
+    /// </para>
     /// </remarks>
-    public override ValueTask InitializeAsync(IServiceProvider serviceProvider, CancellationToken cancellationToken = default)
+    public override async ValueTask InitializeAsync(IServiceProvider serviceProvider, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(serviceProvider);
         cancellationToken.ThrowIfCancellationRequested();
 
-        using var scope = serviceProvider.CreateScope();
-        var provider = scope.ServiceProvider.GetRequiredService<IDatabaseProvider>();
-        var connectionString = scope.ServiceProvider.GetRequiredService<IConfiguration>().GetConnectionString(ConnectionStringName)
-            ?? throw new InvalidOperationException(
-                $"Connection string '{ConnectionStringName}' was not found; the scheduling module requires it.");
+        string connectionString;
+        IDatabaseProvider provider;
+        using (var scope = serviceProvider.CreateScope())
+        {
+            provider = scope.ServiceProvider.GetRequiredService<IDatabaseProvider>();
+            connectionString = scope.ServiceProvider.GetRequiredService<IConfiguration>().GetConnectionString(ConnectionStringName)
+                ?? throw new InvalidOperationException(
+                    $"Connection string '{ConnectionStringName}' was not found; the scheduling module requires it.");
+        }
 
         ThemiaMigrations.Run(
             ToMigrationEngine(provider.ProviderName),
             connectionString,
             typeof(Migrations.SchedulingSchemaMigration).Assembly);
 
-        return ValueTask.CompletedTask;
+        if (options.UsePersistentStore)
+        {
+            // Building the scheduler here (before the hosted service) reads Quartz's process-global LogContext.
+            // Point it at this app's ILoggerFactory so Quartz logs through DI (its default is console) and never
+            // captures a stale/disposed provider. Quartz owns exactly one LogContext per process, so this is the
+            // app's logging wiring rather than a per-instance override.
+            LogContext.SetCurrentLogProvider(serviceProvider.GetRequiredService<ILoggerFactory>());
+
+            // Seed the execution-history store onto the scheduler context BEFORE the hosted service starts the
+            // scheduler, so ExecutionHistoryPlugin.Start() caches the EF store rather than the in-proc fallback.
+            // GetScheduler() builds the scheduler (the qrtz_* tables created above must already exist); the
+            // hosted service later reuses and starts this same instance.
+            var schedulerFactory = serviceProvider.GetRequiredService<ISchedulerFactory>();
+            var scheduler = await schedulerFactory.GetScheduler(cancellationToken).ConfigureAwait(false);
+            var historyStore = serviceProvider.GetRequiredService<IExecutionHistoryStore>();
+            scheduler.Context.SetExecutionHistoryStore(historyStore);
+        }
     }
 
     // Reads a singleton instance registered via AddSingleton(instance)/TryAddSingleton(instance) straight

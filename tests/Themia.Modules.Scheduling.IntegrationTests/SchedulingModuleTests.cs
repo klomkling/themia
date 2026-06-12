@@ -155,6 +155,42 @@ public abstract class SchedulingModuleTestsBase
     }
 
     [Fact]
+    public async Task PersistentScheduler_RecordsExecutionHistory_ToEfStore()
+    {
+        var provider = BuildModuleServices();
+        await new SchedulingModule(new SchedulingModuleOptions { SchedulerName = "module-test" }).InitializeAsync(provider);
+
+        // Mirror the restart test: Quartz's LogContext is a process-global static; point it at this provider's
+        // live ILoggerFactory so the scheduler doesn't log through a disposed factory (ObjectDisposedException).
+        LogContext.SetCurrentLogProvider(provider.GetRequiredService<ILoggerFactory>());
+
+        var factory = provider.GetRequiredService<ISchedulerFactory>();
+        var scheduler = await factory.GetScheduler();
+        await scheduler.Start();
+
+        var jobKey = new JobKey("history-job", "history-group");
+        var job = JobBuilder.Create<NoOpJob>().WithIdentity(jobKey).Build();
+        var trigger = TriggerBuilder.Create().WithIdentity("history-trigger", "history-group").ForJob(jobKey).StartNow().Build();
+        await scheduler.ScheduleJob(job, trigger);
+
+        // Wait for the job to fire and the history listener to write to the EF store (the SAME singleton the
+        // plugin must use). Without FIX 1 the plugin caches the in-proc store and this stays 0.
+        var store = provider.GetRequiredService<IExecutionHistoryStore>();
+        Assert.IsType<EfExecutionHistoryStore>(store);
+        var recorded = false;
+        for (var i = 0; i < 50 && !recorded; i++)
+        {
+            await Task.Delay(100);
+            if (await store.GetTotalJobsExecuted() > 0) recorded = true;
+        }
+
+        await scheduler.Shutdown(waitForJobsToComplete: true);
+        await provider.DisposeAsync();
+
+        Assert.True(recorded, "The job execution was not recorded in the EF execution-history store — the plugin likely bound to the in-proc fallback store.");
+    }
+
+    [Fact]
     public void ConfigureServices_RegistersStoreAndDashboardOptions()
     {
         var provider = BuildModuleServices();
