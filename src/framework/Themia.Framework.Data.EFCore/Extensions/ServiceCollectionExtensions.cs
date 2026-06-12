@@ -14,6 +14,11 @@ public static class ServiceCollectionExtensions
     /// <summary>
     /// Registers a Themia DbContext with a custom database provider.
     /// </summary>
+    /// <remarks>
+    /// The <paramref name="provider"/> is also registered as a singleton <see cref="IDatabaseProvider"/> so
+    /// modules can resolve the app's active engine. Registration uses <c>TryAdd</c> — the first call wins, so
+    /// an app that registers multiple Themia contexts converges on one engine (the expected configuration).
+    /// </remarks>
     /// <typeparam name="TContext">DbContext type derived from <see cref="ThemiaDbContext"/>.</typeparam>
     /// <param name="services">Service collection.</param>
     /// <param name="provider">Database provider implementation.</param>

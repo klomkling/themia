@@ -60,32 +60,38 @@ public abstract class SchedulingModuleTestsBase
     }
 
     [Fact]
-    public async Task InitializeAsync_IsIdempotent_WhenSchedulingSchemaAlreadyExists()
+    public async Task InitializeAsync_AdoptsExistingSchema_AndRestoresMissingIndex_OnCutover()
     {
         var provider = BuildModuleServices();
-
-        // Simulate a pre-0.4.7 database whose scheduling schema already exists but has no FluentMigrator
-        // VersionInfo. Without the migration's existence guards, Create.Schema would throw here.
-        await using (var seedScope = provider.CreateAsyncScope())
-        {
-            var seedContext = seedScope.ServiceProvider.GetRequiredService<SchedulingDbContext>();
-            await seedContext.Database.ExecuteSqlRawAsync("CREATE SCHEMA scheduling");
-        }
-
         var module = new SchedulingModule(new SchedulingModuleOptions { SchedulerName = "module-test" });
 
-        // Must not throw — the guard adopts the existing schema and creates the tables alongside it.
+        // First run creates the full schema: both tables, the index, and the FluentMigrator VersionInfo row.
         await module.InitializeAsync(provider);
 
         await using var scope = provider.CreateAsyncScope();
+        var context = scope.ServiceProvider.GetRequiredService<SchedulingDbContext>();
+
+        // Simulate the EF→FM cutover against a partially-degraded database: the tables remain, the index has
+        // been lost, and FluentMigrator has no record of the migration (a pre-0.4.7 deployment had no
+        // VersionInfo). Without per-object guards the re-run would either fail on CREATE TABLE (already exists)
+        // or silently skip the missing index behind the table guard.
+        await context.Database.ExecuteSqlRawAsync(DropHistoryIndexSql);
+        await context.Database.ExecuteSqlRawAsync(ClearVersionInfoSql);
+        Assert.False(await HistoryIndexExistsAsync(context));
+
+        // Re-run must adopt the existing tables (no "already exists" failure) AND recreate the missing index.
+        await module.InitializeAsync(provider);
+
+        Assert.True(await HistoryIndexExistsAsync(context));
+
         var store = scope.ServiceProvider.GetRequiredService<IExecutionHistoryStore>();
         await store.Save(new ExecutionHistoryEntry
         {
-            FireInstanceId = "idem-1",
+            FireInstanceId = "cutover-1",
             SchedulerName = "module-test",
             ActualFireTimeUtc = DateTimeOffset.UtcNow,
         });
-        Assert.NotNull(await store.Get("idem-1"));
+        Assert.NotNull(await store.Get("cutover-1"));
     }
 
     [Fact]
@@ -137,6 +143,24 @@ public abstract class SchedulingModuleTestsBase
 
         return services.BuildServiceProvider();
     }
+
+    private string DropHistoryIndexSql => ProviderName == DatabaseProviderNames.Postgres
+        ? "DROP INDEX scheduling.ix_execution_history_scheduler_trigger_fired"
+        : "DROP INDEX ix_execution_history_scheduler_trigger_fired ON scheduling.execution_history";
+
+    private string ClearVersionInfoSql => ProviderName == DatabaseProviderNames.Postgres
+        ? "DELETE FROM \"VersionInfo\""
+        : "DELETE FROM [VersionInfo]";
+
+    private async Task<bool> HistoryIndexExistsAsync(SchedulingDbContext context)
+    {
+        // SqlQueryRaw<int> maps a single-column result whose column is aliased "Value".
+        var sql = ProviderName == DatabaseProviderNames.Postgres
+            ? "SELECT COUNT(*) AS \"Value\" FROM pg_indexes WHERE schemaname = 'scheduling' AND indexname = 'ix_execution_history_scheduler_trigger_fired'"
+            : "SELECT COUNT(*) AS Value FROM sys.indexes WHERE name = 'ix_execution_history_scheduler_trigger_fired'";
+        var counts = await context.Database.SqlQueryRaw<int>(sql).ToListAsync();
+        return counts[0] > 0;
+    }
 }
 
 [Trait("Category", "Integration")]
@@ -168,4 +192,39 @@ public sealed class SqlServerSchedulingModuleTests : SchedulingModuleTestsBase, 
 
     public Task InitializeAsync() => container.StartAsync();
     public Task DisposeAsync() => container.DisposeAsync().AsTask();
+}
+
+/// <summary>
+/// Startup fail-fast contract tests for <see cref="SchedulingModule.InitializeAsync"/> that need no database
+/// — the guards throw before any connection is opened.
+/// </summary>
+public sealed class SchedulingModuleConfigurationTests
+{
+    [Fact]
+    public async Task InitializeAsync_Throws_WhenConnectionStringMissing()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<IConfiguration>(new ConfigurationBuilder().Build());
+        services.AddSingleton<IDatabaseProvider>(new FakeDatabaseProvider(DatabaseProviderNames.Postgres));
+        using var sp = services.BuildServiceProvider();
+
+        var module = new SchedulingModule();
+
+        await Assert.ThrowsAsync<InvalidOperationException>(async () => await module.InitializeAsync(sp));
+    }
+
+    [Fact]
+    public async Task InitializeAsync_Throws_WhenProviderUnsupported()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<IConfiguration>(new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?> { ["ConnectionStrings:Default"] = "Host=unused" })
+            .Build());
+        services.AddSingleton<IDatabaseProvider>(new FakeDatabaseProvider("mysql"));
+        using var sp = services.BuildServiceProvider();
+
+        var module = new SchedulingModule();
+
+        await Assert.ThrowsAsync<NotSupportedException>(async () => await module.InitializeAsync(sp));
+    }
 }

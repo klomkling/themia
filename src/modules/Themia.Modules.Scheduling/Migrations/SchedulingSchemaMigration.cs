@@ -30,17 +30,28 @@ public sealed class SchedulingSchemaMigration : Migration
                 "is not supported; add a migration branch for it."));
     }
 
+    private const string HistoryIndexName = "ix_execution_history_scheduler_trigger_fired";
+
     // Idempotent against a pre-existing scheduling schema. A database deployed before 0.4.7 already carries
     // these tables (created by the old EF migration) but has no FluentMigrator VersionInfo row, so this Up()
-    // runs on the first FM execution. The existence guards let it adopt the existing objects — and record the
-    // version — instead of failing on CREATE. On a fresh database every guard is false and all objects are
-    // created; on subsequent runs VersionInfo skips this migration entirely.
+    // runs on the first FM execution. The existence guards let it adopt the objects that are already there —
+    // and record the version — instead of failing on CREATE. Each object (schema, each table, the index) is
+    // guarded independently so a partially-present schema (e.g. table present but index dropped) is repaired
+    // rather than left incomplete. Existence is captured up front, before any CREATE, so the checks read the
+    // pre-migration state and never depend on statement ordering within Up(). On a fresh database every guard
+    // is false and all objects are created; on subsequent runs VersionInfo skips this migration entirely.
     private void CreateSchemaAndTables()
     {
-        if (!Schema.Schema(SchemaName).Exists())
+        var schemaExists = Schema.Schema(SchemaName).Exists();
+        var historyTableExists = Schema.Schema(SchemaName).Table("execution_history").Exists();
+        var historyIndexExists = historyTableExists
+            && Schema.Schema(SchemaName).Table("execution_history").Index(HistoryIndexName).Exists();
+        var statsTableExists = Schema.Schema(SchemaName).Table("scheduler_stats").Exists();
+
+        if (!schemaExists)
             Create.Schema(SchemaName);
 
-        if (!Schema.Schema(SchemaName).Table("execution_history").Exists())
+        if (!historyTableExists)
         {
             Create.Table("execution_history").InSchema(SchemaName)
                 .WithColumn("fire_instance_id").AsString(256).NotNullable().PrimaryKey()
@@ -54,15 +65,18 @@ public sealed class SchedulingSchemaMigration : Migration
                 .WithColumn("vetoed").AsBoolean().NotNullable()
                 .WithColumn("finished_time_utc").AsDateTimeOffset().Nullable()
                 .WithColumn("exception_message").AsString(4000).Nullable();
+        }
 
-            Create.Index("ix_execution_history_scheduler_trigger_fired")
+        if (!historyIndexExists)
+        {
+            Create.Index(HistoryIndexName)
                 .OnTable("execution_history").InSchema(SchemaName)
                 .OnColumn("scheduler_name").Ascending()
                 .OnColumn("trigger").Ascending()
                 .OnColumn("actual_fire_time_utc").Ascending();
         }
 
-        if (!Schema.Schema(SchemaName).Table("scheduler_stats").Exists())
+        if (!statsTableExists)
         {
             Create.Table("scheduler_stats").InSchema(SchemaName)
                 .WithColumn("scheduler_name").AsString(256).NotNullable().PrimaryKey()

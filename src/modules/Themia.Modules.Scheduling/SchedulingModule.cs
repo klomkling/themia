@@ -68,7 +68,7 @@ public sealed class SchedulingModule : ThemiaModuleBase
         name: "Themia.Scheduling",
         displayName: "Scheduling",
         description: "Quartz.NET scheduler dashboard with EF-backed execution history.",
-        version: new Version(0, 4, 0, 0));
+        version: new Version(0, 4, 7, 0));
 
     /// <inheritdoc />
     public override void ConfigureServices(IServiceCollection services)
@@ -121,9 +121,15 @@ public sealed class SchedulingModule : ThemiaModuleBase
     }
 
     /// <inheritdoc />
+    /// <remarks>
+    /// The schema migration runs synchronously via <c>ThemiaMigrations.Run</c> (FluentMigrator's runner is
+    /// synchronous), so <paramref name="cancellationToken"/> is honored at the boundary — observed before the
+    /// migration starts — but cannot interrupt an in-flight <c>MigrateUp</c>.
+    /// </remarks>
     public override ValueTask InitializeAsync(IServiceProvider serviceProvider, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(serviceProvider);
+        cancellationToken.ThrowIfCancellationRequested();
 
         using var scope = serviceProvider.CreateScope();
         var provider = scope.ServiceProvider.GetRequiredService<IDatabaseProvider>();
