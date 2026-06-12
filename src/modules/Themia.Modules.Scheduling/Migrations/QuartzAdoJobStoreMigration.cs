@@ -15,6 +15,9 @@ namespace Themia.Modules.Scheduling.Migrations;
 [Migration(202606130001, "Themia.Scheduling: create Quartz AdoJobStore (qrtz_*) schema")]
 public sealed class QuartzAdoJobStoreMigration : Migration
 {
+    // Used by the fluent schema guards/creation in CreateSchemaAndTables. The verbatim Quartz DDL constants
+    // and SqlServerDrop carry this name literally (for byte-for-byte fidelity with Quartz's canonical SQL),
+    // so changing it here must be mirrored in those SQL strings — it is not a standalone knob.
     private const string SchemaName = "quartz";
 
     /// <inheritdoc />
@@ -58,7 +61,7 @@ public sealed class QuartzAdoJobStoreMigration : Migration
     {
         // Tables carry FKs; dropping the schema with CASCADE (PG) / dropping tables first (SQL Server)
         // is simplest. Down() runs only on explicit rollback, never in the MigrateUp startup path.
-        IfDatabase("postgres").Delegate(() => Execute.Sql("DROP SCHEMA IF EXISTS quartz CASCADE;"));
+        IfDatabase("postgres").Delegate(() => Execute.Sql($"DROP SCHEMA IF EXISTS {SchemaName} CASCADE;"));
         IfDatabase("sqlserver").Delegate(() => Execute.Sql(SqlServerDrop));
     }
 

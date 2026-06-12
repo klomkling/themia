@@ -230,7 +230,9 @@ public sealed class SchedulingModule : ThemiaModuleBase
             // Building the scheduler here (before the hosted service) reads Quartz's process-global LogContext.
             // Point it at this app's ILoggerFactory so Quartz logs through DI (its default is console) and never
             // captures a stale/disposed provider. Quartz owns exactly one LogContext per process, so this is the
-            // app's logging wiring rather than a per-instance override.
+            // app's logging wiring rather than a per-instance override. If GetScheduler below throws, the global
+            // keeps referencing serviceProvider's ILoggerFactory — benign, as serviceProvider is the host's
+            // process-lifetime root, not a throwaway, so the factory is not disposed out from under it.
             LogContext.SetCurrentLogProvider(serviceProvider.GetRequiredService<ILoggerFactory>());
 
             // Seed the execution-history store onto the scheduler context BEFORE the hosted service starts the
