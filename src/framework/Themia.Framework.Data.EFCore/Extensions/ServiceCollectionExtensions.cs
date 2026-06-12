@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Themia.Framework.Data.EFCore.Abstractions;
 
 namespace Themia.Framework.Data.EFCore.Extensions;
@@ -31,6 +32,11 @@ public static class ServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(configuration);
 
         provider.ConfigureServices(services, configuration);
+
+        // Make the active provider discoverable so modules can resolve the app's engine
+        // (e.g. Themia.Modules.Scheduling maps it to a MigrationEngine). TryAdd: an app with
+        // multiple Themia contexts shares one engine, so the first registration wins.
+        services.TryAddSingleton<IDatabaseProvider>(provider);
 
         // The (serviceProvider, options) overload rebuilds options per scope, so the provider can
         // resolve the request-scoped ITenantAccessor for DB-per-tenant connection routing.
