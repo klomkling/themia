@@ -180,8 +180,9 @@ public sealed class SchedulingModule : ThemiaModuleBase
                 // Themia owns the execution-history plugin now (was configured by the host's Quartz wiring).
                 // Registered as a Quartz scheduler plugin (not a bare job listener) so its Initialize sets the
                 // listener Name and self-registers as a job listener, and its Start wires the execution-history
-                // store — the lifecycle the plugin is designed for. The DI-backed EF store is surfaced to the
-                // plugin via the scheduler context by UseThemiaQuartz at dashboard-map time.
+                // store — the lifecycle the plugin is designed for. The DI-backed EF store is seeded onto the
+                // scheduler context in InitializeAsync, before the hosted service starts the scheduler, so the
+                // plugin reads it from there at Start().
                 q.SetProperty(
                     "quartz.plugin.recentHistory.type",
                     $"{typeof(ExecutionHistoryPlugin).FullName}, {typeof(ExecutionHistoryPlugin).Assembly.GetName().Name}");
