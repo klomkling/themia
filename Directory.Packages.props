@@ -70,5 +70,7 @@
     <!-- Quartz (Themia.Quartz neutral core): scheduler + SilkierQuartz vendored dashboard view engine -->
     <PackageVersion Include="Handlebars.Net" Version="2.1.6" />
     <PackageVersion Include="Quartz" Version="3.18.1" />
+    <PackageVersion Include="Quartz.Serialization.SystemTextJson" Version="3.18.1" />
+    <PackageVersion Include="Quartz.Extensions.Hosting" Version="3.18.1" />
   </ItemGroup>
 </Project>
