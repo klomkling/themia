@@ -17,9 +17,11 @@ This is the **foundation slice** of the FM-authority program. The user-approved 
 - **0.4.6 (this spec):** the shared `Themia.Data.Migrations` runner + migrate the three Exceptional
   packages onto it. Low-risk — Exceptional's `ExceptionLogMigration` is **unchanged**; only the runner
   relocates, and Exceptional's existing 3-engine integration suites prove it end-to-end.
-- **0.4.7 (deferred, own spec):** Scheduling EF→FM (its 2 tables) + persistent Quartz `AdoJobStore`
-  (default-on) with `UseSystemTextJsonSerializer()` + the `qrtz_*` schema authored as per-engine FM
-  migrations, all run through this runner.
+- **0.4.7 (own spec):** Scheduling EF→FM (its 2 tables), provider-agnostic over PostgreSQL + SQL Server,
+  run through this runner.
+- **0.4.8 (deferred, own spec):** persistent Quartz `AdoJobStore` (default-on) with
+  `UseSystemTextJsonSerializer()` + the `qrtz_*` schema authored as per-engine FM migrations, all run
+  through this runner.
 
 **Explicitly out of 0.4.6:** anything Scheduling/Quartz; the EF concurrency-*seam* refactor (rides with
 the EF MySQL provider when Pomelo ships an EF Core 10 build); framework-column / concurrency-token DDL

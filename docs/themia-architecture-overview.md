@@ -294,8 +294,8 @@ spec). Later phases extend (SQLite, Oracle) without public-surface breaks.
 
 _All decisions resolved. **#6 data-layer roadmap (revised 2026-06-12):** **0.4.5** EF SQL Server
 provider ✅ → **0.4.6** FluentMigrator-authority **foundation** (neutral `Themia.Data.Migrations`
-shared runner + migrate Exceptional onto it) → **0.4.7** Scheduling EF→FM + **persistent Quartz**
-(`AdoJobStore` default + `qrtz_*` per-engine FM schema) → **0.4.8** raw-connection + `DbSet.Find`
-analyzer gate. **Deferred:** EF MySQL provider + EF concurrency-seam refactor (blocked on Pomelo's
+shared runner + migrate Exceptional onto it) → **0.4.7** Scheduling EF→FM (PostgreSQL + SQL Server) →
+**0.4.8** **persistent Quartz** (`AdoJobStore` default + `qrtz_*` per-engine FM schema + System.Text.Json
+serializer) → **0.4.9** raw-connection + `DbSet.Find` analyzer gate. **Deferred:** EF MySQL provider + EF concurrency-seam refactor (blocked on Pomelo's
 EF Core 10 build — Oracle's `MySql.EntityFrameworkCore` 10.x declined); per-provider concurrency /
 framework-column DDL helpers (until a consuming module); FluentMigrator 6→8 (FM 8 broke `IfDatabase`)._

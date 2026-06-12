@@ -18,6 +18,24 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## 0.4.7 — 2026-06-12
+
+### Changed
+
+- **`Themia.Modules.Scheduling`** now creates its schema through FluentMigrator (the shared
+  `Themia.Data.Migrations` runner, DECISION #6) instead of EF Core migrations, and is **provider-agnostic
+  over PostgreSQL and SQL Server** (was PostgreSQL-only). The module selects the EF provider and migration
+  engine from the app's registered `IDatabaseProvider`, so it now **requires** one
+  (`AddThemiaPostgres`/`AddThemiaSqlServer`). Execution history remains process-wide (the `Default`
+  connection, never tenant-routed).
+- `AddThemiaDbContext` (and thus `AddThemiaPostgres`/`AddThemiaSqlServer`) now registers the active
+  `IDatabaseProvider` in DI so modules can resolve the app's database engine.
+
+### Removed
+
+- The scheduling module's EF Core migration artifacts and design-time `DbContext` factory — its schema is
+  FluentMigrator-owned.
+
 ## 0.4.6 — 2026-06-12
 
 Foundation slice of the FluentMigrator-authority program (DECISION #6): the FluentMigrator runner that

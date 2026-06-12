@@ -26,10 +26,11 @@ EF-is-PostgreSQL-only gap that motivated DECISION #6 (EF and Dapper are selectab
 **Out (later releases, per DECISION #6 follow-ups — roadmap revised 2026-06-12):**
 - FluentMigrator-authority **foundation**: neutral `Themia.Data.Migrations` shared runner + migrate
   Exceptional onto it → **0.4.6**.
-- Scheduling EF→FM + **persistent Quartz** (`AdoJobStore` default + `qrtz_*` per-engine FM schema) →
-  **0.4.7**.
-- Raw-connection analyzer guard (the Dapper-as-peer gate) + the residual `DbSet.Find`-tracked guard →
+- Scheduling EF→FM (PostgreSQL + SQL Server) → **0.4.7**.
+- **Persistent Quartz** (`AdoJobStore` default + `qrtz_*` per-engine FM schema + System.Text.Json serializer) →
   **0.4.8**.
+- Raw-connection analyzer guard (the Dapper-as-peer gate) + the residual `DbSet.Find`-tracked guard →
+  **0.4.9**.
 - EF MySQL provider (+ the EF concurrency-seam refactor) → **deferred** until Pomelo ships an EF Core 10
   build (Oracle's `MySql.EntityFrameworkCore` 10.x exists but was declined).
 
@@ -241,10 +242,11 @@ MySQL deferred (no Pomelo EF Core 10 build)._
 
 - FluentMigrator-authority foundation: neutral `Themia.Data.Migrations` shared runner + Exceptional
   onto it → 0.4.6.
-- Scheduling EF→FM + persistent Quartz (`AdoJobStore` default + System.Text.Json serializer + `qrtz_*`
-  per-engine FM schema), via the shared runner → 0.4.7.
+- Scheduling EF→FM (PostgreSQL + SQL Server) → 0.4.7.
+- Persistent Quartz (`AdoJobStore` default + System.Text.Json serializer + `qrtz_*` per-engine FM schema),
+  via the shared runner → 0.4.8.
 - Raw-connection escape-hatch hardening + `Themia.Analyzers` rule (Dapper-as-peer gate) + the residual
-  `DbSet.Find`-tracked-entity guard → 0.4.8.
+  `DbSet.Find`-tracked-entity guard → 0.4.9.
 - EF MySQL provider + the `ApplyConcurrencyTokens` MySQL branch + the EF concurrency-seam refactor →
   deferred until Pomelo ships EF Core 10 (Oracle's provider declined).
 - Per-provider concurrency-token + framework-column DDL helpers → when a framework module with those

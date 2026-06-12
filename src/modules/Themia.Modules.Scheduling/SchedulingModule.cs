@@ -3,7 +3,9 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Themia.Data.Migrations;
 using Themia.Framework.Core.Modules;
+using Themia.Framework.Data.EFCore.Abstractions;
 using Themia.Quartz;
 
 namespace Themia.Modules.Scheduling;
@@ -11,7 +13,7 @@ namespace Themia.Modules.Scheduling;
 /// <summary>
 /// Themia module that wires the Quartz dashboard (<c>AddThemiaQuartz</c>), registers the
 /// EF-backed <see cref="EfExecutionHistoryStore"/> as the <see cref="IExecutionHistoryStore"/>,
-/// and creates/upgrades the scheduling schema on startup via EF Core migrations.
+/// and creates/upgrades the scheduling schema on startup via FluentMigrator (<c>ThemiaMigrations.Run</c>).
 /// </summary>
 /// <remarks>
 /// <para>
@@ -32,8 +34,11 @@ namespace Themia.Modules.Scheduling;
 /// <c>DbContext</c> state exists between calls.
 /// </para>
 /// <para>
-/// <b>PostgreSQL only (this phase).</b> The module hard-codes <c>UseNpgsql</c> and the
-/// <c>scheduling</c> schema. Generalizing to the framework's multi-provider strategy is deferred.
+/// <b>Provider-agnostic (PostgreSQL + SQL Server).</b> The module selects the EF provider and the
+/// FluentMigrator engine from the app's registered <see cref="IDatabaseProvider"/>; it requires one
+/// (call <c>AddThemiaPostgres</c>/<c>AddThemiaSqlServer</c>). The store always uses the <c>Default</c>
+/// connection — execution history is process-wide, never tenant-routed. MySQL arrives with the EF
+/// MySQL provider.
 /// </para>
 /// </remarks>
 public sealed class SchedulingModule : ThemiaModuleBase
@@ -63,7 +68,7 @@ public sealed class SchedulingModule : ThemiaModuleBase
         name: "Themia.Scheduling",
         displayName: "Scheduling",
         description: "Quartz.NET scheduler dashboard with EF-backed execution history.",
-        version: new Version(0, 4, 0, 0));
+        version: new Version(0, 4, 7, 0));
 
     /// <inheritdoc />
     public override void ConfigureServices(IServiceCollection services)
@@ -72,18 +77,29 @@ public sealed class SchedulingModule : ThemiaModuleBase
 
         // Register the scheduling DbContext factory. Each operation in EfExecutionHistoryStore
         // creates a short-lived context via the factory, keeping concurrent Quartz callbacks safe.
-        // AddDbContextFactory also registers SchedulingDbContext as a scoped service, which
-        // InitializeAsync uses when running EF migrations from a DI scope.
+        // Schema creation/upgrade is handled by ThemiaMigrations.Run in InitializeAsync, not here.
         services.AddDbContextFactory<SchedulingDbContext>((sp, dbOptions) =>
         {
+            var provider = sp.GetRequiredService<IDatabaseProvider>();
             var configuration = sp.GetRequiredService<IConfiguration>();
             var connectionString = configuration.GetConnectionString(ConnectionStringName)
                 ?? throw new InvalidOperationException(
                     $"Connection string '{ConnectionStringName}' was not found; the scheduling module requires it.");
 
-            dbOptions
-                .UseNpgsql(connectionString)
-                .UseSnakeCaseNamingConvention();
+            switch (provider.ProviderName)
+            {
+                case DatabaseProviderNames.Postgres:
+                    dbOptions.UseNpgsql(connectionString);
+                    break;
+                case DatabaseProviderNames.SqlServer:
+                    dbOptions.UseSqlServer(connectionString);
+                    break;
+                default:
+                    throw new NotSupportedException(
+                        $"Themia.Scheduling supports PostgreSQL and SQL Server; provider '{provider.ProviderName}' is not supported.");
+            }
+
+            dbOptions.UseSnakeCaseNamingConvention();
         });
 
         var schedulerName = options.SchedulerName;
@@ -105,14 +121,37 @@ public sealed class SchedulingModule : ThemiaModuleBase
     }
 
     /// <inheritdoc />
-    public override async ValueTask InitializeAsync(IServiceProvider serviceProvider, CancellationToken cancellationToken = default)
+    /// <remarks>
+    /// The schema migration runs synchronously via <c>ThemiaMigrations.Run</c> (FluentMigrator's runner is
+    /// synchronous), so <paramref name="cancellationToken"/> is honored at the boundary — observed before the
+    /// migration starts — but cannot interrupt an in-flight <c>MigrateUp</c>.
+    /// </remarks>
+    public override ValueTask InitializeAsync(IServiceProvider serviceProvider, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(serviceProvider);
+        cancellationToken.ThrowIfCancellationRequested();
 
-        await using var scope = serviceProvider.CreateAsyncScope();
-        var context = scope.ServiceProvider.GetRequiredService<SchedulingDbContext>();
-        await context.Database.MigrateAsync(cancellationToken).ConfigureAwait(false);
+        using var scope = serviceProvider.CreateScope();
+        var provider = scope.ServiceProvider.GetRequiredService<IDatabaseProvider>();
+        var connectionString = scope.ServiceProvider.GetRequiredService<IConfiguration>().GetConnectionString(ConnectionStringName)
+            ?? throw new InvalidOperationException(
+                $"Connection string '{ConnectionStringName}' was not found; the scheduling module requires it.");
+
+        ThemiaMigrations.Run(
+            ToMigrationEngine(provider.ProviderName),
+            connectionString,
+            typeof(Migrations.SchedulingSchemaMigration).Assembly);
+
+        return ValueTask.CompletedTask;
     }
+
+    private static MigrationEngine ToMigrationEngine(string providerName) => providerName switch
+    {
+        DatabaseProviderNames.Postgres => MigrationEngine.Postgres,
+        DatabaseProviderNames.SqlServer => MigrationEngine.SqlServer,
+        _ => throw new NotSupportedException(
+            $"Themia.Scheduling supports PostgreSQL and SQL Server; provider '{providerName}' is not supported."),
+    };
 
     /// <summary>
     /// Default dashboard authorization: allow any authenticated user. Themia has no claims/role model
