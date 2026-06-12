@@ -18,6 +18,16 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## 0.4.8 — 2026-06-12
+
+### Added
+
+- **Persistent Quartz (AdoJobStore), default-on.** `Themia.Modules.Scheduling` now registers and starts a
+  Quartz.NET scheduler backed by AdoJobStore — the `qrtz_*` schema is created in a dedicated `quartz` schema by a
+  FluentMigrator migration (PostgreSQL + SQL Server, run through `ThemiaMigrations.Run`), with
+  `UseSystemTextJsonSerializer()` (no Newtonsoft) and `UseProperties = true`. Scheduled jobs now survive a
+  restart. Set `SchedulingModuleOptions.UsePersistentStore = false` to keep a host-supplied scheduler.
+
 ## 0.4.7 — 2026-06-12
 
 ### Changed
