@@ -1,4 +1,8 @@
 #nullable enable
+override Themia.Modules.Scheduling.Migrations.SchedulingSchemaMigration.Down() -> void
+override Themia.Modules.Scheduling.Migrations.SchedulingSchemaMigration.Up() -> void
+Themia.Modules.Scheduling.Migrations.SchedulingSchemaMigration
+Themia.Modules.Scheduling.Migrations.SchedulingSchemaMigration.SchedulingSchemaMigration() -> void
 Themia.Modules.Scheduling.SchedulingModule
 Themia.Modules.Scheduling.SchedulingModule.SchedulingModule() -> void
 Themia.Modules.Scheduling.SchedulingModule.SchedulingModule(Themia.Modules.Scheduling.SchedulingModuleOptions! options) -> void
