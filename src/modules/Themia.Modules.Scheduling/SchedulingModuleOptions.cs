@@ -15,8 +15,10 @@ public sealed class SchedulingModuleOptions
 
     /// <summary>
     /// The scheduler name used by <see cref="EfExecutionHistoryStore"/> to scope history and stats
-    /// rows. Must match the host's configured Quartz scheduler name. Defaults to
-    /// <c>QuartzScheduler</c> (Quartz.NET's default).
+    /// rows. When <see cref="UsePersistentStore"/> is <see langword="true"/> (default) the module
+    /// applies this name to the scheduler it owns, so the two always match; it only needs to match a
+    /// host-configured scheduler name when <see cref="UsePersistentStore"/> is <see langword="false"/>.
+    /// Defaults to <c>QuartzScheduler</c> (Quartz.NET's default).
     /// </summary>
     public string SchedulerName { get; set; } = "QuartzScheduler";
 

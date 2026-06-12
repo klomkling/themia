@@ -76,7 +76,7 @@ public sealed class SchedulingModule : ThemiaModuleBase
         name: "Themia.Scheduling",
         displayName: "Scheduling",
         description: "Quartz.NET scheduler dashboard with EF-backed execution history.",
-        version: new Version(0, 4, 7, 0));
+        version: new Version(0, 4, 8, 0));
 
     /// <inheritdoc />
     public override void ConfigureServices(IServiceCollection services)

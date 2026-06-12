@@ -36,6 +36,10 @@ public sealed class QuartzAdoJobStoreMigration : Migration
     // Creates the quartz schema and its qrtz_* tables, each guarded so a VersionInfo-less replay (the EF→FM
     // cutover path) adopts existing objects instead of failing on a duplicate CREATE. qrtz_job_details is the
     // root table of the qrtz_* graph; if it exists the whole canonical DDL block has already been applied.
+    // This guard is intentionally all-or-nothing (one root-table check gates the entire block), unlike the
+    // sibling SchedulingSchemaMigration's per-object guards: the qrtz_* DDL is one atomic Execute.Sql block,
+    // so a partial schema cannot arise from a failed replay (only from manual intervention) and need not be
+    // repaired object-by-object.
     private void CreateSchemaAndTables(string ddl)
     {
         if (!Schema.Schema(SchemaName).Exists())

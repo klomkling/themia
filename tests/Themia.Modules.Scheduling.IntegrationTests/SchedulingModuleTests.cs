@@ -113,6 +113,30 @@ public abstract class SchedulingModuleTestsBase
     }
 
     [Fact]
+    public async Task InitializeAsync_AdoptsExistingQuartzSchema_OnCutoverReplay()
+    {
+        var provider = BuildModuleServices();
+        var module = new SchedulingModule(new SchedulingModuleOptions { SchedulerName = "module-test" });
+
+        // First run creates the quartz schema, the qrtz_* tables, and the FluentMigrator VersionInfo row.
+        await module.InitializeAsync(provider);
+
+        await using var scope = provider.CreateAsyncScope();
+        var context = scope.ServiceProvider.GetRequiredService<SchedulingDbContext>();
+
+        // Simulate the cutover replay: the qrtz_* objects already exist but FluentMigrator has no record of
+        // the migration (a deployment with no VersionInfo), forcing a replay. Without the schema/table
+        // existence guards in QuartzAdoJobStoreMigration the re-run fails on a duplicate CREATE SCHEMA quartz.
+        await context.Database.ExecuteSqlRawAsync(ClearVersionInfoSql);
+
+        // Re-run must adopt the existing quartz schema without throwing, leaving qrtz_job_details in place.
+        await module.InitializeAsync(provider);
+
+        var count = await context.Database.SqlQueryRaw<int>(QrtzJobDetailsCountSql).ToListAsync();
+        Assert.Equal(0, count[0]);
+    }
+
+    [Fact]
     public async Task PersistentScheduler_SurvivesRestart_ViaAdoJobStore()
     {
         // First "process": migrate, start a scheduler, schedule a durable job, shut down.
