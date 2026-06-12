@@ -1,5 +1,5 @@
-using FluentMigrator.Runner;
 using Microsoft.Extensions.DependencyInjection;
+using Themia.Data.Migrations;
 using Themia.Exceptional;
 
 namespace Themia.Exceptional.MySql;
@@ -41,8 +41,7 @@ public static class ServiceCollectionExtensions
         return services.AddThemiaExceptionalProvider(
             dialect: new MySqlExceptionalDialect(connectionString),
             configure: configure,
-            configureRunner: rb => rb.AddMySql8(),
-            connectionString: connectionString,
-            databaseDisplayName: "MySQL");
+            engine: MigrationEngine.MySql,
+            connectionString: connectionString);
     }
 }

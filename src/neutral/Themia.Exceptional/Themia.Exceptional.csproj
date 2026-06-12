@@ -12,7 +12,6 @@
   <ItemGroup>
     <PackageReference Include="Dapper" />
     <PackageReference Include="FluentMigrator" />
-    <PackageReference Include="FluentMigrator.Runner" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
     <PackageReference Include="Serilog" />
   </ItemGroup>
@@ -22,6 +21,9 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
     <PackageReference Include="Microsoft.Data.SqlClient" VersionOverride="6.1.5" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Themia.Data.Migrations/Themia.Data.Migrations.csproj" />
   </ItemGroup>
   <ItemGroup>
     <AdditionalFiles Include="PublicAPI.Shipped.txt" />

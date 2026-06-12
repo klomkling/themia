@@ -7,10 +7,10 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
     <PackageReference Include="Npgsql" />
-    <PackageReference Include="FluentMigrator.Runner" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../Themia.Exceptional/Themia.Exceptional.csproj" />
+    <ProjectReference Include="../Themia.Data.Migrations/Themia.Data.Migrations.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers">

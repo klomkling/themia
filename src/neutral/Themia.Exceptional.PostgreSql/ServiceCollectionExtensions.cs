@@ -1,5 +1,5 @@
-using FluentMigrator.Runner;
 using Microsoft.Extensions.DependencyInjection;
+using Themia.Data.Migrations;
 using Themia.Exceptional;
 
 namespace Themia.Exceptional.PostgreSql;
@@ -37,8 +37,7 @@ public static class ServiceCollectionExtensions
         return services.AddThemiaExceptionalProvider(
             dialect: new PostgresExceptionalDialect(connectionString),
             configure: configure,
-            configureRunner: rb => rb.AddPostgres(),
-            connectionString: connectionString,
-            databaseDisplayName: "PostgreSQL");
+            engine: MigrationEngine.Postgres,
+            connectionString: connectionString);
     }
 }
