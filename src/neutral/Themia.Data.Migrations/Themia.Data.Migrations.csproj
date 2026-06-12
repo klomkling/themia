@@ -2,28 +2,20 @@
   <PropertyGroup>
     <!-- Neutral cross-framework package: MUST include net8.0 (cross-framework reuse). -->
     <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
-    <PackageId>Themia.Exceptional</PackageId>
-    <Description>Framework-neutral exception-logging engine: Serilog capture + Dapper store with a per-DB dialect strategy and FluentMigrator schema.</Description>
+    <PackageId>Themia.Data.Migrations</PackageId>
+    <Description>Framework-neutral FluentMigrator runner: applies migrations for PostgreSQL, MySQL, and SQL Server through one engine-agnostic entry point.</Description>
     <!-- Version is inherited from Directory.Build.props (shared). Do not set it here. -->
   </PropertyGroup>
   <ItemGroup>
-    <FrameworkReference Include="Microsoft.AspNetCore.App" />
-  </ItemGroup>
-  <ItemGroup>
-    <PackageReference Include="Dapper" />
     <PackageReference Include="FluentMigrator" />
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
-    <PackageReference Include="Serilog" />
+    <PackageReference Include="FluentMigrator.Runner" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="Microsoft.Data.SqlClient" VersionOverride="6.1.5" />
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="../Themia.Data.Migrations/Themia.Data.Migrations.csproj" />
   </ItemGroup>
   <ItemGroup>
     <AdditionalFiles Include="PublicAPI.Shipped.txt" />

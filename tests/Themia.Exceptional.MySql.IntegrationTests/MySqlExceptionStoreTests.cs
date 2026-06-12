@@ -1,6 +1,5 @@
-using FluentMigrator.Runner;
-using Microsoft.Extensions.DependencyInjection;
 using Testcontainers.MySql;
+using Themia.Data.Migrations;
 using Themia.Exceptional;
 using Themia.Exceptional.Conformance;
 using Themia.Exceptional.Migrations;
@@ -24,13 +23,7 @@ public class MySqlExceptionStoreTests : ExceptionStoreConformanceTests, IAsyncLi
     public async Task InitializeAsync()
     {
         await container.StartAsync();
-        using var provider = new ServiceCollection()
-            .AddFluentMigratorCore()
-            .ConfigureRunner(rb => rb.AddMySql8().WithGlobalConnectionString(ConnString)
-                .ScanIn(typeof(ExceptionLogMigration).Assembly).For.Migrations())
-            .BuildServiceProvider(false);
-        using var scope = provider.CreateScope();
-        scope.ServiceProvider.GetRequiredService<IMigrationRunner>().MigrateUp();
+        ThemiaMigrations.Run(MigrationEngine.MySql, ConnString, typeof(ExceptionLogMigration).Assembly);
     }
 
     public async Task DisposeAsync() => await container.DisposeAsync();

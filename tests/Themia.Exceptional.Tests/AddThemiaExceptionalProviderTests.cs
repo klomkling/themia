@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Themia.Data.Migrations;
 using Themia.Exceptional;
 using Themia.Exceptional.Serilog;
 using Xunit;
@@ -14,8 +15,7 @@ public class AddThemiaExceptionalProviderTests
         services.AddThemiaExceptionalProvider(
             dialect: new SqliteExceptionalDialect("Data Source=:memory:"),
             configure: o => o.ApplicationName = "App",
-            configureRunner: _ => { },
-            databaseDisplayName: "SQLite",
+            engine: MigrationEngine.Postgres, // unused when runMigration is false
             runMigration: false);
 
         var sp = services.BuildServiceProvider();
@@ -34,29 +34,26 @@ public class AddThemiaExceptionalProviderTests
         Assert.ThrowsAny<ArgumentException>(() => services.AddThemiaExceptionalProvider(
             dialect: new SqliteExceptionalDialect("Data Source=:memory:"),
             configure: o => o.ApplicationName = "App",
-            configureRunner: _ => { },
-            databaseDisplayName: "SQLite",
+            engine: MigrationEngine.Postgres,
             connectionString: null,
             runMigration: true));
     }
 
     [Fact]
-    public void RunMigration_Failure_WrapsInInvalidOperationException_WithDatabaseDisplayName()
+    public void RunMigration_Failure_WrapsInInvalidOperationException_NamingTheEngine()
     {
         var services = new ServiceCollection();
 
-        // configureRunner adds no FluentMigrator provider, so resolving/running the migration
-        // fails inside RunMigration's try — exercising the catch that wraps it in an
-        // InvalidOperationException naming the engine.
+        // A connection string the Postgres processor cannot use fails inside the shared runner,
+        // exercising the wrap-and-name behavior propagated from ThemiaMigrations.Run.
         var ex = Assert.Throws<InvalidOperationException>(() => services.AddThemiaExceptionalProvider(
             dialect: new SqliteExceptionalDialect("Data Source=:memory:"),
             configure: o => o.ApplicationName = "App",
-            configureRunner: _ => { },
-            databaseDisplayName: "ConfabulatedEngine",
+            engine: MigrationEngine.Postgres,
             connectionString: "Data Source=:memory:",
             runMigration: true));
 
-        Assert.Contains("ConfabulatedEngine", ex.Message);
+        Assert.Contains("PostgreSQL", ex.Message);
         Assert.NotNull(ex.InnerException);
     }
 }

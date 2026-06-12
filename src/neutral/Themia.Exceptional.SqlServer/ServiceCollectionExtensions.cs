@@ -1,5 +1,5 @@
-using FluentMigrator.Runner;
 using Microsoft.Extensions.DependencyInjection;
+using Themia.Data.Migrations;
 using Themia.Exceptional;
 
 namespace Themia.Exceptional.SqlServer;
@@ -37,8 +37,7 @@ public static class ServiceCollectionExtensions
         return services.AddThemiaExceptionalProvider(
             dialect: new SqlServerExceptionalDialect(connectionString),
             configure: configure,
-            configureRunner: rb => rb.AddSqlServer(),
-            connectionString: connectionString,
-            databaseDisplayName: "SQL Server");
+            engine: MigrationEngine.SqlServer,
+            connectionString: connectionString);
     }
 }

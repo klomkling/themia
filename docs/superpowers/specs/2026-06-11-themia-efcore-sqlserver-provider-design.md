@@ -23,11 +23,15 @@ EF-is-PostgreSQL-only gap that motivated DECISION #6 (EF and Dapper are selectab
   `ThemiaDbContext`; the global snake_case convention becomes an opt-in flag (default off).
 - SQL Server integration tests (Testcontainers).
 
-**Out (later releases, per DECISION #6 follow-ups):**
-- EF MySQL provider → **0.4.6**.
-- FluentMigrator schema standardization (Scheduling rewrite, aggregating runner, per-provider
-  concurrency-token DDL) → **0.4.7**.
-- Raw-connection analyzer guard (the Dapper-as-peer gate) → **0.4.8**.
+**Out (later releases, per DECISION #6 follow-ups — roadmap revised 2026-06-12):**
+- FluentMigrator-authority **foundation**: neutral `Themia.Data.Migrations` shared runner + migrate
+  Exceptional onto it → **0.4.6**.
+- Scheduling EF→FM + **persistent Quartz** (`AdoJobStore` default + `qrtz_*` per-engine FM schema) →
+  **0.4.7**.
+- Raw-connection analyzer guard (the Dapper-as-peer gate) + the residual `DbSet.Find`-tracked guard →
+  **0.4.8**.
+- EF MySQL provider (+ the EF concurrency-seam refactor) → **deferred** until Pomelo ships an EF Core 10
+  build (Oracle's `MySql.EntityFrameworkCore` 10.x exists but was declined).
 
 ## Decisions (resolved during brainstorming, 2026-06-11)
 
@@ -184,7 +188,7 @@ explicit. No change needed here.
 - **Concurrency token.** SQL Server is **already handled correctly** by the existing non-Npgsql branch
   in `ThemiaDbContext.ApplyConcurrencyTokens`: `byte[] RowVersion` + `IsRowVersion()` maps to the
   server-maintained `rowversion` column. No provider-specific code needed. (The documented MySQL
-  landmine in that method remains a 0.4.6 concern, not this release.)
+  landmine in that method is deferred to the EF MySQL provider release, not this one — see roadmap.)
 - **Timestamps.** EF SqlServer maps `DateTimeOffset`/`DateTime` to `datetime2` by default — consistent
   with the 0.4.4 Dapper SqlServer engine's `datetime2` choice. No override.
 - **Tenant query filters, audit stamping, soft-delete filters, `Find` tenant post-check,
@@ -232,10 +236,19 @@ New project `Themia.Framework.Data.EFCore.SqlServer.IntegrationTests`:
 
 ## Out-of-scope / follow-ups (tracked, not built here)
 
-- EF MySQL provider + the `ApplyConcurrencyTokens` MySQL branch (the documented landmine) → 0.4.6.
-- FluentMigrator as single schema authority (Scheduling EF-migration rewrite + aggregating runner +
-  per-provider concurrency-token DDL) → 0.4.7.
-- Raw-connection escape-hatch hardening + `Themia.Analyzers` rule (Dapper-as-peer gate) → 0.4.8.
+_Roadmap revised 2026-06-12 — FluentMigrator authority split into a foundation + consumer slice; EF
+MySQL deferred (no Pomelo EF Core 10 build)._
+
+- FluentMigrator-authority foundation: neutral `Themia.Data.Migrations` shared runner + Exceptional
+  onto it → 0.4.6.
+- Scheduling EF→FM + persistent Quartz (`AdoJobStore` default + System.Text.Json serializer + `qrtz_*`
+  per-engine FM schema), via the shared runner → 0.4.7.
+- Raw-connection escape-hatch hardening + `Themia.Analyzers` rule (Dapper-as-peer gate) + the residual
+  `DbSet.Find`-tracked-entity guard → 0.4.8.
+- EF MySQL provider + the `ApplyConcurrencyTokens` MySQL branch + the EF concurrency-seam refactor →
+  deferred until Pomelo ships EF Core 10 (Oracle's provider declined).
+- Per-provider concurrency-token + framework-column DDL helpers → when a framework module with those
+  columns first gets an FM migration. FluentMigrator 6→8 → deferred (FM 8 broke `IfDatabase`).
 
 ## Success criteria
 

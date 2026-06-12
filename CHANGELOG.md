@@ -18,6 +18,27 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## 0.4.6 — 2026-06-12
+
+Foundation slice of the FluentMigrator-authority program (DECISION #6): the FluentMigrator runner that
+was triplicated inside the three `Themia.Exceptional.*` provider packages becomes one neutral package
+that any neutral core or framework module can hand its migrations to.
+
+### Added
+
+- **`Themia.Data.Migrations`** — a neutral (`net8.0;net10.0`) shared FluentMigrator runner.
+  `ThemiaMigrations.Run(MigrationEngine engine, string connectionString, params Assembly[] migrationAssemblies)`
+  selects the engine's processor (`Postgres`/`MySql`/`SqlServer`), scans the supplied assemblies, and
+  applies pending migrations (`MigrateUp`), wrapping failures in an `InvalidOperationException` that names
+  the engine.
+
+### Changed
+
+- The `Themia.Exceptional.*` packages now apply their schema migration through the shared runner instead
+  of each carrying an identical inline runner. The adopter-facing `AddThemiaExceptional{Postgres,MySql,SqlServer}`
+  API is unchanged. The provider-author extension `AddThemiaExceptionalProvider` now takes a
+  `MigrationEngine` instead of an `Action<IMigrationRunnerBuilder>` + display-name pair.
+
 ## 0.4.5 — 2026-06-11
 
 SQL Server provider for the EF Core data layer — the EF side starts catching up with the three-engine

@@ -237,7 +237,9 @@ framing no longer matches the code. Resolved direction:
 **Per-provider concurrency token** is the cross-cutting follow-up (the `ApplyConcurrencyTokens`
 landmine in `ThemiaDbContext`): Postgres `xmin` (no DDL), SQL Server `rowversion`, MySQL an
 app-updated token — FluentMigrator provisions the right column per engine, and the Dapper layer
-needs a matching concurrency story (it has none yet).
+needs a matching concurrency story (it has none yet). _Deferred: no framework table uses
+`IConcurrencyAware` yet, so the per-engine concurrency DDL helper is built only when a consuming
+module first needs it; the EF concurrency-seam refactor rides with the EF MySQL provider._
 
 ## Multi-database requirement
 
@@ -290,5 +292,10 @@ spec). Later phases extend (SQLite, Oracle) without public-surface breaks.
    **gate on Dapper-as-peer = tenant-isolation parity with EF**, enforced by making the raw-connection
    bypass conspicuous + an analyzer build-time rule. See Data-access peers & schema authority §.
 
-_All decisions resolved; #6 spawns implementation follow-ups (EF multi-provider, Scheduling
-FluentMigrator rewrite, raw-connection analyzer, per-provider concurrency token) — to be specced._
+_All decisions resolved. **#6 data-layer roadmap (revised 2026-06-12):** **0.4.5** EF SQL Server
+provider ✅ → **0.4.6** FluentMigrator-authority **foundation** (neutral `Themia.Data.Migrations`
+shared runner + migrate Exceptional onto it) → **0.4.7** Scheduling EF→FM + **persistent Quartz**
+(`AdoJobStore` default + `qrtz_*` per-engine FM schema) → **0.4.8** raw-connection + `DbSet.Find`
+analyzer gate. **Deferred:** EF MySQL provider + EF concurrency-seam refactor (blocked on Pomelo's
+EF Core 10 build — Oracle's `MySql.EntityFrameworkCore` 10.x declined); per-provider concurrency /
+framework-column DDL helpers (until a consuming module); FluentMigrator 6→8 (FM 8 broke `IfDatabase`)._

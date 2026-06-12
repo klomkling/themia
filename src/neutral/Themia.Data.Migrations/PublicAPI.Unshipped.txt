@@ -1,0 +1,7 @@
+#nullable enable
+Themia.Data.Migrations.MigrationEngine
+Themia.Data.Migrations.MigrationEngine.MySql = 1 -> Themia.Data.Migrations.MigrationEngine
+Themia.Data.Migrations.MigrationEngine.Postgres = 0 -> Themia.Data.Migrations.MigrationEngine
+Themia.Data.Migrations.MigrationEngine.SqlServer = 2 -> Themia.Data.Migrations.MigrationEngine
+Themia.Data.Migrations.ThemiaMigrations
+static Themia.Data.Migrations.ThemiaMigrations.Run(Themia.Data.Migrations.MigrationEngine engine, string! connectionString, params System.Reflection.Assembly![]! migrationAssemblies) -> void
