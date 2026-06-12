@@ -1,4 +1,8 @@
 #nullable enable
+override Themia.Modules.Scheduling.Migrations.QuartzAdoJobStoreMigration.Down() -> void
+override Themia.Modules.Scheduling.Migrations.QuartzAdoJobStoreMigration.Up() -> void
+Themia.Modules.Scheduling.Migrations.QuartzAdoJobStoreMigration
+Themia.Modules.Scheduling.Migrations.QuartzAdoJobStoreMigration.QuartzAdoJobStoreMigration() -> void
 override Themia.Modules.Scheduling.Migrations.SchedulingSchemaMigration.Down() -> void
 override Themia.Modules.Scheduling.Migrations.SchedulingSchemaMigration.Up() -> void
 Themia.Modules.Scheduling.Migrations.SchedulingSchemaMigration
