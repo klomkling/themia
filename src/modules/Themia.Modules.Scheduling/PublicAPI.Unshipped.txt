@@ -18,6 +18,8 @@ Themia.Modules.Scheduling.SchedulingModuleOptions.SchedulerName.get -> string!
 Themia.Modules.Scheduling.SchedulingModuleOptions.SchedulerName.set -> void
 Themia.Modules.Scheduling.SchedulingModuleOptions.Authorize.get -> System.Func<Microsoft.AspNetCore.Http.HttpContext!, System.Threading.Tasks.Task<bool>!>?
 Themia.Modules.Scheduling.SchedulingModuleOptions.Authorize.set -> void
+Themia.Modules.Scheduling.SchedulingModuleOptions.UsePersistentStore.get -> bool
+Themia.Modules.Scheduling.SchedulingModuleOptions.UsePersistentStore.set -> void
 Themia.Modules.Scheduling.EfExecutionHistoryStore
 Themia.Modules.Scheduling.EfExecutionHistoryStore.EfExecutionHistoryStore(Microsoft.EntityFrameworkCore.IDbContextFactory<Themia.Modules.Scheduling.SchedulingDbContext!>! contextFactory, Microsoft.Extensions.Logging.ILogger<Themia.Modules.Scheduling.EfExecutionHistoryStore!>! logger) -> void
 Themia.Modules.Scheduling.EfExecutionHistoryStore.FilterLast(int limit) -> System.Threading.Tasks.Task<System.Collections.Generic.IEnumerable<Themia.Quartz.ExecutionHistoryEntry!>!>!

@@ -26,4 +26,12 @@ public sealed class SchedulingModuleOptions
     /// hosts SHOULD supply an admin check here, as the dashboard is platform-admin surface.
     /// </summary>
     public Func<HttpContext, Task<bool>>? Authorize { get; set; }
+
+    /// <summary>
+    /// When <see langword="true"/> (default), the module registers a persistent Quartz scheduler
+    /// (AdoJobStore over the <c>quartz</c> schema, System.Text.Json serializer) and starts it via the
+    /// Quartz hosted service. Set to <see langword="false"/> to register no scheduler — the host then
+    /// supplies its own <c>IScheduler</c> (via <c>ThemiaQuartzOptions.Scheduler</c> or DI), as before.
+    /// </summary>
+    public bool UsePersistentStore { get; set; } = true;
 }
