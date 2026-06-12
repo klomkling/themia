@@ -30,33 +30,45 @@ public sealed class SchedulingSchemaMigration : Migration
                 "is not supported; add a migration branch for it."));
     }
 
+    // Idempotent against a pre-existing scheduling schema. A database deployed before 0.4.7 already carries
+    // these tables (created by the old EF migration) but has no FluentMigrator VersionInfo row, so this Up()
+    // runs on the first FM execution. The existence guards let it adopt the existing objects — and record the
+    // version — instead of failing on CREATE. On a fresh database every guard is false and all objects are
+    // created; on subsequent runs VersionInfo skips this migration entirely.
     private void CreateSchemaAndTables()
     {
-        Create.Schema(SchemaName);
+        if (!Schema.Schema(SchemaName).Exists())
+            Create.Schema(SchemaName);
 
-        Create.Table("execution_history").InSchema(SchemaName)
-            .WithColumn("fire_instance_id").AsString(256).NotNullable().PrimaryKey()
-            .WithColumn("scheduler_instance_id").AsString(256).Nullable()
-            .WithColumn("scheduler_name").AsString(256).Nullable()
-            .WithColumn("job").AsString(512).Nullable()
-            .WithColumn("trigger").AsString(512).Nullable()
-            .WithColumn("scheduled_fire_time_utc").AsDateTimeOffset().Nullable()
-            .WithColumn("actual_fire_time_utc").AsDateTimeOffset().NotNullable()
-            .WithColumn("recovering").AsBoolean().NotNullable()
-            .WithColumn("vetoed").AsBoolean().NotNullable()
-            .WithColumn("finished_time_utc").AsDateTimeOffset().Nullable()
-            .WithColumn("exception_message").AsString(4000).Nullable();
+        if (!Schema.Schema(SchemaName).Table("execution_history").Exists())
+        {
+            Create.Table("execution_history").InSchema(SchemaName)
+                .WithColumn("fire_instance_id").AsString(256).NotNullable().PrimaryKey()
+                .WithColumn("scheduler_instance_id").AsString(256).Nullable()
+                .WithColumn("scheduler_name").AsString(256).Nullable()
+                .WithColumn("job").AsString(512).Nullable()
+                .WithColumn("trigger").AsString(512).Nullable()
+                .WithColumn("scheduled_fire_time_utc").AsDateTimeOffset().Nullable()
+                .WithColumn("actual_fire_time_utc").AsDateTimeOffset().NotNullable()
+                .WithColumn("recovering").AsBoolean().NotNullable()
+                .WithColumn("vetoed").AsBoolean().NotNullable()
+                .WithColumn("finished_time_utc").AsDateTimeOffset().Nullable()
+                .WithColumn("exception_message").AsString(4000).Nullable();
 
-        Create.Index("ix_execution_history_scheduler_trigger_fired")
-            .OnTable("execution_history").InSchema(SchemaName)
-            .OnColumn("scheduler_name").Ascending()
-            .OnColumn("trigger").Ascending()
-            .OnColumn("actual_fire_time_utc").Ascending();
+            Create.Index("ix_execution_history_scheduler_trigger_fired")
+                .OnTable("execution_history").InSchema(SchemaName)
+                .OnColumn("scheduler_name").Ascending()
+                .OnColumn("trigger").Ascending()
+                .OnColumn("actual_fire_time_utc").Ascending();
+        }
 
-        Create.Table("scheduler_stats").InSchema(SchemaName)
-            .WithColumn("scheduler_name").AsString(256).NotNullable().PrimaryKey()
-            .WithColumn("total_jobs_executed").AsInt32().NotNullable()
-            .WithColumn("total_jobs_failed").AsInt32().NotNullable();
+        if (!Schema.Schema(SchemaName).Table("scheduler_stats").Exists())
+        {
+            Create.Table("scheduler_stats").InSchema(SchemaName)
+                .WithColumn("scheduler_name").AsString(256).NotNullable().PrimaryKey()
+                .WithColumn("total_jobs_executed").AsInt32().NotNullable()
+                .WithColumn("total_jobs_failed").AsInt32().NotNullable();
+        }
     }
 
     /// <inheritdoc />

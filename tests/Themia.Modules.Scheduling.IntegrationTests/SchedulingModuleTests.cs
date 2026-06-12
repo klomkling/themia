@@ -60,6 +60,35 @@ public abstract class SchedulingModuleTestsBase
     }
 
     [Fact]
+    public async Task InitializeAsync_IsIdempotent_WhenSchedulingSchemaAlreadyExists()
+    {
+        var provider = BuildModuleServices();
+
+        // Simulate a pre-0.4.7 database whose scheduling schema already exists but has no FluentMigrator
+        // VersionInfo. Without the migration's existence guards, Create.Schema would throw here.
+        await using (var seedScope = provider.CreateAsyncScope())
+        {
+            var seedContext = seedScope.ServiceProvider.GetRequiredService<SchedulingDbContext>();
+            await seedContext.Database.ExecuteSqlRawAsync("CREATE SCHEMA scheduling");
+        }
+
+        var module = new SchedulingModule(new SchedulingModuleOptions { SchedulerName = "module-test" });
+
+        // Must not throw — the guard adopts the existing schema and creates the tables alongside it.
+        await module.InitializeAsync(provider);
+
+        await using var scope = provider.CreateAsyncScope();
+        var store = scope.ServiceProvider.GetRequiredService<IExecutionHistoryStore>();
+        await store.Save(new ExecutionHistoryEntry
+        {
+            FireInstanceId = "idem-1",
+            SchedulerName = "module-test",
+            ActualFireTimeUtc = DateTimeOffset.UtcNow,
+        });
+        Assert.NotNull(await store.Get("idem-1"));
+    }
+
+    [Fact]
     public void ConfigureServices_RegistersStoreAndDashboardOptions()
     {
         var provider = BuildModuleServices();

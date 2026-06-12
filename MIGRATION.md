@@ -26,8 +26,13 @@ migration engine.
 - Ensure an EF provider is registered before the module initializes — `AddThemiaPostgres<…>(…)` or
   `AddThemiaSqlServer<…>(…)`. Without one, the module throws at startup.
 - Stop running `dotnet ef database update` for the scheduling context; the schema is applied automatically
-  on startup. The table shapes are unchanged, so existing PostgreSQL databases are compatible (the FM
-  migration creates the same `scheduling.execution_history` / `scheduling.scheduler_stats`).
+  on startup.
+- **Existing PostgreSQL databases:** the FluentMigrator migration is **idempotent** — it skips the
+  `scheduling` schema and any `execution_history` / `scheduler_stats` table that already exists, so a database
+  carrying the pre-0.4.7 EF-created tables adopts them in place and simply records the FluentMigrator version
+  (it does **not** drop or recreate your data). On a fresh database it creates the tables. The table shapes are
+  unchanged. (Note: FluentMigrator names the primary-key constraints with its own defaults rather than the EF
+  `pk_*` names — cosmetic only; queries are unaffected.)
 - SQL Server is now supported.
 
 ## 0.4.6
