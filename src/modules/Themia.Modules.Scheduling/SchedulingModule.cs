@@ -3,6 +3,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Quartz;
+using Quartz.Impl.Matchers;
 using Themia.Data.Migrations;
 using Themia.Framework.Core.Modules;
 using Themia.Framework.Data.EFCore.Abstractions;
@@ -17,9 +19,14 @@ namespace Themia.Modules.Scheduling;
 /// </summary>
 /// <remarks>
 /// <para>
-/// The host owns the Quartz <c>IScheduler</c> and job registration; this module does not create one.
-/// The dashboard resolves the scheduler from <see cref="ThemiaQuartzOptions.Scheduler"/> or a
-/// DI-registered <c>IScheduler</c> at <c>MapThemiaQuartz</c> time.
+/// By default (<see cref="SchedulingModuleOptions.UsePersistentStore"/> = <see langword="true"/>) the
+/// module registers a persistent Quartz <c>IScheduler</c>/<c>ISchedulerFactory</c> backed by AdoJobStore
+/// over the <c>quartz</c> schema, serialized with System.Text.Json, and starts it via the Quartz hosted
+/// service. The <see cref="ExecutionHistoryPlugin"/> is attached as a job listener so executions are
+/// recorded. Set <see cref="SchedulingModuleOptions.UsePersistentStore"/> = <see langword="false"/> to
+/// register no scheduler — the host then supplies its own <c>IScheduler</c> (via
+/// <see cref="ThemiaQuartzOptions.Scheduler"/> or a DI-registered <c>IScheduler</c>), as before. Either
+/// way, the dashboard resolves the scheduler at <c>MapThemiaQuartz</c> time.
 /// </para>
 /// <para>
 /// <b>Authorization.</b> Themia has no claims/role model yet, so the dashboard gate defaults to
@@ -118,6 +125,59 @@ public sealed class SchedulingModule : ThemiaModuleBase
             o.VirtualPathRoot = virtualPathRoot;
             o.Authorize = authorize;
         });
+
+        if (options.UsePersistentStore)
+        {
+            // The execution-history plugin is resolved from DI by AddJobListener<T>, so it must be registered.
+            services.TryAddSingleton<ExecutionHistoryPlugin>();
+
+            // Engine + Default connection are needed when the persistent store is configured. A one-off
+            // provider build at registration time mirrors how the DbContext factory resolves the provider.
+            using var bootstrap = services.BuildServiceProvider();
+            var provider = bootstrap.GetRequiredService<IDatabaseProvider>();
+            var connectionString = bootstrap.GetRequiredService<IConfiguration>().GetConnectionString(ConnectionStringName)
+                ?? throw new InvalidOperationException(
+                    $"Connection string '{ConnectionStringName}' was not found; the scheduling module requires it.");
+            var providerName = provider.ProviderName;
+
+            services.AddQuartz(q =>
+            {
+                q.SchedulerName = schedulerName;
+
+                q.UsePersistentStore(s =>
+                {
+                    s.UseProperties = true;          // JobDataMap stored as string key-values
+                    s.UseSystemTextJsonSerializer(); // no Newtonsoft (CLAUDE.md)
+
+                    // qrtz_* tables live in the `quartz` schema → schema-qualified table prefix.
+                    switch (providerName)
+                    {
+                        case DatabaseProviderNames.Postgres:
+                            s.UsePostgres(ado =>
+                            {
+                                ado.ConnectionString = connectionString;
+                                ado.TablePrefix = "quartz.qrtz_";
+                            });
+                            break;
+                        case DatabaseProviderNames.SqlServer:
+                            s.UseSqlServer(ado =>
+                            {
+                                ado.ConnectionString = connectionString;
+                                ado.TablePrefix = "quartz.qrtz_";
+                            });
+                            break;
+                        default:
+                            throw new NotSupportedException(
+                                $"Themia.Scheduling persistent Quartz supports PostgreSQL and SQL Server; provider '{providerName}' is not supported.");
+                    }
+                });
+
+                // Themia owns the execution-history listener now (was attached by the host's plugin wiring).
+                q.AddJobListener<ExecutionHistoryPlugin>(EverythingMatcher<JobKey>.AllJobs());
+            });
+
+            services.AddQuartzHostedService(h => h.WaitForJobsToComplete = true);
+        }
     }
 
     /// <inheritdoc />
