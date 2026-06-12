@@ -10,6 +10,26 @@ with the *why* and concrete upgrade steps.
 - Each entry states: **What changed**, **Why**, and **How to upgrade** (before → after).
 - Non-breaking changes are *not* listed here — see the CHANGELOG.
 
+## 0.4.7
+
+### Scheduling module: schema via FluentMigrator + requires an EF provider
+
+**What changed:** `Themia.Modules.Scheduling` applies its schema with FluentMigrator at `InitializeAsync`
+(through `Themia.Data.Migrations`) instead of EF Core migrations, and is now provider-agnostic over
+PostgreSQL and SQL Server. It resolves the active `IDatabaseProvider` for both the EF provider and the
+migration engine.
+
+**Why:** FluentMigrator is the single schema authority (DECISION #6); the module is no longer PostgreSQL-only.
+
+**How to upgrade:**
+
+- Ensure an EF provider is registered before the module initializes — `AddThemiaPostgres<…>(…)` or
+  `AddThemiaSqlServer<…>(…)`. Without one, the module throws at startup.
+- Stop running `dotnet ef database update` for the scheduling context; the schema is applied automatically
+  on startup. The table shapes are unchanged, so existing PostgreSQL databases are compatible (the FM
+  migration creates the same `scheduling.execution_history` / `scheduling.scheduler_stats`).
+- SQL Server is now supported.
+
 ## 0.4.6
 
 ### `AddThemiaExceptionalProvider` takes a `MigrationEngine`
