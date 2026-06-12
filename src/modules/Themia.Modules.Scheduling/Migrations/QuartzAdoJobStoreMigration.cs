@@ -7,8 +7,10 @@ namespace Themia.Modules.Scheduling.Migrations;
 /// for PostgreSQL and SQL Server. A faithful, schema-qualified port of Quartz.NET 3.18.1's canonical
 /// <c>tables_postgres.sql</c> / <c>tables_sqlServer.sql</c> applied via <c>Execute.Sql</c>
 /// so the cross-engine BLOB/bool/bigint types and composite PK/FK constraints match Quartz exactly.
-/// Greenfield (Themia owns the <c>quartz</c> schema exclusively) — FluentMigrator's VersionInfo provides
-/// idempotency; no per-object existence guards.
+/// Themia owns the <c>quartz</c> schema exclusively. FluentMigrator's VersionInfo normally provides
+/// idempotency, but the EF→FM cutover path can present a database whose objects already exist with no
+/// VersionInfo row (a pre-0.4.7 deployment), forcing a replay; the schema/table existence guards below
+/// keep that replay safe instead of failing on a duplicate <c>CREATE SCHEMA</c>/<c>CREATE TABLE</c>.
 /// </summary>
 [Migration(202606130001, "Themia.Scheduling: create Quartz AdoJobStore (qrtz_*) schema")]
 public sealed class QuartzAdoJobStoreMigration : Migration
@@ -20,17 +22,8 @@ public sealed class QuartzAdoJobStoreMigration : Migration
     {
         // LOCKSTEP: this engine whitelist and the unsupported-provider guard below MUST cover the same set.
         // PostgreSQL + SQL Server only (no EF MySQL provider yet). Edit BOTH when adding an engine.
-        IfDatabase("postgres").Delegate(() =>
-        {
-            Create.Schema(SchemaName);
-            Execute.Sql(PostgresDdl);
-        });
-
-        IfDatabase("sqlserver").Delegate(() =>
-        {
-            Create.Schema(SchemaName);
-            Execute.Sql(SqlServerDdl);
-        });
+        IfDatabase("postgres").Delegate(() => CreateSchemaAndTables(PostgresDdl));
+        IfDatabase("sqlserver").Delegate(() => CreateSchemaAndTables(SqlServerDdl));
 
         IfDatabase(p =>
                 !p.StartsWith("Postgres", System.StringComparison.OrdinalIgnoreCase) &&
@@ -38,6 +31,22 @@ public sealed class QuartzAdoJobStoreMigration : Migration
             .Delegate(() => throw new System.NotSupportedException(
                 "Themia.Scheduling persistent Quartz supports only PostgreSQL and SQL Server. The active " +
                 "database provider is not supported; add a migration branch for it."));
+    }
+
+    // Creates the quartz schema and its qrtz_* tables, each guarded so a VersionInfo-less replay (the EF→FM
+    // cutover path) adopts existing objects instead of failing on a duplicate CREATE. qrtz_job_details is the
+    // root table of the qrtz_* graph; if it exists the whole canonical DDL block has already been applied.
+    private void CreateSchemaAndTables(string ddl)
+    {
+        if (!Schema.Schema(SchemaName).Exists())
+        {
+            Create.Schema(SchemaName);
+        }
+
+        if (!Schema.Schema(SchemaName).Table("qrtz_job_details").Exists())
+        {
+            Execute.Sql(ddl);
+        }
     }
 
     /// <inheritdoc />

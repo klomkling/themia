@@ -4,7 +4,6 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Quartz;
-using Quartz.Impl.Matchers;
 using Themia.Data.Migrations;
 using Themia.Framework.Core.Modules;
 using Themia.Framework.Data.EFCore.Abstractions;
@@ -128,14 +127,18 @@ public sealed class SchedulingModule : ThemiaModuleBase
 
         if (options.UsePersistentStore)
         {
-            // The execution-history plugin is resolved from DI by AddJobListener<T>, so it must be registered.
-            services.TryAddSingleton<ExecutionHistoryPlugin>();
-
-            // Engine + Default connection are needed when the persistent store is configured. A one-off
-            // provider build at registration time mirrors how the DbContext factory resolves the provider.
-            using var bootstrap = services.BuildServiceProvider();
-            var provider = bootstrap.GetRequiredService<IDatabaseProvider>();
-            var connectionString = bootstrap.GetRequiredService<IConfiguration>().GetConnectionString(ConnectionStringName)
+            // Engine + Default connection are needed at registration time to wire the persistent store.
+            // Read them from the already-registered singleton instances rather than building (and disposing)
+            // a throwaway provider — disposing one tears down its ILoggerFactory, which Quartz captures
+            // globally for logging, producing an ObjectDisposedException when the scheduler is later resolved.
+            var provider = GetRegisteredInstance<IDatabaseProvider>(services)
+                ?? throw new InvalidOperationException(
+                    "An IDatabaseProvider must be registered (call AddThemiaPostgres/AddThemiaSqlServer) before " +
+                    "the scheduling module; the persistent Quartz store selects its engine from it.");
+            var configuration = GetRegisteredInstance<IConfiguration>(services)
+                ?? throw new InvalidOperationException(
+                    "An IConfiguration must be registered before the scheduling module.");
+            var connectionString = configuration.GetConnectionString(ConnectionStringName)
                 ?? throw new InvalidOperationException(
                     $"Connection string '{ConnectionStringName}' was not found; the scheduling module requires it.");
             var providerName = provider.ProviderName;
@@ -172,8 +175,14 @@ public sealed class SchedulingModule : ThemiaModuleBase
                     }
                 });
 
-                // Themia owns the execution-history listener now (was attached by the host's plugin wiring).
-                q.AddJobListener<ExecutionHistoryPlugin>(EverythingMatcher<JobKey>.AllJobs());
+                // Themia owns the execution-history plugin now (was configured by the host's Quartz wiring).
+                // Registered as a Quartz scheduler plugin (not a bare job listener) so its Initialize sets the
+                // listener Name and self-registers as a job listener, and its Start wires the execution-history
+                // store — the lifecycle the plugin is designed for. The DI-backed EF store is surfaced to the
+                // plugin via the scheduler context by UseThemiaQuartz at dashboard-map time.
+                q.SetProperty(
+                    "quartz.plugin.recentHistory.type",
+                    "Themia.Quartz.ExecutionHistoryPlugin, Themia.Quartz");
             });
 
             services.AddQuartzHostedService(h => h.WaitForJobsToComplete = true);
@@ -203,6 +212,23 @@ public sealed class SchedulingModule : ThemiaModuleBase
             typeof(Migrations.SchedulingSchemaMigration).Assembly);
 
         return ValueTask.CompletedTask;
+    }
+
+    // Reads a singleton instance registered via AddSingleton(instance)/TryAddSingleton(instance) straight
+    // from the service descriptors, so registration-time wiring need not build a service provider. Both
+    // IDatabaseProvider (AddThemiaPostgres/SqlServer) and IConfiguration are registered as instances.
+    private static T? GetRegisteredInstance<T>(IServiceCollection services) where T : class
+    {
+        for (var i = services.Count - 1; i >= 0; i--)
+        {
+            var descriptor = services[i];
+            if (descriptor.ServiceType == typeof(T) && descriptor.ImplementationInstance is T instance)
+            {
+                return instance;
+            }
+        }
+
+        return null;
     }
 
     private static MigrationEngine ToMigrationEngine(string providerName) => providerName switch

@@ -3,6 +3,9 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Quartz;
+using Quartz.Logging;
 using Testcontainers.MsSql;
 using Testcontainers.PostgreSql;
 using Themia.Framework.Data.EFCore.Abstractions;
@@ -95,6 +98,63 @@ public abstract class SchedulingModuleTestsBase
     }
 
     [Fact]
+    public async Task InitializeAsync_CreatesQuartzAdoJobStoreSchema()
+    {
+        var provider = BuildModuleServices();
+        var module = new SchedulingModule(new SchedulingModuleOptions { SchedulerName = "module-test" });
+
+        await module.InitializeAsync(provider);
+
+        await using var scope = provider.CreateAsyncScope();
+        var context = scope.ServiceProvider.GetRequiredService<SchedulingDbContext>();
+        // qrtz_job_details exists in the quartz schema → COUNT succeeds (throws if absent).
+        var count = await context.Database.SqlQueryRaw<int>(QrtzJobDetailsCountSql).ToListAsync();
+        Assert.Equal(0, count[0]);
+    }
+
+    [Fact]
+    public async Task PersistentScheduler_SurvivesRestart_ViaAdoJobStore()
+    {
+        // First "process": migrate, start a scheduler, schedule a durable job, shut down.
+        var p1 = BuildModuleServices();
+        await new SchedulingModule(new SchedulingModuleOptions { SchedulerName = "module-test" }).InitializeAsync(p1);
+
+        // Quartz's logging is a process-global static (LogContext). Two real processes each own it; in this
+        // single-process test the two providers share it, so point it at the live provider before resolving
+        // the scheduler — otherwise p2 would log through p1's disposed ILoggerFactory after p1.DisposeAsync().
+        LogContext.SetCurrentLogProvider(p1.GetRequiredService<ILoggerFactory>());
+
+        var factory1 = p1.GetRequiredService<ISchedulerFactory>();
+        var scheduler1 = await factory1.GetScheduler();
+        await scheduler1.Start();
+
+        var jobKey = new JobKey("persisted-job", "persisted-group");
+        var job = JobBuilder.Create<NoOpJob>().WithIdentity(jobKey).StoreDurably().Build();
+        var trigger = TriggerBuilder.Create()
+            .WithIdentity("persisted-trigger", "persisted-group")
+            .ForJob(jobKey)
+            .StartAt(DateTimeOffset.UtcNow.AddDays(1))
+            .Build();
+        await scheduler1.ScheduleJob(job, trigger);
+        await scheduler1.Shutdown(waitForJobsToComplete: false);
+        await p1.DisposeAsync();
+
+        // Second "process": a fresh service provider over the SAME container DB; the job must still be there.
+        var p2 = BuildModuleServices();
+        LogContext.SetCurrentLogProvider(p2.GetRequiredService<ILoggerFactory>());
+        var factory2 = p2.GetRequiredService<ISchedulerFactory>();
+        var scheduler2 = await factory2.GetScheduler();
+        await scheduler2.Start();
+
+        Assert.True(await scheduler2.CheckExists(jobKey));
+        var loaded = await scheduler2.GetTrigger(new TriggerKey("persisted-trigger", "persisted-group"));
+        Assert.NotNull(loaded);
+
+        await scheduler2.Shutdown(waitForJobsToComplete: false);
+        await p2.DisposeAsync();
+    }
+
+    [Fact]
     public void ConfigureServices_RegistersStoreAndDashboardOptions()
     {
         var provider = BuildModuleServices();
@@ -151,6 +211,9 @@ public abstract class SchedulingModuleTestsBase
     protected abstract string ClearVersionInfoSql { get; }
     protected abstract string HistoryIndexCountSql { get; }
 
+    // qrtz_job_details COUNT(*) per engine — table exists (in the quartz schema) iff this query succeeds.
+    protected abstract string QrtzJobDetailsCountSql { get; }
+
     private async Task<bool> HistoryIndexExistsAsync(SchedulingDbContext context)
     {
         // SqlQueryRaw<int> maps a single-column result whose column is aliased "Value".
@@ -179,6 +242,8 @@ public sealed class PostgresSchedulingModuleTests : SchedulingModuleTestsBase, I
         "DELETE FROM public.\"VersionInfo\"";
     protected override string HistoryIndexCountSql =>
         "SELECT COUNT(*) AS \"Value\" FROM pg_indexes WHERE schemaname = 'scheduling' AND indexname = 'ix_execution_history_scheduler_trigger_fired'";
+    protected override string QrtzJobDetailsCountSql =>
+        "SELECT COUNT(*) AS \"Value\" FROM quartz.qrtz_job_details";
 
     public Task InitializeAsync() => container.StartAsync();
     public Task DisposeAsync() => container.DisposeAsync().AsTask();
@@ -202,6 +267,8 @@ public sealed class SqlServerSchedulingModuleTests : SchedulingModuleTestsBase, 
     protected override string HistoryIndexCountSql =>
         "SELECT COUNT(*) AS Value FROM sys.indexes WHERE name = 'ix_execution_history_scheduler_trigger_fired' " +
         "AND object_id = OBJECT_ID('scheduling.execution_history')";
+    protected override string QrtzJobDetailsCountSql =>
+        "SELECT COUNT(*) AS Value FROM quartz.qrtz_job_details";
 
     public Task InitializeAsync() => container.StartAsync();
     public Task DisposeAsync() => container.DisposeAsync().AsTask();
@@ -243,5 +310,21 @@ public sealed class SchedulingModuleConfigurationTests
         // lockstep with ToMigrationEngine by the LOCKSTEP comment in SchedulingSchemaMigration; reaching it
         // would require a live unsupported-engine database, which is out of scope until EF MySQL exists.
         await Assert.ThrowsAsync<NotSupportedException>(async () => await module.InitializeAsync(sp));
+    }
+
+    [Fact]
+    public void ConfigureServices_RegistersNoScheduler_WhenUsePersistentStoreFalse()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<IConfiguration>(new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?> { ["ConnectionStrings:Default"] = "Host=unused" })
+            .Build());
+        services.AddSingleton<IDatabaseProvider>(new FakeDatabaseProvider(DatabaseProviderNames.Postgres));
+
+        new SchedulingModule(new SchedulingModuleOptions { UsePersistentStore = false })
+            .ConfigureServices(services);
+
+        using var sp = services.BuildServiceProvider();
+        Assert.Null(sp.GetService<ISchedulerFactory>());
     }
 }
