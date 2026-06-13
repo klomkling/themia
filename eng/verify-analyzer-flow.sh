@@ -93,7 +93,9 @@ BUILD_LOG="$WORK/consumer-build.log"
 # A library build (no entry point); THEMIA104 is a Warning, so the build succeeds — we observe the warning.
 dotnet build "$CONSUMER/consumer.csproj" --configuration Release 2>&1 | tee "$BUILD_LOG" || true
 
-if grep -q "THEMIA104" "$BUILD_LOG"; then
+# Match the MSBuild warning line specifically (not the bare rule ID, which could appear in an
+# analyzer-load error or a doc URL without the analyzer actually firing).
+if grep -q "warning THEMIA104" "$BUILD_LOG"; then
   echo "==> PASS: an adopter of Themia.Framework.Data.EFCore receives THEMIA104."
 else
   echo "==> FAIL: THEMIA104 did not fire in the consumer build — transitive analyzer flow is broken."
