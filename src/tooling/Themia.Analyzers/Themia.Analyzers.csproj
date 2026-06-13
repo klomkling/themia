@@ -2,7 +2,7 @@
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
     <PackageId>Themia.Analyzers</PackageId>
-    <Description>Themia Roslyn analyzers — THEMIA101 catch-log-rethrow and THEMIA102 sync-over-async diagnostics.</Description>
+    <Description>Themia Roslyn analyzers — THEMIA101 catch-log-rethrow, THEMIA102 sync-over-async, and the THEMIA103/104 tenant-isolation gates (raw Dapper connection, DbSet.Find).</Description>
     <PackageTags>themia;roslyn;analyzer;diagnostic</PackageTags>
     <IsRoslynComponent>true</IsRoslynComponent>
     <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>

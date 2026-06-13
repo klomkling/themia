@@ -148,9 +148,14 @@ project — it runs nowhere. Two wiring changes:
    - Drop `DevelopmentDependency=true` from `Themia.Analyzers.csproj` (a dev-dependency is excluded from
      transitive flow).
    - `Themia.Framework.Data.Abstractions`, `Themia.Framework.Data.Dapper`, and
-     `Themia.Framework.Data.EFCore` take a `PackageReference` to `Themia.Analyzers` that flows analyzer
-     assets transitively (no `PrivateAssets=all`; `IncludeAssets` includes `analyzers`). Central-package
-     management: pin the version in `Directory.Packages.props`.
+     `Themia.Framework.Data.EFCore` reference `Themia.Analyzers` so the analyzer assets flow transitively
+     (no `PrivateAssets=all`; `analyzers` included). **As implemented (supersedes the original
+     `PackageReference` + CPM-pin note):** a `ProjectReference` with `<PrivateAssets>none</PrivateAssets>`
+     + `<IncludeAssets>analyzers</IncludeAssets>` — on `dotnet pack` this renders the nuspec dependency
+     `<dependency id="Themia.Analyzers" exclude="Runtime,Compile,Build,Native,BuildTransitive" />`
+     (analyzers flow, nothing else). A ProjectReference avoids a CPM version pin and keeps the dependency
+     in lockstep with the single-version monorepo; `release.yml` packs the whole solution so
+     `Themia.Analyzers` publishes in the same batch.
    - **Consequence (approved):** because one analyzer assembly is all-or-nothing, adopters also receive the
      existing **THEMIA101/102** (benign hygiene Warnings, category `Themia.DI`, suppressible via
      `.editorconfig`). No second analyzer package — YAGNI.
