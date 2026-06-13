@@ -22,6 +22,16 @@ public sealed class ProblemDetailsMiddleware(
         {
             await next(context);
         }
+        catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested)
+        {
+            // The client disconnected — cancellation flow, not a server error. Checked BEFORE the
+            // response-started catch below so a client-abort OperationCanceledException is logged
+            // consistently as cancellation (Debug) whether or not the response had started — never as an
+            // error or a 500. The connection is gone, so don't write a response; log quietly and rethrow.
+            logger.LogDebug("Request aborted by the client for {Method} {Path} (TraceId: {TraceId})",
+                context.Request.Method, context.Request.Path, traceId);
+            throw;
+        }
 #pragma warning disable THEMIA101 // Deliberate: response already started — cannot write problem details, must log here before rethrowing.
         catch (Exception ex) when (context.Response.HasStarted)
         {
