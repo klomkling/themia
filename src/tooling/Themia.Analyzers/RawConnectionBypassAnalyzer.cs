@@ -32,14 +32,17 @@ public sealed class RawConnectionBypassAnalyzer : DiagnosticAnalyzer
         if (DataLayerScope.IsDataLayerAssembly(context.Compilation.AssemblyName))
             return;
 
-        var contextType = context.Compilation.GetTypeByMetadataName(ConnectionContextMetadataName);
-        if (contextType is null)
+        // GetTypesByMetadataName (not the singular GetTypeByMetadataName, which returns null when the type
+        // is defined in more than one referenced assembly) so the gate doesn't silently disengage in a graph
+        // that surfaces IDapperConnectionContext from multiple assemblies.
+        var contextTypes = context.Compilation.GetTypesByMetadataName(ConnectionContextMetadataName);
+        if (contextTypes.IsEmpty)
             return; // Dapper data layer not referenced.
 
-        context.RegisterOperationAction(ctx => Analyze(ctx, contextType), OperationKind.Invocation);
+        context.RegisterOperationAction(ctx => Analyze(ctx, contextTypes), OperationKind.Invocation);
     }
 
-    private static void Analyze(OperationAnalysisContext context, INamedTypeSymbol contextType)
+    private static void Analyze(OperationAnalysisContext context, ImmutableArray<INamedTypeSymbol> contextTypes)
     {
         var method = ((IInvocationOperation)context.Operation).TargetMethod;
         if (method.Name != "GetOpenConnectionAsync")
@@ -48,10 +51,14 @@ public sealed class RawConnectionBypassAnalyzer : DiagnosticAnalyzer
         // (it is DI-injected; the concrete implementation is internal to the Dapper data layer). A call
         // through a concrete-type variable would have a different ContainingType and escape this, but that
         // type is inaccessible outside the data layer, which self-exempts anyway.
-        if (!SymbolEqualityComparer.Default.Equals(method.ContainingType, contextType))
-            return;
-
-        context.ReportDiagnostic(Diagnostic.Create(
-            DiagnosticDescriptors.RawConnectionBypass, context.Operation.Syntax.GetLocation()));
+        foreach (var contextType in contextTypes)
+        {
+            if (SymbolEqualityComparer.Default.Equals(method.ContainingType, contextType))
+            {
+                context.ReportDiagnostic(Diagnostic.Create(
+                    DiagnosticDescriptors.RawConnectionBypass, context.Operation.Syntax.GetLocation()));
+                return;
+            }
+        }
     }
 }

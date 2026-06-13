@@ -5,24 +5,15 @@ real but non-blocking and out of scope for 0.4.9. Captured here so they aren't l
 vulnerability — the analyzers are build-time guard-rails; tenant isolation is still enforced at runtime by
 the repositories / EF query filters regardless of whether the analyzer fires.
 
-## 1. `GetTypeByMetadataName` silently no-ops if the target type is multiply-defined
+## 1. `GetTypeByMetadataName` silently no-ops if the target type is multiply-defined — DONE (0.4.9)
 
-**Where:** `src/tooling/Themia.Analyzers/RawConnectionBypassAnalyzer.cs` and `DbSetFindBypassAnalyzer.cs`,
-the `CompilationStart` symbol resolution.
-
-Both analyzers resolve their target (`Microsoft.EntityFrameworkCore.DbSet`1`,
-`Themia.Framework.Data.Dapper.Connection.IDapperConnectionContext`) via `Compilation.GetTypeByMetadataName`,
-which returns `null` when the type is defined in **more than one** referenced assembly (a documented Roslyn
-behavior). On `null` the analyzer returns early and the gate goes quiet for that compilation.
-
-**Risk if untouched:** in an unusual graph that pulls the same type from two assemblies (e.g. two EF Core
-versions unified oddly), the gate silently disengages — a missed *warning*, not a broken isolation
-guarantee. Very rare for these specific types (`DbSet<T>` is single-sourced under normal NuGet unification;
-`IDapperConnectionContext` is a single Themia assembly).
-
-**Suggested fix:** switch to `Compilation.GetTypesByMetadataName(...)` (plural) and register the operation
-action if the result set is non-empty, comparing the invocation's containing type against any of them.
-Converts a silent no-op into robust matching.
+**Resolved in 0.4.9.** Both analyzers (`RawConnectionBypassAnalyzer`, `DbSetFindBypassAnalyzer`) now resolve
+their target via `Compilation.GetTypesByMetadataName(...)` (plural) in `CompilationStart`, register the
+operation action when the result set is non-empty, and match the invocation's containing type against any
+of the resolved symbols. The singular `GetTypeByMetadataName` returned `null` (silently disengaging the
+gate) when the type was defined in more than one referenced assembly; the plural overload handles that. A
+missed warning was never a broken isolation guarantee — runtime isolation is enforced by the repositories /
+EF filters regardless — but for a security gate, robust matching is worth it.
 
 ## 2. CI smoke-test for transitive analyzer flow to adopters — DONE (0.4.9)
 

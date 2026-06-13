@@ -29,14 +29,17 @@ public sealed class DbSetFindBypassAnalyzer : DiagnosticAnalyzer
         if (DataLayerScope.IsDataLayerAssembly(context.Compilation.AssemblyName))
             return;
 
-        var dbSet = context.Compilation.GetTypeByMetadataName("Microsoft.EntityFrameworkCore.DbSet`1");
-        if (dbSet is null)
+        // GetTypesByMetadataName (not the singular GetTypeByMetadataName, which returns null when the type
+        // is defined in more than one referenced assembly) so the gate doesn't silently disengage in a graph
+        // that surfaces DbSet<T> from multiple assemblies.
+        var dbSets = context.Compilation.GetTypesByMetadataName("Microsoft.EntityFrameworkCore.DbSet`1");
+        if (dbSets.IsEmpty)
             return; // EF Core not referenced — nothing to flag.
 
-        context.RegisterOperationAction(ctx => Analyze(ctx, dbSet), OperationKind.Invocation);
+        context.RegisterOperationAction(ctx => Analyze(ctx, dbSets), OperationKind.Invocation);
     }
 
-    private static void Analyze(OperationAnalysisContext context, INamedTypeSymbol dbSet)
+    private static void Analyze(OperationAnalysisContext context, ImmutableArray<INamedTypeSymbol> dbSets)
     {
         var method = ((IInvocationOperation)context.Operation).TargetMethod;
         if (method.Name is not ("Find" or "FindAsync"))
@@ -45,10 +48,15 @@ public sealed class DbSetFindBypassAnalyzer : DiagnosticAnalyzer
         // and a subclass that inherits Find without overriding it. Known limitation: a subclass that
         // *overrides* Find escapes this (ContainingType becomes the subclass). That is vanishingly rare
         // (DbSet<T> is abstract; EF supplies the concrete type) and the data layer self-exempts anyway.
-        if (!SymbolEqualityComparer.Default.Equals(method.ContainingType.OriginalDefinition, dbSet))
-            return;
-
-        context.ReportDiagnostic(Diagnostic.Create(
-            DiagnosticDescriptors.DbSetFindBypass, context.Operation.Syntax.GetLocation()));
+        var containing = method.ContainingType.OriginalDefinition;
+        foreach (var dbSet in dbSets)
+        {
+            if (SymbolEqualityComparer.Default.Equals(containing, dbSet))
+            {
+                context.ReportDiagnostic(Diagnostic.Create(
+                    DiagnosticDescriptors.DbSetFindBypass, context.Operation.Syntax.GetLocation()));
+                return;
+            }
+        }
     }
 }
