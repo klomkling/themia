@@ -10,6 +10,25 @@ with the *why* and concrete upgrade steps.
 - Each entry states: **What changed**, **Why**, and **How to upgrade** (before → after).
 - Non-breaking changes are *not* listed here — see the CHANGELOG.
 
+## 0.4.8
+
+### Scheduling module now owns a persistent Quartz scheduler by default
+
+**What changed:** `Themia.Modules.Scheduling` registers and starts a persistent AdoJobStore scheduler (the
+`qrtz_*` tables in a `quartz` schema; System.Text.Json serializer; `UseProperties = true`). Previously the host
+supplied the `IScheduler`.
+
+**Why:** scheduled jobs must survive restarts; FluentMigrator owns the `qrtz_*` schema (DECISION #6).
+
+**How to upgrade:**
+
+- Ensure an EF provider is registered (`AddThemiaPostgres`/`AddThemiaSqlServer`) and call the module's
+  `InitializeAsync` **before** running the host — the `qrtz_*` tables must exist before the scheduler starts.
+- JobDataMap is stored as string key-values (`UseProperties = true`) — job data must be string-serializable.
+- To keep managing your own scheduler, set `SchedulingModuleOptions.UsePersistentStore = false`; the module then
+  registers no scheduler and the dashboard resolves your host-supplied `IScheduler` as before.
+- The scheduler uses the `Default` connection (process-wide, never tenant-routed). SQL Server + PostgreSQL only.
+
 ## 0.4.7
 
 ### Scheduling module: schema via FluentMigrator + requires an EF provider

@@ -15,8 +15,10 @@ public sealed class SchedulingModuleOptions
 
     /// <summary>
     /// The scheduler name used by <see cref="EfExecutionHistoryStore"/> to scope history and stats
-    /// rows. Must match the host's configured Quartz scheduler name. Defaults to
-    /// <c>QuartzScheduler</c> (Quartz.NET's default).
+    /// rows. When <see cref="UsePersistentStore"/> is <see langword="true"/> (default) the module
+    /// applies this name to the scheduler it owns, so the two always match; it only needs to match a
+    /// host-configured scheduler name when <see cref="UsePersistentStore"/> is <see langword="false"/>.
+    /// Defaults to <c>QuartzScheduler</c> (Quartz.NET's default).
     /// </summary>
     public string SchedulerName { get; set; } = "QuartzScheduler";
 
@@ -26,4 +28,12 @@ public sealed class SchedulingModuleOptions
     /// hosts SHOULD supply an admin check here, as the dashboard is platform-admin surface.
     /// </summary>
     public Func<HttpContext, Task<bool>>? Authorize { get; set; }
+
+    /// <summary>
+    /// When <see langword="true"/> (default), the module registers a persistent Quartz scheduler
+    /// (AdoJobStore over the <c>quartz</c> schema, System.Text.Json serializer) and starts it via the
+    /// Quartz hosted service. Set to <see langword="false"/> to register no scheduler — the host then
+    /// supplies its own <c>IScheduler</c> (via <c>ThemiaQuartzOptions.Scheduler</c> or DI), as before.
+    /// </summary>
+    public bool UsePersistentStore { get; set; } = true;
 }
