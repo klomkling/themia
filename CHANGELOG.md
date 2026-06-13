@@ -24,10 +24,11 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 - **`ProblemDetailsMiddleware` no longer turns a client-aborted request into a 500.** When the client
   disconnects mid-request, the resulting `OperationCanceledException` was caught by the generic handler,
-  logged at `Error`, and written as a 500 to a dead connection. It is now treated as cancellation flow
-  (`dotnet.md`): when `HttpContext.RequestAborted` is signalled, the middleware logs at `Debug` and lets the
-  cancellation propagate without writing a response. A genuine (non-client-abort) `OperationCanceledException`
-  still takes the generic 500 path.
+  logged at `Error`, and written as a 500 to a dead connection. It is now treated as cancellation flow: when
+  `HttpContext.RequestAborted` is signalled, the middleware logs at `Debug` and lets the cancellation
+  propagate without writing a response (checked ahead of the response-already-started path, so a client abort
+  is never logged as an error). A genuine (non-client-abort) `OperationCanceledException` still takes the
+  generic 500 path.
 
 ## 0.4.9 — 2026-06-13
 

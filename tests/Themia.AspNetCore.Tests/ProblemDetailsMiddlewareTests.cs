@@ -157,7 +157,26 @@ public sealed class ProblemDetailsMiddlewareTests
             _ => throw new OperationCanceledException(),
             NullLogger<ProblemDetailsMiddleware>.Instance);
 
-        // The client disconnected — cancellation, not a server error: propagate it, never write a 500.
+        // The client disconnected — cancellation, not a server error: propagate it, leaving the status
+        // untouched (no response written), never a 500.
+        await Assert.ThrowsAsync<OperationCanceledException>(() => mw.InvokeAsync(ctx));
+        Assert.Equal(200, ctx.Response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Client_aborted_cancellation_with_started_response_is_rethrown_as_cancellation()
+    {
+        // Even when the response has started, a client abort is cancellation (not the "response already
+        // started" error path): the OCE-abort catch is checked first, so it rethrows without a 500.
+        var ctx = new DefaultHttpContext();
+        ctx.Request.Path = "/x";
+        ctx.Features.Set<IHttpResponseFeature>(new StartedResponseFeature());
+        ctx.RequestAborted = new CancellationToken(canceled: true);
+
+        var mw = new ProblemDetailsMiddleware(
+            _ => throw new OperationCanceledException(),
+            NullLogger<ProblemDetailsMiddleware>.Instance);
+
         await Assert.ThrowsAsync<OperationCanceledException>(() => mw.InvokeAsync(ctx));
         Assert.NotEqual(500, ctx.Response.StatusCode);
     }

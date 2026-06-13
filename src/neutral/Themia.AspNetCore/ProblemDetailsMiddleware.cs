@@ -22,6 +22,16 @@ public sealed class ProblemDetailsMiddleware(
         {
             await next(context);
         }
+        catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested)
+        {
+            // The client disconnected — cancellation flow, not a server error. Checked BEFORE the
+            // response-started catch below so a client abort is logged consistently as cancellation
+            // (Debug) regardless of whether the response had started — never as an error or a 500. The
+            // connection is gone, so don't write a response; log quietly and let the cancellation propagate.
+            logger.LogDebug("Request aborted by the client for {Method} {Path} (TraceId: {TraceId})",
+                context.Request.Method, context.Request.Path, traceId);
+            throw;
+        }
 #pragma warning disable THEMIA101 // Deliberate: response already started — cannot write problem details, must log here before rethrowing.
         catch (Exception ex) when (context.Response.HasStarted)
         {
@@ -31,14 +41,6 @@ public sealed class ProblemDetailsMiddleware(
             throw;
         }
 #pragma warning restore THEMIA101
-        catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested)
-        {
-            // The client disconnected — this is cancellation flow, not a server error. The connection is
-            // gone, so don't write a (500) response; log quietly and let the cancellation propagate.
-            logger.LogDebug("Request aborted by the client for {Method} {Path} (TraceId: {TraceId})",
-                context.Request.Method, context.Request.Path, traceId);
-            throw;
-        }
         catch (NotFoundException ex) { await WriteAsync(context, 404, "Not Found", ex, traceId, LogLevel.Warning); }
         catch (ConflictException ex) { await WriteAsync(context, 409, "Conflict", ex, traceId, LogLevel.Warning); }
         catch (ForbiddenException ex) { await WriteAsync(context, 403, "Forbidden", ex, traceId, LogLevel.Warning); }
