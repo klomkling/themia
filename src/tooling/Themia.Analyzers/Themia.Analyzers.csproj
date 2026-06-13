@@ -12,7 +12,6 @@
     <!-- Analyzer-only package: no runtime output → symbols package would be empty → NU5017 -->
     <IncludeSymbols>false</IncludeSymbols>
     <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
-    <DevelopmentDependency>true</DevelopmentDependency>
     <NoWarn>$(NoWarn);RS1032;RS2008;NU5128</NoWarn>
     <NoPackageAnalysis>true</NoPackageAnalysis>
   </PropertyGroup>

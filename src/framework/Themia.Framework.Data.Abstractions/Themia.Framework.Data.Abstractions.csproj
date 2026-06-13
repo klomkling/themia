@@ -9,6 +9,15 @@
     <ProjectReference Include="../Themia.Framework.Core/Themia.Framework.Core.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <!-- Flow the Themia isolation analyzers (THEMIA103/104) to adopters of this data package. PrivateAssets=none
+         + IncludeAssets=analyzers makes the packed nuspec dependency carry ONLY the analyzers asset (no compile/
+         runtime ref), so referencing this package brings the analyzers transitively. -->
+    <ProjectReference Include="$(MSBuildThisFileDirectory)../../tooling/Themia.Analyzers/Themia.Analyzers.csproj">
+      <PrivateAssets>none</PrivateAssets>
+      <IncludeAssets>analyzers</IncludeAssets>
+    </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
     <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
