@@ -75,25 +75,34 @@ FluentMigrator, one schema (`IfDatabase("postgres","sqlserver")`), all tables in
 snake_case columns, with the framework's audit + soft-delete + concurrency columns applied via the
 existing conventions.
 
+`tenant_id` is a `varchar(100)` string (the framework's `TenantId` is a validated string, **not** a
+Guid). A `NULL` `tenant_id` is the framework's existing **"global record"** marker.
+
 | Table | Key columns / notes |
 |---|---|
-| **users** | `id` (Guid PK), `tenant_id`, `scope` (`Tenant`\|`Platform`), `user_name` + `normalized_user_name`, `email` + `normalized_email`, `email_confirmed`, `phone_number` + `phone_number_confirmed`, `password_hash`, `security_stamp`, `is_active`, lockout: `access_failed_count`, `lockout_end`, `lockout_enabled`, 2FA hook: `two_factor_enabled`, + audit/soft-delete/concurrency |
-| **roles** | `id`, `tenant_id`, `scope`, `name` + `normalized_name`, `description` |
+| **users** | `id` (Guid PK), `tenant_id` (varchar(100), NULL ⇒ platform user), `user_name` + `normalized_user_name`, `email` + `normalized_email`, `email_confirmed`, `phone_number` + `phone_number_confirmed`, `password_hash`, `security_stamp`, `is_active`, lockout: `access_failed_count`, `lockout_end`, `lockout_enabled`, 2FA hook: `two_factor_enabled`, + audit/soft-delete/concurrency |
+| **roles** | `id`, `tenant_id` (NULL ⇒ platform role), `name` + `normalized_name`, `description` |
 | **user_roles** | (`user_id`, `role_id`) composite PK |
 | **user_claims** | `id`, `user_id`, `claim_type`, `claim_value` |
 | **role_claims** | `id`, `role_id`, `claim_type`, `claim_value` |
 | **user_tokens** | `id`, `user_id`, `purpose` (`EmailConfirm`\|`PhoneConfirm`\|`PasswordReset`\|`TwoFactor`), `token_hash`, `expires_at`, `consumed_at` — persisted, single-use, expiring; token **hashes** stored, never raw |
 
-**Indexes / uniqueness:**
-- `unique(tenant_id, normalized_user_name)` and `unique(tenant_id, normalized_email)` on `users`.
-- `unique(tenant_id, normalized_name)` on `roles`.
-- index `user_tokens(user_id, purpose)`.
+**Platform vs tenant users use the framework's global-record convention: `tenant_id IS NULL` = platform
+(spans all tenants), non-null = tenant-scoped.** There is no separate `scope` column — platform ⇔
+`TenantId is null`, matching how the framework already models cross-tenant rows (cf.
+`DapperDataOptions.IncludeGlobalRecordsForTenants`). Platform users/roles are read by bypassing the
+tenant filter (`Specification.WithoutTenantFilter()` / `IDataFilterScope`).
 
-**Platform users use a reserved `tenant_id` sentinel (`Guid.Empty`), not NULL.** A composite unique
-index on a *nullable* `tenant_id` behaves differently per engine — PostgreSQL treats NULLs as distinct
-(would allow duplicate platform logins), SQL Server allows only one NULL row total (too restrictive).
-A non-null sentinel makes the unique indexes behave **identically** on both engines and keeps the
-column non-null. The `scope` column is the explicit discriminator; the tenant-filter bypass keys off it.
+**Indexes / uniqueness** — a composite unique index on a *nullable* `tenant_id` behaves differently per
+engine (PostgreSQL treats NULLs as distinct → would allow duplicate platform logins; SQL Server allows
+only one NULL row total → too restrictive), so uniqueness is split into **two filtered unique indexes**
+per table, emitted per-engine via `IfDatabase("postgres"|"sqlserver").Execute.Sql(...)` (both engines
+support `WHERE` on a unique index):
+- `users`: `unique(tenant_id, normalized_user_name) WHERE tenant_id IS NOT NULL` and
+  `unique(normalized_user_name) WHERE tenant_id IS NULL`; likewise for `normalized_email`.
+- `roles`: `unique(tenant_id, normalized_name) WHERE tenant_id IS NOT NULL` and
+  `unique(normalized_name) WHERE tenant_id IS NULL`.
+- plain index `user_tokens(user_id, purpose)`.
 
 **Per-tenant uniqueness:** the same username/email may exist in different tenants. Normalization
 (upper-invariant) is stored so lookups are index-friendly and case-insensitive without depending on DB
@@ -137,21 +146,24 @@ exception-as-control-flow.
 
 **Platform vs tenant resolution.** Tenant users are found within the ambient tenant (resolved from
 path/header before any login attempt) — the framework's row-level filter scopes the query
-automatically. Platform users (sentinel `tenant_id`) are looked up with the `IDataFilterScope` bypass.
-`IUserService.FindByUserNameAsync` tries the ambient-tenant row first, then optionally the platform
-scope (`IdentityModuleOptions.AllowPlatformLogin`, default `true`) so a super-admin can sign in against
-any tenant's entry point.
+automatically. Platform users (`tenant_id IS NULL`, global records) are looked up by bypassing the
+tenant filter (`Specification.WithoutTenantFilter()`). `IUserService.FindByUserNameAsync` tries the
+ambient-tenant row first, then optionally the platform (global) scope
+(`IdentityModuleOptions.AllowPlatformLogin`, default `true`) so a super-admin can sign in against any
+tenant's entry point.
 
 **Current-user principal — two layers:**
 - **`ICurrentUserAccessor`** (the existing `Data.Abstractions` seam, currently a null stub) gets a real
   implementation returning the authenticated user's id — so audit stamping (`created_by`/`modified_by`)
   reflects the real user.
-- **`ICurrentUser`** (new, in `Identity.Abstractions`) — richer ambient principal: `UserId`, `TenantId`,
-  `Scope`, `UserName`, `Roles`, `Claims`, `IsAuthenticated`, `IsInRole(...)`. Backed by a scoped
-  accessor populated from the `ClaimsPrincipal` on `HttpContext.User`. Application code injects this.
+- **`ICurrentUser`** (new, in `Identity.Abstractions`) — richer ambient principal: `UserId`, `TenantId`
+  (null ⇒ platform), `IsPlatform` (⇔ `TenantId is null`), `UserName`, `Roles`, `Claims`,
+  `IsAuthenticated`, `IsInRole(...)`. Backed by a scoped accessor populated from the `ClaimsPrincipal`
+  on `HttpContext.User`. Application code injects this.
 
-**`ClaimsPrincipalFactory`** turns a `User` into claims: subject id, tenant id, scope, user name, a
-`role` claim per assigned role, plus the effective claims from `IClaimService.GetEffectiveClaimsAsync`.
+**`ClaimsPrincipalFactory`** turns a `User` into claims: subject id, tenant id (omitted for platform
+users), user name, a `role` claim per assigned role, plus the effective claims from
+`IClaimService.GetEffectiveClaimsAsync`.
 The 0.5.1 JWT slice uses this factory to mint token claims; in 0.5.0 it is available for hosts already
 authenticating by cookie. It is the **single source of "what's in the principal"** across slices.
 
@@ -168,9 +180,9 @@ backends. The adopter has already registered a layer; Identity contributes its e
 whichever is present.
 
 - **EF Core.** Identity ships `IEntityTypeConfiguration<>` classes (table names in the `identity`
-  schema, composite unique indexes, key types, relationships). The adopter applies them in their
+  schema, the filtered unique indexes, key types, relationships). The adopter applies them in their
   `ThemiaDbContext`-derived `OnModelCreating` via a one-liner: `modelBuilder.ApplyThemiaIdentity();`
-  (wraps `ApplyConfigurationsFromAssembly`). `EfRepository<User>` then resolves through the app's
+  (applies the module's `IEntityTypeConfiguration<>` set). `EfRepository<User>` then resolves through the app's
   context, and the framework's tenant-filter/soft-delete/audit conventions apply automatically because
   the entities implement `ITenantEntity` etc.
 - **Dapper.** `AddThemiaIdentity()` registers the Identity entity mappings into the
