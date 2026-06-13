@@ -30,3 +30,8 @@ asset flag, breaking `PackAnalyzerDlls`) now turns CI red.
   detection for THEMIA103 — both documented in-code as benign limitations (`DbSet<T>` is EF-supplied;
   `DapperConnectionContext` is `internal sealed`, so adopters can't hold a concrete reference). YAGNI.
 - No code-fix provider / custom bypass-marker API (standard suppression suffices).
+- A unit test for the `GetTypesByMetadataName` *multiply-defined* path. Exercising it requires two synthetic
+  referenced assemblies that both define the target metadata name, which forces extern-alias gymnastics to
+  avoid CS0433 in the consumer — a brittle test harder to read than the one-line defensive change it guards.
+  Coverage relies on code review + the obvious correctness of the plural API. (A *non-overriding subclass*
+  positive test for THEMIA104 — cheap and clean — was added.)

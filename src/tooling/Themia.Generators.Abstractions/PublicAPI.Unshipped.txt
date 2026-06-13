@@ -1,1 +1,2 @@
 #nullable enable
+static Themia.Generators.Abstractions.Diagnostics.ThemiaDiagnostics.CreateWarning(string! id, string! title, string! messageFormat, string! category, string? helpLinkUri = null) -> Microsoft.CodeAnalysis.DiagnosticDescriptor!

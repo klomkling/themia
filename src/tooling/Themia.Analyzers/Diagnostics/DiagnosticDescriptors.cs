@@ -18,22 +18,18 @@ internal static class DiagnosticDescriptors
             "'{0}' wraps synchronous work in Task.FromResult; provide a genuinely async implementation.");
 
     // The tenant-isolation gates get their own category so adopters can configure them as a group via
-    // .editorconfig (dotnet_analyzer_diagnostic.category-Themia.Isolation.severity). Built locally rather
-    // than via ThemiaDiagnostics.CreateWarning, which hardcodes the Themia.DI category.
+    // .editorconfig (dotnet_analyzer_diagnostic.category-Themia.Isolation.severity), and a per-rule help
+    // link. They route through ThemiaDiagnostics.CreateWarning's category/help-link overload, so they share
+    // the same ID-pattern validation and descriptor shape as THEMIA101/102 (which use the default category).
     private const string IsolationCategory = "Themia.Isolation";
 
-    // No ID-pattern validation (unlike ThemiaDiagnostics) — every caller below passes a compile-time
-    // string literal, so a malformed ID would be caught in review, not at runtime.
     private static DiagnosticDescriptor IsolationWarning(string id, string title, string message) =>
-        new(
+        ThemiaDiagnostics.CreateWarning(
             id,
             title,
             message,
             IsolationCategory,
-            DiagnosticSeverity.Warning,
-            isEnabledByDefault: true,
-            description: null,
-            helpLinkUri: $"https://github.com/klomkling/themia/blob/main/docs/analyzers/{id}.md");
+            $"https://github.com/klomkling/themia/blob/main/docs/analyzers/{id}.md");
 
     public static readonly DiagnosticDescriptor RawConnectionBypass = IsolationWarning(
         "THEMIA103",

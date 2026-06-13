@@ -28,7 +28,11 @@ trap 'rm -rf "$WORK"' EXIT
 mkdir -p "$FEED" "$CONSUMER"
 
 echo "==> Packing solution to local feed (this also builds)..."
-dotnet pack Themia.sln --configuration Release --output "$FEED" >/dev/null
+# Capture pack output so a failure (compile error, RS0016, NETSDK1085, …) shows its MSBuild diagnostics
+# instead of a bare non-zero exit. set -e would abort with no context if we sent this to /dev/null.
+if ! dotnet pack Themia.sln --configuration Release --output "$FEED" > "$WORK/pack.log" 2>&1; then
+  echo "ERROR: 'dotnet pack' failed — see output below:"; cat "$WORK/pack.log"; exit 1
+fi
 
 echo "==> Structural checks..."
 EFCORE_NUPKG="$FEED/Themia.Framework.Data.EFCore.$VERSION.nupkg"
@@ -90,14 +94,24 @@ public static class Probe
 EOF
 
 BUILD_LOG="$WORK/consumer-build.log"
-# A library build (no entry point); THEMIA104 is a Warning, so the build succeeds — we observe the warning.
-dotnet build "$CONSUMER/consumer.csproj" --configuration Release 2>&1 | tee "$BUILD_LOG" || true
+# A library build (no entry point); THEMIA104 is a Warning, so the build itself should SUCCEED — we then
+# observe the warning. Capture the build's true exit code (PIPESTATUS[0], not tee's) so a restore or
+# analyzer-load failure is reported as such, rather than misattributed to "transitive flow broken".
+set +e
+dotnet build "$CONSUMER/consumer.csproj" --configuration Release 2>&1 | tee "$BUILD_LOG"
+build_rc=${PIPESTATUS[0]}
+set -e
+if [ "$build_rc" -ne 0 ]; then
+  echo "ERROR: the consumer build failed (exit $build_rc) — a restore or analyzer-load problem, NOT"
+  echo "       necessarily a missing THEMIA104. See the build output above."
+  exit 1
+fi
 
 # Match the MSBuild warning line specifically (not the bare rule ID, which could appear in an
 # analyzer-load error or a doc URL without the analyzer actually firing).
 if grep -q "warning THEMIA104" "$BUILD_LOG"; then
   echo "==> PASS: an adopter of Themia.Framework.Data.EFCore receives THEMIA104."
 else
-  echo "==> FAIL: THEMIA104 did not fire in the consumer build — transitive analyzer flow is broken."
+  echo "==> FAIL: consumer built cleanly but THEMIA104 did not fire — transitive analyzer flow is broken."
   exit 1
 fi

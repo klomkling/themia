@@ -9,7 +9,9 @@ namespace Themia.Analyzers;
 /// </summary>
 internal static class DataLayerScope
 {
+    // Trailing dot so the match is bounded to real sub-packages (Themia.Framework.Data.Abstractions,
+    // .Dapper, .EFCore, …) and never a hypothetical sibling like Themia.Framework.Database.
     public static bool IsDataLayerAssembly(string? assemblyName) =>
         assemblyName is not null &&
-        assemblyName.StartsWith("Themia.Framework.Data", StringComparison.Ordinal);
+        assemblyName.StartsWith("Themia.Framework.Data.", StringComparison.Ordinal);
 }

@@ -65,6 +65,22 @@ public class Repo {
     }
 
     [Fact]
+    public async Task NonOverridingSubclassFind_Flagged()
+    {
+        // A subclass that INHERITS Find without overriding it: the invocation's TargetMethod.ContainingType
+        // is still DbSet<T> (the declaring type), so .OriginalDefinition matches and THEMIA104 fires. This
+        // pins the documented behavior and the reason the match uses OriginalDefinition.
+        var src = EfStubs + @"
+public class TenantSet<T> : Microsoft.EntityFrameworkCore.DbSet<T> { }
+public class Repo {
+    private TenantSet<string> _set = new();
+    public string Get() => {|#0:_set.Find(""id"")|};
+}";
+        var expected = new DiagnosticResult("THEMIA104", DiagnosticSeverity.Warning).WithLocation(0);
+        await new Verify<DbSetFindBypassAnalyzer>.Test { TestCode = src, ExpectedDiagnostics = { expected } }.RunAsync();
+    }
+
+    [Fact]
     public async Task GuardedContextFindAsync_NotFlagged()
     {
         // DbContext.FindAsync<T> is the guarded path (member of DbContext, not DbSet<T>).
