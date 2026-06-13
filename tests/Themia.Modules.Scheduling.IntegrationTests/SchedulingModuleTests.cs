@@ -362,8 +362,12 @@ public sealed class SqlServerCaseSensitiveCollationTests : IAsyncLifetime
         {
             await new SchedulingModule(new SchedulingModuleOptions { SchedulerName = "cs-test" }).InitializeAsync(p1);
             LogContext.SetCurrentLogProvider(p1.GetRequiredService<ILoggerFactory>());
+            // Build the scheduler (this runs AdoJobStore ValidateSchema against the uppercase qrtz_* tables —
+            // the actual CS-collation prefix check) but do NOT Start() it: Start spawns the AdoJobStore
+            // check-in thread, whose connection isn't released synchronously on Shutdown and intermittently
+            // deadlocks process 2's FluentMigrator DDL on the shared container. Scheduling + reading the
+            // durable job below exercises the TablePrefix on writes/reads without a running scheduler.
             var scheduler1 = await p1.GetRequiredService<ISchedulerFactory>().GetScheduler();
-            await scheduler1.Start();
 
             var job = JobBuilder.Create<NoOpJob>().WithIdentity(jobKey).StoreDurably().Build();
             var trigger = TriggerBuilder.Create()
