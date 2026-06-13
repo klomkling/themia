@@ -38,12 +38,17 @@ out as PATCH releases.
 that builds out incrementally — e.g. the **0.4.x data layer** (`0.4.1` PostgreSQL Dapper → `0.4.2`
 EF write-path → `0.4.3` MySQL → `0.4.4` SQL Server (Dapper) → `0.4.5` EF SQL Server → `0.4.6`
 FluentMigrator-authority foundation → `0.4.7` Scheduling EF→FM (PostgreSQL + SQL Server) → `0.4.8`
-persistent Quartz (`AdoJobStore` + `qrtz_*` per-engine FM) → `0.4.9` raw-connection analyzer gate;
+persistent Quartz (`AdoJobStore` + `qrtz_*` per-engine FM) → `0.4.9` tenant-isolation analyzer gates
+(THEMIA103/104) → `0.4.10` ProblemDetailsMiddleware OCE→cancellation fix (a pure bug-fix PATCH, not a
+capability increment — illustrating the "bug fixes go out as PATCH" rule below);
 EF MySQL deferred on Pomelo's EF Core 10 build) — ships each
 engine/capability as a PATCH **within** the milestone's MINOR rather
-than spending a new MINOR per package. The MINOR (`0.5.0`) is reserved for the *next* milestone
-(Phase 2 modules). Pre-1.0, the occasional behavior/contract change inside such a PATCH is
-acceptable (`0.x` allows it) provided it's noted in `CHANGELOG.md` / `MIGRATION.md`.
+than spending a new MINOR per package. The `0.4.x` milestone is the **data-access + analyzer
+foundation** (the only Phase-1 *module* it shipped was `Themia.Modules.Scheduling`); the next MINOR,
+`0.5.0`, opens for the **remaining Phase-1 modules** (`Themia.Modules.{ExceptionLogging,Identity,Storage}`),
+and Phase 2 (Notifications, Pdf, Export) shifts to `0.6.0+`. Pre-1.0, the occasional behavior/contract
+change inside such a PATCH is acceptable (`0.x` allows it) provided it's noted in `CHANGELOG.md` /
+`MIGRATION.md`.
 
 Breaking changes during `0.x` are allowed (that's what `0.x` signals) but should still be noted in
 `CHANGELOG.md` and `MIGRATION.md`. The `1.0.0` line is where the public API is committed and SemVer
@@ -60,8 +65,9 @@ remaining neutral cores, then the Phase-1 modules.
 | **0.1.0** *(immediate)* | `Themia.AspNetCore` | neutral core — **done, merged** (`#13`/`#14`) |
 | **0.2.0** | Framework core — rename `zenity-v2` → `Themia.Framework.{Core,Data.EFCore,AspNetCore}`, `Themia.MultiTenancy`, `Themia.Mediator`, `Themia.Caching`, `Themia.Logging`, `Themia.Services` | **Phase 0** (framework) |
 | **0.3.0** | Remaining neutral cores — `Themia.Quartz`, `Themia.Exceptional(.SqlServer/.MySql/.PostgreSql)` | Phase 1 (neutral) |
-| **0.4.0** | Phase-1 modules — `Themia.Modules.{Scheduling,ExceptionLogging,Identity,Storage}` (+ multi-DB baseline) | Phase 1 (modules) |
-| **0.5.0+** | Phase 2 (Notifications, Pdf, Export) → Phase 3 (Geo, AI, Audit; Sequences EF-port; SourceGenerator/analyzer merge) | Phase 2 / 3 |
+| **0.4.x** | Data-access + analyzer foundation — multi-DB (Dapper/EF over SQL Server, PostgreSQL, MySQL), FluentMigrator schema authority, tenant-isolation analyzer gates, `Themia.Modules.Scheduling` (the one Phase-1 module that shipped here) | Phase 1 (data + first module) |
+| **0.5.0** | Remaining Phase-1 modules — `Themia.Modules.{ExceptionLogging,Identity,Storage}` | Phase 1 (modules) |
+| **0.6.0+** | Phase 2 (Notifications, Pdf, Export) → Phase 3 (Geo, AI, Audit; Sequences EF-port; SourceGenerator/analyzer merge) | Phase 2 / 3 |
 | **1.0.0** | Public API committed across framework core + Phase-1 modules | — |
 
 Rationale for Option A: the release pipeline is the only part of the harness still unproven, so
