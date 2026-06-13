@@ -24,19 +24,14 @@ guarantee. Very rare for these specific types (`DbSet<T>` is single-sourced unde
 action if the result set is non-empty, comparing the invocation's containing type against any of them.
 Converts a silent no-op into robust matching.
 
-## 2. No CI smoke-test for transitive analyzer flow to adopters
+## 2. CI smoke-test for transitive analyzer flow to adopters — DONE (0.4.9)
 
-**Where:** the packaging in `src/framework/Themia.Framework.Data.*` csprojs + `Themia.Analyzers.csproj`.
-
-The adopter-flow path (a consumer of a `Themia.Framework.Data.*` package receives THEMIA103/104
-transitively) is verified by inspecting the packed nuspec + the analyzer package's co-located DLLs, and the
-dogfood proves the analyzer loads and fires. But there is no **automated** consumer-compilation test, so a
-future packaging change (e.g. someone re-adds `DevelopmentDependency`, or flips an asset flag) could
-silently break adopter reach without any test going red.
-
-**Suggested fix:** a tiny CI step that packs the data packages + `Themia.Analyzers` to a local feed, builds a
-throwaway consumer project referencing one data package with a `DbSet.Find` call, and asserts a THEMIA104
-warning is emitted. Makes transitive analyzer flow regression-proof.
+**Resolved in 0.4.9.** `eng/verify-analyzer-flow.sh` packs the solution to a local feed, runs structural
+checks (the EFCore nuspec depends on `Themia.Analyzers` without excluding the Analyzers asset; both DLLs are
+co-located in `analyzers/dotnet/cs`), then builds a throwaway consumer of `Themia.Framework.Data.EFCore` with
+a `DbSet.Find` call and asserts THEMIA104 fires. Wired into `.github/workflows/ci.yml` as the `analyzer-flow`
+job, so a future packaging change that breaks adopter reach (re-adding `DevelopmentDependency`, flipping an
+asset flag, breaking `PackAnalyzerDlls`) now turns CI red.
 
 ## Not pursued (intentional, 0.4.9)
 
