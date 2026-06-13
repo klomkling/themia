@@ -22,6 +22,7 @@ public sealed class ProblemDetailsMiddleware(
         {
             await next(context);
         }
+#pragma warning disable THEMIA101 // Deliberate: response already started — cannot write problem details, must log here before rethrowing.
         catch (Exception ex) when (context.Response.HasStarted)
         {
             // The response is already on the wire; we cannot rewrite status/headers. Log and rethrow.
@@ -29,6 +30,7 @@ public sealed class ProblemDetailsMiddleware(
                 context.Request.Method, context.Request.Path, traceId);
             throw;
         }
+#pragma warning restore THEMIA101
         catch (NotFoundException ex) { await WriteAsync(context, 404, "Not Found", ex, traceId, LogLevel.Warning); }
         catch (ConflictException ex) { await WriteAsync(context, 409, "Conflict", ex, traceId, LogLevel.Warning); }
         catch (ForbiddenException ex) { await WriteAsync(context, 403, "Forbidden", ex, traceId, LogLevel.Warning); }
