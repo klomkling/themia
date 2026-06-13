@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Features;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Themia.AspNetCore.Exceptions;
 using Xunit;
@@ -158,27 +159,49 @@ public sealed class ProblemDetailsMiddlewareTests
             NullLogger<ProblemDetailsMiddleware>.Instance);
 
         // The client disconnected — cancellation, not a server error: propagate it, leaving the status
-        // untouched (no response written), never a 500.
+        // untouched and writing nothing to the dead connection (never a 500).
         await Assert.ThrowsAsync<OperationCanceledException>(() => mw.InvokeAsync(ctx));
         Assert.Equal(200, ctx.Response.StatusCode);
+        Assert.Equal(0, ctx.Response.Body.Length);
     }
 
     [Fact]
-    public async Task Client_aborted_cancellation_with_started_response_is_rethrown_as_cancellation()
+    public async Task Client_aborted_TaskCanceledException_is_rethrown_not_turned_into_500()
     {
-        // Even when the response has started, a client abort is cancellation (not the "response already
-        // started" error path): the OCE-abort catch is checked first, so it rethrows without a 500.
+        // The real-world subtype: Kestrel/await on an aborted token throws TaskCanceledException (a subclass
+        // of OperationCanceledException). The catch must cover it, not just the base type.
+        var ctx = new DefaultHttpContext();
+        ctx.Request.Path = "/x";
+        ctx.Response.Body = new MemoryStream();
+        ctx.RequestAborted = new CancellationToken(canceled: true);
+
+        var mw = new ProblemDetailsMiddleware(
+            _ => throw new TaskCanceledException(),
+            NullLogger<ProblemDetailsMiddleware>.Instance);
+
+        await Assert.ThrowsAsync<TaskCanceledException>(() => mw.InvokeAsync(ctx));
+        Assert.Equal(200, ctx.Response.StatusCode);
+        Assert.Equal(0, ctx.Response.Body.Length);
+    }
+
+    [Fact]
+    public async Task Client_aborted_cancellation_with_started_response_logs_as_cancellation_not_error()
+    {
+        // Even when the response has started, a client abort takes the cancellation path, NOT the
+        // "response already started" error path — proving the OCE-abort catch is checked first. Both paths
+        // rethrow without a 500, so the discriminating signal is the LOG: Debug "aborted", never Error.
+        var logger = new CapturingLogger<ProblemDetailsMiddleware>();
         var ctx = new DefaultHttpContext();
         ctx.Request.Path = "/x";
         ctx.Features.Set<IHttpResponseFeature>(new StartedResponseFeature());
         ctx.RequestAborted = new CancellationToken(canceled: true);
 
-        var mw = new ProblemDetailsMiddleware(
-            _ => throw new OperationCanceledException(),
-            NullLogger<ProblemDetailsMiddleware>.Instance);
+        var mw = new ProblemDetailsMiddleware(_ => throw new OperationCanceledException(), logger);
 
         await Assert.ThrowsAsync<OperationCanceledException>(() => mw.InvokeAsync(ctx));
         Assert.NotEqual(500, ctx.Response.StatusCode);
+        Assert.Contains(logger.Entries, e => e.Level == LogLevel.Debug && e.Message.Contains("aborted by the client"));
+        Assert.DoesNotContain(logger.Entries, e => e.Level == LogLevel.Error);
     }
 
     [Fact]
@@ -206,5 +229,16 @@ public sealed class ProblemDetailsMiddlewareTests
         public int StatusCode { get; set; } = 200;
         public void OnCompleted(Func<object, Task> callback, object state) { }
         public void OnStarting(Func<object, Task> callback, object state) { }
+    }
+
+    /// <summary>Captures logged entries (level + formatted message) so tests can assert log severity.</summary>
+    private sealed class CapturingLogger<T> : ILogger<T>
+    {
+        public List<(LogLevel Level, string Message)> Entries { get; } = [];
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+        public bool IsEnabled(LogLevel logLevel) => true;
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception,
+            Func<TState, Exception?, string> formatter)
+            => Entries.Add((logLevel, formatter(state, exception)));
     }
 }

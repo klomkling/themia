@@ -25,9 +25,9 @@ public sealed class ProblemDetailsMiddleware(
         catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested)
         {
             // The client disconnected — cancellation flow, not a server error. Checked BEFORE the
-            // response-started catch below so a client abort is logged consistently as cancellation
-            // (Debug) regardless of whether the response had started — never as an error or a 500. The
-            // connection is gone, so don't write a response; log quietly and let the cancellation propagate.
+            // response-started catch below so a client-abort OperationCanceledException is logged
+            // consistently as cancellation (Debug) whether or not the response had started — never as an
+            // error or a 500. The connection is gone, so don't write a response; log quietly and rethrow.
             logger.LogDebug("Request aborted by the client for {Method} {Path} (TraceId: {TraceId})",
                 context.Request.Method, context.Request.Path, traceId);
             throw;

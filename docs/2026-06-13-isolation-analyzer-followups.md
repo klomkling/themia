@@ -31,8 +31,9 @@ asset flag, breaking `PackAnalyzerDlls`) now turns CI red.
 now has `catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested)` ahead of
 the generic catch-all: a client-aborted request is logged at `Debug` and the cancellation propagates without
 writing a (500) response to a dead connection. A genuine non-client-abort `OperationCanceledException` still
-takes the generic 500 path. Covered by two tests (`Client_aborted_cancellation_is_rethrown_not_turned_into_500`,
-`Cancellation_without_client_abort_still_returns_500`).
+takes the generic 500 path. Covered by four tests — base-OCE and `TaskCanceledException` client aborts
+(rethrow, no 500, no body), the started-response case (asserts the cancellation log path, not the error one),
+and the non-client-abort boundary (`Cancellation_without_client_abort_still_returns_500` → 500).
 
 ## Not pursued (intentional, 0.4.9)
 
