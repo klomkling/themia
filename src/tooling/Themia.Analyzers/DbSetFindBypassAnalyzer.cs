@@ -44,6 +44,10 @@ public sealed class DbSetFindBypassAnalyzer : DiagnosticAnalyzer
         var method = ((IInvocationOperation)context.Operation).TargetMethod;
         if (method.Name is not ("Find" or "FindAsync"))
             return;
+        // ContainingType can be null for an error/unresolved method symbol (analyzers run on incomplete
+        // code during IDE typing); guard before dereferencing OriginalDefinition.
+        if (method.ContainingType is null)
+            return;
         // Matches when the declaring type is DbSet<T> — covers `dbSet.Find(...)`, `ctx.Set<T>().Find(...)`,
         // and a subclass that inherits Find without overriding it. Known limitation: a subclass that
         // *overrides* Find escapes this (ContainingType becomes the subclass). That is vanishingly rare

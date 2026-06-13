@@ -65,6 +65,11 @@ cat > "$CONSUMER/nuget.config" <<EOF
     <add key="themia-local" value="$FEED" />
     <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
   </packageSources>
+  <config>
+    <!-- Isolated global-packages folder so a stale same-version package already in ~/.nuget/packages
+         (CI caches it across runs) cannot shadow the freshly-packed one — the gate must test THIS build. -->
+    <add key="globalPackagesFolder" value="$WORK/gpf" />
+  </config>
 </configuration>
 EOF
 cat > "$CONSUMER/consumer.csproj" <<EOF

@@ -1,9 +1,10 @@
 # Follow-ups: tenant-isolation analyzers (deferred from the 0.4.9 final review)
 
-Two findings from the whole-branch review of the 0.4.9 isolation analyzers (THEMIA103/104) were judged
-real but non-blocking and out of scope for 0.4.9. Captured here so they aren't lost. Neither is a runtime
-vulnerability — the analyzers are build-time guard-rails; tenant isolation is still enforced at runtime by
-the repositories / EF query filters regardless of whether the analyzer fires.
+Findings from the 0.4.9 reviews (final whole-branch review + Agy) judged real but non-blocking and out of
+scope for the 0.4.9 analyzer feature. Captured here so they aren't lost. Items 1–2 were resolved within
+0.4.9; item 3 is a pre-existing, unrelated-subsystem fix left for its own PR. None is a runtime isolation
+vulnerability — the analyzers are build-time guard-rails; tenant isolation is enforced at runtime by the
+repositories / EF query filters regardless of whether the analyzer fires.
 
 ## 1. `GetTypeByMetadataName` silently no-ops if the target type is multiply-defined — DONE (0.4.9)
 
@@ -23,6 +24,23 @@ co-located in `analyzers/dotnet/cs`), then builds a throwaway consumer of `Themi
 a `DbSet.Find` call and asserts THEMIA104 fires. Wired into `.github/workflows/ci.yml` as the `analyzer-flow`
 job, so a future packaging change that breaks adopter reach (re-adding `DevelopmentDependency`, flipping an
 asset flag, breaking `PackAnalyzerDlls`) now turns CI red.
+
+## 3. ProblemDetailsMiddleware treats OperationCanceledException as a 500 — OPEN (separate PR)
+
+**Where:** `src/neutral/Themia.AspNetCore/ProblemDetailsMiddleware.cs` — the final `catch (Exception ex)`
+catch-all. A client-aborted request (`OperationCanceledException`/`TaskCanceledException`) is logged at
+`Error` and turned into a 500, instead of being treated as cancellation flow (`dotnet.md`: "treat
+`OperationCanceledException` as cancellation, not a server error"). Flagged independently by the
+pr-review-toolkit silent-failure-hunter and by Agy.
+
+**Why deferred from 0.4.9:** pre-existing, on a line this PR did not change, in a subsystem unrelated to the
+analyzer feature. A correct fix is a middleware **behavior** change (catch OCE before the catch-all and
+rethrow / no-op rather than write a 500) that warrants its own `WebApplicationFactory` test — it does not
+belong in an analyzer PR (one logical change per PR).
+
+**Suggested fix (next patch):** add `catch (OperationCanceledException) { throw; }` (or a
+`when (context.RequestAborted.IsCancellationRequested)` filter) ahead of the catch-all, plus a unit test
+asserting a cancelled request is not logged as an error / does not emit a 500.
 
 ## Not pursued (intentional, 0.4.9)
 
