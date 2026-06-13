@@ -25,22 +25,14 @@ a `DbSet.Find` call and asserts THEMIA104 fires. Wired into `.github/workflows/c
 job, so a future packaging change that breaks adopter reach (re-adding `DevelopmentDependency`, flipping an
 asset flag, breaking `PackAnalyzerDlls`) now turns CI red.
 
-## 3. ProblemDetailsMiddleware treats OperationCanceledException as a 500 — OPEN (separate PR)
+## 3. ProblemDetailsMiddleware treats OperationCanceledException as a 500 — DONE (0.4.10)
 
-**Where:** `src/neutral/Themia.AspNetCore/ProblemDetailsMiddleware.cs` — the final `catch (Exception ex)`
-catch-all. A client-aborted request (`OperationCanceledException`/`TaskCanceledException`) is logged at
-`Error` and turned into a 500, instead of being treated as cancellation flow (`dotnet.md`: "treat
-`OperationCanceledException` as cancellation, not a server error"). Flagged independently by the
-pr-review-toolkit silent-failure-hunter and by Agy.
-
-**Why deferred from 0.4.9:** pre-existing, on a line this PR did not change, in a subsystem unrelated to the
-analyzer feature. A correct fix is a middleware **behavior** change (catch OCE before the catch-all and
-rethrow / no-op rather than write a 500) that warrants its own `WebApplicationFactory` test — it does not
-belong in an analyzer PR (one logical change per PR).
-
-**Suggested fix (next patch):** add `catch (OperationCanceledException) { throw; }` (or a
-`when (context.RequestAborted.IsCancellationRequested)` filter) ahead of the catch-all, plus a unit test
-asserting a cancelled request is not logged as an error / does not emit a 500.
+**Resolved in 0.4.10** (its own PR, separate from the 0.4.9 analyzer feature). `ProblemDetailsMiddleware`
+now has `catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested)` ahead of
+the generic catch-all: a client-aborted request is logged at `Debug` and the cancellation propagates without
+writing a (500) response to a dead connection. A genuine non-client-abort `OperationCanceledException` still
+takes the generic 500 path. Covered by two tests (`Client_aborted_cancellation_is_rethrown_not_turned_into_500`,
+`Cancellation_without_client_abort_still_returns_500`).
 
 ## Not pursued (intentional, 0.4.9)
 

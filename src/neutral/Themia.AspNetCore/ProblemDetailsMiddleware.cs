@@ -31,6 +31,14 @@ public sealed class ProblemDetailsMiddleware(
             throw;
         }
 #pragma warning restore THEMIA101
+        catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested)
+        {
+            // The client disconnected — this is cancellation flow, not a server error. The connection is
+            // gone, so don't write a (500) response; log quietly and let the cancellation propagate.
+            logger.LogDebug("Request aborted by the client for {Method} {Path} (TraceId: {TraceId})",
+                context.Request.Method, context.Request.Path, traceId);
+            throw;
+        }
         catch (NotFoundException ex) { await WriteAsync(context, 404, "Not Found", ex, traceId, LogLevel.Warning); }
         catch (ConflictException ex) { await WriteAsync(context, 409, "Conflict", ex, traceId, LogLevel.Warning); }
         catch (ForbiddenException ex) { await WriteAsync(context, 403, "Forbidden", ex, traceId, LogLevel.Warning); }

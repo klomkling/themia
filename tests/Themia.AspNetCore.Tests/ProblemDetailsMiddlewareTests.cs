@@ -145,6 +145,32 @@ public sealed class ProblemDetailsMiddlewareTests
         await Assert.ThrowsAsync<NotFoundException>(() => mw.InvokeAsync(ctx));
     }
 
+    [Fact]
+    public async Task Client_aborted_cancellation_is_rethrown_not_turned_into_500()
+    {
+        var ctx = new DefaultHttpContext();
+        ctx.Request.Path = "/x";
+        ctx.Response.Body = new MemoryStream();
+        ctx.RequestAborted = new CancellationToken(canceled: true);
+
+        var mw = new ProblemDetailsMiddleware(
+            _ => throw new OperationCanceledException(),
+            NullLogger<ProblemDetailsMiddleware>.Instance);
+
+        // The client disconnected — cancellation, not a server error: propagate it, never write a 500.
+        await Assert.ThrowsAsync<OperationCanceledException>(() => mw.InvokeAsync(ctx));
+        Assert.NotEqual(500, ctx.Response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Cancellation_without_client_abort_still_returns_500()
+    {
+        // An OCE that is NOT a client abort (RequestAborted not signalled) stays a genuine failure on the
+        // generic 500 path — only client-initiated cancellation is treated specially.
+        var (status, _) = await InvokeWith(new OperationCanceledException());
+        Assert.Equal(500, status);
+    }
+
     /// <summary>A value that fails System.Text.Json serialization (self-referencing cycle).</summary>
     private sealed class Cyclic
     {
