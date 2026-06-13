@@ -25,8 +25,11 @@ public sealed class QuartzAdoJobStoreMigration : Migration
     {
         // LOCKSTEP: this engine whitelist and the unsupported-provider guard below MUST cover the same set.
         // PostgreSQL + SQL Server only (no EF MySQL provider yet). Edit BOTH when adding an engine.
-        IfDatabase("postgres").Delegate(() => CreateSchemaAndTables(PostgresDdl));
-        IfDatabase("sqlserver").Delegate(() => CreateSchemaAndTables(SqlServerDdl));
+        // Root-table name casing MUST match the DDL exactly (PG lowercase, SQL Server uppercase) so the
+        // existence guard resolves under a case-sensitive collation — an exact-case match is collation-
+        // independent, whereas a lowercase guard against the uppercase SQL Server table misses under CS.
+        IfDatabase("postgres").Delegate(() => CreateSchemaAndTables(PostgresDdl, "qrtz_job_details"));
+        IfDatabase("sqlserver").Delegate(() => CreateSchemaAndTables(SqlServerDdl, "QRTZ_JOB_DETAILS"));
 
         IfDatabase(p =>
                 !p.StartsWith("Postgres", System.StringComparison.OrdinalIgnoreCase) &&
@@ -37,20 +40,20 @@ public sealed class QuartzAdoJobStoreMigration : Migration
     }
 
     // Creates the quartz schema and its qrtz_* tables, each guarded so a VersionInfo-less replay (the EF→FM
-    // cutover path) adopts existing objects instead of failing on a duplicate CREATE. qrtz_job_details is the
-    // root table of the qrtz_* graph; if it exists the whole canonical DDL block has already been applied.
-    // This guard is intentionally all-or-nothing (one root-table check gates the entire block), unlike the
-    // sibling SchedulingSchemaMigration's per-object guards: the qrtz_* DDL is one atomic Execute.Sql block,
-    // so a partial schema cannot arise from a failed replay (only from manual intervention) and need not be
-    // repaired object-by-object.
-    private void CreateSchemaAndTables(string ddl)
+    // cutover path) adopts existing objects instead of failing on a duplicate CREATE. <paramref name="rootTable"/>
+    // is the root table of the qrtz_* graph (qrtz_job_details); if it exists the whole canonical DDL block has
+    // already been applied. This guard is intentionally all-or-nothing (one root-table check gates the entire
+    // block), unlike the sibling SchedulingSchemaMigration's per-object guards: the qrtz_* DDL is one atomic
+    // Execute.Sql block, so a partial schema cannot arise from a failed replay (only from manual intervention)
+    // and need not be repaired object-by-object.
+    private void CreateSchemaAndTables(string ddl, string rootTable)
     {
         if (!Schema.Schema(SchemaName).Exists())
         {
             Create.Schema(SchemaName);
         }
 
-        if (!Schema.Schema(SchemaName).Table("qrtz_job_details").Exists())
+        if (!Schema.Schema(SchemaName).Table(rootTable).Exists())
         {
             Execute.Sql(ddl);
         }

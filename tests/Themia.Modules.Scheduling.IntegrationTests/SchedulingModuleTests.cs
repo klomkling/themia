@@ -335,6 +335,101 @@ public sealed class SqlServerSchedulingModuleTests : SchedulingModuleTestsBase, 
 }
 
 /// <summary>
+/// Verifies the persistent Quartz store works on a CASE-SENSITIVE SQL Server collation. The verbatim Quartz
+/// DDL creates uppercase <c>QRTZ_*</c> tables; under a case-insensitive collation (the default the main suite
+/// uses) a lowercase <c>TablePrefix</c> or existence guard still resolves them, masking the mismatch. Under
+/// this CS collation it does not — so this pins both the migration's existence guard (cutover replay) and the
+/// runtime <c>TablePrefix</c> to the uppercase names. A single self-disposing test, to avoid the shared-container
+/// lock contention that running the whole suite under one CS container would introduce.
+/// </summary>
+[Trait("Category", "Integration")]
+public sealed class SqlServerCaseSensitiveCollationTests : IAsyncLifetime
+{
+    private readonly MsSqlContainer container =
+        new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-CU14-ubuntu-22.04")
+            .WithEnvironment("MSSQL_COLLATION", "SQL_Latin1_General_CP1_CS_AS")
+            .Build();
+
+    [Fact]
+    public async Task PersistentStore_WorksOnCaseSensitiveCollation()
+    {
+        var jobKey = new JobKey("cs-job", "cs-group");
+
+        // Process 1: create the schema (uppercase QRTZ_* tables) and prove Quartz's runtime TablePrefix
+        // resolves them — pre-fix the lowercase 'quartz.qrtz_' prefix yields "Invalid object name" under CS.
+        var p1 = BuildServices();
+        try
+        {
+            await new SchedulingModule(new SchedulingModuleOptions { SchedulerName = "cs-test" }).InitializeAsync(p1);
+            LogContext.SetCurrentLogProvider(p1.GetRequiredService<ILoggerFactory>());
+            var scheduler1 = await p1.GetRequiredService<ISchedulerFactory>().GetScheduler();
+            await scheduler1.Start();
+
+            var job = JobBuilder.Create<NoOpJob>().WithIdentity(jobKey).StoreDurably().Build();
+            var trigger = TriggerBuilder.Create()
+                .WithIdentity("cs-trigger", "cs-group").ForJob(jobKey)
+                .StartAt(DateTimeOffset.UtcNow.AddDays(1)).Build();
+            await scheduler1.ScheduleJob(job, trigger);
+            Assert.True(await scheduler1.CheckExists(jobKey));
+
+            await scheduler1.Shutdown(waitForJobsToComplete: false);
+        }
+        finally
+        {
+            await p1.DisposeAsync();
+        }
+
+        // Process 2: a fresh provider over the SAME container DB with VersionInfo cleared, so the migration
+        // replays. The existence guard must find the UPPERCASE qrtz_job_details under CS collation and skip the
+        // DDL — pre-fix the lowercase guard misses it and re-runs the DDL → "already an object named QRTZ_*".
+        var p2 = BuildServices();
+        try
+        {
+            await using (var scope = p2.CreateAsyncScope())
+            {
+                await scope.ServiceProvider.GetRequiredService<SchedulingDbContext>()
+                    .Database.ExecuteSqlRawAsync("DELETE FROM [dbo].[VersionInfo]");
+            }
+
+            LogContext.SetCurrentLogProvider(p2.GetRequiredService<ILoggerFactory>());
+            await new SchedulingModule(new SchedulingModuleOptions { SchedulerName = "cs-test" }).InitializeAsync(p2);
+
+            // The durable job survived the replay and is readable through the rebuilt scheduler.
+            var scheduler2 = await p2.GetRequiredService<ISchedulerFactory>().GetScheduler();
+            Assert.True(await scheduler2.CheckExists(jobKey));
+            await scheduler2.Shutdown(waitForJobsToComplete: false);
+        }
+        finally
+        {
+            await p2.DisposeAsync();
+        }
+    }
+
+    private ServiceProvider BuildServices()
+    {
+        // Pooling=False so each disposed provider closes its SQL connections immediately. The test runs two
+        // "processes" against one container; with pooling on, process 1's shut-down scheduler can leave a
+        // pooled connection holding a lock that deadlocks process 2's migration replay.
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ConnectionStrings:Default"] = container.GetConnectionString() + ";Pooling=False",
+            })
+            .Build();
+
+        var services = new ServiceCollection();
+        services.AddSingleton<IConfiguration>(configuration);
+        services.AddLogging();
+        services.AddSingleton<IDatabaseProvider>(new FakeDatabaseProvider(DatabaseProviderNames.SqlServer));
+        new SchedulingModule(new SchedulingModuleOptions { SchedulerName = "cs-test" }).ConfigureServices(services);
+        return services.BuildServiceProvider();
+    }
+
+    public Task InitializeAsync() => container.StartAsync();
+    public Task DisposeAsync() => container.DisposeAsync().AsTask();
+}
+
+/// <summary>
 /// Startup fail-fast contract tests for <see cref="SchedulingModule.InitializeAsync"/> that need no database
 /// — the guards throw before any connection is opened.
 /// </summary>

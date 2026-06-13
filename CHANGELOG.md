@@ -28,6 +28,14 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
   `UseSystemTextJsonSerializer()` (no Newtonsoft) and `UseProperties = true`. Scheduled jobs now survive a
   restart. Set `SchedulingModuleOptions.UsePersistentStore = false` to keep a host-supplied scheduler.
 
+### Fixed
+
+- **Persistent Quartz on case-sensitive SQL Server collations.** The SQL Server AdoJobStore `TablePrefix` and
+  the migration's existence guard now use the uppercase `QRTZ_*` table names that the verbatim Quartz DDL
+  creates, instead of lowercase. A case-insensitive collation (the default) masked the mismatch, but under a
+  case-sensitive collation Quartz could not resolve the tables and the cutover replay re-ran the DDL. Covered by
+  a case-sensitive-collation integration test.
+
 ## 0.4.7 — 2026-06-12
 
 ### Changed

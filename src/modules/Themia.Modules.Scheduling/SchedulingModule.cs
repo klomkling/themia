@@ -168,7 +168,11 @@ public sealed class SchedulingModule : ThemiaModuleBase
                             s.UseSqlServer(ado =>
                             {
                                 ado.ConnectionString = connectionString;
-                                ado.TablePrefix = "quartz.qrtz_";
+                                // UPPERCASE QRTZ_ to match the verbatim Quartz SQL Server DDL (which creates
+                                // [quartz].[QRTZ_*]). A case-insensitive collation forgives a lowercase prefix,
+                                // but a case-sensitive collation does not — Quartz's runtime object references
+                                // would then fail with "Invalid object name". The `quartz` schema is lowercase.
+                                ado.TablePrefix = "quartz.QRTZ_";
                             });
                             break;
                         default:
