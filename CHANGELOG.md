@@ -18,6 +18,25 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## 0.4.9 — 2026-06-13
+
+### Added
+
+- **Tenant-isolation analyzers (THEMIA103/104).** `Themia.Analyzers` now ships two build-time rules
+  (category `Themia.Isolation`, Warning) closing DECISION #6's by-construction gap: **THEMIA103** flags
+  raw Dapper connection access (`IDapperConnectionContext.GetOpenConnectionAsync`), steering to
+  `ITenantQueryFactory.For<T>()`; **THEMIA104** flags `DbSet<T>.Find/FindAsync`, which bypasses
+  `ThemiaDbContext`'s tenant post-check for already-tracked entities, steering to `DbContext.FindAsync<T>()`
+  / `IReadRepository.GetByIdAsync()`. Both stay silent inside the `Themia.Framework.Data.*` assemblies and
+  fire everywhere else. Deliberate bypasses use standard suppression (`#pragma`/`[SuppressMessage]`).
+
+### Changed
+
+- **`Themia.Analyzers` now flows to consumers of the `Themia.Framework.Data.*` packages.** Adopters of a
+  Themia data package will see Themia analyzer warnings — the new isolation gates plus the pre-existing
+  THEMIA101 (catch-log-rethrow) / THEMIA102 (sync-over-async) hygiene rules. Configure severity or suppress
+  per `.editorconfig`. See [MIGRATION.md](MIGRATION.md).
+
 ## 0.4.8 — 2026-06-12
 
 ### Added
