@@ -60,10 +60,12 @@ public sealed class LoggingBehavior<TRequest, TResponse> : IPipelineBehavior<TRe
             _logger.LogWarning("{RequestName} was cancelled", requestName);
             throw;
         }
+#pragma warning disable THEMIA101 // Deliberate: LoggingBehavior IS the pipeline-level error logger; logging before rethrow is its purpose.
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error handling {RequestName}: {ErrorMessage}", requestName, ex.Message);
             throw;
         }
+#pragma warning restore THEMIA101
     }
 }

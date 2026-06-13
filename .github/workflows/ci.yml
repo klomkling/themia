@@ -47,6 +47,32 @@ jobs:
         # Integration coverage runs in integration.yml + locally before merge.
         run: dotnet test --configuration Release --no-build --verbosity normal --filter "Category!=Integration"
 
+  analyzer-flow:
+    name: Analyzer flow (adopter smoke test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v5
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', '**/Directory.Packages.props') }}
+          restore-keys: ${{ runner.os }}-nuget-
+
+      - name: Verify isolation analyzers flow to adopters
+        # Packs the solution to a local feed, then builds a throwaway consumer of
+        # Themia.Framework.Data.EFCore and asserts THEMIA104 fires — proving transitive analyzer flow,
+        # the part most likely to silently break in a future packaging change.
+        run: bash eng/verify-analyzer-flow.sh
+
   request-copilot-review:
     name: Request Copilot Review
     # Request a Copilot review on open/reopen/ready AND on every new push (synchronize), so each

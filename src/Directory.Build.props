@@ -1,0 +1,43 @@
+<Project>
+  <!-- Preserve the repo-root settings, then dogfood the Themia isolation analyzers on src/ code. -->
+  <Import Project="$(MSBuildThisFileDirectory)../Directory.Build.props" />
+
+  <!--
+    Dogfood the Themia isolation analyzers (THEMIA103/104) on all src/ production projects.
+
+    The analyzer (Themia.Analyzers.dll) depends on Themia.Generators.Abstractions.dll at
+    runtime (DiagnosticDescriptors calls ThemiaDiagnostics.CreateWarning from there).
+    Roslyn's AnalyzerAssemblyLoader probes the directory of the primary analyzer DLL for
+    its dependencies, but only DLLs that are explicitly listed as /analyzer: arguments are
+    guaranteed to be found. We therefore register both DLLs as analyzer items.
+
+    The Generators.Abstractions DLL is already copied into the Analyzers output directory
+    (bin/Debug or bin/Release/netstandard2.0/) by the ProjectReference build. We reference
+    it from there using a path derived from the Analyzers project's base path and
+    $(Configuration), so both DLLs are registered from the same physical directory — exactly
+    what the NuGet pack puts in analyzers/dotnet/cs/.
+  -->
+  <PropertyGroup>
+    <!-- $(Configuration) may be empty during early evaluation; default to Debug. -->
+    <_ThemiaAnalyzersConfig Condition="'$(Configuration)' != ''">$(Configuration)</_ThemiaAnalyzersConfig>
+    <_ThemiaAnalyzersConfig Condition="'$(Configuration)' == ''">Debug</_ThemiaAnalyzersConfig>
+    <!-- netstandard2.0 is fixed for Roslyn analyzers — must match Themia.Analyzers.csproj TargetFramework. -->
+    <_ThemiaAnalyzersBinDir>$(MSBuildThisFileDirectory)tooling/Themia.Analyzers/bin/$(_ThemiaAnalyzersConfig)/netstandard2.0/</_ThemiaAnalyzersBinDir>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Analyzer Include="$(_ThemiaAnalyzersBinDir)Themia.Generators.Abstractions.dll" />
+    <Analyzer Include="$(_ThemiaAnalyzersBinDir)Themia.Analyzers.dll" />
+  </ItemGroup>
+
+  <!--
+    Build-order dependency only: ensures the analyzer DLLs are compiled before any src/
+    project that uses them. ReferenceOutputAssembly="false" makes it a pure build-order
+    edge — no compile-time type reference (we want analysis only).
+  -->
+  <ItemGroup>
+    <ProjectReference Include="$(MSBuildThisFileDirectory)tooling/Themia.Analyzers/Themia.Analyzers.csproj"
+                      ReferenceOutputAssembly="false"
+                      PrivateAssets="all" />
+  </ItemGroup>
+</Project>

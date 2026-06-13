@@ -1,0 +1,4 @@
+<Project>
+  <!-- Tooling projects skip the analyzer dogfood (an analyzer can't reference itself). -->
+  <Import Project="$(MSBuildThisFileDirectory)../../Directory.Build.props" />
+</Project>

@@ -10,6 +10,29 @@ with the *why* and concrete upgrade steps.
 - Each entry states: **What changed**, **Why**, and **How to upgrade** (before → after).
 - Non-breaking changes are *not* listed here — see the CHANGELOG.
 
+## 0.4.9
+
+### Themia analyzers now run in adopter builds
+
+**What changed:** referencing any `Themia.Framework.Data.*` package now brings the `Themia.Analyzers`
+rules into your build: THEMIA103/104 (tenant-isolation gates) and the pre-existing THEMIA101/102 hygiene
+rules. They are **Warnings**, not errors.
+
+**Why:** DECISION #6 — tenant isolation should hold by construction. The two gates flag the raw-connection
+and `DbSet.Find` bypasses at build time so the safe path is inescapable without an explicit, reviewable
+suppression.
+
+**How to upgrade:**
+
+- No action required if you build with warnings as warnings.
+- To silence a rule globally, add to `.editorconfig`: `dotnet_diagnostic.THEMIA104.severity = none`
+  (or `= error` to enforce it harder), or configure the whole group via
+  `dotnet_analyzer_diagnostic.category-Themia.Isolation.severity = …`.
+- For a one-off deliberate bypass, suppress at the call site with a justification:
+  `#pragma warning disable THEMIA103` or `[SuppressMessage("Themia.Isolation", "THEMIA103", Justification = "…")]`.
+- The guarded alternatives are `ITenantQueryFactory.For<T>()` (Dapper) and `DbContext.FindAsync<T>()` /
+  `IReadRepository.GetByIdAsync()` (EF).
+
 ## 0.4.8
 
 ### Scheduling module now owns a persistent Quartz scheduler by default
