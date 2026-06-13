@@ -7,6 +7,10 @@ override Themia.Analyzers.SyncOverAsyncAnalyzer.Initialize(Microsoft.CodeAnalysi
 override Themia.Analyzers.SyncOverAsyncAnalyzer.SupportedDiagnostics.get -> System.Collections.Immutable.ImmutableArray<Microsoft.CodeAnalysis.DiagnosticDescriptor!>
 Themia.Analyzers.DbSetFindBypassAnalyzer
 Themia.Analyzers.DbSetFindBypassAnalyzer.DbSetFindBypassAnalyzer() -> void
+Themia.Analyzers.RawConnectionBypassAnalyzer
+Themia.Analyzers.RawConnectionBypassAnalyzer.RawConnectionBypassAnalyzer() -> void
+override Themia.Analyzers.RawConnectionBypassAnalyzer.Initialize(Microsoft.CodeAnalysis.Diagnostics.AnalysisContext! context) -> void
+override Themia.Analyzers.RawConnectionBypassAnalyzer.SupportedDiagnostics.get -> System.Collections.Immutable.ImmutableArray<Microsoft.CodeAnalysis.DiagnosticDescriptor!>
 Themia.Analyzers.SwallowLogRethrowAnalyzer
 Themia.Analyzers.SwallowLogRethrowAnalyzer.SwallowLogRethrowAnalyzer() -> void
 Themia.Analyzers.SyncOverAsyncAnalyzer
