@@ -129,7 +129,11 @@ public sealed class ClaimService : IClaimService
     }
 
     /// <inheritdoc />
+    // RS0027: mirrors the interface — the convenience overload keeps the optional token; the role-ids
+    // overload below has more parameters but a required token, so only one overload is optional (RS0026).
+#pragma warning disable RS0027
     public async Task<IReadOnlyList<Claim>> GetEffectiveClaimsAsync(Guid userId, CancellationToken cancellationToken = default)
+#pragma warning restore RS0027
     {
         // Resolve the parent user in the ambient tenant or as a platform user; if neither, expose nothing.
         if (!await UserExistsAsync(userId, cancellationToken).ConfigureAwait(false))
@@ -137,11 +141,19 @@ public sealed class ClaimService : IClaimService
             return [];
         }
 
-        var direct = await userClaims.ListAsync(new UserClaimsByUserSpec(userId), cancellationToken).ConfigureAwait(false);
-
         var roleIds = (await memberships.ListAsync(new Specifications.UserRolesByUserSpec(userId), cancellationToken).ConfigureAwait(false))
             .Select(m => m.RoleId)
             .ToList();
+
+        return await GetEffectiveClaimsAsync(userId, roleIds, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<Claim>> GetEffectiveClaimsAsync(Guid userId, IReadOnlyCollection<Guid> roleIds, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(roleIds);
+
+        var direct = await userClaims.ListAsync(new UserClaimsByUserSpec(userId), cancellationToken).ConfigureAwait(false);
 
         var fromRoles = roleIds.Count == 0
             ? []

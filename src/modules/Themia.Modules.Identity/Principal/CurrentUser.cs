@@ -29,7 +29,9 @@ public sealed class CurrentUser : ICurrentUser
     public string? TenantId => Principal?.FindFirst(IdentityClaimTypes.TenantId)?.Value;
 
     /// <inheritdoc />
-    public bool IsPlatform => IsAuthenticated && TenantId is null;
+    public bool IsPlatform =>
+        IsAuthenticated
+        && string.Equals(Principal?.FindFirst(IdentityClaimTypes.IsPlatform)?.Value, "true", StringComparison.OrdinalIgnoreCase);
 
     /// <inheritdoc />
     public string? UserName => Principal?.FindFirst(ClaimTypes.Name)?.Value;

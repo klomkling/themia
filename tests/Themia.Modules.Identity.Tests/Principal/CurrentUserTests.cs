@@ -28,7 +28,22 @@ public class CurrentUserTests
         {
             claims.Add(new Claim(IdentityClaimTypes.TenantId, tenant));
         }
+        else
+        {
+            // A platform principal carries the positive marker, mirroring ClaimsPrincipalFactory.
+            claims.Add(new Claim(IdentityClaimTypes.IsPlatform, "true"));
+        }
         claims.AddRange(roles.Select(r => new Claim(ClaimTypes.Role, r)));
+        return new ClaimsPrincipal(new ClaimsIdentity(claims, "Test", ClaimTypes.Name, ClaimTypes.Role));
+    }
+
+    private static ClaimsPrincipal AuthenticatedWithoutMarkers(Guid id)
+    {
+        var claims = new List<Claim>
+        {
+            new(ClaimTypes.NameIdentifier, id.ToString()),
+            new(ClaimTypes.Name, "alice"),
+        };
         return new ClaimsPrincipal(new ClaimsIdentity(claims, "Test", ClaimTypes.Name, ClaimTypes.Role));
     }
 
@@ -61,6 +76,16 @@ public class CurrentUserTests
         Assert.True(sut.IsAuthenticated);
         Assert.Null(sut.TenantId);
         Assert.True(sut.IsPlatform);
+    }
+
+    [Fact]
+    public void Principal_without_platform_claim_is_not_platform()
+    {
+        // Authenticated, no tenant claim, no is_platform marker — must NOT read as platform (fail-closed).
+        var sut = new CurrentUser(Accessor(AuthenticatedWithoutMarkers(Guid.NewGuid())));
+        Assert.True(sut.IsAuthenticated);
+        Assert.Null(sut.TenantId);
+        Assert.False(sut.IsPlatform);
     }
 
     [Fact]

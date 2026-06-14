@@ -41,5 +41,19 @@ public interface IClaimService
     /// <param name="userId">The user id.</param>
     /// <param name="cancellationToken">A cancellation token.</param>
     /// <returns>The distinct effective claims.</returns>
+    // RS0027: this convenience overload (optional token) intentionally has fewer parameters than the
+    // role-ids overload below, whose token is required to avoid two optional-parameter overloads (RS0026).
+#pragma warning disable RS0027
     Task<IReadOnlyList<Claim>> GetEffectiveClaimsAsync(Guid userId, CancellationToken cancellationToken = default);
+#pragma warning restore RS0027
+
+    /// <summary>Computes the union of a user's direct claims and the claims of the given roles, using
+    /// role ids the caller has already resolved from the user's memberships. This overload skips the
+    /// membership re-query and the user-existence guard, so callers that already hold the user and its
+    /// role ids (such as the principal factory) avoid the redundant round-trips.</summary>
+    /// <param name="userId">The user id whose direct claims are unioned in.</param>
+    /// <param name="roleIds">The role ids already resolved from the user's memberships.</param>
+    /// <param name="cancellationToken">A cancellation token (required — see the overload above).</param>
+    /// <returns>The distinct effective claims.</returns>
+    Task<IReadOnlyList<Claim>> GetEffectiveClaimsAsync(Guid userId, IReadOnlyCollection<Guid> roleIds, CancellationToken cancellationToken);
 }

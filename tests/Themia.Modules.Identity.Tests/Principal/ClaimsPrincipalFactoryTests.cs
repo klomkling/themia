@@ -31,7 +31,8 @@ public class ClaimsPrincipalFactoryTests
         sut = new ClaimsPrincipalFactory(
             new FakeRepository<UserRole>(memberships, ur => ur.Id) { AmbientTenant = tenant },
             new FakeRepository<Role>(roles, r => r.Id) { AmbientTenant = tenant },
-            claimService);
+            claimService,
+            new TenantContext(tenant));
     }
 
     private User MakeUser(TenantId? tenant)
@@ -68,5 +69,20 @@ public class ClaimsPrincipalFactoryTests
     {
         var principal = await sut.CreateAsync(MakeUser(null), "Identity.Application");
         Assert.Null(principal.FindFirst(IdentityClaimTypes.TenantId));
+    }
+
+    [Fact]
+    public async Task Platform_user_principal_has_is_platform_claim()
+    {
+        var principal = await sut.CreateAsync(MakeUser(null), "Identity.Application");
+        Assert.Equal("true", principal.FindFirst(IdentityClaimTypes.IsPlatform)!.Value);
+    }
+
+    [Fact]
+    public async Task Tenant_user_principal_has_is_platform_false_or_absent()
+    {
+        var principal = await sut.CreateAsync(MakeUser(new TenantId("acme")), "Identity.Application");
+        var marker = principal.FindFirst(IdentityClaimTypes.IsPlatform);
+        Assert.True(marker is null || !string.Equals(marker.Value, "true", StringComparison.OrdinalIgnoreCase));
     }
 }

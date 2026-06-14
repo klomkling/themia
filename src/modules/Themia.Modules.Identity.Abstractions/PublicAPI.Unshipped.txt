@@ -1,1 +1,2 @@
 #nullable enable
+Themia.Modules.Identity.Abstractions.IClaimService.GetEffectiveClaimsAsync(System.Guid userId, System.Collections.Generic.IReadOnlyCollection<System.Guid>! roleIds, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<System.Security.Claims.Claim!>!>!

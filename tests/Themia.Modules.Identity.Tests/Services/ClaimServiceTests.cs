@@ -71,6 +71,24 @@ public class ClaimServiceTests
     }
 
     [Fact]
+    public async Task GetEffectiveClaimsAsync_with_roleIds_overload_skips_membership_requery()
+    {
+        // Seed a user with a direct claim and a role with a role-claim, but DO NOT add a membership row:
+        // the overload trusts the supplied roleIds, so role claims resolve without re-querying memberships.
+        SeedUser(userId, tenant);
+        SeedRole(roleId, tenant);
+        await sut.AddUserClaimAsync(userId, "perm", "read");
+        await sut.AddRoleClaimAsync(roleId, "perm", "write");
+
+        var claims = await sut.GetEffectiveClaimsAsync(userId, new[] { roleId }, CancellationToken.None);
+
+        Assert.Equal(2, claims.Count);
+        Assert.Contains(claims, c => c is { Type: "perm", Value: "read" });
+        Assert.Contains(claims, c => c is { Type: "perm", Value: "write" });
+        Assert.Empty(memberships);   // proves no membership row was needed
+    }
+
+    [Fact]
     public async Task RemoveUserClaim_removes_only_the_matching_claim()
     {
         SeedUser(userId, tenant);

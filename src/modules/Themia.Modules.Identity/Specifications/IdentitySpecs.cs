@@ -1,3 +1,4 @@
+using Themia.Framework.Core.Abstractions.Tenancy;
 using Themia.Framework.Data.Abstractions.Specifications;
 using Themia.Modules.Identity.Abstractions.Entities;
 
@@ -126,15 +127,15 @@ internal sealed class TokenByUserPurposeAndHashSpec : Specification<UserToken>
         Where(t => t.UserId == userId && t.Purpose == purpose && t.TokenHash == tokenHash);
 }
 
-/// <summary>All roles whose id is in the given set, resolved without the tenant filter.</summary>
+/// <summary>All roles whose id is in the given set, resolved without the tenant filter but still
+/// guarded to platform (null-tenant) roles or roles of the ambient tenant.</summary>
 internal sealed class RolesByIdsSpec : Specification<Role>
 {
-    public RolesByIdsSpec(IReadOnlyCollection<Guid> roleIds)
+    public RolesByIdsSpec(IReadOnlyCollection<Guid> roleIds, TenantId? ambientTenantId)
     {
-        Where(r => roleIds.Contains(r.Id));
-        // Bypass is safe: the ids come from THIS user's own membership rows (already user-scoped),
-        // so resolving them tenant-free exposes only the user's own roles — never another tenant's.
-        // Needed so a platform user's roles (or platform roles) resolve from a tenant scope.
+        // The bypass lets platform (null-tenant) roles resolve from a tenant scope; the predicate still
+        // excludes other tenants' roles, so a stray cross-tenant membership row can never leak a role.
+        Where(r => roleIds.Contains(r.Id) && (r.TenantId == null || r.TenantId == ambientTenantId));
         WithoutTenantFilter();
     }
 }
