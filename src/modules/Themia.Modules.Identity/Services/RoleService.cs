@@ -1,0 +1,108 @@
+using Themia.Framework.Data.Abstractions.Repositories;
+using Themia.Framework.Data.Abstractions.UnitOfWork;
+using Themia.Modules.Identity.Abstractions;
+using Themia.Modules.Identity.Abstractions.Entities;
+using Themia.Modules.Identity.Specifications;
+
+namespace Themia.Modules.Identity.Services;
+
+/// <summary>Default <see cref="IRoleService"/> over the Themia data abstractions.</summary>
+public sealed class RoleService : IRoleService
+{
+    private readonly IRepository<User, Guid> users;
+    private readonly IRepository<Role, Guid> roles;
+    private readonly IRepository<UserRole, Guid> memberships;
+    private readonly IUnitOfWork unitOfWork;
+
+    /// <summary>Creates the service.</summary>
+    public RoleService(
+        IRepository<User, Guid> users,
+        IRepository<Role, Guid> roles,
+        IRepository<UserRole, Guid> memberships,
+        IUnitOfWork unitOfWork)
+    {
+        ArgumentNullException.ThrowIfNull(users);
+        ArgumentNullException.ThrowIfNull(roles);
+        ArgumentNullException.ThrowIfNull(memberships);
+        ArgumentNullException.ThrowIfNull(unitOfWork);
+        this.users = users;
+        this.roles = roles;
+        this.memberships = memberships;
+        this.unitOfWork = unitOfWork;
+    }
+
+    private static string Normalize(string value) => value.Trim().ToUpperInvariant();
+
+    /// <inheritdoc />
+    public async Task<Guid?> CreateAsync(string name, string? description = null, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        var normalized = Normalize(name);
+        if (await roles.AnyAsync(new RoleByNormalizedNameSpec(normalized), cancellationToken).ConfigureAwait(false))
+        {
+            return null;
+        }
+
+        var role = new Role { Name = name, NormalizedName = normalized, Description = description };
+        role.SetId(Guid.CreateVersion7());
+        await roles.AddAsync(role, cancellationToken).ConfigureAwait(false);
+        await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        return role.Id;
+    }
+
+    /// <inheritdoc />
+    public async Task<Role?> FindByNameAsync(string name, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        var normalized = Normalize(name);
+        var inTenant = await roles.FirstOrDefaultAsync(new RoleByNormalizedNameSpec(normalized), cancellationToken).ConfigureAwait(false);
+        return inTenant ?? await roles.FirstOrDefaultAsync(new PlatformRoleByNormalizedNameSpec(normalized), cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> AssignRoleAsync(Guid userId, Guid roleId, CancellationToken cancellationToken = default)
+    {
+        // Both sides must resolve within the ambient tenant scope (tenant isolation for the parent-keyed join).
+        if (await users.GetByIdAsync(userId, cancellationToken).ConfigureAwait(false) is null)
+        {
+            return false;
+        }
+        if (await roles.GetByIdAsync(roleId, cancellationToken).ConfigureAwait(false) is null)
+        {
+            return false;
+        }
+
+        var existing = await memberships.FirstOrDefaultAsync(new UserRoleSpec(userId, roleId), cancellationToken).ConfigureAwait(false);
+        if (existing is not null)
+        {
+            return true;   // idempotent
+        }
+
+        var membership = new UserRole { UserId = userId, RoleId = roleId };
+        membership.SetId(Guid.CreateVersion7());
+        await memberships.AddAsync(membership, cancellationToken).ConfigureAwait(false);
+        await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        return true;
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> RemoveRoleAsync(Guid userId, Guid roleId, CancellationToken cancellationToken = default)
+    {
+        var existing = await memberships.FirstOrDefaultAsync(new UserRoleSpec(userId, roleId), cancellationToken).ConfigureAwait(false);
+        if (existing is null)
+        {
+            return false;
+        }
+
+        memberships.Remove(existing);
+        await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        return true;
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<Guid>> GetRoleIdsAsync(Guid userId, CancellationToken cancellationToken = default)
+    {
+        var rows = await memberships.ListAsync(new UserRolesByUserSpec(userId), cancellationToken).ConfigureAwait(false);
+        return rows.Select(r => r.RoleId).ToList();
+    }
+}
