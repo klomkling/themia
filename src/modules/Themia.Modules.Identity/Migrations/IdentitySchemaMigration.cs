@@ -13,7 +13,9 @@ public sealed class IdentitySchemaMigration : Migration
     public override void Up()
     {
         IfDatabase("postgres", "sqlserver").Delegate(CreateSchemaAndTables);
-        IfDatabase("postgres", "sqlserver").Delegate(CreateFilteredIndexes);
+        // 'identity' is a reserved keyword in SQL Server — the schema qualifier must be bracketed.
+        IfDatabase("postgres").Delegate(CreateFilteredIndexesPostgres);
+        IfDatabase("sqlserver").Delegate(CreateFilteredIndexesSqlServer);
 
         IfDatabase(p =>
                 !p.StartsWith("Postgres", StringComparison.OrdinalIgnoreCase) &&
@@ -114,17 +116,26 @@ public sealed class IdentitySchemaMigration : Migration
             .WithOptions().Unique();
     }
 
-    private void CreateFilteredIndexes()
+    private void CreateFilteredIndexesPostgres()
     {
-        // Two filtered unique indexes per "named" table: one scoping uniqueness within a tenant,
-        // one enforcing global uniqueness among platform (tenant_id IS NULL) rows. Identical syntax
-        // on PostgreSQL and SQL Server.
+        // PostgreSQL: unquoted 'identity' is fine as a schema name.
         Execute.Sql($"CREATE UNIQUE INDEX ux_users_tenant_user_name ON {SchemaName}.users (tenant_id, normalized_user_name) WHERE tenant_id IS NOT NULL;");
         Execute.Sql($"CREATE UNIQUE INDEX ux_users_platform_user_name ON {SchemaName}.users (normalized_user_name) WHERE tenant_id IS NULL;");
         Execute.Sql($"CREATE UNIQUE INDEX ux_users_tenant_email ON {SchemaName}.users (tenant_id, normalized_email) WHERE tenant_id IS NOT NULL AND normalized_email IS NOT NULL;");
         Execute.Sql($"CREATE UNIQUE INDEX ux_users_platform_email ON {SchemaName}.users (normalized_email) WHERE tenant_id IS NULL AND normalized_email IS NOT NULL;");
         Execute.Sql($"CREATE UNIQUE INDEX ux_roles_tenant_name ON {SchemaName}.roles (tenant_id, normalized_name) WHERE tenant_id IS NOT NULL;");
         Execute.Sql($"CREATE UNIQUE INDEX ux_roles_platform_name ON {SchemaName}.roles (normalized_name) WHERE tenant_id IS NULL;");
+    }
+
+    private void CreateFilteredIndexesSqlServer()
+    {
+        // SQL Server: 'IDENTITY' is a reserved keyword — the schema qualifier must be bracketed.
+        Execute.Sql($"CREATE UNIQUE INDEX ux_users_tenant_user_name ON [{SchemaName}].users (tenant_id, normalized_user_name) WHERE tenant_id IS NOT NULL;");
+        Execute.Sql($"CREATE UNIQUE INDEX ux_users_platform_user_name ON [{SchemaName}].users (normalized_user_name) WHERE tenant_id IS NULL;");
+        Execute.Sql($"CREATE UNIQUE INDEX ux_users_tenant_email ON [{SchemaName}].users (tenant_id, normalized_email) WHERE tenant_id IS NOT NULL AND normalized_email IS NOT NULL;");
+        Execute.Sql($"CREATE UNIQUE INDEX ux_users_platform_email ON [{SchemaName}].users (normalized_email) WHERE tenant_id IS NULL AND normalized_email IS NOT NULL;");
+        Execute.Sql($"CREATE UNIQUE INDEX ux_roles_tenant_name ON [{SchemaName}].roles (tenant_id, normalized_name) WHERE tenant_id IS NOT NULL;");
+        Execute.Sql($"CREATE UNIQUE INDEX ux_roles_platform_name ON [{SchemaName}].roles (normalized_name) WHERE tenant_id IS NULL;");
     }
 
     /// <inheritdoc />
