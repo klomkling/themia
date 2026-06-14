@@ -1,1 +1,6 @@
 #nullable enable
+Themia.Modules.Identity.Hashing.Argon2idPasswordHasher
+Themia.Modules.Identity.Hashing.Argon2idPasswordHasher.Argon2idPasswordHasher() -> void
+Themia.Modules.Identity.Hashing.Argon2idPasswordHasher.Hash(string! password) -> string!
+Themia.Modules.Identity.Hashing.Argon2idPasswordHasher.NeedsRehash(string! encodedHash) -> bool
+Themia.Modules.Identity.Hashing.Argon2idPasswordHasher.Verify(string! encodedHash, string! password) -> bool
