@@ -40,15 +40,26 @@ public sealed class ClaimService : IClaimService
         this.unitOfWork = unitOfWork;
     }
 
+    // Resolves the parent in the ambient tenant OR as a genuine platform row (TenantId == null).
+    // The platform spec's predicate refuses another tenant's row, so cross-tenant access stays closed.
+    // The child rows (UserClaim/RoleClaim) carry no tenant_id, so no write bypass is needed here.
+    private async Task<bool> UserExistsAsync(Guid userId, CancellationToken cancellationToken) =>
+        await users.GetByIdAsync(userId, cancellationToken).ConfigureAwait(false) is not null
+        || await users.FirstOrDefaultAsync(new PlatformUserByIdSpec(userId), cancellationToken).ConfigureAwait(false) is not null;
+
+    private async Task<bool> RoleExistsAsync(Guid roleId, CancellationToken cancellationToken) =>
+        await roles.GetByIdAsync(roleId, cancellationToken).ConfigureAwait(false) is not null
+        || await roles.FirstOrDefaultAsync(new PlatformRoleByIdSpec(roleId), cancellationToken).ConfigureAwait(false) is not null;
+
     /// <inheritdoc />
     public async Task AddUserClaimAsync(Guid userId, string claimType, string claimValue, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(claimType);
         ArgumentNullException.ThrowIfNull(claimValue);
 
-        // Resolve the parent through the tenant-filtered repo: the child table carries no tenant_id,
-        // so a cross-tenant write must be refused here (fail-closed — it is genuine misuse).
-        if (await users.GetByIdAsync(userId, cancellationToken).ConfigureAwait(false) is null)
+        // The parent must resolve in the ambient tenant or as a platform user; a cross-tenant
+        // user is refused (fail-closed — it is genuine misuse).
+        if (!await UserExistsAsync(userId, cancellationToken).ConfigureAwait(false))
         {
             throw new InvalidOperationException($"User '{userId}' was not found in the current tenant scope.");
         }
@@ -62,8 +73,8 @@ public sealed class ClaimService : IClaimService
     /// <inheritdoc />
     public async Task<bool> RemoveUserClaimAsync(Guid userId, string claimType, string claimValue, CancellationToken cancellationToken = default)
     {
-        // Refuse if the parent user is outside the ambient tenant scope (child table has no tenant_id).
-        if (await users.GetByIdAsync(userId, cancellationToken).ConfigureAwait(false) is null)
+        // Refuse if the parent user is neither in the ambient tenant nor a platform user.
+        if (!await UserExistsAsync(userId, cancellationToken).ConfigureAwait(false))
         {
             return false;
         }
@@ -85,8 +96,8 @@ public sealed class ClaimService : IClaimService
         ArgumentException.ThrowIfNullOrWhiteSpace(claimType);
         ArgumentNullException.ThrowIfNull(claimValue);
 
-        // Resolve the parent through the tenant-filtered repo (child table carries no tenant_id).
-        if (await roles.GetByIdAsync(roleId, cancellationToken).ConfigureAwait(false) is null)
+        // The parent must resolve in the ambient tenant or as a platform role; cross-tenant is refused.
+        if (!await RoleExistsAsync(roleId, cancellationToken).ConfigureAwait(false))
         {
             throw new InvalidOperationException($"Role '{roleId}' was not found in the current tenant scope.");
         }
@@ -100,8 +111,8 @@ public sealed class ClaimService : IClaimService
     /// <inheritdoc />
     public async Task<bool> RemoveRoleClaimAsync(Guid roleId, string claimType, string claimValue, CancellationToken cancellationToken = default)
     {
-        // Refuse if the parent role is outside the ambient tenant scope (child table has no tenant_id).
-        if (await roles.GetByIdAsync(roleId, cancellationToken).ConfigureAwait(false) is null)
+        // Refuse if the parent role is neither in the ambient tenant nor a platform role.
+        if (!await RoleExistsAsync(roleId, cancellationToken).ConfigureAwait(false))
         {
             return false;
         }
@@ -120,8 +131,8 @@ public sealed class ClaimService : IClaimService
     /// <inheritdoc />
     public async Task<IReadOnlyList<Claim>> GetEffectiveClaimsAsync(Guid userId, CancellationToken cancellationToken = default)
     {
-        // Resolve the parent user through the tenant-filtered repo; if out of scope, expose nothing.
-        if (await users.GetByIdAsync(userId, cancellationToken).ConfigureAwait(false) is null)
+        // Resolve the parent user in the ambient tenant or as a platform user; if neither, expose nothing.
+        if (!await UserExistsAsync(userId, cancellationToken).ConfigureAwait(false))
         {
             return [];
         }

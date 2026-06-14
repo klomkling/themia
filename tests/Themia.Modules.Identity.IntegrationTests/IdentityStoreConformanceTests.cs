@@ -130,6 +130,60 @@ public abstract class IdentityStoreConformanceTests
     }
 
     [Fact]
+    public async Task Platform_user_can_log_in_and_lockout_state_persists_from_a_tenant_scope()
+    {
+        await ResetAsync();
+        // System scope (ambient tenant null) creates a platform user (TenantId stays null).
+        await using (var system = NewScope(tenant: null))
+        {
+            Assert.True((await system.Users.CreateAsync("root", "pw")).Succeeded);
+        }
+
+        // From a TENANT scope, a wrong password must write the lockout counter on the platform user
+        // (an ITenantEntity) — before the fix this throws ConcurrencyException; it must now just Fail.
+        await using (var tenant = NewScope(new TenantId("acme")))
+        {
+            Assert.Equal(PasswordVerificationResult.Failed, await tenant.Users.VerifyPasswordAsync("root", "nope"));
+            Assert.Equal(PasswordVerificationResult.Success, await tenant.Users.VerifyPasswordAsync("root", "pw"));
+        }
+    }
+
+    [Fact]
+    public async Task Platform_user_effective_claims_resolve_from_a_tenant_scope()
+    {
+        await ResetAsync();
+        Guid rootId;
+        await using (var system = NewScope(tenant: null))
+        {
+            rootId = (await system.Users.CreateAsync("root", "pw")).UserId!.Value;
+            await system.Claims.AddUserClaimAsync(rootId, "perm", "all");
+        }
+
+        await using (var tenant = NewScope(new TenantId("acme")))
+        {
+            var claims = await tenant.Claims.GetEffectiveClaimsAsync(rootId);
+            Assert.Contains(claims, c => c is { Type: "perm", Value: "all" });
+        }
+    }
+
+    [Fact]
+    public async Task Platform_user_token_generate_and_consume_from_a_tenant_scope()
+    {
+        await ResetAsync();
+        Guid rootId;
+        await using (var system = NewScope(tenant: null))
+        {
+            rootId = (await system.Users.CreateAsync("root", "pw")).UserId!.Value;
+        }
+
+        await using (var tenant = NewScope(new TenantId("acme")))
+        {
+            var raw = await tenant.Tokens.GenerateAsync(rootId, TokenPurpose.PasswordReset);
+            Assert.Equal(TokenConsumeResult.Success, await tenant.Tokens.ConsumeAsync(rootId, TokenPurpose.PasswordReset, raw));
+        }
+    }
+
+    [Fact]
     public async Task Assigned_role_claim_appears_in_effective_claims()
     {
         await ResetAsync();

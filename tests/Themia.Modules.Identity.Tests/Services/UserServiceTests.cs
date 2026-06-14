@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Time.Testing;
 using Themia.Framework.Core.Abstractions.Tenancy;
+using Themia.Framework.Data.Abstractions.Filtering;
 using Themia.Modules.Identity.Abstractions;
 using Themia.Modules.Identity.Abstractions.Entities;
 using Themia.Modules.Identity.Hashing;
@@ -21,7 +22,7 @@ public class UserServiceTests
     public UserServiceTests()
     {
         repo = new FakeRepository<User>(store, u => u.Id) { AmbientTenant = new TenantId("acme") };
-        sut = new UserService(repo, uow, new Argon2idPasswordHasher(), clock, options);
+        sut = new UserService(repo, uow, new Argon2idPasswordHasher(), clock, options, new DataFilterScope());
     }
 
     [Fact]
@@ -158,7 +159,7 @@ public class UserServiceTests
     public async Task VerifyPasswordAsync_rehashes_and_rotates_stamp_when_hash_is_outdated()
     {
         var stub = new StubPasswordHasher { VerifyResult = true, NeedsRehashResult = true, HashResult = "rehashed" };
-        var service = new UserService(repo, uow, stub, clock, options);
+        var service = new UserService(repo, uow, stub, clock, options, new DataFilterScope());
 
         // Seed with a distinct, outdated hash so the rehash to the "rehashed" sentinel is observable.
         var seeded = new User { UserName = "jane", NormalizedUserName = "JANE", PasswordHash = "outdated", TenantId = new TenantId("acme") };
@@ -198,6 +199,33 @@ public class UserServiceTests
 
         Assert.NotEqual(stampBefore, Assert.Single(store).SecurityStamp);
         Assert.Equal(PasswordVerificationResult.Success, await sut.VerifyPasswordAsync("liam", "newpw"));
+    }
+
+    [Fact]
+    public async Task Platform_user_lockout_write_succeeds()
+    {
+        // A platform user (TenantId null) seen from a tenant scope (ambient "acme"). A failed
+        // verification writes the lockout counter on a global ITenantEntity — under the real
+        // unit of work that needs the filter bypass; here we guard the resolution/no-throw path.
+        options.MaxFailedAccessAttempts = 3;
+        var platform = new User { UserName = "root", NormalizedUserName = "ROOT", PasswordHash = "x", TenantId = null };
+        platform.SetId(Guid.NewGuid());
+        store.Add(platform);
+
+        var result = await sut.VerifyPasswordAsync("root", "wrong");
+
+        Assert.Equal(PasswordVerificationResult.Failed, result);
+    }
+
+    [Fact]
+    public async Task SetActiveAsync_resolves_platform_user()
+    {
+        var platform = new User { UserName = "root", NormalizedUserName = "ROOT", PasswordHash = "x", TenantId = null };
+        platform.SetId(Guid.NewGuid());
+        store.Add(platform);
+
+        Assert.True(await sut.SetActiveAsync(platform.Id, false));
+        Assert.False(Assert.Single(store).IsActive);
     }
 
     /// <summary>Minimal hasher to drive the rehash path deterministically.</summary>

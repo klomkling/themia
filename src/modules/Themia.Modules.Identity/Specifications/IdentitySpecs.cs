@@ -37,6 +37,30 @@ internal sealed class PlatformUserByNormalizedEmailSpec : Specification<User>
     }
 }
 
+/// <summary>Finds a platform (global) user by id, bypassing the tenant filter. The
+/// <c>TenantId == null</c> predicate guarantees only a genuine platform user matches — never
+/// another tenant's row — so it is safe to resolve outside the ambient tenant scope.</summary>
+internal sealed class PlatformUserByIdSpec : Specification<User>
+{
+    public PlatformUserByIdSpec(Guid id)
+    {
+        Where(u => u.Id == id && u.TenantId == null);
+        WithoutTenantFilter();
+    }
+}
+
+/// <summary>Finds a platform (global) role by id, bypassing the tenant filter. The
+/// <c>TenantId == null</c> predicate guarantees only a genuine platform role matches — never
+/// another tenant's row — so it is safe to resolve outside the ambient tenant scope.</summary>
+internal sealed class PlatformRoleByIdSpec : Specification<Role>
+{
+    public PlatformRoleByIdSpec(Guid id)
+    {
+        Where(r => r.Id == id && r.TenantId == null);
+        WithoutTenantFilter();
+    }
+}
+
 /// <summary>Finds a role by normalized name within the ambient tenant.</summary>
 internal sealed class RoleByNormalizedNameSpec : Specification<Role>
 {
@@ -100,8 +124,15 @@ internal sealed class TokensByUserAndPurposeSpec : Specification<UserToken>
         Where(t => t.UserId == userId && t.Purpose == purpose);
 }
 
-/// <summary>All roles whose id is in the given set.</summary>
+/// <summary>All roles whose id is in the given set, resolved without the tenant filter.</summary>
 internal sealed class RolesByIdsSpec : Specification<Role>
 {
-    public RolesByIdsSpec(IReadOnlyCollection<Guid> roleIds) => Where(r => roleIds.Contains(r.Id));
+    public RolesByIdsSpec(IReadOnlyCollection<Guid> roleIds)
+    {
+        Where(r => roleIds.Contains(r.Id));
+        // Bypass is safe: the ids come from THIS user's own membership rows (already user-scoped),
+        // so resolving them tenant-free exposes only the user's own roles — never another tenant's.
+        // Needed so a platform user's roles (or platform roles) resolve from a tenant scope.
+        WithoutTenantFilter();
+    }
 }

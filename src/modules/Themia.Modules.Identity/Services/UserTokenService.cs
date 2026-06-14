@@ -39,11 +39,17 @@ public sealed class UserTokenService : IUserTokenService
         this.options = options;
     }
 
+    // Resolves the parent in the ambient tenant OR as a genuine platform user (TenantId == null);
+    // the platform spec refuses another tenant's row. The token child rows carry no tenant_id.
+    private async Task<bool> UserExistsAsync(Guid userId, CancellationToken cancellationToken) =>
+        await users.GetByIdAsync(userId, cancellationToken).ConfigureAwait(false) is not null
+        || await users.FirstOrDefaultAsync(new PlatformUserByIdSpec(userId), cancellationToken).ConfigureAwait(false) is not null;
+
     /// <inheritdoc />
     public async Task<string> GenerateAsync(Guid userId, TokenPurpose purpose, TimeSpan? lifetime = null, CancellationToken cancellationToken = default)
     {
-        // Resolve the parent through the tenant-filtered repo (child table carries no tenant_id).
-        if (await users.GetByIdAsync(userId, cancellationToken).ConfigureAwait(false) is null)
+        // The parent must resolve in the ambient tenant or as a platform user; cross-tenant is refused.
+        if (!await UserExistsAsync(userId, cancellationToken).ConfigureAwait(false))
         {
             throw new InvalidOperationException($"User '{userId}' was not found in the current tenant scope.");
         }
@@ -68,8 +74,8 @@ public sealed class UserTokenService : IUserTokenService
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(rawToken);
 
-        // Resolve the parent through the tenant-filtered repo (child table carries no tenant_id).
-        if (await users.GetByIdAsync(userId, cancellationToken).ConfigureAwait(false) is null)
+        // The parent must resolve in the ambient tenant or as a platform user; cross-tenant is refused.
+        if (!await UserExistsAsync(userId, cancellationToken).ConfigureAwait(false))
         {
             return TokenConsumeResult.NotFound;
         }
