@@ -85,3 +85,10 @@ internal sealed class RoleClaimsByRoleIdsSpec : Specification<RoleClaim>
     public RoleClaimsByRoleIdsSpec(IReadOnlyCollection<Guid> roleIds) =>
         Where(c => roleIds.Contains(c.RoleId));
 }
+
+/// <summary>All tokens for a user and purpose (consumed and unconsumed).</summary>
+internal sealed class TokensByUserAndPurposeSpec : Specification<UserToken>
+{
+    public TokensByUserAndPurposeSpec(Guid userId, TokenPurpose purpose) =>
+        Where(t => t.UserId == userId && t.Purpose == purpose);
+}
