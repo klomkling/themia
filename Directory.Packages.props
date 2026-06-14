@@ -69,6 +69,8 @@
     <PackageVersion Include="Testcontainers.MsSql" Version="4.12.0" />
     <!-- Identity (Themia.Modules.Identity): argon2id password hashing -->
     <PackageVersion Include="Konscious.Security.Cryptography.Argon2" Version="1.3.1" />
+    <!-- Identity tests: controllable clock -->
+    <PackageVersion Include="Microsoft.Extensions.TimeProvider.Testing" Version="9.0.0" />
     <!-- Quartz (Themia.Quartz neutral core): scheduler + SilkierQuartz vendored dashboard view engine -->
     <PackageVersion Include="Handlebars.Net" Version="2.1.6" />
     <PackageVersion Include="Quartz" Version="3.18.1" />
