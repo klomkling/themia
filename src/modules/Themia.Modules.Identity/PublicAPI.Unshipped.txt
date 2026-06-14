@@ -54,3 +54,5 @@ Themia.Modules.Identity.Migrations.IdentitySchemaMigration
 Themia.Modules.Identity.Migrations.IdentitySchemaMigration.IdentitySchemaMigration() -> void
 override Themia.Modules.Identity.Migrations.IdentitySchemaMigration.Up() -> void
 override Themia.Modules.Identity.Migrations.IdentitySchemaMigration.Down() -> void
+Themia.Modules.Identity.EntityConfiguration.ModelBuilderExtensions
+static Themia.Modules.Identity.EntityConfiguration.ModelBuilderExtensions.ApplyThemiaIdentity(this Microsoft.EntityFrameworkCore.ModelBuilder! modelBuilder) -> Microsoft.EntityFrameworkCore.ModelBuilder!
