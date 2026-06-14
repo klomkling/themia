@@ -98,8 +98,34 @@ public sealed class ClaimService : IClaimService
     }
 
     /// <inheritdoc />
+    public async Task<bool> RemoveRoleClaimAsync(Guid roleId, string claimType, string claimValue, CancellationToken cancellationToken = default)
+    {
+        // Refuse if the parent role is outside the ambient tenant scope (child table has no tenant_id).
+        if (await roles.GetByIdAsync(roleId, cancellationToken).ConfigureAwait(false) is null)
+        {
+            return false;
+        }
+
+        var existing = await roleClaims.FirstOrDefaultAsync(new RoleClaimMatchSpec(roleId, claimType, claimValue), cancellationToken).ConfigureAwait(false);
+        if (existing is null)
+        {
+            return false;
+        }
+
+        roleClaims.Remove(existing);
+        await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        return true;
+    }
+
+    /// <inheritdoc />
     public async Task<IReadOnlyList<Claim>> GetEffectiveClaimsAsync(Guid userId, CancellationToken cancellationToken = default)
     {
+        // Resolve the parent user through the tenant-filtered repo; if out of scope, expose nothing.
+        if (await users.GetByIdAsync(userId, cancellationToken).ConfigureAwait(false) is null)
+        {
+            return [];
+        }
+
         var direct = await userClaims.ListAsync(new UserClaimsByUserSpec(userId), cancellationToken).ConfigureAwait(false);
 
         var roleIds = (await memberships.ListAsync(new Specifications.UserRolesByUserSpec(userId), cancellationToken).ConfigureAwait(false))

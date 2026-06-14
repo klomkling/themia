@@ -45,6 +45,7 @@ public class ClaimsPrincipalFactoryTests
     public async Task Creates_principal_with_subject_name_role_and_effective_claims()
     {
         var user = MakeUser(new TenantId("acme"));
+        users.Add(user);   // the effective-claims lookup resolves the user through the tenant-scoped repo
         var roleId = Guid.NewGuid();
         var role = new Role { Name = "Admin", NormalizedName = "ADMIN", TenantId = new TenantId("acme") };
         role.SetId(roleId);

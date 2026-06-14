@@ -97,4 +97,18 @@ public class RoleServiceTests
         Assert.False(await sut.RemoveRoleAsync(otherUser.Id, roleId));
         Assert.Single(memberships);   // untouched
     }
+
+    [Fact]
+    public async Task GetRoleIdsAsync_returns_empty_for_user_in_another_tenant()
+    {
+        // User is in tenant "other"; ambient tenant is "acme", so the user is out of scope.
+        var otherUser = new User { UserName = "x", NormalizedUserName = "X", TenantId = new TenantId("other") };
+        otherUser.SetId(Guid.NewGuid());
+        users.Add(otherUser);
+        var roleId = (await sut.CreateAsync("Editor"))!.Value;
+        // A pre-existing membership row (the join carries no tenant_id column).
+        memberships.Add(new UserRole { Id = Guid.NewGuid(), UserId = otherUser.Id, RoleId = roleId });
+
+        Assert.Empty(await sut.GetRoleIdsAsync(otherUser.Id));
+    }
 }

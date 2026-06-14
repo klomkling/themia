@@ -13,6 +13,7 @@ public sealed class UserTokenService : IUserTokenService
 {
     private const int TokenByteLength = 32;
 
+    private readonly IRepository<User, Guid> users;
     private readonly IRepository<UserToken, Guid> tokens;
     private readonly IUnitOfWork unitOfWork;
     private readonly TimeProvider timeProvider;
@@ -20,15 +21,18 @@ public sealed class UserTokenService : IUserTokenService
 
     /// <summary>Creates the service.</summary>
     public UserTokenService(
+        IRepository<User, Guid> users,
         IRepository<UserToken, Guid> tokens,
         IUnitOfWork unitOfWork,
         TimeProvider timeProvider,
         IdentityModuleOptions options)
     {
+        ArgumentNullException.ThrowIfNull(users);
         ArgumentNullException.ThrowIfNull(tokens);
         ArgumentNullException.ThrowIfNull(unitOfWork);
         ArgumentNullException.ThrowIfNull(timeProvider);
         ArgumentNullException.ThrowIfNull(options);
+        this.users = users;
         this.tokens = tokens;
         this.unitOfWork = unitOfWork;
         this.timeProvider = timeProvider;
@@ -38,6 +42,12 @@ public sealed class UserTokenService : IUserTokenService
     /// <inheritdoc />
     public async Task<string> GenerateAsync(Guid userId, TokenPurpose purpose, TimeSpan? lifetime = null, CancellationToken cancellationToken = default)
     {
+        // Resolve the parent through the tenant-filtered repo (child table carries no tenant_id).
+        if (await users.GetByIdAsync(userId, cancellationToken).ConfigureAwait(false) is null)
+        {
+            throw new InvalidOperationException($"User '{userId}' was not found in the current tenant scope.");
+        }
+
         var raw = Base64UrlEncode(RandomNumberGenerator.GetBytes(TokenByteLength));
         var token = new UserToken
         {
@@ -57,6 +67,12 @@ public sealed class UserTokenService : IUserTokenService
     public async Task<TokenConsumeResult> ConsumeAsync(Guid userId, TokenPurpose purpose, string rawToken, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(rawToken);
+
+        // Resolve the parent through the tenant-filtered repo (child table carries no tenant_id).
+        if (await users.GetByIdAsync(userId, cancellationToken).ConfigureAwait(false) is null)
+        {
+            return TokenConsumeResult.NotFound;
+        }
 
         var candidates = await tokens.ListAsync(new TokensByUserAndPurposeSpec(userId, purpose), cancellationToken).ConfigureAwait(false);
         var match = candidates.FirstOrDefault(t => TokenHasher.Matches(t.TokenHash, rawToken));

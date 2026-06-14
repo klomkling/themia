@@ -116,4 +116,40 @@ public class ClaimServiceTests
 
         Assert.Empty(roleClaims);
     }
+
+    [Fact]
+    public async Task GetEffectiveClaimsAsync_returns_empty_for_user_in_another_tenant()
+    {
+        SeedUser(userId, new TenantId("other"));   // ambient is "acme"
+        // A pre-existing claim row for that user (no tenant_id column on the child table).
+        userClaims.Add(new UserClaim { Id = Guid.NewGuid(), UserId = userId, ClaimType = "perm", ClaimValue = "read" });
+
+        var claims = await sut.GetEffectiveClaimsAsync(userId);
+
+        Assert.Empty(claims);
+    }
+
+    [Fact]
+    public async Task RemoveRoleClaimAsync_removes_matching_role_claim()
+    {
+        SeedRole(roleId, tenant);
+        await sut.AddRoleClaimAsync(roleId, "perm", "read");
+        await sut.AddRoleClaimAsync(roleId, "perm", "write");
+
+        Assert.True(await sut.RemoveRoleClaimAsync(roleId, "perm", "read"));
+
+        Assert.Single(roleClaims, c => c.ClaimValue == "write");
+        Assert.DoesNotContain(roleClaims, c => c.ClaimValue == "read");
+    }
+
+    [Fact]
+    public async Task RemoveRoleClaimAsync_returns_false_for_role_in_another_tenant()
+    {
+        SeedRole(roleId, new TenantId("other"));   // ambient is "acme"
+        // A pre-existing role-claim row (no tenant_id column on the child table).
+        roleClaims.Add(new RoleClaim { Id = Guid.NewGuid(), RoleId = roleId, ClaimType = "perm", ClaimValue = "read" });
+
+        Assert.False(await sut.RemoveRoleClaimAsync(roleId, "perm", "read"));
+        Assert.Single(roleClaims);   // untouched
+    }
 }

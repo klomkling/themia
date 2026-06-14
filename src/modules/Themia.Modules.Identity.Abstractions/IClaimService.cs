@@ -27,6 +27,14 @@ public interface IClaimService
     /// <param name="cancellationToken">A cancellation token.</param>
     Task AddRoleClaimAsync(Guid roleId, string claimType, string claimValue, CancellationToken cancellationToken = default);
 
+    /// <summary>Removes a matching claim from a role.</summary>
+    /// <param name="roleId">The role id.</param>
+    /// <param name="claimType">The claim type.</param>
+    /// <param name="claimValue">The claim value.</param>
+    /// <param name="cancellationToken">A cancellation token.</param>
+    /// <returns><see langword="true"/> when a claim was removed.</returns>
+    Task<bool> RemoveRoleClaimAsync(Guid roleId, string claimType, string claimValue, CancellationToken cancellationToken = default);
+
     /// <summary>Computes the union of a user's direct claims and the claims of every role assigned to the user.</summary>
     /// <param name="userId">The user id.</param>
     /// <param name="cancellationToken">A cancellation token.</param>

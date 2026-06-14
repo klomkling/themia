@@ -112,6 +112,12 @@ public sealed class RoleService : IRoleService
     /// <inheritdoc />
     public async Task<IReadOnlyList<Guid>> GetRoleIdsAsync(Guid userId, CancellationToken cancellationToken = default)
     {
+        // Resolve the parent user through the tenant-filtered repo; if out of scope, expose nothing.
+        if (await users.GetByIdAsync(userId, cancellationToken).ConfigureAwait(false) is null)
+        {
+            return [];
+        }
+
         var rows = await memberships.ListAsync(new UserRolesByUserSpec(userId), cancellationToken).ConfigureAwait(false);
         return rows.Select(r => r.RoleId).ToList();
     }
