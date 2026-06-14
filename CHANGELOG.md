@@ -18,6 +18,17 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-06-14
+
+### Added
+- `Themia.Modules.Identity.Abstractions` and `Themia.Modules.Identity`: tenant-aware Identity core —
+  user/role/claim store with full account lifecycle (lockout, email/phone confirmation + password-reset
+  tokens, a 2FA flag), argon2id password hashing, the `ICurrentUser` principal + `ClaimsPrincipalFactory`,
+  and ASP.NET Core authorization integration. Runs on either data peer (EF Core or Dapper) over a
+  FluentMigrator schema (PostgreSQL + SQL Server). Platform (cross-tenant) users are modeled as global
+  records (`tenant_id IS NULL`). First slice of the full Identity provider (JWT → 0.5.1, external/LINE
+  login → 0.5.2).
+
 ## 0.4.10 — 2026-06-13
 
 ### Fixed
