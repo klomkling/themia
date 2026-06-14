@@ -65,3 +65,23 @@ internal sealed class UserRoleSpec : Specification<UserRole>
 {
     public UserRoleSpec(Guid userId, Guid roleId) => Where(ur => ur.UserId == userId && ur.RoleId == roleId);
 }
+
+/// <summary>All direct claims of a user.</summary>
+internal sealed class UserClaimsByUserSpec : Specification<UserClaim>
+{
+    public UserClaimsByUserSpec(Guid userId) => Where(c => c.UserId == userId);
+}
+
+/// <summary>A specific user-claim row (for removal).</summary>
+internal sealed class UserClaimMatchSpec : Specification<UserClaim>
+{
+    public UserClaimMatchSpec(Guid userId, string claimType, string claimValue) =>
+        Where(c => c.UserId == userId && c.ClaimType == claimType && c.ClaimValue == claimValue);
+}
+
+/// <summary>All claims belonging to any of the given roles.</summary>
+internal sealed class RoleClaimsByRoleIdsSpec : Specification<RoleClaim>
+{
+    public RoleClaimsByRoleIdsSpec(IReadOnlyCollection<Guid> roleIds) =>
+        Where(c => roleIds.Contains(c.RoleId));
+}
