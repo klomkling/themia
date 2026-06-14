@@ -33,6 +33,24 @@ review; none is an active bug — they are hardening / consistency / architectur
   `Themia.Modules.Identity.EFCore` (model config) and `…Dapper` (mappings) satellite packages so the
   core stays peer-neutral, per the "selectable first-class peers" decision. Larger refactor; revisit if
   package weight matters to adopters.
+- **First-class framework global-record path + `IncludeGlobalRecordsForTenants` peer alignment
+  (deferred from the 0.5.0 code review, deliberately).** The framework owns the *read* side of global
+  records (`IncludeGlobalRecordsForTenants`: EF default **true**, Dapper default **false**) but has no
+  symmetric *write* path — modules hand-roll `if (TenantId is null) using(BypassTenantFilter()) save()`
+  (centralized in `IdentityScope` for Identity, but every future module that needs platform/global rows
+  would reinvent it). The deep fix is a sanctioned framework "global-record resolve + write" path honored
+  identically by both peers, and aligning the `IncludeGlobalRecordsForTenants` default across EF/Dapper.
+  **Why not done here:** changing those defaults / the core write-validation alters tenant-isolation
+  semantics for **every** adopter and module (Scheduling, Exceptional, apps), so it warrants its own
+  spec → plan → review cycle rather than riding a feature PR. Identity is correct and peer-consistent
+  today via its explicit platform specs; this is an altitude/consistency improvement, not a bug.
+- **Centralize the DI descriptor-scan** (`ContributeDapperMappings`) — duplicates
+  `SchedulingModule.GetRegisteredInstance<T>`; extract a shared `Themia.Framework.Core` helper so the
+  third module doesn't copy it again.
+- **EF audit-user bridge.** EF audit reads `ThemiaDbContext.CurrentUserId` (a `virtual` defaulting to
+  null), not `ICurrentUserAccessor`; adopters must override it (documented in the Identity README). A
+  framework bridge from `ICurrentUserAccessor` → `CurrentUserId` would make audit correct by default on
+  both peers (Dapper already reads `ICurrentUserAccessor`).
 
 ## Already documented elsewhere
 - **Optimistic concurrency on `User`/`Role`** — deferred in the spec (the `rowversion`/`xmin`/Dapper
