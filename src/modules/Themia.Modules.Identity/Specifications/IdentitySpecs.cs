@@ -92,3 +92,9 @@ internal sealed class TokensByUserAndPurposeSpec : Specification<UserToken>
     public TokensByUserAndPurposeSpec(Guid userId, TokenPurpose purpose) =>
         Where(t => t.UserId == userId && t.Purpose == purpose);
 }
+
+/// <summary>All roles whose id is in the given set.</summary>
+internal sealed class RolesByIdsSpec : Specification<Role>
+{
+    public RolesByIdsSpec(IReadOnlyCollection<Guid> roleIds) => Where(r => roleIds.Contains(r.Id));
+}
