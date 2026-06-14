@@ -50,3 +50,7 @@ Themia.Modules.Identity.Principal.CurrentUser.IsInRole(string! role) -> bool
 Themia.Modules.Identity.Principal.IdentityCurrentUserAccessor
 Themia.Modules.Identity.Principal.IdentityCurrentUserAccessor.IdentityCurrentUserAccessor(Microsoft.AspNetCore.Http.IHttpContextAccessor! httpContextAccessor) -> void
 Themia.Modules.Identity.Principal.IdentityCurrentUserAccessor.UserId.get -> string?
+Themia.Modules.Identity.Migrations.IdentitySchemaMigration
+Themia.Modules.Identity.Migrations.IdentitySchemaMigration.IdentitySchemaMigration() -> void
+override Themia.Modules.Identity.Migrations.IdentitySchemaMigration.Up() -> void
+override Themia.Modules.Identity.Migrations.IdentitySchemaMigration.Down() -> void
