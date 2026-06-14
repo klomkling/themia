@@ -155,7 +155,12 @@ tenant's entry point.
 **Current-user principal — two layers:**
 - **`ICurrentUserAccessor`** (the existing `Data.Abstractions` seam, currently a null stub) gets a real
   implementation returning the authenticated user's id — so audit stamping (`created_by`/`modified_by`)
-  reflects the real user.
+  reflects the real user. **Peer note (found during integration):** the **Dapper** audit path reads
+  `ICurrentUserAccessor`, so replacing it is sufficient there. The **EF** audit path instead reads
+  `ThemiaDbContext.CurrentUserId` (a `protected virtual` property defaulting to `null`), so an **EF
+  adopter must override `CurrentUserId`** in their `ThemiaDbContext`-derived context to surface the real
+  user (e.g. `protected override string? CurrentUserId => currentUserAccessor.UserId;`). The README
+  documents this; the integration `TestIdentityDbContext` demonstrates it.
 - **`ICurrentUser`** (new, in `Identity.Abstractions`) — richer ambient principal: `UserId`, `TenantId`
   (null ⇒ platform), `IsPlatform` (⇔ `TenantId is null`), `UserName`, `Roles`, `Claims`,
   `IsAuthenticated`, `IsInRole(...)`. Backed by a scoped accessor populated from the `ClaimsPrincipal`
