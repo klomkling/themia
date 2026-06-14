@@ -115,7 +115,7 @@ In `Directory.Packages.props`, add inside the `<ItemGroup>` of `<PackageVersion>
     <PackageTags>themia;identity;authentication;authorization;multi-tenancy;efcore;dapper</PackageTags>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="Themia.Modules.Identity.Abstractions/Themia.Modules.Identity.Abstractions.csproj" />
+    <ProjectReference Include="../Themia.Modules.Identity.Abstractions/Themia.Modules.Identity.Abstractions.csproj" />
     <ProjectReference Include="../../framework/Themia.Framework.Core/Themia.Framework.Core.csproj" />
     <ProjectReference Include="../../framework/Themia.Framework.Data.Abstractions/Themia.Framework.Data.Abstractions.csproj" />
     <ProjectReference Include="../../framework/Themia.Framework.Data.EFCore/Themia.Framework.Data.EFCore.csproj" />
