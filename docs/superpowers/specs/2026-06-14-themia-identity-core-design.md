@@ -207,10 +207,23 @@ addition, not an Identity special case.
 
 - Expected outcomes are typed results (§5); genuine faults throw. Concurrency conflicts surface as the
   framework's existing `ConcurrencyException`.
-- Token verification uses a **constant-time** hash compare and never reveals whether the user or the
-  token was wrong (no user enumeration). Password verify returns a uniform `Failed` regardless of
-  whether the user exists.
-- Token **hashes** are stored, never raw tokens; raw tokens are returned once at generation.
+- Token verification uses a **constant-time** hash compare. Token **hashes** are stored, never raw
+  tokens; raw tokens are returned once at generation.
+- **`VerifyPasswordAsync` returns distinct results** (`Success`/`Failed`/`LockedOut`/`Inactive`/`NotFound`)
+  so the caller can apply policy (e.g. a `Retry-After` on `LockedOut`). This mirrors ASP.NET Core
+  Identity's `SignInResult`. **Anti-enumeration is the presentation boundary's job:** the **0.5.1 login
+  endpoint** collapses `NotFound`/`Inactive`/`Failed` into a single "invalid credentials" response so the
+  HTTP surface does not reveal whether an account exists. (Timing-equalization — hashing a dummy password
+  on the not-found path — is a documented 0.5.1 hardening.)
+- **Child-table tenant isolation is enforced at the service layer by resolving the tenant-scoped parent
+  first.** Every service method that mutates a parent-keyed child (`UserRole`/`UserClaim`/`RoleClaim`)
+  via a caller-supplied `userId`/`roleId` first loads that user/role through the tenant-filtered
+  repository and refuses the operation when it is not in scope — so a caller cannot assign/remove a role
+  or write a claim across tenants.
+- **Known limitation (0.5.x follow-up):** `IUserService.CreateAsync`'s duplicate pre-check is a
+  best-effort `AnyAsync`; under a concurrent same-username race both creators can pass it and the second
+  hits the filtered unique index, surfacing a provider exception rather than `UserCreationResult.Failure`.
+  No data corruption (the index holds); a unified cross-peer unique-violation translation is deferred.
 - The "module registered but EF configs not applied" guard fails loudly at startup (§7).
 
 ## 9. Testing

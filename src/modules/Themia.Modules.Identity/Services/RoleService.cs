@@ -88,6 +88,16 @@ public sealed class RoleService : IRoleService
     /// <inheritdoc />
     public async Task<bool> RemoveRoleAsync(Guid userId, Guid roleId, CancellationToken cancellationToken = default)
     {
+        // Both sides must resolve within the ambient tenant scope (tenant isolation for the parent-keyed join).
+        if (await users.GetByIdAsync(userId, cancellationToken).ConfigureAwait(false) is null)
+        {
+            return false;
+        }
+        if (await roles.GetByIdAsync(roleId, cancellationToken).ConfigureAwait(false) is null)
+        {
+            return false;
+        }
+
         var existing = await memberships.FirstOrDefaultAsync(new UserRoleSpec(userId, roleId), cancellationToken).ConfigureAwait(false);
         if (existing is null)
         {

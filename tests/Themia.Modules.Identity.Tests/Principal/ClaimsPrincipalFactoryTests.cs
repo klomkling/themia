@@ -14,6 +14,7 @@ public class ClaimsPrincipalFactoryTests
     private readonly List<UserRole> memberships = [];
     private readonly List<UserClaim> userClaims = [];
     private readonly List<RoleClaim> roleClaims = [];
+    private readonly List<User> users = [];
     private readonly ClaimsPrincipalFactory sut;
 
     public ClaimsPrincipalFactoryTests()
@@ -23,6 +24,8 @@ public class ClaimsPrincipalFactoryTests
             new FakeRepository<UserClaim>(userClaims, c => c.Id) { AmbientTenant = tenant },
             new FakeRepository<RoleClaim>(roleClaims, c => c.Id) { AmbientTenant = tenant },
             new FakeRepository<UserRole>(memberships, ur => ur.Id) { AmbientTenant = tenant },
+            new FakeRepository<User>(users, u => u.Id) { AmbientTenant = tenant },
+            new FakeRepository<Role>(roles, r => r.Id) { AmbientTenant = tenant },
             new FakeUnitOfWork());
 
         sut = new ClaimsPrincipalFactory(
