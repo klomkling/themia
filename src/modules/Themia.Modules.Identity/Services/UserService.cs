@@ -42,56 +42,6 @@ public sealed class UserService : IUserService
 
     private static string Normalize(string value) => value.Trim().ToUpperInvariant();
 
-    /// <summary>Resolves a user in the ambient tenant, falling back to a genuine platform user
-    /// (<c>TenantId == null</c>). The platform spec's predicate ensures another tenant's user is
-    /// never matched, so cross-tenant access stays refused.</summary>
-    private async Task<User?> ResolveUserAsync(Guid id, CancellationToken cancellationToken)
-    {
-        var user = await users.GetByIdAsync(id, cancellationToken).ConfigureAwait(false);
-        if (user is not null)
-        {
-            return user;
-        }
-        return await users.FirstOrDefaultAsync(new PlatformUserByIdSpec(id), cancellationToken).ConfigureAwait(false);
-    }
-
-    /// <summary>Persists a pending user update. A platform user (<c>TenantId == null</c>) is an
-    /// <c>ITenantEntity</c>; writing it from a tenant scope must bypass the tenant write-validation,
-    /// otherwise the unit of work rejects the global row. Tenant users save normally.</summary>
-    private async Task SaveUserAsync(User user, CancellationToken cancellationToken)
-    {
-        users.Update(user);
-        if (user.TenantId is null)
-        {
-            using (filterScope.BypassTenantFilter())
-            {
-                await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-            }
-        }
-        else
-        {
-            await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-        }
-    }
-
-    /// <summary>Soft-deletes a user. Like <see cref="SaveUserAsync"/>, a platform user's removal is a
-    /// write to an <c>ITenantEntity</c> and needs the filter bypass from a tenant scope.</summary>
-    private async Task SaveUserRemovedAsync(User user, CancellationToken cancellationToken)
-    {
-        users.Remove(user);
-        if (user.TenantId is null)
-        {
-            using (filterScope.BypassTenantFilter())
-            {
-                await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-            }
-        }
-        else
-        {
-            await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-        }
-    }
-
     /// <inheritdoc />
     public async Task<UserCreationResult> CreateAsync(string userName, string password, string? email = null, CancellationToken cancellationToken = default)
     {
@@ -177,7 +127,7 @@ public sealed class UserService : IUserService
     public async Task<bool> SetPasswordAsync(Guid userId, string password, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(password);
-        var user = await ResolveUserAsync(userId, cancellationToken).ConfigureAwait(false);
+        var user = await IdentityScope.ResolveUserAsync(users, userId, cancellationToken).ConfigureAwait(false);
         if (user is null)
         {
             return false;
@@ -185,7 +135,8 @@ public sealed class UserService : IUserService
 
         user.PasswordHash = passwordHasher.Hash(password);
         user.SecurityStamp = Guid.NewGuid().ToString("N");
-        await SaveUserAsync(user, cancellationToken).ConfigureAwait(false);
+        users.Update(user);
+        await IdentityScope.SaveScopedAsync(unitOfWork, filterScope, user.TenantId is null, cancellationToken).ConfigureAwait(false);
         return true;
     }
 
@@ -219,7 +170,8 @@ public sealed class UserService : IUserService
                     user.LockoutEnd = now.Add(options.LockoutDuration);
                     user.AccessFailedCount = 0;
                 }
-                await SaveUserAsync(user, cancellationToken).ConfigureAwait(false);
+                users.Update(user);
+                await IdentityScope.SaveScopedAsync(unitOfWork, filterScope, user.TenantId is null, cancellationToken).ConfigureAwait(false);
             }
             return PasswordVerificationResult.Failed;
         }
@@ -240,7 +192,8 @@ public sealed class UserService : IUserService
         }
         if (changed)
         {
-            await SaveUserAsync(user, cancellationToken).ConfigureAwait(false);
+            users.Update(user);
+            await IdentityScope.SaveScopedAsync(unitOfWork, filterScope, user.TenantId is null, cancellationToken).ConfigureAwait(false);
         }
 
         return PasswordVerificationResult.Success;
@@ -249,27 +202,29 @@ public sealed class UserService : IUserService
     /// <inheritdoc />
     public async Task<bool> SetActiveAsync(Guid userId, bool isActive, CancellationToken cancellationToken = default)
     {
-        var user = await ResolveUserAsync(userId, cancellationToken).ConfigureAwait(false);
+        var user = await IdentityScope.ResolveUserAsync(users, userId, cancellationToken).ConfigureAwait(false);
         if (user is null)
         {
             return false;
         }
 
         user.IsActive = isActive;
-        await SaveUserAsync(user, cancellationToken).ConfigureAwait(false);
+        users.Update(user);
+        await IdentityScope.SaveScopedAsync(unitOfWork, filterScope, user.TenantId is null, cancellationToken).ConfigureAwait(false);
         return true;
     }
 
     /// <inheritdoc />
     public async Task<bool> DeleteAsync(Guid userId, CancellationToken cancellationToken = default)
     {
-        var user = await ResolveUserAsync(userId, cancellationToken).ConfigureAwait(false);
+        var user = await IdentityScope.ResolveUserAsync(users, userId, cancellationToken).ConfigureAwait(false);
         if (user is null)
         {
             return false;
         }
 
-        await SaveUserRemovedAsync(user, cancellationToken).ConfigureAwait(false);
+        users.Remove(user);
+        await IdentityScope.SaveScopedAsync(unitOfWork, filterScope, user.TenantId is null, cancellationToken).ConfigureAwait(false);
         return true;
     }
 }

@@ -33,17 +33,6 @@ public sealed class RoleService : IRoleService
 
     private static string Normalize(string value) => value.Trim().ToUpperInvariant();
 
-    // Resolves the parent in the ambient tenant OR as a genuine platform row (TenantId == null).
-    // The platform spec refuses another tenant's row, so cross-tenant access stays closed.
-    // The membership (UserRole) child rows carry no tenant_id, so no write bypass is needed here.
-    private async Task<bool> UserExistsAsync(Guid userId, CancellationToken cancellationToken) =>
-        await users.GetByIdAsync(userId, cancellationToken).ConfigureAwait(false) is not null
-        || await users.FirstOrDefaultAsync(new PlatformUserByIdSpec(userId), cancellationToken).ConfigureAwait(false) is not null;
-
-    private async Task<bool> RoleExistsAsync(Guid roleId, CancellationToken cancellationToken) =>
-        await roles.GetByIdAsync(roleId, cancellationToken).ConfigureAwait(false) is not null
-        || await roles.FirstOrDefaultAsync(new PlatformRoleByIdSpec(roleId), cancellationToken).ConfigureAwait(false) is not null;
-
     /// <inheritdoc />
     public async Task<Guid?> CreateAsync(string name, string? description = null, CancellationToken cancellationToken = default)
     {
@@ -74,11 +63,11 @@ public sealed class RoleService : IRoleService
     public async Task<bool> AssignRoleAsync(Guid userId, Guid roleId, CancellationToken cancellationToken = default)
     {
         // Both sides must resolve in the ambient tenant or as platform rows; cross-tenant is refused.
-        if (!await UserExistsAsync(userId, cancellationToken).ConfigureAwait(false))
+        if (!await IdentityScope.UserExistsAsync(users, userId, cancellationToken).ConfigureAwait(false))
         {
             return false;
         }
-        if (!await RoleExistsAsync(roleId, cancellationToken).ConfigureAwait(false))
+        if (!await IdentityScope.RoleExistsAsync(roles, roleId, cancellationToken).ConfigureAwait(false))
         {
             return false;
         }
@@ -100,11 +89,11 @@ public sealed class RoleService : IRoleService
     public async Task<bool> RemoveRoleAsync(Guid userId, Guid roleId, CancellationToken cancellationToken = default)
     {
         // Both sides must resolve in the ambient tenant or as platform rows; cross-tenant is refused.
-        if (!await UserExistsAsync(userId, cancellationToken).ConfigureAwait(false))
+        if (!await IdentityScope.UserExistsAsync(users, userId, cancellationToken).ConfigureAwait(false))
         {
             return false;
         }
-        if (!await RoleExistsAsync(roleId, cancellationToken).ConfigureAwait(false))
+        if (!await IdentityScope.RoleExistsAsync(roles, roleId, cancellationToken).ConfigureAwait(false))
         {
             return false;
         }
@@ -124,7 +113,7 @@ public sealed class RoleService : IRoleService
     public async Task<IReadOnlyList<Guid>> GetRoleIdsAsync(Guid userId, CancellationToken cancellationToken = default)
     {
         // Resolve the parent user in the ambient tenant or as a platform user; if neither, expose nothing.
-        if (!await UserExistsAsync(userId, cancellationToken).ConfigureAwait(false))
+        if (!await IdentityScope.UserExistsAsync(users, userId, cancellationToken).ConfigureAwait(false))
         {
             return [];
         }
