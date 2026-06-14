@@ -14,8 +14,8 @@ public sealed class IdentitySchemaMigration : Migration
     {
         IfDatabase("postgres", "sqlserver").Delegate(CreateSchemaAndTables);
         // 'identity' is a reserved keyword in SQL Server — the schema qualifier must be bracketed.
-        IfDatabase("postgres").Delegate(CreateFilteredIndexesPostgres);
-        IfDatabase("sqlserver").Delegate(CreateFilteredIndexesSqlServer);
+        IfDatabase("postgres").Delegate(() => CreateFilteredIndexes(SchemaName));
+        IfDatabase("sqlserver").Delegate(() => CreateFilteredIndexes($"[{SchemaName}]"));
 
         IfDatabase(p =>
                 !p.StartsWith("Postgres", StringComparison.OrdinalIgnoreCase) &&
@@ -114,28 +114,39 @@ public sealed class IdentitySchemaMigration : Migration
         Create.Index("ux_user_roles_user_role").OnTable("user_roles").InSchema(SchemaName)
             .OnColumn("user_id").Ascending().OnColumn("role_id").Ascending()
             .WithOptions().Unique();
+
+        // A SHA-256 of 32 random bytes is effectively collision-free; uniqueness blocks duplicate/forged
+        // hash rows and makes the consume lookup a guaranteed single row.
+        Create.Index("ux_user_tokens_token_hash").OnTable("user_tokens").InSchema(SchemaName)
+            .OnColumn("token_hash").Ascending().WithOptions().Unique();
+
+        // Child-table referential integrity. No cascade: users/roles are soft-deleted (rows persist),
+        // so cascade is unnecessary and risky — restrict (the default) is correct. Fluent Create.ForeignKey
+        // is portable across PostgreSQL and SQL Server.
+        Create.ForeignKey("fk_user_roles_user_id").FromTable("user_roles").InSchema(SchemaName).ForeignColumn("user_id")
+            .ToTable("users").InSchema(SchemaName).PrimaryColumn("id");
+        Create.ForeignKey("fk_user_roles_role_id").FromTable("user_roles").InSchema(SchemaName).ForeignColumn("role_id")
+            .ToTable("roles").InSchema(SchemaName).PrimaryColumn("id");
+        Create.ForeignKey("fk_user_claims_user_id").FromTable("user_claims").InSchema(SchemaName).ForeignColumn("user_id")
+            .ToTable("users").InSchema(SchemaName).PrimaryColumn("id");
+        Create.ForeignKey("fk_role_claims_role_id").FromTable("role_claims").InSchema(SchemaName).ForeignColumn("role_id")
+            .ToTable("roles").InSchema(SchemaName).PrimaryColumn("id");
+        Create.ForeignKey("fk_user_tokens_user_id").FromTable("user_tokens").InSchema(SchemaName).ForeignColumn("user_id")
+            .ToTable("users").InSchema(SchemaName).PrimaryColumn("id");
     }
 
-    private void CreateFilteredIndexesPostgres()
+    /// <summary>Emits the six per-tenant + platform filtered unique indexes. <paramref name="schema"/> is
+    /// the SQL schema qualifier already escaped for the active engine (<c>identity</c> on PostgreSQL,
+    /// <c>[identity]</c> on SQL Server, since <c>IDENTITY</c> is a reserved keyword there). The emitted DDL
+    /// is otherwise identical across engines.</summary>
+    private void CreateFilteredIndexes(string schema)
     {
-        // PostgreSQL: unquoted 'identity' is fine as a schema name.
-        Execute.Sql($"CREATE UNIQUE INDEX ux_users_tenant_user_name ON {SchemaName}.users (tenant_id, normalized_user_name) WHERE tenant_id IS NOT NULL;");
-        Execute.Sql($"CREATE UNIQUE INDEX ux_users_platform_user_name ON {SchemaName}.users (normalized_user_name) WHERE tenant_id IS NULL;");
-        Execute.Sql($"CREATE UNIQUE INDEX ux_users_tenant_email ON {SchemaName}.users (tenant_id, normalized_email) WHERE tenant_id IS NOT NULL AND normalized_email IS NOT NULL;");
-        Execute.Sql($"CREATE UNIQUE INDEX ux_users_platform_email ON {SchemaName}.users (normalized_email) WHERE tenant_id IS NULL AND normalized_email IS NOT NULL;");
-        Execute.Sql($"CREATE UNIQUE INDEX ux_roles_tenant_name ON {SchemaName}.roles (tenant_id, normalized_name) WHERE tenant_id IS NOT NULL;");
-        Execute.Sql($"CREATE UNIQUE INDEX ux_roles_platform_name ON {SchemaName}.roles (normalized_name) WHERE tenant_id IS NULL;");
-    }
-
-    private void CreateFilteredIndexesSqlServer()
-    {
-        // SQL Server: 'IDENTITY' is a reserved keyword — the schema qualifier must be bracketed.
-        Execute.Sql($"CREATE UNIQUE INDEX ux_users_tenant_user_name ON [{SchemaName}].users (tenant_id, normalized_user_name) WHERE tenant_id IS NOT NULL;");
-        Execute.Sql($"CREATE UNIQUE INDEX ux_users_platform_user_name ON [{SchemaName}].users (normalized_user_name) WHERE tenant_id IS NULL;");
-        Execute.Sql($"CREATE UNIQUE INDEX ux_users_tenant_email ON [{SchemaName}].users (tenant_id, normalized_email) WHERE tenant_id IS NOT NULL AND normalized_email IS NOT NULL;");
-        Execute.Sql($"CREATE UNIQUE INDEX ux_users_platform_email ON [{SchemaName}].users (normalized_email) WHERE tenant_id IS NULL AND normalized_email IS NOT NULL;");
-        Execute.Sql($"CREATE UNIQUE INDEX ux_roles_tenant_name ON [{SchemaName}].roles (tenant_id, normalized_name) WHERE tenant_id IS NOT NULL;");
-        Execute.Sql($"CREATE UNIQUE INDEX ux_roles_platform_name ON [{SchemaName}].roles (normalized_name) WHERE tenant_id IS NULL;");
+        Execute.Sql($"CREATE UNIQUE INDEX ux_users_tenant_user_name ON {schema}.users (tenant_id, normalized_user_name) WHERE tenant_id IS NOT NULL;");
+        Execute.Sql($"CREATE UNIQUE INDEX ux_users_platform_user_name ON {schema}.users (normalized_user_name) WHERE tenant_id IS NULL;");
+        Execute.Sql($"CREATE UNIQUE INDEX ux_users_tenant_email ON {schema}.users (tenant_id, normalized_email) WHERE tenant_id IS NOT NULL AND normalized_email IS NOT NULL;");
+        Execute.Sql($"CREATE UNIQUE INDEX ux_users_platform_email ON {schema}.users (normalized_email) WHERE tenant_id IS NULL AND normalized_email IS NOT NULL;");
+        Execute.Sql($"CREATE UNIQUE INDEX ux_roles_tenant_name ON {schema}.roles (tenant_id, normalized_name) WHERE tenant_id IS NOT NULL;");
+        Execute.Sql($"CREATE UNIQUE INDEX ux_roles_platform_name ON {schema}.roles (normalized_name) WHERE tenant_id IS NULL;");
     }
 
     /// <inheritdoc />

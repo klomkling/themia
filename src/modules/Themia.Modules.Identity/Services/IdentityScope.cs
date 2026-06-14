@@ -12,6 +12,11 @@ namespace Themia.Modules.Identity.Services;
 /// the rules hold by construction across every caller.</summary>
 internal static class IdentityScope
 {
+    /// <summary>Normalizes a lookup key (user name, email, role name) to its canonical form. This MUST
+    /// stay byte-identical to the comparison the DB filtered unique indexes perform, so the in-memory
+    /// duplicate check and the at-rest uniqueness constraint agree.</summary>
+    public static string Normalize(string value) => value.Trim().ToUpperInvariant();
+
     /// <summary>Resolves a user in the ambient tenant, falling back to a genuine platform user
     /// (<c>TenantId == null</c>). The platform spec's predicate ensures another tenant's user is
     /// never matched, so cross-tenant access stays refused.</summary>
@@ -39,8 +44,13 @@ internal static class IdentityScope
         => await ResolveRoleAsync(roles, id, ct).ConfigureAwait(false) is not null;
 
     /// <summary>Saves changes, bypassing the tenant write-validation ONLY for a global (platform,
-    /// <c>TenantId == null</c>) entity. The bypass is scoped to this single SaveChangesAsync; callers
-    /// save one entity per call (no co-tracked tenant entities are flushed under the bypass).</summary>
+    /// <c>TenantId == null</c>) entity.
+    /// <para><b>Contract — call only with a single pending change.</b> The bypass suppresses tenant
+    /// write-validation for the WHOLE unit of work, not just the platform entity. Any other tenant
+    /// entity co-tracked on the same context would therefore also skip validation when the platform
+    /// branch runs. Every current caller stages exactly one <c>Update</c>/<c>Remove</c> before this
+    /// call, so the bypass is safe by construction. Making the bypass per-entity is a framework
+    /// concern tracked as a follow-up; until then, do not flush co-tracked tenant entities here.</para></summary>
     public static async Task SaveScopedAsync(IUnitOfWork unitOfWork, IDataFilterScope filterScope, bool isPlatform, CancellationToken ct)
     {
         if (isPlatform)

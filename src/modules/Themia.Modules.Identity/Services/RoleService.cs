@@ -31,13 +31,11 @@ public sealed class RoleService : IRoleService
         this.unitOfWork = unitOfWork;
     }
 
-    private static string Normalize(string value) => value.Trim().ToUpperInvariant();
-
     /// <inheritdoc />
     public async Task<Guid?> CreateAsync(string name, string? description = null, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        var normalized = Normalize(name);
+        var normalized = IdentityScope.Normalize(name);
         if (await roles.AnyAsync(new RoleByNormalizedNameSpec(normalized), cancellationToken).ConfigureAwait(false))
         {
             return null;
@@ -54,7 +52,7 @@ public sealed class RoleService : IRoleService
     public async Task<Role?> FindByNameAsync(string name, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        var normalized = Normalize(name);
+        var normalized = IdentityScope.Normalize(name);
         var inTenant = await roles.FirstOrDefaultAsync(new RoleByNormalizedNameSpec(normalized), cancellationToken).ConfigureAwait(false);
         return inTenant ?? await roles.FirstOrDefaultAsync(new PlatformRoleByNormalizedNameSpec(normalized), cancellationToken).ConfigureAwait(false);
     }

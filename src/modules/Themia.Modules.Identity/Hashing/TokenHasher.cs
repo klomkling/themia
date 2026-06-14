@@ -14,7 +14,9 @@ internal static class TokenHasher
         return Convert.ToBase64String(bytes);
     }
 
-    /// <summary>Constant-time check that a stored hash matches a presented raw token.</summary>
+    /// <summary>Constant-time check that a stored hash matches a presented raw token. Retained as a hashing
+    /// utility (and exercised by tests); production token consume now matches by an exact <c>token_hash</c>
+    /// DB lookup rather than loading and comparing in memory.</summary>
     public static bool Matches(string storedHash, string rawToken)
     {
         ArgumentNullException.ThrowIfNull(storedHash);

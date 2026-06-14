@@ -40,15 +40,13 @@ public sealed class UserService : IUserService
         this.filterScope = filterScope;
     }
 
-    private static string Normalize(string value) => value.Trim().ToUpperInvariant();
-
     /// <inheritdoc />
     public async Task<UserCreationResult> CreateAsync(string userName, string password, string? email = null, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(userName);
         ArgumentException.ThrowIfNullOrWhiteSpace(password);
 
-        var normalizedName = Normalize(userName);
+        var normalizedName = IdentityScope.Normalize(userName);
         if (await users.AnyAsync(new UserByNormalizedNameSpec(normalizedName), cancellationToken).ConfigureAwait(false))
         {
             return UserCreationResult.Failure("duplicate_user_name");
@@ -57,7 +55,7 @@ public sealed class UserService : IUserService
         string? normalizedEmail = null;
         if (!string.IsNullOrWhiteSpace(email))
         {
-            normalizedEmail = Normalize(email);
+            normalizedEmail = IdentityScope.Normalize(email);
             if (await users.AnyAsync(new UserByNormalizedEmailSpec(normalizedEmail), cancellationToken).ConfigureAwait(false))
             {
                 return UserCreationResult.Failure("duplicate_email");
@@ -87,7 +85,7 @@ public sealed class UserService : IUserService
     public async Task<User?> FindByUserNameAsync(string userName, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(userName);
-        var normalized = Normalize(userName);
+        var normalized = IdentityScope.Normalize(userName);
 
         var inTenant = await users.FirstOrDefaultAsync(new UserByNormalizedNameSpec(normalized), cancellationToken).ConfigureAwait(false);
         if (inTenant is not null)
@@ -107,7 +105,7 @@ public sealed class UserService : IUserService
     public async Task<User?> FindByEmailAsync(string email, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(email);
-        var normalized = Normalize(email);
+        var normalized = IdentityScope.Normalize(email);
 
         var inTenant = await users.FirstOrDefaultAsync(new UserByNormalizedEmailSpec(normalized), cancellationToken).ConfigureAwait(false);
         if (inTenant is not null)

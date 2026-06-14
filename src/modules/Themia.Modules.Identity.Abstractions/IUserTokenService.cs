@@ -13,7 +13,9 @@ public interface IUserTokenService
     /// <returns>The raw token value to deliver to the user.</returns>
     Task<string> GenerateAsync(Guid userId, TokenPurpose purpose, TimeSpan? lifetime = null, CancellationToken cancellationToken = default);
 
-    /// <summary>Validates and consumes a token (single-use, expiry-checked, constant-time hash compare).</summary>
+    /// <summary>Validates and consumes a token (single-use, expiry-checked). The presented raw token is
+    /// SHA-256 hashed and matched against the stored <c>token_hash</c> by exact DB equality; because the
+    /// stored value is a hash of a high-entropy random token, the equality match leaks nothing useful.</summary>
     /// <param name="userId">The owning user id.</param>
     /// <param name="purpose">The expected purpose.</param>
     /// <param name="rawToken">The raw token presented by the user.</param>
