@@ -58,3 +58,12 @@ Themia.Modules.Identity.EntityConfiguration.ModelBuilderExtensions
 static Themia.Modules.Identity.EntityConfiguration.ModelBuilderExtensions.ApplyThemiaIdentity(this Microsoft.EntityFrameworkCore.ModelBuilder! modelBuilder) -> Microsoft.EntityFrameworkCore.ModelBuilder!
 Themia.Modules.Identity.Mapping.IdentityDapperMappings
 static Themia.Modules.Identity.Mapping.IdentityDapperMappings.Apply(Themia.Framework.Data.Dapper.Mapping.EntityMappingRegistry! registry) -> void
+Themia.Modules.Identity.DependencyInjection.IdentityServiceCollectionExtensions
+static Themia.Modules.Identity.DependencyInjection.IdentityServiceCollectionExtensions.AddThemiaIdentityServices(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Themia.Modules.Identity.Abstractions.IdentityModuleOptions!>? configure = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static Themia.Modules.Identity.DependencyInjection.IdentityServiceCollectionExtensions.AddThemiaIdentityAuthorization(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+Themia.Modules.Identity.IdentityModule
+Themia.Modules.Identity.IdentityModule.IdentityModule(Themia.Data.Migrations.MigrationEngine engine) -> void
+Themia.Modules.Identity.IdentityModule.IdentityModule(Themia.Data.Migrations.MigrationEngine engine, Themia.Modules.Identity.Abstractions.IdentityModuleOptions! options) -> void
+override Themia.Modules.Identity.IdentityModule.Descriptor.get -> Themia.Framework.Core.Modules.ModuleDescriptor!
+override Themia.Modules.Identity.IdentityModule.ConfigureServices(Microsoft.Extensions.DependencyInjection.IServiceCollection! services) -> void
+override Themia.Modules.Identity.IdentityModule.InitializeAsync(System.IServiceProvider! serviceProvider, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
