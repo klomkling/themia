@@ -37,3 +37,16 @@ const Themia.Modules.Identity.Principal.IdentityClaimTypes.SecurityStamp = "them
 Themia.Modules.Identity.Principal.ClaimsPrincipalFactory
 Themia.Modules.Identity.Principal.ClaimsPrincipalFactory.ClaimsPrincipalFactory(Themia.Framework.Data.Abstractions.Repositories.IRepository<Themia.Modules.Identity.Abstractions.Entities.UserRole!, System.Guid>! memberships, Themia.Framework.Data.Abstractions.Repositories.IRepository<Themia.Modules.Identity.Abstractions.Entities.Role!, System.Guid>! roles, Themia.Modules.Identity.Abstractions.IClaimService! claims) -> void
 Themia.Modules.Identity.Principal.ClaimsPrincipalFactory.CreateAsync(Themia.Modules.Identity.Abstractions.Entities.User! user, string! authenticationType, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Security.Claims.ClaimsPrincipal!>!
+Themia.Modules.Identity.Principal.CurrentUser
+Themia.Modules.Identity.Principal.CurrentUser.CurrentUser(Microsoft.AspNetCore.Http.IHttpContextAccessor! httpContextAccessor) -> void
+Themia.Modules.Identity.Principal.CurrentUser.IsAuthenticated.get -> bool
+Themia.Modules.Identity.Principal.CurrentUser.UserId.get -> System.Guid?
+Themia.Modules.Identity.Principal.CurrentUser.TenantId.get -> string?
+Themia.Modules.Identity.Principal.CurrentUser.IsPlatform.get -> bool
+Themia.Modules.Identity.Principal.CurrentUser.UserName.get -> string?
+Themia.Modules.Identity.Principal.CurrentUser.Roles.get -> System.Collections.Generic.IReadOnlyCollection<string!>!
+Themia.Modules.Identity.Principal.CurrentUser.Claims.get -> System.Collections.Generic.IReadOnlyCollection<System.Security.Claims.Claim!>!
+Themia.Modules.Identity.Principal.CurrentUser.IsInRole(string! role) -> bool
+Themia.Modules.Identity.Principal.IdentityCurrentUserAccessor
+Themia.Modules.Identity.Principal.IdentityCurrentUserAccessor.IdentityCurrentUserAccessor(Microsoft.AspNetCore.Http.IHttpContextAccessor! httpContextAccessor) -> void
+Themia.Modules.Identity.Principal.IdentityCurrentUserAccessor.UserId.get -> string?
