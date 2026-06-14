@@ -34,7 +34,7 @@ public enum TokenConsumeResult
     /// <summary>The token was valid and is now consumed.</summary>
     Success,
 
-    /// <summary>No matching unconsumed token exists for the user and purpose.</summary>
+    /// <summary>No token whose hash matches the presented value exists for the user and purpose.</summary>
     NotFound,
 
     /// <summary>The token existed but has expired.</summary>

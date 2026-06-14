@@ -81,8 +81,11 @@ builder.AddModule(new IdentityModule(MigrationEngine.SqlServer));
 - Registers `IUserService`, `IRoleService`, `IClaimService`, `IUserTokenService`, `IPasswordHasher`,
   `IClaimsPrincipalFactory`, and `ICurrentUser` in the DI container.
 
-To also wire up ASP.NET Core authorization (adds claims-based policy support and registers
-`ICurrentUserAccessor` from the HTTP context):
+`IdentityModule` already calls `AddThemiaIdentityAuthorization()` automatically, so you normally
+don't need to call it yourself. It registers `IHttpContextAccessor`, the `ICurrentUser` principal,
+and overrides the audit-user accessor (`ICurrentUserAccessor`) so it reads the authenticated user
+from the HTTP context. It does **not** register any authorization policies. Call it directly only
+when wiring the Identity services **without** the module:
 
 ```csharp
 builder.Services.AddThemiaIdentityAuthorization();
@@ -133,7 +136,7 @@ with a foreign key to `user_id`:
 ```csharp
 public class UserProfile
 {
-    public Guid UserId { get; set; }   // FK → themia_users.id
+    public Guid UserId { get; set; }   // FK → identity.users.id
     public string? DisplayName { get; set; }
     public string? AvatarUrl { get; set; }
 }
@@ -149,6 +152,6 @@ Configure it in your `AppDbContext.OnModelCreating`. Themia never touches this t
 |----------|---------|-------------|
 | `MaxFailedAccessAttempts` | 5 | Consecutive failures before lockout |
 | `LockoutDuration` | 15 minutes | How long an account stays locked |
-| `DefaultTokenLifetime` | 24 hours | Expiry for generated tokens |
+| `DefaultTokenLifetime` | 1 hour | Expiry for generated tokens |
 | `AllowPlatformLogin` | `true` | Whether platform users (`tenant_id IS NULL`) can log in |
 | `ConnectionStringName` | `"Default"` | Connection string key used by Dapper |

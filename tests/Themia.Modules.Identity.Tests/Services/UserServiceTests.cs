@@ -136,4 +136,79 @@ public class UserServiceTests
         Assert.True(await sut.DeleteAsync(create.UserId!.Value));
         Assert.Null(await sut.FindByUserNameAsync("hank"));
     }
+
+    [Fact]
+    public async Task VerifyPasswordAsync_resets_failure_count_after_successful_login()
+    {
+        options.MaxFailedAccessAttempts = 3;
+        await sut.CreateAsync("ivy", "right");
+
+        Assert.Equal(PasswordVerificationResult.Failed, await sut.VerifyPasswordAsync("ivy", "wrong"));
+        Assert.Equal(PasswordVerificationResult.Failed, await sut.VerifyPasswordAsync("ivy", "wrong"));
+
+        // Successful login resets the failure counter.
+        Assert.Equal(PasswordVerificationResult.Success, await sut.VerifyPasswordAsync("ivy", "right"));
+        Assert.Equal(0, Assert.Single(store).AccessFailedCount);
+
+        // One more failure must report Failed, not LockedOut — proving the counter reset.
+        Assert.Equal(PasswordVerificationResult.Failed, await sut.VerifyPasswordAsync("ivy", "wrong"));
+    }
+
+    [Fact]
+    public async Task VerifyPasswordAsync_rehashes_and_rotates_stamp_when_hash_is_outdated()
+    {
+        var stub = new StubPasswordHasher { VerifyResult = true, NeedsRehashResult = true, HashResult = "rehashed" };
+        var service = new UserService(repo, uow, stub, clock, options);
+
+        // Seed with a distinct, outdated hash so the rehash to the "rehashed" sentinel is observable.
+        var seeded = new User { UserName = "jane", NormalizedUserName = "JANE", PasswordHash = "outdated", TenantId = new TenantId("acme") };
+        seeded.SetId(Guid.NewGuid());
+        store.Add(seeded);
+        var stampBefore = seeded.SecurityStamp;
+
+        Assert.Equal(PasswordVerificationResult.Success, await service.VerifyPasswordAsync("jane", "pw"));
+
+        var after = Assert.Single(store);
+        Assert.Equal("rehashed", after.PasswordHash);
+        Assert.NotEqual(stampBefore, after.SecurityStamp);
+    }
+
+    [Fact]
+    public async Task VerifyPasswordAsync_never_locks_out_when_lockout_disabled()
+    {
+        options.MaxFailedAccessAttempts = 1;
+        await sut.CreateAsync("kyle", "right");
+        Assert.Single(store).LockoutEnabled = false;
+
+        for (var i = 0; i < 5; i++)
+        {
+            Assert.Equal(PasswordVerificationResult.Failed, await sut.VerifyPasswordAsync("kyle", "wrong"));
+        }
+
+        Assert.Null(Assert.Single(store).LockoutEnd);
+    }
+
+    [Fact]
+    public async Task SetPasswordAsync_rotates_security_stamp_and_new_password_verifies()
+    {
+        var create = await sut.CreateAsync("liam", "oldpw");
+        var stampBefore = Assert.Single(store).SecurityStamp;
+
+        Assert.True(await sut.SetPasswordAsync(create.UserId!.Value, "newpw"));
+
+        Assert.NotEqual(stampBefore, Assert.Single(store).SecurityStamp);
+        Assert.Equal(PasswordVerificationResult.Success, await sut.VerifyPasswordAsync("liam", "newpw"));
+    }
+
+    /// <summary>Minimal hasher to drive the rehash path deterministically.</summary>
+    private sealed class StubPasswordHasher : IPasswordHasher
+    {
+        public string HashResult { get; init; } = "hashed";
+        public bool VerifyResult { get; init; }
+        public bool NeedsRehashResult { get; init; }
+
+        public string Hash(string password) => HashResult;
+        public bool Verify(string encodedHash, string password) => VerifyResult;
+        public bool NeedsRehash(string encodedHash) => NeedsRehashResult;
+    }
 }

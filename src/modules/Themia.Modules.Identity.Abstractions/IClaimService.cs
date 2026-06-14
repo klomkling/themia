@@ -10,6 +10,7 @@ public interface IClaimService
     /// <param name="claimType">The claim type.</param>
     /// <param name="claimValue">The claim value.</param>
     /// <param name="cancellationToken">A cancellation token.</param>
+    /// <exception cref="System.InvalidOperationException">Thrown when the user is not found in the current tenant scope.</exception>
     Task AddUserClaimAsync(Guid userId, string claimType, string claimValue, CancellationToken cancellationToken = default);
 
     /// <summary>Removes a matching claim from a user.</summary>
@@ -25,6 +26,7 @@ public interface IClaimService
     /// <param name="claimType">The claim type.</param>
     /// <param name="claimValue">The claim value.</param>
     /// <param name="cancellationToken">A cancellation token.</param>
+    /// <exception cref="System.InvalidOperationException">Thrown when the role is not found in the current tenant scope.</exception>
     Task AddRoleClaimAsync(Guid roleId, string claimType, string claimValue, CancellationToken cancellationToken = default);
 
     /// <summary>Removes a matching claim from a role.</summary>

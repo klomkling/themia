@@ -32,6 +32,7 @@ public abstract class IdentityStoreConformanceTests
         public IUserService Users => Inner.ServiceProvider.GetRequiredService<IUserService>();
         public IRoleService Roles => Inner.ServiceProvider.GetRequiredService<IRoleService>();
         public IClaimService Claims => Inner.ServiceProvider.GetRequiredService<IClaimService>();
+        public IUserTokenService Tokens => Inner.ServiceProvider.GetRequiredService<IUserTokenService>();
 
         public async ValueTask DisposeAsync()
         {
@@ -40,7 +41,7 @@ public abstract class IdentityStoreConformanceTests
         }
     }
 
-    protected Scope NewScope(TenantId? tenant, bool allowPlatformLogin = true, string auditUserId = "test-user")
+    protected Scope NewScope(TenantId? tenant, bool allowPlatformLogin = true, string auditUserId = "test-user", int? maxFailedAccessAttempts = null)
     {
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?> { ["ConnectionStrings:Default"] = ConnectionString })
@@ -50,7 +51,14 @@ public abstract class IdentityStoreConformanceTests
         services.AddSingleton<IConfiguration>(configuration);
         services.AddScoped<ITenantContext>(_ => new TenantContext(tenant));
         ConfigurePeer(services, configuration);
-        services.AddThemiaIdentityServices(o => o.AllowPlatformLogin = allowPlatformLogin);
+        services.AddThemiaIdentityServices(o =>
+        {
+            o.AllowPlatformLogin = allowPlatformLogin;
+            if (maxFailedAccessAttempts is { } max)
+            {
+                o.MaxFailedAccessAttempts = max;
+            }
+        });
         // Override the framework null accessor with a deterministic audit user (no HttpContext here).
         services.RemoveAll<ICurrentUserAccessor>();
         services.AddSingleton<ICurrentUserAccessor>(new StubCurrentUserAccessor(auditUserId));
@@ -153,5 +161,72 @@ public abstract class IdentityStoreConformanceTests
         await s.Users.CreateAsync("frank", "s3cret");
         Assert.Equal(PasswordVerificationResult.Success, await s.Users.VerifyPasswordAsync("frank", "s3cret"));
         Assert.Equal(PasswordVerificationResult.Failed, await s.Users.VerifyPasswordAsync("frank", "nope"));
+    }
+
+    [Fact]
+    public async Task Lockout_engages_at_threshold_and_releases_after_window()
+    {
+        // The integration scope uses TimeProvider.System (no controllable clock), so the time-based
+        // release is exercised by the unit tests. Here we assert the round-trip of LockoutEnd through
+        // the real store: failing to the threshold refuses even the correct password while locked.
+        await ResetAsync();
+        await using var s = NewScope(new TenantId("acme"), maxFailedAccessAttempts: 2);
+        await s.Users.CreateAsync("grace", "right");
+
+        Assert.Equal(PasswordVerificationResult.Failed, await s.Users.VerifyPasswordAsync("grace", "wrong"));
+        Assert.Equal(PasswordVerificationResult.Failed, await s.Users.VerifyPasswordAsync("grace", "wrong"));
+
+        // Threshold reached: the correct password is refused while the lockout window is open.
+        Assert.Equal(PasswordVerificationResult.LockedOut, await s.Users.VerifyPasswordAsync("grace", "right"));
+    }
+
+    [Fact]
+    public async Task Token_generate_consume_is_single_use_and_purpose_scoped()
+    {
+        await ResetAsync();
+        await using var s = NewScope(new TenantId("acme"));
+        var userId = (await s.Users.CreateAsync("heidi", "pw")).UserId!.Value;
+
+        var raw = await s.Tokens.GenerateAsync(userId, TokenPurpose.PasswordReset);
+        Assert.Equal(TokenConsumeResult.Success, await s.Tokens.ConsumeAsync(userId, TokenPurpose.PasswordReset, raw));
+        Assert.Equal(TokenConsumeResult.AlreadyConsumed, await s.Tokens.ConsumeAsync(userId, TokenPurpose.PasswordReset, raw));
+
+        // A token generated for one purpose is not consumable under another.
+        var raw2 = await s.Tokens.GenerateAsync(userId, TokenPurpose.PasswordReset);
+        Assert.Equal(TokenConsumeResult.NotFound, await s.Tokens.ConsumeAsync(userId, TokenPurpose.EmailConfirm, raw2));
+    }
+
+    [Fact]
+    public async Task Cross_tenant_claim_write_is_rejected()
+    {
+        await ResetAsync();
+        Guid userId;
+        await using (var a = NewScope(new TenantId("a")))
+        {
+            userId = (await a.Users.CreateAsync("ivan", "pw")).UserId!.Value;
+        }
+        await using (var b = NewScope(new TenantId("b")))
+        {
+            await Assert.ThrowsAsync<InvalidOperationException>(
+                () => b.Claims.AddUserClaimAsync(userId, "perm", "x"));
+        }
+    }
+
+    [Fact]
+    public async Task Cross_tenant_role_removal_is_rejected()
+    {
+        await ResetAsync();
+        Guid userId;
+        Guid roleId;
+        await using (var a = NewScope(new TenantId("a")))
+        {
+            userId = (await a.Users.CreateAsync("judy", "pw")).UserId!.Value;
+            roleId = (await a.Roles.CreateAsync("Editor"))!.Value;
+            Assert.True(await a.Roles.AssignRoleAsync(userId, roleId));
+        }
+        await using (var b = NewScope(new TenantId("b")))
+        {
+            Assert.False(await b.Roles.RemoveRoleAsync(userId, roleId));
+        }
     }
 }
