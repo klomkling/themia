@@ -117,6 +117,20 @@ Inject any of:
 | `IUserTokenService` | Generate and consume one-time tokens (email confirm, password reset, etc.) |
 | `ICurrentUser` | Read the authenticated principal (UserId, TenantId, Roles, Claims) |
 
+## Notes / gotchas
+
+- **Dapper: register the data peer first.** Adopters using the Dapper peer must call
+  `AddThemiaDapper*(...)` **before** registering the Identity module (or calling
+  `AddThemiaIdentityServices`). The module contributes its entity mappings to the Dapper
+  `EntityMappingRegistry` that the Dapper registration creates; if Identity is registered first the
+  registry doesn't exist yet, the mappings are silently skipped, and Dapper queries fail at runtime.
+  (EF adopters are unaffected — see `ApplyThemiaIdentity()` above.)
+- **`AddThemiaIdentityAuthorization()` replaces `ICurrentUserAccessor`.** It calls
+  `RemoveAll<ICurrentUserAccessor>()` and registers `IdentityCurrentUserAccessor`, so any
+  previously-registered custom `ICurrentUserAccessor` is replaced. This is intentional — Identity
+  becomes the audit-user source — but an adopter with a custom accessor should be aware it will not
+  survive. (`IdentityModule` calls this automatically.)
+
 ## Platform users
 
 A **platform user** is a user whose `tenant_id IS NULL` in the database. Platform users can

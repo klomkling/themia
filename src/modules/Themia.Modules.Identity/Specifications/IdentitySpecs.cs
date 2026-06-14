@@ -117,11 +117,13 @@ internal sealed class RoleClaimsByRoleIdsSpec : Specification<RoleClaim>
         Where(c => roleIds.Contains(c.RoleId));
 }
 
-/// <summary>All tokens for a user and purpose (consumed and unconsumed).</summary>
-internal sealed class TokensByUserAndPurposeSpec : Specification<UserToken>
+/// <summary>The single token matching a user, purpose, and exact (deterministic SHA-256) hash.
+/// Querying by hash avoids loading every token for the pair — the raw-token hash is high-entropy
+/// and irreversible, so an exact DB match leaks nothing about the presented token.</summary>
+internal sealed class TokenByUserPurposeAndHashSpec : Specification<UserToken>
 {
-    public TokensByUserAndPurposeSpec(Guid userId, TokenPurpose purpose) =>
-        Where(t => t.UserId == userId && t.Purpose == purpose);
+    public TokenByUserPurposeAndHashSpec(Guid userId, TokenPurpose purpose, string tokenHash) =>
+        Where(t => t.UserId == userId && t.Purpose == purpose && t.TokenHash == tokenHash);
 }
 
 /// <summary>All roles whose id is in the given set, resolved without the tenant filter.</summary>

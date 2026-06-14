@@ -80,8 +80,11 @@ public sealed class UserTokenService : IUserTokenService
             return TokenConsumeResult.NotFound;
         }
 
-        var candidates = await tokens.ListAsync(new TokensByUserAndPurposeSpec(userId, purpose), cancellationToken).ConfigureAwait(false);
-        var match = candidates.FirstOrDefault(t => TokenHasher.Matches(t.TokenHash, rawToken));
+        // TokenHasher.Hash is deterministic (plain SHA-256, no per-row salt), so an exact-match DB
+        // lookup on the hash is correct and avoids loading every token for the pair (DoS-resistant).
+        // The stored hash is high-entropy and irreversible — comparing it directly leaks nothing.
+        var hash = TokenHasher.Hash(rawToken);
+        var match = await tokens.FirstOrDefaultAsync(new TokenByUserPurposeAndHashSpec(userId, purpose, hash), cancellationToken).ConfigureAwait(false);
         if (match is null)
         {
             return TokenConsumeResult.NotFound;

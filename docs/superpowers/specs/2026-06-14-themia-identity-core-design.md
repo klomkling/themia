@@ -193,11 +193,12 @@ whichever is present.
 - **Dapper.** `AddThemiaIdentity()` registers the Identity entity mappings into the
   `EntityMappingRegistry` (table + column names), so `DapperRepository<User>` resolves the same schema.
   No adopter `OnModelCreating` step (Dapper has no model).
-- **Loud failure.** EF needs the configs *inside the adopter's own `DbContext`* (Themia does not own
-  their context type), so it cannot be fully hidden — but it is a single documented call. The module
-  detects at startup whether `User` is present in the EF model and throws a clear configuration error if
-  the module is registered but `ApplyThemiaIdentity()` was not called — not a confusing runtime
-  "no DbSet" error.
+- **Required call, no dedicated startup guard.** EF needs the configs *inside the adopter's own
+  `DbContext`* (Themia does not own their context type), so it cannot be fully hidden — but it is a
+  single documented, required call: `modelBuilder.ApplyThemiaIdentity()`. If an EF adopter omits it,
+  EF surfaces its own "no entity type / no DbSet for `User`" error at the first Identity query. A
+  dedicated pre-flight startup guard is a documented follow-up: it cannot be implemented generically
+  because the module has no reference to the adopter's concrete `DbContext` type to inspect its model.
 
 This contribution mechanism is **reusable** — ExceptionLogging and future modules that use the shared
 repositories follow the same `ApplyThemiaX()` + registry pattern. It is a small, general framework
@@ -224,7 +225,9 @@ addition, not an Identity special case.
   best-effort `AnyAsync`; under a concurrent same-username race both creators can pass it and the second
   hits the filtered unique index, surfacing a provider exception rather than `UserCreationResult.Failure`.
   No data corruption (the index holds); a unified cross-peer unique-violation translation is deferred.
-- The "module registered but EF configs not applied" guard fails loudly at startup (§7).
+- An EF adopter that omits `ApplyThemiaIdentity()` gets EF's own "no entity type for `User`" error at
+  first query; a dedicated pre-flight startup guard is a documented follow-up (cannot be done
+  generically without the adopter's `DbContext` type — §7).
 
 ## 9. Testing
 
