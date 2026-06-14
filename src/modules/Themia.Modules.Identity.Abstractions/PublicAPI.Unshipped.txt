@@ -1,1 +1,96 @@
 #nullable enable
+Themia.Modules.Identity.Abstractions.Entities.Role
+Themia.Modules.Identity.Abstractions.Entities.Role.Description.get -> string?
+Themia.Modules.Identity.Abstractions.Entities.Role.Description.set -> void
+Themia.Modules.Identity.Abstractions.Entities.Role.Name.get -> string!
+Themia.Modules.Identity.Abstractions.Entities.Role.Name.set -> void
+Themia.Modules.Identity.Abstractions.Entities.Role.NormalizedName.get -> string!
+Themia.Modules.Identity.Abstractions.Entities.Role.NormalizedName.set -> void
+Themia.Modules.Identity.Abstractions.Entities.Role.Role() -> void
+Themia.Modules.Identity.Abstractions.Entities.Role.SetId(System.Guid id) -> void
+Themia.Modules.Identity.Abstractions.Entities.Role.TenantId.get -> Themia.Framework.Core.Abstractions.Tenancy.TenantId?
+Themia.Modules.Identity.Abstractions.Entities.Role.TenantId.set -> void
+Themia.Modules.Identity.Abstractions.Entities.RoleClaim
+Themia.Modules.Identity.Abstractions.Entities.RoleClaim.ClaimType.get -> string!
+Themia.Modules.Identity.Abstractions.Entities.RoleClaim.ClaimType.set -> void
+Themia.Modules.Identity.Abstractions.Entities.RoleClaim.ClaimValue.get -> string!
+Themia.Modules.Identity.Abstractions.Entities.RoleClaim.ClaimValue.set -> void
+Themia.Modules.Identity.Abstractions.Entities.RoleClaim.Id.get -> System.Guid
+Themia.Modules.Identity.Abstractions.Entities.RoleClaim.Id.set -> void
+Themia.Modules.Identity.Abstractions.Entities.RoleClaim.RoleClaim() -> void
+Themia.Modules.Identity.Abstractions.Entities.RoleClaim.RoleId.get -> System.Guid
+Themia.Modules.Identity.Abstractions.Entities.RoleClaim.RoleId.set -> void
+Themia.Modules.Identity.Abstractions.Entities.RoleClaim.SetId(System.Guid id) -> void
+Themia.Modules.Identity.Abstractions.Entities.TokenPurpose
+Themia.Modules.Identity.Abstractions.Entities.TokenPurpose.EmailConfirm = 0 -> Themia.Modules.Identity.Abstractions.Entities.TokenPurpose
+Themia.Modules.Identity.Abstractions.Entities.TokenPurpose.PasswordReset = 2 -> Themia.Modules.Identity.Abstractions.Entities.TokenPurpose
+Themia.Modules.Identity.Abstractions.Entities.TokenPurpose.PhoneConfirm = 1 -> Themia.Modules.Identity.Abstractions.Entities.TokenPurpose
+Themia.Modules.Identity.Abstractions.Entities.TokenPurpose.TwoFactor = 3 -> Themia.Modules.Identity.Abstractions.Entities.TokenPurpose
+Themia.Modules.Identity.Abstractions.Entities.User
+Themia.Modules.Identity.Abstractions.Entities.User.AccessFailedCount.get -> int
+Themia.Modules.Identity.Abstractions.Entities.User.AccessFailedCount.set -> void
+Themia.Modules.Identity.Abstractions.Entities.User.Email.get -> string?
+Themia.Modules.Identity.Abstractions.Entities.User.Email.set -> void
+Themia.Modules.Identity.Abstractions.Entities.User.EmailConfirmed.get -> bool
+Themia.Modules.Identity.Abstractions.Entities.User.EmailConfirmed.set -> void
+Themia.Modules.Identity.Abstractions.Entities.User.IsActive.get -> bool
+Themia.Modules.Identity.Abstractions.Entities.User.IsActive.set -> void
+Themia.Modules.Identity.Abstractions.Entities.User.LockoutEnabled.get -> bool
+Themia.Modules.Identity.Abstractions.Entities.User.LockoutEnabled.set -> void
+Themia.Modules.Identity.Abstractions.Entities.User.LockoutEnd.get -> System.DateTimeOffset?
+Themia.Modules.Identity.Abstractions.Entities.User.LockoutEnd.set -> void
+Themia.Modules.Identity.Abstractions.Entities.User.NormalizedEmail.get -> string?
+Themia.Modules.Identity.Abstractions.Entities.User.NormalizedEmail.set -> void
+Themia.Modules.Identity.Abstractions.Entities.User.NormalizedUserName.get -> string!
+Themia.Modules.Identity.Abstractions.Entities.User.NormalizedUserName.set -> void
+Themia.Modules.Identity.Abstractions.Entities.User.PasswordHash.get -> string?
+Themia.Modules.Identity.Abstractions.Entities.User.PasswordHash.set -> void
+Themia.Modules.Identity.Abstractions.Entities.User.PhoneNumber.get -> string?
+Themia.Modules.Identity.Abstractions.Entities.User.PhoneNumber.set -> void
+Themia.Modules.Identity.Abstractions.Entities.User.PhoneNumberConfirmed.get -> bool
+Themia.Modules.Identity.Abstractions.Entities.User.PhoneNumberConfirmed.set -> void
+Themia.Modules.Identity.Abstractions.Entities.User.SecurityStamp.get -> string!
+Themia.Modules.Identity.Abstractions.Entities.User.SecurityStamp.set -> void
+Themia.Modules.Identity.Abstractions.Entities.User.SetId(System.Guid id) -> void
+Themia.Modules.Identity.Abstractions.Entities.User.TenantId.get -> Themia.Framework.Core.Abstractions.Tenancy.TenantId?
+Themia.Modules.Identity.Abstractions.Entities.User.TenantId.set -> void
+Themia.Modules.Identity.Abstractions.Entities.User.TwoFactorEnabled.get -> bool
+Themia.Modules.Identity.Abstractions.Entities.User.TwoFactorEnabled.set -> void
+Themia.Modules.Identity.Abstractions.Entities.User.User() -> void
+Themia.Modules.Identity.Abstractions.Entities.User.UserName.get -> string!
+Themia.Modules.Identity.Abstractions.Entities.User.UserName.set -> void
+Themia.Modules.Identity.Abstractions.Entities.UserClaim
+Themia.Modules.Identity.Abstractions.Entities.UserClaim.ClaimType.get -> string!
+Themia.Modules.Identity.Abstractions.Entities.UserClaim.ClaimType.set -> void
+Themia.Modules.Identity.Abstractions.Entities.UserClaim.ClaimValue.get -> string!
+Themia.Modules.Identity.Abstractions.Entities.UserClaim.ClaimValue.set -> void
+Themia.Modules.Identity.Abstractions.Entities.UserClaim.Id.get -> System.Guid
+Themia.Modules.Identity.Abstractions.Entities.UserClaim.Id.set -> void
+Themia.Modules.Identity.Abstractions.Entities.UserClaim.SetId(System.Guid id) -> void
+Themia.Modules.Identity.Abstractions.Entities.UserClaim.UserClaim() -> void
+Themia.Modules.Identity.Abstractions.Entities.UserClaim.UserId.get -> System.Guid
+Themia.Modules.Identity.Abstractions.Entities.UserClaim.UserId.set -> void
+Themia.Modules.Identity.Abstractions.Entities.UserRole
+Themia.Modules.Identity.Abstractions.Entities.UserRole.Id.get -> System.Guid
+Themia.Modules.Identity.Abstractions.Entities.UserRole.Id.set -> void
+Themia.Modules.Identity.Abstractions.Entities.UserRole.RoleId.get -> System.Guid
+Themia.Modules.Identity.Abstractions.Entities.UserRole.RoleId.set -> void
+Themia.Modules.Identity.Abstractions.Entities.UserRole.SetId(System.Guid id) -> void
+Themia.Modules.Identity.Abstractions.Entities.UserRole.UserRole() -> void
+Themia.Modules.Identity.Abstractions.Entities.UserRole.UserId.get -> System.Guid
+Themia.Modules.Identity.Abstractions.Entities.UserRole.UserId.set -> void
+Themia.Modules.Identity.Abstractions.Entities.UserToken
+Themia.Modules.Identity.Abstractions.Entities.UserToken.ConsumedAt.get -> System.DateTimeOffset?
+Themia.Modules.Identity.Abstractions.Entities.UserToken.ConsumedAt.set -> void
+Themia.Modules.Identity.Abstractions.Entities.UserToken.ExpiresAt.get -> System.DateTimeOffset
+Themia.Modules.Identity.Abstractions.Entities.UserToken.ExpiresAt.set -> void
+Themia.Modules.Identity.Abstractions.Entities.UserToken.Id.get -> System.Guid
+Themia.Modules.Identity.Abstractions.Entities.UserToken.Id.set -> void
+Themia.Modules.Identity.Abstractions.Entities.UserToken.Purpose.get -> Themia.Modules.Identity.Abstractions.Entities.TokenPurpose
+Themia.Modules.Identity.Abstractions.Entities.UserToken.Purpose.set -> void
+Themia.Modules.Identity.Abstractions.Entities.UserToken.SetId(System.Guid id) -> void
+Themia.Modules.Identity.Abstractions.Entities.UserToken.TokenHash.get -> string!
+Themia.Modules.Identity.Abstractions.Entities.UserToken.TokenHash.set -> void
+Themia.Modules.Identity.Abstractions.Entities.UserToken.UserToken() -> void
+Themia.Modules.Identity.Abstractions.Entities.UserToken.UserId.get -> System.Guid
+Themia.Modules.Identity.Abstractions.Entities.UserToken.UserId.set -> void
