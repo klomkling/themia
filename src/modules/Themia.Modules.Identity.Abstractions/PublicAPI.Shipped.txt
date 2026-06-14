@@ -145,6 +145,7 @@ Themia.Modules.Identity.Abstractions.IdentityModuleOptions.LockoutDuration.get -
 Themia.Modules.Identity.Abstractions.IdentityModuleOptions.LockoutDuration.set -> void
 Themia.Modules.Identity.Abstractions.IdentityModuleOptions.MaxFailedAccessAttempts.get -> int
 Themia.Modules.Identity.Abstractions.IdentityModuleOptions.MaxFailedAccessAttempts.set -> void
+Themia.Modules.Identity.Abstractions.IdentityModuleOptions.Validate() -> void
 Themia.Modules.Identity.Abstractions.PasswordVerificationResult
 Themia.Modules.Identity.Abstractions.PasswordVerificationResult.Failed = 1 -> Themia.Modules.Identity.Abstractions.PasswordVerificationResult
 Themia.Modules.Identity.Abstractions.PasswordVerificationResult.Inactive = 3 -> Themia.Modules.Identity.Abstractions.PasswordVerificationResult
@@ -158,12 +159,8 @@ Themia.Modules.Identity.Abstractions.TokenConsumeResult.NotFound = 1 -> Themia.M
 Themia.Modules.Identity.Abstractions.TokenConsumeResult.Success = 0 -> Themia.Modules.Identity.Abstractions.TokenConsumeResult
 Themia.Modules.Identity.Abstractions.UserCreationResult
 Themia.Modules.Identity.Abstractions.UserCreationResult.Error.get -> string?
-Themia.Modules.Identity.Abstractions.UserCreationResult.Error.init -> void
 Themia.Modules.Identity.Abstractions.UserCreationResult.Succeeded.get -> bool
-Themia.Modules.Identity.Abstractions.UserCreationResult.Succeeded.init -> void
 Themia.Modules.Identity.Abstractions.UserCreationResult.UserCreationResult() -> void
-Themia.Modules.Identity.Abstractions.UserCreationResult.UserCreationResult(bool Succeeded, System.Guid? UserId, string? Error) -> void
 Themia.Modules.Identity.Abstractions.UserCreationResult.UserId.get -> System.Guid?
-Themia.Modules.Identity.Abstractions.UserCreationResult.UserId.init -> void
 static Themia.Modules.Identity.Abstractions.UserCreationResult.Failure(string! error) -> Themia.Modules.Identity.Abstractions.UserCreationResult
 static Themia.Modules.Identity.Abstractions.UserCreationResult.Success(System.Guid userId) -> Themia.Modules.Identity.Abstractions.UserCreationResult

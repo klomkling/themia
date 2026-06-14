@@ -55,4 +55,24 @@ public class IdentityServiceCollectionExtensionsTests
         var options = services.BuildServiceProvider().GetRequiredService<IdentityModuleOptions>();
         Assert.Equal(9, options.MaxFailedAccessAttempts);
     }
+
+    [Fact]
+    public void AddThemiaIdentityServices_throws_for_invalid_options()
+    {
+        var services = new ServiceCollection();
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => services.AddThemiaIdentityServices(o => o.MaxFailedAccessAttempts = 0));
+    }
+
+    [Fact]
+    public void AddThemiaIdentityServices_registers_supplied_options_instance()
+    {
+        var services = new ServiceCollection();
+        var options = new IdentityModuleOptions { MaxFailedAccessAttempts = 7 };
+        services.AddThemiaIdentityServices(options);
+
+        var provider = services.BuildServiceProvider();
+        Assert.Same(options, provider.GetRequiredService<IdentityModuleOptions>());
+        Assert.NotNull(provider.GetService<IPasswordHasher>());
+    }
 }

@@ -24,8 +24,29 @@ public static class IdentityServiceCollectionExtensions
 
         var options = new IdentityModuleOptions();
         configure?.Invoke(options);
+        options.Validate();
         services.TryAddSingleton(options);
 
+        return AddThemiaIdentityServicesCore(services);
+    }
+
+    /// <summary>Registers the Identity stores, services, password hasher, and the supplied options instance. If a Dapper <see cref="EntityMappingRegistry"/> is already registered, contributes the Identity mappings to it.</summary>
+    /// <param name="services">The service collection.</param>
+    /// <param name="options">The validated module options to register.</param>
+    /// <returns>The same service collection.</returns>
+    public static IServiceCollection AddThemiaIdentityServices(this IServiceCollection services, IdentityModuleOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(options);
+
+        options.Validate();
+        services.TryAddSingleton(options);
+
+        return AddThemiaIdentityServicesCore(services);
+    }
+
+    private static IServiceCollection AddThemiaIdentityServicesCore(IServiceCollection services)
+    {
         services.TryAddSingleton(TimeProvider.System);
         services.TryAddSingleton<IPasswordHasher, Argon2idPasswordHasher>();
 

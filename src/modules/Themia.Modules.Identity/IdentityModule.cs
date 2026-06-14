@@ -46,14 +46,7 @@ public sealed class IdentityModule : ThemiaModuleBase
     public override void ConfigureServices(IServiceCollection services)
     {
         ArgumentNullException.ThrowIfNull(services);
-        services.AddThemiaIdentityServices(o =>
-        {
-            o.ConnectionStringName = options.ConnectionStringName;
-            o.MaxFailedAccessAttempts = options.MaxFailedAccessAttempts;
-            o.LockoutDuration = options.LockoutDuration;
-            o.AllowPlatformLogin = options.AllowPlatformLogin;
-            o.DefaultTokenLifetime = options.DefaultTokenLifetime;
-        });
+        services.AddThemiaIdentityServices(options);
         services.AddThemiaIdentityAuthorization();
     }
 
