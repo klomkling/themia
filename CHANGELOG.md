@@ -18,6 +18,26 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-06-15
+
+### Added
+
+- **`Themia.Modules.Identity.AspNetCore`** (net10.0) — JWT access-token issuance, revocable
+  rotating refresh tokens with token-family reuse-detection (family invalidated on token reuse),
+  JwtBearer validation scheme (`AddThemiaJwtBearer`), `AddThemiaIdentityAspNetCore` DI entry
+  point, opt-in `MapIdentityAuthEndpoints()` (login / refresh / logout), and a DI-replaceable
+  `IAuthenticationFlow` + `IAuthenticationHooks` extension pair.
+- **`identity.refresh_tokens` table** — FluentMigrator migration (PostgreSQL + SQL Server);
+  `RefreshTokenService` ships in the Identity core (`Themia.Modules.Identity`) and runs on both
+  EF Core and Dapper data peers.
+- **`IdentityModuleOptions.RefreshTokenLifetime`** — configurable refresh-token TTL (default 30 days).
+
+### Security
+
+- Login is **anti-enumeration, uniform-401**: an argon2id dummy hash is computed on not-found /
+  inactive / locked-out paths to equalize timing across all failure modes, preventing username
+  enumeration via response-time side-channel.
+
 ## [0.5.0] - 2026-06-14
 
 ### Added

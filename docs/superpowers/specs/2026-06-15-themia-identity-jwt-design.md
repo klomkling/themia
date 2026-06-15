@@ -82,20 +82,21 @@ provided the same way the core does it.
 ## 4. Schema — `identity.refresh_tokens`
 
 One FluentMigrator migration (`IfDatabase("postgres","sqlserver")`), snake_case, in the existing
-`identity` schema, with the framework's audit/soft-delete/concurrency conventions.
+`identity` schema. Like `user_tokens`, `refresh_tokens` is a **parent-keyed child table** — a plain
+POCO with **no `tenant_id`** and no audit/soft-delete base. Tenant isolation is enforced at the
+service layer (see below), matching the 0.5.0 child-table decision.
 
 | Column | Notes |
 |---|---|
-| `id` | Guid PK |
-| `user_id` | FK → `users.id` |
-| `tenant_id` | `varchar(100)`, NULL ⇒ platform user (framework global-record convention) |
+| `id` | Guid PK (`Guid.CreateVersion7()`) |
+| `user_id` | owning user (resolved in tenant/platform scope before any read or write) |
 | `token_hash` | SHA-256 of the opaque refresh token; raw token returned once, never stored |
 | `family_id` | Guid — groups a rotation chain for reuse-detection |
 | `expires_at` | absolute expiry |
-| `consumed_at` | set when the token is rotated (single redemption) |
-| `revoked_at` | set on logout / revoke-all / reuse-detection |
+| `consumed_at` | set when the token is rotated (single redemption), else NULL |
+| `revoked_at` | set on logout / revoke-all / reuse-detection, else NULL |
 | `replaced_by_id` | successor row in the rotation chain (nullable) |
-| + audit/concurrency | per framework conventions |
+| `created_at` | issue time (set by the service via `TimeProvider`, for forensics) |
 
 **Indexes:** `(user_id)` for revoke-all and `(token_hash)` for redemption lookup.
 
@@ -108,8 +109,11 @@ One FluentMigrator migration (`IfDatabase("postgres","sqlserver")`), snake_case,
 - **Revocation** — `logout` revokes the presented token's family; `logout?all=true` revokes all
   non-expired tokens for the user.
 
-Refresh tokens are tenant-scoped rows; platform-user tokens carry `tenant_id IS NULL`. Lookups honor
-the framework's tenant filter (platform path bypasses it), consistent with the 0.5.0 store.
+**Tenant isolation (no `tenant_id` column).** Issue and redeem first resolve the owning user via
+`IdentityScope.ResolveUserAsync` (ambient tenant, else genuine platform user `TenantId == null`) — so
+a refresh token whose `user_id` does not resolve in the caller's tenant scope is never read or rotated,
+exactly as `UserTokenService` guards `user_tokens`. The new access token's tenant claim comes from the
+resolved `user.TenantId`.
 
 ## 5. Token services & abstractions
 
@@ -118,10 +122,12 @@ the framework's tenant filter (platform path bypasses it), consistent with the 0
   issuer/audience/expiry from `JwtOptions`. The factory remains the single source of "what's in the
   principal" across cookie and JWT.
 - **`IRefreshTokenService`** —
-  - `IssueAsync(userId, tenantId, familyId?) → (rawToken, RefreshToken)` — new high-entropy opaque
-    token; persists only the hash.
-  - `RotateAsync(rawToken) → RefreshRotationResult` — validates hash + expiry + not-consumed +
-    not-revoked; on success consumes + issues successor; on reuse revokes the family.
+  - `IssueAsync(userId, familyId?) → RefreshIssue(rawToken, expiresAt, familyId)` — resolves the user
+    in scope, then issues a new high-entropy opaque token; persists only the hash.
+  - `ValidateAndRotateAsync(rawToken) → RefreshValidationResult(outcome, userId, tenantId, replacement?)`
+    — validates hash + expiry + not-consumed + not-revoked; on success consumes + issues successor; on
+    reuse (consumed/revoked replay) revokes the family. The orchestrator uses `userId`/`tenantId` to mint
+    the new access token.
   - `RevokeAsync(rawToken, allForUser: bool)` — logout / logout-everywhere.
 - **`IJwtSigningCredentialsProvider`** — returns the `SigningCredentials` + token-validation key
   material; default `SymmetricSigningCredentialsProvider` (HS256 from `JwtOptions.SigningKey`).
@@ -191,7 +197,8 @@ changes.
 
 ## 8. Options & configuration
 
-`JwtOptions`, bound and **validated on start** (`ValidateOnStart`), missing/short key fails fast:
+`JwtOptions` with a `Validate()` method called at registration (fail-fast, mirroring
+`IdentityModuleOptions.Validate()`), missing/short key fails fast:
 
 | Option | Default | Notes |
 |---|---|---|
