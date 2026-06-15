@@ -73,21 +73,24 @@ public sealed class RefreshTokenService : IRefreshTokenService
             return RefreshValidationResult.Invalid();
         }
 
-        var user = await IdentityScope.ResolveUserAsync(users, match.UserId, cancellationToken).ConfigureAwait(false);
-        if (user is null)
-        {
-            return RefreshValidationResult.Invalid();
-        }
-
         var now = timeProvider.GetUtcNow();
 
-        // Reuse check precedes expiry on purpose: a consumed/revoked token replayed by a thief must
-        // revoke the family even if it has since expired.
+        // Reuse detection precedes user resolution on purpose: a consumed/revoked token replayed by a
+        // thief must revoke the family even when the owner is soft-deleted or out of the current scope
+        // (ResolveUserAsync would return null). It needs only the token row's FamilyId/UserId.
+        // Reuse check also precedes expiry: replaying a consumed/revoked token revokes the family even
+        // if it has since expired.
         if (match.ConsumedAt is not null || match.RevokedAt is not null)
         {
             logger.LogWarning("Refresh token reuse detected; revoking token family {FamilyId} for user {UserId}.", match.FamilyId, match.UserId);
             await RevokeFamilyAsync(match.FamilyId, now, cancellationToken).ConfigureAwait(false);
             return RefreshValidationResult.ReuseDetected();
+        }
+
+        var user = await IdentityScope.ResolveUserAsync(users, match.UserId, cancellationToken).ConfigureAwait(false);
+        if (user is null)
+        {
+            return RefreshValidationResult.Invalid();
         }
 
         if (match.ExpiresAt <= now)

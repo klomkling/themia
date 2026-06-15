@@ -1,7 +1,6 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Microsoft.Extensions.Logging;
 using Themia.Framework.Data.Abstractions.Auditing;
 using Themia.Framework.Data.Dapper.Mapping;
 using Themia.Modules.Identity.Abstractions;

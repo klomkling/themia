@@ -407,6 +407,26 @@ public abstract class IdentityStoreConformanceTests
     }
 
     [Fact]
+    public async Task Refresh_replay_after_owner_soft_deleted_still_revokes_family()
+    {
+        await ResetAsync();
+        await using var s = NewScope(new TenantId("acme"));
+        var u = await s.Users.CreateAsync("rt-deleted-reuse", "pw");
+        var issue = await s.RefreshTokens.IssueAsync(u.UserId!.Value);
+        var rotated = await s.RefreshTokens.ValidateAndRotateAsync(issue.RawToken); // consumes original
+        Assert.Equal(RefreshOutcome.Success, rotated.Outcome);
+
+        Assert.True(await s.Users.DeleteAsync(u.UserId!.Value)); // soft-delete the owner
+
+        // Replaying the consumed original must still be ReuseDetected (reuse-check precedes user resolution),
+        // and the successor's family is revoked.
+        var replay = await s.RefreshTokens.ValidateAndRotateAsync(issue.RawToken);
+        Assert.Equal(RefreshOutcome.ReuseDetected, replay.Outcome);
+        var successor = await s.RefreshTokens.ValidateAndRotateAsync(rotated.Replacement!.Value.RawToken);
+        Assert.Equal(RefreshOutcome.ReuseDetected, successor.Outcome);
+    }
+
+    [Fact]
     public async Task Revoke_unknown_token_is_a_safe_noop()
     {
         await ResetAsync();
