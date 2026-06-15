@@ -17,7 +17,8 @@ public sealed record RefreshRequest(string RefreshToken);
 
 /// <summary>Logout request body.</summary>
 /// <param name="RefreshToken">The opaque refresh token.</param>
-public sealed record LogoutRequest(string RefreshToken);
+/// <param name="All">When true, revoke all of the user's sessions; default false.</param>
+public sealed record LogoutRequest(string RefreshToken, bool All = false);
 
 /// <summary>Issued token pair response.</summary>
 /// <param name="AccessToken">The serialized JWT.</param>
@@ -66,9 +67,9 @@ public static class IdentityAuthEndpointRouteBuilderExtensions
         return Results.Ok(new AuthResponse(tokens.AccessToken, tokens.ExpiresInSeconds, tokens.RefreshToken));
     }
 
-    private static async Task<IResult> LogoutAsync(LogoutRequest request, IAuthenticationFlow flow, bool all = false, CancellationToken cancellationToken = default)
+    private static async Task<IResult> LogoutAsync(LogoutRequest request, IAuthenticationFlow flow, CancellationToken cancellationToken)
     {
-        await flow.LogoutAsync(request.RefreshToken, all, cancellationToken).ConfigureAwait(false);
+        await flow.LogoutAsync(request.RefreshToken, request.All, cancellationToken).ConfigureAwait(false);
         return Results.NoContent();
     }
 }

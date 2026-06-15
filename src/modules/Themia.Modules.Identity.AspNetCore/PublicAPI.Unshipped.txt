@@ -49,7 +49,9 @@ Themia.Modules.Identity.AspNetCore.Endpoints.RefreshRequest.RefreshRequest(strin
 Themia.Modules.Identity.AspNetCore.Endpoints.RefreshRequest.RefreshToken.get -> string!
 Themia.Modules.Identity.AspNetCore.Endpoints.RefreshRequest.RefreshToken.init -> void
 Themia.Modules.Identity.AspNetCore.Endpoints.LogoutRequest
-Themia.Modules.Identity.AspNetCore.Endpoints.LogoutRequest.LogoutRequest(string! RefreshToken) -> void
+Themia.Modules.Identity.AspNetCore.Endpoints.LogoutRequest.All.get -> bool
+Themia.Modules.Identity.AspNetCore.Endpoints.LogoutRequest.All.init -> void
+Themia.Modules.Identity.AspNetCore.Endpoints.LogoutRequest.LogoutRequest(string! RefreshToken, bool All = false) -> void
 Themia.Modules.Identity.AspNetCore.Endpoints.LogoutRequest.RefreshToken.get -> string!
 Themia.Modules.Identity.AspNetCore.Endpoints.LogoutRequest.RefreshToken.init -> void
 Themia.Modules.Identity.AspNetCore.Endpoints.AuthResponse

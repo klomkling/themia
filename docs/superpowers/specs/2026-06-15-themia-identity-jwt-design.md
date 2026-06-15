@@ -106,8 +106,8 @@ service layer (see below), matching the 0.5.0 child-table decision.
 - **Reuse-detection** — presenting an already-consumed or revoked token is treated as theft: revoke
   the entire `family_id` and reject. (Defends against a stolen refresh token replayed after the
   legitimate client already rotated.)
-- **Revocation** — `logout` revokes the presented token's family; `logout?all=true` revokes all
-  non-expired tokens for the user.
+- **Revocation** — `logout` revokes the presented token's family; `logout { all: true }` (body flag)
+  revokes all non-expired tokens for the user.
 
 **Tenant isolation (no `tenant_id` column).** Issue and redeem first resolve the owning user via
 `IdentityScope.ResolveUserAsync` (ambient tenant, else genuine platform user `TenantId == null`) — so
@@ -157,8 +157,8 @@ Opt-in minimal-API extension; host chooses the prefix (e.g. `app.MapGroup("/auth
 - **`POST refresh`** `{ refreshToken }` → `IAuthenticationFlow.RefreshAsync` (→
   `IRefreshTokenService.RotateAsync`). Success: new pair. `Invalid`/`ReuseDetected`/`Denied`: generic
   `401`.
-- **`POST logout`** `{ refreshToken }`, optional `?all=true` → `IAuthenticationFlow.LogoutAsync` →
-  revoke. Always `204` (idempotent; no existence signal).
+- **`POST logout`** `{ refreshToken, all? }` (optional body flag, default `false`) →
+  `IAuthenticationFlow.LogoutAsync` → revoke. Always `204` (idempotent; no existence signal).
 
 Responses are a small DTO (`{ accessToken, expiresIn, refreshToken }`); errors flow through the
 existing `Themia.AspNetCore` ProblemDetails middleware.
@@ -220,7 +220,7 @@ changes.
   the flow; default `AuthenticationHooksBase` no-ops don't alter the happy path.
 - **Integration (PG + SQL Server, `WebApplicationFactory` + Testcontainers, both data peers):**
   login → refresh → logout happy path; refresh replay after rotation → 401 + family revoked;
-  `logout?all=true` revokes all sessions; platform-user login when `AllowPlatformLogin = true`;
+  `logout { all: true }` revokes all sessions; platform-user login when `AllowPlatformLogin = true`;
   JwtBearer middleware populates `ICurrentUser` on an authenticated request.
 
 ## 10. Out of scope (deferred)

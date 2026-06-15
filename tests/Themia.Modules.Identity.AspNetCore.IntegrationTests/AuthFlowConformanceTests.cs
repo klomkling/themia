@@ -247,9 +247,10 @@ public abstract class AuthFlowConformanceTests : IAsyncLifetime
 
     private async Task<HttpStatusCode> LogoutAsync(string refreshToken, bool all = false)
     {
-        var url = all ? "/auth/logout?all=true" : "/auth/logout";
-        var response = await _client!.PostAsJsonAsync(
-            url, new { RefreshToken = refreshToken }, JsonOpts);
+        var body = all
+            ? (object)new { RefreshToken = refreshToken, All = true }
+            : new { RefreshToken = refreshToken };
+        var response = await _client!.PostAsJsonAsync("/auth/logout", body, JsonOpts);
         return response.StatusCode;
     }
 
@@ -294,7 +295,7 @@ public abstract class AuthFlowConformanceTests : IAsyncLifetime
         Assert.False(string.IsNullOrEmpty(refreshBody.RefreshToken));
         Assert.NotEqual(firstRefreshToken, refreshBody.RefreshToken);
 
-        // Logout with the rotated token → 204 (no ?all query string; exercises the optional default).
+        // Logout with the rotated token → 204 (no "all" flag in body; exercises the optional default).
         var logoutStatus = await LogoutAsync(refreshBody.RefreshToken);
         Assert.Equal(HttpStatusCode.NoContent, logoutStatus);
 

@@ -61,8 +61,7 @@ public sealed class AuthenticationFlow : IAuthenticationFlow
         await hooks.OnBeforeLoginAsync(before, cancellationToken).ConfigureAwait(false);
         if (before.IsDenied)
         {
-            logger.LogWarning("Login denied by hook for {UserName}: {DenialReason}.", userName, before.DenialReason);
-            return await FailAsync(userName, LoginFailureReason.Denied, LoginResult.Denied(), cancellationToken).ConfigureAwait(false);
+            return await FailAsync(userName, LoginFailureReason.Denied, LoginResult.Denied(), cancellationToken, before.DenialReason).ConfigureAwait(false);
         }
 
         var verification = await users.VerifyPasswordAsync(userName, password, cancellationToken).ConfigureAwait(false);
@@ -91,8 +90,7 @@ public sealed class AuthenticationFlow : IAuthenticationFlow
         await hooks.OnLoginSucceededAsync(succeeded, cancellationToken).ConfigureAwait(false);
         if (succeeded.IsDenied)
         {
-            logger.LogWarning("Login denied by hook for {UserName}: {DenialReason}.", userName, succeeded.DenialReason);
-            return await FailAsync(userName, LoginFailureReason.Denied, LoginResult.Denied(), cancellationToken).ConfigureAwait(false);
+            return await FailAsync(userName, LoginFailureReason.Denied, LoginResult.Denied(), cancellationToken, succeeded.DenialReason).ConfigureAwait(false);
         }
 
         var tokens = await IssueAsync(user, cancellationToken).ConfigureAwait(false);
@@ -114,17 +112,13 @@ public sealed class AuthenticationFlow : IAuthenticationFlow
         }
 
         var rotation = await refreshTokens.ValidateAndRotateAsync(refreshToken, cancellationToken).ConfigureAwait(false);
-        switch (rotation.Outcome)
-        {
-            case RefreshOutcome.ReuseDetected:
-                return RefreshRotationResult.ReuseDetected();
-            case RefreshOutcome.Invalid:
-                return RefreshRotationResult.Invalid();
-        }
-
         if (!rotation.TryGetSuccess(out var user, out var replacement))
         {
-            return RefreshRotationResult.Invalid();
+            return rotation.Outcome switch
+            {
+                RefreshOutcome.ReuseDetected => RefreshRotationResult.ReuseDetected(),
+                _ => RefreshRotationResult.Invalid(),
+            };
         }
         var principal = await principalFactory.CreateAsync(user, AuthenticationType, cancellationToken).ConfigureAwait(false);
         var access = accessTokens.Issue(principal);
@@ -161,9 +155,17 @@ public sealed class AuthenticationFlow : IAuthenticationFlow
         return new AuthTokens(access.Token, ExpiresInSeconds(access.ExpiresAt), refresh.RawToken);
     }
 
-    private async Task<LoginResult> FailAsync(string userName, LoginFailureReason reason, LoginResult result, CancellationToken cancellationToken)
+    private async Task<LoginResult> FailAsync(string userName, LoginFailureReason reason, LoginResult result, CancellationToken cancellationToken, string? denialReason = null)
     {
-        logger.LogWarning("Login failed for {UserName}: {Reason}.", userName, reason);
+        if (denialReason is null)
+        {
+            logger.LogWarning("Login failed for {UserName}: {Reason}.", userName, reason);
+        }
+        else
+        {
+            logger.LogWarning("Login failed for {UserName}: {Reason} ({DenialReason}).", userName, reason, denialReason);
+        }
+
         await hooks.OnLoginFailedAsync(new LoginFailedContext(userName, reason), cancellationToken).ConfigureAwait(false);
         return result;
     }
