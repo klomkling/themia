@@ -44,6 +44,14 @@ public sealed class EfRepository<T, TKey>(ThemiaDbContext context, IDataFilterSc
         ArgumentNullException.ThrowIfNull(specification);
         ArgumentNullException.ThrowIfNull(set);
 
+        // Validate the setters once up front against a counting collector — this enforces the same empty-setter
+        // and direct-property-access contract as the Dapper peer (identical failure for identical misuse), before
+        // any SQL is emitted. The real EF update below re-invokes set against the live UpdateSettersBuilder.
+        var counter = new CountingBulkUpdateSetters();
+        set(counter);
+        if (counter.Count == 0)
+            throw new InvalidOperationException("UpdateWhereAsync requires at least one Set(...) call.");
+
         // Build the WHERE from the normal read path (criteria + tenant global query filter, with
         // WithoutTenantFilter honoured), then translate the collected setters straight onto EF's
         // UpdateSettersBuilder. The tenant predicate is thus part of the emitted UPDATE by construction.
@@ -52,12 +60,13 @@ public sealed class EfRepository<T, TKey>(ThemiaDbContext context, IDataFilterSc
             cancellationToken).ConfigureAwait(false);
 
         // ExecuteUpdate writes straight to the database and does NOT touch the change tracker, so any
-        // T already tracked in this scope still holds its pre-update column values. Detach them so a
-        // later read in the same scope re-queries the DB and observes the bulk write (the Dapper peer,
-        // which has no tracker, always re-queries). Inserts (Added) are left alone so a not-yet-flushed
-        // staged insert in the same UoW isn't lost.
+        // T already tracked in this scope still holds its pre-update column values. Detach ONLY the
+        // Unchanged entries: a later read in the same scope then re-queries the DB and observes the bulk
+        // write (the Dapper peer, which has no tracker, always re-queries). Modified (the caller's pending
+        // edit) and Added (staged inserts) are deliberately preserved so a caller's un-saved intent is
+        // never silently dropped — their later SaveChanges wins for that row (last-writer EF semantics).
         foreach (var entry in Context.ChangeTracker.Entries<T>())
-            if (entry.State is EntityState.Unchanged or EntityState.Modified)
+            if (entry.State is EntityState.Unchanged)
                 entry.State = EntityState.Detached;
 
         return affected;
@@ -71,6 +80,21 @@ public sealed class EfRepository<T, TKey>(ThemiaDbContext context, IDataFilterSc
         public IBulkUpdateSetters<T> Set<TProperty>(Expression<Func<T, TProperty>> property, TProperty value)
         {
             builder.SetProperty(property, value);
+            return this;
+        }
+    }
+
+    // Dry-run collector used to validate the setters before SQL is emitted: counts the Set(...) calls and
+    // routes each expression through the shared helper so a non-member-access setter fails with the same
+    // uniform ArgumentException as the Dapper/fake peers.
+    private sealed class CountingBulkUpdateSetters : IBulkUpdateSetters<T>
+    {
+        public int Count { get; private set; }
+
+        public IBulkUpdateSetters<T> Set<TProperty>(Expression<Func<T, TProperty>> property, TProperty value)
+        {
+            BulkUpdateSetters.MemberName(property);
+            Count++;
             return this;
         }
     }

@@ -67,17 +67,9 @@ internal sealed class DapperRepository<T, TKey>(
 
         public IBulkUpdateSetters<T> Set<TProperty>(Expression<Func<T, TProperty>> property, TProperty value)
         {
-            Values[map.Column(PropertyNameOf(property))] = value;
+            // Shared helper so an invalid setter expression fails identically across every peer.
+            Values[map.Column(BulkUpdateSetters.MemberName(property))] = value;
             return this;
-        }
-
-        // Peels a Convert wrapper (boxing of value types into the Func<T,object?> shape) and reads the member.
-        private static string PropertyNameOf<TProperty>(Expression<Func<T, TProperty>> property)
-        {
-            var body = property.Body is UnaryExpression { NodeType: ExpressionType.Convert } u ? u.Operand : property.Body;
-            return body is MemberExpression member
-                ? member.Member.Name
-                : throw new ArgumentException($"Set expression '{property}' must be a direct property access.", nameof(property));
         }
     }
 }

@@ -20,12 +20,13 @@ public interface IRepository<T, in TKey> : IReadRepository<T, TKey> where T : cl
     /// ambient transaction when one is open.
     /// </summary>
     /// <remarks>
-    /// Bypasses change tracking, audit stamping and soft-delete interception: it writes only the columns named
-    /// in <paramref name="set"/>. Use it for direct column writes (e.g. flag/timestamp flips); callers that need
-    /// audit/soft-delete semantics must load and <see cref="Update"/> entities instead.
-    /// In the EF Core peer, tracked entities of <typeparamref name="T"/> in the current context are detached after
-    /// the write so subsequent reads observe the bulk update; any unsaved in-memory modification on such a tracked
-    /// entity is therefore discarded.
+    /// Bypasses change tracking and audit stamping — it writes only the columns named in <paramref name="set"/>.
+    /// Soft-deleted rows are still excluded from the target set (the read path's soft-delete filter is applied to
+    /// the WHERE). Use it for direct column writes (e.g. flag/timestamp flips); callers that need audit/soft-delete
+    /// stamping must load and <see cref="Update"/> entities instead.
+    /// In the EF Core peer, only <em>Unchanged</em> tracked entities of <typeparamref name="T"/> are detached after
+    /// the write so subsequent reads observe the bulk update; staged inserts (Added) and pending in-memory
+    /// modifications (Modified) are preserved, so a caller's un-saved intent is never silently dropped.
     /// </remarks>
     /// <returns>The number of rows updated.</returns>
     Task<int> UpdateWhereAsync(

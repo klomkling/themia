@@ -75,6 +75,8 @@ internal sealed class FakeRepository<T>(List<T> store, Func<T, Guid> idSelector)
         // then write each named property directly on the matched instances.
         var setters = new FakeBulkUpdateSetters();
         set(setters);
+        if (setters.Assignments.Count == 0)
+            throw new InvalidOperationException("UpdateWhereAsync requires at least one Set(...) call.");
 
         var matched = Query(specification).ToList();
         foreach (var entity in matched)
@@ -93,8 +95,11 @@ internal sealed class FakeRepository<T>(List<T> store, Func<T, Guid> idSelector)
 
         public IBulkUpdateSetters<T> Set<TProperty>(Expression<Func<T, TProperty>> property, TProperty value)
         {
-            var body = property.Body is UnaryExpression { NodeType: ExpressionType.Convert } u ? u.Operand : property.Body;
-            var member = (PropertyInfo)((MemberExpression)body).Member;
+            // Shared helper: a non-member-access expression fails with the same uniform ArgumentException as the
+            // real peers. The resolved name maps back to the PropertyInfo for the in-memory write.
+            var name = BulkUpdateSetters.MemberName(property);
+            var member = typeof(T).GetProperty(name)
+                ?? throw new ArgumentException($"Property '{name}' not found on {typeof(T).Name}.", nameof(property));
             Assignments.Add((member, value));
             return this;
         }
