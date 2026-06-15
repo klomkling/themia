@@ -46,4 +46,12 @@ public sealed class JwtOptionsTests
         options.AccessTokenLifetime = TimeSpan.Zero;
         Assert.Throws<ArgumentOutOfRangeException>(options.Validate);
     }
+
+    [Fact]
+    public void Validate_rejects_negative_clock_skew()
+    {
+        var options = Valid();
+        options.ClockSkew = TimeSpan.FromSeconds(-1);
+        Assert.Throws<ArgumentOutOfRangeException>(options.Validate);
+    }
 }
