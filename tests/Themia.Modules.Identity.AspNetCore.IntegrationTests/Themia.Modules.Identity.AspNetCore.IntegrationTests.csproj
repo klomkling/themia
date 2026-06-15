@@ -19,6 +19,7 @@
     <PackageReference Include="Microsoft.Extensions.Configuration" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+    <PackageReference Include="Microsoft.AspNetCore.TestHost" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/modules/Themia.Modules.Identity.AspNetCore/Themia.Modules.Identity.AspNetCore.csproj" />
