@@ -32,7 +32,7 @@ public sealed class RefreshToken
     /// <summary>Issue time, set by the service via <see cref="TimeProvider"/> (forensics).</summary>
     public DateTimeOffset CreatedAt { get; set; }
 
-    /// <summary>Assigns the client-generated identifier.</summary>
-    /// <param name="id">A UUIDv7.</param>
+    /// <summary>Assigns the identifier for a new (transient) token.</summary>
+    /// <param name="id">A client-generated identifier.</param>
     public void SetId(Guid id) => Id = id;
 }

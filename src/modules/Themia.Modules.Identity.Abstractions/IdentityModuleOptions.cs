@@ -27,8 +27,8 @@ public sealed class IdentityModuleOptions
     /// first wrong password). Called once at registration so a misconfiguration fails fast at startup.
     /// </summary>
     /// <exception cref="ArgumentOutOfRangeException">
-    /// <see cref="MaxFailedAccessAttempts"/> is below 1, or <see cref="LockoutDuration"/> or
-    /// <see cref="DefaultTokenLifetime"/> is not strictly positive.
+    /// <see cref="MaxFailedAccessAttempts"/> is below 1, or <see cref="LockoutDuration"/>,
+    /// <see cref="DefaultTokenLifetime"/>, or <see cref="RefreshTokenLifetime"/> is not strictly positive.
     /// </exception>
     /// <exception cref="ArgumentException"><see cref="ConnectionStringName"/> is null, empty, or whitespace.</exception>
     public void Validate()
