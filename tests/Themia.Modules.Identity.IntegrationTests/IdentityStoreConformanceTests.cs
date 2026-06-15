@@ -287,7 +287,7 @@ public abstract class IdentityStoreConformanceTests
     }
 
     [Fact]
-    public async Task Refresh_issue_persists_hash_not_raw_and_returns_family()
+    public async Task Refresh_issue_returns_raw_token_family_and_expiry()
     {
         await ResetAsync();
         await using var s = NewScope(new TenantId("acme"));

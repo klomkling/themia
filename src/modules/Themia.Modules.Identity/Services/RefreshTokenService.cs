@@ -74,6 +74,8 @@ public sealed class RefreshTokenService : IRefreshTokenService
 
         var now = timeProvider.GetUtcNow();
 
+        // Reuse check precedes expiry on purpose: a consumed/revoked token replayed by a thief must
+        // revoke the family even if it has since expired.
         if (match.ConsumedAt is not null || match.RevokedAt is not null)
         {
             await RevokeFamilyAsync(match.FamilyId, now, cancellationToken).ConfigureAwait(false);
