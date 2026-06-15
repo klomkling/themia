@@ -26,12 +26,13 @@ public sealed class AccessTokenServiceTests
         new(new ClaimsIdentity(claims, "Bearer", ClaimTypes.Name, ClaimTypes.Role));
 
     [Fact]
-    public async Task Issue_emits_a_validatable_jwt_with_issuer_audience_and_subject()
+    public async Task Issue_emits_a_validatable_jwt_with_standard_sub_name_and_role_claims()
     {
         var time = new FakeTimeProvider(DateTimeOffset.Parse("2026-06-15T00:00:00Z"));
         var service = NewService(time);
         var principal = Principal(
             new Claim(ClaimTypes.NameIdentifier, "11111111-1111-1111-1111-111111111111"),
+            new Claim(ClaimTypes.Name, "alice"),
             new Claim(ClaimTypes.Role, "admin"));
 
         var token = service.Issue(principal);
@@ -47,9 +48,16 @@ public sealed class AccessTokenServiceTests
 
         Assert.True(result.IsValid);
         Assert.Equal(token.ExpiresAt, time.GetUtcNow().Add(Options.AccessTokenLifetime));
+
+        // The wire format uses standard short claim names, not the long .NET ClaimTypes URIs.
         var jwt = (JsonWebToken)result.SecurityToken;
-        Assert.Equal("11111111-1111-1111-1111-111111111111", jwt.GetClaim(ClaimTypes.NameIdentifier).Value);
-        Assert.Contains(jwt.Claims, c => c.Type == ClaimTypes.Role && c.Value == "admin");
+        Assert.Equal("11111111-1111-1111-1111-111111111111", jwt.GetClaim("sub").Value);
+        Assert.Equal("alice", jwt.GetClaim("name").Value);
+        Assert.Contains(jwt.Claims, c => c.Type == "role" && c.Value == "admin");
+
+        // The long .NET URIs must NOT appear on the wire (no double "sub"/NameIdentifier).
+        Assert.DoesNotContain(jwt.Claims, c => c.Type == ClaimTypes.NameIdentifier);
+        Assert.DoesNotContain(jwt.Claims, c => c.Type == ClaimTypes.Role);
     }
 
     [Fact]

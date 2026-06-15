@@ -1,8 +1,10 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Security.Claims;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -12,6 +14,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.IdentityModel.JsonWebTokens;
 using Themia.AspNetCore;
 using Themia.Framework.Core.Abstractions.Tenancy;
 using Themia.Framework.Data.Abstractions.Auditing;
@@ -157,6 +160,11 @@ public abstract class AuthFlowConformanceTests : IAsyncLifetime
                         endpoints.MapGet("/me", (ICurrentUser u) =>
                                 Results.Ok(new MeResponse(u.UserId, u.IsAuthenticated)))
                             .RequireAuthorization();
+
+                        // Role-gated probe: proves [Authorize(Roles)] works through the short-claim
+                        // JWT + the OnTokenValidated remap to ClaimTypes.Role.
+                        endpoints.MapGet("/admin", () => Results.Ok())
+                            .RequireAuthorization(p => p.RequireRole("admin"));
                     });
                 });
             })
@@ -218,6 +226,36 @@ public abstract class AuthFlowConformanceTests : IAsyncLifetime
         return user!.Id;
     }
 
+    /// <summary>Creates (if needed) a role in the fixed tenant and assigns it to the user.</summary>
+    private async Task AssignRoleAsync(Guid userId, string roleName)
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ConnectionStrings:Default"] = ConnectionString,
+            })
+            .Build();
+
+        var services = new ServiceCollection();
+        services.AddSingleton<IConfiguration>(configuration);
+        services.AddScoped<ITenantContext>(_ => new TenantContext(new TenantId(FixedTenantId)));
+        ConfigurePeer(services, configuration);
+        services.AddThemiaIdentityServices(o => o.AllowPlatformLogin = false);
+        services.RemoveAll<ICurrentUserAccessor>();
+        services.AddSingleton<ICurrentUserAccessor>(new FixedCurrentUserAccessor("seed-user"));
+
+        await using var provider = services.BuildServiceProvider();
+        await using var scope = provider.CreateAsyncScope();
+        var roles = scope.ServiceProvider.GetRequiredService<IRoleService>();
+
+        var roleId = await roles.CreateAsync(roleName)
+            ?? (await roles.FindByNameAsync(roleName))!.Id;
+        if (!await roles.AssignRoleAsync(userId, roleId))
+        {
+            throw new InvalidOperationException($"Assigning role '{roleName}' to user '{userId}' failed.");
+        }
+    }
+
     // ── HTTP helpers ─────────────────────────────────────────────────────────
 
     private async Task<(HttpStatusCode Status, AuthResponse? Body)> LoginAsync(
@@ -269,6 +307,15 @@ public abstract class AuthFlowConformanceTests : IAsyncLifetime
             body = await response.Content.ReadFromJsonAsync<MeResponse>(JsonOpts);
         }
         return (response.StatusCode, body);
+    }
+
+    private async Task<HttpStatusCode> GetWithBearerAsync(string path, string bearerToken)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Get, path);
+        request.Headers.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", bearerToken);
+        var response = await _client!.SendAsync(request);
+        return response.StatusCode;
     }
 
     // ── Tests ────────────────────────────────────────────────────────────────
@@ -459,6 +506,48 @@ public abstract class AuthFlowConformanceTests : IAsyncLifetime
         // GET /me with no token → 401.
         var (noTokenStatus, _) = await GetMeAsync();
         Assert.Equal(HttpStatusCode.Unauthorized, noTokenStatus);
+    }
+
+    [Fact]
+    public async Task Access_token_uses_standard_sub_claim_not_dotnet_uri()
+    {
+        await ResetAsync();
+        var userId = await SeedTenantUserAsync("frank", "Pass1234!");
+
+        var (_, loginBody) = await LoginAsync("frank", "Pass1234!");
+        Assert.NotNull(loginBody);
+
+        // The minted access token must carry the external-standard "sub" claim equal to the user id,
+        // and must NOT carry the long .NET ClaimTypes.NameIdentifier URI.
+        var jwt = new JsonWebTokenHandler().ReadJsonWebToken(loginBody.AccessToken);
+        Assert.Equal(userId.ToString(), jwt.GetClaim("sub").Value);
+        Assert.DoesNotContain(jwt.Claims, c => c.Type == ClaimTypes.NameIdentifier);
+    }
+
+    [Fact]
+    public async Task Role_gated_endpoint_authorizes_via_short_claim_jwt()
+    {
+        await ResetAsync();
+
+        // Admin member: seed user, grant "admin" role.
+        var adminId = await SeedTenantUserAsync("grace", "Pass1234!");
+        await AssignRoleAsync(adminId, "admin");
+        var (_, adminLogin) = await LoginAsync("grace", "Pass1234!");
+        Assert.NotNull(adminLogin);
+
+        // Non-member: seed user with no roles.
+        await SeedTenantUserAsync("heidi", "Pass1234!", email: "heidi@example.com");
+        var (_, nonMemberLogin) = await LoginAsync("heidi", "Pass1234!");
+        Assert.NotNull(nonMemberLogin);
+
+        // Admin bearer → 200 (the short "role" claim was remapped to ClaimTypes.Role on validation,
+        // so [Authorize(Roles="admin")] / RequireRole("admin") is satisfied).
+        var adminStatus = await GetWithBearerAsync("/admin", adminLogin.AccessToken);
+        Assert.Equal(HttpStatusCode.OK, adminStatus);
+
+        // Non-member bearer → 403.
+        var nonMemberStatus = await GetWithBearerAsync("/admin", nonMemberLogin.AccessToken);
+        Assert.Equal(HttpStatusCode.Forbidden, nonMemberStatus);
     }
 }
 

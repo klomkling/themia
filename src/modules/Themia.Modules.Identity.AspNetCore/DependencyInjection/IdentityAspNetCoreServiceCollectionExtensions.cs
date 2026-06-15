@@ -93,8 +93,51 @@ public static class IdentityAspNetCoreServiceCollectionExtensions
                     NameClaimType = ClaimTypes.Name,
                     RoleClaimType = ClaimTypes.Role,
                 };
+
+                // Tokens carry standard short claim names (sub/name/role) on the wire. After
+                // validation, re-add the long ClaimTypes.* claims so the bearer principal matches the
+                // cookie principal shape and ICurrentUser/[Authorize(Roles)]/the audit accessor work
+                // unchanged. The namespaced Themia claims (themia:tenant_id, themia:is_platform, …)
+                // pass through verbatim and need no remap. Chain onto any existing handler instead of
+                // clobbering it.
+                bearer.Events ??= new JwtBearerEvents();
+                var inner = bearer.Events.OnTokenValidated;
+                bearer.Events.OnTokenValidated = async context =>
+                {
+                    AddLongClaims(context);
+                    if (inner is not null)
+                    {
+                        await inner(context).ConfigureAwait(false);
+                    }
+                };
             });
 
         return builder;
+    }
+
+    private static void AddLongClaims(TokenValidatedContext context)
+    {
+        if (context.Principal?.Identity is not ClaimsIdentity identity)
+        {
+            return;
+        }
+
+        Mirror(identity, JwtClaimNames.Subject, ClaimTypes.NameIdentifier);
+        Mirror(identity, JwtClaimNames.Name, ClaimTypes.Name);
+        Mirror(identity, JwtClaimNames.Role, ClaimTypes.Role);
+    }
+
+    /// <summary>Adds a <paramref name="longType"/> claim for each <paramref name="shortType"/> claim,
+    /// skipping values already present under the long type (idempotent — guards against double-add).</summary>
+    private static void Mirror(ClaimsIdentity identity, string shortType, string longType)
+    {
+        var existing = identity.FindAll(longType).Select(c => c.Value).ToHashSet(StringComparer.Ordinal);
+        foreach (var claim in identity.FindAll(shortType).ToList())
+        {
+            if (existing.Add(claim.Value))
+            {
+                identity.AddClaim(new Claim(longType, claim.Value, claim.ValueType, claim.Issuer));
+            }
+        }
     }
 }
