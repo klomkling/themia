@@ -386,6 +386,47 @@ public abstract class AuthFlowConformanceTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Login_with_blank_username_returns_400()
+    {
+        await ResetAsync();
+
+        // A blank required field is malformed input → 400 (not 500 from a guard, not 401).
+        var response = await _client!.PostAsJsonAsync(
+            "/auth/login", new { UserName = "", Password = "Pass1234!" }, JsonOpts);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Login_with_blank_password_returns_400()
+    {
+        await ResetAsync();
+
+        var response = await _client!.PostAsJsonAsync(
+            "/auth/login", new { UserName = "alice", Password = "" }, JsonOpts);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Refresh_with_blank_token_returns_400()
+    {
+        await ResetAsync();
+
+        var response = await _client!.PostAsJsonAsync(
+            "/auth/refresh", new { RefreshToken = "" }, JsonOpts);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Logout_with_blank_token_returns_400()
+    {
+        await ResetAsync();
+
+        var response = await _client!.PostAsJsonAsync(
+            "/auth/logout", new { RefreshToken = "" }, JsonOpts);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
     public async Task Platform_user_can_log_in_when_allowed()
     {
         await ResetAsync();

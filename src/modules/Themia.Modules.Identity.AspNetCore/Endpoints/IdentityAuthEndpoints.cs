@@ -49,6 +49,14 @@ public static class IdentityAuthEndpointRouteBuilderExtensions
 
     private static async Task<IResult> LoginAsync(LoginRequest request, IAuthenticationFlow flow, CancellationToken cancellationToken)
     {
+        // Boundary validation: a missing/blank credential is malformed input (400), not an auth
+        // failure (401). An empty field is not an account-existence oracle, so this is not an
+        // enumeration signal — actual credential failures still flow through to the uniform 401 below.
+        if (request is null || string.IsNullOrWhiteSpace(request.UserName) || string.IsNullOrWhiteSpace(request.Password))
+        {
+            throw new ValidationException(nameof(LoginRequest), "User name and password are required.");
+        }
+
         var result = await flow.LoginAsync(request.UserName, request.Password, cancellationToken).ConfigureAwait(false);
         if (!result.TryGetTokens(out var tokens))
         {
@@ -59,6 +67,11 @@ public static class IdentityAuthEndpointRouteBuilderExtensions
 
     private static async Task<IResult> RefreshAsync(RefreshRequest request, IAuthenticationFlow flow, CancellationToken cancellationToken)
     {
+        if (request is null || string.IsNullOrWhiteSpace(request.RefreshToken))
+        {
+            throw new ValidationException(nameof(RefreshRequest), "Refresh token is required.");
+        }
+
         var result = await flow.RefreshAsync(request.RefreshToken, cancellationToken).ConfigureAwait(false);
         if (!result.TryGetTokens(out var tokens))
         {
@@ -69,6 +82,11 @@ public static class IdentityAuthEndpointRouteBuilderExtensions
 
     private static async Task<IResult> LogoutAsync(LogoutRequest request, IAuthenticationFlow flow, CancellationToken cancellationToken)
     {
+        if (request is null || string.IsNullOrWhiteSpace(request.RefreshToken))
+        {
+            throw new ValidationException(nameof(LogoutRequest), "Refresh token is required.");
+        }
+
         await flow.LogoutAsync(request.RefreshToken, request.All, cancellationToken).ConfigureAwait(false);
         return Results.NoContent();
     }

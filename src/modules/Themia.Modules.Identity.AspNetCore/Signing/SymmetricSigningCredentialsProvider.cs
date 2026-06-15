@@ -8,6 +8,7 @@ namespace Themia.Modules.Identity.AspNetCore.Signing;
 public sealed class SymmetricSigningCredentialsProvider : IJwtSigningCredentialsProvider
 {
     private readonly SymmetricSecurityKey key;
+    private readonly SigningCredentials signingCredentials;
 
     /// <summary>Creates the provider from validated options.</summary>
     /// <param name="options">The JWT options carrying the signing key.</param>
@@ -15,10 +16,11 @@ public sealed class SymmetricSigningCredentialsProvider : IJwtSigningCredentials
     {
         ArgumentNullException.ThrowIfNull(options);
         key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(options.SigningKey));
+        signingCredentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
     }
 
     /// <inheritdoc />
-    public SigningCredentials SigningCredentials => new(key, SecurityAlgorithms.HmacSha256);
+    public SigningCredentials SigningCredentials => signingCredentials;
 
     /// <inheritdoc />
     public SecurityKey ValidationKey => key;
