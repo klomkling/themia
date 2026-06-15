@@ -1,1 +1,14 @@
 #nullable enable
+Themia.Modules.Identity.AspNetCore.Options.JwtOptions
+Themia.Modules.Identity.AspNetCore.Options.JwtOptions.JwtOptions() -> void
+Themia.Modules.Identity.AspNetCore.Options.JwtOptions.AccessTokenLifetime.get -> System.TimeSpan
+Themia.Modules.Identity.AspNetCore.Options.JwtOptions.AccessTokenLifetime.set -> void
+Themia.Modules.Identity.AspNetCore.Options.JwtOptions.Audience.get -> string!
+Themia.Modules.Identity.AspNetCore.Options.JwtOptions.Audience.set -> void
+Themia.Modules.Identity.AspNetCore.Options.JwtOptions.ClockSkew.get -> System.TimeSpan
+Themia.Modules.Identity.AspNetCore.Options.JwtOptions.ClockSkew.set -> void
+Themia.Modules.Identity.AspNetCore.Options.JwtOptions.Issuer.get -> string!
+Themia.Modules.Identity.AspNetCore.Options.JwtOptions.Issuer.set -> void
+Themia.Modules.Identity.AspNetCore.Options.JwtOptions.SigningKey.get -> string!
+Themia.Modules.Identity.AspNetCore.Options.JwtOptions.SigningKey.set -> void
+Themia.Modules.Identity.AspNetCore.Options.JwtOptions.Validate() -> void
