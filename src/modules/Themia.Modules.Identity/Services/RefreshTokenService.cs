@@ -128,14 +128,13 @@ public sealed class RefreshTokenService : IRefreshTokenService
         var now = timeProvider.GetUtcNow();
         if (allForUser)
         {
-            var active = await tokens.ListAsync(new ActiveRefreshTokensByUserSpec(match.UserId, now), cancellationToken).ConfigureAwait(false);
-            foreach (var t in active)
-            {
-                t.RevokedAt = now;
-                tokens.Update(t);
-            }
-            logger.LogInformation("Revoked all active refresh tokens for user {UserId} ({Count} tokens).", match.UserId, active.Count);
-            await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+            // One set-based UPDATE over the user's active tokens (the spec already filters
+            // RevokedAt == null && ExpiresAt > now), instead of loading-and-stamping each row.
+            var revoked = await tokens.UpdateWhereAsync(
+                new ActiveRefreshTokensByUserSpec(match.UserId, now),
+                set => set.Set(t => t.RevokedAt, now),
+                cancellationToken).ConfigureAwait(false);
+            logger.LogInformation("Revoked all active refresh tokens for user {UserId} ({Count} tokens).", match.UserId, revoked);
         }
         else
         {
@@ -145,15 +144,12 @@ public sealed class RefreshTokenService : IRefreshTokenService
 
     private async Task RevokeFamilyAsync(Guid familyId, DateTimeOffset now, CancellationToken cancellationToken)
     {
-        foreach (var t in await tokens.ListAsync(new RefreshTokensByFamilySpec(familyId), cancellationToken).ConfigureAwait(false))
-        {
-            if (t.RevokedAt is null)
-            {
-                t.RevokedAt = now;
-                tokens.Update(t);
-            }
-        }
-        await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        // One set-based UPDATE over the family's not-yet-revoked tokens — the spec's RevokedAt == null
+        // predicate means already-revoked rows are not needlessly rewritten.
+        await tokens.UpdateWhereAsync(
+            new ActiveRefreshTokensByFamilySpec(familyId),
+            set => set.Set(t => t.RevokedAt, now),
+            cancellationToken).ConfigureAwait(false);
     }
 
     private (RefreshToken Entity, string Raw) Create(Guid userId, Guid familyId)

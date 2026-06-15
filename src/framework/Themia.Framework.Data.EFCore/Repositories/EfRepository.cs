@@ -1,6 +1,10 @@
+using System.Linq.Expressions;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Query;
 using Themia.Framework.Core.Abstractions.Tenancy;
 using Themia.Framework.Data.Abstractions.Filtering;
 using Themia.Framework.Data.Abstractions.Repositories;
+using Themia.Framework.Data.Abstractions.Specifications;
 
 namespace Themia.Framework.Data.EFCore.Repositories;
 
@@ -30,4 +34,44 @@ public sealed class EfRepository<T, TKey>(ThemiaDbContext context, IDataFilterSc
 
     /// <inheritdoc />
     public void Remove(T entity) => Context.Set<T>().Remove(entity);   // ThemiaDbContext converts to soft-delete on SaveChanges
+
+    /// <inheritdoc />
+    public async Task<int> UpdateWhereAsync(
+        ISpecification<T> specification,
+        Action<IBulkUpdateSetters<T>> set,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(specification);
+        ArgumentNullException.ThrowIfNull(set);
+
+        // Build the WHERE from the normal read path (criteria + tenant global query filter, with
+        // WithoutTenantFilter honoured), then translate the collected setters straight onto EF's
+        // UpdateSettersBuilder. The tenant predicate is thus part of the emitted UPDATE by construction.
+        var affected = await CountQuery(specification).ExecuteUpdateAsync(
+            builder => set(new EfBulkUpdateSetters(builder)),
+            cancellationToken).ConfigureAwait(false);
+
+        // ExecuteUpdate writes straight to the database and does NOT touch the change tracker, so any
+        // T already tracked in this scope still holds its pre-update column values. Detach them so a
+        // later read in the same scope re-queries the DB and observes the bulk write (the Dapper peer,
+        // which has no tracker, always re-queries). Inserts (Added) are left alone so a not-yet-flushed
+        // staged insert in the same UoW isn't lost.
+        foreach (var entry in Context.ChangeTracker.Entries<T>())
+            if (entry.State is EntityState.Unchanged or EntityState.Modified)
+                entry.State = EntityState.Detached;
+
+        return affected;
+    }
+
+    // Adapts the provider-agnostic IBulkUpdateSetters onto EF Core's UpdateSettersBuilder. Each Set
+    // forwards to SetProperty(property, value) — the constant-value overload — so no expression trees
+    // are hand-built. Returns itself for chaining.
+    private sealed class EfBulkUpdateSetters(UpdateSettersBuilder<T> builder) : IBulkUpdateSetters<T>
+    {
+        public IBulkUpdateSetters<T> Set<TProperty>(Expression<Func<T, TProperty>> property, TProperty value)
+        {
+            builder.SetProperty(property, value);
+            return this;
+        }
+    }
 }

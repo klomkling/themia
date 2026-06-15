@@ -78,7 +78,9 @@ public class EfReadRepository<T, TKey>(ThemiaDbContext context, IDataFilterScope
         return new PagedResult<T>(items, total, spec.Skip, spec.Take);
     }
 
-    private IQueryable<T> CountQuery(ISpecification<T> spec)
+    // The spec's criteria + tenant scope (the same WHERE the read path applies), without ordering or paging.
+    // Used by Count and by the set-based UpdateWhere, which must target rows by predicate, not by page.
+    private protected IQueryable<T> CountQuery(ISpecification<T> spec)
     {
         IQueryable<T> q = Context.Set<T>();
         if (spec.IgnoreTenantFilter || filterScope.IsTenantFilterBypassed) q = WithSoftDeleteOnly(q);

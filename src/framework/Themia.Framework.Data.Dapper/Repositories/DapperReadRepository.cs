@@ -29,7 +29,7 @@ internal class DapperReadRepository<T, TKey>(
 
     // Seeds a query with the tenant predicate + soft-delete filter. The tenant predicate is omitted when
     // either the ambient scope bypasses it or the spec opts out (ignoreTenantFilter); soft-delete always stays.
-    private Query Seeded(bool ignoreTenantFilter)
+    private protected Query Seeded(bool ignoreTenantFilter)
     {
         var map = Map;
         var q = new Query(map.Table);

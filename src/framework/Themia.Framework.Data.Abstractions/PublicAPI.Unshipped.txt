@@ -51,6 +51,8 @@ Themia.Framework.Data.Abstractions.Filtering.DataFilterScope.IsTenantFilterBypas
 Themia.Framework.Data.Abstractions.Filtering.IDataFilterScope
 Themia.Framework.Data.Abstractions.Filtering.IDataFilterScope.BypassTenantFilter() -> System.IDisposable!
 Themia.Framework.Data.Abstractions.Filtering.IDataFilterScope.IsTenantFilterBypassed.get -> bool
+Themia.Framework.Data.Abstractions.Repositories.IBulkUpdateSetters<T>
+Themia.Framework.Data.Abstractions.Repositories.IBulkUpdateSetters<T>.Set<TProperty>(System.Linq.Expressions.Expression<System.Func<T, TProperty>!>! property, TProperty value) -> Themia.Framework.Data.Abstractions.Repositories.IBulkUpdateSetters<T>!
 Themia.Framework.Data.Abstractions.Repositories.IReadRepository<T, TKey>
 Themia.Framework.Data.Abstractions.Repositories.IReadRepository<T, TKey>.AnyAsync(Themia.Framework.Data.Abstractions.Specifications.ISpecification<T!>! specification, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!
 Themia.Framework.Data.Abstractions.Repositories.IReadRepository<T, TKey>.CountAsync(Themia.Framework.Data.Abstractions.Specifications.ISpecification<T!>! specification, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<long>!
@@ -62,6 +64,7 @@ Themia.Framework.Data.Abstractions.Repositories.IRepository<T, TKey>
 Themia.Framework.Data.Abstractions.Repositories.IRepository<T, TKey>.AddAsync(T! entity, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
 Themia.Framework.Data.Abstractions.Repositories.IRepository<T, TKey>.Remove(T! entity) -> void
 Themia.Framework.Data.Abstractions.Repositories.IRepository<T, TKey>.Update(T! entity) -> void
+Themia.Framework.Data.Abstractions.Repositories.IRepository<T, TKey>.UpdateWhereAsync(Themia.Framework.Data.Abstractions.Specifications.ISpecification<T!>! specification, System.Action<Themia.Framework.Data.Abstractions.Repositories.IBulkUpdateSetters<T!>!>! set, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<int>!
 Themia.Framework.Data.Abstractions.UnitOfWork.ITransactionScope
 Themia.Framework.Data.Abstractions.UnitOfWork.ITransactionScope.CommitAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
 Themia.Framework.Data.Abstractions.UnitOfWork.ITransactionScope.RollbackAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!

@@ -147,10 +147,11 @@ internal sealed class RefreshTokenByHashSpec : Specification<RefreshToken>
     public RefreshTokenByHashSpec(string tokenHash) => Where(t => t.TokenHash == tokenHash);
 }
 
-/// <summary>Every token in a rotation family (for family revocation).</summary>
-internal sealed class RefreshTokensByFamilySpec : Specification<RefreshToken>
+/// <summary>A family's not-yet-revoked tokens — the rows a family revocation actually flips.</summary>
+internal sealed class ActiveRefreshTokensByFamilySpec : Specification<RefreshToken>
 {
-    public RefreshTokensByFamilySpec(Guid familyId) => Where(t => t.FamilyId == familyId);
+    public ActiveRefreshTokensByFamilySpec(Guid familyId) =>
+        Where(t => t.FamilyId == familyId && t.RevokedAt == null);
 }
 
 /// <summary>A user's non-expired, non-revoked tokens (for revoke-all).</summary>

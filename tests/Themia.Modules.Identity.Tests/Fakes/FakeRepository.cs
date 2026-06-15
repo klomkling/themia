@@ -1,3 +1,5 @@
+using System.Linq.Expressions;
+using System.Reflection;
 using Themia.Framework.Core.Abstractions.Entities;
 using Themia.Framework.Core.Abstractions.Tenancy;
 using Themia.Framework.Data.Abstractions.Paging;
@@ -63,6 +65,40 @@ internal sealed class FakeRepository<T>(List<T> store, Func<T, Guid> idSelector)
     }
 
     public void Update(T entity) { /* in-memory: the instance is already mutated */ }
+
+    public Task<int> UpdateWhereAsync(
+        ISpecification<T> specification,
+        Action<IBulkUpdateSetters<T>> set,
+        CancellationToken cancellationToken = default)
+    {
+        // Mirror the real set-based path: target rows by the spec's WHERE (tenant filter + criteria),
+        // then write each named property directly on the matched instances.
+        var setters = new FakeBulkUpdateSetters();
+        set(setters);
+
+        var matched = Query(specification).ToList();
+        foreach (var entity in matched)
+        {
+            foreach (var (property, value) in setters.Assignments)
+            {
+                property.SetValue(entity, value);
+            }
+        }
+        return Task.FromResult(matched.Count);
+    }
+
+    private sealed class FakeBulkUpdateSetters : IBulkUpdateSetters<T>
+    {
+        public List<(PropertyInfo Property, object? Value)> Assignments { get; } = [];
+
+        public IBulkUpdateSetters<T> Set<TProperty>(Expression<Func<T, TProperty>> property, TProperty value)
+        {
+            var body = property.Body is UnaryExpression { NodeType: ExpressionType.Convert } u ? u.Operand : property.Body;
+            var member = (PropertyInfo)((MemberExpression)body).Member;
+            Assignments.Add((member, value));
+            return this;
+        }
+    }
 
     public void Remove(T entity)
     {
