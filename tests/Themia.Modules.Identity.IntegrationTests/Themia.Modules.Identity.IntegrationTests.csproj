@@ -8,6 +8,7 @@
   <ItemGroup>
     <!-- xunit provides IAsyncLifetime + [Fact] used in the conformance base and fixtures. -->
     <PackageReference Include="xunit" />
+    <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
     <PackageReference Include="Testcontainers.PostgreSql" />
     <PackageReference Include="Testcontainers.MsSql" />
     <PackageReference Include="Npgsql" />

@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Time.Testing;
 using Themia.Modules.Identity.Abstractions;
 using Themia.Modules.Identity.Abstractions.Authentication;
 using Themia.Modules.Identity.Abstractions.Entities;
@@ -12,14 +13,15 @@ public sealed class AuthenticationFlowLoginTests
     private static User NewUser() => new() { UserName = "alice" };
 
     private static (AuthenticationFlow Flow, FakeUserService Users, FakeRefreshTokenService Refresh, FakePasswordHasher Hasher, RecordingHooks Hooks)
-        Build(PasswordVerificationResult verify, User? user)
+        Build(PasswordVerificationResult verify, User? user, TimeProvider? clock = null)
     {
+        var timeProvider = clock ?? TimeProvider.System;
         var users = new FakeUserService { VerifyResult = verify, UserToReturn = user };
         var refresh = new FakeRefreshTokenService();
         var hasher = new FakePasswordHasher();
         var hooks = new RecordingHooks { Refresh = refresh };
-        var flow = new AuthenticationFlow(users, new FakeClaimsPrincipalFactory(), new FakeAccessTokenService(),
-            refresh, hasher, hooks, TimeProvider.System, NullLogger<AuthenticationFlow>.Instance);
+        var flow = new AuthenticationFlow(users, new FakeClaimsPrincipalFactory(), new FakeAccessTokenService(timeProvider),
+            refresh, hasher, hooks, timeProvider, NullLogger<AuthenticationFlow>.Instance);
         return (flow, users, refresh, hasher, hooks);
     }
 
@@ -81,5 +83,15 @@ public sealed class AuthenticationFlowLoginTests
         Assert.Equal(LoginOutcome.Denied, result.Outcome);
         Assert.Equal(0, refresh.IssueCalls);
         Assert.Equal(LoginFailureReason.Denied, hooks.FailedReason);
+    }
+
+    [Fact]
+    public async Task Login_reports_access_token_lifetime_in_seconds()
+    {
+        var clock = new FakeTimeProvider(DateTimeOffset.Parse("2026-06-15T00:00:00Z"));
+        var (flow, _, _, _, _) = Build(PasswordVerificationResult.Success, NewUser(), clock: clock);
+        var result = await flow.LoginAsync("alice", "pw");
+        Assert.True(result.Succeeded);
+        Assert.Equal(900, result.Tokens!.Value.ExpiresInSeconds); // 15 min = 900 s
     }
 }

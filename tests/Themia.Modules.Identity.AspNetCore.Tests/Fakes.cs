@@ -33,9 +33,10 @@ internal sealed class FakeClaimsPrincipalFactory : IClaimsPrincipalFactory
             [new Claim(ClaimTypes.NameIdentifier, user.Id.ToString())], authenticationType)));
 }
 
-internal sealed class FakeAccessTokenService : IAccessTokenService
+internal sealed class FakeAccessTokenService(TimeProvider? clock = null) : IAccessTokenService
 {
-    public AccessToken Issue(ClaimsPrincipal principal) => new("access-jwt", DateTimeOffset.UtcNow.AddMinutes(15));
+    public AccessToken Issue(ClaimsPrincipal principal) =>
+        new("access-jwt", (clock ?? TimeProvider.System).GetUtcNow().AddMinutes(15));
 }
 
 internal sealed class FakeRefreshTokenService : IRefreshTokenService
@@ -106,6 +107,15 @@ internal sealed class RecordingHooks : Themia.Modules.Identity.AspNetCore.Authen
     {
         Calls.Add("before-refresh");
         if (DenyBeforeRefresh) context.Deny();
+        return Task.CompletedTask;
+    }
+
+    public bool DenyRefreshSucceeded { get; set; }
+
+    public override Task OnRefreshSucceededAsync(RefreshSucceededContext context, CancellationToken cancellationToken = default)
+    {
+        Calls.Add("refresh-succeeded");
+        if (DenyRefreshSucceeded) context.Deny("blocked-after-refresh");
         return Task.CompletedTask;
     }
 }

@@ -54,6 +54,18 @@ public sealed class AuthenticationFlowRefreshTests
     }
 
     [Fact]
+    public async Task Refresh_denied_by_succeeded_hook_returns_denied()
+    {
+        var refresh = new FakeRefreshTokenService
+        {
+            RotateResult = RefreshValidationResult.Success(new User { UserName = "u" }, Successor()),
+        };
+        var hooks = new RecordingHooks { DenyRefreshSucceeded = true };
+        var result = await Build(refresh, hooks).RefreshAsync("token");
+        Assert.Equal(RefreshRotationOutcome.Denied, result.Outcome);
+    }
+
+    [Fact]
     public async Task Logout_revokes_single_family_by_default()
     {
         var refresh = new FakeRefreshTokenService();

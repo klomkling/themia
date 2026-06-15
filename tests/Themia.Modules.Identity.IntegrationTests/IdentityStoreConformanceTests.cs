@@ -1,7 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Time.Testing;
 using Themia.Framework.Core.Abstractions.Tenancy;
 using Themia.Framework.Data.Abstractions.Auditing;
 using Themia.Modules.Identity.Abstractions;
@@ -44,7 +44,7 @@ public abstract class IdentityStoreConformanceTests
         }
     }
 
-    protected Scope NewScope(TenantId? tenant, bool allowPlatformLogin = true, string auditUserId = "test-user", int? maxFailedAccessAttempts = null)
+    protected Scope NewScope(TenantId? tenant, bool allowPlatformLogin = true, string auditUserId = "test-user", int? maxFailedAccessAttempts = null, TimeProvider? timeProvider = null)
     {
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?> { ["ConnectionStrings:Default"] = ConnectionString })
@@ -54,6 +54,10 @@ public abstract class IdentityStoreConformanceTests
         services.AddSingleton<IConfiguration>(configuration);
         services.AddLogging();
         services.AddScoped<ITenantContext>(_ => new TenantContext(tenant));
+        if (timeProvider is not null)
+        {
+            services.AddSingleton<TimeProvider>(timeProvider);
+        }
         ConfigurePeer(services, configuration);
         services.AddThemiaIdentityServices(o =>
         {
@@ -370,5 +374,48 @@ public abstract class IdentityStoreConformanceTests
 
         Assert.Equal(RefreshOutcome.ReuseDetected, (await s.RefreshTokens.ValidateAndRotateAsync(first.RawToken)).Outcome);
         Assert.Equal(RefreshOutcome.ReuseDetected, (await s.RefreshTokens.ValidateAndRotateAsync(second.RawToken)).Outcome);
+    }
+
+    [Fact]
+    public async Task Refresh_rejects_an_expired_token()
+    {
+        await ResetAsync();
+        var clock = new FakeTimeProvider(DateTimeOffset.Parse("2026-06-15T00:00:00Z"));
+        await using var s = NewScope(new TenantId("acme"), timeProvider: clock);
+        var u = await s.Users.CreateAsync("rt-expire", "pw");
+        var issue = await s.RefreshTokens.IssueAsync(u.UserId!.Value);
+
+        clock.SetUtcNow(clock.GetUtcNow() + TimeSpan.FromDays(15)); // past the 14-day default RefreshTokenLifetime
+        var result = await s.RefreshTokens.ValidateAndRotateAsync(issue.RawToken);
+        Assert.Equal(RefreshOutcome.Invalid, result.Outcome);
+    }
+
+    [Fact]
+    public async Task Refresh_replay_of_consumed_token_revokes_family_even_after_expiry()
+    {
+        await ResetAsync();
+        var clock = new FakeTimeProvider(DateTimeOffset.Parse("2026-06-15T00:00:00Z"));
+        await using var s = NewScope(new TenantId("acme"), timeProvider: clock);
+        var u = await s.Users.CreateAsync("rt-expire-reuse", "pw");
+        var issue = await s.RefreshTokens.IssueAsync(u.UserId!.Value);
+        await s.RefreshTokens.ValidateAndRotateAsync(issue.RawToken); // consumes original
+
+        clock.SetUtcNow(clock.GetUtcNow() + TimeSpan.FromDays(15)); // original is now also expired
+        // Reuse check precedes expiry: replaying the consumed original must still be ReuseDetected.
+        var replay = await s.RefreshTokens.ValidateAndRotateAsync(issue.RawToken);
+        Assert.Equal(RefreshOutcome.ReuseDetected, replay.Outcome);
+    }
+
+    [Fact]
+    public async Task Revoke_unknown_token_is_a_safe_noop()
+    {
+        await ResetAsync();
+        await using var s = NewScope(new TenantId("acme"));
+        var u = await s.Users.CreateAsync("rt-revoke-unknown", "pw");
+        var issue = await s.RefreshTokens.IssueAsync(u.UserId!.Value);
+
+        await s.RefreshTokens.RevokeAsync("garbage-not-a-real-token", allForUser: false); // must not throw
+        // The real token is untouched and still rotates.
+        Assert.Equal(RefreshOutcome.Success, (await s.RefreshTokens.ValidateAndRotateAsync(issue.RawToken)).Outcome);
     }
 }
