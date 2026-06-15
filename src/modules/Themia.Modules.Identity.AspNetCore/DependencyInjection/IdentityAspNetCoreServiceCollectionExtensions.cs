@@ -64,6 +64,13 @@ public static class IdentityAspNetCoreServiceCollectionExtensions
 
     /// <summary>Adds the JwtBearer validation scheme wired to <see cref="JwtOptions"/> and the registered
     /// <see cref="IJwtSigningCredentialsProvider"/>. Call after <c>AddAuthentication(...)</c>.</summary>
+    /// <remarks>The internal <see cref="ClaimTypes"/> principal shape that <c>ICurrentUser</c>, the audit
+    /// accessor, and <c>[Authorize(Roles)]</c> depend on is established by THIS scheme's
+    /// <c>OnTokenValidated</c> remap — it is not carried by the token. The minted access token only
+    /// carries the standard short <c>sub</c>/<c>name</c>/<c>role</c> claims on the wire, so a consumer that
+    /// validates a Themia access token WITHOUT this configured JwtBearer scheme (e.g. a bare
+    /// <c>JsonWebTokenHandler.ValidateToken</c> in a background or non-HTTP context) sees only the short
+    /// claims and must map them to the long <see cref="ClaimTypes"/> URIs itself.</remarks>
     /// <param name="builder">The authentication builder.</param>
     /// <param name="scheme">The scheme name; defaults to <see cref="JwtBearerDefaults.AuthenticationScheme"/>.</param>
     /// <returns>The same authentication builder.</returns>
@@ -114,6 +121,11 @@ public static class IdentityAspNetCoreServiceCollectionExtensions
         return builder;
     }
 
+    /// <summary>Re-adds the long <see cref="ClaimTypes"/> claims from their short JWT counterparts,
+    /// driven by <see cref="JwtClaimNames.WellKnown"/>. Idempotent via <see cref="ClaimsIdentity.HasClaim(string,string)"/>.
+    /// Collects matches in a single enumeration and adds afterward so the identity's claim collection is
+    /// never mutated mid-enumeration; at most one small list is allocated, and only when there is
+    /// something to add.</summary>
     private static void AddLongClaims(TokenValidatedContext context)
     {
         if (context.Principal?.Identity is not ClaimsIdentity identity)
@@ -121,22 +133,26 @@ public static class IdentityAspNetCoreServiceCollectionExtensions
             return;
         }
 
-        Mirror(identity, JwtClaimNames.Subject, ClaimTypes.NameIdentifier);
-        Mirror(identity, JwtClaimNames.Name, ClaimTypes.Name);
-        Mirror(identity, JwtClaimNames.Role, ClaimTypes.Role);
-    }
-
-    /// <summary>Adds a <paramref name="longType"/> claim for each <paramref name="shortType"/> claim,
-    /// skipping values already present under the long type (idempotent — guards against double-add).</summary>
-    private static void Mirror(ClaimsIdentity identity, string shortType, string longType)
-    {
-        var existing = identity.FindAll(longType).Select(c => c.Value).ToHashSet(StringComparer.Ordinal);
-        foreach (var claim in identity.FindAll(shortType).ToList())
+        List<Claim>? toAdd = null;
+        foreach (var claim in identity.Claims)
         {
-            if (existing.Add(claim.Value))
+            foreach (var (longType, shortType) in JwtClaimNames.WellKnown)
             {
-                identity.AddClaim(new Claim(longType, claim.Value, claim.ValueType, claim.Issuer));
+                if (claim.Type == shortType && !identity.HasClaim(longType, claim.Value))
+                {
+                    (toAdd ??= []).Add(new Claim(longType, claim.Value, claim.ValueType, claim.Issuer));
+                }
             }
+        }
+
+        if (toAdd is null)
+        {
+            return;
+        }
+
+        foreach (var claim in toAdd)
+        {
+            identity.AddClaim(claim);
         }
     }
 }

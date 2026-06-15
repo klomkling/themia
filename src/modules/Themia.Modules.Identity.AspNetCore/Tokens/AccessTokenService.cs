@@ -62,13 +62,16 @@ public sealed class AccessTokenService : IAccessTokenService
         var identity = new ClaimsIdentity();
         foreach (var claim in principal.Claims)
         {
-            var type = claim.Type switch
+            var type = claim.Type;
+            foreach (var (longType, shortType) in JwtClaimNames.WellKnown)
             {
-                ClaimTypes.NameIdentifier => JwtClaimNames.Subject,
-                ClaimTypes.Name => JwtClaimNames.Name,
-                ClaimTypes.Role => JwtClaimNames.Role,
-                _ => claim.Type,
-            };
+                if (claim.Type == longType)
+                {
+                    type = shortType;
+                    break;
+                }
+            }
+
             identity.AddClaim(new Claim(type, claim.Value, claim.ValueType, claim.Issuer));
         }
 

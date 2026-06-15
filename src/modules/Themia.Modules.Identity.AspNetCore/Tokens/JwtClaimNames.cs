@@ -18,4 +18,14 @@ internal static class JwtClaimNames
     /// <summary>Role — maps from <see cref="ClaimTypes.Role"/>. There is no registered "role" claim,
     /// so the conventional ASP.NET short name is used.</summary>
     public const string Role = "role";
+
+    /// <summary>The well-known .NET claim type ↔ standard JWT claim-name pairs that are remapped on
+    /// mint (long→short) and validation (short→long). Single source of truth so the two directions
+    /// cannot drift.</summary>
+    internal static readonly (string Long, string Short)[] WellKnown =
+    [
+        (ClaimTypes.NameIdentifier, Subject),
+        (ClaimTypes.Name, Name),
+        (ClaimTypes.Role, Role),
+    ];
 }
