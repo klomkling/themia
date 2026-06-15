@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>false</IsTestProject>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- xunit provides IAsyncLifetime + [Fact] used in the conformance base and fixtures. -->
+    <PackageReference Include="xunit" />
+    <PackageReference Include="Testcontainers.PostgreSql" />
+    <PackageReference Include="Testcontainers.MsSql" />
+    <PackageReference Include="Npgsql" />
+    <PackageReference Include="Microsoft.Data.SqlClient" />
+    <PackageReference Include="Microsoft.Extensions.Configuration" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/modules/Themia.Modules.Identity.AspNetCore/Themia.Modules.Identity.AspNetCore.csproj" />
+    <ProjectReference Include="../../src/modules/Themia.Modules.Identity/Themia.Modules.Identity.csproj" />
+    <ProjectReference Include="../../src/modules/Themia.Modules.Identity.Abstractions/Themia.Modules.Identity.Abstractions.csproj" />
+    <ProjectReference Include="../../src/framework/Themia.Framework.AspNetCore/Themia.Framework.AspNetCore.csproj" />
+    <ProjectReference Include="../../src/framework/Themia.Framework.Data.EFCore.PostgreSql/Themia.Framework.Data.EFCore.PostgreSql.csproj" />
+    <ProjectReference Include="../../src/framework/Themia.Framework.Data.EFCore.SqlServer/Themia.Framework.Data.EFCore.SqlServer.csproj" />
+    <ProjectReference Include="../../src/framework/Themia.Framework.Data.Dapper.PostgreSql/Themia.Framework.Data.Dapper.PostgreSql.csproj" />
+    <ProjectReference Include="../../src/framework/Themia.Framework.Data.Dapper.SqlServer/Themia.Framework.Data.Dapper.SqlServer.csproj" />
+    <ProjectReference Include="../../src/framework/Themia.MultiTenancy/Themia.MultiTenancy.csproj" />
+  </ItemGroup>
+</Project>

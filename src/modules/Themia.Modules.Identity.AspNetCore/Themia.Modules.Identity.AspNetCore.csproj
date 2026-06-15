@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <PackageId>Themia.Modules.Identity.AspNetCore</PackageId>
+    <Description>JWT bearer authentication wiring for the Themia Identity module — token issuance, validation, and ASP.NET Core middleware integration.</Description>
+    <PackageTags>themia;identity;jwt;authentication;authorization;aspnetcore;multi-tenancy</PackageTags>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Themia.Modules.Identity.Abstractions/Themia.Modules.Identity.Abstractions.csproj" />
+    <ProjectReference Include="../Themia.Modules.Identity/Themia.Modules.Identity.csproj" />
+    <ProjectReference Include="../../framework/Themia.Framework.AspNetCore/Themia.Framework.AspNetCore.csproj" />
+    <ProjectReference Include="../../neutral/Themia.AspNetCore/Themia.AspNetCore.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
+    <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+  <ItemGroup>
+    <AdditionalFiles Include="PublicAPI.Shipped.txt" />
+    <AdditionalFiles Include="PublicAPI.Unshipped.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Themia.Modules.Identity.AspNetCore.Tests" />
+    <InternalsVisibleTo Include="Themia.Modules.Identity.AspNetCore.IntegrationTests" />
+  </ItemGroup>
+</Project>
