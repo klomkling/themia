@@ -247,9 +247,7 @@ public abstract class AuthFlowConformanceTests : IAsyncLifetime
 
     private async Task<HttpStatusCode> LogoutAsync(string refreshToken, bool all = false)
     {
-        // Always include the 'all' query parameter so minimal-API binding does not
-        // treat the missing parameter as a validation failure (400).
-        var url = $"/auth/logout?all={all}";
+        var url = all ? "/auth/logout?all=true" : "/auth/logout";
         var response = await _client!.PostAsJsonAsync(
             url, new { RefreshToken = refreshToken }, JsonOpts);
         return response.StatusCode;
@@ -296,9 +294,13 @@ public abstract class AuthFlowConformanceTests : IAsyncLifetime
         Assert.False(string.IsNullOrEmpty(refreshBody.RefreshToken));
         Assert.NotEqual(firstRefreshToken, refreshBody.RefreshToken);
 
-        // Logout with the rotated token → 204.
+        // Logout with the rotated token → 204 (no ?all query string; exercises the optional default).
         var logoutStatus = await LogoutAsync(refreshBody.RefreshToken);
         Assert.Equal(HttpStatusCode.NoContent, logoutStatus);
+
+        // Post-logout: the revoked refresh token must be rejected → 401.
+        var (postLogoutStatus, _) = await RefreshAsync(refreshBody.RefreshToken);
+        Assert.Equal(HttpStatusCode.Unauthorized, postLogoutStatus);
     }
 
     [Fact]

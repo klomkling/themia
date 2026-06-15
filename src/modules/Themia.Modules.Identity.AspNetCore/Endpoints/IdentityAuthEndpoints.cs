@@ -68,7 +68,7 @@ public static class IdentityAuthEndpointRouteBuilderExtensions
         return Results.Ok(new AuthResponse(tokens.AccessToken, tokens.ExpiresInSeconds, tokens.RefreshToken));
     }
 
-    private static async Task<IResult> LogoutAsync(LogoutRequest request, IAuthenticationFlow flow, bool all, CancellationToken cancellationToken)
+    private static async Task<IResult> LogoutAsync(LogoutRequest request, IAuthenticationFlow flow, bool all = false, CancellationToken cancellationToken = default)
     {
         await flow.LogoutAsync(request.RefreshToken, all, cancellationToken).ConfigureAwait(false);
         return Results.NoContent();
