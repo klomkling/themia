@@ -1,4 +1,104 @@
 #nullable enable
+Themia.Modules.Identity.Abstractions.Authentication.AccessToken
+Themia.Modules.Identity.Abstractions.Authentication.AccessToken.AccessToken() -> void
+Themia.Modules.Identity.Abstractions.Authentication.AccessToken.AccessToken(string! Token, System.DateTimeOffset ExpiresAt) -> void
+Themia.Modules.Identity.Abstractions.Authentication.AccessToken.ExpiresAt.get -> System.DateTimeOffset
+Themia.Modules.Identity.Abstractions.Authentication.AccessToken.ExpiresAt.init -> void
+Themia.Modules.Identity.Abstractions.Authentication.AccessToken.Token.get -> string!
+Themia.Modules.Identity.Abstractions.Authentication.AccessToken.Token.init -> void
+Themia.Modules.Identity.Abstractions.Authentication.AuthenticationHookContext
+Themia.Modules.Identity.Abstractions.Authentication.AuthenticationHookContext.AuthenticationHookContext() -> void
+Themia.Modules.Identity.Abstractions.Authentication.AuthenticationHookContext.DenialReason.get -> string?
+Themia.Modules.Identity.Abstractions.Authentication.AuthenticationHookContext.Deny(string? reason = null) -> void
+Themia.Modules.Identity.Abstractions.Authentication.AuthenticationHookContext.IsDenied.get -> bool
+Themia.Modules.Identity.Abstractions.Authentication.AuthTokens
+Themia.Modules.Identity.Abstractions.Authentication.AuthTokens.AccessToken.get -> string!
+Themia.Modules.Identity.Abstractions.Authentication.AuthTokens.AccessToken.init -> void
+Themia.Modules.Identity.Abstractions.Authentication.AuthTokens.AuthTokens() -> void
+Themia.Modules.Identity.Abstractions.Authentication.AuthTokens.AuthTokens(string! AccessToken, int ExpiresInSeconds, string! RefreshToken) -> void
+Themia.Modules.Identity.Abstractions.Authentication.AuthTokens.ExpiresInSeconds.get -> int
+Themia.Modules.Identity.Abstractions.Authentication.AuthTokens.ExpiresInSeconds.init -> void
+Themia.Modules.Identity.Abstractions.Authentication.AuthTokens.RefreshToken.get -> string!
+Themia.Modules.Identity.Abstractions.Authentication.AuthTokens.RefreshToken.init -> void
+Themia.Modules.Identity.Abstractions.Authentication.BeforeLoginContext
+Themia.Modules.Identity.Abstractions.Authentication.BeforeLoginContext.BeforeLoginContext(string! userName) -> void
+Themia.Modules.Identity.Abstractions.Authentication.BeforeLoginContext.UserName.get -> string!
+Themia.Modules.Identity.Abstractions.Authentication.BeforeRefreshContext
+Themia.Modules.Identity.Abstractions.Authentication.BeforeRefreshContext.BeforeRefreshContext() -> void
+Themia.Modules.Identity.Abstractions.Authentication.IAccessTokenService
+Themia.Modules.Identity.Abstractions.Authentication.IAccessTokenService.Issue(System.Security.Claims.ClaimsPrincipal! principal) -> Themia.Modules.Identity.Abstractions.Authentication.AccessToken
+Themia.Modules.Identity.Abstractions.Authentication.IAuthenticationFlow
+Themia.Modules.Identity.Abstractions.Authentication.IAuthenticationFlow.LoginAsync(string! userName, string! password, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Identity.Abstractions.Authentication.LoginResult>!
+Themia.Modules.Identity.Abstractions.Authentication.IAuthenticationFlow.LogoutAsync(string! refreshToken, bool allSessions, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Modules.Identity.Abstractions.Authentication.IAuthenticationFlow.RefreshAsync(string! refreshToken, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Identity.Abstractions.Authentication.RefreshRotationResult>!
+Themia.Modules.Identity.Abstractions.Authentication.IAuthenticationHooks
+Themia.Modules.Identity.Abstractions.Authentication.IAuthenticationHooks.OnBeforeLoginAsync(Themia.Modules.Identity.Abstractions.Authentication.BeforeLoginContext! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Modules.Identity.Abstractions.Authentication.IAuthenticationHooks.OnBeforeRefreshAsync(Themia.Modules.Identity.Abstractions.Authentication.BeforeRefreshContext! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Modules.Identity.Abstractions.Authentication.IAuthenticationHooks.OnLoginFailedAsync(Themia.Modules.Identity.Abstractions.Authentication.LoginFailedContext! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Modules.Identity.Abstractions.Authentication.IAuthenticationHooks.OnLoginSucceededAsync(Themia.Modules.Identity.Abstractions.Authentication.LoginSucceededContext! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Modules.Identity.Abstractions.Authentication.IAuthenticationHooks.OnLogoutAsync(Themia.Modules.Identity.Abstractions.Authentication.LogoutContext! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Modules.Identity.Abstractions.Authentication.IAuthenticationHooks.OnRefreshSucceededAsync(Themia.Modules.Identity.Abstractions.Authentication.RefreshSucceededContext! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Modules.Identity.Abstractions.Authentication.IRefreshTokenService
+Themia.Modules.Identity.Abstractions.Authentication.IRefreshTokenService.IssueAsync(System.Guid userId, System.Guid? familyId = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Identity.Abstractions.Authentication.RefreshIssue>!
+Themia.Modules.Identity.Abstractions.Authentication.IRefreshTokenService.RevokeAsync(string! rawToken, bool allForUser, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Modules.Identity.Abstractions.Authentication.IRefreshTokenService.ValidateAndRotateAsync(string! rawToken, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Identity.Abstractions.Authentication.RefreshValidationResult>!
+Themia.Modules.Identity.Abstractions.Authentication.LoginFailedContext
+Themia.Modules.Identity.Abstractions.Authentication.LoginFailedContext.LoginFailedContext(string! userName, Themia.Modules.Identity.Abstractions.Authentication.LoginFailureReason reason) -> void
+Themia.Modules.Identity.Abstractions.Authentication.LoginFailedContext.Reason.get -> Themia.Modules.Identity.Abstractions.Authentication.LoginFailureReason
+Themia.Modules.Identity.Abstractions.Authentication.LoginFailedContext.UserName.get -> string!
+Themia.Modules.Identity.Abstractions.Authentication.LoginFailureReason
+Themia.Modules.Identity.Abstractions.Authentication.LoginFailureReason.Denied = 4 -> Themia.Modules.Identity.Abstractions.Authentication.LoginFailureReason
+Themia.Modules.Identity.Abstractions.Authentication.LoginFailureReason.Inactive = 2 -> Themia.Modules.Identity.Abstractions.Authentication.LoginFailureReason
+Themia.Modules.Identity.Abstractions.Authentication.LoginFailureReason.LockedOut = 3 -> Themia.Modules.Identity.Abstractions.Authentication.LoginFailureReason
+Themia.Modules.Identity.Abstractions.Authentication.LoginFailureReason.NotFound = 0 -> Themia.Modules.Identity.Abstractions.Authentication.LoginFailureReason
+Themia.Modules.Identity.Abstractions.Authentication.LoginFailureReason.WrongPassword = 1 -> Themia.Modules.Identity.Abstractions.Authentication.LoginFailureReason
+Themia.Modules.Identity.Abstractions.Authentication.LoginOutcome
+Themia.Modules.Identity.Abstractions.Authentication.LoginOutcome.Denied = 3 -> Themia.Modules.Identity.Abstractions.Authentication.LoginOutcome
+Themia.Modules.Identity.Abstractions.Authentication.LoginOutcome.InvalidCredentials = 1 -> Themia.Modules.Identity.Abstractions.Authentication.LoginOutcome
+Themia.Modules.Identity.Abstractions.Authentication.LoginOutcome.LockedOut = 2 -> Themia.Modules.Identity.Abstractions.Authentication.LoginOutcome
+Themia.Modules.Identity.Abstractions.Authentication.LoginOutcome.Success = 0 -> Themia.Modules.Identity.Abstractions.Authentication.LoginOutcome
+Themia.Modules.Identity.Abstractions.Authentication.LoginResult
+Themia.Modules.Identity.Abstractions.Authentication.LoginResult.LoginResult() -> void
+Themia.Modules.Identity.Abstractions.Authentication.LoginResult.Outcome.get -> Themia.Modules.Identity.Abstractions.Authentication.LoginOutcome
+Themia.Modules.Identity.Abstractions.Authentication.LoginResult.Succeeded.get -> bool
+Themia.Modules.Identity.Abstractions.Authentication.LoginResult.Tokens.get -> Themia.Modules.Identity.Abstractions.Authentication.AuthTokens?
+Themia.Modules.Identity.Abstractions.Authentication.LoginSucceededContext
+Themia.Modules.Identity.Abstractions.Authentication.LoginSucceededContext.LoginSucceededContext(Themia.Modules.Identity.Abstractions.Entities.User! user) -> void
+Themia.Modules.Identity.Abstractions.Authentication.LoginSucceededContext.User.get -> Themia.Modules.Identity.Abstractions.Entities.User!
+Themia.Modules.Identity.Abstractions.Authentication.LogoutContext
+Themia.Modules.Identity.Abstractions.Authentication.LogoutContext.AllSessions.get -> bool
+Themia.Modules.Identity.Abstractions.Authentication.LogoutContext.LogoutContext(bool allSessions) -> void
+Themia.Modules.Identity.Abstractions.Authentication.RefreshIssue
+Themia.Modules.Identity.Abstractions.Authentication.RefreshIssue.ExpiresAt.get -> System.DateTimeOffset
+Themia.Modules.Identity.Abstractions.Authentication.RefreshIssue.ExpiresAt.init -> void
+Themia.Modules.Identity.Abstractions.Authentication.RefreshIssue.FamilyId.get -> System.Guid
+Themia.Modules.Identity.Abstractions.Authentication.RefreshIssue.FamilyId.init -> void
+Themia.Modules.Identity.Abstractions.Authentication.RefreshIssue.RawToken.get -> string!
+Themia.Modules.Identity.Abstractions.Authentication.RefreshIssue.RawToken.init -> void
+Themia.Modules.Identity.Abstractions.Authentication.RefreshIssue.RefreshIssue() -> void
+Themia.Modules.Identity.Abstractions.Authentication.RefreshIssue.RefreshIssue(string! RawToken, System.DateTimeOffset ExpiresAt, System.Guid FamilyId) -> void
+Themia.Modules.Identity.Abstractions.Authentication.RefreshOutcome
+Themia.Modules.Identity.Abstractions.Authentication.RefreshOutcome.Invalid = 1 -> Themia.Modules.Identity.Abstractions.Authentication.RefreshOutcome
+Themia.Modules.Identity.Abstractions.Authentication.RefreshOutcome.ReuseDetected = 2 -> Themia.Modules.Identity.Abstractions.Authentication.RefreshOutcome
+Themia.Modules.Identity.Abstractions.Authentication.RefreshOutcome.Success = 0 -> Themia.Modules.Identity.Abstractions.Authentication.RefreshOutcome
+Themia.Modules.Identity.Abstractions.Authentication.RefreshRotationOutcome
+Themia.Modules.Identity.Abstractions.Authentication.RefreshRotationOutcome.Denied = 3 -> Themia.Modules.Identity.Abstractions.Authentication.RefreshRotationOutcome
+Themia.Modules.Identity.Abstractions.Authentication.RefreshRotationOutcome.Invalid = 1 -> Themia.Modules.Identity.Abstractions.Authentication.RefreshRotationOutcome
+Themia.Modules.Identity.Abstractions.Authentication.RefreshRotationOutcome.ReuseDetected = 2 -> Themia.Modules.Identity.Abstractions.Authentication.RefreshRotationOutcome
+Themia.Modules.Identity.Abstractions.Authentication.RefreshRotationOutcome.Success = 0 -> Themia.Modules.Identity.Abstractions.Authentication.RefreshRotationOutcome
+Themia.Modules.Identity.Abstractions.Authentication.RefreshRotationResult
+Themia.Modules.Identity.Abstractions.Authentication.RefreshRotationResult.Outcome.get -> Themia.Modules.Identity.Abstractions.Authentication.RefreshRotationOutcome
+Themia.Modules.Identity.Abstractions.Authentication.RefreshRotationResult.RefreshRotationResult() -> void
+Themia.Modules.Identity.Abstractions.Authentication.RefreshRotationResult.Succeeded.get -> bool
+Themia.Modules.Identity.Abstractions.Authentication.RefreshRotationResult.Tokens.get -> Themia.Modules.Identity.Abstractions.Authentication.AuthTokens?
+Themia.Modules.Identity.Abstractions.Authentication.RefreshSucceededContext
+Themia.Modules.Identity.Abstractions.Authentication.RefreshSucceededContext.RefreshSucceededContext(Themia.Modules.Identity.Abstractions.Entities.User! user) -> void
+Themia.Modules.Identity.Abstractions.Authentication.RefreshSucceededContext.User.get -> Themia.Modules.Identity.Abstractions.Entities.User!
+Themia.Modules.Identity.Abstractions.Authentication.RefreshValidationResult
+Themia.Modules.Identity.Abstractions.Authentication.RefreshValidationResult.Outcome.get -> Themia.Modules.Identity.Abstractions.Authentication.RefreshOutcome
+Themia.Modules.Identity.Abstractions.Authentication.RefreshValidationResult.RefreshValidationResult() -> void
+Themia.Modules.Identity.Abstractions.Authentication.RefreshValidationResult.Replacement.get -> Themia.Modules.Identity.Abstractions.Authentication.RefreshIssue?
+Themia.Modules.Identity.Abstractions.Authentication.RefreshValidationResult.User.get -> Themia.Modules.Identity.Abstractions.Entities.User?
 Themia.Modules.Identity.Abstractions.Entities.RefreshToken
 Themia.Modules.Identity.Abstractions.Entities.RefreshToken.ConsumedAt.get -> System.DateTimeOffset?
 Themia.Modules.Identity.Abstractions.Entities.RefreshToken.ConsumedAt.set -> void
@@ -23,3 +123,14 @@ Themia.Modules.Identity.Abstractions.Entities.RefreshToken.UserId.set -> void
 Themia.Modules.Identity.Abstractions.IClaimService.GetEffectiveClaimsAsync(System.Guid userId, System.Collections.Generic.IReadOnlyCollection<System.Guid>! roleIds, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<System.Security.Claims.Claim!>!>!
 Themia.Modules.Identity.Abstractions.IdentityModuleOptions.RefreshTokenLifetime.get -> System.TimeSpan
 Themia.Modules.Identity.Abstractions.IdentityModuleOptions.RefreshTokenLifetime.set -> void
+static Themia.Modules.Identity.Abstractions.Authentication.LoginResult.Denied() -> Themia.Modules.Identity.Abstractions.Authentication.LoginResult
+static Themia.Modules.Identity.Abstractions.Authentication.LoginResult.InvalidCredentials() -> Themia.Modules.Identity.Abstractions.Authentication.LoginResult
+static Themia.Modules.Identity.Abstractions.Authentication.LoginResult.LockedOut() -> Themia.Modules.Identity.Abstractions.Authentication.LoginResult
+static Themia.Modules.Identity.Abstractions.Authentication.LoginResult.Success(Themia.Modules.Identity.Abstractions.Authentication.AuthTokens tokens) -> Themia.Modules.Identity.Abstractions.Authentication.LoginResult
+static Themia.Modules.Identity.Abstractions.Authentication.RefreshRotationResult.Denied() -> Themia.Modules.Identity.Abstractions.Authentication.RefreshRotationResult
+static Themia.Modules.Identity.Abstractions.Authentication.RefreshRotationResult.Invalid() -> Themia.Modules.Identity.Abstractions.Authentication.RefreshRotationResult
+static Themia.Modules.Identity.Abstractions.Authentication.RefreshRotationResult.ReuseDetected() -> Themia.Modules.Identity.Abstractions.Authentication.RefreshRotationResult
+static Themia.Modules.Identity.Abstractions.Authentication.RefreshRotationResult.Success(Themia.Modules.Identity.Abstractions.Authentication.AuthTokens tokens) -> Themia.Modules.Identity.Abstractions.Authentication.RefreshRotationResult
+static Themia.Modules.Identity.Abstractions.Authentication.RefreshValidationResult.Invalid() -> Themia.Modules.Identity.Abstractions.Authentication.RefreshValidationResult
+static Themia.Modules.Identity.Abstractions.Authentication.RefreshValidationResult.ReuseDetected() -> Themia.Modules.Identity.Abstractions.Authentication.RefreshValidationResult
+static Themia.Modules.Identity.Abstractions.Authentication.RefreshValidationResult.Success(Themia.Modules.Identity.Abstractions.Entities.User! user, Themia.Modules.Identity.Abstractions.Authentication.RefreshIssue replacement) -> Themia.Modules.Identity.Abstractions.Authentication.RefreshValidationResult
