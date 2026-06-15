@@ -1,6 +1,8 @@
 using System.Data;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Themia.Framework.Data.Abstractions.Exceptions;
 using Themia.Framework.Data.Dapper;
 using Themia.Framework.Data.Dapper.Connection;
 using Themia.Framework.Data.Dapper.DependencyInjection;
@@ -24,6 +26,9 @@ public static class SqlServerDapperServiceCollectionExtensions
         services.AddThemiaDapperCore(configure);
         services.AddScoped<IDapperConnectionFactory>(sp => new SqlServerConnectionFactory(configuration, sp));
         services.AddSingleton<ISqlCompiler, SqlServerSqlCompiler>();
+        // SqlClient does not surface a usable SqlState, so replace the default SQLSTATE interpreter with one
+        // that matches SQL Server's native duplicate-key error numbers (2627 / 2601).
+        services.Replace(ServiceDescriptor.Singleton<ISqlExceptionInterpreter, SqlServerSqlExceptionInterpreter>());
         return services;
     }
 }

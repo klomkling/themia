@@ -19,7 +19,8 @@ internal sealed class DapperUnitOfWork(
     ITenantContext tenantContext,
     ICurrentUserAccessor currentUser,
     IDataFilterScope filterScope,
-    TimeProvider timeProvider) : IUnitOfWork, IPendingOperationSink
+    TimeProvider timeProvider,
+    ISqlExceptionInterpreter sqlExceptionInterpreter) : IUnitOfWork, IPendingOperationSink
 {
     private readonly List<PendingOperation> pending = [];
 
@@ -42,7 +43,7 @@ internal sealed class DapperUnitOfWork(
             pending.Clear();
             return affected;
         }
-        catch
+        catch (Exception ex)
         {
             pending.Clear();
             if (ownsTransaction && tx is not null)
@@ -51,6 +52,13 @@ internal sealed class DapperUnitOfWork(
                 // and swallow a rollback failure so it doesn't mask the original error (rethrown below).
                 try { await tx.RollbackAsync(CancellationToken.None); }
                 catch { /* preserve the original exception */ }
+            }
+            // Translate a unique/primary-key violation into the framework's provider-agnostic exception
+            // (still after rollback) so both data layers surface a duplicate-key write the same way.
+            if (sqlExceptionInterpreter.IsUniqueConstraintViolation(ex))
+            {
+                throw new UniqueConstraintException(
+                    "A write violated a unique or primary-key constraint: a row with the same key already exists.", ex);
             }
             throw;
         }
