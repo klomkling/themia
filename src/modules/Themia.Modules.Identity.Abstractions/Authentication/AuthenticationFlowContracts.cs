@@ -23,7 +23,7 @@ public enum LoginOutcome
     Denied,
 }
 
-/// <summary>The result of <c>IAuthenticationFlow.LoginAsync</c>.</summary>
+/// <summary>The result of <see cref="IAuthenticationFlow.LoginAsync"/>.</summary>
 public readonly record struct LoginResult
 {
     private LoginResult(LoginOutcome outcome, AuthTokens? tokens)
@@ -70,7 +70,7 @@ public enum RefreshRotationOutcome
     Denied,
 }
 
-/// <summary>The result of <c>IAuthenticationFlow.RefreshAsync</c>.</summary>
+/// <summary>The result of <see cref="IAuthenticationFlow.RefreshAsync"/>.</summary>
 public readonly record struct RefreshRotationResult
 {
     private RefreshRotationResult(RefreshRotationOutcome outcome, AuthTokens? tokens)

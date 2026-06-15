@@ -81,6 +81,8 @@ public sealed class RefreshSucceededContext(User user) : AuthenticationHookConte
 }
 
 /// <summary>Runs after revocation.</summary>
+/// <remarks>Logout is irrevocable once committed; this context intentionally does not
+/// extend <see cref="AuthenticationHookContext"/> — there is nothing to deny.</remarks>
 /// <param name="allSessions">Whether all sessions were revoked.</param>
 public sealed class LogoutContext(bool allSessions)
 {
