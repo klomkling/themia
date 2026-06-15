@@ -290,15 +290,21 @@ core. Key structural decisions:
 - **`refresh_tokens` is a parent-keyed child table** (no `tenant_id` column): the token row
   references `identity.users.id`; tenant isolation is enforced at the service layer (load user +
   validate tenant in the same operation), not by a DB column predicate.
-- **Rotating refresh tokens with token-family reuse-detection.** On every refresh, a new token is
-  issued and the old one is consumed atomically. A reuse attempt (presenting an already-consumed
-  token) invalidates the entire family, forcing re-login.
+- **Rotating refresh tokens with token-family reuse-detection.** On every refresh, the service
+  rotates the presented token and issues a successor in the same family. A reuse attempt
+  (presenting an already-consumed token) invalidates the entire family, forcing re-login.
 - **`RefreshTokenLifetime` lives in `IdentityModuleOptions`** (core options, not AspNetCore
   options), because the core service owns token creation and must enforce TTL.
 - **Anti-enumeration login.** `AuthenticationFlow.LoginAsync` runs an argon2id dummy hash on
   not-found / inactive / locked-out paths, so all failure modes take the same wall-clock time.
 - **`IAuthenticationFlow` + `IAuthenticationHooks`** are DI-replaceable seams. Hosts that need
   custom login orchestration (e.g. 2FA, LINE login later) replace only the affected interface.
+
+**Known follow-ups (0.5.1):**
+- Concurrent double-use of a single refresh token is not yet guarded by an explicit transaction /
+  compare-and-set consume. `RefreshToken` is a plain POCO with no concurrency token, so two
+  simultaneous refreshes of the same token could both rotate successfully. This is acceptable at
+  current scale; a future hardening could add optimistic concurrency or a transactional consume.
 
 ## Decisions
 

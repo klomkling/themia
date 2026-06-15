@@ -11,9 +11,9 @@ namespace Themia.Modules.Identity.AspNetCore.Tokens;
 /// stamping issuer/audience/expiry from <see cref="JwtOptions"/>.</summary>
 public sealed class AccessTokenService : IAccessTokenService
 {
-    private readonly IJwtSigningCredentialsProvider _credentials;
-    private readonly JwtOptions _options;
-    private readonly TimeProvider _timeProvider;
+    private readonly IJwtSigningCredentialsProvider credentials;
+    private readonly JwtOptions options;
+    private readonly TimeProvider timeProvider;
 
     /// <summary>Creates the service.</summary>
     /// <param name="credentials">The signing-credentials provider.</param>
@@ -24,9 +24,9 @@ public sealed class AccessTokenService : IAccessTokenService
         ArgumentNullException.ThrowIfNull(credentials);
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(timeProvider);
-        _credentials = credentials;
-        _options = options;
-        _timeProvider = timeProvider;
+        this.credentials = credentials;
+        this.options = options;
+        this.timeProvider = timeProvider;
     }
 
     /// <inheritdoc />
@@ -34,18 +34,18 @@ public sealed class AccessTokenService : IAccessTokenService
     {
         ArgumentNullException.ThrowIfNull(principal);
 
-        var now = _timeProvider.GetUtcNow();
-        var expires = now.Add(_options.AccessTokenLifetime);
+        var now = timeProvider.GetUtcNow();
+        var expires = now.Add(options.AccessTokenLifetime);
 
         var descriptor = new SecurityTokenDescriptor
         {
-            Issuer = _options.Issuer,
-            Audience = _options.Audience,
+            Issuer = options.Issuer,
+            Audience = options.Audience,
             IssuedAt = now.UtcDateTime,
             NotBefore = now.UtcDateTime,
             Expires = expires.UtcDateTime,
             Subject = principal.Identity as ClaimsIdentity ?? new ClaimsIdentity(principal.Claims),
-            SigningCredentials = _credentials.SigningCredentials,
+            SigningCredentials = credentials.SigningCredentials,
         };
 
         var token = new JsonWebTokenHandler().CreateToken(descriptor);
