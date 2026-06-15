@@ -51,6 +51,7 @@ public sealed class AuthenticationFlowLoginTests
     [Theory]
     [InlineData(PasswordVerificationResult.NotFound, true)]
     [InlineData(PasswordVerificationResult.Inactive, true)]
+    [InlineData(PasswordVerificationResult.LockedOut, true)]
     [InlineData(PasswordVerificationResult.Failed, false)]
     public async Task Login_runs_throwaway_hash_only_when_no_real_hash_ran(PasswordVerificationResult verify, bool expectBurn)
     {

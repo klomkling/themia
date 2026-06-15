@@ -62,7 +62,11 @@ public sealed class AuthenticationFlow : IAuthenticationFlow
         var verification = await users.VerifyPasswordAsync(userName, password, cancellationToken).ConfigureAwait(false);
         if (verification != PasswordVerificationResult.Success)
         {
-            if (verification is PasswordVerificationResult.NotFound or PasswordVerificationResult.Inactive)
+            // Equalize latency across every "no real hash ran" path (NotFound/Inactive/LockedOut all
+            // return before VerifyPasswordAsync runs argon2), so response time leaks no account state.
+            if (verification is PasswordVerificationResult.NotFound
+                             or PasswordVerificationResult.Inactive
+                             or PasswordVerificationResult.LockedOut)
             {
                 _ = passwordHasher.Hash(password);
             }
