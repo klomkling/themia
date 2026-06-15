@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using Themia.Modules.Identity.Abstractions;
 using Themia.Modules.Identity.Abstractions.Authentication;
 using Themia.Modules.Identity.Abstractions.Entities;
@@ -19,6 +20,7 @@ public sealed class AuthenticationFlow : IAuthenticationFlow
     private readonly IPasswordHasher passwordHasher;
     private readonly IAuthenticationHooks hooks;
     private readonly TimeProvider timeProvider;
+    private readonly ILogger<AuthenticationFlow> logger;
 
     /// <summary>Creates the flow.</summary>
     public AuthenticationFlow(
@@ -28,7 +30,8 @@ public sealed class AuthenticationFlow : IAuthenticationFlow
         IRefreshTokenService refreshTokens,
         IPasswordHasher passwordHasher,
         IAuthenticationHooks hooks,
-        TimeProvider timeProvider)
+        TimeProvider timeProvider,
+        ILogger<AuthenticationFlow> logger)
     {
         ArgumentNullException.ThrowIfNull(users);
         ArgumentNullException.ThrowIfNull(principalFactory);
@@ -37,6 +40,7 @@ public sealed class AuthenticationFlow : IAuthenticationFlow
         ArgumentNullException.ThrowIfNull(passwordHasher);
         ArgumentNullException.ThrowIfNull(hooks);
         ArgumentNullException.ThrowIfNull(timeProvider);
+        ArgumentNullException.ThrowIfNull(logger);
         this.users = users;
         this.principalFactory = principalFactory;
         this.accessTokens = accessTokens;
@@ -44,6 +48,7 @@ public sealed class AuthenticationFlow : IAuthenticationFlow
         this.passwordHasher = passwordHasher;
         this.hooks = hooks;
         this.timeProvider = timeProvider;
+        this.logger = logger;
     }
 
     /// <inheritdoc />
@@ -56,6 +61,7 @@ public sealed class AuthenticationFlow : IAuthenticationFlow
         await hooks.OnBeforeLoginAsync(before, cancellationToken).ConfigureAwait(false);
         if (before.IsDenied)
         {
+            logger.LogWarning("Login denied by hook for {UserName}: {DenialReason}.", userName, before.DenialReason);
             return await FailAsync(userName, LoginFailureReason.Denied, LoginResult.Denied(), cancellationToken).ConfigureAwait(false);
         }
 
@@ -85,10 +91,12 @@ public sealed class AuthenticationFlow : IAuthenticationFlow
         await hooks.OnLoginSucceededAsync(succeeded, cancellationToken).ConfigureAwait(false);
         if (succeeded.IsDenied)
         {
+            logger.LogWarning("Login denied by hook for {UserName}: {DenialReason}.", userName, succeeded.DenialReason);
             return await FailAsync(userName, LoginFailureReason.Denied, LoginResult.Denied(), cancellationToken).ConfigureAwait(false);
         }
 
         var tokens = await IssueAsync(user, cancellationToken).ConfigureAwait(false);
+        logger.LogInformation("User {UserId} authenticated via password.", user.Id);
         return LoginResult.Success(tokens);
     }
 
@@ -101,6 +109,7 @@ public sealed class AuthenticationFlow : IAuthenticationFlow
         await hooks.OnBeforeRefreshAsync(before, cancellationToken).ConfigureAwait(false);
         if (before.IsDenied)
         {
+            logger.LogWarning("Refresh denied by hook: {DenialReason}.", before.DenialReason);
             return RefreshRotationResult.Denied();
         }
 
@@ -125,9 +134,11 @@ public sealed class AuthenticationFlow : IAuthenticationFlow
         await hooks.OnRefreshSucceededAsync(refreshSucceeded, cancellationToken).ConfigureAwait(false);
         if (refreshSucceeded.IsDenied)
         {
+            logger.LogWarning("Refresh denied by hook: {DenialReason}.", refreshSucceeded.DenialReason);
             return RefreshRotationResult.Denied();
         }
 
+        logger.LogInformation("Access token refreshed for user {UserId}.", user.Id);
         return RefreshRotationResult.Success(tokens);
     }
 
@@ -136,6 +147,7 @@ public sealed class AuthenticationFlow : IAuthenticationFlow
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(refreshToken);
         await refreshTokens.RevokeAsync(refreshToken, allSessions, cancellationToken).ConfigureAwait(false);
+        logger.LogInformation("Logout for refresh token (allSessions={AllSessions}).", allSessions);
         await hooks.OnLogoutAsync(new LogoutContext(allSessions), cancellationToken).ConfigureAwait(false);
     }
 
@@ -149,6 +161,7 @@ public sealed class AuthenticationFlow : IAuthenticationFlow
 
     private async Task<LoginResult> FailAsync(string userName, LoginFailureReason reason, LoginResult result, CancellationToken cancellationToken)
     {
+        logger.LogWarning("Login failed for {UserName}: {Reason}.", userName, reason);
         await hooks.OnLoginFailedAsync(new LoginFailedContext(userName, reason), cancellationToken).ConfigureAwait(false);
         return result;
     }

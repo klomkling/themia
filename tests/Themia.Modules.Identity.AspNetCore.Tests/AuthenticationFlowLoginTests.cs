@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging.Abstractions;
 using Themia.Modules.Identity.Abstractions;
 using Themia.Modules.Identity.Abstractions.Authentication;
 using Themia.Modules.Identity.Abstractions.Entities;
@@ -18,7 +19,7 @@ public sealed class AuthenticationFlowLoginTests
         var hasher = new FakePasswordHasher();
         var hooks = new RecordingHooks { Refresh = refresh };
         var flow = new AuthenticationFlow(users, new FakeClaimsPrincipalFactory(), new FakeAccessTokenService(),
-            refresh, hasher, hooks, TimeProvider.System);
+            refresh, hasher, hooks, TimeProvider.System, NullLogger<AuthenticationFlow>.Instance);
         return (flow, users, refresh, hasher, hooks);
     }
 

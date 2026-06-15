@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging.Abstractions;
 using Themia.Modules.Identity.Abstractions;
 using Themia.Modules.Identity.Abstractions.Authentication;
 using Themia.Modules.Identity.Abstractions.Entities;
@@ -10,7 +11,7 @@ public sealed class AuthenticationFlowRefreshTests
 {
     private static AuthenticationFlow Build(FakeRefreshTokenService refresh, RecordingHooks hooks) =>
         new(new FakeUserService(), new FakeClaimsPrincipalFactory(), new FakeAccessTokenService(),
-            refresh, new FakePasswordHasher(), hooks, TimeProvider.System);
+            refresh, new FakePasswordHasher(), hooks, TimeProvider.System, NullLogger<AuthenticationFlow>.Instance);
 
     private static RefreshIssue Successor() => new("new-refresh", DateTimeOffset.UtcNow.AddDays(14), Guid.NewGuid());
 

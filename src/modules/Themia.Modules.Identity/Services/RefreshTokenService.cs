@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using Microsoft.Extensions.Logging;
 using Themia.Framework.Data.Abstractions.Repositories;
 using Themia.Framework.Data.Abstractions.UnitOfWork;
 using Themia.Modules.Identity.Abstractions;
@@ -23,6 +24,7 @@ public sealed class RefreshTokenService : IRefreshTokenService
     private readonly IUnitOfWork unitOfWork;
     private readonly TimeProvider timeProvider;
     private readonly IdentityModuleOptions options;
+    private readonly ILogger<RefreshTokenService> logger;
 
     /// <summary>Creates the service.</summary>
     public RefreshTokenService(
@@ -30,18 +32,21 @@ public sealed class RefreshTokenService : IRefreshTokenService
         IRepository<RefreshToken, Guid> tokens,
         IUnitOfWork unitOfWork,
         TimeProvider timeProvider,
-        IdentityModuleOptions options)
+        IdentityModuleOptions options,
+        ILogger<RefreshTokenService> logger)
     {
         ArgumentNullException.ThrowIfNull(users);
         ArgumentNullException.ThrowIfNull(tokens);
         ArgumentNullException.ThrowIfNull(unitOfWork);
         ArgumentNullException.ThrowIfNull(timeProvider);
         ArgumentNullException.ThrowIfNull(options);
+        ArgumentNullException.ThrowIfNull(logger);
         this.users = users;
         this.tokens = tokens;
         this.unitOfWork = unitOfWork;
         this.timeProvider = timeProvider;
         this.options = options;
+        this.logger = logger;
     }
 
     /// <inheritdoc />
@@ -80,6 +85,7 @@ public sealed class RefreshTokenService : IRefreshTokenService
         // revoke the family even if it has since expired.
         if (match.ConsumedAt is not null || match.RevokedAt is not null)
         {
+            logger.LogWarning("Refresh token reuse detected; revoking token family {FamilyId} for user {UserId}.", match.FamilyId, match.UserId);
             await RevokeFamilyAsync(match.FamilyId, now, cancellationToken).ConfigureAwait(false);
             return RefreshValidationResult.ReuseDetected();
         }
@@ -120,11 +126,13 @@ public sealed class RefreshTokenService : IRefreshTokenService
         var now = timeProvider.GetUtcNow();
         if (allForUser)
         {
-            foreach (var t in await tokens.ListAsync(new ActiveRefreshTokensByUserSpec(match.UserId, now), cancellationToken).ConfigureAwait(false))
+            var active = await tokens.ListAsync(new ActiveRefreshTokensByUserSpec(match.UserId, now), cancellationToken).ConfigureAwait(false);
+            foreach (var t in active)
             {
                 t.RevokedAt = now;
                 tokens.Update(t);
             }
+            logger.LogInformation("Revoked all active refresh tokens for user {UserId} ({Count} tokens).", match.UserId, active.Count);
             await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         }
         else

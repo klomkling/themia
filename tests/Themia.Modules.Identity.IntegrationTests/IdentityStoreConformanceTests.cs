@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
 using Themia.Framework.Core.Abstractions.Tenancy;
 using Themia.Framework.Data.Abstractions.Auditing;
 using Themia.Modules.Identity.Abstractions;
@@ -51,6 +52,7 @@ public abstract class IdentityStoreConformanceTests
 
         var services = new ServiceCollection();
         services.AddSingleton<IConfiguration>(configuration);
+        services.AddLogging();
         services.AddScoped<ITenantContext>(_ => new TenantContext(tenant));
         ConfigurePeer(services, configuration);
         services.AddThemiaIdentityServices(o =>
