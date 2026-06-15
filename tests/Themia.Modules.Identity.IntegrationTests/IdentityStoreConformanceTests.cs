@@ -52,7 +52,7 @@ public abstract class IdentityStoreConformanceTests
 
         var services = new ServiceCollection();
         services.AddSingleton<IConfiguration>(configuration);
-        services.AddLogging();
+        // Logging is registered by AddThemiaIdentityServices below.
         services.AddScoped<ITenantContext>(_ => new TenantContext(tenant));
         if (timeProvider is not null)
         {

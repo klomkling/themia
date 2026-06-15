@@ -1,9 +1,12 @@
+using System.Linq;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
+using Themia.Modules.Identity.Abstractions;
 using Themia.Modules.Identity.Abstractions.Authentication;
 using Themia.Modules.Identity.AspNetCore.Authentication;
 using Themia.Modules.Identity.AspNetCore.Options;
@@ -30,10 +33,26 @@ public static class IdentityAspNetCoreServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(configure);
 
+        // Fail fast at startup if the prerequisite core registrations are missing, instead of
+        // surfacing a runtime 500 on the first /auth/login. The flow constructor needs these.
+        static bool IsRegistered(IServiceCollection s, Type t) => s.Any(d => d.ServiceType == t);
+        if (!IsRegistered(services, typeof(IUserService))
+            || !IsRegistered(services, typeof(IRefreshTokenService))
+            || !IsRegistered(services, typeof(IClaimsPrincipalFactory)))
+        {
+            throw new InvalidOperationException(
+                "AddThemiaIdentityAspNetCore requires AddThemiaIdentityServices() to be called first " +
+                "(IUserService, IRefreshTokenService, and IClaimsPrincipalFactory must be registered).");
+        }
+
         var options = new JwtOptions();
         configure(options);
         options.Validate();
         services.TryAddSingleton(options);
+
+        // The authentication flow depends on ILogger<T>; ensure logging is resolvable even on a
+        // bare ServiceCollection. AddLogging is idempotent/TryAdd-based.
+        services.AddLogging();
 
         services.TryAddSingleton(TimeProvider.System);
         services.TryAddSingleton<IJwtSigningCredentialsProvider, SymmetricSigningCredentialsProvider>();
