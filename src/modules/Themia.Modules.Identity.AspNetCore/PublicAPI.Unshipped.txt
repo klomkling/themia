@@ -12,3 +12,10 @@ Themia.Modules.Identity.AspNetCore.Options.JwtOptions.Issuer.set -> void
 Themia.Modules.Identity.AspNetCore.Options.JwtOptions.SigningKey.get -> string!
 Themia.Modules.Identity.AspNetCore.Options.JwtOptions.SigningKey.set -> void
 Themia.Modules.Identity.AspNetCore.Options.JwtOptions.Validate() -> void
+Themia.Modules.Identity.AspNetCore.Signing.IJwtSigningCredentialsProvider
+Themia.Modules.Identity.AspNetCore.Signing.IJwtSigningCredentialsProvider.SigningCredentials.get -> Microsoft.IdentityModel.Tokens.SigningCredentials!
+Themia.Modules.Identity.AspNetCore.Signing.IJwtSigningCredentialsProvider.ValidationKey.get -> Microsoft.IdentityModel.Tokens.SecurityKey!
+Themia.Modules.Identity.AspNetCore.Signing.SymmetricSigningCredentialsProvider
+Themia.Modules.Identity.AspNetCore.Signing.SymmetricSigningCredentialsProvider.SymmetricSigningCredentialsProvider(Themia.Modules.Identity.AspNetCore.Options.JwtOptions! options) -> void
+Themia.Modules.Identity.AspNetCore.Signing.SymmetricSigningCredentialsProvider.SigningCredentials.get -> Microsoft.IdentityModel.Tokens.SigningCredentials!
+Themia.Modules.Identity.AspNetCore.Signing.SymmetricSigningCredentialsProvider.ValidationKey.get -> Microsoft.IdentityModel.Tokens.SecurityKey!
