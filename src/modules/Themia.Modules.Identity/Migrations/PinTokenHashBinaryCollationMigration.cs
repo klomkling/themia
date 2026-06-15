@@ -24,8 +24,8 @@ public sealed class PinTokenHashBinaryCollationMigration : Migration
         // reserved keyword in SQL Server, so the schema qualifier must be bracketed.
         IfDatabase("sqlserver").Delegate(() =>
         {
-            PinBinaryCollation("user_tokens", "ux_user_tokens_token_hash");
-            PinBinaryCollation("refresh_tokens", "ux_refresh_tokens_token_hash");
+            RecollateTokenHash("user_tokens", "ux_user_tokens_token_hash", "Latin1_General_BIN2");
+            RecollateTokenHash("refresh_tokens", "ux_refresh_tokens_token_hash", "Latin1_General_BIN2");
         });
 
         // PostgreSQL: no-op. text/varchar comparison is case-sensitive by default, so the case-folding
@@ -45,24 +45,21 @@ public sealed class PinTokenHashBinaryCollationMigration : Migration
         // Reverse on SQL Server: drop the unique index, restore the server-default collation, recreate it.
         IfDatabase("sqlserver").Delegate(() =>
         {
-            RestoreDefaultCollation("user_tokens", "ux_user_tokens_token_hash");
-            RestoreDefaultCollation("refresh_tokens", "ux_refresh_tokens_token_hash");
+            RecollateTokenHash("user_tokens", "ux_user_tokens_token_hash", collation: null);
+            RecollateTokenHash("refresh_tokens", "ux_refresh_tokens_token_hash", collation: null);
         });
 
         // PostgreSQL: no-op (Up was a no-op).
     }
 
-    private void PinBinaryCollation(string table, string uniqueIndex)
+    // Re-collates token_hash on SQL Server: drop the unique index, alter the column (optionally pinning a
+    // collation; null falls back to the server default), recreate the unique index. A null collation emits
+    // no COLLATE clause, so the emitted DDL is byte-identical to the prior restore path.
+    private void RecollateTokenHash(string table, string uniqueIndex, string? collation)
     {
+        var collate = collation is null ? string.Empty : $" COLLATE {collation}";
         Execute.Sql($"DROP INDEX {uniqueIndex} ON [{SchemaName}].{table};");
-        Execute.Sql($"ALTER TABLE [{SchemaName}].{table} ALTER COLUMN token_hash nvarchar(256) COLLATE Latin1_General_BIN2 NOT NULL;");
-        Execute.Sql($"CREATE UNIQUE INDEX {uniqueIndex} ON [{SchemaName}].{table} (token_hash);");
-    }
-
-    private void RestoreDefaultCollation(string table, string uniqueIndex)
-    {
-        Execute.Sql($"DROP INDEX {uniqueIndex} ON [{SchemaName}].{table};");
-        Execute.Sql($"ALTER TABLE [{SchemaName}].{table} ALTER COLUMN token_hash nvarchar(256) NOT NULL;");
+        Execute.Sql($"ALTER TABLE [{SchemaName}].{table} ALTER COLUMN token_hash nvarchar(256){collate} NOT NULL;");
         Execute.Sql($"CREATE UNIQUE INDEX {uniqueIndex} ON [{SchemaName}].{table} (token_hash);");
     }
 }
