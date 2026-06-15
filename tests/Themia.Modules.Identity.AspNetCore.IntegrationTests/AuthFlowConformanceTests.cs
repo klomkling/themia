@@ -28,7 +28,7 @@ using Xunit;
 namespace Themia.Modules.Identity.AspNetCore.IntegrationTests;
 
 /// <summary>Response type returned by the /me probe endpoint.</summary>
-public sealed record MeResponse(Guid? UserId, bool IsAuthenticated);
+public sealed record MeResponse(Guid? UserId, bool IsAuthenticated, string? TenantId, bool IsPlatform);
 
 /// <summary>
 /// Abstract base for in-process HTTP integration tests covering the full JWT auth flow.
@@ -158,7 +158,7 @@ public abstract class AuthFlowConformanceTests : IAsyncLifetime
                         endpoints.MapGroup("/auth").MapIdentityAuthEndpoints();
 
                         endpoints.MapGet("/me", (ICurrentUser u) =>
-                                Results.Ok(new MeResponse(u.UserId, u.IsAuthenticated)))
+                                Results.Ok(new MeResponse(u.UserId, u.IsAuthenticated, u.TenantId, u.IsPlatform)))
                             .RequireAuthorization();
 
                         // Role-gated probe: proves [Authorize(Roles)] works through the short-claim
@@ -502,6 +502,12 @@ public abstract class AuthFlowConformanceTests : IAsyncLifetime
         Assert.NotNull(meBody);
         Assert.True(meBody.IsAuthenticated);
         Assert.Equal(userId, meBody.UserId);
+
+        // The namespaced themia:tenant_id / themia:is_platform claims are minted verbatim and left
+        // untouched by the OnTokenValidated remap, so ICurrentUser reads them on the bearer path.
+        // A tenant-scoped user resolves to the host's fixed tenant ("acme") and is not a platform user.
+        Assert.Equal(FixedTenantId, meBody.TenantId);
+        Assert.False(meBody.IsPlatform);
 
         // GET /me with no token → 401.
         var (noTokenStatus, _) = await GetMeAsync();
