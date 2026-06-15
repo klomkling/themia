@@ -19,3 +19,6 @@ Themia.Modules.Identity.AspNetCore.Signing.SymmetricSigningCredentialsProvider
 Themia.Modules.Identity.AspNetCore.Signing.SymmetricSigningCredentialsProvider.SymmetricSigningCredentialsProvider(Themia.Modules.Identity.AspNetCore.Options.JwtOptions! options) -> void
 Themia.Modules.Identity.AspNetCore.Signing.SymmetricSigningCredentialsProvider.SigningCredentials.get -> Microsoft.IdentityModel.Tokens.SigningCredentials!
 Themia.Modules.Identity.AspNetCore.Signing.SymmetricSigningCredentialsProvider.ValidationKey.get -> Microsoft.IdentityModel.Tokens.SecurityKey!
+Themia.Modules.Identity.AspNetCore.Tokens.AccessTokenService
+Themia.Modules.Identity.AspNetCore.Tokens.AccessTokenService.AccessTokenService(Themia.Modules.Identity.AspNetCore.Signing.IJwtSigningCredentialsProvider! credentials, Themia.Modules.Identity.AspNetCore.Options.JwtOptions! options, System.TimeProvider! timeProvider) -> void
+Themia.Modules.Identity.AspNetCore.Tokens.AccessTokenService.Issue(System.Security.Claims.ClaimsPrincipal! principal) -> Themia.Modules.Identity.Abstractions.Authentication.AccessToken
