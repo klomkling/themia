@@ -17,5 +17,6 @@ public static class IdentityDapperMappings
         registry.Register<UserClaim>(EntityMapping.ForConvention<UserClaim>("identity.user_claims", null));
         registry.Register<RoleClaim>(EntityMapping.ForConvention<RoleClaim>("identity.role_claims", null));
         registry.Register<UserToken>(EntityMapping.ForConvention<UserToken>("identity.user_tokens", null));
+        registry.Register<RefreshToken>(EntityMapping.ForConvention<RefreshToken>("identity.refresh_tokens", null));
     }
 }
