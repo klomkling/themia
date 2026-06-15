@@ -44,19 +44,20 @@ public sealed class EfRepository<T, TKey>(ThemiaDbContext context, IDataFilterSc
         ArgumentNullException.ThrowIfNull(specification);
         ArgumentNullException.ThrowIfNull(set);
 
-        // Validate the setters once up front against a counting collector — this enforces the same empty-setter
-        // and direct-property-access contract as the Dapper peer (identical failure for identical misuse), before
-        // any SQL is emitted. The real EF update below re-invokes set against the live UpdateSettersBuilder.
-        var counter = new CountingBulkUpdateSetters();
-        set(counter);
-        if (counter.Count == 0)
+        // Invoke the caller's setter lambda exactly once against a collector. The collector enforces the same
+        // direct-property-access contract as the Dapper peer (uniform ArgumentException for a non-member
+        // expression) and captures each setter for replay, while the empty-setter guard below enforces the same
+        // InvalidOperationException as the Dapper peer (identical failure for identical misuse).
+        var collector = new EfBulkUpdateSetters();
+        set(collector);
+        if (collector.Setters.Count == 0)
             throw new InvalidOperationException("UpdateWhereAsync requires at least one Set(...) call.");
 
         // Build the WHERE from the normal read path (criteria + tenant global query filter, with
-        // WithoutTenantFilter honoured), then translate the collected setters straight onto EF's
-        // UpdateSettersBuilder. The tenant predicate is thus part of the emitted UPDATE by construction.
+        // WithoutTenantFilter honoured), then replay the collected setters onto EF's UpdateSettersBuilder.
+        // The tenant predicate is thus part of the emitted UPDATE by construction.
         var affected = await CountQuery(specification).ExecuteUpdateAsync(
-            builder => set(new EfBulkUpdateSetters(builder)),
+            builder => { foreach (var setter in collector.Setters) setter(builder); },
             cancellationToken).ConfigureAwait(false);
 
         // ExecuteUpdate writes straight to the database and does NOT touch the change tracker, so any
@@ -72,29 +73,20 @@ public sealed class EfRepository<T, TKey>(ThemiaDbContext context, IDataFilterSc
         return affected;
     }
 
-    // Adapts the provider-agnostic IBulkUpdateSetters onto EF Core's UpdateSettersBuilder. Each Set
-    // forwards to SetProperty(property, value) — the constant-value overload — so no expression trees
-    // are hand-built. Returns itself for chaining.
-    private sealed class EfBulkUpdateSetters(UpdateSettersBuilder<T> builder) : IBulkUpdateSetters<T>
+    // Collects the caller's setters in a single pass (so the caller's lambda runs exactly once). Each Set
+    // validates the expression through the shared helper — a non-member-access setter fails with the same
+    // uniform ArgumentException as the Dapper/fake peers — then captures a SetProperty(property, value) call
+    // (the constant-value overload, so no expression trees are hand-built) for later replay onto EF Core's
+    // UpdateSettersBuilder. Returns itself for chaining.
+    private sealed class EfBulkUpdateSetters : IBulkUpdateSetters<T>
     {
-        public IBulkUpdateSetters<T> Set<TProperty>(Expression<Func<T, TProperty>> property, TProperty value)
-        {
-            builder.SetProperty(property, value);
-            return this;
-        }
-    }
-
-    // Dry-run collector used to validate the setters before SQL is emitted: counts the Set(...) calls and
-    // routes each expression through the shared helper so a non-member-access setter fails with the same
-    // uniform ArgumentException as the Dapper/fake peers.
-    private sealed class CountingBulkUpdateSetters : IBulkUpdateSetters<T>
-    {
-        public int Count { get; private set; }
+        public List<Action<UpdateSettersBuilder<T>>> Setters { get; } = [];
 
         public IBulkUpdateSetters<T> Set<TProperty>(Expression<Func<T, TProperty>> property, TProperty value)
         {
-            BulkUpdateSetters.MemberName(property);
-            Count++;
+            ArgumentNullException.ThrowIfNull(property);
+            _ = BulkUpdateSetters.MemberName(property);   // uniform ArgumentException for a non-member expression
+            Setters.Add(builder => builder.SetProperty(property, value));
             return this;
         }
     }

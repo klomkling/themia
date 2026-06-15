@@ -27,6 +27,10 @@ public interface IRepository<T, in TKey> : IReadRepository<T, TKey> where T : cl
     /// In the EF Core peer, only <em>Unchanged</em> tracked entities of <typeparamref name="T"/> are detached after
     /// the write so subsequent reads observe the bulk update; staged inserts (Added) and pending in-memory
     /// modifications (Modified) are preserved, so a caller's un-saved intent is never silently dropped.
+    /// Consequence on the EF Core peer: if you hold a tracked, modified entity that this bulk update also matches,
+    /// your later <c>SaveChangesAsync</c> re-writes that entity's columns from its tracked snapshot — overwriting the
+    /// bulk-updated values for that row (last-writer-wins). The Dapper peer has no change tracker and keeps the bulk
+    /// value. Avoid mixing a tracked edit with an overlapping bulk update in the same unit of work.
     /// </remarks>
     /// <returns>The number of rows updated.</returns>
     Task<int> UpdateWhereAsync(
