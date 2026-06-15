@@ -38,3 +38,27 @@ Themia.Modules.Identity.AspNetCore.Authentication.AuthenticationFlow.LogoutAsync
 Themia.Modules.Identity.AspNetCore.DependencyInjection.IdentityAspNetCoreServiceCollectionExtensions
 static Themia.Modules.Identity.AspNetCore.DependencyInjection.IdentityAspNetCoreServiceCollectionExtensions.AddThemiaIdentityAspNetCore(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Themia.Modules.Identity.AspNetCore.Options.JwtOptions!>! configure) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
 static Themia.Modules.Identity.AspNetCore.DependencyInjection.IdentityAspNetCoreServiceCollectionExtensions.AddThemiaJwtBearer(this Microsoft.AspNetCore.Authentication.AuthenticationBuilder! builder, string? scheme = null) -> Microsoft.AspNetCore.Authentication.AuthenticationBuilder!
+Themia.Modules.Identity.AspNetCore.Endpoints.LoginRequest
+Themia.Modules.Identity.AspNetCore.Endpoints.LoginRequest.LoginRequest(string! UserName, string! Password) -> void
+Themia.Modules.Identity.AspNetCore.Endpoints.LoginRequest.UserName.get -> string!
+Themia.Modules.Identity.AspNetCore.Endpoints.LoginRequest.UserName.init -> void
+Themia.Modules.Identity.AspNetCore.Endpoints.LoginRequest.Password.get -> string!
+Themia.Modules.Identity.AspNetCore.Endpoints.LoginRequest.Password.init -> void
+Themia.Modules.Identity.AspNetCore.Endpoints.RefreshRequest
+Themia.Modules.Identity.AspNetCore.Endpoints.RefreshRequest.RefreshRequest(string! RefreshToken) -> void
+Themia.Modules.Identity.AspNetCore.Endpoints.RefreshRequest.RefreshToken.get -> string!
+Themia.Modules.Identity.AspNetCore.Endpoints.RefreshRequest.RefreshToken.init -> void
+Themia.Modules.Identity.AspNetCore.Endpoints.LogoutRequest
+Themia.Modules.Identity.AspNetCore.Endpoints.LogoutRequest.LogoutRequest(string! RefreshToken) -> void
+Themia.Modules.Identity.AspNetCore.Endpoints.LogoutRequest.RefreshToken.get -> string!
+Themia.Modules.Identity.AspNetCore.Endpoints.LogoutRequest.RefreshToken.init -> void
+Themia.Modules.Identity.AspNetCore.Endpoints.AuthResponse
+Themia.Modules.Identity.AspNetCore.Endpoints.AuthResponse.AuthResponse(string! AccessToken, int ExpiresIn, string! RefreshToken) -> void
+Themia.Modules.Identity.AspNetCore.Endpoints.AuthResponse.AccessToken.get -> string!
+Themia.Modules.Identity.AspNetCore.Endpoints.AuthResponse.AccessToken.init -> void
+Themia.Modules.Identity.AspNetCore.Endpoints.AuthResponse.ExpiresIn.get -> int
+Themia.Modules.Identity.AspNetCore.Endpoints.AuthResponse.ExpiresIn.init -> void
+Themia.Modules.Identity.AspNetCore.Endpoints.AuthResponse.RefreshToken.get -> string!
+Themia.Modules.Identity.AspNetCore.Endpoints.AuthResponse.RefreshToken.init -> void
+Themia.Modules.Identity.AspNetCore.Endpoints.IdentityAuthEndpointRouteBuilderExtensions
+static Themia.Modules.Identity.AspNetCore.Endpoints.IdentityAuthEndpointRouteBuilderExtensions.MapIdentityAuthEndpoints(this Microsoft.AspNetCore.Routing.IEndpointRouteBuilder! endpoints) -> Microsoft.AspNetCore.Routing.IEndpointRouteBuilder!
