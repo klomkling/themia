@@ -1,2 +1,25 @@
 #nullable enable
+Themia.Modules.Identity.Abstractions.Entities.RefreshToken
+Themia.Modules.Identity.Abstractions.Entities.RefreshToken.ConsumedAt.get -> System.DateTimeOffset?
+Themia.Modules.Identity.Abstractions.Entities.RefreshToken.ConsumedAt.set -> void
+Themia.Modules.Identity.Abstractions.Entities.RefreshToken.CreatedAt.get -> System.DateTimeOffset
+Themia.Modules.Identity.Abstractions.Entities.RefreshToken.CreatedAt.set -> void
+Themia.Modules.Identity.Abstractions.Entities.RefreshToken.ExpiresAt.get -> System.DateTimeOffset
+Themia.Modules.Identity.Abstractions.Entities.RefreshToken.ExpiresAt.set -> void
+Themia.Modules.Identity.Abstractions.Entities.RefreshToken.FamilyId.get -> System.Guid
+Themia.Modules.Identity.Abstractions.Entities.RefreshToken.FamilyId.set -> void
+Themia.Modules.Identity.Abstractions.Entities.RefreshToken.Id.get -> System.Guid
+Themia.Modules.Identity.Abstractions.Entities.RefreshToken.Id.set -> void
+Themia.Modules.Identity.Abstractions.Entities.RefreshToken.RefreshToken() -> void
+Themia.Modules.Identity.Abstractions.Entities.RefreshToken.ReplacedById.get -> System.Guid?
+Themia.Modules.Identity.Abstractions.Entities.RefreshToken.ReplacedById.set -> void
+Themia.Modules.Identity.Abstractions.Entities.RefreshToken.RevokedAt.get -> System.DateTimeOffset?
+Themia.Modules.Identity.Abstractions.Entities.RefreshToken.RevokedAt.set -> void
+Themia.Modules.Identity.Abstractions.Entities.RefreshToken.SetId(System.Guid id) -> void
+Themia.Modules.Identity.Abstractions.Entities.RefreshToken.TokenHash.get -> string!
+Themia.Modules.Identity.Abstractions.Entities.RefreshToken.TokenHash.set -> void
+Themia.Modules.Identity.Abstractions.Entities.RefreshToken.UserId.get -> System.Guid
+Themia.Modules.Identity.Abstractions.Entities.RefreshToken.UserId.set -> void
 Themia.Modules.Identity.Abstractions.IClaimService.GetEffectiveClaimsAsync(System.Guid userId, System.Collections.Generic.IReadOnlyCollection<System.Guid>! roleIds, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<System.Security.Claims.Claim!>!>!
+Themia.Modules.Identity.Abstractions.IdentityModuleOptions.RefreshTokenLifetime.get -> System.TimeSpan
+Themia.Modules.Identity.Abstractions.IdentityModuleOptions.RefreshTokenLifetime.set -> void

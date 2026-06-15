@@ -18,6 +18,9 @@ public sealed class IdentityModuleOptions
     /// <summary>Default lifetime for generated <see cref="Entities.TokenPurpose"/> tokens. Defaults to 1 hour.</summary>
     public TimeSpan DefaultTokenLifetime { get; set; } = TimeSpan.FromHours(1);
 
+    /// <summary>The lifetime of an issued refresh token. Default 14 days.</summary>
+    public TimeSpan RefreshTokenLifetime { get; set; } = TimeSpan.FromDays(14);
+
     /// <summary>
     /// Validates that the configured policy values are internally consistent, throwing if any would
     /// produce a broken runtime (for example a zero lockout threshold that locks an account on the
@@ -46,6 +49,12 @@ public sealed class IdentityModuleOptions
         {
             throw new ArgumentOutOfRangeException(
                 nameof(DefaultTokenLifetime), DefaultTokenLifetime, "Must be a positive duration.");
+        }
+
+        if (RefreshTokenLifetime <= TimeSpan.Zero)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(RefreshTokenLifetime), RefreshTokenLifetime, "Must be a positive duration.");
         }
 
         if (string.IsNullOrWhiteSpace(ConnectionStringName))
