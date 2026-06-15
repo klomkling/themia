@@ -58,6 +58,8 @@ public sealed class LoginSucceededContext(User user) : AuthenticationHookContext
 }
 
 /// <summary>Runs on any login failure with the real internal reason (audit only).</summary>
+/// <remarks>Intentionally does not extend <see cref="AuthenticationHookContext"/> — a login that has
+/// already failed cannot be denied; this context is audit-only.</remarks>
 /// <param name="userName">The presented login name.</param>
 /// <param name="reason">The real internal reason.</param>
 public sealed class LoginFailedContext(string userName, LoginFailureReason reason)
@@ -73,6 +75,8 @@ public sealed class LoginFailedContext(string userName, LoginFailureReason reaso
 public sealed class BeforeRefreshContext : AuthenticationHookContext;
 
 /// <summary>Runs after a successful rotation, before the new pair is returned.</summary>
+/// <remarks>The rotation is already committed when this runs; denying here returns a uniform 401 but
+/// does not roll back the rotation — the successor token simply expires unused.</remarks>
 /// <param name="user">The user whose token was rotated.</param>
 public sealed class RefreshSucceededContext(User user) : AuthenticationHookContext
 {

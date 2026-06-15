@@ -52,8 +52,8 @@ public readonly record struct RefreshValidationResult
 }
 
 /// <summary>Issues, rotates, and revokes refresh tokens. All operations resolve the owning user in the
-/// ambient tenant (else genuine platform) scope before reading or writing, so cross-tenant tokens are
-/// never touched.</summary>
+/// ambient tenant (else genuine platform) scope before acting on a token, so cross-tenant tokens can
+/// never be rotated, revoked, or accepted.</summary>
 public interface IRefreshTokenService
 {
     /// <summary>Issues a new refresh token for a user, optionally continuing an existing family.</summary>

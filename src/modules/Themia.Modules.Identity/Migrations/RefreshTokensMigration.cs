@@ -39,6 +39,9 @@ public sealed class RefreshTokensMigration : Migration
         Create.Index("ix_refresh_tokens_user").OnTable("refresh_tokens").InSchema(SchemaName)
             .OnColumn("user_id").Ascending();
 
+        Create.Index("ix_refresh_tokens_family").OnTable("refresh_tokens").InSchema(SchemaName)
+            .OnColumn("family_id").Ascending();
+
         Create.Index("ux_refresh_tokens_token_hash").OnTable("refresh_tokens").InSchema(SchemaName)
             .OnColumn("token_hash").Ascending().WithOptions().Unique();
 

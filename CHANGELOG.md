@@ -30,7 +30,7 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 - **`identity.refresh_tokens` table** — FluentMigrator migration (PostgreSQL + SQL Server);
   `RefreshTokenService` ships in the Identity core (`Themia.Modules.Identity`) and runs on both
   EF Core and Dapper data peers.
-- **`IdentityModuleOptions.RefreshTokenLifetime`** — configurable refresh-token TTL (default 30 days).
+- **`IdentityModuleOptions.RefreshTokenLifetime`** — configurable refresh-token TTL (default 14 days).
 
 ### Security
 

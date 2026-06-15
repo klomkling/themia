@@ -11,6 +11,8 @@ namespace Themia.Modules.Identity.AspNetCore.Tokens;
 /// stamping issuer/audience/expiry from <see cref="JwtOptions"/>.</summary>
 public sealed class AccessTokenService : IAccessTokenService
 {
+    private static readonly JsonWebTokenHandler Handler = new();
+
     private readonly IJwtSigningCredentialsProvider credentials;
     private readonly JwtOptions options;
     private readonly TimeProvider timeProvider;
@@ -48,7 +50,7 @@ public sealed class AccessTokenService : IAccessTokenService
             SigningCredentials = credentials.SigningCredentials,
         };
 
-        var token = new JsonWebTokenHandler().CreateToken(descriptor);
+        var token = Handler.CreateToken(descriptor);
         return new AccessToken(token, expires);
     }
 }

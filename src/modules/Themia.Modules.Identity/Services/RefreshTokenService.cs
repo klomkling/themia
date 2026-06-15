@@ -10,8 +10,10 @@ using Themia.Modules.Identity.Specifications;
 namespace Themia.Modules.Identity.Services;
 
 /// <summary>Default <see cref="IRefreshTokenService"/>. Persists only token hashes; raw tokens are
-/// returned once. Resolves the owning user in scope before any read or write so cross-tenant tokens
-/// are never touched. Rotation chains a family; replaying a consumed/revoked token revokes the family.</summary>
+/// returned once. Resolves the owning user in scope before any read or write — a cross-tenant token
+/// can never be rotated, revoked, or accepted (its row may be read by hash, but is rejected once the
+/// owner fails to resolve in scope). Rotation chains a family; replaying a consumed/revoked token
+/// revokes the family.</summary>
 public sealed class RefreshTokenService : IRefreshTokenService
 {
     private const int TokenByteLength = 32;
