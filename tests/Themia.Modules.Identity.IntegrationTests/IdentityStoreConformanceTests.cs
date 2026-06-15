@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Themia.Framework.Core.Abstractions.Tenancy;
 using Themia.Framework.Data.Abstractions.Auditing;
 using Themia.Modules.Identity.Abstractions;
+using Themia.Modules.Identity.Abstractions.Authentication;
 using Themia.Modules.Identity.Abstractions.Entities;
 using Themia.Modules.Identity.DependencyInjection;
 using Xunit;
@@ -33,6 +34,7 @@ public abstract class IdentityStoreConformanceTests
         public IRoleService Roles => Inner.ServiceProvider.GetRequiredService<IRoleService>();
         public IClaimService Claims => Inner.ServiceProvider.GetRequiredService<IClaimService>();
         public IUserTokenService Tokens => Inner.ServiceProvider.GetRequiredService<IUserTokenService>();
+        public IRefreshTokenService RefreshTokens => Inner.ServiceProvider.GetRequiredService<IRefreshTokenService>();
 
         public async ValueTask DisposeAsync()
         {
@@ -282,5 +284,89 @@ public abstract class IdentityStoreConformanceTests
         {
             Assert.False(await b.Roles.RemoveRoleAsync(userId, roleId));
         }
+    }
+
+    [Fact]
+    public async Task Refresh_issue_persists_hash_not_raw_and_returns_family()
+    {
+        await ResetAsync();
+        await using var s = NewScope(new TenantId("acme"));
+        var created = await s.Users.CreateAsync("rt-issue", "pw");
+        var issue = await s.RefreshTokens.IssueAsync(created.UserId!.Value);
+        Assert.NotEmpty(issue.RawToken);
+        Assert.NotEqual(Guid.Empty, issue.FamilyId);
+        Assert.True(issue.ExpiresAt > DateTimeOffset.UtcNow);
+    }
+
+    [Fact]
+    public async Task Refresh_rotate_consumes_and_chains_same_family()
+    {
+        await ResetAsync();
+        await using var s = NewScope(new TenantId("acme"));
+        var u = await s.Users.CreateAsync("rt-rotate", "pw");
+        var issue = await s.RefreshTokens.IssueAsync(u.UserId!.Value);
+
+        var result = await s.RefreshTokens.ValidateAndRotateAsync(issue.RawToken);
+        Assert.Equal(RefreshOutcome.Success, result.Outcome);
+        Assert.NotNull(result.Replacement);
+        Assert.Equal(issue.FamilyId, result.Replacement!.Value.FamilyId);
+        Assert.Equal(u.UserId, result.User!.Id);
+    }
+
+    [Fact]
+    public async Task Refresh_replay_after_rotation_revokes_family()
+    {
+        await ResetAsync();
+        await using var s = NewScope(new TenantId("acme"));
+        var u = await s.Users.CreateAsync("rt-replay", "pw");
+        var issue = await s.RefreshTokens.IssueAsync(u.UserId!.Value);
+        var rotated = await s.RefreshTokens.ValidateAndRotateAsync(issue.RawToken);
+
+        var replay = await s.RefreshTokens.ValidateAndRotateAsync(issue.RawToken);
+        Assert.Equal(RefreshOutcome.ReuseDetected, replay.Outcome);
+
+        var successor = await s.RefreshTokens.ValidateAndRotateAsync(rotated.Replacement!.Value.RawToken);
+        Assert.Equal(RefreshOutcome.ReuseDetected, successor.Outcome);
+    }
+
+    [Fact]
+    public async Task Refresh_unknown_token_is_invalid()
+    {
+        await ResetAsync();
+        await using var s = NewScope(new TenantId("acme"));
+        var result = await s.RefreshTokens.ValidateAndRotateAsync("not-a-real-token");
+        Assert.Equal(RefreshOutcome.Invalid, result.Outcome);
+    }
+
+    [Fact]
+    public async Task Refresh_token_of_another_tenant_is_invalid()
+    {
+        await ResetAsync();
+        string raw;
+        await using (var a = NewScope(new TenantId("a")))
+        {
+            var u = await a.Users.CreateAsync("rt-iso", "pw");
+            raw = (await a.RefreshTokens.IssueAsync(u.UserId!.Value)).RawToken;
+        }
+        await using (var b = NewScope(new TenantId("b"), allowPlatformLogin: false))
+        {
+            var result = await b.RefreshTokens.ValidateAndRotateAsync(raw);
+            Assert.Equal(RefreshOutcome.Invalid, result.Outcome);
+        }
+    }
+
+    [Fact]
+    public async Task Revoke_all_invalidates_every_session()
+    {
+        await ResetAsync();
+        await using var s = NewScope(new TenantId("acme"));
+        var u = await s.Users.CreateAsync("rt-revoke-all", "pw");
+        var first = await s.RefreshTokens.IssueAsync(u.UserId!.Value);
+        var second = await s.RefreshTokens.IssueAsync(u.UserId!.Value);
+
+        await s.RefreshTokens.RevokeAsync(first.RawToken, allForUser: true);
+
+        Assert.Equal(RefreshOutcome.ReuseDetected, (await s.RefreshTokens.ValidateAndRotateAsync(first.RawToken)).Outcome);
+        Assert.Equal(RefreshOutcome.ReuseDetected, (await s.RefreshTokens.ValidateAndRotateAsync(second.RawToken)).Outcome);
     }
 }

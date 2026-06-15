@@ -139,3 +139,23 @@ internal sealed class RolesByIdsSpec : Specification<Role>
         WithoutTenantFilter();
     }
 }
+
+/// <summary>The single refresh token matching an exact (deterministic SHA-256) hash. No tenant column
+/// exists; the owning user is resolved in scope by the service, which is what enforces isolation.</summary>
+internal sealed class RefreshTokenByHashSpec : Specification<RefreshToken>
+{
+    public RefreshTokenByHashSpec(string tokenHash) => Where(t => t.TokenHash == tokenHash);
+}
+
+/// <summary>Every token in a rotation family (for family revocation).</summary>
+internal sealed class RefreshTokensByFamilySpec : Specification<RefreshToken>
+{
+    public RefreshTokensByFamilySpec(Guid familyId) => Where(t => t.FamilyId == familyId);
+}
+
+/// <summary>A user's non-expired, non-revoked tokens (for revoke-all).</summary>
+internal sealed class ActiveRefreshTokensByUserSpec : Specification<RefreshToken>
+{
+    public ActiveRefreshTokensByUserSpec(Guid userId, DateTimeOffset now) =>
+        Where(t => t.UserId == userId && t.RevokedAt == null && t.ExpiresAt > now);
+}
