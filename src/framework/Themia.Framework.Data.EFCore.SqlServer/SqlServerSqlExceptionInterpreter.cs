@@ -18,16 +18,8 @@ internal sealed class SqlServerSqlExceptionInterpreter : ISqlExceptionInterprete
     private const int DuplicateKeyInUniqueIndex = 2601;
 
     /// <inheritdoc />
-    public bool IsUniqueConstraintViolation(Exception? exception)
-    {
-        for (var current = exception; current is not null; current = current.InnerException)
-        {
-            if (current is SqlException { Number: UniqueConstraintViolation or DuplicateKeyInUniqueIndex })
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
+    public bool IsUniqueConstraintViolation(Exception? exception) =>
+        ExceptionChain.Any(
+            exception,
+            current => current is SqlException { Number: UniqueConstraintViolation or DuplicateKeyInUniqueIndex });
 }

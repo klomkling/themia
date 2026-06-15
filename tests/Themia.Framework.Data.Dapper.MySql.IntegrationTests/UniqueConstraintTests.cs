@@ -48,6 +48,44 @@ public sealed class UniqueConstraintTests(MySqlContainerFixture fixture) : IClas
         Assert.NotEqual(MySqlErrorCode.DuplicateKeyEntry, ex.ErrorCode);
     }
 
+    /// <summary>
+    /// A duplicate on a NAMED unique index (not the PK) is the case MySQL/MariaDB may report as error 1586
+    /// (<see cref="MySqlErrorCode.DuplicateEntryWithKeyName"/>, ER_DUP_ENTRY_WITH_KEY_NAME) instead of 1062.
+    /// The interpreter must classify whichever code the engine emits as a unique violation, so the typed
+    /// <see cref="UniqueConstraintException"/> contract holds for named-index duplicates too.
+    /// </summary>
+    [Fact]
+    public async Task NamedUniqueIndexDuplicate_IsUniqueConstraintViolation()
+    {
+        await fixture.ResetAsync();
+        await using var provider = BuildProvider();
+        var interpreter = provider.GetRequiredService<ISqlExceptionInterpreter>();
+
+        await using var connection = new MySqlConnection(fixture.ConnectionString);
+        await connection.OpenAsync();
+        await ExecuteAsync(connection, "DROP TABLE IF EXISTS named_index_widgets");
+        await ExecuteAsync(
+            connection,
+            "CREATE TABLE named_index_widgets (id INT NOT NULL AUTO_INCREMENT PRIMARY KEY, code VARCHAR(50) NOT NULL, CONSTRAINT uq_named_index_widgets_code UNIQUE (code))");
+        await ExecuteAsync(connection, "INSERT INTO named_index_widgets (code) VALUES ('dup')");
+
+        var ex = await Assert.ThrowsAsync<MySqlException>(
+            () => ExecuteAsync(connection, "INSERT INTO named_index_widgets (code) VALUES ('dup')"));
+
+        // Engine may emit 1062 or 1586 for a named-index duplicate; both must be classified as unique.
+        Assert.True(
+            ex.ErrorCode is MySqlErrorCode.DuplicateKeyEntry or MySqlErrorCode.DuplicateEntryWithKeyName,
+            $"Expected a duplicate-entry error code, got {ex.ErrorCode}.");
+        Assert.True(interpreter.IsUniqueConstraintViolation(ex));
+    }
+
+    private static async Task ExecuteAsync(MySqlConnection connection, string sql)
+    {
+        await using var command = connection.CreateCommand();
+        command.CommandText = sql;
+        await command.ExecuteNonQueryAsync();
+    }
+
     private ServiceProvider BuildProvider()
     {
         var configuration = new ConfigurationBuilder()

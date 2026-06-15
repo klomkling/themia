@@ -16,16 +16,6 @@ public sealed class SqlStateUniqueConstraintInterpreter : ISqlExceptionInterpret
     private const string UniqueViolation = "23505";
 
     /// <inheritdoc />
-    public bool IsUniqueConstraintViolation(Exception? exception)
-    {
-        for (var current = exception; current is not null; current = current.InnerException)
-        {
-            if (current is DbException { SqlState: UniqueViolation })
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
+    public bool IsUniqueConstraintViolation(Exception? exception) =>
+        ExceptionChain.Any(exception, current => current is DbException { SqlState: UniqueViolation });
 }

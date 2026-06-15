@@ -42,7 +42,9 @@ Themia.Framework.Data.Abstractions.Auditing.ICurrentUserAccessor.UserId.get -> s
 Themia.Framework.Data.Abstractions.Exceptions.ConcurrencyException
 Themia.Framework.Data.Abstractions.Exceptions.ConcurrencyException.ConcurrencyException(string! message) -> void
 Themia.Framework.Data.Abstractions.Exceptions.ConcurrencyException.ConcurrencyException(string! message, System.Exception! innerException) -> void
+Themia.Framework.Data.Abstractions.Exceptions.ExceptionChain
 Themia.Framework.Data.Abstractions.Exceptions.ISqlExceptionInterpreter
+static Themia.Framework.Data.Abstractions.Exceptions.ExceptionChain.Any(System.Exception? exception, System.Func<System.Exception!, bool>! predicate) -> bool
 Themia.Framework.Data.Abstractions.Exceptions.ISqlExceptionInterpreter.IsUniqueConstraintViolation(System.Exception? exception) -> bool
 Themia.Framework.Data.Abstractions.Exceptions.SqlStateUniqueConstraintInterpreter
 Themia.Framework.Data.Abstractions.Exceptions.SqlStateUniqueConstraintInterpreter.SqlStateUniqueConstraintInterpreter() -> void

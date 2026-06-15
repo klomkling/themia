@@ -112,6 +112,11 @@ public sealed class RefreshTokenService : IRefreshTokenService
         {
             await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         }
+        // ConcurrencyException is deliberately NOT caught here: RefreshToken carries no optimistic-concurrency
+        // token today, so the parent UPDATE always affects its row and the filtered unique index on
+        // replaced_token_id is the sole race gate. If RefreshToken later gains a row-version (issue #86
+        // follow-up), this catch must also handle ConcurrencyException. Do not add that clause until then —
+        // it would handle a currently-impossible scenario.
         catch (UniqueConstraintException)
         {
             return RefreshValidationResult.Invalid();
