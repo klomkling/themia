@@ -407,23 +407,21 @@ public abstract class IdentityStoreConformanceTests
     }
 
     [Fact]
-    public async Task Refresh_replay_after_owner_soft_deleted_still_revokes_family()
+    public async Task Refresh_after_owner_soft_deleted_returns_invalid()
     {
+        // Tenant isolation by construction: ValidateAndRotateAsync resolves the owner in scope BEFORE
+        // acting on the token. A soft-deleted (or out-of-scope) owner does not resolve, so the token —
+        // including a replayed consumed one — returns Invalid rather than triggering a family-revoke
+        // write. Accepted tradeoff: a deleted account's replayed consumed token does not emit the
+        // reuse/theft signal (its tokens are already unusable for authentication).
         await ResetAsync();
         await using var s = NewScope(new TenantId("acme"));
-        var u = await s.Users.CreateAsync("rt-deleted-reuse", "pw");
+        var u = await s.Users.CreateAsync("rt-deleted", "pw");
         var issue = await s.RefreshTokens.IssueAsync(u.UserId!.Value);
-        var rotated = await s.RefreshTokens.ValidateAndRotateAsync(issue.RawToken); // consumes original
-        Assert.Equal(RefreshOutcome.Success, rotated.Outcome);
+        await s.RefreshTokens.ValidateAndRotateAsync(issue.RawToken); // consume original
+        Assert.True(await s.Users.DeleteAsync(u.UserId!.Value));      // soft-delete owner
 
-        Assert.True(await s.Users.DeleteAsync(u.UserId!.Value)); // soft-delete the owner
-
-        // Replaying the consumed original must still be ReuseDetected (reuse-check precedes user resolution),
-        // and the successor's family is revoked.
-        var replay = await s.RefreshTokens.ValidateAndRotateAsync(issue.RawToken);
-        Assert.Equal(RefreshOutcome.ReuseDetected, replay.Outcome);
-        var successor = await s.RefreshTokens.ValidateAndRotateAsync(rotated.Replacement!.Value.RawToken);
-        Assert.Equal(RefreshOutcome.ReuseDetected, successor.Outcome);
+        Assert.Equal(RefreshOutcome.Invalid, (await s.RefreshTokens.ValidateAndRotateAsync(issue.RawToken)).Outcome);
     }
 
     [Fact]
