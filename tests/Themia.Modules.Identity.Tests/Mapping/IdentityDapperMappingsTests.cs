@@ -30,5 +30,6 @@ public class IdentityDapperMappingsTests
         Assert.Equal("identity.user_claims", registry.For<UserClaim>().Table);
         Assert.Equal("identity.role_claims", registry.For<RoleClaim>().Table);
         Assert.Equal("identity.user_tokens", registry.For<UserToken>().Table);
+        Assert.Equal("identity.refresh_tokens", registry.For<RefreshToken>().Table);
     }
 }

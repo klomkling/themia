@@ -4,9 +4,10 @@ using Themia.Data.Migrations;
 using Themia.Modules.Identity.Migrations;
 using Xunit;
 
-namespace Themia.Modules.Identity.IntegrationTests.Fixtures;
+namespace Themia.Modules.Identity.AspNetCore.IntegrationTests.Fixtures;
 
-public sealed class SqlServerIdentityFixture : IAsyncLifetime
+/// <summary>Starts a SQL Server Testcontainer, runs Identity migrations, and exposes a reset helper.</summary>
+public sealed class SqlServerAuthFixture : IAsyncLifetime
 {
     private readonly MsSqlContainer container = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-CU14-ubuntu-22.04")
         .WithCleanUp(true)
@@ -14,13 +15,11 @@ public sealed class SqlServerIdentityFixture : IAsyncLifetime
 
     public string ConnectionString { get; private set; } = string.Empty;
 
-    public MigrationEngine Engine => MigrationEngine.SqlServer;
-
     public async Task InitializeAsync()
     {
         await container.StartAsync();
         ConnectionString = container.GetConnectionString();
-        ThemiaMigrations.Run(Engine, ConnectionString, typeof(IdentitySchemaMigration).Assembly);
+        ThemiaMigrations.Run(MigrationEngine.SqlServer, ConnectionString, typeof(IdentitySchemaMigration).Assembly);
     }
 
     public async Task DisposeAsync() => await container.DisposeAsync();

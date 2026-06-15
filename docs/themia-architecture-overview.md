@@ -112,7 +112,8 @@ you the target: `neutral/` = net8.0;net10.0, everything else = net10.0 (tooling 
 |---|---|---|
 | `Themia.Modules.Scheduling` (+ `Themia.Quartz`) | PowerACC SilkierQuartz | **✅ built** (`Themia.Quartz` neutral core + `Themia.Modules.Scheduling`; dashboard smoke + EF store integration green) |
 | `Themia.Modules.ExceptionLogging` (+ `Themia.Exceptional.*`) | PowerACC/Idevs custom Dapper dialect engine (3 DB). *typed-exceptions + ProblemDetails split out to standalone neutral `Themia.AspNetCore`* | **✅ specced** |
-| `Themia.Modules.Identity` | ezy-assets `Jwt/Authentication/RoleAccess/TenantContext/LineLogin` + claims/policies + Zenity Identity.Example | ⬜ **P1 — next to spec** |
+| `Themia.Modules.Identity` (+ `.Abstractions`) | ezy-assets `Jwt/Authentication/RoleAccess/TenantContext/LineLogin` + claims/policies + Zenity Identity.Example | **✅ built** (0.5.0 — tenant-aware user/role/claim store, argon2id, `ICurrentUser`, EF+Dapper, PostgreSQL+SQL Server FM schema) |
+| `Themia.Modules.Identity.AspNetCore` | ezy-assets JWT + authentication flows | **✅ built** (0.5.1 — JWT issuance, rotating refresh tokens, `IAuthenticationFlow`, `MapIdentityAuthEndpoints`) |
 | `Themia.Modules.Storage` | **ezy-assets** S3/Local + **Idevs** `CloudUploadStorage` + **PowerACC** ClamAV scan | ⬜ **P1 — next to spec** |
 | `Themia.Modules.Notifications` | ezy-assets `NotificationDispatcher`/Email/OTP/`Sms2Pro` | ⬜ to-spec |
 | `Themia.Modules.Pdf` | **ezy-assets** Contract/Proposal PDF + **Idevs** `PdfOptionsBuilder`/PuppeteerSharp + PowerACC reporting | ⬜ to-spec |
@@ -268,8 +269,42 @@ spec). Later phases extend (SQLite, Oracle) without public-surface breaks.
 - ✅ `docs/superpowers/specs/2026-06-01-themia-release-strategy-design.md` (versioning + build order)
 - ✅ `docs/superpowers/specs/2026-06-01-themia-quartz-scheduling-design.md`
 - ✅ `docs/superpowers/specs/2026-06-01-themia-exceptional-design.md`
+- ✅ `docs/superpowers/specs/2026-06-14-themia-identity-core-design.md` (Identity core — 0.5.0)
+- ✅ `docs/superpowers/specs/2026-06-15-themia-identity-jwt-design.md` (Identity JWT — 0.5.1)
 - ⬜ Phase 0 framework rename (`0.2.0`) — own spec when started
-- ⬜ Identity, Storage, Notifications, Pdf, Export, … (one spec each, this catalog as parent)
+- ⬜ Storage, Notifications, Pdf, Export, … (one spec each, this catalog as parent)
+
+## Identity JWT slice (0.5.1 — 2026-06-15)
+
+`Themia.Modules.Identity.AspNetCore` (net10.0) is the HTTP/JWT layer on top of the 0.5.0 Identity
+core. Key structural decisions:
+
+- **Package split is hard.** JWT issuance and JwtBearer validation live entirely in
+  `Themia.Modules.Identity.AspNetCore`, NOT in `.Abstractions` — this keeps `.Abstractions` free
+  of `Microsoft.IdentityModel.*` / `System.IdentityModel.Tokens.Jwt` (which `Themia.AspNetCore`
+  already hosts). `IJwtSigningCredentialsProvider` and `JwtOptions` live in `.AspNetCore`.
+- **`RefreshTokenService` is in the Identity CORE** (`Themia.Modules.Identity`), beside
+  `UserTokenService`, reusing the internal `IdentityScope` (DbContext/connection + scope guard). It
+  runs on both EF Core and Dapper data peers. Only the HTTP-facing pieces (endpoint routing, bearer
+  validation, `IAuthenticationFlow`) are in `.AspNetCore`.
+- **`refresh_tokens` is a parent-keyed child table** (no `tenant_id` column): the token row
+  references `identity.users.id`; tenant isolation is enforced at the service layer (load user +
+  validate tenant in the same operation), not by a DB column predicate.
+- **Rotating refresh tokens with token-family reuse-detection.** On every refresh, the service
+  rotates the presented token and issues a successor in the same family. A reuse attempt
+  (presenting an already-consumed token) invalidates the entire family, forcing re-login.
+- **`RefreshTokenLifetime` lives in `IdentityModuleOptions`** (core options, not AspNetCore
+  options), because the core service owns token creation and must enforce TTL.
+- **Anti-enumeration login.** `AuthenticationFlow.LoginAsync` runs an argon2id dummy hash on
+  not-found / inactive / locked-out paths, so all failure modes take the same wall-clock time.
+- **`IAuthenticationFlow` + `IAuthenticationHooks`** are DI-replaceable seams. Hosts that need
+  custom login orchestration (e.g. 2FA, LINE login later) replace only the affected interface.
+
+**Known follow-ups (0.5.1):**
+- Concurrent double-use of a single refresh token is not yet guarded by an explicit transaction /
+  compare-and-set consume. `RefreshToken` is a plain POCO with no concurrency token, so two
+  simultaneous refreshes of the same token could both rotate successfully. This is acceptable at
+  current scale; a future hardening could add optimistic concurrency or a transactional consume.
 
 ## Decisions
 
@@ -291,6 +326,13 @@ spec). Later phases extend (SQLite, Oracle) without public-surface breaks.
    single schema/DDL authority** for all framework-owned tables (no `dotnet ef migrations add`);
    **gate on Dapper-as-peer = tenant-isolation parity with EF**, enforced by making the raw-connection
    bypass conspicuous + an analyzer build-time rule. See Data-access peers & schema authority §.
+
+**Resolved (2026-06-15):**
+7. ✅ **Identity JWT package split** — JWT/HTTP pieces in `Themia.Modules.Identity.AspNetCore`
+   (net10.0); `RefreshTokenService` in the Identity core; `.Abstractions` stays free of
+   `Microsoft.IdentityModel.*`. Refresh tokens use rotating families with reuse-detection;
+   tenant isolation enforced at service layer (no `tenant_id` column on `refresh_tokens`).
+   See Identity JWT slice §.
 
 _All decisions resolved. **#6 data-layer roadmap (revised 2026-06-12):** **0.4.5** EF SQL Server
 provider ✅ → **0.4.6** FluentMigrator-authority **foundation** (neutral `Themia.Data.Migrations`

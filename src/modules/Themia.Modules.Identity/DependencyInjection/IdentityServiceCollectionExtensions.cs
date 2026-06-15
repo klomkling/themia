@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Themia.Framework.Data.Abstractions.Auditing;
 using Themia.Framework.Data.Dapper.Mapping;
 using Themia.Modules.Identity.Abstractions;
+using Themia.Modules.Identity.Abstractions.Authentication;
 using Themia.Modules.Identity.Hashing;
 using Themia.Modules.Identity.Mapping;
 using Themia.Modules.Identity.Principal;
@@ -47,6 +48,10 @@ public static class IdentityServiceCollectionExtensions
 
     private static IServiceCollection AddThemiaIdentityServicesCore(IServiceCollection services)
     {
+        // Services here depend on ILogger<T>; ensure logging is resolvable even on a bare
+        // ServiceCollection (no generic host). AddLogging is idempotent/TryAdd-based.
+        services.AddLogging();
+
         services.TryAddSingleton(TimeProvider.System);
         services.TryAddSingleton<IPasswordHasher, Argon2idPasswordHasher>();
 
@@ -54,6 +59,7 @@ public static class IdentityServiceCollectionExtensions
         services.TryAddScoped<IRoleService, RoleService>();
         services.TryAddScoped<IClaimService, ClaimService>();
         services.TryAddScoped<IUserTokenService, UserTokenService>();
+        services.TryAddScoped<IRefreshTokenService, RefreshTokenService>();
         services.TryAddScoped<IClaimsPrincipalFactory, ClaimsPrincipalFactory>();
 
         // Dapper adopters: contribute mappings to the registry they already registered.

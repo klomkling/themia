@@ -4,12 +4,13 @@ using Themia.Data.Migrations;
 using Themia.Modules.Identity.Migrations;
 using Xunit;
 
-namespace Themia.Modules.Identity.IntegrationTests.Fixtures;
+namespace Themia.Modules.Identity.AspNetCore.IntegrationTests.Fixtures;
 
-public sealed class PostgresIdentityFixture : IAsyncLifetime
+/// <summary>Starts a PostgreSQL Testcontainer, runs Identity migrations, and exposes a reset helper.</summary>
+public sealed class PostgresAuthFixture : IAsyncLifetime
 {
     private readonly PostgreSqlContainer container = new PostgreSqlBuilder("postgres:16-alpine")
-        .WithDatabase("themia_identity_tests")
+        .WithDatabase("themia_auth_tests")
         .WithUsername("postgres")
         .WithPassword("postgres")
         .WithCleanUp(true)

@@ -21,6 +21,7 @@ public static class ModelBuilderExtensions
         modelBuilder.ApplyConfiguration(new UserClaimConfiguration());
         modelBuilder.ApplyConfiguration(new RoleClaimConfiguration());
         modelBuilder.ApplyConfiguration(new UserTokenConfiguration());
+        modelBuilder.ApplyConfiguration(new RefreshTokenConfiguration());
         return modelBuilder;
     }
 
@@ -110,6 +111,24 @@ public static class ModelBuilderExtensions
             b.Property(t => t.TokenHash).HasColumnName("token_hash").HasMaxLength(256).IsRequired();
             b.Property(t => t.ExpiresAt).HasColumnName("expires_at");
             b.Property(t => t.ConsumedAt).HasColumnName("consumed_at");
+        }
+    }
+
+    private sealed class RefreshTokenConfiguration : IEntityTypeConfiguration<RefreshToken>
+    {
+        public void Configure(EntityTypeBuilder<RefreshToken> b)
+        {
+            b.ToTable("refresh_tokens", Schema);
+            b.HasKey(t => t.Id);
+            b.Property(t => t.Id).HasColumnName("id");
+            b.Property(t => t.UserId).HasColumnName("user_id");
+            b.Property(t => t.TokenHash).HasColumnName("token_hash").HasMaxLength(256).IsRequired();
+            b.Property(t => t.FamilyId).HasColumnName("family_id");
+            b.Property(t => t.ExpiresAt).HasColumnName("expires_at");
+            b.Property(t => t.ConsumedAt).HasColumnName("consumed_at");
+            b.Property(t => t.RevokedAt).HasColumnName("revoked_at");
+            b.Property(t => t.ReplacedById).HasColumnName("replaced_by_id");
+            b.Property(t => t.CreatedAt).HasColumnName("created_at");
         }
     }
 }
