@@ -50,12 +50,12 @@ public sealed class RefreshTokenService : IRefreshTokenService
     }
 
     /// <inheritdoc />
-    public async Task<RefreshIssue> IssueAsync(Guid userId, Guid? familyId = null, CancellationToken cancellationToken = default)
+    public async Task<RefreshIssue> IssueAsync(Guid userId, CancellationToken cancellationToken = default)
     {
         var user = await IdentityScope.ResolveUserAsync(users, userId, cancellationToken).ConfigureAwait(false)
             ?? throw new InvalidOperationException($"User '{userId}' was not found in the current tenant scope.");
 
-        var (entity, raw) = Create(user.Id, familyId ?? Guid.CreateVersion7());
+        var (entity, raw) = Create(user.Id, Guid.CreateVersion7());
         await tokens.AddAsync(entity, cancellationToken).ConfigureAwait(false);
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         return new RefreshIssue(raw, entity.ExpiresAt, entity.FamilyId);

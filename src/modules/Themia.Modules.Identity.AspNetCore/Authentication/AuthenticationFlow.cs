@@ -122,8 +122,10 @@ public sealed class AuthenticationFlow : IAuthenticationFlow
                 return RefreshRotationResult.Invalid();
         }
 
-        var user = rotation.User!;
-        var replacement = rotation.Replacement!.Value;
+        if (!rotation.TryGetSuccess(out var user, out var replacement))
+        {
+            return RefreshRotationResult.Invalid();
+        }
         var principal = await principalFactory.CreateAsync(user, AuthenticationType, cancellationToken).ConfigureAwait(false);
         var access = accessTokens.Issue(principal);
         var tokens = new AuthTokens(access.Token, ExpiresInSeconds(access.ExpiresAt), replacement.RawToken);
@@ -155,7 +157,7 @@ public sealed class AuthenticationFlow : IAuthenticationFlow
     {
         var principal = await principalFactory.CreateAsync(user, AuthenticationType, cancellationToken).ConfigureAwait(false);
         var access = accessTokens.Issue(principal);
-        var refresh = await refreshTokens.IssueAsync(user.Id, null, cancellationToken).ConfigureAwait(false);
+        var refresh = await refreshTokens.IssueAsync(user.Id, cancellationToken).ConfigureAwait(false);
         return new AuthTokens(access.Token, ExpiresInSeconds(access.ExpiresAt), refresh.RawToken);
     }
 

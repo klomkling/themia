@@ -49,22 +49,20 @@ public static class IdentityAuthEndpointRouteBuilderExtensions
     private static async Task<IResult> LoginAsync(LoginRequest request, IAuthenticationFlow flow, CancellationToken cancellationToken)
     {
         var result = await flow.LoginAsync(request.UserName, request.Password, cancellationToken).ConfigureAwait(false);
-        if (!result.Succeeded)
+        if (!result.TryGetTokens(out var tokens))
         {
             throw new UnauthorizedException(GenericAuthFailure);
         }
-        var tokens = result.Tokens!.Value;
         return Results.Ok(new AuthResponse(tokens.AccessToken, tokens.ExpiresInSeconds, tokens.RefreshToken));
     }
 
     private static async Task<IResult> RefreshAsync(RefreshRequest request, IAuthenticationFlow flow, CancellationToken cancellationToken)
     {
         var result = await flow.RefreshAsync(request.RefreshToken, cancellationToken).ConfigureAwait(false);
-        if (!result.Succeeded)
+        if (!result.TryGetTokens(out var tokens))
         {
             throw new UnauthorizedException(GenericAuthFailure);
         }
-        var tokens = result.Tokens!.Value;
         return Results.Ok(new AuthResponse(tokens.AccessToken, tokens.ExpiresInSeconds, tokens.RefreshToken));
     }
 

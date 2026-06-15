@@ -41,6 +41,15 @@ public readonly record struct LoginResult
     /// <summary>Whether the login succeeded.</summary>
     public bool Succeeded => Outcome == LoginOutcome.Success;
 
+    /// <summary>Gets the issued tokens when the login succeeded.</summary>
+    /// <param name="tokens">The issued tokens, when this returns <see langword="true"/>.</param>
+    /// <returns><see langword="true"/> if the login succeeded and tokens are available.</returns>
+    public bool TryGetTokens(out AuthTokens tokens)
+    {
+        tokens = Tokens ?? default;
+        return Succeeded;
+    }
+
     /// <summary>Creates a success result.</summary>
     public static LoginResult Success(AuthTokens tokens) => new(LoginOutcome.Success, tokens);
 
@@ -87,6 +96,15 @@ public readonly record struct RefreshRotationResult
 
     /// <summary>Whether the refresh succeeded.</summary>
     public bool Succeeded => Outcome == RefreshRotationOutcome.Success;
+
+    /// <summary>Gets the issued tokens when the refresh succeeded.</summary>
+    /// <param name="tokens">The issued tokens, when this returns <see langword="true"/>.</param>
+    /// <returns><see langword="true"/> if the refresh succeeded and tokens are available.</returns>
+    public bool TryGetTokens(out AuthTokens tokens)
+    {
+        tokens = Tokens ?? default;
+        return Succeeded;
+    }
 
     /// <summary>Creates a success result.</summary>
     public static RefreshRotationResult Success(AuthTokens tokens) => new(RefreshRotationOutcome.Success, tokens);

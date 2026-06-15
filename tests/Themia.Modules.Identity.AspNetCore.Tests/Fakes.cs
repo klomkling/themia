@@ -46,10 +46,10 @@ internal sealed class FakeRefreshTokenService : IRefreshTokenService
     public int RevokeCalls { get; private set; }
     public bool LastRevokeAllForUser { get; private set; }
 
-    public Task<RefreshIssue> IssueAsync(Guid userId, Guid? familyId = null, CancellationToken cancellationToken = default)
+    public Task<RefreshIssue> IssueAsync(Guid userId, CancellationToken cancellationToken = default)
     {
         IssueCalls++;
-        return Task.FromResult(new RefreshIssue("refresh-raw", DateTimeOffset.UtcNow.AddDays(14), familyId ?? Guid.NewGuid()));
+        return Task.FromResult(new RefreshIssue("refresh-raw", DateTimeOffset.UtcNow.AddDays(14), Guid.NewGuid()));
     }
 
     public Task<RefreshValidationResult> ValidateAndRotateAsync(string rawToken, CancellationToken cancellationToken = default) =>

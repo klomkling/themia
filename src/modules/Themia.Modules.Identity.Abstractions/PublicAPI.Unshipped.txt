@@ -39,7 +39,7 @@ Themia.Modules.Identity.Abstractions.Authentication.IAuthenticationHooks.OnLogin
 Themia.Modules.Identity.Abstractions.Authentication.IAuthenticationHooks.OnLogoutAsync(Themia.Modules.Identity.Abstractions.Authentication.LogoutContext! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
 Themia.Modules.Identity.Abstractions.Authentication.IAuthenticationHooks.OnRefreshSucceededAsync(Themia.Modules.Identity.Abstractions.Authentication.RefreshSucceededContext! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
 Themia.Modules.Identity.Abstractions.Authentication.IRefreshTokenService
-Themia.Modules.Identity.Abstractions.Authentication.IRefreshTokenService.IssueAsync(System.Guid userId, System.Guid? familyId = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Identity.Abstractions.Authentication.RefreshIssue>!
+Themia.Modules.Identity.Abstractions.Authentication.IRefreshTokenService.IssueAsync(System.Guid userId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Identity.Abstractions.Authentication.RefreshIssue>!
 Themia.Modules.Identity.Abstractions.Authentication.IRefreshTokenService.RevokeAsync(string! rawToken, bool allForUser, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
 Themia.Modules.Identity.Abstractions.Authentication.IRefreshTokenService.ValidateAndRotateAsync(string! rawToken, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Identity.Abstractions.Authentication.RefreshValidationResult>!
 Themia.Modules.Identity.Abstractions.Authentication.LoginFailedContext
@@ -62,6 +62,7 @@ Themia.Modules.Identity.Abstractions.Authentication.LoginResult.LoginResult() ->
 Themia.Modules.Identity.Abstractions.Authentication.LoginResult.Outcome.get -> Themia.Modules.Identity.Abstractions.Authentication.LoginOutcome
 Themia.Modules.Identity.Abstractions.Authentication.LoginResult.Succeeded.get -> bool
 Themia.Modules.Identity.Abstractions.Authentication.LoginResult.Tokens.get -> Themia.Modules.Identity.Abstractions.Authentication.AuthTokens?
+Themia.Modules.Identity.Abstractions.Authentication.LoginResult.TryGetTokens(out Themia.Modules.Identity.Abstractions.Authentication.AuthTokens tokens) -> bool
 Themia.Modules.Identity.Abstractions.Authentication.LoginSucceededContext
 Themia.Modules.Identity.Abstractions.Authentication.LoginSucceededContext.LoginSucceededContext(Themia.Modules.Identity.Abstractions.Entities.User! user) -> void
 Themia.Modules.Identity.Abstractions.Authentication.LoginSucceededContext.User.get -> Themia.Modules.Identity.Abstractions.Entities.User!
@@ -91,6 +92,7 @@ Themia.Modules.Identity.Abstractions.Authentication.RefreshRotationResult.Outcom
 Themia.Modules.Identity.Abstractions.Authentication.RefreshRotationResult.RefreshRotationResult() -> void
 Themia.Modules.Identity.Abstractions.Authentication.RefreshRotationResult.Succeeded.get -> bool
 Themia.Modules.Identity.Abstractions.Authentication.RefreshRotationResult.Tokens.get -> Themia.Modules.Identity.Abstractions.Authentication.AuthTokens?
+Themia.Modules.Identity.Abstractions.Authentication.RefreshRotationResult.TryGetTokens(out Themia.Modules.Identity.Abstractions.Authentication.AuthTokens tokens) -> bool
 Themia.Modules.Identity.Abstractions.Authentication.RefreshSucceededContext
 Themia.Modules.Identity.Abstractions.Authentication.RefreshSucceededContext.RefreshSucceededContext(Themia.Modules.Identity.Abstractions.Entities.User! user) -> void
 Themia.Modules.Identity.Abstractions.Authentication.RefreshSucceededContext.User.get -> Themia.Modules.Identity.Abstractions.Entities.User!
@@ -98,6 +100,7 @@ Themia.Modules.Identity.Abstractions.Authentication.RefreshValidationResult
 Themia.Modules.Identity.Abstractions.Authentication.RefreshValidationResult.Outcome.get -> Themia.Modules.Identity.Abstractions.Authentication.RefreshOutcome
 Themia.Modules.Identity.Abstractions.Authentication.RefreshValidationResult.RefreshValidationResult() -> void
 Themia.Modules.Identity.Abstractions.Authentication.RefreshValidationResult.Replacement.get -> Themia.Modules.Identity.Abstractions.Authentication.RefreshIssue?
+Themia.Modules.Identity.Abstractions.Authentication.RefreshValidationResult.TryGetSuccess(out Themia.Modules.Identity.Abstractions.Entities.User? user, out Themia.Modules.Identity.Abstractions.Authentication.RefreshIssue replacement) -> bool
 Themia.Modules.Identity.Abstractions.Authentication.RefreshValidationResult.User.get -> Themia.Modules.Identity.Abstractions.Entities.User?
 Themia.Modules.Identity.Abstractions.Entities.RefreshToken
 Themia.Modules.Identity.Abstractions.Entities.RefreshToken.ConsumedAt.get -> System.DateTimeOffset?

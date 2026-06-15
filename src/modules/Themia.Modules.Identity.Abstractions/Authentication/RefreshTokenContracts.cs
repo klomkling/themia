@@ -40,6 +40,17 @@ public readonly record struct RefreshValidationResult
     /// <summary>The successor refresh token on success; otherwise null.</summary>
     public RefreshIssue? Replacement { get; }
 
+    /// <summary>Gets the resolved user and successor token when the rotation succeeded.</summary>
+    /// <param name="user">The resolved owning user, when this returns <see langword="true"/>.</param>
+    /// <param name="replacement">The successor refresh token, when this returns <see langword="true"/>.</param>
+    /// <returns><see langword="true"/> if the rotation succeeded.</returns>
+    public bool TryGetSuccess([System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out User? user, out RefreshIssue replacement)
+    {
+        user = User;
+        replacement = Replacement ?? default;
+        return Outcome == RefreshOutcome.Success;
+    }
+
     /// <summary>Creates a success result.</summary>
     public static RefreshValidationResult Success(User user, RefreshIssue replacement) =>
         new(RefreshOutcome.Success, user, replacement);
@@ -56,12 +67,11 @@ public readonly record struct RefreshValidationResult
 /// never be rotated, revoked, or accepted.</summary>
 public interface IRefreshTokenService
 {
-    /// <summary>Issues a new refresh token for a user, optionally continuing an existing family.</summary>
+    /// <summary>Issues a new refresh token for a user, always starting a new rotation family.</summary>
     /// <param name="userId">The owning user id (must resolve in scope).</param>
-    /// <param name="familyId">An existing family to continue, or null to start a new one.</param>
     /// <param name="cancellationToken">A cancellation token.</param>
     /// <returns>The issued token (raw value returned once).</returns>
-    Task<RefreshIssue> IssueAsync(Guid userId, Guid? familyId = null, CancellationToken cancellationToken = default);
+    Task<RefreshIssue> IssueAsync(Guid userId, CancellationToken cancellationToken = default);
 
     /// <summary>Validates a presented raw token and, on success, consumes it and issues a successor in
     /// the same family. A replayed consumed/revoked token revokes the entire family.</summary>
