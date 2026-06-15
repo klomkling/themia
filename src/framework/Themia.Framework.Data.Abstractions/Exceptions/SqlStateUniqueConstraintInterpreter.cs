@@ -4,25 +4,23 @@ namespace Themia.Framework.Data.Abstractions.Exceptions;
 
 /// <summary>
 /// Default, provider-agnostic <see cref="ISqlExceptionInterpreter"/> that detects a unique-constraint
-/// violation from the ANSI <c>SQLSTATE</c> on <see cref="DbException"/>. Covers any driver that populates
-/// <see cref="DbException.SqlState"/>: PostgreSQL/Npgsql (<c>23505</c>) and MySQL/MySqlConnector
-/// (<c>23000</c>, the generic integrity-constraint class MySQL reports for duplicate keys). Keeps the base
-/// data packages free of any concrete-provider reference.
+/// violation from the ANSI <c>SQLSTATE</c> on <see cref="DbException"/>. Covers PostgreSQL/Npgsql
+/// (<c>23505</c>) and any driver that reports the <em>specific</em> <c>23505</c> unique-violation SQLSTATE.
+/// MySQL is handled by a provider-specific interpreter, because MySQL reports the generic <c>23000</c>
+/// integrity-constraint class (shared by foreign-key, NOT-NULL and other faults) rather than a
+/// unique-specific SQLSTATE. Keeps the base data packages free of any concrete-provider reference.
 /// </summary>
 public sealed class SqlStateUniqueConstraintInterpreter : ISqlExceptionInterpreter
 {
     /// <summary>SQLSTATE for a unique-index/unique-constraint violation (PostgreSQL and the SQL standard).</summary>
     private const string UniqueViolation = "23505";
 
-    /// <summary>SQLSTATE class MySQL reports for a duplicate-key (error 1062) integrity violation.</summary>
-    private const string IntegrityConstraintViolation = "23000";
-
     /// <inheritdoc />
     public bool IsUniqueConstraintViolation(Exception? exception)
     {
         for (var current = exception; current is not null; current = current.InnerException)
         {
-            if (current is DbException { SqlState: UniqueViolation or IntegrityConstraintViolation })
+            if (current is DbException { SqlState: UniqueViolation })
             {
                 return true;
             }
