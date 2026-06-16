@@ -22,6 +22,7 @@ public static class ModelBuilderExtensions
         modelBuilder.ApplyConfiguration(new RoleClaimConfiguration());
         modelBuilder.ApplyConfiguration(new UserTokenConfiguration());
         modelBuilder.ApplyConfiguration(new RefreshTokenConfiguration());
+        modelBuilder.ApplyConfiguration(new ExternalLoginLinkConfiguration());
         return modelBuilder;
     }
 
@@ -130,6 +131,21 @@ public static class ModelBuilderExtensions
             b.Property(t => t.ReplacedById).HasColumnName("replaced_by_id");
             b.Property(t => t.ReplacedTokenId).HasColumnName("replaced_token_id");
             b.Property(t => t.CreatedAt).HasColumnName("created_at");
+        }
+    }
+
+    private sealed class ExternalLoginLinkConfiguration : IEntityTypeConfiguration<ExternalLoginLink>
+    {
+        public void Configure(EntityTypeBuilder<ExternalLoginLink> b)
+        {
+            b.ToTable("external_logins", Schema);
+            b.HasKey(l => l.Id);
+            b.Property(l => l.Id).HasColumnName("id");
+            // Framework maps tenant_id (tenant entity); map the link-specific columns here.
+            b.Property(l => l.UserId).HasColumnName("user_id");
+            b.Property(l => l.Provider).HasColumnName("provider").HasMaxLength(64).IsRequired();
+            b.Property(l => l.ExternalId).HasColumnName("external_id").HasMaxLength(256).IsRequired();
+            b.Property(l => l.CreatedAt).HasColumnName("created_at");
         }
     }
 }
