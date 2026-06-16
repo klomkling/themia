@@ -36,6 +36,7 @@ public abstract class IdentityStoreConformanceTests
         public IClaimService Claims => Inner.ServiceProvider.GetRequiredService<IClaimService>();
         public IUserTokenService Tokens => Inner.ServiceProvider.GetRequiredService<IUserTokenService>();
         public IRefreshTokenService RefreshTokens => Inner.ServiceProvider.GetRequiredService<IRefreshTokenService>();
+        public IExternalLoginService ExternalLogins => Inner.ServiceProvider.GetRequiredService<IExternalLoginService>();
 
         public async ValueTask DisposeAsync()
         {
@@ -480,5 +481,89 @@ public abstract class IdentityStoreConformanceTests
         // the loser sees the now-consumed parent and revokes the family, the designed theft signal).
         Assert.All(results.Where(r => r.Outcome != RefreshOutcome.Success),
             r => Assert.Contains(r.Outcome, new[] { RefreshOutcome.Invalid, RefreshOutcome.ReuseDetected }));
+    }
+
+    [Fact] // existing link → same user, no create/link
+    public async Task External_existing_link_returns_same_user()
+    {
+        await ResetAsync();
+        await using var s = NewScope(new TenantId("acme"));
+
+        var first = await s.ExternalLogins.ResolveOrProvisionAsync(
+            new ExternalIdentity("Google", "sub-1", "ext1@acme.test", true, "Ext One"));
+        Assert.True(first.WasCreated);
+        Assert.True(first.WasLinked);
+
+        var second = await s.ExternalLogins.ResolveOrProvisionAsync(
+            new ExternalIdentity("Google", "sub-1", "ext1@acme.test", true, "Ext One"));
+        Assert.Equal(first.User.Id, second.User.Id);
+        Assert.False(second.WasCreated);
+        Assert.False(second.WasLinked);
+    }
+
+    [Fact] // verified-email match → link to existing user
+    public async Task External_verified_email_links_existing_user()
+    {
+        await ResetAsync();
+        await using var s = NewScope(new TenantId("acme"));
+
+        var seeded = await s.Users.CreateAsync("emailowner", "pw", "owner@acme.test");
+        Assert.True(seeded.Succeeded);
+
+        var result = await s.ExternalLogins.ResolveOrProvisionAsync(
+            new ExternalIdentity("Google", "sub-link", "owner@acme.test", true, null));
+        Assert.Equal(seeded.UserId, result.User.Id);
+        Assert.False(result.WasCreated);
+        Assert.True(result.WasLinked);
+    }
+
+    [Fact] // no match → create
+    public async Task External_no_match_creates_user()
+    {
+        await ResetAsync();
+        await using var s = NewScope(new TenantId("acme"));
+
+        var result = await s.ExternalLogins.ResolveOrProvisionAsync(
+            new ExternalIdentity("Google", "sub-new", "new@acme.test", true, null));
+        Assert.True(result.WasCreated);
+        Assert.True(result.WasLinked);
+        Assert.NotEqual(Guid.Empty, result.User.Id);
+    }
+
+    [Fact] // unverified email → create, never link
+    public async Task External_unverified_email_never_links()
+    {
+        await ResetAsync();
+        await using var s = NewScope(new TenantId("acme"));
+
+        var seeded = await s.Users.CreateAsync("verifiedowner", "pw", "v@acme.test");
+        Assert.True(seeded.Succeeded);
+
+        var result = await s.ExternalLogins.ResolveOrProvisionAsync(
+            new ExternalIdentity("Google", "sub-unverified", "v@acme.test", false, null));
+        Assert.True(result.WasCreated);
+        Assert.True(result.WasLinked);
+        Assert.NotEqual(seeded.UserId, result.User.Id);   // a different, freshly provisioned user
+    }
+
+    [Fact] // tenant isolation: a link created in tenant A is not seen in tenant B
+    public async Task External_link_is_tenant_isolated()
+    {
+        await ResetAsync();
+        Guid userInA;
+        await using (var a = NewScope(new TenantId("a")))
+        {
+            var first = await a.ExternalLogins.ResolveOrProvisionAsync(
+                new ExternalIdentity("Google", "shared-sub", "shared@x.test", true, null));
+            userInA = first.User.Id;
+        }
+
+        await using (var b = NewScope(new TenantId("b")))
+        {
+            var inB = await b.ExternalLogins.ResolveOrProvisionAsync(
+                new ExternalIdentity("Google", "shared-sub", "shared@x.test", true, null));
+            Assert.NotEqual(userInA, inB.User.Id);   // tenant b does not see tenant a's link → new user
+            Assert.True(inB.WasCreated);
+        }
     }
 }
