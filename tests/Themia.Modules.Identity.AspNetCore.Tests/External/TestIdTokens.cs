@@ -1,0 +1,80 @@
+using System.Security.Cryptography;
+using System.Text;
+using Microsoft.IdentityModel.JsonWebTokens;
+using Microsoft.IdentityModel.Tokens;
+
+namespace Themia.Modules.Identity.AspNetCore.Tests.External;
+
+/// <summary>Test helpers that mint id_tokens (HS256 for the symmetric path, RS256 + a stub JWKS
+/// document for the asymmetric path) so the provider can be exercised end-to-end without a live IdP.</summary>
+internal static class TestIdTokens
+{
+    /// <summary>Mints an HS256-signed id_token from the given claims.</summary>
+    public static string SignHs256(
+        string secret,
+        string issuer,
+        string audience,
+        DateTimeOffset notBefore,
+        DateTimeOffset expires,
+        IDictionary<string, object> claims)
+    {
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secret));
+        var descriptor = Descriptor(issuer, audience, notBefore, expires, claims,
+            new SigningCredentials(key, SecurityAlgorithms.HmacSha256));
+        return new JsonWebTokenHandler().CreateToken(descriptor);
+    }
+
+    /// <summary>An RSA key plus the matching single-key JWKS document, for the asymmetric path.</summary>
+    public sealed record RsaKeyMaterial(RSA Rsa, RsaSecurityKey SecurityKey, string Kid, string JwksJson);
+
+    /// <summary>Generates a fresh RSA key and the JWKS document a provider would fetch for it.</summary>
+    public static RsaKeyMaterial NewRsaKey()
+    {
+        var rsa = RSA.Create(2048);
+        var key = new RsaSecurityKey(rsa) { KeyId = Guid.NewGuid().ToString("N") };
+        var jwk = JsonWebKeyConverter.ConvertFromRSASecurityKey(key);
+        jwk.Use = "sig";
+        jwk.Alg = SecurityAlgorithms.RsaSha256;
+        var jwks = new JsonWebKeySet();
+        jwks.Keys.Add(jwk);
+        var json = System.Text.Json.JsonSerializer.Serialize(new
+        {
+            keys = new[]
+            {
+                new { kty = jwk.Kty, use = jwk.Use, kid = jwk.Kid, alg = jwk.Alg, n = jwk.N, e = jwk.E },
+            },
+        });
+        return new RsaKeyMaterial(rsa, key, key.KeyId, json);
+    }
+
+    /// <summary>Mints an RS256-signed id_token using the given RSA key material.</summary>
+    public static string SignRs256(
+        RsaKeyMaterial material,
+        string issuer,
+        string audience,
+        DateTimeOffset notBefore,
+        DateTimeOffset expires,
+        IDictionary<string, object> claims)
+    {
+        var descriptor = Descriptor(issuer, audience, notBefore, expires, claims,
+            new SigningCredentials(material.SecurityKey, SecurityAlgorithms.RsaSha256));
+        return new JsonWebTokenHandler().CreateToken(descriptor);
+    }
+
+    private static SecurityTokenDescriptor Descriptor(
+        string issuer,
+        string audience,
+        DateTimeOffset notBefore,
+        DateTimeOffset expires,
+        IDictionary<string, object> claims,
+        SigningCredentials credentials) => new()
+        {
+            Issuer = issuer,
+            Audience = audience,
+            NotBefore = notBefore.UtcDateTime,
+            IssuedAt = notBefore.UtcDateTime,
+            Expires = expires.UtcDateTime,
+            Claims = claims,
+            SigningCredentials = credentials,
+        };
+}

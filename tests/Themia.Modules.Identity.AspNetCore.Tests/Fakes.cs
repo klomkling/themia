@@ -21,6 +21,7 @@ internal sealed class FakeUserService : IUserService
     public Task<User?> FindByIdAsync(Guid id, CancellationToken cancellationToken = default) => Task.FromResult(UserToReturn);
     public Task<User?> FindByEmailAsync(string email, CancellationToken cancellationToken = default) => Task.FromResult(UserToReturn);
     public Task<UserCreationResult> CreateAsync(string userName, string password, string? email = null, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    public Task<UserCreationResult> CreateExternalUserAsync(string userName, string? email, bool emailVerified, CancellationToken cancellationToken = default) => throw new NotSupportedException();
     public Task<bool> SetPasswordAsync(Guid userId, string password, CancellationToken cancellationToken = default) => throw new NotSupportedException();
     public Task<bool> SetActiveAsync(Guid userId, bool isActive, CancellationToken cancellationToken = default) => throw new NotSupportedException();
     public Task<bool> DeleteAsync(Guid userId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
