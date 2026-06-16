@@ -23,7 +23,7 @@ public sealed class ExternalLoginLink : ITenantEntity
     /// <summary>The provider subject (stable per provider).</summary>
     public string ExternalId { get; set; } = string.Empty;
 
-    /// <summary>Link creation time (service-set via TimeProvider).</summary>
+    /// <summary>The time the link was created.</summary>
     public DateTimeOffset CreatedAt { get; set; }
 
     /// <summary>Assigns the client-generated identifier (UUIDv7).</summary>

@@ -187,7 +187,7 @@ error surfaced by the host's tenant middleware, not handled here.
 ## 7. Flow & endpoint
 
 **`IExternalAuthenticationFlow.AuthenticateAsync(provider, ExternalAuthRequest, ct) →
-ExternalLoginResultType`** (orchestrator in `.AspNetCore`, parallels `IAuthenticationFlow`):
+ExternalLoginFlowResult`** (orchestrator in `.AspNetCore`, parallels `IAuthenticationFlow`):
 
 1. Resolve provider from the registry (unknown → `ProviderNotFound`).
 2. `OnBeforeExternalLoginAsync` hook (early gate; `Deny()` → uniform `401`).

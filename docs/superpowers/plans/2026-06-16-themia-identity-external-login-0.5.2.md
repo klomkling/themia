@@ -28,7 +28,7 @@
 - Create `Entities/ExternalLoginLink.cs`
 - Create `Authentication/ExternalAuthContracts.cs` (`ExternalAuthRequest`, `ExternalIdentity`, `ExternalAuthResult`, `IExternalAuthProvider`)
 - Create `Authentication/ExternalLoginContracts.cs` (`ExternalLoginResult`, `IExternalLoginService`)
-- Create `Authentication/ExternalAuthFlowContracts.cs` (`ExternalLoginOutcome`, `ExternalLoginResultType`, `IExternalAuthenticationFlow`)
+- Create `Authentication/ExternalAuthFlowContracts.cs` (`ExternalLoginOutcome`, `ExternalLoginFlowResult`, `IExternalAuthenticationFlow`)
 - Create `Authentication/ExternalAuthHooks.cs` (hook contexts + `IExternalAuthenticationHooks`)
 - Modify `IUserService.cs` (add `CreateExternalUserAsync`)
 - Modify `PublicAPI.Unshipped.txt`
@@ -207,9 +207,9 @@ public enum ExternalLoginOutcome
 }
 
 /// <summary>The result of <see cref="IExternalAuthenticationFlow.AuthenticateAsync"/>.</summary>
-public readonly record struct ExternalLoginResultType
+public readonly record struct ExternalLoginFlowResult
 {
-    private ExternalLoginResultType(ExternalLoginOutcome outcome, AuthTokens? tokens, bool wasCreated, bool wasLinked)
+    private ExternalLoginFlowResult(ExternalLoginOutcome outcome, AuthTokens? tokens, bool wasCreated, bool wasLinked)
     {
         Outcome = outcome; Tokens = tokens; WasCreated = wasCreated; WasLinked = wasLinked;
     }
@@ -226,14 +226,14 @@ public readonly record struct ExternalLoginResultType
     public bool Succeeded => Outcome == ExternalLoginOutcome.Success;
 
     /// <summary>Creates a success result.</summary>
-    public static ExternalLoginResultType Success(AuthTokens tokens, bool created, bool linked) =>
+    public static ExternalLoginFlowResult Success(AuthTokens tokens, bool created, bool linked) =>
         new(ExternalLoginOutcome.Success, tokens, created, linked);
     /// <summary>Creates a provider-not-found result.</summary>
-    public static ExternalLoginResultType ProviderNotFound() => new(ExternalLoginOutcome.ProviderNotFound, null, false, false);
+    public static ExternalLoginFlowResult ProviderNotFound() => new(ExternalLoginOutcome.ProviderNotFound, null, false, false);
     /// <summary>Creates a provider-rejected result.</summary>
-    public static ExternalLoginResultType ProviderRejected() => new(ExternalLoginOutcome.ProviderRejected, null, false, false);
+    public static ExternalLoginFlowResult ProviderRejected() => new(ExternalLoginOutcome.ProviderRejected, null, false, false);
     /// <summary>Creates a denied result.</summary>
-    public static ExternalLoginResultType Denied() => new(ExternalLoginOutcome.Denied, null, false, false);
+    public static ExternalLoginFlowResult Denied() => new(ExternalLoginOutcome.Denied, null, false, false);
 }
 
 /// <summary>Orchestrates the external-login sequence (provider exchange → link/provision → issue
@@ -241,7 +241,7 @@ public readonly record struct ExternalLoginResultType
 public interface IExternalAuthenticationFlow
 {
     /// <summary>Authenticates via the named provider and issues an access + refresh pair.</summary>
-    Task<ExternalLoginResultType> AuthenticateAsync(string provider, ExternalAuthRequest request, CancellationToken cancellationToken = default);
+    Task<ExternalLoginFlowResult> AuthenticateAsync(string provider, ExternalAuthRequest request, CancellationToken cancellationToken = default);
 }
 ```
 
