@@ -12,7 +12,8 @@ namespace Themia.Modules.Identity.AspNetCore.DependencyInjection;
 public static class ExternalAuthServiceCollectionExtensions
 {
     /// <summary>Begins external-auth registration. Chain <see cref="ExternalAuthBuilder.AddGoogle"/>,
-    /// <see cref="ExternalAuthBuilder.AddLine"/>, or <c>AddProvider</c> calls onto the result.</summary>
+    /// <see cref="ExternalAuthBuilder.AddLine"/>, <see cref="ExternalAuthBuilder.AddOidc"/> (the
+    /// escape hatch for any custom OIDC provider), or <c>AddProvider</c> calls onto the result.</summary>
     /// <param name="services">The service collection.</param>
     /// <returns>The external-auth builder.</returns>
     public static ExternalAuthBuilder AddThemiaExternalAuth(this IServiceCollection services)
@@ -31,7 +32,7 @@ public static class ExternalAuthServiceCollectionExtensions
 public sealed class ExternalAuthBuilder
 {
     private const string GoogleTokenEndpoint = "https://oauth2.googleapis.com/token";
-    private const string GoogleJwksUri = "https://www.googleapis.com/oauth2/v3/certs";
+    private const string GoogleMetadataAddress = "https://accounts.google.com/.well-known/openid-configuration";
     private const string GoogleIssuer = "https://accounts.google.com";
     private const string LineTokenEndpoint = "https://api.line.me/oauth2/v2.1/token";
     private const string LineIssuer = "https://access.line.me";
@@ -43,7 +44,8 @@ public sealed class ExternalAuthBuilder
     /// <summary>The underlying service collection.</summary>
     public IServiceCollection Services => services;
 
-    /// <summary>Registers Google as an OIDC provider named <c>google</c> (RS256 via Google's JWKS).</summary>
+    /// <summary>Registers Google as an OIDC provider named <c>google</c> (RS256 via Google's OIDC
+    /// discovery document, so signing-key rotations are picked up automatically).</summary>
     /// <param name="configure">Configures the Google credentials.</param>
     /// <returns>The same builder.</returns>
     /// <exception cref="ArgumentException">The credentials are blank.</exception>
@@ -64,7 +66,7 @@ public sealed class ExternalAuthBuilder
             Scopes = options.Scopes,
             Issuer = GoogleIssuer,
             Audience = options.ClientId,
-            JwksUri = new Uri(GoogleJwksUri),
+            MetadataAddress = new Uri(GoogleMetadataAddress),
         });
     }
 

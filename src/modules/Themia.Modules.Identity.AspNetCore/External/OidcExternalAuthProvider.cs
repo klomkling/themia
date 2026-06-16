@@ -2,6 +2,8 @@ using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.JsonWebTokens;
+using Microsoft.IdentityModel.Protocols;
+using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using Microsoft.IdentityModel.Tokens;
 using Themia.Modules.Identity.Abstractions.Authentication;
 
@@ -9,11 +11,13 @@ namespace Themia.Modules.Identity.AspNetCore.External;
 
 /// <summary>An <see cref="IExternalAuthProvider"/> that performs the OAuth/OIDC server-side code
 /// exchange and validates the returned id_token. Supports two signing-key strategies:
-/// RS256 via a cached JWKS fetch (<see cref="OidcProviderConfig.JwksUri"/>), or HS256 via a shared
+/// RS256 via OIDC discovery (<see cref="OidcProviderConfig.MetadataAddress"/>), or HS256 via a shared
 /// secret (<see cref="OidcProviderConfig.SymmetricSecret"/>).</summary>
 /// <remarks>Reuses the same <see cref="JsonWebTokenHandler"/> validation idioms as the 0.5.1 access
 /// token slice (<c>MapInboundClaims=false</c>, explicit issuer/audience/lifetime), and a fixed
-/// <see cref="TimeProvider"/> for deterministic lifetime validation.</remarks>
+/// <see cref="TimeProvider"/> for deterministic lifetime validation. The asymmetric path resolves and
+/// auto-refreshes signing keys through <see cref="ConfigurationManager{T}"/>, so a key rotation at the
+/// IdP recovers without a process restart.</remarks>
 public sealed class OidcExternalAuthProvider : IExternalAuthProvider
 {
     /// <summary>The named-<see cref="HttpClient"/> prefix; the suffix is the provider name.</summary>
@@ -25,9 +29,7 @@ public sealed class OidcExternalAuthProvider : IExternalAuthProvider
     private readonly IHttpClientFactory httpClientFactory;
     private readonly TimeProvider timeProvider;
     private readonly ILogger<OidcExternalAuthProvider> logger;
-    private readonly SemaphoreSlim jwksLock = new(1, 1);
-
-    private IReadOnlyCollection<SecurityKey>? cachedJwksKeys;
+    private readonly ConfigurationManager<OpenIdConnectConfiguration>? configManager;
 
     /// <summary>Creates the provider.</summary>
     /// <param name="config">The provider configuration.</param>
@@ -46,12 +48,12 @@ public sealed class OidcExternalAuthProvider : IExternalAuthProvider
         ArgumentNullException.ThrowIfNull(timeProvider);
         ArgumentNullException.ThrowIfNull(loggerFactory);
 
-        var hasJwks = config.JwksUri is not null;
+        var hasMetadata = config.MetadataAddress is not null;
         var hasSymmetric = !string.IsNullOrEmpty(config.SymmetricSecret);
-        if (hasJwks == hasSymmetric)
+        if (hasMetadata == hasSymmetric)
         {
             throw new ArgumentException(
-                "Exactly one signing-key strategy must be set: JwksUri (RS256) or SymmetricSecret (HS256).",
+                "Exactly one signing-key strategy must be set: MetadataAddress (RS256) or SymmetricSecret (HS256).",
                 nameof(config));
         }
 
@@ -59,6 +61,18 @@ public sealed class OidcExternalAuthProvider : IExternalAuthProvider
         this.httpClientFactory = httpClientFactory;
         this.timeProvider = timeProvider;
         this.logger = loggerFactory.CreateLogger<OidcExternalAuthProvider>();
+
+        if (hasMetadata)
+        {
+            // The OIDC discovery doc is fetched (and auto-refreshed on its interval) through the
+            // provider's named HttpClient, so tests can route discovery + JWKS to a stub.
+            var documentRetriever = new HttpDocumentRetriever(
+                httpClientFactory.CreateClient(HttpClientPrefix + config.Name));
+            configManager = new ConfigurationManager<OpenIdConnectConfiguration>(
+                config.MetadataAddress!.AbsoluteUri,
+                new OpenIdConnectConfigurationRetriever(),
+                documentRetriever);
+        }
     }
 
     /// <inheritdoc />
@@ -80,7 +94,7 @@ public sealed class OidcExternalAuthProvider : IExternalAuthProvider
             return ExternalAuthResult.Failed("token_endpoint_rejected");
         }
 
-        var validation = await ValidateIdTokenAsync(client, idToken, cancellationToken);
+        var validation = await ValidateIdTokenAsync(idToken, cancellationToken);
         if (validation is not { } validated)
         {
             return ExternalAuthResult.Failed("id_token_invalid");
@@ -131,11 +145,41 @@ public sealed class OidcExternalAuthProvider : IExternalAuthProvider
     }
 
     private async Task<JsonWebToken?> ValidateIdTokenAsync(
-        HttpClient client,
         string idToken,
         CancellationToken cancellationToken)
     {
-        var signingKeys = await ResolveSigningKeysAsync(client, cancellationToken);
+        // Symmetric (HS256) keys are static; resolve once and validate.
+        if (config.SymmetricSecret is { } secret)
+        {
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secret));
+            return await ValidateWithKeysAsync(idToken, [key]);
+        }
+
+        // Asymmetric (RS256): keys come from OIDC discovery + JWKS, auto-refreshed on rotation.
+        var signingKeys = await GetSigningKeysAsync(cancellationToken);
+        var validated = await ValidateWithKeysAsync(idToken, signingKeys);
+        if (validated is not null)
+        {
+            return validated;
+        }
+
+        // A rotation race (token signed by a new key not yet in our cached metadata) looks like a
+        // signature failure. Force a metadata refresh and retry exactly once so login recovers.
+        configManager!.RequestRefresh();
+        var refreshedKeys = await GetSigningKeysAsync(cancellationToken);
+        return await ValidateWithKeysAsync(idToken, refreshedKeys);
+    }
+
+    private async Task<ICollection<SecurityKey>> GetSigningKeysAsync(CancellationToken cancellationToken)
+    {
+        var configuration = await configManager!.GetConfigurationAsync(cancellationToken);
+        return configuration.SigningKeys;
+    }
+
+    private async Task<JsonWebToken?> ValidateWithKeysAsync(
+        string idToken,
+        IEnumerable<SecurityKey> signingKeys)
+    {
         var parameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
@@ -172,40 +216,13 @@ public sealed class OidcExternalAuthProvider : IExternalAuthProvider
             return false;
         }
 
-        return expires is not { } exp || now - ClockSkew <= exp;
-    }
-
-    private async Task<IReadOnlyCollection<SecurityKey>> ResolveSigningKeysAsync(
-        HttpClient client,
-        CancellationToken cancellationToken)
-    {
-        if (config.SymmetricSecret is { } secret)
+        // OIDC mandates `exp` on an id_token; reject a token that omits it rather than waving it through.
+        if (expires is not { } exp)
         {
-            return [new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secret))];
+            return false;
         }
 
-        if (cachedJwksKeys is { } cached)
-        {
-            return cached;
-        }
-
-        await jwksLock.WaitAsync(cancellationToken);
-        try
-        {
-            if (cachedJwksKeys is { } existing)
-            {
-                return existing;
-            }
-
-            var json = await client.GetStringAsync(config.JwksUri!, cancellationToken);
-            var keys = new JsonWebKeySet(json).GetSigningKeys();
-            cachedJwksKeys = (IReadOnlyCollection<SecurityKey>)keys;
-            return cachedJwksKeys;
-        }
-        finally
-        {
-            jwksLock.Release();
-        }
+        return now - ClockSkew <= exp;
     }
 
     private ExternalAuthResult MapIdentity(JsonWebToken token)

@@ -1,16 +1,5 @@
 namespace Themia.Modules.Identity.AspNetCore.Options;
 
-/// <summary>External-auth (OAuth/OIDC) provider credentials, validated at startup (fail-fast),
-/// mirroring <see cref="JwtOptions.Validate"/>.</summary>
-public sealed class ExternalAuthOptions
-{
-    /// <summary>Google OAuth credentials. Configured only when <c>AddGoogle</c> is called.</summary>
-    public GoogleOptions Google { get; } = new();
-
-    /// <summary>LINE Login credentials. Configured only when <c>AddLine</c> is called.</summary>
-    public LineOptions Line { get; } = new();
-}
-
 /// <summary>Google OAuth credentials.</summary>
 public sealed class GoogleOptions
 {

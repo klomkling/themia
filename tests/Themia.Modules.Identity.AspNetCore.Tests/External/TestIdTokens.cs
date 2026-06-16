@@ -24,6 +24,27 @@ internal static class TestIdTokens
         return new JsonWebTokenHandler().CreateToken(descriptor);
     }
 
+    /// <summary>Mints an HS256-signed id_token with NO <c>exp</c> claim (an OIDC violation), to assert
+    /// the provider rejects tokens that omit an expiry.</summary>
+    public static string SignHs256NoExpiry(
+        string secret,
+        string issuer,
+        string audience,
+        IDictionary<string, object> claims)
+    {
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secret));
+        var descriptor = new SecurityTokenDescriptor
+        {
+            Issuer = issuer,
+            Audience = audience,
+            Claims = claims,
+            SigningCredentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256),
+        };
+        // Suppress the handler's default exp/nbf/iat so the minted token genuinely has no expiry.
+        var handler = new JsonWebTokenHandler { SetDefaultTimesOnTokenCreation = false };
+        return handler.CreateToken(descriptor);
+    }
+
     /// <summary>An RSA key plus the matching single-key JWKS document, for the asymmetric path.</summary>
     public sealed record RsaKeyMaterial(RSA Rsa, RsaSecurityKey SecurityKey, string Kid, string JwksJson);
 

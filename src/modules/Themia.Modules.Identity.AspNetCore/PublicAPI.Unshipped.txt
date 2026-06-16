@@ -80,8 +80,8 @@ Themia.Modules.Identity.AspNetCore.External.OidcProviderConfig.Issuer.get -> str
 Themia.Modules.Identity.AspNetCore.External.OidcProviderConfig.Issuer.init -> void
 Themia.Modules.Identity.AspNetCore.External.OidcProviderConfig.Audience.get -> string!
 Themia.Modules.Identity.AspNetCore.External.OidcProviderConfig.Audience.init -> void
-Themia.Modules.Identity.AspNetCore.External.OidcProviderConfig.JwksUri.get -> System.Uri?
-Themia.Modules.Identity.AspNetCore.External.OidcProviderConfig.JwksUri.init -> void
+Themia.Modules.Identity.AspNetCore.External.OidcProviderConfig.MetadataAddress.get -> System.Uri?
+Themia.Modules.Identity.AspNetCore.External.OidcProviderConfig.MetadataAddress.init -> void
 Themia.Modules.Identity.AspNetCore.External.OidcProviderConfig.SymmetricSecret.get -> string?
 Themia.Modules.Identity.AspNetCore.External.OidcProviderConfig.SymmetricSecret.init -> void
 Themia.Modules.Identity.AspNetCore.External.OidcProviderConfig.SubjectClaim.get -> string!
@@ -105,10 +105,6 @@ Themia.Modules.Identity.AspNetCore.External.IExternalAuthProviderRegistry.TryGet
 Themia.Modules.Identity.AspNetCore.External.ExternalAuthProviderRegistry
 Themia.Modules.Identity.AspNetCore.External.ExternalAuthProviderRegistry.ExternalAuthProviderRegistry(System.Collections.Generic.IEnumerable<Themia.Modules.Identity.Abstractions.Authentication.IExternalAuthProvider!>! providers) -> void
 Themia.Modules.Identity.AspNetCore.External.ExternalAuthProviderRegistry.TryGet(string! name, out Themia.Modules.Identity.Abstractions.Authentication.IExternalAuthProvider? provider) -> bool
-Themia.Modules.Identity.AspNetCore.Options.ExternalAuthOptions
-Themia.Modules.Identity.AspNetCore.Options.ExternalAuthOptions.ExternalAuthOptions() -> void
-Themia.Modules.Identity.AspNetCore.Options.ExternalAuthOptions.Google.get -> Themia.Modules.Identity.AspNetCore.Options.GoogleOptions!
-Themia.Modules.Identity.AspNetCore.Options.ExternalAuthOptions.Line.get -> Themia.Modules.Identity.AspNetCore.Options.LineOptions!
 Themia.Modules.Identity.AspNetCore.Options.GoogleOptions
 Themia.Modules.Identity.AspNetCore.Options.GoogleOptions.GoogleOptions() -> void
 Themia.Modules.Identity.AspNetCore.Options.GoogleOptions.ClientId.get -> string!

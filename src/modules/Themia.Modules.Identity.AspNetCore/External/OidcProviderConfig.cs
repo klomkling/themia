@@ -1,12 +1,10 @@
-using System.Collections.Generic;
-
 namespace Themia.Modules.Identity.AspNetCore.External;
 
 /// <summary>Immutable configuration for an OIDC-style external-auth provider. Holds the token-endpoint
 /// exchange parameters, the expected token issuer/audience, the signing-key strategy
-/// (JWKS for RS256, <em>or</em> a symmetric secret for HS256), claim-name overrides, and provider
-/// quirks (e.g. LINE never returns <c>email_verified</c>, so the email is treated as verified).</summary>
-/// <remarks>The signing-key strategy is exactly one of <see cref="JwksUri"/> (asymmetric) or
+/// (OIDC discovery + JWKS for RS256, <em>or</em> a symmetric secret for HS256), claim-name overrides,
+/// and provider quirks (e.g. LINE never returns <c>email_verified</c>, so the email is treated as verified).</summary>
+/// <remarks>The signing-key strategy is exactly one of <see cref="MetadataAddress"/> (asymmetric) or
 /// <see cref="SymmetricSecret"/> (symmetric). Supplying neither, or both, is a configuration error
 /// detected by <see cref="OidcExternalAuthProvider"/>.</remarks>
 public sealed class OidcProviderConfig
@@ -33,12 +31,14 @@ public sealed class OidcProviderConfig
     /// <summary>The expected <c>aud</c> of the returned id_token (the OAuth client id).</summary>
     public required string Audience { get; init; }
 
-    /// <summary>The JWKS endpoint for RS256 (asymmetric) validation. Mutually exclusive with
+    /// <summary>The OIDC discovery metadata address (the <c>.well-known/openid-configuration</c> URL)
+    /// for RS256 (asymmetric) validation. The signing keys are resolved (and auto-refreshed on
+    /// rotation) from the <c>jwks_uri</c> advertised by this document. Mutually exclusive with
     /// <see cref="SymmetricSecret"/>.</summary>
-    public Uri? JwksUri { get; init; }
+    public Uri? MetadataAddress { get; init; }
 
     /// <summary>The shared secret for HS256 (symmetric) validation (e.g. LINE's channel secret).
-    /// Mutually exclusive with <see cref="JwksUri"/>.</summary>
+    /// Mutually exclusive with <see cref="MetadataAddress"/>.</summary>
     public string? SymmetricSecret { get; init; }
 
     /// <summary>The claim name carrying the stable subject. Defaults to <c>sub</c>.</summary>

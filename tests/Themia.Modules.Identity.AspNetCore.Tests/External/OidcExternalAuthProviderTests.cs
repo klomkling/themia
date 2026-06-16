@@ -11,6 +11,7 @@ public sealed class OidcExternalAuthProviderTests
 {
     private static readonly DateTimeOffset Now = DateTimeOffset.Parse("2026-06-15T00:00:00Z");
     private static readonly Uri TokenEndpoint = new("https://idp.test/token");
+    private static readonly Uri MetadataAddress = new("https://idp.test/.well-known/openid-configuration");
     private static readonly Uri JwksUri = new("https://idp.test/jwks");
     private const string Issuer = "https://idp.test";
     private const string ClientId = "client-123";
@@ -146,6 +147,21 @@ public sealed class OidcExternalAuthProviderTests
     }
 
     [Fact]
+    public async Task ExchangeAsync_token_with_no_expiry_fails()
+    {
+        const string secret = "this-is-a-32-byte-minimum-secret!!";
+        // OIDC mandates `exp` on an id_token; a token without one must be rejected.
+        var idToken = TestIdTokens.SignHs256NoExpiry(secret, Issuer, ClientId,
+            new Dictionary<string, object> { ["sub"] = "U1" });
+        var handler = StubHttpMessageHandler.Json(HttpStatusCode.OK, TokenResponse(idToken));
+        var provider = Provider(SymmetricConfig(secret), HttpClientReturning(handler), Clock());
+
+        var result = await provider.ExchangeAsync(Request());
+
+        Assert.False(result.Succeeded);
+    }
+
+    [Fact]
     public async Task ExchangeAsync_token_endpoint_non_2xx_fails()
     {
         var handler = StubHttpMessageHandler.Json(HttpStatusCode.BadRequest,
@@ -212,24 +228,41 @@ public sealed class OidcExternalAuthProviderTests
         ClientSecret = "client-secret",
         Issuer = Issuer,
         Audience = ClientId,
-        JwksUri = JwksUri,
+        MetadataAddress = MetadataAddress,
     };
 
-    /// <summary>Routes the token POST and the JWKS GET to the correct canned response by URL.</summary>
-    private static StubHttpMessageHandler RoutingHandler(string tokenJson, string jwksJson) =>
-        new(req =>
+    /// <summary>The OIDC discovery document the provider fetches before the JWKS, pointing the key
+    /// retrieval at <see cref="JwksUri"/>.</summary>
+    private static string DiscoveryJson() =>
+        JsonSerializer.Serialize(new { issuer = Issuer, jwks_uri = JwksUri.AbsoluteUri });
+
+    /// <summary>Routes the token POST, the OIDC discovery GET, and the JWKS GET to the correct canned
+    /// response by URL, so the asymmetric path runs hermetically against a stub.</summary>
+    private static StubHttpMessageHandler RoutingHandler(string tokenJson, string jwksJson)
+    {
+        var discoveryJson = DiscoveryJson();
+        return new StubHttpMessageHandler(req =>
         {
-            var response = req.RequestUri == JwksUri
-                ? new HttpResponseMessage(HttpStatusCode.OK)
-                {
-                    Content = new StringContent(jwksJson, System.Text.Encoding.UTF8, "application/json"),
-                }
-                : new HttpResponseMessage(HttpStatusCode.OK)
-                {
-                    Content = new StringContent(tokenJson, System.Text.Encoding.UTF8, "application/json"),
-                };
-            return Task.FromResult(response);
+            string body;
+            if (req.RequestUri == MetadataAddress)
+            {
+                body = discoveryJson;
+            }
+            else if (req.RequestUri == JwksUri)
+            {
+                body = jwksJson;
+            }
+            else
+            {
+                body = tokenJson;
+            }
+
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(body, System.Text.Encoding.UTF8, "application/json"),
+            });
         });
+    }
 
     [Fact]
     public async Task ExchangeAsync_asymmetric_success_returns_normalized_identity()
@@ -270,6 +303,50 @@ public sealed class OidcExternalAuthProviderTests
         var result = await provider.ExchangeAsync(Request());
 
         Assert.False(result.Succeeded);
+    }
+
+    [Fact]
+    public async Task ExchangeAsync_asymmetric_recovers_after_key_rotation()
+    {
+        // The IdP has rotated keys: the cached JWKS serves the OLD key, but the token is signed with
+        // the NEW key. The provider must refresh the JWKS and validate against the rotated key.
+        var rotatedKey = TestIdTokens.NewRsaKey();
+        var staleKey = TestIdTokens.NewRsaKey();
+        var idToken = TestIdTokens.SignRs256(rotatedKey, Issuer, ClientId, Now, Now.AddMinutes(5),
+            new Dictionary<string, object> { ["sub"] = "G1", ["email"] = "user@gmail.test" });
+
+        var discoveryJson = JsonSerializer.Serialize(new { issuer = Issuer, jwks_uri = JwksUri.AbsoluteUri });
+        var tokenJson = TokenResponse(idToken);
+        var jwksFetches = 0;
+        var handler = new StubHttpMessageHandler(req =>
+        {
+            string body;
+            if (req.RequestUri == MetadataAddress)
+            {
+                body = discoveryJson;
+            }
+            else if (req.RequestUri == JwksUri)
+            {
+                // First JWKS fetch serves the stale key; after rotation it serves the new signing key.
+                body = Interlocked.Increment(ref jwksFetches) == 1 ? staleKey.JwksJson : rotatedKey.JwksJson;
+            }
+            else
+            {
+                body = tokenJson;
+            }
+
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(body, System.Text.Encoding.UTF8, "application/json"),
+            });
+        });
+        var provider = Provider(AsymmetricConfig(), HttpClientReturning(handler), Clock());
+
+        var result = await provider.ExchangeAsync(Request());
+
+        Assert.True(result.Succeeded);
+        Assert.Equal("G1", result.Identity!.Value.Subject);
+        Assert.True(jwksFetches >= 2); // refreshed after the first (stale) attempt failed
     }
 }
 
