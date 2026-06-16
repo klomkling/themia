@@ -2,6 +2,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Themia.Framework.Data.Abstractions.Exceptions;
 using Themia.Framework.Data.EFCore.Abstractions;
 using Themia.Framework.Data.EFCore.Infrastructure;
 
@@ -44,6 +46,10 @@ public sealed class SqlServerDatabaseProvider : IDatabaseProvider
         // No eager connection-string validation: with DB-per-tenant the connection string may be supplied
         // at request time via ITenantAccessor.Current.ConnectionString. Resolution + validation happen per
         // scope in Configure.
+
+        // SqlClient does not surface a usable SqlState, so replace the default SQLSTATE interpreter with one
+        // that matches SQL Server's native duplicate-key error numbers (2627 / 2601).
+        services.Replace(ServiceDescriptor.Singleton<ISqlExceptionInterpreter, SqlServerSqlExceptionInterpreter>());
     }
 
     private static void ConfigureSqlServerOptions(SqlServerDbContextOptionsBuilder builder)

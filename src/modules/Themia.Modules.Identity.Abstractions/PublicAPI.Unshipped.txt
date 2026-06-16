@@ -116,6 +116,8 @@ Themia.Modules.Identity.Abstractions.Entities.RefreshToken.Id.set -> void
 Themia.Modules.Identity.Abstractions.Entities.RefreshToken.RefreshToken() -> void
 Themia.Modules.Identity.Abstractions.Entities.RefreshToken.ReplacedById.get -> System.Guid?
 Themia.Modules.Identity.Abstractions.Entities.RefreshToken.ReplacedById.set -> void
+Themia.Modules.Identity.Abstractions.Entities.RefreshToken.ReplacedTokenId.get -> System.Guid?
+Themia.Modules.Identity.Abstractions.Entities.RefreshToken.ReplacedTokenId.set -> void
 Themia.Modules.Identity.Abstractions.Entities.RefreshToken.RevokedAt.get -> System.DateTimeOffset?
 Themia.Modules.Identity.Abstractions.Entities.RefreshToken.RevokedAt.set -> void
 Themia.Modules.Identity.Abstractions.Entities.RefreshToken.SetId(System.Guid id) -> void

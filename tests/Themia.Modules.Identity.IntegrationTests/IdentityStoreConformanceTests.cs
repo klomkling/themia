@@ -453,4 +453,32 @@ public abstract class IdentityStoreConformanceTests
         // The real token is untouched and still rotates.
         Assert.Equal(RefreshOutcome.Success, (await s.RefreshTokens.ValidateAndRotateAsync(issue.RawToken)).Outcome);
     }
+
+    [Fact]
+    public async Task Concurrent_rotation_of_same_token_rotates_exactly_once()
+    {
+        await ResetAsync();
+        Guid userId;
+        string raw;
+        await using (var seed = NewScope(new TenantId("acme")))
+        {
+            userId = (await seed.Users.CreateAsync("rt-concurrent", "pw")).UserId!.Value;
+            raw = (await seed.RefreshTokens.IssueAsync(userId)).RawToken;
+        }
+
+        // Two independent scopes = two UoWs/connections racing the same token.
+        await using var a = NewScope(new TenantId("acme"));
+        await using var b = NewScope(new TenantId("acme"));
+        var results = await Task.WhenAll(
+            a.RefreshTokens.ValidateAndRotateAsync(raw),
+            b.RefreshTokens.ValidateAndRotateAsync(raw));
+
+        var successes = results.Count(r => r.Outcome == RefreshOutcome.Success);
+        Assert.Equal(1, successes);                                   // exactly one rotation won
+        // The loser is timing-dependent but never a second Success: it is either Invalid (the rotations
+        // interleaved → unique-index violation on the successor insert) or ReuseDetected (they serialized →
+        // the loser sees the now-consumed parent and revokes the family, the designed theft signal).
+        Assert.All(results.Where(r => r.Outcome != RefreshOutcome.Success),
+            r => Assert.Contains(r.Outcome, new[] { RefreshOutcome.Invalid, RefreshOutcome.ReuseDetected }));
+    }
 }

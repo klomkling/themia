@@ -6,20 +6,29 @@ using Themia.Framework.Data.Abstractions.UnitOfWork;
 namespace Themia.Framework.Data.EFCore.UnitOfWork;
 
 /// <summary>EF Core unit of work over <see cref="ThemiaDbContext"/>.</summary>
-public sealed class EfUnitOfWork(ThemiaDbContext context, IDataFilterScope filterScope) : IUnitOfWork
+public sealed class EfUnitOfWork(ThemiaDbContext context, IDataFilterScope filterScope, ISqlExceptionInterpreter sqlExceptionInterpreter) : IUnitOfWork
 {
     /// <summary>
     /// Back-compatible overload matching the original signature. The tenant-filter bypass state is
     /// process-ambient (a static <see cref="DataFilterScope"/> async-local), so a fresh instance observes the
-    /// same bypass as the DI-registered one. DI selects the two-parameter constructor (greediest resolvable).
+    /// same bypass as the DI-registered one. DI selects the greediest resolvable constructor.
     /// </summary>
     public EfUnitOfWork(ThemiaDbContext context) : this(context, new DataFilterScope()) { }
+
+    /// <summary>
+    /// Back-compatible overload that defaults to the SQLSTATE-based unique-violation interpreter
+    /// (PostgreSQL/MySQL). DI prefers the three-parameter constructor and injects the engine's registered
+    /// <see cref="ISqlExceptionInterpreter"/> (e.g. the SQL Server number-based one).
+    /// </summary>
+    public EfUnitOfWork(ThemiaDbContext context, IDataFilterScope filterScope)
+        : this(context, filterScope, new SqlStateUniqueConstraintInterpreter()) { }
 
     /// <inheritdoc />
     public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default) => SaveAsync(cancellationToken);
 
-    // Translate EF's optimistic-concurrency failure (a tracked update/delete that affected no rows) into the
-    // framework's provider-agnostic ConcurrencyException so both data layers surface a lost write the same way.
+    // Translate EF's write failures into the framework's provider-agnostic exceptions so both data layers
+    // surface them the same way: optimistic-concurrency (a tracked update/delete that affected no rows) ->
+    // ConcurrencyException; a unique/primary-key violation -> UniqueConstraintException.
     private async Task<int> SaveAsync(CancellationToken cancellationToken)
     {
         if (!filterScope.IsTenantFilterBypassed)
@@ -36,6 +45,11 @@ public sealed class EfUnitOfWork(ThemiaDbContext context, IDataFilterScope filte
             throw new ConcurrencyException(
                 "A tracked update or delete affected no rows: the row does not exist, was concurrently deleted, " +
                 "or is outside the current tenant scope.", ex);
+        }
+        catch (DbUpdateException ex) when (sqlExceptionInterpreter.IsUniqueConstraintViolation(ex))
+        {
+            throw new UniqueConstraintException(
+                "A write violated a unique or primary-key constraint: a row with the same key already exists.", ex);
         }
     }
 

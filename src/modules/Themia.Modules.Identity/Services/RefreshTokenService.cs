@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using Microsoft.Extensions.Logging;
+using Themia.Framework.Data.Abstractions.Exceptions;
 using Themia.Framework.Data.Abstractions.Repositories;
 using Themia.Framework.Data.Abstractions.UnitOfWork;
 using Themia.Modules.Identity.Abstractions;
@@ -98,11 +99,28 @@ public sealed class RefreshTokenService : IRefreshTokenService
         }
 
         var (successor, raw) = Create(match.UserId, match.FamilyId);
+        // Compare-and-set: the successor carries the parent's id in replaced_token_id, which has a filtered
+        // unique index. Two simultaneous rotations of the same token both try to insert a successor with the
+        // same replaced_token_id; the index lets only one commit. The loser hits a unique violation here —
+        // caught below — and returns Invalid (the legitimate winner already rotated).
+        successor.ReplacedTokenId = match.Id;
         await tokens.AddAsync(successor, cancellationToken).ConfigureAwait(false);
         match.ConsumedAt = now;
         match.ReplacedById = successor.Id;
         tokens.Update(match);
-        await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        }
+        // ConcurrencyException is deliberately NOT caught here: RefreshToken carries no optimistic-concurrency
+        // token today, so the parent UPDATE always affects its row and the filtered unique index on
+        // replaced_token_id is the sole race gate. If RefreshToken later gains a row-version (issue #86
+        // follow-up), this catch must also handle ConcurrencyException. Do not add that clause until then —
+        // it would handle a currently-impossible scenario.
+        catch (UniqueConstraintException)
+        {
+            return RefreshValidationResult.Invalid();
+        }
 
         return RefreshValidationResult.Success(user, new RefreshIssue(raw, successor.ExpiresAt, successor.FamilyId));
     }

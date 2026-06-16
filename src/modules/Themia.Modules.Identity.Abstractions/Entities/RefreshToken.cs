@@ -29,6 +29,10 @@ public sealed class RefreshToken
     /// <summary>Successor row id in the rotation chain; null until rotated.</summary>
     public Guid? ReplacedById { get; set; }
 
+    /// <summary>The id of the token this one replaced; carries a filtered unique index so a parent can be
+    /// rotated only once. Null for freshly-issued tokens; set only on a rotation successor.</summary>
+    public Guid? ReplacedTokenId { get; set; }
+
     /// <summary>Issue time, set by the service via <see cref="TimeProvider"/> (forensics).</summary>
     public DateTimeOffset CreatedAt { get; set; }
 
