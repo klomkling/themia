@@ -80,6 +80,10 @@ public sealed class ExternalLoginService : IExternalLoginService
         // Auto-link by verified email only: an unverified email must never adopt an existing account.
         if (!string.IsNullOrWhiteSpace(identity.Email) && identity.EmailVerified)
         {
+            // FindByEmailAsync may resolve a platform (TenantId == null) user when AllowPlatformLogin is
+            // set. This platform fallback is intentional and matches the password flow's AllowPlatformLogin
+            // semantics (FindByUserNameAsync/FindByEmailAsync), so a tenant external login can resolve a
+            // platform super-admin exactly as a tenant password login can.
             var existing = await userService.FindByEmailAsync(identity.Email, cancellationToken).ConfigureAwait(false);
             if (existing is not null)
             {

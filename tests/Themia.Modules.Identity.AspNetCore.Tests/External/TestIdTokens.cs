@@ -45,6 +45,25 @@ internal static class TestIdTokens
         return handler.CreateToken(descriptor);
     }
 
+    /// <summary>Mints an unsigned (<c>alg:none</c>) JWT: a header with <c>"alg":"none"</c>, a claims
+    /// payload, and an empty signature segment. Used to assert the provider rejects unsigned tokens.</summary>
+    public static string UnsignedNone(string issuer, string audience, DateTimeOffset expires, IDictionary<string, object> claims)
+    {
+        static string B64(string json) =>
+            Base64UrlEncoder.Encode(Encoding.UTF8.GetBytes(json));
+
+        var header = System.Text.Json.JsonSerializer.Serialize(new { alg = "none", typ = "JWT" });
+        var payload = new Dictionary<string, object>(claims)
+        {
+            ["iss"] = issuer,
+            ["aud"] = audience,
+            ["exp"] = expires.ToUnixTimeSeconds(),
+        };
+        var payloadJson = System.Text.Json.JsonSerializer.Serialize(payload);
+        // Trailing dot: empty signature segment, as an alg:none JWT is unsigned.
+        return $"{B64(header)}.{B64(payloadJson)}.";
+    }
+
     /// <summary>An RSA key plus the matching single-key JWKS document, for the asymmetric path.</summary>
     public sealed record RsaKeyMaterial(RSA Rsa, RsaSecurityKey SecurityKey, string Kid, string JwksJson);
 

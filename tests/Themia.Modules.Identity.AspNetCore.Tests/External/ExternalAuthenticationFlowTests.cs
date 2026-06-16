@@ -118,6 +118,71 @@ public sealed class ExternalAuthenticationFlowTests
     }
 
     [Fact]
+    public async Task Inactive_resolved_user_returns_uniform_failure_without_issuing_and_fires_failed_hook()
+    {
+        var inactiveUser = new User { UserName = "ext-alice", IsActive = false };
+        var provider = new FakeExternalAuthProvider { Result = ExternalAuthResult.Success(Identity()) };
+        var (flow, logins, refresh, access, hooks) =
+            Build(provider, new ExternalLoginResult(inactiveUser, WasCreated: false, WasLinked: false));
+
+        var result = await flow.AuthenticateAsync(Provider, Request());
+
+        Assert.Equal(ExternalLoginOutcome.AccountInactive, result.Outcome);
+        Assert.False(result.Succeeded);
+        Assert.Equal(1, logins.ResolveCalls);
+        Assert.Equal(0, access.IssueCalls);
+        Assert.Equal(0, refresh.IssueCalls);
+        // The post-resolve gate fires before the succeeded hook, so the only hooks seen are before + failed.
+        Assert.Equal(["before", "failed"], hooks.Calls);
+        Assert.Equal(ExternalLoginOutcome.AccountInactive, hooks.FailedReason);
+    }
+
+    [Fact]
+    public async Task LockedOut_resolved_user_returns_uniform_failure_without_issuing()
+    {
+        var clock = new FakeTimeProvider(DateTimeOffset.Parse("2026-06-15T00:00:00Z"));
+        var lockedUser = new User
+        {
+            UserName = "ext-alice",
+            LockoutEnabled = true,
+            LockoutEnd = clock.GetUtcNow().AddMinutes(5),
+        };
+        var provider = new FakeExternalAuthProvider { Result = ExternalAuthResult.Success(Identity()) };
+        var (flow, logins, refresh, access, hooks) =
+            Build(provider, new ExternalLoginResult(lockedUser, WasCreated: false, WasLinked: false), clock);
+
+        var result = await flow.AuthenticateAsync(Provider, Request());
+
+        Assert.Equal(ExternalLoginOutcome.AccountInactive, result.Outcome);
+        Assert.Equal(0, access.IssueCalls);
+        Assert.Equal(0, refresh.IssueCalls);
+        Assert.Equal(["before", "failed"], hooks.Calls);
+        Assert.Equal(ExternalLoginOutcome.AccountInactive, hooks.FailedReason);
+    }
+
+    [Fact]
+    public async Task Expired_lockout_resolved_user_succeeds()
+    {
+        var clock = new FakeTimeProvider(DateTimeOffset.Parse("2026-06-15T00:00:00Z"));
+        var user = new User
+        {
+            UserName = "ext-alice",
+            LockoutEnabled = true,
+            LockoutEnd = clock.GetUtcNow().AddMinutes(-5), // lockout already elapsed
+        };
+        var provider = new FakeExternalAuthProvider { Result = ExternalAuthResult.Success(Identity()) };
+        var (flow, _, refresh, access, hooks) =
+            Build(provider, new ExternalLoginResult(user, WasCreated: false, WasLinked: false), clock);
+
+        var result = await flow.AuthenticateAsync(Provider, Request());
+
+        Assert.True(result.Succeeded);
+        Assert.Equal(1, access.IssueCalls);
+        Assert.Equal(1, refresh.IssueCalls);
+        Assert.Equal(["before", "succeeded"], hooks.Calls);
+    }
+
+    [Fact]
     public async Task Success_reports_access_token_lifetime_in_seconds()
     {
         var clock = new FakeTimeProvider(DateTimeOffset.Parse("2026-06-15T00:00:00Z"));

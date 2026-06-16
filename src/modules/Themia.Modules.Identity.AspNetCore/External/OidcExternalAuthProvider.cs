@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
@@ -24,6 +25,12 @@ public sealed class OidcExternalAuthProvider : IExternalAuthProvider
     internal const string HttpClientPrefix = "Themia.Identity.ExternalAuth:";
 
     private static readonly JsonWebTokenHandler Handler = new();
+
+    /// <summary>The signing algorithms accepted on the asymmetric (JWKS/metadata) path.</summary>
+    private static readonly string[] AsymmetricAlgorithms = [SecurityAlgorithms.RsaSha256];
+
+    /// <summary>The signing algorithms accepted on the symmetric (shared-secret) path.</summary>
+    private static readonly string[] SymmetricAlgorithms = [SecurityAlgorithms.HmacSha256];
 
     private readonly OidcProviderConfig config;
     private readonly IHttpClientFactory httpClientFactory;
@@ -100,7 +107,23 @@ public sealed class OidcExternalAuthProvider : IExternalAuthProvider
             return ExternalAuthResult.Failed("id_token_invalid");
         }
 
+        // Optional nonce binding: when the client supplied a nonce, the id_token's `nonce` claim must be
+        // present and equal (ordinal compare). When no nonce was supplied, skip (no behavior change).
+        if (!string.IsNullOrEmpty(request.Nonce) && !NonceMatches(validated, request.Nonce))
+        {
+            logger.LogInformation("External provider {Provider} id_token nonce did not match.", config.Name);
+            return ExternalAuthResult.Failed("nonce_mismatch");
+        }
+
         return MapIdentity(validated);
+    }
+
+    private static bool NonceMatches(JsonWebToken token, string expected)
+    {
+        var actual = GetClaim(token, "nonce");
+        return actual is not null
+            && CryptographicOperations.FixedTimeEquals(
+                Encoding.UTF8.GetBytes(actual), Encoding.UTF8.GetBytes(expected));
     }
 
     private async Task<string?> ExchangeCodeForIdTokenAsync(
@@ -148,16 +171,19 @@ public sealed class OidcExternalAuthProvider : IExternalAuthProvider
         string idToken,
         CancellationToken cancellationToken)
     {
-        // Symmetric (HS256) keys are static; resolve once and validate.
+        // Symmetric (HS256) keys are static; resolve once and validate. The algorithm allow-list pins
+        // HS256 so a token signed with any other algorithm is rejected up front.
         if (config.SymmetricSecret is { } secret)
         {
             var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secret));
-            return await ValidateWithKeysAsync(idToken, [key]);
+            return await ValidateWithKeysAsync(idToken, [key], SymmetricAlgorithms);
         }
 
-        // Asymmetric (RS256): keys come from OIDC discovery + JWKS, auto-refreshed on rotation.
+        // Asymmetric (RS256): keys come from OIDC discovery + JWKS, auto-refreshed on rotation. The
+        // algorithm allow-list pins RS256, blocking alg-confusion (an HS256 token signed with the public
+        // key as a MAC secret) and alg:none by allow-list rather than relying on key typing alone.
         var signingKeys = await GetSigningKeysAsync(cancellationToken);
-        var validated = await ValidateWithKeysAsync(idToken, signingKeys);
+        var validated = await ValidateWithKeysAsync(idToken, signingKeys, AsymmetricAlgorithms);
         if (validated is not null)
         {
             return validated;
@@ -167,7 +193,7 @@ public sealed class OidcExternalAuthProvider : IExternalAuthProvider
         // signature failure. Force a metadata refresh and retry exactly once so login recovers.
         configManager!.RequestRefresh();
         var refreshedKeys = await GetSigningKeysAsync(cancellationToken);
-        return await ValidateWithKeysAsync(idToken, refreshedKeys);
+        return await ValidateWithKeysAsync(idToken, refreshedKeys, AsymmetricAlgorithms);
     }
 
     private async Task<ICollection<SecurityKey>> GetSigningKeysAsync(CancellationToken cancellationToken)
@@ -178,7 +204,8 @@ public sealed class OidcExternalAuthProvider : IExternalAuthProvider
 
     private async Task<JsonWebToken?> ValidateWithKeysAsync(
         string idToken,
-        IEnumerable<SecurityKey> signingKeys)
+        IEnumerable<SecurityKey> signingKeys,
+        IEnumerable<string> validAlgorithms)
     {
         var parameters = new TokenValidationParameters
         {
@@ -188,6 +215,8 @@ public sealed class OidcExternalAuthProvider : IExternalAuthProvider
             ValidAudience = config.Audience,
             ValidateIssuerSigningKey = true,
             IssuerSigningKeys = signingKeys,
+            // Pin the accepted signing algorithm(s) by allow-list, blocking alg-confusion and alg:none.
+            ValidAlgorithms = validAlgorithms,
             ValidateLifetime = true,
             // Validate lifetime against the injected clock (deterministic + testable), applying skew.
             LifetimeValidator = ValidateLifetime,

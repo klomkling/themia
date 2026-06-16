@@ -15,6 +15,10 @@ public enum ExternalLoginOutcome
 
     /// <summary>A hook denied the attempt.</summary>
     Denied,
+
+    /// <summary>The resolved (pre-existing) linked account is inactive or locked out. Collapses to the
+    /// same uniform 401 as the other failures; the distinct value exists only so audit sees the reason.</summary>
+    AccountInactive,
 }
 
 /// <summary>The result of <see cref="IExternalAuthenticationFlow.AuthenticateAsync"/>.</summary>
@@ -55,6 +59,9 @@ public readonly record struct ExternalLoginFlowResult
 
     /// <summary>Creates a denied result.</summary>
     public static ExternalLoginFlowResult Denied() => new(ExternalLoginOutcome.Denied, null, false, false);
+
+    /// <summary>Creates an account-inactive result (resolved account is disabled or locked out).</summary>
+    public static ExternalLoginFlowResult AccountInactive() => new(ExternalLoginOutcome.AccountInactive, null, false, false);
 }
 
 /// <summary>Orchestrates the external-login sequence (provider exchange → link/provision → issue

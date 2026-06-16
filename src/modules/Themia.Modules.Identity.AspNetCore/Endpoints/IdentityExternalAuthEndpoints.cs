@@ -11,7 +11,9 @@ namespace Themia.Modules.Identity.AspNetCore.Endpoints;
 /// <param name="Code">The authorization code obtained from the provider.</param>
 /// <param name="RedirectUri">The redirect URI the client used for the authorization request.</param>
 /// <param name="CodeVerifier">The PKCE code verifier, if PKCE was used.</param>
-public sealed record ExternalLoginRequest(string Code, string RedirectUri, string? CodeVerifier = null);
+/// <param name="Nonce">The nonce the client sent in the authorization request, if any. When supplied,
+/// the server requires the id_token's <c>nonce</c> claim to match it.</param>
+public sealed record ExternalLoginRequest(string Code, string RedirectUri, string? CodeVerifier = null, string? Nonce = null);
 
 /// <summary>Maps the opt-in external-login endpoint. The host owns the route prefix
 /// (e.g. <c>app.MapGroup("/auth").MapIdentityExternalAuthEndpoints()</c>). The endpoint is thin: it binds
@@ -42,7 +44,7 @@ public static class IdentityExternalAuthEndpointRouteBuilderExtensions
             throw new ValidationException(nameof(ExternalLoginRequest), "Code and redirect URI are required.");
         }
 
-        var externalRequest = new ExternalAuthRequest(request.Code, request.RedirectUri, request.CodeVerifier);
+        var externalRequest = new ExternalAuthRequest(request.Code, request.RedirectUri, request.CodeVerifier, request.Nonce);
         var result = await flow.AuthenticateAsync(provider, externalRequest, cancellationToken).ConfigureAwait(false);
 
         if (result.Succeeded && result.Tokens is { } tokens)
@@ -55,7 +57,8 @@ public static class IdentityExternalAuthEndpointRouteBuilderExtensions
             return Results.NotFound();
         }
 
-        // ProviderRejected and Denied both collapse to the same uniform 401 (anti-enumeration).
+        // ProviderRejected, Denied, and AccountInactive all collapse to the same uniform 401
+        // (anti-enumeration); only the audit hook sees the distinct internal reason.
         throw new UnauthorizedException(GenericAuthFailure);
     }
 }

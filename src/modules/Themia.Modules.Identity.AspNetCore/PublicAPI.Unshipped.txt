@@ -137,7 +137,9 @@ Themia.Modules.Identity.AspNetCore.Endpoints.ExternalLoginRequest.Code.get -> st
 Themia.Modules.Identity.AspNetCore.Endpoints.ExternalLoginRequest.Code.init -> void
 Themia.Modules.Identity.AspNetCore.Endpoints.ExternalLoginRequest.CodeVerifier.get -> string?
 Themia.Modules.Identity.AspNetCore.Endpoints.ExternalLoginRequest.CodeVerifier.init -> void
-Themia.Modules.Identity.AspNetCore.Endpoints.ExternalLoginRequest.ExternalLoginRequest(string! Code, string! RedirectUri, string? CodeVerifier = null) -> void
+Themia.Modules.Identity.AspNetCore.Endpoints.ExternalLoginRequest.ExternalLoginRequest(string! Code, string! RedirectUri, string? CodeVerifier = null, string? Nonce = null) -> void
+Themia.Modules.Identity.AspNetCore.Endpoints.ExternalLoginRequest.Nonce.get -> string?
+Themia.Modules.Identity.AspNetCore.Endpoints.ExternalLoginRequest.Nonce.init -> void
 Themia.Modules.Identity.AspNetCore.Endpoints.ExternalLoginRequest.RedirectUri.get -> string!
 Themia.Modules.Identity.AspNetCore.Endpoints.ExternalLoginRequest.RedirectUri.init -> void
 Themia.Modules.Identity.AspNetCore.Endpoints.IdentityExternalAuthEndpointRouteBuilderExtensions

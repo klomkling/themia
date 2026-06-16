@@ -78,6 +78,15 @@ public sealed class ExternalAuthenticationFlow : IExternalAuthenticationFlow
 
         var resolution = await externalLogins.ResolveOrProvisionAsync(identity, cancellationToken).ConfigureAwait(false);
 
+        // Gate on the same active + lockout semantics the password flow enforces
+        // (IUserService.VerifyPasswordAsync). A freshly-provisioned user is active by construction, so
+        // this only blocks a pre-existing linked account that was deactivated or locked after linking —
+        // closing the auth-bypass where such a user could still mint tokens via external login.
+        if (!IsActiveAndUnlocked(resolution.User))
+        {
+            return await FailAsync(provider, ExternalLoginOutcome.AccountInactive, ExternalLoginFlowResult.AccountInactive(), cancellationToken).ConfigureAwait(false);
+        }
+
         var succeeded = new ExternalLoginSucceededContext(resolution.User, resolution.WasCreated, resolution.WasLinked);
         await hooks.OnExternalLoginSucceededAsync(succeeded, cancellationToken).ConfigureAwait(false);
         if (succeeded.IsDenied)
@@ -115,4 +124,16 @@ public sealed class ExternalAuthenticationFlow : IExternalAuthenticationFlow
 
     private int ExpiresInSeconds(DateTimeOffset expiresAt) =>
         (int)Math.Max(0, (expiresAt - timeProvider.GetUtcNow()).TotalSeconds);
+
+    // Mirrors the inactive + lockout checks in IUserService.VerifyPasswordAsync, using the injected clock.
+    private bool IsActiveAndUnlocked(User user)
+    {
+        if (!user.IsActive)
+        {
+            return false;
+        }
+
+        var now = timeProvider.GetUtcNow();
+        return !(user.LockoutEnabled && user.LockoutEnd is { } end && end > now);
+    }
 }

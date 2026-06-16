@@ -218,6 +218,101 @@ public sealed class OidcExternalAuthProviderTests
         Assert.False(result.Identity!.Value.EmailVerified);
     }
 
+    // ----- nonce validation ----------------------------------------------------------------------
+
+    private static ExternalAuthRequest RequestWithNonce(string nonce) =>
+        new("auth-code", "https://app.test/callback", "pkce-verifier", nonce);
+
+    [Fact]
+    public async Task ExchangeAsync_nonce_supplied_and_matching_succeeds()
+    {
+        const string secret = "this-is-a-32-byte-minimum-secret!!";
+        var idToken = TestIdTokens.SignHs256(secret, Issuer, ClientId, Now, Now.AddMinutes(5),
+            new Dictionary<string, object> { ["sub"] = "U1", ["nonce"] = "n-abc-123" });
+        var handler = StubHttpMessageHandler.Json(HttpStatusCode.OK, TokenResponse(idToken));
+        var provider = Provider(SymmetricConfig(secret), HttpClientReturning(handler), Clock());
+
+        var result = await provider.ExchangeAsync(RequestWithNonce("n-abc-123"));
+
+        Assert.True(result.Succeeded);
+        Assert.Equal("U1", result.Identity!.Value.Subject);
+    }
+
+    [Fact]
+    public async Task ExchangeAsync_nonce_supplied_but_mismatched_fails()
+    {
+        const string secret = "this-is-a-32-byte-minimum-secret!!";
+        var idToken = TestIdTokens.SignHs256(secret, Issuer, ClientId, Now, Now.AddMinutes(5),
+            new Dictionary<string, object> { ["sub"] = "U1", ["nonce"] = "n-from-token" });
+        var handler = StubHttpMessageHandler.Json(HttpStatusCode.OK, TokenResponse(idToken));
+        var provider = Provider(SymmetricConfig(secret), HttpClientReturning(handler), Clock());
+
+        var result = await provider.ExchangeAsync(RequestWithNonce("n-different"));
+
+        Assert.False(result.Succeeded);
+    }
+
+    [Fact]
+    public async Task ExchangeAsync_nonce_supplied_but_absent_in_token_fails()
+    {
+        const string secret = "this-is-a-32-byte-minimum-secret!!";
+        var idToken = TestIdTokens.SignHs256(secret, Issuer, ClientId, Now, Now.AddMinutes(5),
+            new Dictionary<string, object> { ["sub"] = "U1" }); // no nonce claim
+        var handler = StubHttpMessageHandler.Json(HttpStatusCode.OK, TokenResponse(idToken));
+        var provider = Provider(SymmetricConfig(secret), HttpClientReturning(handler), Clock());
+
+        var result = await provider.ExchangeAsync(RequestWithNonce("n-expected"));
+
+        Assert.False(result.Succeeded);
+    }
+
+    [Fact]
+    public async Task ExchangeAsync_no_nonce_supplied_skips_check_even_when_token_carries_one()
+    {
+        const string secret = "this-is-a-32-byte-minimum-secret!!";
+        var idToken = TestIdTokens.SignHs256(secret, Issuer, ClientId, Now, Now.AddMinutes(5),
+            new Dictionary<string, object> { ["sub"] = "U1", ["nonce"] = "ignored" });
+        var handler = StubHttpMessageHandler.Json(HttpStatusCode.OK, TokenResponse(idToken));
+        var provider = Provider(SymmetricConfig(secret), HttpClientReturning(handler), Clock());
+
+        var result = await provider.ExchangeAsync(Request()); // no nonce on the request
+
+        Assert.True(result.Succeeded);
+    }
+
+    // ----- algorithm pinning ---------------------------------------------------------------------
+
+    [Fact]
+    public async Task ExchangeAsync_asymmetric_rejects_hs256_token_alg_confusion()
+    {
+        // An HS256 token presented to the JWKS (RS256) provider must be rejected by the algorithm
+        // allow-list, not accepted by treating the RSA public-key material as an HMAC secret.
+        const string secret = "this-is-a-32-byte-minimum-secret!!";
+        var hsToken = TestIdTokens.SignHs256(secret, Issuer, ClientId, Now, Now.AddMinutes(5),
+            new Dictionary<string, object> { ["sub"] = "G1" });
+        var keys = TestIdTokens.NewRsaKey();
+        var handler = RoutingHandler(TokenResponse(hsToken), keys.JwksJson);
+        var provider = Provider(AsymmetricConfig(), HttpClientReturning(handler), Clock());
+
+        var result = await provider.ExchangeAsync(Request());
+
+        Assert.False(result.Succeeded);
+    }
+
+    [Fact]
+    public async Task ExchangeAsync_asymmetric_rejects_alg_none_token()
+    {
+        var unsigned = TestIdTokens.UnsignedNone(Issuer, ClientId, Now.AddMinutes(5),
+            new Dictionary<string, object> { ["sub"] = "G1" });
+        var keys = TestIdTokens.NewRsaKey();
+        var handler = RoutingHandler(TokenResponse(unsigned), keys.JwksJson);
+        var provider = Provider(AsymmetricConfig(), HttpClientReturning(handler), Clock());
+
+        var result = await provider.ExchangeAsync(Request());
+
+        Assert.False(result.Succeeded);
+    }
+
     // ----- asymmetric (RS256 / JWKS / Google-style) ----------------------------------------------
 
     private static OidcProviderConfig AsymmetricConfig() => new()

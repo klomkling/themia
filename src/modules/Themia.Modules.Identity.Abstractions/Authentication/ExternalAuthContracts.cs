@@ -1,11 +1,14 @@
 namespace Themia.Modules.Identity.Abstractions.Authentication;
 
 /// <summary>A headless external-login request: the authorization code the client obtained, plus the
-/// redirect URI it used and an optional PKCE verifier.</summary>
+/// redirect URI it used, an optional PKCE verifier, and an optional nonce.</summary>
 /// <param name="Code">The authorization code obtained by the client.</param>
 /// <param name="RedirectUri">The redirect URI the client used in the authorization request.</param>
 /// <param name="CodeVerifier">An optional PKCE code verifier.</param>
-public readonly record struct ExternalAuthRequest(string Code, string RedirectUri, string? CodeVerifier = null);
+/// <param name="Nonce">An optional nonce. When supplied, the provider requires the id_token's
+/// <c>nonce</c> claim to be present and equal to this value; when omitted, no nonce check runs.</param>
+public readonly record struct ExternalAuthRequest(
+    string Code, string RedirectUri, string? CodeVerifier = null, string? Nonce = null);
 
 /// <summary>A provider identity normalized to a common shape.</summary>
 /// <param name="Provider">The provider key (lowercased).</param>
