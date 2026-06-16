@@ -15,9 +15,9 @@ public sealed class AddRefreshTokenReplacedTokenIdMigration : Migration
     /// <inheritdoc />
     public override void Up()
     {
-        IfDatabase("postgres", "sqlserver").Delegate(AddColumn);
+        IfDatabase("postgresql", "sqlserver").Delegate(AddColumn);
         // 'identity' is a reserved keyword in SQL Server — the schema qualifier must be bracketed.
-        IfDatabase("postgres").Delegate(() => CreateFilteredIndex(SchemaName));
+        IfDatabase("postgresql").Delegate(() => CreateFilteredIndex(SchemaName));
         IfDatabase("sqlserver").Delegate(() => CreateFilteredIndex($"[{SchemaName}]"));
 
         IfDatabase(p =>

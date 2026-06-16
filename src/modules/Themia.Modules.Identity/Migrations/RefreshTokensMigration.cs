@@ -13,7 +13,7 @@ public sealed class RefreshTokensMigration : Migration
     /// <inheritdoc />
     public override void Up()
     {
-        IfDatabase("postgres", "sqlserver").Delegate(CreateRefreshTokens);
+        IfDatabase("postgresql", "sqlserver").Delegate(CreateRefreshTokens);
 
         IfDatabase(p =>
                 !p.StartsWith("Postgres", StringComparison.OrdinalIgnoreCase) &&

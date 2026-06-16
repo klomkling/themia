@@ -12,9 +12,9 @@ public sealed class IdentitySchemaMigration : Migration
     /// <inheritdoc />
     public override void Up()
     {
-        IfDatabase("postgres", "sqlserver").Delegate(CreateSchemaAndTables);
+        IfDatabase("postgresql", "sqlserver").Delegate(CreateSchemaAndTables);
         // 'identity' is a reserved keyword in SQL Server — the schema qualifier must be bracketed.
-        IfDatabase("postgres").Delegate(() => CreateFilteredIndexes(SchemaName));
+        IfDatabase("postgresql").Delegate(() => CreateFilteredIndexes(SchemaName));
         IfDatabase("sqlserver").Delegate(() => CreateFilteredIndexes($"[{SchemaName}]"));
 
         IfDatabase(p =>

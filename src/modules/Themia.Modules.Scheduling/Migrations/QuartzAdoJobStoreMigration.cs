@@ -28,7 +28,7 @@ public sealed class QuartzAdoJobStoreMigration : Migration
         // Root-table name casing MUST match the DDL exactly (PG lowercase, SQL Server uppercase) so the
         // existence guard resolves under a case-sensitive collation — an exact-case match is collation-
         // independent, whereas a lowercase guard against the uppercase SQL Server table misses under CS.
-        IfDatabase("postgres").Delegate(() => CreateSchemaAndTables(PostgresDdl, "qrtz_job_details"));
+        IfDatabase("postgresql").Delegate(() => CreateSchemaAndTables(PostgresDdl, "qrtz_job_details"));
         IfDatabase("sqlserver").Delegate(() => CreateSchemaAndTables(SqlServerDdl, "QRTZ_JOB_DETAILS"));
 
         IfDatabase(p =>
@@ -64,7 +64,7 @@ public sealed class QuartzAdoJobStoreMigration : Migration
     {
         // Tables carry FKs; dropping the schema with CASCADE (PG) / dropping tables first (SQL Server)
         // is simplest. Down() runs only on explicit rollback, never in the MigrateUp startup path.
-        IfDatabase("postgres").Delegate(() => Execute.Sql($"DROP SCHEMA IF EXISTS {SchemaName} CASCADE;"));
+        IfDatabase("postgresql").Delegate(() => Execute.Sql($"DROP SCHEMA IF EXISTS {SchemaName} CASCADE;"));
         IfDatabase("sqlserver").Delegate(() => Execute.Sql(SqlServerDrop));
     }
 

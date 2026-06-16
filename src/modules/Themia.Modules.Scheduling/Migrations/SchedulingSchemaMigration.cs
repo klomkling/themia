@@ -20,7 +20,7 @@ public sealed class SchedulingSchemaMigration : Migration
         // today (no EF MySQL — Pomelo has no EF Core 10 build). FluentMigrator's AsDateTimeOffset maps to
         // timestamptz (Postgres) / datetimeoffset (SQL Server), matching EF's DateTimeOffset mapping, so a
         // single CreateTable serves both. When EF MySQL lands, add a branch here AND to the guard.
-        IfDatabase("postgres", "sqlserver").Delegate(CreateSchemaAndTables);
+        IfDatabase("postgresql", "sqlserver").Delegate(CreateSchemaAndTables);
 
         IfDatabase(p =>
                 !p.StartsWith("Postgres", System.StringComparison.OrdinalIgnoreCase) &&
