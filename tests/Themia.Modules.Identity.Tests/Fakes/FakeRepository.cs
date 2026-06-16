@@ -1,3 +1,5 @@
+using System.Linq.Expressions;
+using System.Reflection;
 using Themia.Framework.Core.Abstractions.Entities;
 using Themia.Framework.Core.Abstractions.Tenancy;
 using Themia.Framework.Data.Abstractions.Paging;
@@ -63,6 +65,45 @@ internal sealed class FakeRepository<T>(List<T> store, Func<T, Guid> idSelector)
     }
 
     public void Update(T entity) { /* in-memory: the instance is already mutated */ }
+
+    public Task<int> UpdateWhereAsync(
+        ISpecification<T> specification,
+        Action<IBulkUpdateSetters<T>> set,
+        CancellationToken cancellationToken = default)
+    {
+        // Mirror the real set-based path: target rows by the spec's WHERE (tenant filter + criteria),
+        // then write each named property directly on the matched instances.
+        var setters = new FakeBulkUpdateSetters();
+        set(setters);
+        if (setters.Assignments.Count == 0)
+            throw new InvalidOperationException("UpdateWhereAsync requires at least one Set(...) call.");
+
+        var matched = Query(specification).ToList();
+        foreach (var entity in matched)
+        {
+            foreach (var (property, value) in setters.Assignments)
+            {
+                property.SetValue(entity, value);
+            }
+        }
+        return Task.FromResult(matched.Count);
+    }
+
+    private sealed class FakeBulkUpdateSetters : IBulkUpdateSetters<T>
+    {
+        public List<(PropertyInfo Property, object? Value)> Assignments { get; } = [];
+
+        public IBulkUpdateSetters<T> Set<TProperty>(Expression<Func<T, TProperty>> property, TProperty value)
+        {
+            // Shared helper: a non-member-access expression fails with the same uniform ArgumentException as the
+            // real peers. The resolved name maps back to the PropertyInfo for the in-memory write.
+            var name = BulkUpdateSetters.MemberName(property);
+            var member = typeof(T).GetProperty(name)
+                ?? throw new ArgumentException($"Property '{name}' not found on {typeof(T).Name}.", nameof(property));
+            Assignments.Add((member, value));
+            return this;
+        }
+    }
 
     public void Remove(T entity)
     {

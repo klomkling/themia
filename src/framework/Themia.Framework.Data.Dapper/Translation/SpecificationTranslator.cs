@@ -17,8 +17,7 @@ internal static class SpecificationTranslator
 {
     public static void Apply<T>(Query query, ISpecification<T> spec, EntityMapping map)
     {
-        if (spec.Criteria is not null)
-            query.Where(q => Translate(q, spec.Criteria.Body, spec.Criteria.Parameters[0], map));
+        ApplyCriteria(query, spec, map);
 
         foreach (var order in spec.OrderBy)
         {
@@ -28,6 +27,14 @@ internal static class SpecificationTranslator
 
         if (spec.Skip is { } skip) query.Offset(skip);
         if (spec.Take is { } take) query.Limit(take);
+    }
+
+    // Applies only the spec's WHERE predicate (no ordering/paging). Used by the set-based UPDATE path,
+    // where ordering and paging are meaningless.
+    public static void ApplyCriteria<T>(Query query, ISpecification<T> spec, EntityMapping map)
+    {
+        if (spec.Criteria is not null)
+            query.Where(q => Translate(q, spec.Criteria.Body, spec.Criteria.Parameters[0], map));
     }
 
     private static Query Translate(Query q, Expression expr, ParameterExpression root, EntityMapping map)

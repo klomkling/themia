@@ -377,6 +377,23 @@ public abstract class IdentityStoreConformanceTests
     }
 
     [Fact]
+    public async Task Revoke_all_does_not_touch_another_users_tokens()
+    {
+        await ResetAsync();
+        await using var s = NewScope(new TenantId("acme"));
+        var victim = (await s.Users.CreateAsync("rt-victim", "pw")).UserId!.Value;
+        var bystander = (await s.Users.CreateAsync("rt-bystander", "pw")).UserId!.Value;
+        var victimToken = await s.RefreshTokens.IssueAsync(victim);
+        var bystanderToken = await s.RefreshTokens.IssueAsync(bystander);
+
+        await s.RefreshTokens.RevokeAsync(victimToken.RawToken, allForUser: true);
+
+        // Victim's token is revoked (reuse on a revoked token => ReuseDetected); bystander's still rotates.
+        Assert.Equal(RefreshOutcome.ReuseDetected, (await s.RefreshTokens.ValidateAndRotateAsync(victimToken.RawToken)).Outcome);
+        Assert.Equal(RefreshOutcome.Success, (await s.RefreshTokens.ValidateAndRotateAsync(bystanderToken.RawToken)).Outcome);
+    }
+
+    [Fact]
     public async Task Refresh_rejects_an_expired_token()
     {
         await ResetAsync();

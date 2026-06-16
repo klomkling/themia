@@ -375,6 +375,91 @@ public abstract class DataLayerConformanceTests
         Assert.DoesNotContain(matched, w => w.Name == "w1");
     }
 
+    [Fact]
+    public async Task UpdateWhere_UpdatesMatchingRows_AndReturnsCount()
+    {
+        await ResetAsync();
+
+        await using (var s = await NewScopeAsync(new TenantId("acme")))
+        {
+            await s.Repo.AddAsync(NewWidget("hit", 1));
+            await s.Repo.AddAsync(NewWidget("hit", 2));
+            await s.Repo.AddAsync(NewWidget("miss", 3));
+            await s.Uow.SaveChangesAsync();
+
+            var affected = await s.Repo.UpdateWhereAsync(new WidgetByNameSpec("hit"), set => set.Set(w => w.Quantity, 99));
+            Assert.Equal(2, affected);
+        }
+
+        // Re-read in a fresh scope: a set-based UPDATE bypasses change tracking, so the committed DB state
+        // (not the still-tracked insert instances) is what proves the rows were written.
+        await using var check = await NewScopeAsync(new TenantId("acme"));
+        var hits = await check.Repo.ListAsync(new WidgetByNameSpec("hit"));
+        Assert.Equal(2, hits.Count);
+        Assert.All(hits, w => Assert.Equal(99, w.Quantity));
+        var miss = await check.Repo.ListAsync(new WidgetByNameSpec("miss"));
+        Assert.Equal(3, Assert.Single(miss).Quantity);   // a non-matching row is untouched
+    }
+
+    [Fact]
+    public async Task UpdateWhere_RespectsTenantIsolation()
+    {
+        await ResetAsync();
+
+        await using (var a = await NewScopeAsync(new TenantId("a")))
+        {
+            await a.Repo.AddAsync(NewWidget("shared", 1));
+            await a.Uow.SaveChangesAsync();
+        }
+
+        await using (var b = await NewScopeAsync(new TenantId("b")))
+        {
+            await b.Repo.AddAsync(NewWidget("shared", 1));
+            await b.Uow.SaveChangesAsync();
+
+            // The UPDATE WHERE carries tenant B's predicate by construction: only B's row is touched.
+            var affected = await b.Repo.UpdateWhereAsync(new WidgetByNameSpec("shared"), set => set.Set(w => w.Quantity, 42));
+            Assert.Equal(1, affected);
+        }
+
+        await using var checkA = await NewScopeAsync(new TenantId("a"));
+        var aRow = Assert.Single(await checkA.Repo.ListAsync(new WidgetByNameSpec("shared")));
+        Assert.Equal(1, aRow.Quantity);   // tenant A's row was NOT updated by tenant B's bulk update
+
+        await using var checkB = await NewScopeAsync(new TenantId("b"));
+        var bRow = Assert.Single(await checkB.Repo.ListAsync(new WidgetByNameSpec("shared")));
+        Assert.Equal(42, bRow.Quantity);
+    }
+
+    [Fact]
+    public async Task UpdateWhere_HonorsWithoutTenantFilter()
+    {
+        await ResetAsync();
+
+        await using (var a = await NewScopeAsync(new TenantId("a")))
+        {
+            await a.Repo.AddAsync(NewWidget("x", 1));
+            await a.Uow.SaveChangesAsync();
+        }
+        await using (var b = await NewScopeAsync(new TenantId("b")))
+        {
+            await b.Repo.AddAsync(NewWidget("x", 1));
+            await b.Uow.SaveChangesAsync();
+        }
+
+        // A spec that opts out of the tenant filter updates BOTH tenants' rows in one statement.
+        await using (var b = await NewScopeAsync(new TenantId("b")))
+        {
+            var affected = await b.Repo.UpdateWhereAsync(new WidgetByNameNoTenantSpec("x"), set => set.Set(w => w.Quantity, 7));
+            Assert.Equal(2, affected);
+        }
+
+        await using var checkA = await NewScopeAsync(new TenantId("a"));
+        Assert.Equal(7, Assert.Single(await checkA.Repo.ListAsync(new WidgetByNameSpec("x"))).Quantity);
+        await using var checkB = await NewScopeAsync(new TenantId("b"));
+        Assert.Equal(7, Assert.Single(await checkB.Repo.ListAsync(new WidgetByNameSpec("x"))).Quantity);
+    }
+
     /// <summary>All widgets ordered by name with a single page applied (Skip/Take).</summary>
     private sealed class AllOrderedByNamePagedSpec : Specification<Widget>
     {
