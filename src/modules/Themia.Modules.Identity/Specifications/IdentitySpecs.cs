@@ -160,3 +160,12 @@ internal sealed class ActiveRefreshTokensByUserSpec : Specification<RefreshToken
     public ActiveRefreshTokensByUserSpec(Guid userId, DateTimeOffset now) =>
         Where(t => t.UserId == userId && t.RevokedAt == null && t.ExpiresAt > now);
 }
+
+/// <summary>The external-login link matching a provider and provider subject within the ambient
+/// tenant. The framework tenant filter isolates it, so the same external account can map to a
+/// different user per tenant.</summary>
+internal sealed class ExternalLoginByProviderKeySpec : Specification<ExternalLoginLink>
+{
+    public ExternalLoginByProviderKeySpec(string provider, string externalId) =>
+        Where(l => l.Provider == provider && l.ExternalId == externalId);
+}

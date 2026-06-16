@@ -78,6 +78,44 @@ public sealed class UserService : IUserService
     }
 
     /// <inheritdoc />
+    public async Task<UserCreationResult> CreateExternalUserAsync(
+        string userName, string? email, bool emailVerified, string? displayName, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(userName);
+
+        var normalizedName = IdentityScope.Normalize(userName);
+        if (await users.AnyAsync(new UserByNormalizedNameSpec(normalizedName), cancellationToken).ConfigureAwait(false))
+        {
+            return UserCreationResult.Failure("duplicate_user_name");
+        }
+
+        string? normalizedEmail = null;
+        if (!string.IsNullOrWhiteSpace(email))
+        {
+            normalizedEmail = IdentityScope.Normalize(email);
+            if (await users.AnyAsync(new UserByNormalizedEmailSpec(normalizedEmail), cancellationToken).ConfigureAwait(false))
+            {
+                return UserCreationResult.Failure("duplicate_email");
+            }
+        }
+
+        var user = new User
+        {
+            UserName = userName,
+            NormalizedUserName = normalizedName,
+            Email = email,
+            NormalizedEmail = normalizedEmail,
+            EmailConfirmed = emailVerified,
+            IsActive = true,
+        };
+        user.SetId(Guid.CreateVersion7());
+
+        await users.AddAsync(user, cancellationToken).ConfigureAwait(false);
+        await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        return UserCreationResult.Success(user.Id);
+    }
+
+    /// <inheritdoc />
     public Task<User?> FindByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
         users.GetByIdAsync(id, cancellationToken);
 
