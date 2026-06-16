@@ -31,7 +31,7 @@ public sealed class SqlServerAuthFixture : IAsyncLifetime
         await using var command = connection.CreateCommand();
         // 'IDENTITY' is a reserved keyword in SQL Server — the schema qualifier must be bracketed.
         command.CommandText =
-            "DELETE FROM [identity].refresh_tokens; DELETE FROM [identity].user_tokens; DELETE FROM [identity].user_claims; DELETE FROM [identity].role_claims; " +
+            "DELETE FROM [identity].refresh_tokens; DELETE FROM [identity].external_logins; DELETE FROM [identity].user_tokens; DELETE FROM [identity].user_claims; DELETE FROM [identity].role_claims; " +
             "DELETE FROM [identity].user_roles; DELETE FROM [identity].users; DELETE FROM [identity].roles;";
         await command.ExecuteNonQueryAsync();
     }
