@@ -257,7 +257,7 @@ public interface IExternalAuthenticationFlow
     /// <summary>Creates an active, password-less user from an external identity. The username is
     /// caller-supplied (already derived + unique); <paramref name="emailVerified"/> sets EmailConfirmed.</summary>
     Task<UserCreationResult> CreateExternalUserAsync(
-        string userName, string? email, bool emailVerified, string? displayName, CancellationToken cancellationToken = default);
+        string userName, string? email, bool emailVerified, CancellationToken cancellationToken = default);
 ```
 
 > Open `IUserService.cs` + `UserCreationResult` first; match the existing `CreateAsync` return-type/shape exactly.
@@ -404,7 +404,7 @@ ResolveOrProvisionAsync(identity):
         await CreateLinkAsync(existing, provider, identity.Subject)   // honors platform/tenant write path
         return (existing, created:false, linked:true)
   userName = await DeriveUniqueUserNameAsync(identity)
-  created = await userService.CreateExternalUserAsync(userName, identity.Email, identity.EmailVerified, identity.DisplayName)
+  created = await userService.CreateExternalUserAsync(userName, identity.Email, identity.EmailVerified)
   user = IdentityScope.ResolveUserAsync(users, created.UserId!.Value) ?? throw
   await CreateLinkAsync(user, provider, identity.Subject)
   return (user, created:true, linked:true)

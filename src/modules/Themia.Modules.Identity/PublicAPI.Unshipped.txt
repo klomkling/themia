@@ -24,4 +24,4 @@ Themia.Modules.Identity.Migrations.ExternalLoginsMigration
 Themia.Modules.Identity.Migrations.ExternalLoginsMigration.ExternalLoginsMigration() -> void
 override Themia.Modules.Identity.Migrations.ExternalLoginsMigration.Down() -> void
 override Themia.Modules.Identity.Migrations.ExternalLoginsMigration.Up() -> void
-Themia.Modules.Identity.Services.UserService.CreateExternalUserAsync(string! userName, string? email, bool emailVerified, string? displayName, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Identity.Abstractions.UserCreationResult>!
+Themia.Modules.Identity.Services.UserService.CreateExternalUserAsync(string! userName, string? email, bool emailVerified, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Identity.Abstractions.UserCreationResult>!

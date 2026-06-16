@@ -79,7 +79,7 @@ public sealed class UserService : IUserService
 
     /// <inheritdoc />
     public async Task<UserCreationResult> CreateExternalUserAsync(
-        string userName, string? email, bool emailVerified, string? displayName, CancellationToken cancellationToken = default)
+        string userName, string? email, bool emailVerified, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(userName);
 
