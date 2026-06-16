@@ -52,8 +52,8 @@ public sealed class ExternalLoginsMigration : Migration
     /// keyword there). The emitted DDL is otherwise identical across engines.</summary>
     private void CreateFilteredIndexes(string schema)
     {
-        Execute.Sql($"CREATE UNIQUE INDEX ux_external_logins_tenant_provider_key ON {schema}.external_logins (tenant_id, provider, external_id) WHERE tenant_id IS NOT NULL;");
-        Execute.Sql($"CREATE UNIQUE INDEX ux_external_logins_platform_provider_key ON {schema}.external_logins (provider, external_id) WHERE tenant_id IS NULL;");
+        Execute.Sql($"CREATE UNIQUE INDEX ux_external_logins_tenant_provider_external_id ON {schema}.external_logins (tenant_id, provider, external_id) WHERE tenant_id IS NOT NULL;");
+        Execute.Sql($"CREATE UNIQUE INDEX ux_external_logins_platform_provider_external_id ON {schema}.external_logins (provider, external_id) WHERE tenant_id IS NULL;");
     }
 
     /// <inheritdoc />
