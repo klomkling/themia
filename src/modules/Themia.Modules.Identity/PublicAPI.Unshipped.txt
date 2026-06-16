@@ -13,6 +13,10 @@ Themia.Modules.Identity.Migrations.AddRefreshTokenReplacedTokenIdMigration
 Themia.Modules.Identity.Migrations.AddRefreshTokenReplacedTokenIdMigration.AddRefreshTokenReplacedTokenIdMigration() -> void
 override Themia.Modules.Identity.Migrations.AddRefreshTokenReplacedTokenIdMigration.Down() -> void
 override Themia.Modules.Identity.Migrations.AddRefreshTokenReplacedTokenIdMigration.Up() -> void
+Themia.Modules.Identity.Migrations.PinTokenHashBinaryCollationMigration
+Themia.Modules.Identity.Migrations.PinTokenHashBinaryCollationMigration.PinTokenHashBinaryCollationMigration() -> void
+override Themia.Modules.Identity.Migrations.PinTokenHashBinaryCollationMigration.Down() -> void
+override Themia.Modules.Identity.Migrations.PinTokenHashBinaryCollationMigration.Up() -> void
 Themia.Modules.Identity.Principal.ClaimsPrincipalFactory.ClaimsPrincipalFactory(Themia.Framework.Data.Abstractions.Repositories.IRepository<Themia.Modules.Identity.Abstractions.Entities.UserRole!, System.Guid>! memberships, Themia.Framework.Data.Abstractions.Repositories.IRepository<Themia.Modules.Identity.Abstractions.Entities.Role!, System.Guid>! roles, Themia.Modules.Identity.Abstractions.IClaimService! claims, Themia.Framework.Core.Abstractions.Tenancy.ITenantContext! tenantContext) -> void
 Themia.Modules.Identity.Services.ClaimService.GetEffectiveClaimsAsync(System.Guid userId, System.Collections.Generic.IReadOnlyCollection<System.Guid>! roleIds, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<System.Security.Claims.Claim!>!>!
 const Themia.Modules.Identity.Principal.IdentityClaimTypes.IsPlatform = "themia:is_platform" -> string!
