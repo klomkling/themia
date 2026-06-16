@@ -180,18 +180,6 @@ public abstract class ExternalAuthConformanceTests : IAsyncLifetime
         return (response.StatusCode, body);
     }
 
-    private async Task<(HttpStatusCode Status, AuthResponse? Body)> LoginAsync(string userName, string password)
-    {
-        var response = await _client!.PostAsJsonAsync(
-            "/auth/login", new { UserName = userName, Password = password }, JsonOpts);
-        AuthResponse? body = null;
-        if (response.IsSuccessStatusCode)
-        {
-            body = await response.Content.ReadFromJsonAsync<AuthResponse>(JsonOpts);
-        }
-        return (response.StatusCode, body);
-    }
-
     private async Task<(HttpStatusCode Status, MeResponse? Body)> GetMeAsync(string bearerToken)
     {
         var request = new HttpRequestMessage(HttpMethod.Get, "/me");
@@ -259,11 +247,8 @@ public abstract class ExternalAuthConformanceTests : IAsyncLifetime
     {
         await ResetAsync();
 
-        // Seed a password user via the public login surface is not possible (no signup endpoint), so
-        // provision the password user the same way the password tests do: through the store. Here we
-        // reuse the external flow's own auto-link path by first creating the user via a verified-email
-        // external login, then confirming a NEW subject with the SAME verified email resolves to it.
-        // To keep this strictly about auto-link to a PASSWORD user, seed via the user service.
+        // No signup endpoint exists, so seed the password user via the user service, then verify a NEW
+        // external subject carrying the SAME verified email auto-links to that existing user.
         var passwordUserId = await SeedPasswordUserAsync("linkme", "Pass1234!", "linkme@example.com");
 
         // New external subject, same verified email → auto-link to the seeded password user.
