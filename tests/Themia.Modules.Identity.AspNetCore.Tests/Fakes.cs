@@ -36,8 +36,13 @@ internal sealed class FakeClaimsPrincipalFactory : IClaimsPrincipalFactory
 
 internal sealed class FakeAccessTokenService(TimeProvider? clock = null) : IAccessTokenService
 {
-    public AccessToken Issue(ClaimsPrincipal principal) =>
-        new("access-jwt", (clock ?? TimeProvider.System).GetUtcNow().AddMinutes(15));
+    public int IssueCalls { get; private set; }
+
+    public AccessToken Issue(ClaimsPrincipal principal)
+    {
+        IssueCalls++;
+        return new("access-jwt", (clock ?? TimeProvider.System).GetUtcNow().AddMinutes(15));
+    }
 }
 
 internal sealed class FakeRefreshTokenService : IRefreshTokenService

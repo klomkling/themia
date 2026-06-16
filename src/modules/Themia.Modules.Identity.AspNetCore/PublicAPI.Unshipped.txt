@@ -132,3 +132,21 @@ Themia.Modules.Identity.AspNetCore.DependencyInjection.ExternalAuthBuilder.AddLi
 Themia.Modules.Identity.AspNetCore.DependencyInjection.ExternalAuthBuilder.AddOidc(Themia.Modules.Identity.AspNetCore.External.OidcProviderConfig! config) -> Themia.Modules.Identity.AspNetCore.DependencyInjection.ExternalAuthBuilder!
 Themia.Modules.Identity.AspNetCore.DependencyInjection.ExternalAuthBuilder.AddProvider(Themia.Modules.Identity.Abstractions.Authentication.IExternalAuthProvider! provider) -> Themia.Modules.Identity.AspNetCore.DependencyInjection.ExternalAuthBuilder!
 Themia.Modules.Identity.AspNetCore.DependencyInjection.ExternalAuthBuilder.AddProvider<TProvider>() -> Themia.Modules.Identity.AspNetCore.DependencyInjection.ExternalAuthBuilder!
+Themia.Modules.Identity.AspNetCore.Endpoints.ExternalLoginRequest
+Themia.Modules.Identity.AspNetCore.Endpoints.ExternalLoginRequest.Code.get -> string!
+Themia.Modules.Identity.AspNetCore.Endpoints.ExternalLoginRequest.Code.init -> void
+Themia.Modules.Identity.AspNetCore.Endpoints.ExternalLoginRequest.CodeVerifier.get -> string?
+Themia.Modules.Identity.AspNetCore.Endpoints.ExternalLoginRequest.CodeVerifier.init -> void
+Themia.Modules.Identity.AspNetCore.Endpoints.ExternalLoginRequest.ExternalLoginRequest(string! Code, string! RedirectUri, string? CodeVerifier = null) -> void
+Themia.Modules.Identity.AspNetCore.Endpoints.ExternalLoginRequest.RedirectUri.get -> string!
+Themia.Modules.Identity.AspNetCore.Endpoints.ExternalLoginRequest.RedirectUri.init -> void
+Themia.Modules.Identity.AspNetCore.Endpoints.IdentityExternalAuthEndpointRouteBuilderExtensions
+Themia.Modules.Identity.AspNetCore.External.ExternalAuthenticationFlow
+Themia.Modules.Identity.AspNetCore.External.ExternalAuthenticationFlow.AuthenticateAsync(string! provider, Themia.Modules.Identity.Abstractions.Authentication.ExternalAuthRequest request, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Identity.Abstractions.Authentication.ExternalLoginFlowResult>!
+Themia.Modules.Identity.AspNetCore.External.ExternalAuthenticationFlow.ExternalAuthenticationFlow(Themia.Modules.Identity.AspNetCore.External.IExternalAuthProviderRegistry! registry, Themia.Modules.Identity.Abstractions.Authentication.IExternalLoginService! externalLogins, Themia.Modules.Identity.Abstractions.IClaimsPrincipalFactory! principalFactory, Themia.Modules.Identity.Abstractions.Authentication.IAccessTokenService! accessTokens, Themia.Modules.Identity.Abstractions.Authentication.IRefreshTokenService! refreshTokens, Themia.Modules.Identity.Abstractions.Authentication.IExternalAuthenticationHooks! hooks, System.TimeProvider! timeProvider, Microsoft.Extensions.Logging.ILogger<Themia.Modules.Identity.AspNetCore.External.ExternalAuthenticationFlow!>! logger) -> void
+Themia.Modules.Identity.AspNetCore.External.ExternalAuthenticationHooksBase
+Themia.Modules.Identity.AspNetCore.External.ExternalAuthenticationHooksBase.ExternalAuthenticationHooksBase() -> void
+static Themia.Modules.Identity.AspNetCore.Endpoints.IdentityExternalAuthEndpointRouteBuilderExtensions.MapIdentityExternalAuthEndpoints(this Microsoft.AspNetCore.Routing.IEndpointRouteBuilder! endpoints) -> Microsoft.AspNetCore.Routing.IEndpointRouteBuilder!
+virtual Themia.Modules.Identity.AspNetCore.External.ExternalAuthenticationHooksBase.OnBeforeExternalLoginAsync(Themia.Modules.Identity.Abstractions.Authentication.BeforeExternalLoginContext! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+virtual Themia.Modules.Identity.AspNetCore.External.ExternalAuthenticationHooksBase.OnExternalLoginFailedAsync(Themia.Modules.Identity.Abstractions.Authentication.ExternalLoginFailedContext! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+virtual Themia.Modules.Identity.AspNetCore.External.ExternalAuthenticationHooksBase.OnExternalLoginSucceededAsync(Themia.Modules.Identity.Abstractions.Authentication.ExternalLoginSucceededContext! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!

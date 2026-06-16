@@ -37,11 +37,13 @@ public static class IdentityAspNetCoreServiceCollectionExtensions
         static bool IsRegistered(IServiceCollection s, Type t) => s.Any(d => d.ServiceType == t);
         if (!IsRegistered(services, typeof(IUserService))
             || !IsRegistered(services, typeof(IRefreshTokenService))
+            || !IsRegistered(services, typeof(IExternalLoginService))
             || !IsRegistered(services, typeof(IClaimsPrincipalFactory)))
         {
             throw new InvalidOperationException(
                 "AddThemiaIdentityAspNetCore requires AddThemiaIdentityServices() to be called first " +
-                "(IUserService, IRefreshTokenService, and IClaimsPrincipalFactory must be registered).");
+                "(IUserService, IRefreshTokenService, IExternalLoginService, and IClaimsPrincipalFactory " +
+                "must be registered).");
         }
 
         var options = new JwtOptions();
@@ -58,6 +60,13 @@ public static class IdentityAspNetCoreServiceCollectionExtensions
         services.TryAddSingleton<IAccessTokenService, AccessTokenService>();
         services.TryAddScoped<IAuthenticationFlow, AuthenticationFlow>();
         services.TryAddScoped<IAuthenticationHooks, AuthenticationHooksBase>();
+
+        // External-login flow + default no-op hooks. The flow additionally needs IExternalLoginService
+        // (from AddThemiaIdentityServices) and IExternalAuthProviderRegistry (from AddThemiaExternalAuth);
+        // both are resolved at runtime, so the registration order of those calls does not matter. The flow
+        // is inert unless the host also maps MapIdentityExternalAuthEndpoints and registers a provider.
+        services.TryAddScoped<IExternalAuthenticationFlow, External.ExternalAuthenticationFlow>();
+        services.TryAddScoped<IExternalAuthenticationHooks, External.ExternalAuthenticationHooksBase>();
 
         return services;
     }
