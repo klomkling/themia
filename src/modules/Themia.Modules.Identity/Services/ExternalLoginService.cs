@@ -128,7 +128,7 @@ public sealed class ExternalLoginService : IExternalLoginService
     }
 
     /// <summary>Derives a user name that is unique within the ambient scope: the email local-part when
-    /// present (with a short subject-derived disambiguator on collision), else
+    /// present (with a short random disambiguator appended on collision), else
     /// <c>{provider}_{subject-prefix}</c>. Loops until <see cref="IUserService.FindByUserNameAsync"/>
     /// reports no collision.</summary>
     private async Task<string> DeriveUniqueUserNameAsync(
