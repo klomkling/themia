@@ -17,6 +17,7 @@
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
   <ItemGroup>
+    <PackageReference Include="FluentMigrator.Runner" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" />
     <PackageReference Include="FluentMigrator" />
     <PackageReference Include="Konscious.Security.Cryptography.Argon2" />
