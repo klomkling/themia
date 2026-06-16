@@ -18,6 +18,47 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.5.2] - 2026-06-16
+
+### Added
+
+- **Pluggable external/OAuth login for Themia Identity.** New contracts in
+  `Themia.Modules.Identity.Abstractions` (`IExternalAuthProvider`,
+  `ExternalAuthRequest`/`ExternalIdentity`/`ExternalAuthResult`, `IExternalLoginService` +
+  `ExternalLoginResult`, `IExternalAuthenticationFlow` +
+  `ExternalLoginFlowResult`/`ExternalLoginOutcome`, `IExternalAuthenticationHooks`, the
+  `ExternalLoginLink` entity, and `IUserService.CreateExternalUserAsync`) let any OAuth/OIDC
+  provider plug into the same auth pipeline as password login.
+- **`identity.external_logins` table** — tenant-scoped FluentMigrator migration
+  (PostgreSQL + SQL Server) with a filtered-unique index per tenant + platform, plus EF Core and
+  Dapper mappings. `ExternalLoginService` ships in the Identity core (`Themia.Modules.Identity`)
+  and runs on both data peers: it resolves an existing link, otherwise auto-links by **verified**
+  email, otherwise provisions a password-less user via the new password-less
+  `CreateExternalUserAsync`.
+- **`Themia.Modules.Identity.AspNetCore` external-auth stack** — a generic `OidcExternalAuthProvider`
+  (server-side authorization-code→token exchange + id-token validation via JWKS/RS256 with
+  `ConfigurationManager` auto-refresh, or HS256 with a channel secret), an
+  `IExternalAuthProviderRegistry`, and a fluent
+  `AddThemiaExternalAuth().AddGoogle(...).AddLine(...).AddProvider(...)/.AddOidc(...)` builder.
+  `ExternalAuthenticationFlow` orchestrates the exchange, and `IExternalAuthenticationHooks`
+  exposes DI-replaceable extension points.
+- **Opt-in `MapIdentityExternalAuthEndpoints()`** — exposes
+  `POST /auth/external/{provider}` (headless code-exchange) returning the **same**
+  `AuthResponse { accessToken, expiresIn, refreshToken }` as login and rotating through
+  `/auth/refresh`.
+- **Reference providers: Google** (standard OIDC) and **LINE** (OIDC-ish, HS256 channel secret).
+  Facebook / Microsoft / Telegram are deferred additive providers.
+
+### Security
+
+- **Auto-link only on a verified provider email.** A link is created automatically only when the
+  provider asserts a verified email; an unverified email never links and is never persisted.
+- **Server-side code exchange** keeps the client secret off the wire (never exposed or logged),
+  with the id-token issuer / audience / signature / expiry all validated and the PKCE
+  `code_verifier` forwarded. Provider failures return a **uniform 401** (404 only for an unknown
+  provider). The flow is headless: the client owns `state` (CSRF) while the server validates
+  `nonce`.
+
 ## [0.5.1] - 2026-06-15
 
 ### Added

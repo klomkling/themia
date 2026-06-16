@@ -113,7 +113,7 @@ you the target: `neutral/` = net8.0;net10.0, everything else = net10.0 (tooling 
 | `Themia.Modules.Scheduling` (+ `Themia.Quartz`) | PowerACC SilkierQuartz | **✅ built** (`Themia.Quartz` neutral core + `Themia.Modules.Scheduling`; dashboard smoke + EF store integration green) |
 | `Themia.Modules.ExceptionLogging` (+ `Themia.Exceptional.*`) | PowerACC/Idevs custom Dapper dialect engine (3 DB). *typed-exceptions + ProblemDetails split out to standalone neutral `Themia.AspNetCore`* | **✅ specced** |
 | `Themia.Modules.Identity` (+ `.Abstractions`) | ezy-assets `Jwt/Authentication/RoleAccess/TenantContext/LineLogin` + claims/policies + Zenity Identity.Example | **✅ built** (0.5.0 — tenant-aware user/role/claim store, argon2id, `ICurrentUser`, EF+Dapper, PostgreSQL+SQL Server FM schema) |
-| `Themia.Modules.Identity.AspNetCore` | ezy-assets JWT + authentication flows | **✅ built** (0.5.1 — JWT issuance, rotating refresh tokens, `IAuthenticationFlow`, `MapIdentityAuthEndpoints`) |
+| `Themia.Modules.Identity.AspNetCore` | ezy-assets JWT + authentication flows | **✅ built** (0.5.2 — external/OAuth login: pluggable providers + Google/LINE, `AddThemiaExternalAuth`, `MapIdentityExternalAuthEndpoints`; Facebook/Microsoft/Telegram deferred additive providers — on top of 0.5.1 JWT issuance, rotating refresh tokens, `IAuthenticationFlow`, `MapIdentityAuthEndpoints`) |
 | `Themia.Modules.Storage` | **ezy-assets** S3/Local + **Idevs** `CloudUploadStorage` + **PowerACC** ClamAV scan | ⬜ **P1 — next to spec** |
 | `Themia.Modules.Notifications` | ezy-assets `NotificationDispatcher`/Email/OTP/`Sms2Pro` | ⬜ to-spec |
 | `Themia.Modules.Pdf` | **ezy-assets** Contract/Proposal PDF + **Idevs** `PdfOptionsBuilder`/PuppeteerSharp + PowerACC reporting | ⬜ to-spec |
