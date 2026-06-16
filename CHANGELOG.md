@@ -32,6 +32,26 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
   EF Core and Dapper data peers.
 - **`IdentityModuleOptions.RefreshTokenLifetime`** — configurable refresh-token TTL (default 14 days).
 
+### Changed
+
+- **FluentMigrator upgraded to 7.2.0** (from 6.x). FM7 renamed the PostgreSQL generator id, so
+  `IfDatabase("postgres")` matched nothing and the Postgres branch silently no-opped while
+  `VersionInfo` recorded the migration as applied; all migrations now route via
+  `IfDatabase("postgresql")`. Resulting schema is unchanged.
+- **`Themia.Data.Migrations` references only the provider runners Themia supports** —
+  `FluentMigrator.Runner.Postgres` / `.MySql` / `.SqlServer` — instead of the
+  `FluentMigrator.Runner` meta-package, dropping seven unused providers (Db2, Oracle, Hana,
+  Snowflake, Redshift, Firebird, SQLite) from the dependency graph.
+- Routine dependency updates (TimeProvider.Testing, SqlKata, StackExchange.Redis, test SDKs).
+
+### Fixed
+
+- **FluentMigrator-dependent test projects no longer report "inconclusive" in Rider/ReSharper on
+  Apple Silicon.** The `FluentMigrator.Runner` meta-package dragged in the x64-only
+  `IBM.Data.Db2.dll`, whose PE machine header (AMD64) made the IDE force an x64 test host; with no
+  x64 .NET installed on an arm64 machine the run aborted. Trimming to the used providers removes the
+  x64 assembly so tests run natively (arm64). Headless `dotnet test` was unaffected.
+
 ### Security
 
 - Login is **anti-enumeration, uniform-401**: an argon2id dummy hash is computed on not-found /
