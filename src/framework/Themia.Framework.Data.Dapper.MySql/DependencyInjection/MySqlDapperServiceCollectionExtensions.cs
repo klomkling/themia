@@ -1,6 +1,8 @@
 using System.Data;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Themia.Framework.Data.Abstractions.Exceptions;
 using Themia.Framework.Data.Dapper;
 using Themia.Framework.Data.Dapper.Connection;
 using Themia.Framework.Data.Dapper.DependencyInjection;
@@ -24,6 +26,9 @@ public static class MySqlDapperServiceCollectionExtensions
         services.AddThemiaDapperCore(configure);
         services.AddScoped<IDapperConnectionFactory>(sp => new MySqlConnectionFactory(configuration, sp));
         services.AddSingleton<ISqlCompiler, MySqlSqlCompiler>();
+        // MySQL reports the generic 23000 integrity-constraint class for many faults, so replace the default
+        // SQLSTATE interpreter with one that matches MySQL's native duplicate-key error number (1062).
+        services.Replace(ServiceDescriptor.Singleton<ISqlExceptionInterpreter, MySqlSqlExceptionInterpreter>());
         return services;
     }
 }

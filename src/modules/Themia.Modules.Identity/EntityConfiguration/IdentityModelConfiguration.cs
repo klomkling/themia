@@ -128,6 +128,7 @@ public static class ModelBuilderExtensions
             b.Property(t => t.ConsumedAt).HasColumnName("consumed_at");
             b.Property(t => t.RevokedAt).HasColumnName("revoked_at");
             b.Property(t => t.ReplacedById).HasColumnName("replaced_by_id");
+            b.Property(t => t.ReplacedTokenId).HasColumnName("replaced_token_id");
             b.Property(t => t.CreatedAt).HasColumnName("created_at");
         }
     }

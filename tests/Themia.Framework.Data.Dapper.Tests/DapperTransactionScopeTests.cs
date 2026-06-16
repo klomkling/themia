@@ -49,7 +49,8 @@ public sealed class DapperTransactionScopeTests
     // helper stays safe to reuse on a path that reaches TenantScoped.
     private static DapperUnitOfWork NewUnitOfWork(IDapperConnectionContext ctx) =>
         new(ctx, registry: null!, compiler: null!, tenantContext: null!, currentUser: null!,
-            filterScope: new DataFilterScope(), timeProvider: TimeProvider.System);
+            filterScope: new DataFilterScope(), timeProvider: TimeProvider.System,
+            sqlExceptionInterpreter: null!);
 
     private sealed class FakeConnectionContext(DbTransaction tx) : IDapperConnectionContext
     {

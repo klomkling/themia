@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Themia.Framework.Data.Abstractions.Exceptions;
 using Themia.Framework.Data.Abstractions.Filtering;
 using Themia.Framework.Data.Abstractions.Repositories;
 using Themia.Framework.Data.Abstractions.UnitOfWork;
@@ -16,6 +17,10 @@ public static class RepositoryServiceCollectionExtensions
         where TContext : ThemiaDbContext
     {
         services.TryAddScoped<IDataFilterScope, DataFilterScope>();
+        // Default SQLSTATE-based unique-violation detection (PostgreSQL/MySQL). The SQL Server provider
+        // replaces this in its ConfigureServices with a SqlException.Number-based interpreter, since
+        // SqlClient does not surface a usable SqlState.
+        services.TryAddSingleton<ISqlExceptionInterpreter, SqlStateUniqueConstraintInterpreter>();
         services.AddScoped<ThemiaDbContext>(sp => sp.GetRequiredService<TContext>());
         services.AddScoped(typeof(IReadRepository<,>), typeof(EfReadRepository<,>));
         services.AddScoped(typeof(IRepository<,>), typeof(EfRepository<,>));
