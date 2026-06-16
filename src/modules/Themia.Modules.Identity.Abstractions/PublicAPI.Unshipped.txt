@@ -20,9 +20,80 @@ Themia.Modules.Identity.Abstractions.Authentication.AuthTokens.ExpiresInSeconds.
 Themia.Modules.Identity.Abstractions.Authentication.AuthTokens.ExpiresInSeconds.init -> void
 Themia.Modules.Identity.Abstractions.Authentication.AuthTokens.RefreshToken.get -> string!
 Themia.Modules.Identity.Abstractions.Authentication.AuthTokens.RefreshToken.init -> void
+Themia.Modules.Identity.Abstractions.Authentication.BeforeExternalLoginContext
+Themia.Modules.Identity.Abstractions.Authentication.BeforeExternalLoginContext.BeforeExternalLoginContext(string! provider) -> void
+Themia.Modules.Identity.Abstractions.Authentication.BeforeExternalLoginContext.Provider.get -> string!
 Themia.Modules.Identity.Abstractions.Authentication.BeforeLoginContext
 Themia.Modules.Identity.Abstractions.Authentication.BeforeLoginContext.BeforeLoginContext(string! userName) -> void
 Themia.Modules.Identity.Abstractions.Authentication.BeforeLoginContext.UserName.get -> string!
+Themia.Modules.Identity.Abstractions.Authentication.ExternalAuthRequest
+Themia.Modules.Identity.Abstractions.Authentication.ExternalAuthRequest.Code.get -> string!
+Themia.Modules.Identity.Abstractions.Authentication.ExternalAuthRequest.Code.init -> void
+Themia.Modules.Identity.Abstractions.Authentication.ExternalAuthRequest.CodeVerifier.get -> string?
+Themia.Modules.Identity.Abstractions.Authentication.ExternalAuthRequest.CodeVerifier.init -> void
+Themia.Modules.Identity.Abstractions.Authentication.ExternalAuthRequest.ExternalAuthRequest() -> void
+Themia.Modules.Identity.Abstractions.Authentication.ExternalAuthRequest.ExternalAuthRequest(string! Code, string! RedirectUri, string? CodeVerifier = null) -> void
+Themia.Modules.Identity.Abstractions.Authentication.ExternalAuthRequest.RedirectUri.get -> string!
+Themia.Modules.Identity.Abstractions.Authentication.ExternalAuthRequest.RedirectUri.init -> void
+Themia.Modules.Identity.Abstractions.Authentication.ExternalAuthResult
+Themia.Modules.Identity.Abstractions.Authentication.ExternalAuthResult.ExternalAuthResult() -> void
+Themia.Modules.Identity.Abstractions.Authentication.ExternalAuthResult.FailureReason.get -> string?
+Themia.Modules.Identity.Abstractions.Authentication.ExternalAuthResult.Identity.get -> Themia.Modules.Identity.Abstractions.Authentication.ExternalIdentity?
+Themia.Modules.Identity.Abstractions.Authentication.ExternalAuthResult.Succeeded.get -> bool
+Themia.Modules.Identity.Abstractions.Authentication.ExternalIdentity
+Themia.Modules.Identity.Abstractions.Authentication.ExternalIdentity.DisplayName.get -> string?
+Themia.Modules.Identity.Abstractions.Authentication.ExternalIdentity.DisplayName.init -> void
+Themia.Modules.Identity.Abstractions.Authentication.ExternalIdentity.Email.get -> string?
+Themia.Modules.Identity.Abstractions.Authentication.ExternalIdentity.Email.init -> void
+Themia.Modules.Identity.Abstractions.Authentication.ExternalIdentity.EmailVerified.get -> bool
+Themia.Modules.Identity.Abstractions.Authentication.ExternalIdentity.EmailVerified.init -> void
+Themia.Modules.Identity.Abstractions.Authentication.ExternalIdentity.ExternalIdentity() -> void
+Themia.Modules.Identity.Abstractions.Authentication.ExternalIdentity.ExternalIdentity(string! Provider, string! Subject, string? Email, bool EmailVerified, string? DisplayName) -> void
+Themia.Modules.Identity.Abstractions.Authentication.ExternalIdentity.Provider.get -> string!
+Themia.Modules.Identity.Abstractions.Authentication.ExternalIdentity.Provider.init -> void
+Themia.Modules.Identity.Abstractions.Authentication.ExternalIdentity.Subject.get -> string!
+Themia.Modules.Identity.Abstractions.Authentication.ExternalIdentity.Subject.init -> void
+Themia.Modules.Identity.Abstractions.Authentication.ExternalLoginFailedContext
+Themia.Modules.Identity.Abstractions.Authentication.ExternalLoginFailedContext.ExternalLoginFailedContext(string! provider, Themia.Modules.Identity.Abstractions.Authentication.ExternalLoginOutcome reason) -> void
+Themia.Modules.Identity.Abstractions.Authentication.ExternalLoginFailedContext.Provider.get -> string!
+Themia.Modules.Identity.Abstractions.Authentication.ExternalLoginFailedContext.Reason.get -> Themia.Modules.Identity.Abstractions.Authentication.ExternalLoginOutcome
+Themia.Modules.Identity.Abstractions.Authentication.ExternalLoginOutcome
+Themia.Modules.Identity.Abstractions.Authentication.ExternalLoginOutcome.Denied = 3 -> Themia.Modules.Identity.Abstractions.Authentication.ExternalLoginOutcome
+Themia.Modules.Identity.Abstractions.Authentication.ExternalLoginOutcome.ProviderNotFound = 1 -> Themia.Modules.Identity.Abstractions.Authentication.ExternalLoginOutcome
+Themia.Modules.Identity.Abstractions.Authentication.ExternalLoginOutcome.ProviderRejected = 2 -> Themia.Modules.Identity.Abstractions.Authentication.ExternalLoginOutcome
+Themia.Modules.Identity.Abstractions.Authentication.ExternalLoginOutcome.Success = 0 -> Themia.Modules.Identity.Abstractions.Authentication.ExternalLoginOutcome
+Themia.Modules.Identity.Abstractions.Authentication.ExternalLoginResult
+Themia.Modules.Identity.Abstractions.Authentication.ExternalLoginResult.ExternalLoginResult() -> void
+Themia.Modules.Identity.Abstractions.Authentication.ExternalLoginResult.ExternalLoginResult(Themia.Modules.Identity.Abstractions.Entities.User! User, bool WasCreated, bool WasLinked) -> void
+Themia.Modules.Identity.Abstractions.Authentication.ExternalLoginResult.User.get -> Themia.Modules.Identity.Abstractions.Entities.User!
+Themia.Modules.Identity.Abstractions.Authentication.ExternalLoginResult.User.init -> void
+Themia.Modules.Identity.Abstractions.Authentication.ExternalLoginResult.WasCreated.get -> bool
+Themia.Modules.Identity.Abstractions.Authentication.ExternalLoginResult.WasCreated.init -> void
+Themia.Modules.Identity.Abstractions.Authentication.ExternalLoginResult.WasLinked.get -> bool
+Themia.Modules.Identity.Abstractions.Authentication.ExternalLoginResult.WasLinked.init -> void
+Themia.Modules.Identity.Abstractions.Authentication.ExternalLoginResultType
+Themia.Modules.Identity.Abstractions.Authentication.ExternalLoginResultType.ExternalLoginResultType() -> void
+Themia.Modules.Identity.Abstractions.Authentication.ExternalLoginResultType.Outcome.get -> Themia.Modules.Identity.Abstractions.Authentication.ExternalLoginOutcome
+Themia.Modules.Identity.Abstractions.Authentication.ExternalLoginResultType.Succeeded.get -> bool
+Themia.Modules.Identity.Abstractions.Authentication.ExternalLoginResultType.Tokens.get -> Themia.Modules.Identity.Abstractions.Authentication.AuthTokens?
+Themia.Modules.Identity.Abstractions.Authentication.ExternalLoginResultType.WasCreated.get -> bool
+Themia.Modules.Identity.Abstractions.Authentication.ExternalLoginResultType.WasLinked.get -> bool
+Themia.Modules.Identity.Abstractions.Authentication.ExternalLoginSucceededContext
+Themia.Modules.Identity.Abstractions.Authentication.ExternalLoginSucceededContext.ExternalLoginSucceededContext(Themia.Modules.Identity.Abstractions.Entities.User! user, bool wasCreated, bool wasLinked) -> void
+Themia.Modules.Identity.Abstractions.Authentication.ExternalLoginSucceededContext.User.get -> Themia.Modules.Identity.Abstractions.Entities.User!
+Themia.Modules.Identity.Abstractions.Authentication.ExternalLoginSucceededContext.WasCreated.get -> bool
+Themia.Modules.Identity.Abstractions.Authentication.ExternalLoginSucceededContext.WasLinked.get -> bool
+Themia.Modules.Identity.Abstractions.Authentication.IExternalAuthenticationFlow
+Themia.Modules.Identity.Abstractions.Authentication.IExternalAuthenticationFlow.AuthenticateAsync(string! provider, Themia.Modules.Identity.Abstractions.Authentication.ExternalAuthRequest request, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Identity.Abstractions.Authentication.ExternalLoginResultType>!
+Themia.Modules.Identity.Abstractions.Authentication.IExternalAuthenticationHooks
+Themia.Modules.Identity.Abstractions.Authentication.IExternalAuthenticationHooks.OnBeforeExternalLoginAsync(Themia.Modules.Identity.Abstractions.Authentication.BeforeExternalLoginContext! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Modules.Identity.Abstractions.Authentication.IExternalAuthenticationHooks.OnExternalLoginFailedAsync(Themia.Modules.Identity.Abstractions.Authentication.ExternalLoginFailedContext! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Modules.Identity.Abstractions.Authentication.IExternalAuthenticationHooks.OnExternalLoginSucceededAsync(Themia.Modules.Identity.Abstractions.Authentication.ExternalLoginSucceededContext! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Modules.Identity.Abstractions.Authentication.IExternalAuthProvider
+Themia.Modules.Identity.Abstractions.Authentication.IExternalAuthProvider.ExchangeAsync(Themia.Modules.Identity.Abstractions.Authentication.ExternalAuthRequest request, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Identity.Abstractions.Authentication.ExternalAuthResult>!
+Themia.Modules.Identity.Abstractions.Authentication.IExternalAuthProvider.Name.get -> string!
+Themia.Modules.Identity.Abstractions.Authentication.IExternalLoginService
+Themia.Modules.Identity.Abstractions.Authentication.IExternalLoginService.ResolveOrProvisionAsync(Themia.Modules.Identity.Abstractions.Authentication.ExternalIdentity identity, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Identity.Abstractions.Authentication.ExternalLoginResult>!
 Themia.Modules.Identity.Abstractions.Authentication.BeforeRefreshContext
 Themia.Modules.Identity.Abstractions.Authentication.BeforeRefreshContext.BeforeRefreshContext() -> void
 Themia.Modules.Identity.Abstractions.Authentication.IAccessTokenService
@@ -102,6 +173,20 @@ Themia.Modules.Identity.Abstractions.Authentication.RefreshValidationResult.Refr
 Themia.Modules.Identity.Abstractions.Authentication.RefreshValidationResult.Replacement.get -> Themia.Modules.Identity.Abstractions.Authentication.RefreshIssue?
 Themia.Modules.Identity.Abstractions.Authentication.RefreshValidationResult.TryGetSuccess(out Themia.Modules.Identity.Abstractions.Entities.User? user, out Themia.Modules.Identity.Abstractions.Authentication.RefreshIssue replacement) -> bool
 Themia.Modules.Identity.Abstractions.Authentication.RefreshValidationResult.User.get -> Themia.Modules.Identity.Abstractions.Entities.User?
+Themia.Modules.Identity.Abstractions.Entities.ExternalLoginLink
+Themia.Modules.Identity.Abstractions.Entities.ExternalLoginLink.CreatedAt.get -> System.DateTimeOffset
+Themia.Modules.Identity.Abstractions.Entities.ExternalLoginLink.CreatedAt.set -> void
+Themia.Modules.Identity.Abstractions.Entities.ExternalLoginLink.ExternalId.get -> string!
+Themia.Modules.Identity.Abstractions.Entities.ExternalLoginLink.ExternalId.set -> void
+Themia.Modules.Identity.Abstractions.Entities.ExternalLoginLink.ExternalLoginLink() -> void
+Themia.Modules.Identity.Abstractions.Entities.ExternalLoginLink.Id.get -> System.Guid
+Themia.Modules.Identity.Abstractions.Entities.ExternalLoginLink.Provider.get -> string!
+Themia.Modules.Identity.Abstractions.Entities.ExternalLoginLink.Provider.set -> void
+Themia.Modules.Identity.Abstractions.Entities.ExternalLoginLink.SetId(System.Guid id) -> void
+Themia.Modules.Identity.Abstractions.Entities.ExternalLoginLink.TenantId.get -> Themia.Framework.Core.Abstractions.Tenancy.TenantId?
+Themia.Modules.Identity.Abstractions.Entities.ExternalLoginLink.TenantId.set -> void
+Themia.Modules.Identity.Abstractions.Entities.ExternalLoginLink.UserId.get -> System.Guid
+Themia.Modules.Identity.Abstractions.Entities.ExternalLoginLink.UserId.set -> void
 Themia.Modules.Identity.Abstractions.Entities.RefreshToken
 Themia.Modules.Identity.Abstractions.Entities.RefreshToken.ConsumedAt.get -> System.DateTimeOffset?
 Themia.Modules.Identity.Abstractions.Entities.RefreshToken.ConsumedAt.set -> void
@@ -128,6 +213,13 @@ Themia.Modules.Identity.Abstractions.Entities.RefreshToken.UserId.set -> void
 Themia.Modules.Identity.Abstractions.IClaimService.GetEffectiveClaimsAsync(System.Guid userId, System.Collections.Generic.IReadOnlyCollection<System.Guid>! roleIds, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<System.Security.Claims.Claim!>!>!
 Themia.Modules.Identity.Abstractions.IdentityModuleOptions.RefreshTokenLifetime.get -> System.TimeSpan
 Themia.Modules.Identity.Abstractions.IdentityModuleOptions.RefreshTokenLifetime.set -> void
+Themia.Modules.Identity.Abstractions.IUserService.CreateExternalUserAsync(string! userName, string? email, bool emailVerified, string? displayName, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Identity.Abstractions.UserCreationResult>!
+static Themia.Modules.Identity.Abstractions.Authentication.ExternalAuthResult.Failed(string! reason) -> Themia.Modules.Identity.Abstractions.Authentication.ExternalAuthResult
+static Themia.Modules.Identity.Abstractions.Authentication.ExternalAuthResult.Success(Themia.Modules.Identity.Abstractions.Authentication.ExternalIdentity identity) -> Themia.Modules.Identity.Abstractions.Authentication.ExternalAuthResult
+static Themia.Modules.Identity.Abstractions.Authentication.ExternalLoginResultType.Denied() -> Themia.Modules.Identity.Abstractions.Authentication.ExternalLoginResultType
+static Themia.Modules.Identity.Abstractions.Authentication.ExternalLoginResultType.ProviderNotFound() -> Themia.Modules.Identity.Abstractions.Authentication.ExternalLoginResultType
+static Themia.Modules.Identity.Abstractions.Authentication.ExternalLoginResultType.ProviderRejected() -> Themia.Modules.Identity.Abstractions.Authentication.ExternalLoginResultType
+static Themia.Modules.Identity.Abstractions.Authentication.ExternalLoginResultType.Success(Themia.Modules.Identity.Abstractions.Authentication.AuthTokens tokens, bool created, bool linked) -> Themia.Modules.Identity.Abstractions.Authentication.ExternalLoginResultType
 static Themia.Modules.Identity.Abstractions.Authentication.LoginResult.Denied() -> Themia.Modules.Identity.Abstractions.Authentication.LoginResult
 static Themia.Modules.Identity.Abstractions.Authentication.LoginResult.InvalidCredentials() -> Themia.Modules.Identity.Abstractions.Authentication.LoginResult
 static Themia.Modules.Identity.Abstractions.Authentication.LoginResult.LockedOut() -> Themia.Modules.Identity.Abstractions.Authentication.LoginResult
