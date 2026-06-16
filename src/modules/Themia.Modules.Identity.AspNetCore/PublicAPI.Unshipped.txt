@@ -120,6 +120,8 @@ Themia.Modules.Identity.AspNetCore.Options.LineOptions.ChannelId.get -> string!
 Themia.Modules.Identity.AspNetCore.Options.LineOptions.ChannelId.set -> void
 Themia.Modules.Identity.AspNetCore.Options.LineOptions.ChannelSecret.get -> string!
 Themia.Modules.Identity.AspNetCore.Options.LineOptions.ChannelSecret.set -> void
+Themia.Modules.Identity.AspNetCore.Options.LineOptions.EmailAlwaysVerified.get -> bool
+Themia.Modules.Identity.AspNetCore.Options.LineOptions.EmailAlwaysVerified.set -> void
 Themia.Modules.Identity.AspNetCore.Options.LineOptions.Scopes.get -> System.Collections.Generic.IReadOnlyList<string!>!
 Themia.Modules.Identity.AspNetCore.Options.LineOptions.Scopes.set -> void
 Themia.Modules.Identity.AspNetCore.Options.LineOptions.Validate() -> void

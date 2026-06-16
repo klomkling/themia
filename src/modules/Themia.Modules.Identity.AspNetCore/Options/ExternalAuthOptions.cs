@@ -40,6 +40,14 @@ public sealed class LineOptions
     /// <summary>The requested scopes. Defaults to <c>openid profile email</c>.</summary>
     public IReadOnlyList<string> Scopes { get; set; } = ["openid", "profile", "email"];
 
+    /// <summary>Treats the LINE-supplied email as provider-verified. <b>Defaults to <c>false</c></b>:
+    /// LINE emits no <c>email_verified</c> claim, so a LINE login never auto-links to (or claims the
+    /// email of) an existing local account, and the unverified email is not persisted onto a newly
+    /// provisioned user. Set to <c>true</c> only if you trust LINE's email verification for your
+    /// channel — then a verified-email match auto-links exactly as Google does (an account-takeover
+    /// surface if the email is not strongly verified).</summary>
+    public bool EmailAlwaysVerified { get; set; }
+
     /// <summary>Validates the options, throwing on blank credentials.</summary>
     /// <exception cref="ArgumentException">The channel id or secret is blank.</exception>
     public void Validate()

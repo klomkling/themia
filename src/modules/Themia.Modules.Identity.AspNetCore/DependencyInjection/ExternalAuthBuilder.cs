@@ -70,7 +70,12 @@ public sealed class ExternalAuthBuilder
         });
     }
 
-    /// <summary>Registers LINE as an OIDC provider named <c>line</c> (HS256 via the channel secret).</summary>
+    /// <summary>Registers LINE as an OIDC provider named <c>line</c> (HS256 via the channel secret).
+    /// <para>By default a LINE login does <b>not</b> auto-link to an existing local account: LINE emits
+    /// no <c>email_verified</c> claim, so its email is treated as unverified — it is neither used to
+    /// adopt an existing account nor persisted onto a new user. Opt in via
+    /// <see cref="LineOptions.EmailAlwaysVerified"/> only if you trust LINE's email verification for
+    /// your channel.</para></summary>
     /// <param name="configure">Configures the LINE credentials.</param>
     /// <returns>The same builder.</returns>
     /// <exception cref="ArgumentException">The credentials are blank.</exception>
@@ -92,7 +97,7 @@ public sealed class ExternalAuthBuilder
             Issuer = LineIssuer,
             Audience = options.ChannelId,
             SymmetricSecret = options.ChannelSecret,
-            EmailAlwaysVerified = true,
+            EmailAlwaysVerified = options.EmailAlwaysVerified,
         });
     }
 

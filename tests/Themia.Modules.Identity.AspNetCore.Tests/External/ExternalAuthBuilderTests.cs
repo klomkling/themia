@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Themia.Modules.Identity.Abstractions.Authentication;
 using Themia.Modules.Identity.AspNetCore.DependencyInjection;
 using Themia.Modules.Identity.AspNetCore.External;
+using Themia.Modules.Identity.AspNetCore.Options;
 using Xunit;
 
 namespace Themia.Modules.Identity.AspNetCore.Tests.External;
@@ -72,6 +73,19 @@ public sealed class ExternalAuthBuilderTests
         var ex = Assert.Throws<ArgumentException>(() =>
             Build(b => b.AddLine(o => { o.ChannelId = "channel"; o.ChannelSecret = " "; })));
         Assert.Contains("ChannelSecret", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact] // LINE emits no email_verified claim: the email must NOT be auto-trusted by default.
+    public void LineOptions_does_not_trust_email_by_default()
+    {
+        Assert.False(new LineOptions().EmailAlwaysVerified);
+    }
+
+    [Fact] // An adopter who trusts LINE's email verification can opt back in.
+    public void LineOptions_email_verification_is_opt_in()
+    {
+        var options = new LineOptions { EmailAlwaysVerified = true };
+        Assert.True(options.EmailAlwaysVerified);
     }
 
     [Fact]

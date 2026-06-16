@@ -57,7 +57,7 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
   with the id-token issuer / audience / signature / expiry all validated and the PKCE
   `code_verifier` forwarded. Provider failures return a **uniform 401** (404 only for an unknown
   provider). The flow is headless: the client owns `state` (CSRF) while the server validates
-  `nonce`.
+  `nonce` when the client supplies one.
 
 ## [0.5.1] - 2026-06-15
 
