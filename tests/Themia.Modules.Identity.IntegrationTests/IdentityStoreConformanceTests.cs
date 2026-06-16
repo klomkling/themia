@@ -377,6 +377,23 @@ public abstract class IdentityStoreConformanceTests
     }
 
     [Fact]
+    public async Task Revoke_all_does_not_touch_another_users_tokens()
+    {
+        await ResetAsync();
+        await using var s = NewScope(new TenantId("acme"));
+        var victim = (await s.Users.CreateAsync("rt-victim", "pw")).UserId!.Value;
+        var bystander = (await s.Users.CreateAsync("rt-bystander", "pw")).UserId!.Value;
+        var victimToken = await s.RefreshTokens.IssueAsync(victim);
+        var bystanderToken = await s.RefreshTokens.IssueAsync(bystander);
+
+        await s.RefreshTokens.RevokeAsync(victimToken.RawToken, allForUser: true);
+
+        // Victim's token is revoked (reuse on a revoked token => ReuseDetected); bystander's still rotates.
+        Assert.Equal(RefreshOutcome.ReuseDetected, (await s.RefreshTokens.ValidateAndRotateAsync(victimToken.RawToken)).Outcome);
+        Assert.Equal(RefreshOutcome.Success, (await s.RefreshTokens.ValidateAndRotateAsync(bystanderToken.RawToken)).Outcome);
+    }
+
+    [Fact]
     public async Task Refresh_rejects_an_expired_token()
     {
         await ResetAsync();
@@ -435,5 +452,33 @@ public abstract class IdentityStoreConformanceTests
         await s.RefreshTokens.RevokeAsync("garbage-not-a-real-token", allForUser: false); // must not throw
         // The real token is untouched and still rotates.
         Assert.Equal(RefreshOutcome.Success, (await s.RefreshTokens.ValidateAndRotateAsync(issue.RawToken)).Outcome);
+    }
+
+    [Fact]
+    public async Task Concurrent_rotation_of_same_token_rotates_exactly_once()
+    {
+        await ResetAsync();
+        Guid userId;
+        string raw;
+        await using (var seed = NewScope(new TenantId("acme")))
+        {
+            userId = (await seed.Users.CreateAsync("rt-concurrent", "pw")).UserId!.Value;
+            raw = (await seed.RefreshTokens.IssueAsync(userId)).RawToken;
+        }
+
+        // Two independent scopes = two UoWs/connections racing the same token.
+        await using var a = NewScope(new TenantId("acme"));
+        await using var b = NewScope(new TenantId("acme"));
+        var results = await Task.WhenAll(
+            a.RefreshTokens.ValidateAndRotateAsync(raw),
+            b.RefreshTokens.ValidateAndRotateAsync(raw));
+
+        var successes = results.Count(r => r.Outcome == RefreshOutcome.Success);
+        Assert.Equal(1, successes);                                   // exactly one rotation won
+        // The loser is timing-dependent but never a second Success: it is either Invalid (the rotations
+        // interleaved → unique-index violation on the successor insert) or ReuseDetected (they serialized →
+        // the loser sees the now-consumed parent and revokes the family, the designed theft signal).
+        Assert.All(results.Where(r => r.Outcome != RefreshOutcome.Success),
+            r => Assert.Contains(r.Outcome, new[] { RefreshOutcome.Invalid, RefreshOutcome.ReuseDetected }));
     }
 }

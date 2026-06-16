@@ -9,6 +9,10 @@ Themia.Modules.Identity.Migrations.RefreshTokensMigration
 Themia.Modules.Identity.Migrations.RefreshTokensMigration.RefreshTokensMigration() -> void
 override Themia.Modules.Identity.Migrations.RefreshTokensMigration.Down() -> void
 override Themia.Modules.Identity.Migrations.RefreshTokensMigration.Up() -> void
+Themia.Modules.Identity.Migrations.AddRefreshTokenReplacedTokenIdMigration
+Themia.Modules.Identity.Migrations.AddRefreshTokenReplacedTokenIdMigration.AddRefreshTokenReplacedTokenIdMigration() -> void
+override Themia.Modules.Identity.Migrations.AddRefreshTokenReplacedTokenIdMigration.Down() -> void
+override Themia.Modules.Identity.Migrations.AddRefreshTokenReplacedTokenIdMigration.Up() -> void
 Themia.Modules.Identity.Migrations.PinTokenHashBinaryCollationMigration
 Themia.Modules.Identity.Migrations.PinTokenHashBinaryCollationMigration.PinTokenHashBinaryCollationMigration() -> void
 override Themia.Modules.Identity.Migrations.PinTokenHashBinaryCollationMigration.Down() -> void

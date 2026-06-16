@@ -29,5 +29,9 @@
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="Themia.Framework.Data.Abstractions.Tests" />
+    <!-- Peers share the BulkUpdateSetters.MemberName helper so an invalid setter expression fails identically. -->
+    <InternalsVisibleTo Include="Themia.Framework.Data.Dapper" />
+    <InternalsVisibleTo Include="Themia.Framework.Data.EFCore" />
+    <InternalsVisibleTo Include="Themia.Modules.Identity.Tests" />
   </ItemGroup>
 </Project>

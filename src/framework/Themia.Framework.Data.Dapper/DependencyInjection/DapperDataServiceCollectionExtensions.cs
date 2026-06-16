@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Themia.Framework.Data.Abstractions.Auditing;
+using Themia.Framework.Data.Abstractions.Exceptions;
 using Themia.Framework.Data.Abstractions.Filtering;
 using Themia.Framework.Data.Abstractions.Repositories;
 using Themia.Framework.Data.Abstractions.UnitOfWork;
@@ -32,6 +33,10 @@ public static class DapperDataServiceCollectionExtensions
         services.TryAddSingleton(TimeProvider.System);
         services.TryAddSingleton<ICurrentUserAccessor, NullCurrentUserAccessor>();
         services.TryAddScoped<IDataFilterScope, DataFilterScope>();
+        // Default SQLSTATE-based unique-violation detection (PostgreSQL/MySQL). The SQL Server engine
+        // package replaces this with a SqlException.Number-based interpreter, since SqlClient does not
+        // surface a usable SqlState. TryAdd keeps the engine package's prior replacement, if any.
+        services.TryAddSingleton<ISqlExceptionInterpreter, SqlStateUniqueConstraintInterpreter>();
         services.AddScoped<DapperConnectionContext>();
         services.AddScoped<IDapperConnectionContext>(sp => sp.GetRequiredService<DapperConnectionContext>());
         services.AddScoped<ITenantQueryFactory, TenantQueryFactory>();
