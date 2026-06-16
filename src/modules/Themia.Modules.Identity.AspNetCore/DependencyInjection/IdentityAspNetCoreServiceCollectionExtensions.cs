@@ -1,4 +1,3 @@
-using System.Linq;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -65,6 +64,13 @@ public static class IdentityAspNetCoreServiceCollectionExtensions
 
     /// <summary>Adds the JwtBearer validation scheme wired to <see cref="JwtOptions"/> and the registered
     /// <see cref="IJwtSigningCredentialsProvider"/>. Call after <c>AddAuthentication(...)</c>.</summary>
+    /// <remarks>The internal <see cref="ClaimTypes"/> principal shape that <c>ICurrentUser</c>, the audit
+    /// accessor, and <c>[Authorize(Roles)]</c> depend on is established by THIS scheme's
+    /// <c>OnTokenValidated</c> remap — it is not carried by the token. The minted access token only
+    /// carries the standard short <c>sub</c>/<c>name</c>/<c>role</c> claims on the wire, so a consumer that
+    /// validates a Themia access token WITHOUT this configured JwtBearer scheme (e.g. a bare
+    /// <c>JsonWebTokenHandler.ValidateToken</c> in a background or non-HTTP context) sees only the short
+    /// claims and must map them to the long <see cref="ClaimTypes"/> URIs itself.</remarks>
     /// <param name="builder">The authentication builder.</param>
     /// <param name="scheme">The scheme name; defaults to <see cref="JwtBearerDefaults.AuthenticationScheme"/>.</param>
     /// <returns>The same authentication builder.</returns>
@@ -93,8 +99,60 @@ public static class IdentityAspNetCoreServiceCollectionExtensions
                     NameClaimType = ClaimTypes.Name,
                     RoleClaimType = ClaimTypes.Role,
                 };
+
+                // Tokens carry standard short claim names (sub/name/role) on the wire. After
+                // validation, re-add the long ClaimTypes.* claims so the bearer principal matches the
+                // cookie principal shape and ICurrentUser/[Authorize(Roles)]/the audit accessor work
+                // unchanged. The namespaced Themia claims (themia:tenant_id, themia:is_platform, …)
+                // pass through verbatim and need no remap. Chain onto any existing handler instead of
+                // clobbering it.
+                bearer.Events ??= new JwtBearerEvents();
+                var inner = bearer.Events.OnTokenValidated;
+                bearer.Events.OnTokenValidated = async context =>
+                {
+                    AddLongClaims(context);
+                    if (inner is not null)
+                    {
+                        await inner(context).ConfigureAwait(false);
+                    }
+                };
             });
 
         return builder;
+    }
+
+    /// <summary>Re-adds the long <see cref="ClaimTypes"/> claims from their short JWT counterparts,
+    /// driven by <see cref="JwtClaimNames.WellKnown"/>. Idempotent via <see cref="ClaimsIdentity.HasClaim(string,string)"/>.
+    /// Collects matches in a single enumeration and adds afterward so the identity's claim collection is
+    /// never mutated mid-enumeration; at most one small list is allocated, and only when there is
+    /// something to add.</summary>
+    private static void AddLongClaims(TokenValidatedContext context)
+    {
+        if (context.Principal?.Identity is not ClaimsIdentity identity)
+        {
+            return;
+        }
+
+        List<Claim>? toAdd = null;
+        foreach (var claim in identity.Claims)
+        {
+            foreach (var (longType, shortType) in JwtClaimNames.WellKnown)
+            {
+                if (claim.Type == shortType && !identity.HasClaim(longType, claim.Value))
+                {
+                    (toAdd ??= []).Add(new Claim(longType, claim.Value, claim.ValueType, claim.Issuer));
+                }
+            }
+        }
+
+        if (toAdd is null)
+        {
+            return;
+        }
+
+        foreach (var claim in toAdd)
+        {
+            identity.AddClaim(claim);
+        }
     }
 }

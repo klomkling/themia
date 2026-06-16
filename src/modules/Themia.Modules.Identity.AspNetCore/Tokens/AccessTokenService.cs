@@ -46,11 +46,35 @@ public sealed class AccessTokenService : IAccessTokenService
             IssuedAt = now.UtcDateTime,
             NotBefore = now.UtcDateTime,
             Expires = expires.UtcDateTime,
-            Subject = principal.Identity as ClaimsIdentity ?? new ClaimsIdentity(principal.Claims),
+            Subject = BuildWireIdentity(principal),
             SigningCredentials = credentials.SigningCredentials,
         };
 
         var token = Handler.CreateToken(descriptor);
         return new AccessToken(token, expires);
+    }
+
+    /// <summary>Builds the token identity, mapping the three well-known .NET claims to standard JWT
+    /// names (<c>sub</c>/<c>name</c>/<c>role</c>) and copying every other claim verbatim (the Themia
+    /// namespaced claims are already external-safe and are read by their literal type internally).</summary>
+    private static ClaimsIdentity BuildWireIdentity(ClaimsPrincipal principal)
+    {
+        var identity = new ClaimsIdentity();
+        foreach (var claim in principal.Claims)
+        {
+            var type = claim.Type;
+            foreach (var (longType, shortType) in JwtClaimNames.WellKnown)
+            {
+                if (claim.Type == longType)
+                {
+                    type = shortType;
+                    break;
+                }
+            }
+
+            identity.AddClaim(new Claim(type, claim.Value, claim.ValueType, claim.Issuer));
+        }
+
+        return identity;
     }
 }
