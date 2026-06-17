@@ -75,6 +75,12 @@ public sealed class StorageBuilder
         ArgumentNullException.ThrowIfNull(configure);
         var local = new LocalStorageOptions();
         configure(local);
+        // Register the signer so the module's _local routes can verify presigned tokens.
+        if (!string.IsNullOrWhiteSpace(local.SigningKey))
+        {
+            services.AddSingleton(new LocalUrlSigner(local.SigningKey));
+        }
+
         return RegisterProvider(_ => new LocalStorageProvider(local));
     }
 

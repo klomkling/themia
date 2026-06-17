@@ -165,6 +165,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Themia.Modules.Storage.EFCo
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Themia.Modules.Storage.Dapper.SqlServer.IntegrationTests", "tests\Themia.Modules.Storage.Dapper.SqlServer.IntegrationTests\Themia.Modules.Storage.Dapper.SqlServer.IntegrationTests.csproj", "{A93C8691-B083-4FC4-881C-0FA06DC0F8EA}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Themia.Modules.Storage.AspNetCore.IntegrationTests", "tests\Themia.Modules.Storage.AspNetCore.IntegrationTests\Themia.Modules.Storage.AspNetCore.IntegrationTests.csproj", "{59D79364-8A90-47EB-8B61-2850384DF1E3}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -1075,6 +1077,18 @@ Global
 		{A93C8691-B083-4FC4-881C-0FA06DC0F8EA}.Release|x64.Build.0 = Release|Any CPU
 		{A93C8691-B083-4FC4-881C-0FA06DC0F8EA}.Release|x86.ActiveCfg = Release|Any CPU
 		{A93C8691-B083-4FC4-881C-0FA06DC0F8EA}.Release|x86.Build.0 = Release|Any CPU
+		{59D79364-8A90-47EB-8B61-2850384DF1E3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{59D79364-8A90-47EB-8B61-2850384DF1E3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{59D79364-8A90-47EB-8B61-2850384DF1E3}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{59D79364-8A90-47EB-8B61-2850384DF1E3}.Debug|x64.Build.0 = Debug|Any CPU
+		{59D79364-8A90-47EB-8B61-2850384DF1E3}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{59D79364-8A90-47EB-8B61-2850384DF1E3}.Debug|x86.Build.0 = Debug|Any CPU
+		{59D79364-8A90-47EB-8B61-2850384DF1E3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{59D79364-8A90-47EB-8B61-2850384DF1E3}.Release|Any CPU.Build.0 = Release|Any CPU
+		{59D79364-8A90-47EB-8B61-2850384DF1E3}.Release|x64.ActiveCfg = Release|Any CPU
+		{59D79364-8A90-47EB-8B61-2850384DF1E3}.Release|x64.Build.0 = Release|Any CPU
+		{59D79364-8A90-47EB-8B61-2850384DF1E3}.Release|x86.ActiveCfg = Release|Any CPU
+		{59D79364-8A90-47EB-8B61-2850384DF1E3}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -1159,5 +1173,6 @@ Global
 		{D1AFC3B9-0393-4798-9B9F-FCFA0123AE84} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 		{BE16E601-9E9D-43EA-A936-8D60B9F66C49} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 		{A93C8691-B083-4FC4-881C-0FA06DC0F8EA} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
+		{59D79364-8A90-47EB-8B61-2850384DF1E3} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 	EndGlobalSection
 EndGlobal

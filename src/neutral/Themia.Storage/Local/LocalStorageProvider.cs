@@ -79,9 +79,9 @@ public sealed class LocalStorageProvider : IStorageProvider
         ResolvePath(key); // validates the key
         var op = request.Operation == PresignedUrlOperation.Put ? "put" : "get";
         var token = new LocalUrlSigner(options.SigningKey).Sign(key, op, DateTimeOffset.UtcNow.Add(request.Expiry));
-        // Relative URI the module's MapThemiaStorageEndpoints download/upload route materializes + verifies.
-        var encodedKey = Uri.EscapeDataString(key);
-        var uri = new Uri($"themia-storage://{op}/{encodedKey}?token={Uri.EscapeDataString(token)}", UriKind.Absolute);
+        // Relative URI the module's MapThemiaStorageEndpoints _local route materializes + verifies.
+        // The token signs the PHYSICAL key + op; the endpoint calls the provider directly with this key.
+        var uri = new Uri($"_local/{op}?key={Uri.EscapeDataString(key)}&token={Uri.EscapeDataString(token)}", UriKind.Relative);
         return Task.FromResult(uri);
     }
 
