@@ -109,7 +109,14 @@ public sealed class ExternalAuthBuilder
     {
         ArgumentNullException.ThrowIfNull(config);
 
-        services.AddHttpClient(OidcExternalAuthProvider.HttpClientPrefix + config.Name);
+        services.AddHttpClient(OidcExternalAuthProvider.HttpClientPrefix + config.Name)
+            .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
+            {
+                // The discovery/JWKS client is held for the singleton provider's lifetime (inside its
+                // ConfigurationManager), so it cannot rely on IHttpClientFactory handler rotation. Bound
+                // connection age at the socket level so DNS/endpoint changes are still picked up.
+                PooledConnectionLifetime = TimeSpan.FromMinutes(15),
+            });
         services.AddSingleton<IExternalAuthProvider>(sp => new OidcExternalAuthProvider(
             config,
             sp.GetRequiredService<IHttpClientFactory>(),

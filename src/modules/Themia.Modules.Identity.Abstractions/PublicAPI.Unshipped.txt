@@ -235,3 +235,5 @@ static Themia.Modules.Identity.Abstractions.Authentication.RefreshRotationResult
 static Themia.Modules.Identity.Abstractions.Authentication.RefreshValidationResult.Invalid() -> Themia.Modules.Identity.Abstractions.Authentication.RefreshValidationResult
 static Themia.Modules.Identity.Abstractions.Authentication.RefreshValidationResult.ReuseDetected() -> Themia.Modules.Identity.Abstractions.Authentication.RefreshValidationResult
 static Themia.Modules.Identity.Abstractions.Authentication.RefreshValidationResult.Success(Themia.Modules.Identity.Abstractions.Entities.User! user, Themia.Modules.Identity.Abstractions.Authentication.RefreshIssue replacement) -> Themia.Modules.Identity.Abstractions.Authentication.RefreshValidationResult
+Themia.Modules.Identity.Abstractions.Entities.UserLockoutExtensions
+static Themia.Modules.Identity.Abstractions.Entities.UserLockoutExtensions.IsLockedOut(this Themia.Modules.Identity.Abstractions.Entities.User! user, System.DateTimeOffset now) -> bool

@@ -617,6 +617,53 @@ public abstract class IdentityStoreConformanceTests
                 new RaceWinnerUserService(inner, sp, winnerUserId, "google", "race-sub"));
         }
     }
+
+    [Fact] // a deactivated account is never auto-linked: returned un-linked for the flow gate to block
+    public async Task External_auto_link_skipped_for_inactive_user()
+    {
+        await ResetAsync();
+        await using var s = NewScope(new TenantId("acme"));
+
+        var seeded = await s.Users.CreateAsync("inactiveowner", "pw", "inactive@acme.test");
+        Assert.True(seeded.Succeeded);
+        Assert.True(await s.Users.SetActiveAsync(seeded.UserId!.Value, false));
+
+        var result = await s.ExternalLogins.ResolveOrProvisionAsync(
+            new ExternalIdentity("Google", "sub-inactive", "inactive@acme.test", true, null));
+
+        Assert.Equal(seeded.UserId, result.User.Id);   // matched the existing (deactivated) account
+        Assert.False(result.WasCreated);
+        Assert.False(result.WasLinked);                // but did NOT bind a link to it
+
+        var link = await s.Links.FirstOrDefaultAsync(
+            new Themia.Modules.Identity.Specifications.ExternalLoginByProviderKeySpec("google", "sub-inactive"));
+        Assert.Null(link);
+    }
+
+    [Fact] // a user-name collision lost to a concurrent provision retries with a suffixed name, not a 500
+    public async Task External_user_name_collision_race_retries_with_suffixed_name()
+    {
+        await ResetAsync();
+        var tenant = new TenantId("acme");
+
+        // The "winner" occupies the user name our identity's email local-part derives ("collide"),
+        // committed mid-flight (after our name probe, before our insert) by the decorator below — forcing
+        // the duplicate-name path that previously surfaced a 500.
+        await using var s = NewScope(tenant, configureServices: ConfigureNameRaceWinner);
+
+        var result = await s.ExternalLogins.ResolveOrProvisionAsync(
+            new ExternalIdentity("Google", "collide-sub", "collide@acme.test", true, null));
+
+        Assert.True(result.WasCreated);                       // provisioned a new user...
+        Assert.True(result.WasLinked);
+        Assert.StartsWith("collide_", result.User.UserName);  // ...with a disambiguated name
+
+        static void ConfigureNameRaceWinner(IServiceCollection services)
+        {
+            services.Decorate<IUserService>((inner, sp) =>
+                new RaceWinnerNameUserService(inner, sp, "collide"));
+        }
+    }
 }
 
 /// <summary>Test-only DI helper: replaces a registered <typeparamref name="T"/> with a decorator.</summary>
@@ -679,6 +726,64 @@ file sealed class RaceWinnerUserService(
         };
         link.SetId(Guid.CreateVersion7());
         await links.AddAsync(link, cancellationToken);
+        await unitOfWork.SaveChangesAsync(cancellationToken);
+    }
+
+    public Task<UserCreationResult> CreateAsync(string userName, string password, string? email = null, CancellationToken cancellationToken = default)
+        => inner.CreateAsync(userName, password, email, cancellationToken);
+    public Task<User?> FindByIdAsync(Guid id, CancellationToken cancellationToken = default)
+        => inner.FindByIdAsync(id, cancellationToken);
+    public Task<User?> FindByUserNameAsync(string userName, CancellationToken cancellationToken = default)
+        => inner.FindByUserNameAsync(userName, cancellationToken);
+    public Task<User?> FindByEmailAsync(string email, CancellationToken cancellationToken = default)
+        => inner.FindByEmailAsync(email, cancellationToken);
+    public Task<bool> SetPasswordAsync(Guid userId, string password, CancellationToken cancellationToken = default)
+        => inner.SetPasswordAsync(userId, password, cancellationToken);
+    public Task<PasswordVerificationResult> VerifyPasswordAsync(string userName, string password, CancellationToken cancellationToken = default)
+        => inner.VerifyPasswordAsync(userName, password, cancellationToken);
+    public Task<bool> SetActiveAsync(Guid userId, bool isActive, CancellationToken cancellationToken = default)
+        => inner.SetActiveAsync(userId, isActive, cancellationToken);
+    public Task<bool> DeleteAsync(Guid userId, CancellationToken cancellationToken = default)
+        => inner.DeleteAsync(userId, cancellationToken);
+}
+
+/// <summary>Decorating <see cref="IUserService"/> that, on its first <see cref="CreateExternalUserAsync"/>
+/// call, commits a conflicting user (occupying <paramref name="winnerUserName"/>) in an independent scope,
+/// then delegates — so the service's own insert hits the filtered-unique name index. A deterministic
+/// stand-in for a true concurrent provision racing the same derived user name.</summary>
+file sealed class RaceWinnerNameUserService(
+    IUserService inner, IServiceProvider rootProvider, string winnerUserName)
+    : IUserService
+{
+    private int raced;
+
+    public async Task<UserCreationResult> CreateExternalUserAsync(
+        string userName, string? email, bool emailVerified, CancellationToken cancellationToken = default)
+    {
+        if (Interlocked.Exchange(ref raced, 1) == 0)
+        {
+            await CommitWinnerUserAsync(cancellationToken);
+        }
+
+        return await inner.CreateExternalUserAsync(userName, email, emailVerified, cancellationToken);
+    }
+
+    private async Task CommitWinnerUserAsync(CancellationToken cancellationToken)
+    {
+        await using var scope = rootProvider.CreateAsyncScope();
+        var users = scope.ServiceProvider.GetRequiredService<IRepository<User, Guid>>();
+        var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+        var tenant = scope.ServiceProvider.GetRequiredService<ITenantContext>().CurrentTenantId;
+
+        var user = new User
+        {
+            UserName = winnerUserName,
+            NormalizedUserName = Themia.Modules.Identity.Services.IdentityScope.Normalize(winnerUserName),
+            TenantId = tenant,
+            IsActive = true,
+        };
+        user.SetId(Guid.CreateVersion7());
+        await users.AddAsync(user, cancellationToken);
         await unitOfWork.SaveChangesAsync(cancellationToken);
     }
 

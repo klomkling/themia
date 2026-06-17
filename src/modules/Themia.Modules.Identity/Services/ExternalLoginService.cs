@@ -20,6 +20,7 @@ public sealed class ExternalLoginService : IExternalLoginService
     private const int SubjectFallbackLength = 8;
     private const int DisambiguatorLength = 4;
     private const int MaxDisambiguationAttempts = 8;
+    private const int MaxRaceRetries = 3;
 
     private readonly IRepository<User, Guid> users;
     private readonly IRepository<ExternalLoginLink, Guid> links;
@@ -66,6 +67,30 @@ public sealed class ExternalLoginService : IExternalLoginService
 
         var provider = identity.Provider.ToLowerInvariant();
 
+        // A concurrent first-login can win a race on the (tenant, provider, subject) link index OR on the
+        // new user's unique name/email index. All of these surface as a UniqueConstraintException (a
+        // duplicate name/email caught by the pre-insert probe is funnelled into the same signal below);
+        // on retry the winner's rows are visible, so the next pass resolves the existing link, auto-links
+        // by verified email, or derives a fresh user name instead of dead-ending on a 500. Bounded so a
+        // pathological, sustained conflict surfaces rather than spinning.
+        for (var attempt = 0; ; attempt++)
+        {
+            try
+            {
+                return await ResolveOrProvisionCoreAsync(provider, identity, cancellationToken).ConfigureAwait(false);
+            }
+            catch (UniqueConstraintException) when (attempt < MaxRaceRetries)
+            {
+                // Retry: re-read the now-committed winner.
+            }
+        }
+    }
+
+    /// <summary>One resolve/auto-link/provision pass. A lost race surfaces as a
+    /// <see cref="UniqueConstraintException"/> for the caller's bounded retry to absorb.</summary>
+    private async Task<ExternalLoginResult> ResolveOrProvisionCoreAsync(
+        string provider, ExternalIdentity identity, CancellationToken cancellationToken)
+    {
         // Existing link: the framework tenant filter isolates the lookup, so a link from another
         // tenant never matches.
         var link = await links
@@ -89,35 +114,23 @@ public sealed class ExternalLoginService : IExternalLoginService
             var existing = await userService.FindByEmailAsync(identity.Email, cancellationToken).ConfigureAwait(false);
             if (existing is not null)
             {
-                try
+                // Never bind a new external credential to a deactivated or locked account: return it
+                // un-linked so the flow's active/lockout gate blocks the login. Otherwise a later
+                // re-activation would silently inherit a usable external login the admin never approved.
+                if (!existing.IsActive || existing.IsLockedOut(timeProvider.GetUtcNow()))
                 {
-                    await CreateLinkAsync(existing, provider, identity.Subject, cancellationToken).ConfigureAwait(false);
-                    return new ExternalLoginResult(existing, WasCreated: false, WasLinked: true);
+                    return new ExternalLoginResult(existing, WasCreated: false, WasLinked: false);
                 }
-                catch (UniqueConstraintException)
-                {
-                    // A concurrent first-login won the (tenant, provider, subject) filtered-unique index
-                    // first. Re-resolve its link and return that user instead of surfacing a 500.
-                    return await ResolveExistingLinkAfterRaceAsync(provider, identity.Subject, cancellationToken)
-                        .ConfigureAwait(false);
-                }
+
+                await CreateLinkAsync(existing, provider, identity.Subject, cancellationToken).ConfigureAwait(false);
+                return new ExternalLoginResult(existing, WasCreated: false, WasLinked: true);
             }
         }
 
         // No match: provision a password-less user and link it, atomically. CreateExternalUserAsync and
         // CreateLinkAsync run inside one transaction so a link-insert failure rolls the new user back —
         // no orphaned user that would dead-end the next login on a duplicate user name.
-        try
-        {
-            return await ProvisionAndLinkAsync(provider, identity, cancellationToken).ConfigureAwait(false);
-        }
-        catch (UniqueConstraintException)
-        {
-            // A concurrent first-login committed the same (tenant, provider, subject) link first; our
-            // transaction rolled back. Re-resolve the winner's link and return its user.
-            return await ResolveExistingLinkAfterRaceAsync(provider, identity.Subject, cancellationToken)
-                .ConfigureAwait(false);
-        }
+        return await ProvisionAndLinkAsync(provider, identity, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>Provisions a password-less user and links it to the external identity inside a single
@@ -138,6 +151,15 @@ public sealed class ExternalLoginService : IExternalLoginService
                 .ConfigureAwait(false);
             if (!created.Succeeded || created.UserId is not { } newUserId)
             {
+                // A concurrent first-login took this user name or verified email between our uniqueness
+                // probe and insert. Funnel into the same race-retry signal as a unique-index violation, so
+                // the next pass auto-links by email or derives a fresh name instead of failing the login.
+                if (created.Error is "duplicate_user_name" or "duplicate_email")
+                {
+                    throw new UniqueConstraintException(
+                        $"Provisioning '{provider}:{identity.Subject}' lost a race on {created.Error}.");
+                }
+
                 throw new InvalidOperationException(
                     $"Failed to provision an external user for '{provider}:{identity.Subject}': {created.Error ?? "unknown error"}.");
             }
@@ -153,24 +175,6 @@ public sealed class ExternalLoginService : IExternalLoginService
                 $"Provisioning '{provider}:{identity.Subject}' completed without a user."),
             WasCreated: true,
             WasLinked: true);
-    }
-
-    /// <summary>Re-runs the (provider, subject) link lookup after a unique-constraint violation lost the
-    /// race, resolving the concurrent winner's user. Returns it as an existing-link result. Throws if
-    /// the link still does not resolve (the violation was not the expected race).</summary>
-    private async Task<ExternalLoginResult> ResolveExistingLinkAfterRaceAsync(
-        string provider, string subject, CancellationToken cancellationToken)
-    {
-        var link = await links
-            .FirstOrDefaultAsync(new ExternalLoginByProviderKeySpec(provider, subject), cancellationToken)
-            .ConfigureAwait(false)
-            ?? throw new InvalidOperationException(
-                $"A unique-constraint violation linking '{provider}:{subject}' did not resolve to an existing link.");
-
-        var user = await IdentityScope.ResolveUserAsync(users, link.UserId, cancellationToken).ConfigureAwait(false)
-            ?? throw new InvalidOperationException(
-                $"External link '{provider}:{subject}' references user '{link.UserId}', which does not resolve in scope.");
-        return new ExternalLoginResult(user, WasCreated: false, WasLinked: false);
     }
 
     /// <summary>Creates and persists a link from the user to the external (provider, subject), using

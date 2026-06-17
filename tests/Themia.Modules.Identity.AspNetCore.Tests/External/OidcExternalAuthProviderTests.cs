@@ -267,11 +267,28 @@ public sealed class OidcExternalAuthProviderTests
     }
 
     [Fact]
-    public async Task ExchangeAsync_no_nonce_supplied_skips_check_even_when_token_carries_one()
+    public async Task ExchangeAsync_token_carries_nonce_but_client_omits_fails()
+    {
+        // Nonce is bound to the token: a token asserting a `nonce` claim must be matched by a client-
+        // supplied nonce. Omitting the field must NOT skip the check (that would let an attacker bypass
+        // replay protection on a token that actually carries a nonce).
+        const string secret = "this-is-a-32-byte-minimum-secret!!";
+        var idToken = TestIdTokens.SignHs256(secret, Issuer, ClientId, Now, Now.AddMinutes(5),
+            new Dictionary<string, object> { ["sub"] = "U1", ["nonce"] = "n-from-token" });
+        var handler = StubHttpMessageHandler.Json(HttpStatusCode.OK, TokenResponse(idToken));
+        var provider = Provider(SymmetricConfig(secret), HttpClientReturning(handler), Clock());
+
+        var result = await provider.ExchangeAsync(Request()); // no nonce on the request
+
+        Assert.False(result.Succeeded);
+    }
+
+    [Fact]
+    public async Task ExchangeAsync_no_nonce_on_either_side_succeeds()
     {
         const string secret = "this-is-a-32-byte-minimum-secret!!";
         var idToken = TestIdTokens.SignHs256(secret, Issuer, ClientId, Now, Now.AddMinutes(5),
-            new Dictionary<string, object> { ["sub"] = "U1", ["nonce"] = "ignored" });
+            new Dictionary<string, object> { ["sub"] = "U1" }); // no nonce claim
         var handler = StubHttpMessageHandler.Json(HttpStatusCode.OK, TokenResponse(idToken));
         var provider = Provider(SymmetricConfig(secret), HttpClientReturning(handler), Clock());
 

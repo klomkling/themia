@@ -122,7 +122,7 @@ public sealed class AuthenticationFlow : IAuthenticationFlow
         }
         var principal = await principalFactory.CreateAsync(user, AuthenticationType, cancellationToken).ConfigureAwait(false);
         var access = accessTokens.Issue(principal);
-        var tokens = new AuthTokens(access.Token, ExpiresInSeconds(access.ExpiresAt), replacement.RawToken);
+        var tokens = new AuthTokens(access.Token, AuthTokenIssuer.ExpiresInSeconds(timeProvider, access.ExpiresAt), replacement.RawToken);
 
         // The rotation has already persisted. A late deny here returns a uniform 401; the (valid but
         // undelivered) successor simply expires unused — acceptable per the access-token tradeoff.
@@ -147,13 +147,8 @@ public sealed class AuthenticationFlow : IAuthenticationFlow
         await hooks.OnLogoutAsync(new LogoutContext(allSessions), cancellationToken).ConfigureAwait(false);
     }
 
-    private async Task<AuthTokens> IssueAsync(User user, CancellationToken cancellationToken)
-    {
-        var principal = await principalFactory.CreateAsync(user, AuthenticationType, cancellationToken).ConfigureAwait(false);
-        var access = accessTokens.Issue(principal);
-        var refresh = await refreshTokens.IssueAsync(user.Id, cancellationToken).ConfigureAwait(false);
-        return new AuthTokens(access.Token, ExpiresInSeconds(access.ExpiresAt), refresh.RawToken);
-    }
+    private Task<AuthTokens> IssueAsync(User user, CancellationToken cancellationToken) =>
+        AuthTokenIssuer.IssueAsync(principalFactory, accessTokens, refreshTokens, timeProvider, user, AuthenticationType, cancellationToken);
 
     private async Task<LoginResult> FailAsync(string userName, LoginFailureReason reason, LoginResult result, CancellationToken cancellationToken, string? denialReason = null)
     {
@@ -169,9 +164,6 @@ public sealed class AuthenticationFlow : IAuthenticationFlow
         await hooks.OnLoginFailedAsync(new LoginFailedContext(userName, reason), cancellationToken).ConfigureAwait(false);
         return result;
     }
-
-    private int ExpiresInSeconds(DateTimeOffset expiresAt) =>
-        (int)Math.Max(0, (expiresAt - timeProvider.GetUtcNow()).TotalSeconds);
 
     private static LoginFailureReason Map(PasswordVerificationResult verification) => verification switch
     {

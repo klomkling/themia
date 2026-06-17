@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using Themia.Modules.Identity.Abstractions;
 using Themia.Modules.Identity.Abstractions.Authentication;
 using Themia.Modules.Identity.Abstractions.Entities;
+using Themia.Modules.Identity.AspNetCore.Authentication;
 
 namespace Themia.Modules.Identity.AspNetCore.External;
 
@@ -94,17 +95,15 @@ public sealed class ExternalAuthenticationFlow : IExternalAuthenticationFlow
             return await FailAsync(provider, ExternalLoginOutcome.Denied, ExternalLoginFlowResult.Denied(), cancellationToken, succeeded.DenialReason).ConfigureAwait(false);
         }
 
-        var tokens = await IssueAsync(resolution.User, cancellationToken).ConfigureAwait(false);
+        // Token issuance is the last step. For a freshly-provisioned user the user+link were already
+        // committed by ResolveOrProvisionAsync, so a transient failure here returns a 500 but leaves a
+        // resolvable link: the next attempt finds it and issues tokens without re-provisioning. The
+        // success hook above means "authentication authorized" (it may still deny), not "session created".
+        var tokens = await AuthTokenIssuer
+            .IssueAsync(principalFactory, accessTokens, refreshTokens, timeProvider, resolution.User, AuthenticationType, cancellationToken)
+            .ConfigureAwait(false);
         logger.LogInformation("User {UserId} authenticated via external provider {Provider}.", resolution.User.Id, provider);
         return ExternalLoginFlowResult.Success(tokens, resolution.WasCreated, resolution.WasLinked);
-    }
-
-    private async Task<AuthTokens> IssueAsync(User user, CancellationToken cancellationToken)
-    {
-        var principal = await principalFactory.CreateAsync(user, AuthenticationType, cancellationToken).ConfigureAwait(false);
-        var access = accessTokens.Issue(principal);
-        var refresh = await refreshTokens.IssueAsync(user.Id, cancellationToken).ConfigureAwait(false);
-        return new AuthTokens(access.Token, ExpiresInSeconds(access.ExpiresAt), refresh.RawToken);
     }
 
     private async Task<ExternalLoginFlowResult> FailAsync(string provider, ExternalLoginOutcome reason, ExternalLoginFlowResult result, CancellationToken cancellationToken, string? denialReason = null)
@@ -122,18 +121,8 @@ public sealed class ExternalAuthenticationFlow : IExternalAuthenticationFlow
         return result;
     }
 
-    private int ExpiresInSeconds(DateTimeOffset expiresAt) =>
-        (int)Math.Max(0, (expiresAt - timeProvider.GetUtcNow()).TotalSeconds);
-
-    // Mirrors the inactive + lockout checks in IUserService.VerifyPasswordAsync, using the injected clock.
-    private bool IsActiveAndUnlocked(User user)
-    {
-        if (!user.IsActive)
-        {
-            return false;
-        }
-
-        var now = timeProvider.GetUtcNow();
-        return !(user.LockoutEnabled && user.LockoutEnd is { } end && end > now);
-    }
+    // Same inactive + lockout semantics as IUserService.VerifyPasswordAsync, via the shared
+    // UserLockoutExtensions predicate so the two paths cannot drift.
+    private bool IsActiveAndUnlocked(User user) =>
+        user.IsActive && !user.IsLockedOut(timeProvider.GetUtcNow());
 }

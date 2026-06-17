@@ -191,7 +191,7 @@ public sealed class UserService : IUserService
         }
 
         var now = timeProvider.GetUtcNow();
-        if (user.LockoutEnabled && user.LockoutEnd is { } end && end > now)
+        if (user.IsLockedOut(now))
         {
             return PasswordVerificationResult.LockedOut;
         }

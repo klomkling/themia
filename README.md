@@ -87,9 +87,11 @@ POST /auth/external/{provider}
 
 The server performs the code→token exchange server-side (the client secret is never exposed or
 logged), validates the id-token issuer / audience / signature / expiry, forwards the PKCE
-`code_verifier`, and validates the `nonce` when the client supplies one. Account resolution: an
-existing external link → auto-link to a user **only when the provider asserts a verified email** (an
-unverified email never links and is never persisted) → otherwise provision a password-less user.
+`code_verifier`, and binds the `nonce` to the id-token (if the token carries one, a matching client
+nonce is required, and vice-versa). Account resolution: an existing external link → auto-link to a
+user **only when the provider asserts a verified email and the account is active** (an unverified
+email never links and is never persisted; a deactivated/locked account is never auto-linked) →
+otherwise provision a password-less user.
 Google ships as standard OIDC and LINE as an HS256 channel-secret provider; Facebook / Microsoft /
 Telegram are deferred additive providers. LINE emits no `email_verified` claim, so by default a LINE
 login never auto-links to an existing account (opt in via `LineOptions.EmailAlwaysVerified` if you

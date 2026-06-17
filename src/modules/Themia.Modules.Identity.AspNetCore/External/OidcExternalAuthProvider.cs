@@ -72,7 +72,10 @@ public sealed class OidcExternalAuthProvider : IExternalAuthProvider
         if (hasMetadata)
         {
             // The OIDC discovery doc is fetched (and auto-refreshed on its interval) through the
-            // provider's named HttpClient, so tests can route discovery + JWKS to a stub.
+            // provider's named HttpClient, so tests can route discovery + JWKS to a stub. This client is
+            // held for the provider's (singleton) lifetime by ConfigurationManager; the named client's
+            // handler is configured with a bounded PooledConnectionLifetime (see ExternalAuthBuilder) so
+            // socket-level connection age is recycled despite not rotating the HttpClient instance.
             var documentRetriever = new HttpDocumentRetriever(
                 httpClientFactory.CreateClient(HttpClientPrefix + config.Name));
             configManager = new ConfigurationManager<OpenIdConnectConfiguration>(
@@ -107,9 +110,12 @@ public sealed class OidcExternalAuthProvider : IExternalAuthProvider
             return ExternalAuthResult.Failed("id_token_invalid");
         }
 
-        // Optional nonce binding: when the client supplied a nonce, the id_token's `nonce` claim must be
-        // present and equal (ordinal compare). When no nonce was supplied, skip (no behavior change).
-        if (!string.IsNullOrEmpty(request.Nonce) && !NonceMatches(validated, request.Nonce))
+        // Nonce binding: if the id_token carries a `nonce` claim, the client MUST supply the matching
+        // value, and if the client supplies a nonce, the token MUST carry the matching one. Binding to the
+        // token (not just to whether the client opted in) closes the replay where an attacker omits the
+        // nonce field to skip the check on a token that actually asserts one. Only when neither side has a
+        // nonce is the check skipped.
+        if (!NonceSatisfied(validated, request.Nonce))
         {
             logger.LogInformation("External provider {Provider} id_token nonce did not match.", config.Name);
             return ExternalAuthResult.Failed("nonce_mismatch");
@@ -118,12 +124,19 @@ public sealed class OidcExternalAuthProvider : IExternalAuthProvider
         return MapIdentity(validated);
     }
 
-    private static bool NonceMatches(JsonWebToken token, string expected)
+    private static bool NonceSatisfied(JsonWebToken token, string? expected)
     {
         var actual = GetClaim(token, "nonce");
-        return actual is not null
+        var hasActual = !string.IsNullOrEmpty(actual);
+        var hasExpected = !string.IsNullOrEmpty(expected);
+        if (!hasActual && !hasExpected)
+        {
+            return true; // neither side asserts a nonce
+        }
+
+        return hasActual && hasExpected
             && CryptographicOperations.FixedTimeEquals(
-                Encoding.UTF8.GetBytes(actual), Encoding.UTF8.GetBytes(expected));
+                Encoding.UTF8.GetBytes(actual!), Encoding.UTF8.GetBytes(expected!));
     }
 
     private async Task<string?> ExchangeCodeForIdTokenAsync(
