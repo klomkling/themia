@@ -22,6 +22,7 @@ public sealed class TenantStorage : ITenantStorage
     private readonly IFileValidator validator;
     private readonly IFileScanner scanner;
     private readonly StorageModuleOptions options;
+    private readonly TimeProvider timeProvider;
     private readonly ILogger<TenantStorage> logger;
 
     /// <summary>Creates the service.</summary>
@@ -32,6 +33,7 @@ public sealed class TenantStorage : ITenantStorage
     /// <param name="validator">The upload validator.</param>
     /// <param name="scanner">The upload scanner.</param>
     /// <param name="options">The module options.</param>
+    /// <param name="timeProvider">The time source for commit timestamps.</param>
     /// <param name="logger">The logger.</param>
     public TenantStorage(
         IStorageProvider provider,
@@ -41,6 +43,7 @@ public sealed class TenantStorage : ITenantStorage
         IFileValidator validator,
         IFileScanner scanner,
         StorageModuleOptions options,
+        TimeProvider timeProvider,
         ILogger<TenantStorage> logger)
     {
         ArgumentNullException.ThrowIfNull(provider);
@@ -50,6 +53,7 @@ public sealed class TenantStorage : ITenantStorage
         ArgumentNullException.ThrowIfNull(validator);
         ArgumentNullException.ThrowIfNull(scanner);
         ArgumentNullException.ThrowIfNull(options);
+        ArgumentNullException.ThrowIfNull(timeProvider);
         ArgumentNullException.ThrowIfNull(logger);
         this.provider = provider;
         this.objects = objects;
@@ -58,6 +62,7 @@ public sealed class TenantStorage : ITenantStorage
         this.validator = validator;
         this.scanner = scanner;
         this.options = options;
+        this.timeProvider = timeProvider;
         this.logger = logger;
     }
 
@@ -89,9 +94,10 @@ public sealed class TenantStorage : ITenantStorage
             throw new StorageScanException(scan.Threat ?? "Upload failed the virus scan.");
         }
 
-        // Metadata-first: reserve the row (quota-checked) in a transaction, then write the blob.
+        // Metadata-first: reserve the row (quota-checked) in a transaction, then write the blob. Server-
+        // proxied uploads commit inline (the bytes are written in this call), so the row is visible at once.
         var (row, rowWasCreated, priorContentType, priorSize, priorETag) =
-            await ReserveAsync(key, putOptions.ContentType, size, cancellationToken).ConfigureAwait(false);
+            await ReserveAsync(key, putOptions.ContentType, size, commit: true, cancellationToken).ConfigureAwait(false);
 
         try
         {
@@ -148,7 +154,7 @@ public sealed class TenantStorage : ITenantStorage
     /// <inheritdoc />
     public async Task<StorageReadResult?> GetAsync(string key, CancellationToken cancellationToken = default)
     {
-        var row = await objects.FirstOrDefaultAsync(new StorageObjectByKeySpec(key, tenantContext.CurrentTenantId), cancellationToken).ConfigureAwait(false);
+        var row = await objects.FirstOrDefaultAsync(new StorageObjectByKeySpec(key, tenantContext.CurrentTenantId, committedOnly: true), cancellationToken).ConfigureAwait(false);
         if (row is null || !InScope(row))
         {
             return null;
@@ -161,14 +167,15 @@ public sealed class TenantStorage : ITenantStorage
     public async Task<bool> ExistsAsync(string key, CancellationToken cancellationToken = default)
     {
         // Cannot use AnyAsync: it can't apply the in-scope check below, so fetch the row and verify scope.
-        var row = await objects.FirstOrDefaultAsync(new StorageObjectByKeySpec(key, tenantContext.CurrentTenantId), cancellationToken).ConfigureAwait(false);
+        // committedOnly: a pending presigned reservation (CommittedAt == null) is invisible until completed.
+        var row = await objects.FirstOrDefaultAsync(new StorageObjectByKeySpec(key, tenantContext.CurrentTenantId, committedOnly: true), cancellationToken).ConfigureAwait(false);
         return row is not null && InScope(row);
     }
 
     /// <inheritdoc />
     public async Task DeleteAsync(string key, CancellationToken cancellationToken = default)
     {
-        var row = await objects.FirstOrDefaultAsync(new StorageObjectByKeySpec(key, tenantContext.CurrentTenantId), cancellationToken).ConfigureAwait(false);
+        var row = await objects.FirstOrDefaultAsync(new StorageObjectByKeySpec(key, tenantContext.CurrentTenantId, committedOnly: true), cancellationToken).ConfigureAwait(false);
         if (row is null || !InScope(row))
         {
             return;
@@ -207,9 +214,10 @@ public sealed class TenantStorage : ITenantStorage
             throw new StorageValidationException(validation.Error ?? "Upload failed validation.");
         }
 
-        // Reserve a quota-counted metadata row up front (declared size is authoritative). The bytes
-        // are written by the subsequent presigned PUT; nothing here writes a blob.
-        await ReserveAsync(key, contentType, sizeBytes, cancellationToken).ConfigureAwait(false);
+        // Reserve a quota-counted but PENDING metadata row up front (declared size is authoritative for
+        // the reservation; CommittedAt stays null so the row is invisible to reads until CompleteUploadAsync
+        // confirms it). The bytes are written by the subsequent presigned PUT; nothing here writes a blob.
+        await ReserveAsync(key, contentType, sizeBytes, commit: false, cancellationToken).ConfigureAwait(false);
 
         return await provider.GetPresignedUrlAsync(
             StorageScope.PhysicalKey(tenantContext.CurrentTenantId, key),
@@ -217,11 +225,81 @@ public sealed class TenantStorage : ITenantStorage
             cancellationToken).ConfigureAwait(false);
     }
 
+    /// <inheritdoc />
+    public async Task<StoredObject> CompleteUploadAsync(string key, CancellationToken cancellationToken = default)
+    {
+        var physicalKey = StorageScope.PhysicalKey(tenantContext.CurrentTenantId, key);
+
+        // Stat the actually-stored bytes; absent means the client never uploaded (nothing to complete).
+        var stat = await provider.StatAsync(physicalKey, cancellationToken).ConfigureAwait(false);
+        if (stat is null)
+        {
+            throw new StorageValidationException($"No uploaded object found for key '{key}' to complete.");
+        }
+
+        var actualSize = stat.Length;
+
+        StoredObject result = null!;
+        await unitOfWork.ExecuteInTransactionAsync(async ct =>
+        {
+            // committedOnly: false — the reservation is still pending here; load it to reconcile.
+            var existingRow = await objects.FirstOrDefaultAsync(new StorageObjectByKeySpec(key, tenantContext.CurrentTenantId, committedOnly: false), ct).ConfigureAwait(false);
+            var row = existingRow is not null && InScope(existingRow) ? existingRow : null;
+            if (row is null)
+            {
+                throw new StorageValidationException($"No reservation to complete for key '{key}'.");
+            }
+
+            // Enforce the size cap (and any other rules) against the ACTUAL stored bytes, not the
+            // declared size, so a client cannot under-declare to bypass the cap.
+            var validation = validator.Validate(key, row.ContentType, actualSize, content: null);
+            if (!validation.IsValid)
+            {
+                throw new StorageValidationException(validation.Error ?? "Upload failed validation.");
+            }
+
+            // Reconcile quota to the actual size: swap this row's reserved size for the actual size.
+            var all = await objects.ListAsync(new AllStorageObjectsSpec(tenantContext.CurrentTenantId), ct).ConfigureAwait(false);
+            var usage = all.Where(InScope).Sum(o => o.SizeBytes) - row.SizeBytes + actualSize;
+            if (usage > options.DefaultTenantQuotaBytes)
+            {
+                // The actual upload overruns the quota: discard the orphaned blob (best-effort) and the
+                // reservation row, then surface the quota error.
+                try
+                {
+                    await provider.DeleteAsync(physicalKey, ct).ConfigureAwait(false);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    logger.LogWarning(ex, "Best-effort blob delete of an over-quota upload failed for key {Key}; left for a future reconcile sweep.", key);
+                }
+
+                objects.Remove(row);
+                await unitOfWork.SaveChangesAsync(ct).ConfigureAwait(false);
+                throw new StorageQuotaExceededException(
+                    $"Completing '{key}' ({actualSize} bytes) would exceed the tenant quota of {options.DefaultTenantQuotaBytes} bytes.");
+            }
+
+            row.SizeBytes = actualSize;
+            row.ETag = stat.ETag;
+            row.CommittedAt = timeProvider.GetUtcNow();
+            objects.Update(row);
+            await unitOfWork.SaveChangesAsync(ct).ConfigureAwait(false);
+
+            result = new StoredObject(row.Id, row.Key, row.SizeBytes, row.ContentType);
+        }, cancellationToken).ConfigureAwait(false);
+
+        return result;
+    }
+
     // Reserves (creates or overwrites) the quota-counted metadata row for a key in a transaction.
-    // Returns the row plus the prior in-scope state so a caller writing a blob afterwards can
-    // compensate (restore an overwrite / remove a new reservation) if that write fails.
+    // When commit is true the row is marked committed (visible) inline; when false it is left PENDING
+    // (CommittedAt unchanged: null on a new row, untouched on an existing one) so a presigned re-upload
+    // never hides an already-committed object. Returns the row plus the prior in-scope state so a caller
+    // writing a blob afterwards can compensate (restore an overwrite / remove a new reservation) if that
+    // write fails.
     private async Task<(StorageObject Row, bool WasCreated, string PriorContentType, long PriorSize, string? PriorETag)> ReserveAsync(
-        string key, string contentType, long size, CancellationToken cancellationToken)
+        string key, string contentType, long size, bool commit, CancellationToken cancellationToken)
     {
         StorageObject row = null!;
         var rowWasCreated = false;
@@ -230,7 +308,9 @@ public sealed class TenantStorage : ITenantStorage
         string? priorETag = null;
         await unitOfWork.ExecuteInTransactionAsync(async ct =>
         {
-            var existingRow = await objects.FirstOrDefaultAsync(new StorageObjectByKeySpec(key, tenantContext.CurrentTenantId), ct).ConfigureAwait(false);
+            // committedOnly: false — a pending reservation must be visible here so a re-reserve updates it
+            // (rather than inserting a duplicate that hits the (tenant_id, key) unique constraint).
+            var existingRow = await objects.FirstOrDefaultAsync(new StorageObjectByKeySpec(key, tenantContext.CurrentTenantId, committedOnly: false), ct).ConfigureAwait(false);
             var existing = existingRow is not null && InScope(existingRow) ? existingRow : null;
             var existingSize = existing?.SizeBytes ?? 0;
             var all = await objects.ListAsync(new AllStorageObjectsSpec(tenantContext.CurrentTenantId), ct).ConfigureAwait(false);
@@ -248,7 +328,13 @@ public sealed class TenantStorage : ITenantStorage
             if (existing is null)
             {
                 rowWasCreated = true;
-                row = new StorageObject { Key = key, ContentType = contentType, SizeBytes = size };
+                row = new StorageObject
+                {
+                    Key = key,
+                    ContentType = contentType,
+                    SizeBytes = size,
+                    CommittedAt = commit ? timeProvider.GetUtcNow() : null,
+                };
                 row.SetId(Guid.CreateVersion7());
                 await objects.AddAsync(row, ct).ConfigureAwait(false);
             }
@@ -261,6 +347,13 @@ public sealed class TenantStorage : ITenantStorage
                 priorETag = existing.ETag;
                 existing.ContentType = contentType;
                 existing.SizeBytes = size;
+                // Commit inline (server-proxied) marks it visible; a pending presigned re-reservation
+                // leaves CommittedAt unchanged so an already-committed object is never hidden mid-upload.
+                if (commit)
+                {
+                    existing.CommittedAt = timeProvider.GetUtcNow();
+                }
+
                 objects.Update(existing);
                 row = existing;
             }

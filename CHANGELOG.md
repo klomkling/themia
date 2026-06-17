@@ -36,6 +36,12 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
   data peer (**EF Core or Dapper**), DI-replaceable `IFileValidator` / `IFileScanner` seams, an
   `AddThemiaStorage().UseLocal()/UseS3()/UseR2()` builder, and an opt-in
   `MapThemiaStorageEndpoints` presigned-direct upload/download flow.
+- **Presigned-upload reserve→complete flow.** `GetUploadUrlAsync` reserves a **pending** metadata row
+  (quota-counted at the declared size but invisible to `Get`/`Exists` until confirmed); after the client
+  uploads the bytes, `ITenantStorage.CompleteUploadAsync` (and the `POST /storage/complete` endpoint)
+  stat the actually-stored object, reconcile the per-tenant quota to the **actual** size, and commit the
+  reservation. Backed by a new nullable `storage_objects.committed_at` visibility marker and a provider
+  `IStorageProvider.StatAsync` (metadata without a content stream).
 
 ### Security
 

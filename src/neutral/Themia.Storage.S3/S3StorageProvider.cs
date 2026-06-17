@@ -83,6 +83,20 @@ public sealed class S3StorageProvider : IStorageProvider, IDisposable
     }
 
     /// <inheritdoc />
+    public async Task<StorageObjectInfo?> StatAsync(string key, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var response = await client.GetObjectMetadataAsync(bucket, key, cancellationToken).ConfigureAwait(false);
+            return new StorageObjectInfo(key, response.ContentLength, response.Headers.ContentType ?? "application/octet-stream", response.ETag);
+        }
+        catch (AmazonS3Exception ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+    }
+
+    /// <inheritdoc />
     public Task DeleteAsync(string key, CancellationToken cancellationToken = default) =>
         client.DeleteObjectAsync(bucket, key, cancellationToken);
 

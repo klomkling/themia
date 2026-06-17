@@ -40,6 +40,7 @@ public sealed class StorageSchemaMigration : Migration
             .WithColumn("content_type").AsString(256).NotNullable()
             .WithColumn("size_bytes").AsInt64().NotNullable()
             .WithColumn("etag").AsString(256).Nullable()
+            .WithColumn("committed_at").AsDateTimeOffset().Nullable()
             .WithColumn("created_at").AsDateTimeOffset().NotNullable()
             .WithColumn("created_by").AsString(100).Nullable()
             .WithColumn("last_modified_at").AsDateTimeOffset().Nullable()

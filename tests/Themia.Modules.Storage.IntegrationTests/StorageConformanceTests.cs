@@ -38,6 +38,9 @@ file sealed class ThrowingStorageProvider(IStorageProvider inner, int throwOnPut
     public Task<bool> ExistsAsync(string key, CancellationToken cancellationToken = default) =>
         inner.ExistsAsync(key, cancellationToken);
 
+    public Task<StorageObjectInfo?> StatAsync(string key, CancellationToken cancellationToken = default) =>
+        inner.StatAsync(key, cancellationToken);
+
     public Task DeleteAsync(string key, CancellationToken cancellationToken = default) =>
         inner.DeleteAsync(key, cancellationToken);
 
@@ -63,6 +66,11 @@ public abstract class StorageConformanceTests
     protected sealed record Scope(ServiceProvider Provider, AsyncServiceScope Inner) : IAsyncDisposable
     {
         public ITenantStorage Storage => Inner.ServiceProvider.GetRequiredService<ITenantStorage>();
+
+        /// <summary>The registered backend, so a test can simulate a presigned client upload by writing
+        /// bytes directly to the physical key (bypassing the tenant service).</summary>
+        public IStorageProvider Backend => Inner.ServiceProvider.GetRequiredService<IStorageProvider>();
+
         public async ValueTask DisposeAsync() { await Inner.DisposeAsync(); await Provider.DisposeAsync(); }
     }
 
@@ -362,17 +370,17 @@ public abstract class StorageConformanceTests
     }
 
     [Fact]
-    public async Task GetUploadUrlAsync_reserves_a_quota_counted_visible_row()
+    public async Task GetUploadUrlAsync_reserves_a_quota_counted_pending_row()
     {
-        // A presigned upload must reserve a quota-counted metadata row up front (declared size is
-        // authoritative): the key is visible immediately, and a second reservation that would exceed
-        // the quota is rejected before any URL is issued.
+        // A presigned upload reserves a quota-counted but PENDING metadata row up front (declared size is
+        // reserved against quota): the row is invisible to reads until completion, yet still counts toward
+        // quota, so a second reservation that would exceed the quota is rejected before any URL is issued.
         await ResetAsync();
         await using var s = NewScope(new TenantId("acme"), quota: 8);
 
         var url = await s.Storage.GetUploadUrlAsync("k", "text/plain", 5, TimeSpan.FromMinutes(5));
         Assert.NotNull(url);
-        Assert.True(await s.Storage.ExistsAsync("k")); // row reserved before any bytes are uploaded
+        Assert.False(await s.Storage.ExistsAsync("k")); // pending reservation is invisible until completed
 
         await Assert.ThrowsAsync<StorageQuotaExceededException>(
             () => s.Storage.GetUploadUrlAsync("k2", "text/plain", 5, TimeSpan.FromMinutes(5))); // +5 > 8
@@ -389,5 +397,64 @@ public abstract class StorageConformanceTests
         await Assert.ThrowsAsync<StorageValidationException>(
             () => s.Storage.GetUploadUrlAsync("k", "application/json", 5, TimeSpan.FromMinutes(5)));
         Assert.False(await s.Storage.ExistsAsync("k"));
+    }
+
+    [Fact]
+    public async Task Presigned_reservation_is_invisible_until_completed()
+    {
+        // I3: a reserved-but-not-uploaded row must not be visible to reads. After the client uploads the
+        // bytes (simulated by writing to the physical key directly) and CompleteUploadAsync confirms it,
+        // the object becomes visible and readable.
+        await ResetAsync();
+        var tenant = new TenantId("acme");
+        await using var s = NewScope(tenant);
+
+        await s.Storage.GetUploadUrlAsync("k", "text/plain", 5, TimeSpan.FromMinutes(5));
+        Assert.False(await s.Storage.ExistsAsync("k")); // pending — invisible
+        Assert.Null(await s.Storage.GetAsync("k"));
+
+        // Simulate the client upload directly to the backend at the physical key.
+        await s.Backend.PutAsync(StorageScope.PhysicalKey(tenant, "k"), Bytes("hello"), new StoragePutOptions("text/plain"));
+
+        await s.Storage.CompleteUploadAsync("k");
+        Assert.True(await s.Storage.ExistsAsync("k"));
+        var read = await s.Storage.GetAsync("k");
+        Assert.NotNull(read);
+        using var reader = new StreamReader(read!.Content);
+        Assert.Equal("hello", await reader.ReadToEndAsync());
+    }
+
+    [Fact]
+    public async Task Complete_reconciles_actual_size_and_enforces_quota()
+    {
+        // C2: completion reconciles quota to the ACTUAL stored size, not the declared size. An upload that
+        // overruns the quota is rejected at completion (orphaned blob discarded, row removed); a within-
+        // quota upload commits at its actual size.
+        await ResetAsync();
+        var tenant = new TenantId("acme");
+        var sharedRoot = Path.Combine(Path.GetTempPath(), "themia-storage-it", Guid.NewGuid().ToString("N"));
+
+        await using (var over = NewScope(tenant, quota: 8, localRoot: sharedRoot))
+        {
+            await over.Storage.GetUploadUrlAsync("k", "text/plain", 1, TimeSpan.FromMinutes(5)); // declare 1
+            var physicalKey = StorageScope.PhysicalKey(tenant, "k");
+            await over.Backend.PutAsync(physicalKey, Bytes("0123456789"), new StoragePutOptions("text/plain")); // actual 10
+
+            await Assert.ThrowsAsync<StorageQuotaExceededException>(() => over.Storage.CompleteUploadAsync("k")); // 10 > 8
+            Assert.False(await over.Storage.ExistsAsync("k"));
+            Assert.Null(await over.Backend.StatAsync(physicalKey)); // blob deleted
+        }
+
+        await using (var ok = NewScope(tenant, quota: 8, localRoot: sharedRoot))
+        {
+            await ok.Storage.GetUploadUrlAsync("k", "text/plain", 1, TimeSpan.FromMinutes(5)); // declare 1
+            await ok.Backend.PutAsync(StorageScope.PhysicalKey(tenant, "k"), Bytes("12345"), new StoragePutOptions("text/plain")); // actual 5
+
+            var stored = await ok.Storage.CompleteUploadAsync("k");
+            Assert.Equal(5, stored.SizeBytes);
+            var read = await ok.Storage.GetAsync("k");
+            Assert.NotNull(read);
+            Assert.Equal(5, read!.Length);
+        }
     }
 }

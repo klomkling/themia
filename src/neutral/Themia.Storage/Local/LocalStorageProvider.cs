@@ -86,6 +86,23 @@ public sealed class LocalStorageProvider : IStorageProvider
     }
 
     /// <inheritdoc />
+    public async Task<StorageObjectInfo?> StatAsync(string key, CancellationToken cancellationToken = default)
+    {
+        var blobPath = ResolveBlobPath(key);
+        if (!File.Exists(blobPath))
+        {
+            return null;
+        }
+
+        var typePath = ResolveContentTypePath(key);
+        var contentType = File.Exists(typePath)
+            ? await File.ReadAllTextAsync(typePath, cancellationToken).ConfigureAwait(false)
+            : "application/octet-stream";
+
+        return new StorageObjectInfo(key, new FileInfo(blobPath).Length, contentType, ETag: null);
+    }
+
+    /// <inheritdoc />
     public Task DeleteAsync(string key, CancellationToken cancellationToken = default)
     {
         var blobPath = ResolveBlobPath(key);

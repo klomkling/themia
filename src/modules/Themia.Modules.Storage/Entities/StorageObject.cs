@@ -23,6 +23,9 @@ public sealed class StorageObject : SoftDeletableEntity<Guid>, ITenantEntity
     /// <summary>The backend entity tag, when available.</summary>
     public string? ETag { get; set; }
 
+    /// <summary>When the object's upload was confirmed; null while a presigned reservation is pending (invisible to reads).</summary>
+    public DateTimeOffset? CommittedAt { get; set; }
+
     /// <summary>Assigns the identifier for a new (transient) object.</summary>
     /// <param name="id">A client-generated identifier.</param>
     public void SetId(Guid id) => Id = id;

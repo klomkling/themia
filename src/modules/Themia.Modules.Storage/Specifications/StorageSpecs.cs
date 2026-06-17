@@ -11,8 +11,21 @@ namespace Themia.Modules.Storage.Specifications;
 /// the tenant's own row.</summary>
 internal sealed class StorageObjectByKeySpec : Specification<StorageObject>
 {
-    public StorageObjectByKeySpec(string key, TenantId? tenantId) =>
-        Where(o => o.Key == key && o.TenantId == tenantId);
+    public StorageObjectByKeySpec(string key, TenantId? tenantId, bool committedOnly)
+    {
+        // Build the predicate by branch (not with a captured `committedOnly` flag inside the expression
+        // tree): the Dapper specification translator only supports entity-column predicates, so a captured
+        // local boolean would fail to translate. committedOnly: pending presigned reservations
+        // (CommittedAt == null) are invisible to reads; the reserve/complete path passes false to see them.
+        if (committedOnly)
+        {
+            Where(o => o.Key == key && o.TenantId == tenantId && o.CommittedAt != null);
+        }
+        else
+        {
+            Where(o => o.Key == key && o.TenantId == tenantId);
+        }
+    }
 }
 
 /// <summary>All objects in the ambient tenant (soft-deleted rows are excluded by the framework filter).

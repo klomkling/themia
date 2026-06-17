@@ -28,6 +28,13 @@ public interface IStorageProvider
     /// <returns><see langword="true"/> when present.</returns>
     Task<bool> ExistsAsync(string key, CancellationToken cancellationToken = default);
 
+    /// <summary>Returns metadata (size, content type, etag) for the object at <paramref name="key"/> without
+    /// opening a content stream, or <see langword="null"/> when absent.</summary>
+    /// <param name="key">The physical object key.</param>
+    /// <param name="cancellationToken">A cancellation token.</param>
+    /// <returns>The object metadata, or <see langword="null"/> when absent.</returns>
+    Task<StorageObjectInfo?> StatAsync(string key, CancellationToken cancellationToken = default);
+
     /// <summary>Deletes the object at <paramref name="key"/>. Idempotent — deleting an absent key is a no-op.</summary>
     /// <param name="key">The physical object key.</param>
     /// <param name="cancellationToken">A cancellation token.</param>

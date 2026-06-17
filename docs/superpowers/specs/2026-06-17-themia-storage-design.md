@@ -197,11 +197,19 @@ binding, and the FM migration assembly.
 `MapThemiaStorageEndpoints()` (minimal API, opt-in like `MapIdentityAuthEndpoints`). Default flow is
 **presigned direct transfer** (client ↔ S3/R2, server only brokers):
 
-- `POST /storage` → reserve a `storage_objects` row (pending) + return a **presigned PUT** URL.
-- `POST /storage/{id}/complete` → confirm upload, finalize `size_bytes`/`etag` (and run scan/validate
-  if server-proxied).
+- `POST /storage/upload-url` → reserve a **pending** `storage_objects` row (quota-counted at the
+  declared size, but **invisible** to `Get`/`Exists` until completed) + return a **presigned PUT** URL.
+- *(client uploads the bytes directly to the presigned URL)*
+- `POST /storage/complete` → confirm the upload: `Stat` the actually-stored bytes, validate + re-check
+  the per-tenant quota against the **actual** size (not the declared size), then commit the reservation
+  (record actual `size_bytes`/`etag`, mark `committed_at` → visible). A quota overrun discards the
+  orphaned blob + reservation and returns the quota error.
 - `GET /storage/{id}` → **presigned GET** redirect (Local: signed download route).
 - `DELETE /storage/{id}` → delete blob + soft-delete row.
+
+The reserve→upload→complete flow closes two quota/visibility gaps: a presigned reservation can no
+longer leave a phantom (uploaded-but-never-confirmed) object visible, and quota is reconciled to the
+**actual** stored size at completion so an under-declared size cannot bypass the quota.
 
 A server-proxied `PUT` (multipart form → stream through the service) is supported for small files.
 Endpoints are thin; clean-arch consumers (ezy-assets) may call `ITenantStorage` from their own

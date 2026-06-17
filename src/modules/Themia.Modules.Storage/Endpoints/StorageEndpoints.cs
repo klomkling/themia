@@ -22,7 +22,8 @@ public static class StorageEndpoints
         var group = endpoints.MapGroup(prefix);
 
         // Request a presigned upload URL. The provider returns an absolute URL for S3/R2 and a relative
-        // _local URL for the Local backend; resolve both to an absolute URL the client can use.
+        // _local URL for the Local backend; resolve both to an absolute URL the client can use. The
+        // reservation is pending (invisible) until the client uploads the bytes and POSTs /complete.
         group.MapPost("/upload-url", async (UploadUrlRequest request, HttpRequest httpRequest, ITenantStorage storage, CancellationToken ct) =>
         {
             if (request is null || string.IsNullOrWhiteSpace(request.Key) || string.IsNullOrWhiteSpace(request.ContentType) || request.SizeBytes < 0)
@@ -35,6 +36,22 @@ public static class StorageEndpoints
 
             var url = await storage.GetUploadUrlAsync(request.Key, request.ContentType, request.SizeBytes, TimeSpan.FromMinutes(15), ct);
             return Results.Ok(new { uploadUrl = ToAbsolute(httpRequest, prefix, url) });
+        });
+
+        // Confirm a presigned upload after the client has transferred the bytes: reconciles quota to the
+        // actual stored size and makes the object visible (or 409 via StorageQuotaExceededException).
+        group.MapPost("/complete", async (CompleteRequest request, ITenantStorage storage, CancellationToken ct) =>
+        {
+            if (request is null || string.IsNullOrWhiteSpace(request.Key))
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    ["request"] = ["Key is required."],
+                });
+            }
+
+            var stored = await storage.CompleteUploadAsync(request.Key, ct);
+            return Results.Ok(new { key = stored.Key, sizeBytes = stored.SizeBytes });
         });
 
         // Serve a Local presigned download (the token authorizes exactly this physical key).
@@ -131,9 +148,14 @@ public static class StorageEndpoints
             ? url.ToString()
             : new Uri(new Uri($"{httpRequest.Scheme}://{httpRequest.Host}{httpRequest.PathBase}{prefix}/"), url).ToString();
 
-    /// <summary>The request body for an upload-URL request.</summary>
+    /// <summary>The request body for an upload-URL request. After uploading the bytes to the returned URL,
+    /// the client must POST <c>/complete</c> with the same key to confirm the upload and make it visible.</summary>
     /// <param name="Key">The logical key.</param>
     /// <param name="ContentType">The content type the upload will declare.</param>
-    /// <param name="SizeBytes">The declared object size in bytes (authoritative for the reserved quota).</param>
+    /// <param name="SizeBytes">The declared object size in bytes (reserved against quota up front).</param>
     public sealed record UploadUrlRequest(string Key, string ContentType, long SizeBytes);
+
+    /// <summary>The request body for confirming a presigned upload (after the client has uploaded the bytes).</summary>
+    /// <param name="Key">The logical key whose presigned upload to confirm.</param>
+    public sealed record CompleteRequest(string Key);
 }
