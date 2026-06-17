@@ -1,6 +1,8 @@
 using System.Security.Cryptography;
 using System.Text;
 
+using Themia.Storage;
+
 namespace Themia.Storage.Local;
 
 /// <summary>Signs and verifies Local presigned-URL tokens with HMAC-SHA256 over
@@ -21,10 +23,10 @@ public sealed class LocalUrlSigner
     /// <summary>Produces a token authorizing <paramref name="operation"/> on <paramref name="key"/> until
     /// <paramref name="expiresAt"/>, formatted as <c>{expiryUnix}.{base64urlSignature}</c>.</summary>
     /// <param name="key">The physical object key.</param>
-    /// <param name="operation">The operation tag (e.g. "get"/"put").</param>
+    /// <param name="operation">The operation the token authorizes.</param>
     /// <param name="expiresAt">When the token expires.</param>
     /// <returns>The signed token.</returns>
-    public string Sign(string key, string operation, DateTimeOffset expiresAt)
+    public string Sign(string key, PresignedUrlOperation operation, DateTimeOffset expiresAt)
     {
         var expiry = expiresAt.ToUnixTimeSeconds();
         var signature = Compute(key, operation, expiry);
@@ -34,11 +36,11 @@ public sealed class LocalUrlSigner
     /// <summary>Verifies <paramref name="token"/> for <paramref name="key"/>/<paramref name="operation"/>
     /// at <paramref name="now"/> (constant-time compare; rejects malformed or expired tokens).</summary>
     /// <param name="key">The physical object key.</param>
-    /// <param name="operation">The operation tag.</param>
+    /// <param name="operation">The operation the token must authorize.</param>
     /// <param name="token">The token to verify.</param>
     /// <param name="now">The current time.</param>
     /// <returns><see langword="true"/> when valid and unexpired.</returns>
-    public bool TryVerify(string key, string operation, string token, DateTimeOffset now)
+    public bool TryVerify(string key, PresignedUrlOperation operation, string token, DateTimeOffset now)
     {
         if (string.IsNullOrEmpty(token)) return false;
         var dot = token.IndexOf('.');
@@ -50,9 +52,12 @@ public sealed class LocalUrlSigner
             Encoding.UTF8.GetBytes(token[(dot + 1)..]), Encoding.UTF8.GetBytes(expected));
     }
 
-    private string Compute(string key, string operation, long expiry)
+    // Maps the operation to a STABLE wire string so the signed payload format never changes.
+    private static string OpToken(PresignedUrlOperation op) => op == PresignedUrlOperation.Put ? "put" : "get";
+
+    private string Compute(string key, PresignedUrlOperation operation, long expiry)
     {
-        var payload = Encoding.UTF8.GetBytes($"{key}|{operation}|{expiry}");
+        var payload = Encoding.UTF8.GetBytes($"{key}|{OpToken(operation)}|{expiry}");
         var hash = HMACSHA256.HashData(keyBytes, payload);
         return Convert.ToBase64String(hash).Replace('+', '-').Replace('/', '_').TrimEnd('=');
     }

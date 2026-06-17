@@ -68,5 +68,9 @@ public sealed class StorageSchemaMigration : Migration
     }
 
     /// <inheritdoc />
-    public override void Down() => Delete.Table("storage_objects").InSchema(SchemaName);
+    public override void Down()
+    {
+        Delete.Table("storage_objects").InSchema(SchemaName);
+        Delete.Schema(SchemaName);
+    }
 }

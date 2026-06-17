@@ -16,7 +16,8 @@ public sealed class StorageModuleOptions
     public IReadOnlyList<string>? AllowedContentTypes { get; set; }
 
     /// <summary>Validates the options; throws when a value is out of range.</summary>
-    /// <exception cref="ArgumentException">A value is invalid.</exception>
+    /// <exception cref="ArgumentException">The connection-string name is null or whitespace.</exception>
+    /// <exception cref="System.ArgumentOutOfRangeException">A numeric option is less than 1.</exception>
     public void Validate()
     {
         if (MaxObjectSizeBytes < 1)

@@ -11,21 +11,28 @@ public sealed class LocalUrlSignerTests
     [Fact]
     public void Valid_signature_within_expiry_verifies()
     {
-        var token = signer.Sign("tenant/a.txt", "get", Now.AddMinutes(10));
-        Assert.True(signer.TryVerify("tenant/a.txt", "get", token, Now));
+        var token = signer.Sign("tenant/a.txt", PresignedUrlOperation.Get, Now.AddMinutes(10));
+        Assert.True(signer.TryVerify("tenant/a.txt", PresignedUrlOperation.Get, token, Now));
     }
 
     [Fact]
     public void Expired_signature_fails()
     {
-        var token = signer.Sign("tenant/a.txt", "get", Now.AddMinutes(-1));
-        Assert.False(signer.TryVerify("tenant/a.txt", "get", token, Now));
+        var token = signer.Sign("tenant/a.txt", PresignedUrlOperation.Get, Now.AddMinutes(-1));
+        Assert.False(signer.TryVerify("tenant/a.txt", PresignedUrlOperation.Get, token, Now));
     }
 
     [Fact]
     public void Tampered_key_fails()
     {
-        var token = signer.Sign("tenant/a.txt", "get", Now.AddMinutes(10));
-        Assert.False(signer.TryVerify("tenant/OTHER.txt", "get", token, Now));
+        var token = signer.Sign("tenant/a.txt", PresignedUrlOperation.Get, Now.AddMinutes(10));
+        Assert.False(signer.TryVerify("tenant/OTHER.txt", PresignedUrlOperation.Get, token, Now));
+    }
+
+    [Fact]
+    public void Operation_mismatch_fails()
+    {
+        var token = signer.Sign("tenant/a.txt", PresignedUrlOperation.Get, Now.AddMinutes(10));
+        Assert.False(signer.TryVerify("tenant/a.txt", PresignedUrlOperation.Put, token, Now));
     }
 }

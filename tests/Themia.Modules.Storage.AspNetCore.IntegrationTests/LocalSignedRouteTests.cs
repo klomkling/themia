@@ -96,7 +96,7 @@ public sealed class LocalSignedRouteTests : IAsyncLifetime
     {
         const string key = "acme/docs/old.txt";
         // Sign with an already-elapsed expiry so the route rejects it.
-        var token = signer.Sign(key, "get", DateTimeOffset.UtcNow.AddMinutes(-1));
+        var token = signer.Sign(key, PresignedUrlOperation.Get, DateTimeOffset.UtcNow.AddMinutes(-1));
         var url = $"/storage/_local/get?key={Uri.EscapeDataString(key)}&token={Uri.EscapeDataString(token)}";
 
         var response = await client.GetAsync(url);

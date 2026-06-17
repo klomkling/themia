@@ -10,7 +10,7 @@ public readonly record struct FileScanResult(bool IsClean, string? Threat)
 }
 
 /// <summary>Scans upload content for malware before it is stored. The default is a no-op; a ClamAV
-/// implementation arrives in 0.5.4 (Themia.Storage.ClamAV).</summary>
+/// implementation arrives in a future slice (Themia.Storage.ClamAV).</summary>
 public interface IFileScanner
 {
     /// <summary>Scans <paramref name="content"/>. The stream must be readable; implementations restore its

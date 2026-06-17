@@ -51,7 +51,7 @@ public static class StorageEndpoints
                 return Results.NotFound();
             }
 
-            if (!signer.TryVerify(key, "get", token, DateTimeOffset.UtcNow))
+            if (!signer.TryVerify(key, PresignedUrlOperation.Get, token, DateTimeOffset.UtcNow))
             {
                 return Results.Unauthorized();
             }
@@ -75,7 +75,7 @@ public static class StorageEndpoints
                 return Results.NotFound();
             }
 
-            if (!signer.TryVerify(key, "put", token, DateTimeOffset.UtcNow))
+            if (!signer.TryVerify(key, PresignedUrlOperation.Put, token, DateTimeOffset.UtcNow))
             {
                 return Results.Unauthorized();
             }

@@ -11,6 +11,7 @@ public sealed class S3StorageProvider : IStorageProvider, IDisposable
 {
     private readonly IAmazonS3 client;
     private readonly string bucket;
+    private readonly bool ownsClient;
 
     /// <summary>Creates the provider, building the S3 client from <paramref name="options"/>.</summary>
     /// <param name="options">The S3 options.</param>
@@ -20,6 +21,7 @@ public sealed class S3StorageProvider : IStorageProvider, IDisposable
         ArgumentException.ThrowIfNullOrWhiteSpace(options.BucketName);
         bucket = options.BucketName;
         client = BuildClient(options);
+        ownsClient = true;
     }
 
     /// <summary>Creates the provider over an existing client (used by tests against MinIO).</summary>
@@ -31,6 +33,7 @@ public sealed class S3StorageProvider : IStorageProvider, IDisposable
         ArgumentException.ThrowIfNullOrWhiteSpace(bucketName);
         this.client = client;
         bucket = bucketName;
+        ownsClient = false;
     }
 
     /// <inheritdoc />
@@ -98,7 +101,15 @@ public sealed class S3StorageProvider : IStorageProvider, IDisposable
     }
 
     /// <inheritdoc />
-    public void Dispose() => client.Dispose();
+    public void Dispose()
+    {
+        // Only dispose the client this provider built; an externally-supplied client (test ctor) is
+        // owned by the caller.
+        if (ownsClient)
+        {
+            client.Dispose();
+        }
+    }
 
     private static IAmazonS3 BuildClient(S3StorageOptions options)
     {

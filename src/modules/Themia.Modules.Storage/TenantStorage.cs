@@ -144,7 +144,7 @@ public sealed class TenantStorage : ITenantStorage
 #pragma warning disable THEMIA101 // Deliberate: only the nested compensation catch logs (a distinct secondary error) before surfacing both via AggregateException; the outer catch itself just rethrows the original.
         catch (Exception primary) when (primary is not OperationCanceledException)
         {
-            // Do not compensate on cancellation — the reservation row is left for the future reconcile
+            // Do not compensate on cancellation — the reservation row is left for a future reconcile
             // sweep. Compensation runs in its own try/catch so it can never bury the original error.
             try
             {
@@ -212,7 +212,7 @@ public sealed class TenantStorage : ITenantStorage
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 
         // Best-effort blob delete; a backend failure must not fail the already-committed logical
-        // delete. An orphaned blob is swept by the 0.5.5 reconcile job.
+        // delete. An orphaned blob is swept by a future reconcile sweep.
         var physicalKey = StorageScope.PhysicalKey(tenantContext.CurrentTenantId, key);
         try
         {
@@ -220,7 +220,7 @@ public sealed class TenantStorage : ITenantStorage
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            logger.LogWarning(ex, "Best-effort blob delete failed for key {Key}; left for reconcile.", key);
+            logger.LogWarning(ex, "Best-effort blob delete failed for key {Key}; left for a future reconcile sweep.", key);
         }
     }
 

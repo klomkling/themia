@@ -14,7 +14,7 @@ public readonly record struct FileValidationResult(bool IsValid, string? Error)
 }
 
 /// <summary>Validates an upload's declared content type and size before it is stored. The default
-/// implementation enforces a size cap + content-type allowlist; content sniffing arrives in 0.5.4.</summary>
+/// implementation enforces a size cap + content-type allowlist; content sniffing arrives in a future slice.</summary>
 public interface IFileValidator
 {
     /// <summary>Validates an upload.</summary>

@@ -1,7 +1,7 @@
 namespace Themia.Modules.Storage.Scanning;
 
 /// <summary>A pass-through <see cref="IFileScanner"/> (always clean). The default until a real scanner
-/// (ClamAV) is registered in 0.5.4.</summary>
+/// (ClamAV) is registered in a future slice.</summary>
 public sealed class NullFileScanner : IFileScanner
 {
     /// <inheritdoc />

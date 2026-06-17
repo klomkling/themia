@@ -53,7 +53,19 @@ public sealed class LocalStorageProvider : IStorageProvider
         var contentType = File.Exists(path + ContentTypeSuffix)
             ? await File.ReadAllTextAsync(path + ContentTypeSuffix, cancellationToken).ConfigureAwait(false)
             : "application/octet-stream";
-        var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+
+        FileStream stream;
+        try
+        {
+            stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+        }
+        catch (Exception ex) when (ex is FileNotFoundException or DirectoryNotFoundException)
+        {
+            // The file was deleted concurrently after the File.Exists check (TOCTOU); honor the
+            // absent-object contract (null) rather than surfacing the race as an exception.
+            return null;
+        }
+
         return new StorageReadResult(stream, contentType, stream.Length);
     }
 
@@ -79,7 +91,7 @@ public sealed class LocalStorageProvider : IStorageProvider
         ArgumentException.ThrowIfNullOrWhiteSpace(options.SigningKey);
         ResolvePath(key); // validates the key
         var op = request.Operation == PresignedUrlOperation.Put ? "put" : "get";
-        var token = new LocalUrlSigner(options.SigningKey).Sign(key, op, DateTimeOffset.UtcNow.Add(request.Expiry));
+        var token = new LocalUrlSigner(options.SigningKey).Sign(key, request.Operation, DateTimeOffset.UtcNow.Add(request.Expiry));
         // Relative URI the module's MapThemiaStorageEndpoints _local route materializes + verifies.
         // The token signs the PHYSICAL key + op; the endpoint calls the provider directly with this key.
         var uri = new Uri($"_local/{op}?key={Uri.EscapeDataString(key)}&token={Uri.EscapeDataString(token)}", UriKind.Relative);
