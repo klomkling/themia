@@ -87,10 +87,15 @@ public sealed class TenantStorage : ITenantStorage
         string? priorETag = null;
         await unitOfWork.ExecuteInTransactionAsync(async ct =>
         {
-            var existing = await objects.FirstOrDefaultAsync(new StorageObjectByKeySpec(key), ct).ConfigureAwait(false);
+            var existingRow = await objects.FirstOrDefaultAsync(new StorageObjectByKeySpec(key), ct).ConfigureAwait(false);
+            var existing = existingRow is not null && InScope(existingRow) ? existingRow : null;
             var existingSize = existing?.SizeBytes ?? 0;
             var all = await objects.ListAsync(new AllStorageObjectsSpec(), ct).ConfigureAwait(false);
-            var usage = all.Sum(o => o.SizeBytes) - existingSize;
+            // Sum only this scope's own rows (and subtract the in-scope existing row, captured above).
+            // See InScope: EF's IncludeGlobalRecordsForTenants defaults true so the ambient filter
+            // can leak platform (tenant_id IS NULL) rows into a tenant query; storage objects are
+            // strictly tenant-owned, so platform bytes must never count against a tenant's quota.
+            var usage = all.Where(InScope).Sum(o => o.SizeBytes) - existingSize;
             if (usage + size > options.DefaultTenantQuotaBytes)
             {
                 throw new StorageQuotaExceededException(
@@ -159,7 +164,7 @@ public sealed class TenantStorage : ITenantStorage
     public async Task<StorageReadResult?> GetAsync(string key, CancellationToken cancellationToken = default)
     {
         var row = await objects.FirstOrDefaultAsync(new StorageObjectByKeySpec(key), cancellationToken).ConfigureAwait(false);
-        if (row is null)
+        if (row is null || !InScope(row))
         {
             return null;
         }
@@ -168,14 +173,18 @@ public sealed class TenantStorage : ITenantStorage
     }
 
     /// <inheritdoc />
-    public Task<bool> ExistsAsync(string key, CancellationToken cancellationToken = default) =>
-        objects.AnyAsync(new StorageObjectByKeySpec(key), cancellationToken);
+    public async Task<bool> ExistsAsync(string key, CancellationToken cancellationToken = default)
+    {
+        // Cannot use AnyAsync: it can't apply the in-scope check below, so fetch the row and verify scope.
+        var row = await objects.FirstOrDefaultAsync(new StorageObjectByKeySpec(key), cancellationToken).ConfigureAwait(false);
+        return row is not null && InScope(row);
+    }
 
     /// <inheritdoc />
     public async Task DeleteAsync(string key, CancellationToken cancellationToken = default)
     {
         var row = await objects.FirstOrDefaultAsync(new StorageObjectByKeySpec(key), cancellationToken).ConfigureAwait(false);
-        if (row is null)
+        if (row is null || !InScope(row))
         {
             return;
         }
@@ -219,4 +228,11 @@ public sealed class TenantStorage : ITenantStorage
         buffer.Position = 0;
         return buffer;
     }
+
+    // Strict scope match: a tenant scope sees only its own rows, a platform scope (CurrentTenantId == null)
+    // only platform rows. Needed because EF's ThemiaDbContext.IncludeGlobalRecordsForTenants defaults true
+    // (a tenant query also returns tenant_id IS NULL rows) while Dapper defaults it false — so the ambient
+    // filter alone diverges. Storage objects are strictly tenant-owned, so we enforce parity here.
+    private bool InScope(StorageObject row) =>
+        EqualityComparer<TenantId?>.Default.Equals(row.TenantId, tenantContext.CurrentTenantId);
 }

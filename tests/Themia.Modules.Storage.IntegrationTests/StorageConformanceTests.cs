@@ -120,6 +120,42 @@ public abstract class StorageConformanceTests
     }
 
     [Fact]
+    public async Task Platform_object_invisible_from_tenant_scope()
+    {
+        // A platform (null-tenant) object must never resolve from a tenant scope, even over the same
+        // DB + blob root. Guards against EF's IncludeGlobalRecordsForTenants leaking platform rows.
+        await ResetAsync();
+        var sharedRoot = Path.Combine(Path.GetTempPath(), "themia-storage-it", Guid.NewGuid().ToString("N"));
+        await using (var platform = NewScope(tenant: null, localRoot: sharedRoot))
+        {
+            await platform.Storage.PutAsync("p.txt", Bytes("plat"), new StoragePutOptions("text/plain"));
+        }
+        await using (var tenant = NewScope(new TenantId("acme"), localRoot: sharedRoot))
+        {
+            Assert.False(await tenant.Storage.ExistsAsync("p.txt"));
+            Assert.Null(await tenant.Storage.GetAsync("p.txt"));
+        }
+    }
+
+    [Fact]
+    public async Task Platform_object_does_not_count_against_tenant_quota()
+    {
+        // Platform bytes must not be charged to a tenant's quota: the tenant can still fill its own.
+        await ResetAsync();
+        var sharedRoot = Path.Combine(Path.GetTempPath(), "themia-storage-it", Guid.NewGuid().ToString("N"));
+        await using (var platform = NewScope(tenant: null, localRoot: sharedRoot))
+        {
+            await platform.Storage.PutAsync("big.txt", Bytes("0123456789"), new StoragePutOptions("text/plain")); // 10 bytes
+        }
+        await using (var tenant = NewScope(new TenantId("acme"), quota: 8, localRoot: sharedRoot))
+        {
+            // Tenant's own quota is 8; the 10-byte platform object is not charged, so this 5-byte Put fits.
+            var stored = await tenant.Storage.PutAsync("a.txt", Bytes("12345"), new StoragePutOptions("text/plain"));
+            Assert.Equal(5, stored.SizeBytes);
+        }
+    }
+
+    [Fact]
     public async Task Reupload_after_delete_same_key_succeeds()
     {
         // The filtered unique index excludes soft-deleted rows, so a deleted key can be re-uploaded
