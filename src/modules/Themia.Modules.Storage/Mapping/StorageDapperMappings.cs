@@ -11,6 +11,8 @@ public static class StorageDapperMappings
     public static void Apply(EntityMappingRegistry registry)
     {
         ArgumentNullException.ThrowIfNull(registry);
-        registry.Register<StorageObject>(EntityMapping.ForConvention<StorageObject>("storage.storage_objects", null));
+        // The snake_case convention maps ETag → "e_tag", but the schema (and the EF config) use "etag".
+        var columnOverrides = new Dictionary<string, string> { ["ETag"] = "etag" };
+        registry.Register<StorageObject>(EntityMapping.ForConvention<StorageObject>("storage.storage_objects", columnOverrides));
     }
 }

@@ -15,8 +15,8 @@ public sealed class StorageSchemaMigration : Migration
     {
         IfDatabase("postgresql", "sqlserver").Delegate(CreateSchemaAndTable);
         // The boolean literal differs per engine (PostgreSQL: false, SQL Server bit: 0).
-        IfDatabase("postgresql").Delegate(() => CreateFilteredIndexes(SchemaName, "false"));
-        IfDatabase("sqlserver").Delegate(() => CreateFilteredIndexes($"[{SchemaName}]", "0"));
+        IfDatabase("postgresql").Delegate(() => CreateFilteredIndexes(SchemaName, "\"key\"", "false"));
+        IfDatabase("sqlserver").Delegate(() => CreateFilteredIndexes($"[{SchemaName}]", "[key]", "0"));
 
         IfDatabase(p =>
                 !p.StartsWith("Postgres", StringComparison.OrdinalIgnoreCase) &&
@@ -57,12 +57,14 @@ public sealed class StorageSchemaMigration : Migration
 
     /// <summary>Emits the per-tenant + platform filtered unique indexes on the logical key, excluding
     /// soft-deleted rows so a deleted key can be re-uploaded. <paramref name="schema"/> is pre-escaped
-    /// (<c>storage</c> on PostgreSQL, <c>[storage]</c> on SQL Server); <paramref name="falseLiteral"/> is
-    /// the engine's boolean-false literal (<c>false</c> on PostgreSQL, <c>0</c> on SQL Server).</summary>
-    private void CreateFilteredIndexes(string schema, string falseLiteral)
+    /// (<c>storage</c> on PostgreSQL, <c>[storage]</c> on SQL Server); <paramref name="keyColumn"/> is the
+    /// quoted <c>key</c> identifier (<c>"key"</c> on PostgreSQL, <c>[key]</c> on SQL Server — <c>key</c> is a
+    /// reserved word on SQL Server); <paramref name="falseLiteral"/> is the engine's boolean-false literal
+    /// (<c>false</c> on PostgreSQL, <c>0</c> on SQL Server).</summary>
+    private void CreateFilteredIndexes(string schema, string keyColumn, string falseLiteral)
     {
-        Execute.Sql($"CREATE UNIQUE INDEX ux_storage_objects_tenant_key ON {schema}.storage_objects (tenant_id, key) WHERE tenant_id IS NOT NULL AND is_deleted = {falseLiteral};");
-        Execute.Sql($"CREATE UNIQUE INDEX ux_storage_objects_platform_key ON {schema}.storage_objects (key) WHERE tenant_id IS NULL AND is_deleted = {falseLiteral};");
+        Execute.Sql($"CREATE UNIQUE INDEX ux_storage_objects_tenant_key ON {schema}.storage_objects (tenant_id, {keyColumn}) WHERE tenant_id IS NOT NULL AND is_deleted = {falseLiteral};");
+        Execute.Sql($"CREATE UNIQUE INDEX ux_storage_objects_platform_key ON {schema}.storage_objects ({keyColumn}) WHERE tenant_id IS NULL AND is_deleted = {falseLiteral};");
     }
 
     /// <inheritdoc />
