@@ -149,6 +149,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Themia.Modules.Identity.Asp
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Themia.Storage", "src\neutral\Themia.Storage\Themia.Storage.csproj", "{E5072BCB-6DBF-47F8-80D0-980B5E97AB54}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Themia.Storage.Tests", "tests\Themia.Storage.Tests\Themia.Storage.Tests.csproj", "{A2A8A398-C993-4CC6-9B7A-EBDBC4E78911}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -963,6 +965,18 @@ Global
 		{E5072BCB-6DBF-47F8-80D0-980B5E97AB54}.Release|x64.Build.0 = Release|Any CPU
 		{E5072BCB-6DBF-47F8-80D0-980B5E97AB54}.Release|x86.ActiveCfg = Release|Any CPU
 		{E5072BCB-6DBF-47F8-80D0-980B5E97AB54}.Release|x86.Build.0 = Release|Any CPU
+		{A2A8A398-C993-4CC6-9B7A-EBDBC4E78911}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A2A8A398-C993-4CC6-9B7A-EBDBC4E78911}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A2A8A398-C993-4CC6-9B7A-EBDBC4E78911}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{A2A8A398-C993-4CC6-9B7A-EBDBC4E78911}.Debug|x64.Build.0 = Debug|Any CPU
+		{A2A8A398-C993-4CC6-9B7A-EBDBC4E78911}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{A2A8A398-C993-4CC6-9B7A-EBDBC4E78911}.Debug|x86.Build.0 = Debug|Any CPU
+		{A2A8A398-C993-4CC6-9B7A-EBDBC4E78911}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A2A8A398-C993-4CC6-9B7A-EBDBC4E78911}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A2A8A398-C993-4CC6-9B7A-EBDBC4E78911}.Release|x64.ActiveCfg = Release|Any CPU
+		{A2A8A398-C993-4CC6-9B7A-EBDBC4E78911}.Release|x64.Build.0 = Release|Any CPU
+		{A2A8A398-C993-4CC6-9B7A-EBDBC4E78911}.Release|x86.ActiveCfg = Release|Any CPU
+		{A2A8A398-C993-4CC6-9B7A-EBDBC4E78911}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -1039,5 +1053,6 @@ Global
 		{0009D3B7-895A-41AD-8CE9-E1F856FA4F87} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 		{F2A9FFDD-8B30-48F2-B5B5-038CFBA0B6B4} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 		{E5072BCB-6DBF-47F8-80D0-980B5E97AB54} = {1F655D57-935D-D295-E882-5052ED9A6376}
+		{A2A8A398-C993-4CC6-9B7A-EBDBC4E78911} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 	EndGlobalSection
 EndGlobal

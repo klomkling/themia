@@ -1,5 +1,18 @@
 #nullable enable
 Themia.Storage.IStorageProvider
+Themia.Storage.Local.LocalStorageOptions
+Themia.Storage.Local.LocalStorageOptions.LocalStorageOptions() -> void
+Themia.Storage.Local.LocalStorageOptions.RootPath.get -> string!
+Themia.Storage.Local.LocalStorageOptions.RootPath.set -> void
+Themia.Storage.Local.LocalStorageOptions.SigningKey.get -> string!
+Themia.Storage.Local.LocalStorageOptions.SigningKey.set -> void
+Themia.Storage.Local.LocalStorageProvider
+Themia.Storage.Local.LocalStorageProvider.LocalStorageProvider(Themia.Storage.Local.LocalStorageOptions! options) -> void
+Themia.Storage.Local.LocalStorageProvider.DeleteAsync(string! key, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Storage.Local.LocalStorageProvider.ExistsAsync(string! key, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!
+Themia.Storage.Local.LocalStorageProvider.GetAsync(string! key, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Storage.StorageReadResult?>!
+Themia.Storage.Local.LocalStorageProvider.GetPresignedUrlAsync(string! key, Themia.Storage.PresignedUrlRequest request, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Uri!>!
+Themia.Storage.Local.LocalStorageProvider.PutAsync(string! key, System.IO.Stream! content, Themia.Storage.StoragePutOptions options, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Storage.StorageObjectInfo!>!
 Themia.Storage.IStorageProvider.DeleteAsync(string! key, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
 Themia.Storage.IStorageProvider.ExistsAsync(string! key, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!
 Themia.Storage.IStorageProvider.GetAsync(string! key, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Storage.StorageReadResult?>!
