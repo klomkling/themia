@@ -6,6 +6,7 @@ Themia.Storage.Local.LocalStorageOptions.RootPath.get -> string!
 Themia.Storage.Local.LocalStorageOptions.RootPath.set -> void
 Themia.Storage.Local.LocalStorageOptions.SigningKey.get -> string!
 Themia.Storage.Local.LocalStorageOptions.SigningKey.set -> void
+Themia.Storage.Local.LocalStorageOptions.Validate() -> void
 Themia.Storage.Local.LocalStorageProvider
 Themia.Storage.Local.LocalStorageProvider.LocalStorageProvider(Themia.Storage.Local.LocalStorageOptions! options) -> void
 Themia.Storage.Local.LocalUrlSigner

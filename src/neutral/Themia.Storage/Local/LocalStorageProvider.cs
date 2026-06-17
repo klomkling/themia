@@ -29,6 +29,7 @@ public sealed class LocalStorageProvider : IStorageProvider
         }
 
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        var contentType = string.IsNullOrEmpty(options.ContentType) ? "application/octet-stream" : options.ContentType;
         long length;
         await using (var file = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.None))
         {
@@ -36,8 +37,8 @@ public sealed class LocalStorageProvider : IStorageProvider
             length = file.Length;
         }
 
-        await File.WriteAllTextAsync(path + ContentTypeSuffix, options.ContentType, cancellationToken).ConfigureAwait(false);
-        return new StorageObjectInfo(key, length, options.ContentType, ETag: null);
+        await File.WriteAllTextAsync(path + ContentTypeSuffix, contentType, cancellationToken).ConfigureAwait(false);
+        return new StorageObjectInfo(key, length, contentType, ETag: null);
     }
 
     /// <inheritdoc />

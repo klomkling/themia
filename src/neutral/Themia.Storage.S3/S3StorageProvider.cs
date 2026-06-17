@@ -37,17 +37,18 @@ public sealed class S3StorageProvider : IStorageProvider, IDisposable
     public async Task<StorageObjectInfo> PutAsync(string key, Stream content, StoragePutOptions options, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(content);
+        var contentType = string.IsNullOrEmpty(options.ContentType) ? "application/octet-stream" : options.ContentType;
         var response = await client.PutObjectAsync(new PutObjectRequest
         {
             BucketName = bucket,
             Key = key,
             InputStream = content,
-            ContentType = options.ContentType,
+            ContentType = contentType,
             AutoCloseStream = false,
         }, cancellationToken).ConfigureAwait(false);
 
         var length = content.CanSeek ? content.Length : 0;
-        return new StorageObjectInfo(key, length, options.ContentType, response.ETag);
+        return new StorageObjectInfo(key, length, contentType, response.ETag);
     }
 
     /// <inheritdoc />
@@ -111,7 +112,12 @@ public sealed class S3StorageProvider : IStorageProvider, IDisposable
             config.RegionEndpoint = RegionEndpoint.GetBySystemName(options.Region);
         }
 
-        if (options.AccessKey is null || options.SecretKey is null)
+        if (string.IsNullOrWhiteSpace(options.AccessKey) != string.IsNullOrWhiteSpace(options.SecretKey))
+        {
+            throw new ArgumentException("S3 credentials must be set together: provide both AccessKey and SecretKey, or neither (to use the default AWS credential chain).", nameof(options));
+        }
+
+        if (string.IsNullOrWhiteSpace(options.AccessKey) || string.IsNullOrWhiteSpace(options.SecretKey))
         {
             return new AmazonS3Client(config);
         }
