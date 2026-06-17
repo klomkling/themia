@@ -35,4 +35,13 @@ public sealed class LocalUrlSignerTests
         var token = signer.Sign("tenant/a.txt", PresignedUrlOperation.Get, Now.AddMinutes(10));
         Assert.False(signer.TryVerify("tenant/a.txt", PresignedUrlOperation.Put, token, Now));
     }
+
+    [Fact]
+    public void Out_of_range_expiry_fails_without_throwing()
+    {
+        // An expiry segment beyond DateTimeOffset's valid unix-seconds range must verify as false,
+        // never escape as an ArgumentOutOfRangeException (which the endpoint would surface as a 500).
+        var token = "999999999999999." + "anything";
+        Assert.False(signer.TryVerify("tenant/a.txt", PresignedUrlOperation.Get, token, Now));
+    }
 }

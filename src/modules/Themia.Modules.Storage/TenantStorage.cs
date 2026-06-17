@@ -148,7 +148,7 @@ public sealed class TenantStorage : ITenantStorage
     /// <inheritdoc />
     public async Task<StorageReadResult?> GetAsync(string key, CancellationToken cancellationToken = default)
     {
-        var row = await objects.FirstOrDefaultAsync(new StorageObjectByKeySpec(key), cancellationToken).ConfigureAwait(false);
+        var row = await objects.FirstOrDefaultAsync(new StorageObjectByKeySpec(key, tenantContext.CurrentTenantId), cancellationToken).ConfigureAwait(false);
         if (row is null || !InScope(row))
         {
             return null;
@@ -161,14 +161,14 @@ public sealed class TenantStorage : ITenantStorage
     public async Task<bool> ExistsAsync(string key, CancellationToken cancellationToken = default)
     {
         // Cannot use AnyAsync: it can't apply the in-scope check below, so fetch the row and verify scope.
-        var row = await objects.FirstOrDefaultAsync(new StorageObjectByKeySpec(key), cancellationToken).ConfigureAwait(false);
+        var row = await objects.FirstOrDefaultAsync(new StorageObjectByKeySpec(key, tenantContext.CurrentTenantId), cancellationToken).ConfigureAwait(false);
         return row is not null && InScope(row);
     }
 
     /// <inheritdoc />
     public async Task DeleteAsync(string key, CancellationToken cancellationToken = default)
     {
-        var row = await objects.FirstOrDefaultAsync(new StorageObjectByKeySpec(key), cancellationToken).ConfigureAwait(false);
+        var row = await objects.FirstOrDefaultAsync(new StorageObjectByKeySpec(key, tenantContext.CurrentTenantId), cancellationToken).ConfigureAwait(false);
         if (row is null || !InScope(row))
         {
             return;
@@ -230,10 +230,10 @@ public sealed class TenantStorage : ITenantStorage
         string? priorETag = null;
         await unitOfWork.ExecuteInTransactionAsync(async ct =>
         {
-            var existingRow = await objects.FirstOrDefaultAsync(new StorageObjectByKeySpec(key), ct).ConfigureAwait(false);
+            var existingRow = await objects.FirstOrDefaultAsync(new StorageObjectByKeySpec(key, tenantContext.CurrentTenantId), ct).ConfigureAwait(false);
             var existing = existingRow is not null && InScope(existingRow) ? existingRow : null;
             var existingSize = existing?.SizeBytes ?? 0;
-            var all = await objects.ListAsync(new AllStorageObjectsSpec(), ct).ConfigureAwait(false);
+            var all = await objects.ListAsync(new AllStorageObjectsSpec(tenantContext.CurrentTenantId), ct).ConfigureAwait(false);
             // Sum only this scope's own rows (and subtract the in-scope existing row, captured above).
             // See InScope: EF's IncludeGlobalRecordsForTenants defaults true so the ambient filter
             // can leak platform (tenant_id IS NULL) rows into a tenant query; storage objects are

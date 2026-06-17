@@ -10,6 +10,10 @@ namespace Themia.Storage.Local;
 /// before serving, giving the Local backend the same time-limited, tamper-evident URLs as S3/R2.</summary>
 public sealed class LocalUrlSigner
 {
+    // Valid unix-seconds bounds for DateTimeOffset (DateTimeOffset.MinValue/MaxValue as unix seconds).
+    private const long UnixSecondsMin = -62135596800L;
+    private const long UnixSecondsMax = 253402300799L;
+
     private readonly byte[] keyBytes;
 
     /// <summary>Creates the signer.</summary>
@@ -45,6 +49,9 @@ public sealed class LocalUrlSigner
         if (string.IsNullOrEmpty(token)) return false;
         var dot = token.IndexOf('.');
         if (dot <= 0 || !long.TryParse(token.AsSpan(0, dot), out var expiry)) return false;
+        // Guard the unix-seconds range before converting: a client-supplied out-of-range value would
+        // make FromUnixTimeSeconds throw, which must verify as false, never escape as a 500.
+        if (expiry < UnixSecondsMin || expiry > UnixSecondsMax) return false;
         if (DateTimeOffset.FromUnixTimeSeconds(expiry) < now) return false;
 
         var expected = Compute(key, operation, expiry);

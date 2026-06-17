@@ -198,6 +198,47 @@ public abstract class StorageConformanceTests
     }
 
     [Fact]
+    public async Task Tenant_and_platform_objects_with_same_key_do_not_shadow()
+    {
+        // A platform (null-tenant) row and a tenant row can share the same logical key. EF defaults
+        // IncludeGlobalRecordsForTenants = true, so a tenant query without a tenant predicate could
+        // return the platform row and shadow the tenant's own — masking Get/Exists and breaking
+        // overwrite (a re-reserve would treat it as absent and hit the unique constraint). The
+        // query-level tenant predicate in the specs must isolate the tenant's row.
+        await ResetAsync();
+        var sharedRoot = Path.Combine(Path.GetTempPath(), "themia-storage-it", Guid.NewGuid().ToString("N"));
+
+        await using (var platform = NewScope(tenant: null, localRoot: sharedRoot))
+        {
+            await platform.Storage.PutAsync("shared.txt", Bytes("PLATFORM"), new StoragePutOptions("text/plain"));
+        }
+        await using (var tenant = NewScope(new TenantId("acme"), localRoot: sharedRoot))
+        {
+            await tenant.Storage.PutAsync("shared.txt", Bytes("tenant-v1"), new StoragePutOptions("text/plain"));
+        }
+
+        await using (var tenant = NewScope(new TenantId("acme"), localRoot: sharedRoot))
+        {
+            Assert.True(await tenant.Storage.ExistsAsync("shared.txt"));
+            var read = await tenant.Storage.GetAsync("shared.txt");
+            Assert.NotNull(read);
+            using (var reader = new StreamReader(read!.Content))
+            {
+                Assert.Equal("tenant-v1", await reader.ReadToEndAsync()); // the tenant's row, not the platform's
+            }
+
+            // Overwriting the tenant's own key must succeed — the platform row must not be mistaken for
+            // an absent row (which would insert and hit the (tenant_id, key) unique constraint → 500).
+            var stored = await tenant.Storage.PutAsync("shared.txt", Bytes("tenant-v2"), new StoragePutOptions("text/plain"));
+            Assert.Equal("shared.txt", stored.Key);
+            var reread = await tenant.Storage.GetAsync("shared.txt");
+            Assert.NotNull(reread);
+            using var rereader = new StreamReader(reread!.Content);
+            Assert.Equal("tenant-v2", await rereader.ReadToEndAsync());
+        }
+    }
+
+    [Fact]
     public async Task Platform_object_does_not_count_against_tenant_quota()
     {
         // Platform bytes must not be charged to a tenant's quota: the tenant can still fill its own.
