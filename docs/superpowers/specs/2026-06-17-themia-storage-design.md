@@ -133,7 +133,7 @@ the blob backend) with no shared transaction, so `PutAsync` is **metadata-first*
    **transactional but best-effort** under high concurrency — quota-by-sum has no unique index to
    compare-and-set against, so two simultaneous puts could each read the pre-commit sum and overshoot
    slightly. Strict serialization (a per-tenant usage row updated with a conditional `UPDATE`, or a
-   `SERIALIZABLE` transaction) is a **0.5.5** hardening, not this slice.
+   `SERIALIZABLE` transaction) is a deferred hardening (§12), not this slice.
 4. write the blob via `IStorageProvider`.
 
 If the blob write fails after the row commits, the reserved row is best-effort deleted in a
@@ -249,21 +249,22 @@ controllers instead.
 - **Per-tenant bucket** isolation (key-prefixing chosen).
 - **Orphan-blob reconcile** job and the raw-provider-bypass analyzer (noted follow-ups).
 
-Each deferred item has a home in the slice roadmap (§12).
+Each deferred item has a home in the backlog (§12).
 
-## 12. Release roadmap (slices)
+## 12. Backlog (needs-driven, no committed version)
 
-Storage ships as dependency-ordered slices, each a shippable PATCH with its own spec → plan →
-implement cycle (the same cadence Identity used for 0.5.0 → 0.5.1 → 0.5.2). The **order is fixed; the
-version numbers are targets** — Themia uses one shared monorepo version counter, so a slice ships under
-the next available minor and another module shipping in between can shift the exact number.
+**0.5.3 (this spec) shipped the foundation.** The hardening below is **deferred until a consumer
+actually needs it** — no fixed 0.5.4/0.5.5 slices. Each is enhancement to a Phase-1 module, so it stays
+Phase-1 work (phase = module category, not version) and ships under whatever version it lands; it does
+**not** gate Phase 2 (Notifications / Pdf / Export), which opens at **0.6.0**.
 
-| Version | Slice | Scope |
-|---|---|---|
-| **0.5.3** *(this spec)* | **Foundation** | Neutral core (`Themia.Storage`) + Local + S3/R2 (`Themia.Storage.S3`); module (`ITenantStorage`) with tenant key-prefix isolation, DB metadata + race-safe quota over EF/Dapper + FM schema, `IFileValidator` (size + content-type allowlist), `IFileScanner` no-op seam, the `AddThemiaStorage().UseLocal/UseS3/UseR2` builder, and opt-in presigned-direct endpoints. |
-| **0.5.4** | **Content trust** | `Themia.Storage.ClamAV` — the `IFileScanner` implementation (donor: PowerACC), stream-scan on server-proxied upload + a post-upload scan hook for presigned uploads; plus the magic-byte content-sniffing `IFileValidator` (validate by content, not extension). |
-| **0.5.5** | **Scale & ops** | Strict quota serialization (per-tenant usage row with a conditional `UPDATE`, replacing the best-effort SUM); server-side multipart / `TransferUtility` for large server-proxied uploads; per-tenant quota override rows; the orphan-blob reconcile job; and a `Themia.Analyzers` rule (THEMIA10x) flagging raw `IStorageProvider` use outside the module (tenant-prefix bypass). |
-| *later (additive, uncommitted)* | **More backends** | Azure Blob and GCS provider packages (`Themia.Storage.AzureBlob` / `.Gcs`); an optional per-tenant-bucket isolation mode. Built only if a consumer needs them (YAGNI). |
-
-Phase boundary unchanged: all Storage slices are **Phase 1** and stay in the **0.5.x** line; **0.6.0**
-opens **Phase 2** (Notifications / Pdf / Export).
+- **Content trust** — `Themia.Storage.ClamAV` (`IFileScanner` impl, donor: PowerACC), stream-scan on
+  server-proxied upload + a post-upload scan hook for presigned uploads; magic-byte content-sniffing
+  `IFileValidator`. *Pull when a consumer accepts untrusted uploads.*
+- **Scale & ops** — DB-side quota `SUM` / a framework `SumAsync` aggregate (today the sum materializes
+  rows); strict quota serialization (per-tenant usage row + conditional `UPDATE`, replacing the
+  best-effort sum); per-tenant quota overrides; orphan-blob + abandoned-reservation reconcile job;
+  server-side multipart / `TransferUtility`; a `Themia.Analyzers` THEMIA10x rule flagging raw
+  `IStorageProvider` use outside the module. *Pull when a tenant gets large or throughput matters.*
+- **More backends** — Azure Blob / GCS provider packages; optional per-tenant-bucket isolation. *Pull
+  only if a consumer needs them.*
