@@ -1,0 +1,134 @@
+#nullable enable
+const Themia.Modules.Storage.StorageScope.PlatformPrefix = "_platform" -> string!
+static Themia.Modules.Storage.EntityConfiguration.StorageModelBuilderExtensions.ApplyThemiaStorage(this Microsoft.EntityFrameworkCore.ModelBuilder! modelBuilder) -> Microsoft.EntityFrameworkCore.ModelBuilder!
+override Themia.Modules.Storage.Migrations.StorageSchemaMigration.Down() -> void
+override Themia.Modules.Storage.Migrations.StorageSchemaMigration.Up() -> void
+static Themia.Modules.Storage.Mapping.StorageDapperMappings.Apply(Themia.Framework.Data.Dapper.Mapping.EntityMappingRegistry! registry) -> void
+static Themia.Modules.Storage.StorageScope.PhysicalKey(Themia.Framework.Core.Abstractions.Tenancy.TenantId? tenantId, string! logicalKey) -> string!
+Themia.Modules.Storage.EntityConfiguration.StorageModelBuilderExtensions
+Themia.Modules.Storage.Entities.StorageObject
+Themia.Modules.Storage.Entities.StorageObject.ContentType.get -> string!
+Themia.Modules.Storage.Entities.StorageObject.ContentType.set -> void
+Themia.Modules.Storage.Entities.StorageObject.ETag.get -> string?
+Themia.Modules.Storage.Entities.StorageObject.ETag.set -> void
+Themia.Modules.Storage.Entities.StorageObject.CommittedAt.get -> System.DateTimeOffset?
+Themia.Modules.Storage.Entities.StorageObject.CommittedAt.set -> void
+Themia.Modules.Storage.Entities.StorageObject.Key.get -> string!
+Themia.Modules.Storage.Entities.StorageObject.Key.set -> void
+Themia.Modules.Storage.Entities.StorageObject.SetId(System.Guid id) -> void
+Themia.Modules.Storage.Entities.StorageObject.SizeBytes.get -> long
+Themia.Modules.Storage.Entities.StorageObject.SizeBytes.set -> void
+Themia.Modules.Storage.Entities.StorageObject.StorageObject() -> void
+Themia.Modules.Storage.Entities.StorageObject.TenantId.get -> Themia.Framework.Core.Abstractions.Tenancy.TenantId?
+Themia.Modules.Storage.Entities.StorageObject.TenantId.set -> void
+Themia.Modules.Storage.Mapping.StorageDapperMappings
+Themia.Modules.Storage.Migrations.StorageSchemaMigration
+Themia.Modules.Storage.Migrations.StorageSchemaMigration.StorageSchemaMigration() -> void
+Themia.Modules.Storage.StorageScope
+Themia.Modules.Storage.StorageModuleOptions
+Themia.Modules.Storage.StorageModuleOptions.StorageModuleOptions() -> void
+Themia.Modules.Storage.StorageModuleOptions.ConnectionStringName.get -> string!
+Themia.Modules.Storage.StorageModuleOptions.ConnectionStringName.set -> void
+Themia.Modules.Storage.StorageModuleOptions.MaxObjectSizeBytes.get -> long
+Themia.Modules.Storage.StorageModuleOptions.MaxObjectSizeBytes.set -> void
+Themia.Modules.Storage.StorageModuleOptions.DefaultTenantQuotaBytes.get -> long
+Themia.Modules.Storage.StorageModuleOptions.DefaultTenantQuotaBytes.set -> void
+Themia.Modules.Storage.StorageModuleOptions.AllowedContentTypes.get -> System.Collections.Generic.IReadOnlyList<string!>?
+Themia.Modules.Storage.StorageModuleOptions.AllowedContentTypes.set -> void
+Themia.Modules.Storage.StorageModuleOptions.Validate() -> void
+Themia.Modules.Storage.StorageValidationException
+Themia.Modules.Storage.StorageValidationException.StorageValidationException(string! message) -> void
+Themia.Modules.Storage.StorageScanException
+Themia.Modules.Storage.StorageScanException.StorageScanException(string! message) -> void
+Themia.Modules.Storage.StorageQuotaExceededException
+Themia.Modules.Storage.StorageQuotaExceededException.StorageQuotaExceededException(string! message) -> void
+Themia.Modules.Storage.Validation.FileValidationResult
+Themia.Modules.Storage.Validation.FileValidationResult.FileValidationResult() -> void
+Themia.Modules.Storage.Validation.FileValidationResult.FileValidationResult(bool IsValid, string? Error) -> void
+Themia.Modules.Storage.Validation.FileValidationResult.IsValid.get -> bool
+Themia.Modules.Storage.Validation.FileValidationResult.IsValid.init -> void
+Themia.Modules.Storage.Validation.FileValidationResult.Error.get -> string?
+Themia.Modules.Storage.Validation.FileValidationResult.Error.init -> void
+static Themia.Modules.Storage.Validation.FileValidationResult.Valid.get -> Themia.Modules.Storage.Validation.FileValidationResult
+static Themia.Modules.Storage.Validation.FileValidationResult.Invalid(string! error) -> Themia.Modules.Storage.Validation.FileValidationResult
+Themia.Modules.Storage.Validation.IFileValidator
+Themia.Modules.Storage.Validation.IFileValidator.Validate(string! key, string! contentType, long sizeBytes, System.IO.Stream? content) -> Themia.Modules.Storage.Validation.FileValidationResult
+Themia.Modules.Storage.Validation.DefaultFileValidator
+Themia.Modules.Storage.Validation.DefaultFileValidator.DefaultFileValidator(Themia.Modules.Storage.StorageModuleOptions! options) -> void
+Themia.Modules.Storage.Validation.DefaultFileValidator.Validate(string! key, string! contentType, long sizeBytes, System.IO.Stream? content) -> Themia.Modules.Storage.Validation.FileValidationResult
+Themia.Modules.Storage.Scanning.FileScanResult
+Themia.Modules.Storage.Scanning.FileScanResult.FileScanResult() -> void
+Themia.Modules.Storage.Scanning.FileScanResult.FileScanResult(bool IsClean, string? Threat) -> void
+Themia.Modules.Storage.Scanning.FileScanResult.IsClean.get -> bool
+Themia.Modules.Storage.Scanning.FileScanResult.IsClean.init -> void
+Themia.Modules.Storage.Scanning.FileScanResult.Threat.get -> string?
+Themia.Modules.Storage.Scanning.FileScanResult.Threat.init -> void
+static Themia.Modules.Storage.Scanning.FileScanResult.Clean.get -> Themia.Modules.Storage.Scanning.FileScanResult
+Themia.Modules.Storage.Scanning.IFileScanner
+Themia.Modules.Storage.Scanning.IFileScanner.ScanAsync(System.IO.Stream! content, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Storage.Scanning.FileScanResult>!
+Themia.Modules.Storage.Scanning.NullFileScanner
+Themia.Modules.Storage.Scanning.NullFileScanner.NullFileScanner() -> void
+Themia.Modules.Storage.Scanning.NullFileScanner.ScanAsync(System.IO.Stream! content, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Storage.Scanning.FileScanResult>!
+Themia.Modules.Storage.StoredObject
+Themia.Modules.Storage.StoredObject.StoredObject(System.Guid Id, string! Key, long SizeBytes, string! ContentType) -> void
+Themia.Modules.Storage.StoredObject.Id.get -> System.Guid
+Themia.Modules.Storage.StoredObject.Id.init -> void
+Themia.Modules.Storage.StoredObject.Key.get -> string!
+Themia.Modules.Storage.StoredObject.Key.init -> void
+Themia.Modules.Storage.StoredObject.SizeBytes.get -> long
+Themia.Modules.Storage.StoredObject.SizeBytes.init -> void
+Themia.Modules.Storage.StoredObject.ContentType.get -> string!
+Themia.Modules.Storage.StoredObject.ContentType.init -> void
+Themia.Modules.Storage.ITenantStorage
+Themia.Modules.Storage.ITenantStorage.PutAsync(string! key, System.IO.Stream! content, Themia.Storage.StoragePutOptions options, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Storage.StoredObject!>!
+Themia.Modules.Storage.ITenantStorage.GetAsync(string! key, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Storage.StorageReadResult?>!
+Themia.Modules.Storage.ITenantStorage.ExistsAsync(string! key, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!
+Themia.Modules.Storage.ITenantStorage.DeleteAsync(string! key, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Modules.Storage.ITenantStorage.GetDownloadUrlAsync(string! key, System.TimeSpan expiry, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Uri!>!
+Themia.Modules.Storage.ITenantStorage.GetUploadUrlAsync(string! key, string! contentType, long sizeBytes, System.TimeSpan expiry, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Uri!>!
+Themia.Modules.Storage.ITenantStorage.CompleteUploadAsync(string! key, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Storage.StoredObject!>!
+Themia.Modules.Storage.TenantStorage
+Themia.Modules.Storage.TenantStorage.TenantStorage(Themia.Storage.IStorageProvider! provider, Themia.Framework.Data.Abstractions.Repositories.IRepository<Themia.Modules.Storage.Entities.StorageObject!, System.Guid>! objects, Themia.Framework.Data.Abstractions.UnitOfWork.IUnitOfWork! unitOfWork, Themia.Framework.Core.Abstractions.Tenancy.ITenantContext! tenantContext, Themia.Modules.Storage.Validation.IFileValidator! validator, Themia.Modules.Storage.Scanning.IFileScanner! scanner, Themia.Modules.Storage.StorageModuleOptions! options, System.TimeProvider! timeProvider, Microsoft.Extensions.Logging.ILogger<Themia.Modules.Storage.TenantStorage!>! logger) -> void
+Themia.Modules.Storage.TenantStorage.PutAsync(string! key, System.IO.Stream! content, Themia.Storage.StoragePutOptions putOptions, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Storage.StoredObject!>!
+Themia.Modules.Storage.TenantStorage.GetAsync(string! key, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Storage.StorageReadResult?>!
+Themia.Modules.Storage.TenantStorage.ExistsAsync(string! key, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!
+Themia.Modules.Storage.TenantStorage.DeleteAsync(string! key, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Modules.Storage.TenantStorage.GetDownloadUrlAsync(string! key, System.TimeSpan expiry, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Uri!>!
+Themia.Modules.Storage.TenantStorage.GetUploadUrlAsync(string! key, string! contentType, long sizeBytes, System.TimeSpan expiry, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Uri!>!
+Themia.Modules.Storage.TenantStorage.CompleteUploadAsync(string! key, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Storage.StoredObject!>!
+Themia.Modules.Storage.DependencyInjection.R2StorageOptions
+Themia.Modules.Storage.DependencyInjection.R2StorageOptions.AccessKey.get -> string?
+Themia.Modules.Storage.DependencyInjection.R2StorageOptions.AccessKey.set -> void
+Themia.Modules.Storage.DependencyInjection.R2StorageOptions.AccountId.get -> string!
+Themia.Modules.Storage.DependencyInjection.R2StorageOptions.AccountId.set -> void
+Themia.Modules.Storage.DependencyInjection.R2StorageOptions.BucketName.get -> string!
+Themia.Modules.Storage.DependencyInjection.R2StorageOptions.BucketName.set -> void
+Themia.Modules.Storage.DependencyInjection.R2StorageOptions.R2StorageOptions() -> void
+Themia.Modules.Storage.DependencyInjection.R2StorageOptions.SecretKey.get -> string?
+Themia.Modules.Storage.DependencyInjection.R2StorageOptions.SecretKey.set -> void
+Themia.Modules.Storage.DependencyInjection.StorageBuilder
+Themia.Modules.Storage.DependencyInjection.StorageBuilder.Services.get -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+Themia.Modules.Storage.DependencyInjection.StorageBuilder.UseLocal(System.Action<Themia.Storage.Local.LocalStorageOptions!>! configure) -> Themia.Modules.Storage.DependencyInjection.StorageBuilder!
+Themia.Modules.Storage.DependencyInjection.StorageBuilder.UseR2(System.Action<Themia.Modules.Storage.DependencyInjection.R2StorageOptions!>! configure) -> Themia.Modules.Storage.DependencyInjection.StorageBuilder!
+Themia.Modules.Storage.DependencyInjection.StorageBuilder.UseS3(System.Action<Themia.Storage.S3.S3StorageOptions!>! configure) -> Themia.Modules.Storage.DependencyInjection.StorageBuilder!
+Themia.Modules.Storage.DependencyInjection.StorageServiceCollectionExtensions
+Themia.Modules.Storage.StorageModule
+Themia.Modules.Storage.StorageModule.StorageModule(Themia.Data.Migrations.MigrationEngine engine) -> void
+Themia.Modules.Storage.StorageModule.StorageModule(Themia.Data.Migrations.MigrationEngine engine, Themia.Modules.Storage.StorageModuleOptions! options) -> void
+override Themia.Modules.Storage.StorageModule.Descriptor.get -> Themia.Framework.Core.Modules.ModuleDescriptor!
+override Themia.Modules.Storage.StorageModule.InitializeAsync(System.IServiceProvider! serviceProvider, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+static Themia.Modules.Storage.DependencyInjection.StorageServiceCollectionExtensions.AddThemiaStorage(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Themia.Modules.Storage.StorageModuleOptions!>? configure = null) -> Themia.Modules.Storage.DependencyInjection.StorageBuilder!
+Themia.Modules.Storage.Endpoints.StorageEndpoints
+Themia.Modules.Storage.Endpoints.StorageEndpoints.UploadUrlRequest
+Themia.Modules.Storage.Endpoints.StorageEndpoints.UploadUrlRequest.UploadUrlRequest(string! Key, string! ContentType, long SizeBytes) -> void
+Themia.Modules.Storage.Endpoints.StorageEndpoints.UploadUrlRequest.Key.get -> string!
+Themia.Modules.Storage.Endpoints.StorageEndpoints.UploadUrlRequest.Key.init -> void
+Themia.Modules.Storage.Endpoints.StorageEndpoints.UploadUrlRequest.ContentType.get -> string!
+Themia.Modules.Storage.Endpoints.StorageEndpoints.UploadUrlRequest.ContentType.init -> void
+Themia.Modules.Storage.Endpoints.StorageEndpoints.UploadUrlRequest.SizeBytes.get -> long
+Themia.Modules.Storage.Endpoints.StorageEndpoints.UploadUrlRequest.SizeBytes.init -> void
+Themia.Modules.Storage.Endpoints.StorageEndpoints.CompleteRequest
+Themia.Modules.Storage.Endpoints.StorageEndpoints.CompleteRequest.CompleteRequest(string! Key) -> void
+Themia.Modules.Storage.Endpoints.StorageEndpoints.CompleteRequest.Key.get -> string!
+Themia.Modules.Storage.Endpoints.StorageEndpoints.CompleteRequest.Key.init -> void
+static Themia.Modules.Storage.Endpoints.StorageEndpoints.MapThemiaStorageEndpoints(this Microsoft.AspNetCore.Routing.IEndpointRouteBuilder! endpoints, string! prefix = "/storage") -> Microsoft.AspNetCore.Routing.RouteGroupBuilder!
