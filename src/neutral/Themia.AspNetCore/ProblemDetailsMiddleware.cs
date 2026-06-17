@@ -45,6 +45,7 @@ public sealed class ProblemDetailsMiddleware(
         catch (ConflictException ex) { await WriteAsync(context, 409, "Conflict", ex, traceId, LogLevel.Warning); }
         catch (ForbiddenException ex) { await WriteAsync(context, 403, "Forbidden", ex, traceId, LogLevel.Warning); }
         catch (UnauthorizedException ex) { await WriteAsync(context, 401, "Unauthorized", ex, traceId, LogLevel.Warning); }
+        catch (RateLimitException ex) { await WriteAsync(context, 429, "Too Many Requests", ex, traceId, LogLevel.Warning); }
         catch (ValidationException ex) { await WriteValidationAsync(context, ex, traceId); }
         catch (ExternalServiceException ex) { await WriteAsync(context, 503, "Service unavailable", ex, traceId, LogLevel.Error); }
         catch (Exception ex)
@@ -72,6 +73,11 @@ public sealed class ProblemDetailsMiddleware(
         problem.Extensions["traceId"] = traceId;
         if (ex.ErrorCode is not null) problem.Extensions["errorCode"] = ex.ErrorCode;
         if (ex is ExternalServiceException ese) problem.Extensions["service"] = ese.ServiceName;
+        if (ex is RateLimitException rle)
+        {
+            problem.Extensions["retryAfterSeconds"] = rle.RetryAfterSeconds;
+            ctx.Response.Headers.RetryAfter = rle.RetryAfterSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        }
 
         await WriteProblemAsync(ctx, problem, status, traceId);
     }

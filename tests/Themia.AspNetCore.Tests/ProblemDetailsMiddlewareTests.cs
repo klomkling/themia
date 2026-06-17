@@ -77,6 +77,26 @@ public sealed class ProblemDetailsMiddlewareTests
     }
 
     [Fact]
+    public async Task RateLimit_returns_429_with_RetryAfter_header_and_extension()
+    {
+        var ctx = new DefaultHttpContext();
+        ctx.Request.Path = "/x";
+        ctx.Response.Body = new MemoryStream();
+        var mw = new ProblemDetailsMiddleware(
+            _ => throw new RateLimitException("slow down", retryAfterSeconds: 30, errorCode: "COOLDOWN"),
+            NullLogger<ProblemDetailsMiddleware>.Instance);
+
+        await mw.InvokeAsync(ctx);
+
+        Assert.Equal(429, ctx.Response.StatusCode);
+        Assert.Equal("30", ctx.Response.Headers.RetryAfter);
+        ctx.Response.Body.Position = 0;
+        using var doc = JsonDocument.Parse(await new StreamReader(ctx.Response.Body).ReadToEndAsync());
+        Assert.Equal(30, doc.RootElement.GetProperty("retryAfterSeconds").GetInt32());
+        Assert.Equal("COOLDOWN", doc.RootElement.GetProperty("errorCode").GetString());
+    }
+
+    [Fact]
     public async Task ExternalService_returns_503_with_service_and_detail()
     {
         var (status, body) = await InvokeWith(new ExternalServiceException("payments", "down"));

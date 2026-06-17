@@ -18,6 +18,16 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.5.4] - 2026-06-18
+
+### Added
+
+- **`Themia.AspNetCore.Exceptions.RateLimitException`** → HTTP **429** via `ProblemDetailsMiddleware`,
+  emitting a `Retry-After` header and a `retryAfterSeconds` problem extension. For rate-limit/cooldown
+  paths (e.g. OTP resend) that previously had to fall back to a generic 400. `RetryAfterSeconds` is a
+  domain value, so the exception stays HTTP-agnostic (the middleware owns the type→status map). Unblocks
+  the ezy-assets Phase-1 middleware swap (coord #0001).
+
 ## [0.5.3] - 2026-06-17
 
 ### Added
