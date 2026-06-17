@@ -21,19 +21,15 @@ public sealed class S3StorageProviderConformanceTests : StorageProviderConforman
     {
         await container.StartAsync();
 
-        // AWS SDK for .NET v4's synchronous GetPreSignedURL resolves credentials through the
-        // default identity chain rather than the client-attached credentials, so the MinIO root
-        // credentials are exported as env vars to make that chain succeed under the test process.
-        Environment.SetEnvironmentVariable("AWS_ACCESS_KEY_ID", container.GetAccessKey());
-        Environment.SetEnvironmentVariable("AWS_SECRET_ACCESS_KEY", container.GetSecretKey());
-
+        var credentials = new BasicAWSCredentials(container.GetAccessKey(), container.GetSecretKey());
         var config = new AmazonS3Config
         {
             ServiceURL = container.GetConnectionString(),
             ForcePathStyle = true,
             AuthenticationRegion = "us-east-1",
+            DefaultAWSCredentials = credentials,
         };
-        client = new AmazonS3Client(new BasicAWSCredentials(container.GetAccessKey(), container.GetSecretKey()), config);
+        client = new AmazonS3Client(credentials, config);
         await client.PutBucketAsync(new PutBucketRequest { BucketName = "themia-conf" });
         provider = new S3StorageProvider(client, "themia-conf");
     }

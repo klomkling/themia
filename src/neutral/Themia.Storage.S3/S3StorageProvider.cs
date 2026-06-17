@@ -83,17 +83,17 @@ public sealed class S3StorageProvider : IStorageProvider, IDisposable
         client.DeleteObjectAsync(bucket, key, cancellationToken);
 
     /// <inheritdoc />
-    public Task<Uri> GetPresignedUrlAsync(string key, PresignedUrlRequest request, CancellationToken cancellationToken = default)
+    public async Task<Uri> GetPresignedUrlAsync(string key, PresignedUrlRequest request, CancellationToken cancellationToken = default)
     {
-        var url = client.GetPreSignedURL(new GetPreSignedUrlRequest
+        var url = await client.GetPreSignedURLAsync(new GetPreSignedUrlRequest
         {
             BucketName = bucket,
             Key = key,
             Verb = request.Operation == PresignedUrlOperation.Put ? HttpVerb.PUT : HttpVerb.GET,
             Expires = DateTime.UtcNow.Add(request.Expiry),
             ContentType = request.Operation == PresignedUrlOperation.Put ? request.ContentType : null,
-        });
-        return Task.FromResult(new Uri(url));
+        }).ConfigureAwait(false);
+        return new Uri(url);
     }
 
     /// <inheritdoc />
@@ -111,8 +111,16 @@ public sealed class S3StorageProvider : IStorageProvider, IDisposable
             config.RegionEndpoint = RegionEndpoint.GetBySystemName(options.Region);
         }
 
-        return options.AccessKey is not null && options.SecretKey is not null
-            ? new AmazonS3Client(new BasicAWSCredentials(options.AccessKey, options.SecretKey), config)
-            : new AmazonS3Client(config);
+        if (options.AccessKey is null || options.SecretKey is null)
+        {
+            return new AmazonS3Client(config);
+        }
+
+        var credentials = new BasicAWSCredentials(options.AccessKey, options.SecretKey);
+        // AWS SDK for .NET v4 resolves presigned-URL credentials from Config.DefaultAWSCredentials
+        // (falling back to the default identity chain) — NOT from the credentials passed to the
+        // client constructor. Set both so explicit keys (e.g. Cloudflare R2) sign presigned URLs.
+        config.DefaultAWSCredentials = credentials;
+        return new AmazonS3Client(credentials, config);
     }
 }
