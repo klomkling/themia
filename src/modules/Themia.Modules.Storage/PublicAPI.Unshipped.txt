@@ -114,3 +114,11 @@ Themia.Modules.Storage.StorageModule.StorageModule(Themia.Data.Migrations.Migrat
 override Themia.Modules.Storage.StorageModule.Descriptor.get -> Themia.Framework.Core.Modules.ModuleDescriptor!
 override Themia.Modules.Storage.StorageModule.InitializeAsync(System.IServiceProvider! serviceProvider, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
 static Themia.Modules.Storage.DependencyInjection.StorageServiceCollectionExtensions.AddThemiaStorage(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Themia.Modules.Storage.StorageModuleOptions!>? configure = null) -> Themia.Modules.Storage.DependencyInjection.StorageBuilder!
+Themia.Modules.Storage.Endpoints.StorageEndpoints
+Themia.Modules.Storage.Endpoints.StorageEndpoints.UploadUrlRequest
+Themia.Modules.Storage.Endpoints.StorageEndpoints.UploadUrlRequest.UploadUrlRequest(string! Key, string! ContentType) -> void
+Themia.Modules.Storage.Endpoints.StorageEndpoints.UploadUrlRequest.Key.get -> string!
+Themia.Modules.Storage.Endpoints.StorageEndpoints.UploadUrlRequest.Key.init -> void
+Themia.Modules.Storage.Endpoints.StorageEndpoints.UploadUrlRequest.ContentType.get -> string!
+Themia.Modules.Storage.Endpoints.StorageEndpoints.UploadUrlRequest.ContentType.init -> void
+static Themia.Modules.Storage.Endpoints.StorageEndpoints.MapThemiaStorageEndpoints(this Microsoft.AspNetCore.Routing.IEndpointRouteBuilder! endpoints, string! prefix = "/storage") -> Microsoft.AspNetCore.Routing.RouteGroupBuilder!
