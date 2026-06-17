@@ -8,6 +8,10 @@ Themia.Storage.Local.LocalStorageOptions.SigningKey.get -> string!
 Themia.Storage.Local.LocalStorageOptions.SigningKey.set -> void
 Themia.Storage.Local.LocalStorageProvider
 Themia.Storage.Local.LocalStorageProvider.LocalStorageProvider(Themia.Storage.Local.LocalStorageOptions! options) -> void
+Themia.Storage.Local.LocalUrlSigner
+Themia.Storage.Local.LocalUrlSigner.LocalUrlSigner(string! signingKey) -> void
+Themia.Storage.Local.LocalUrlSigner.Sign(string! key, string! operation, System.DateTimeOffset expiresAt) -> string!
+Themia.Storage.Local.LocalUrlSigner.TryVerify(string! key, string! operation, string! token, System.DateTimeOffset now) -> bool
 Themia.Storage.Local.LocalStorageProvider.DeleteAsync(string! key, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
 Themia.Storage.Local.LocalStorageProvider.ExistsAsync(string! key, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!
 Themia.Storage.Local.LocalStorageProvider.GetAsync(string! key, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Storage.StorageReadResult?>!

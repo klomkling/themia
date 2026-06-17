@@ -73,8 +73,17 @@ public sealed class LocalStorageProvider : IStorageProvider
     }
 
     /// <inheritdoc />
-    public Task<Uri> GetPresignedUrlAsync(string key, PresignedUrlRequest request, CancellationToken cancellationToken = default) =>
-        throw new NotImplementedException("Implemented in Task 4.");
+    public Task<Uri> GetPresignedUrlAsync(string key, PresignedUrlRequest request, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(options.SigningKey);
+        ResolvePath(key); // validates the key
+        var op = request.Operation == PresignedUrlOperation.Put ? "put" : "get";
+        var token = new LocalUrlSigner(options.SigningKey).Sign(key, op, DateTimeOffset.UtcNow.Add(request.Expiry));
+        // Relative URI the module's MapThemiaStorageEndpoints download/upload route materializes + verifies.
+        var encodedKey = Uri.EscapeDataString(key);
+        var uri = new Uri($"themia-storage://{op}/{encodedKey}?token={Uri.EscapeDataString(token)}", UriKind.Absolute);
+        return Task.FromResult(uri);
+    }
 
     // Maps a key to an absolute path UNDER RootPath, rejecting traversal/absolute keys by verifying the
     // resolved full path stays within the root.
