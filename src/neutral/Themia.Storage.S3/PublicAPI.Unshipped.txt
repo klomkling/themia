@@ -1,0 +1,24 @@
+#nullable enable
+Themia.Storage.S3.S3StorageOptions
+Themia.Storage.S3.S3StorageOptions.AccessKey.get -> string?
+Themia.Storage.S3.S3StorageOptions.AccessKey.set -> void
+Themia.Storage.S3.S3StorageOptions.BucketName.get -> string!
+Themia.Storage.S3.S3StorageOptions.BucketName.set -> void
+Themia.Storage.S3.S3StorageOptions.ForcePathStyle.get -> bool
+Themia.Storage.S3.S3StorageOptions.ForcePathStyle.set -> void
+Themia.Storage.S3.S3StorageOptions.Region.get -> string?
+Themia.Storage.S3.S3StorageOptions.Region.set -> void
+Themia.Storage.S3.S3StorageOptions.S3StorageOptions() -> void
+Themia.Storage.S3.S3StorageOptions.SecretKey.get -> string?
+Themia.Storage.S3.S3StorageOptions.SecretKey.set -> void
+Themia.Storage.S3.S3StorageOptions.ServiceUrl.get -> System.Uri?
+Themia.Storage.S3.S3StorageOptions.ServiceUrl.set -> void
+Themia.Storage.S3.S3StorageProvider
+Themia.Storage.S3.S3StorageProvider.DeleteAsync(string! key, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Storage.S3.S3StorageProvider.Dispose() -> void
+Themia.Storage.S3.S3StorageProvider.ExistsAsync(string! key, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!
+Themia.Storage.S3.S3StorageProvider.GetAsync(string! key, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Storage.StorageReadResult?>!
+Themia.Storage.S3.S3StorageProvider.GetPresignedUrlAsync(string! key, Themia.Storage.PresignedUrlRequest request, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Uri!>!
+Themia.Storage.S3.S3StorageProvider.PutAsync(string! key, System.IO.Stream! content, Themia.Storage.StoragePutOptions options, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Storage.StorageObjectInfo!>!
+Themia.Storage.S3.S3StorageProvider.S3StorageProvider(Amazon.S3.IAmazonS3! client, string! bucketName) -> void
+Themia.Storage.S3.S3StorageProvider.S3StorageProvider(Themia.Storage.S3.S3StorageOptions! options) -> void
