@@ -23,3 +23,47 @@ Themia.Modules.Storage.Mapping.StorageDapperMappings
 Themia.Modules.Storage.Migrations.StorageSchemaMigration
 Themia.Modules.Storage.Migrations.StorageSchemaMigration.StorageSchemaMigration() -> void
 Themia.Modules.Storage.StorageScope
+Themia.Modules.Storage.StorageModuleOptions
+Themia.Modules.Storage.StorageModuleOptions.StorageModuleOptions() -> void
+Themia.Modules.Storage.StorageModuleOptions.ConnectionStringName.get -> string!
+Themia.Modules.Storage.StorageModuleOptions.ConnectionStringName.set -> void
+Themia.Modules.Storage.StorageModuleOptions.MaxObjectSizeBytes.get -> long
+Themia.Modules.Storage.StorageModuleOptions.MaxObjectSizeBytes.set -> void
+Themia.Modules.Storage.StorageModuleOptions.DefaultTenantQuotaBytes.get -> long
+Themia.Modules.Storage.StorageModuleOptions.DefaultTenantQuotaBytes.set -> void
+Themia.Modules.Storage.StorageModuleOptions.AllowedContentTypes.get -> System.Collections.Generic.IReadOnlyList<string!>?
+Themia.Modules.Storage.StorageModuleOptions.AllowedContentTypes.set -> void
+Themia.Modules.Storage.StorageModuleOptions.Validate() -> void
+Themia.Modules.Storage.StorageValidationException
+Themia.Modules.Storage.StorageValidationException.StorageValidationException(string! message) -> void
+Themia.Modules.Storage.StorageScanException
+Themia.Modules.Storage.StorageScanException.StorageScanException(string! message) -> void
+Themia.Modules.Storage.StorageQuotaExceededException
+Themia.Modules.Storage.StorageQuotaExceededException.StorageQuotaExceededException(string! message) -> void
+Themia.Modules.Storage.Validation.FileValidationResult
+Themia.Modules.Storage.Validation.FileValidationResult.FileValidationResult() -> void
+Themia.Modules.Storage.Validation.FileValidationResult.FileValidationResult(bool IsValid, string? Error) -> void
+Themia.Modules.Storage.Validation.FileValidationResult.IsValid.get -> bool
+Themia.Modules.Storage.Validation.FileValidationResult.IsValid.init -> void
+Themia.Modules.Storage.Validation.FileValidationResult.Error.get -> string?
+Themia.Modules.Storage.Validation.FileValidationResult.Error.init -> void
+static Themia.Modules.Storage.Validation.FileValidationResult.Valid.get -> Themia.Modules.Storage.Validation.FileValidationResult
+static Themia.Modules.Storage.Validation.FileValidationResult.Invalid(string! error) -> Themia.Modules.Storage.Validation.FileValidationResult
+Themia.Modules.Storage.Validation.IFileValidator
+Themia.Modules.Storage.Validation.IFileValidator.Validate(string! key, string! contentType, long sizeBytes) -> Themia.Modules.Storage.Validation.FileValidationResult
+Themia.Modules.Storage.Validation.DefaultFileValidator
+Themia.Modules.Storage.Validation.DefaultFileValidator.DefaultFileValidator(Themia.Modules.Storage.StorageModuleOptions! options) -> void
+Themia.Modules.Storage.Validation.DefaultFileValidator.Validate(string! key, string! contentType, long sizeBytes) -> Themia.Modules.Storage.Validation.FileValidationResult
+Themia.Modules.Storage.Scanning.FileScanResult
+Themia.Modules.Storage.Scanning.FileScanResult.FileScanResult() -> void
+Themia.Modules.Storage.Scanning.FileScanResult.FileScanResult(bool IsClean, string? Threat) -> void
+Themia.Modules.Storage.Scanning.FileScanResult.IsClean.get -> bool
+Themia.Modules.Storage.Scanning.FileScanResult.IsClean.init -> void
+Themia.Modules.Storage.Scanning.FileScanResult.Threat.get -> string?
+Themia.Modules.Storage.Scanning.FileScanResult.Threat.init -> void
+static Themia.Modules.Storage.Scanning.FileScanResult.Clean.get -> Themia.Modules.Storage.Scanning.FileScanResult
+Themia.Modules.Storage.Scanning.IFileScanner
+Themia.Modules.Storage.Scanning.IFileScanner.ScanAsync(System.IO.Stream! content, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Storage.Scanning.FileScanResult>!
+Themia.Modules.Storage.Scanning.NullFileScanner
+Themia.Modules.Storage.Scanning.NullFileScanner.NullFileScanner() -> void
+Themia.Modules.Storage.Scanning.NullFileScanner.ScanAsync(System.IO.Stream! content, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Storage.Scanning.FileScanResult>!
