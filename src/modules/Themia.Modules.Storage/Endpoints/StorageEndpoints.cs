@@ -25,15 +25,15 @@ public static class StorageEndpoints
         // _local URL for the Local backend; resolve both to an absolute URL the client can use.
         group.MapPost("/upload-url", async (UploadUrlRequest request, HttpRequest httpRequest, ITenantStorage storage, CancellationToken ct) =>
         {
-            if (request is null || string.IsNullOrWhiteSpace(request.Key) || string.IsNullOrWhiteSpace(request.ContentType))
+            if (request is null || string.IsNullOrWhiteSpace(request.Key) || string.IsNullOrWhiteSpace(request.ContentType) || request.SizeBytes < 0)
             {
                 return Results.ValidationProblem(new Dictionary<string, string[]>
                 {
-                    ["request"] = ["Key and contentType are required."],
+                    ["request"] = ["Key and contentType are required, and sizeBytes must be non-negative."],
                 });
             }
 
-            var url = await storage.GetUploadUrlAsync(request.Key, request.ContentType, TimeSpan.FromMinutes(15), ct);
+            var url = await storage.GetUploadUrlAsync(request.Key, request.ContentType, request.SizeBytes, TimeSpan.FromMinutes(15), ct);
             return Results.Ok(new { uploadUrl = ToAbsolute(httpRequest, prefix, url) });
         });
 
@@ -62,12 +62,14 @@ public static class StorageEndpoints
 
         // Accept a Local presigned upload (the token authorizes exactly this physical key).
         // Returns 404 when the backend is not Local (the signer is only registered for UseLocal).
+        // Enforces the configured size cap before writing (413 when exceeded) to bound memory/DoS.
         group.MapPut("/_local/put", async (
             [FromQuery] string key,
             [FromQuery] string token,
             HttpRequest request,
             [FromServices] LocalUrlSigner? signer,
             [FromServices] IStorageProvider provider,
+            [FromServices] StorageModuleOptions options,
             CancellationToken ct) =>
         {
             if (signer is null)
@@ -80,7 +82,23 @@ public static class StorageEndpoints
                 return Results.Unauthorized();
             }
 
-            await provider.PutAsync(key, request.Body, new StoragePutOptions(request.ContentType ?? "application/octet-stream"), ct);
+            // Buffer with a hard cap so the size limit holds even for a non-seekable request body;
+            // reject (without writing) once the total exceeds MaxObjectSizeBytes.
+            var buffer = new MemoryStream();
+            var chunk = new byte[81920];
+            int read;
+            while ((read = await request.Body.ReadAsync(chunk, ct)) > 0)
+            {
+                if (buffer.Length + read > options.MaxObjectSizeBytes)
+                {
+                    return Results.StatusCode(StatusCodes.Status413PayloadTooLarge);
+                }
+
+                buffer.Write(chunk, 0, read);
+            }
+
+            buffer.Position = 0;
+            await provider.PutAsync(key, buffer, new StoragePutOptions(request.ContentType ?? "application/octet-stream"), ct);
             return Results.NoContent();
         });
 
@@ -116,5 +134,6 @@ public static class StorageEndpoints
     /// <summary>The request body for an upload-URL request.</summary>
     /// <param name="Key">The logical key.</param>
     /// <param name="ContentType">The content type the upload will declare.</param>
-    public sealed record UploadUrlRequest(string Key, string ContentType);
+    /// <param name="SizeBytes">The declared object size in bytes (authoritative for the reserved quota).</param>
+    public sealed record UploadUrlRequest(string Key, string ContentType, long SizeBytes);
 }

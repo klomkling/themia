@@ -19,6 +19,7 @@ namespace Themia.Modules.Storage.AspNetCore.IntegrationTests;
 public sealed class LocalSignedRouteTests : IAsyncLifetime
 {
     private const string SigningKey = "test-signing-key-at-least-32-characters-long";
+    private const long MaxObjectSizeBytes = 32; // small cap so the oversize _local/put test trips 413
     private readonly string root = Path.Combine(Path.GetTempPath(), "themia-storage-http", Guid.NewGuid().ToString("N"));
 
     private WebApplication app = null!;
@@ -32,7 +33,11 @@ public sealed class LocalSignedRouteTests : IAsyncLifetime
         builder.WebHost.UseUrls("http://127.0.0.1:0");
 
         builder.Services
-            .AddThemiaStorage(o => o.DefaultTenantQuotaBytes = 1024L * 1024 * 1024)
+            .AddThemiaStorage(o =>
+            {
+                o.DefaultTenantQuotaBytes = 1024L * 1024 * 1024;
+                o.MaxObjectSizeBytes = MaxObjectSizeBytes;
+            })
             .UseLocal(o =>
             {
                 o.RootPath = root;
@@ -77,6 +82,25 @@ public sealed class LocalSignedRouteTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
         var downloaded = await getResponse.Content.ReadAsByteArrayAsync();
         Assert.Equal(payload, downloaded);
+    }
+
+    [Fact]
+    public async Task Oversize_local_put_is_rejected_with_413_and_writes_nothing()
+    {
+        const string key = "acme/docs/oversize.txt";
+        // A body larger than the configured MaxObjectSizeBytes must be rejected before any write.
+        var payload = Encoding.UTF8.GetBytes(new string('x', (int)MaxObjectSizeBytes + 1));
+
+        var putUrl = await AbsoluteAsync(key, PresignedUrlOperation.Put);
+        using var putContent = new ByteArrayContent(payload);
+        putContent.Headers.Add("Content-Type", "text/plain");
+        var putResponse = await client.PutAsync(putUrl, putContent);
+        Assert.Equal(HttpStatusCode.RequestEntityTooLarge, putResponse.StatusCode);
+
+        // Nothing was written: a signed GET for the same key returns 404.
+        var getUrl = await AbsoluteAsync(key, PresignedUrlOperation.Get);
+        var getResponse = await client.GetAsync(getUrl);
+        Assert.Equal(HttpStatusCode.NotFound, getResponse.StatusCode);
     }
 
     [Fact]

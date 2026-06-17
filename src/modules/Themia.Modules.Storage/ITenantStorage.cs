@@ -38,11 +38,15 @@ public interface ITenantStorage
     /// <returns>A time-limited download URL.</returns>
     Task<Uri> GetDownloadUrlAsync(string key, TimeSpan expiry, CancellationToken cancellationToken = default);
 
-    /// <summary>Issues a presigned upload URL for the object (the client uploads directly to the backend).</summary>
+    /// <summary>Validates and quota-reserves an object, then issues a presigned upload URL (the client
+    /// uploads directly to the backend). A quota-counted metadata row is reserved up front at the
+    /// declared <paramref name="sizeBytes"/>; the bytes are written by the subsequent presigned PUT,
+    /// so the declared size is authoritative for quota accounting.</summary>
     /// <param name="key">The logical key.</param>
     /// <param name="contentType">The content type the upload must declare.</param>
+    /// <param name="sizeBytes">The declared object size in bytes (authoritative for quota).</param>
     /// <param name="expiry">How long the URL stays valid.</param>
     /// <param name="cancellationToken">A cancellation token.</param>
     /// <returns>A time-limited upload URL.</returns>
-    Task<Uri> GetUploadUrlAsync(string key, string contentType, TimeSpan expiry, CancellationToken cancellationToken = default);
+    Task<Uri> GetUploadUrlAsync(string key, string contentType, long sizeBytes, TimeSpan expiry, CancellationToken cancellationToken = default);
 }

@@ -319,4 +319,34 @@ public abstract class StorageConformanceTests
             () => s.Storage.PutAsync("k.txt", Bytes("0123456789"), new StoragePutOptions("text/plain")));
         Assert.False(await s.Storage.ExistsAsync("k.txt"));
     }
+
+    [Fact]
+    public async Task GetUploadUrlAsync_reserves_a_quota_counted_visible_row()
+    {
+        // A presigned upload must reserve a quota-counted metadata row up front (declared size is
+        // authoritative): the key is visible immediately, and a second reservation that would exceed
+        // the quota is rejected before any URL is issued.
+        await ResetAsync();
+        await using var s = NewScope(new TenantId("acme"), quota: 8);
+
+        var url = await s.Storage.GetUploadUrlAsync("k", "text/plain", 5, TimeSpan.FromMinutes(5));
+        Assert.NotNull(url);
+        Assert.True(await s.Storage.ExistsAsync("k")); // row reserved before any bytes are uploaded
+
+        await Assert.ThrowsAsync<StorageQuotaExceededException>(
+            () => s.Storage.GetUploadUrlAsync("k2", "text/plain", 5, TimeSpan.FromMinutes(5))); // +5 > 8
+    }
+
+    [Fact]
+    public async Task GetUploadUrlAsync_rejects_disallowed_content_type()
+    {
+        // Validation runs before reservation: a disallowed content type throws and reserves no row.
+        await ResetAsync();
+        await using var s = NewScope(new TenantId("acme"),
+            configureOptions: o => o.AllowedContentTypes = ["text/plain"]);
+
+        await Assert.ThrowsAsync<StorageValidationException>(
+            () => s.Storage.GetUploadUrlAsync("k", "application/json", 5, TimeSpan.FromMinutes(5)));
+        Assert.False(await s.Storage.ExistsAsync("k"));
+    }
 }

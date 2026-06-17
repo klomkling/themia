@@ -86,50 +86,8 @@ public sealed class TenantStorage : ITenantStorage
         }
 
         // Metadata-first: reserve the row (quota-checked) in a transaction, then write the blob.
-        StorageObject row = null!;
-        var rowWasCreated = false;
-        var priorContentType = string.Empty;
-        long priorSize = 0;
-        string? priorETag = null;
-        await unitOfWork.ExecuteInTransactionAsync(async ct =>
-        {
-            var existingRow = await objects.FirstOrDefaultAsync(new StorageObjectByKeySpec(key), ct).ConfigureAwait(false);
-            var existing = existingRow is not null && InScope(existingRow) ? existingRow : null;
-            var existingSize = existing?.SizeBytes ?? 0;
-            var all = await objects.ListAsync(new AllStorageObjectsSpec(), ct).ConfigureAwait(false);
-            // Sum only this scope's own rows (and subtract the in-scope existing row, captured above).
-            // See InScope: EF's IncludeGlobalRecordsForTenants defaults true so the ambient filter
-            // can leak platform (tenant_id IS NULL) rows into a tenant query; storage objects are
-            // strictly tenant-owned, so platform bytes must never count against a tenant's quota.
-            var usage = all.Where(InScope).Sum(o => o.SizeBytes) - existingSize;
-            if (usage + size > options.DefaultTenantQuotaBytes)
-            {
-                throw new StorageQuotaExceededException(
-                    $"Storing '{key}' ({size} bytes) would exceed the tenant quota of {options.DefaultTenantQuotaBytes} bytes.");
-            }
-
-            if (existing is null)
-            {
-                rowWasCreated = true;
-                row = new StorageObject { Key = key, ContentType = putOptions.ContentType, SizeBytes = size };
-                row.SetId(Guid.CreateVersion7());
-                await objects.AddAsync(row, ct).ConfigureAwait(false);
-            }
-            else
-            {
-                // Capture the prior metadata so a failed blob write can be rolled back without
-                // soft-deleting the user's pre-existing object (whose old blob is still present).
-                priorContentType = existing.ContentType;
-                priorSize = existing.SizeBytes;
-                priorETag = existing.ETag;
-                existing.ContentType = putOptions.ContentType;
-                existing.SizeBytes = size;
-                objects.Update(existing);
-                row = existing;
-            }
-
-            await unitOfWork.SaveChangesAsync(ct).ConfigureAwait(false);
-        }, cancellationToken).ConfigureAwait(false);
+        var (row, rowWasCreated, priorContentType, priorSize, priorETag) =
+            await ReserveAsync(key, putOptions.ContentType, size, cancellationToken).ConfigureAwait(false);
 
         try
         {
@@ -164,7 +122,11 @@ public sealed class TenantStorage : ITenantStorage
                     objects.Update(row);
                 }
 
-                await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+                // Compensate with CancellationToken.None: if the request token is cancelled mid-
+                // compensation, the cancel must not escape this inner catch (it would replace the
+                // original `primary` error and leave the reservation row orphaned). Compensation
+                // always runs to completion so `primary` is the exception that surfaces.
+                await unitOfWork.SaveChangesAsync(CancellationToken.None).ConfigureAwait(false);
             }
             catch (Exception compensation) when (compensation is not OperationCanceledException)
             {
@@ -232,11 +194,77 @@ public sealed class TenantStorage : ITenantStorage
             cancellationToken);
 
     /// <inheritdoc />
-    public Task<Uri> GetUploadUrlAsync(string key, string contentType, TimeSpan expiry, CancellationToken cancellationToken = default) =>
-        provider.GetPresignedUrlAsync(
+    public async Task<Uri> GetUploadUrlAsync(string key, string contentType, long sizeBytes, TimeSpan expiry, CancellationToken cancellationToken = default)
+    {
+        var validation = validator.Validate(key, contentType, sizeBytes);
+        if (!validation.IsValid)
+        {
+            throw new StorageValidationException(validation.Error ?? "Upload failed validation.");
+        }
+
+        // Reserve a quota-counted metadata row up front (declared size is authoritative). The bytes
+        // are written by the subsequent presigned PUT; nothing here writes a blob.
+        await ReserveAsync(key, contentType, sizeBytes, cancellationToken).ConfigureAwait(false);
+
+        return await provider.GetPresignedUrlAsync(
             StorageScope.PhysicalKey(tenantContext.CurrentTenantId, key),
             new PresignedUrlRequest(PresignedUrlOperation.Put, expiry, contentType),
-            cancellationToken);
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    // Reserves (creates or overwrites) the quota-counted metadata row for a key in a transaction.
+    // Returns the row plus the prior in-scope state so a caller writing a blob afterwards can
+    // compensate (restore an overwrite / remove a new reservation) if that write fails.
+    private async Task<(StorageObject Row, bool WasCreated, string PriorContentType, long PriorSize, string? PriorETag)> ReserveAsync(
+        string key, string contentType, long size, CancellationToken cancellationToken)
+    {
+        StorageObject row = null!;
+        var rowWasCreated = false;
+        var priorContentType = string.Empty;
+        long priorSize = 0;
+        string? priorETag = null;
+        await unitOfWork.ExecuteInTransactionAsync(async ct =>
+        {
+            var existingRow = await objects.FirstOrDefaultAsync(new StorageObjectByKeySpec(key), ct).ConfigureAwait(false);
+            var existing = existingRow is not null && InScope(existingRow) ? existingRow : null;
+            var existingSize = existing?.SizeBytes ?? 0;
+            var all = await objects.ListAsync(new AllStorageObjectsSpec(), ct).ConfigureAwait(false);
+            // Sum only this scope's own rows (and subtract the in-scope existing row, captured above).
+            // See InScope: EF's IncludeGlobalRecordsForTenants defaults true so the ambient filter
+            // can leak platform (tenant_id IS NULL) rows into a tenant query; storage objects are
+            // strictly tenant-owned, so platform bytes must never count against a tenant's quota.
+            var usage = all.Where(InScope).Sum(o => o.SizeBytes) - existingSize;
+            if (usage + size > options.DefaultTenantQuotaBytes)
+            {
+                throw new StorageQuotaExceededException(
+                    $"Storing '{key}' ({size} bytes) would exceed the tenant quota of {options.DefaultTenantQuotaBytes} bytes.");
+            }
+
+            if (existing is null)
+            {
+                rowWasCreated = true;
+                row = new StorageObject { Key = key, ContentType = contentType, SizeBytes = size };
+                row.SetId(Guid.CreateVersion7());
+                await objects.AddAsync(row, ct).ConfigureAwait(false);
+            }
+            else
+            {
+                // Capture the prior metadata so a failed blob write can be rolled back without
+                // soft-deleting the user's pre-existing object (whose old blob is still present).
+                priorContentType = existing.ContentType;
+                priorSize = existing.SizeBytes;
+                priorETag = existing.ETag;
+                existing.ContentType = contentType;
+                existing.SizeBytes = size;
+                objects.Update(existing);
+                row = existing;
+            }
+
+            await unitOfWork.SaveChangesAsync(ct).ConfigureAwait(false);
+        }, cancellationToken).ConfigureAwait(false);
+
+        return (row, rowWasCreated, priorContentType, priorSize, priorETag);
+    }
 
     private static async Task<MemoryStream> BufferWithCapAsync(Stream source, long cap, CancellationToken cancellationToken)
     {
