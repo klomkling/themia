@@ -1,1 +1,17 @@
 #nullable enable
+const Themia.Modules.Storage.StorageScope.PlatformPrefix = "_platform" -> string!
+static Themia.Modules.Storage.StorageScope.PhysicalKey(Themia.Framework.Core.Abstractions.Tenancy.TenantId? tenantId, string! logicalKey) -> string!
+Themia.Modules.Storage.Entities.StorageObject
+Themia.Modules.Storage.Entities.StorageObject.ContentType.get -> string!
+Themia.Modules.Storage.Entities.StorageObject.ContentType.set -> void
+Themia.Modules.Storage.Entities.StorageObject.ETag.get -> string?
+Themia.Modules.Storage.Entities.StorageObject.ETag.set -> void
+Themia.Modules.Storage.Entities.StorageObject.Key.get -> string!
+Themia.Modules.Storage.Entities.StorageObject.Key.set -> void
+Themia.Modules.Storage.Entities.StorageObject.SetId(System.Guid id) -> void
+Themia.Modules.Storage.Entities.StorageObject.SizeBytes.get -> long
+Themia.Modules.Storage.Entities.StorageObject.SizeBytes.set -> void
+Themia.Modules.Storage.Entities.StorageObject.StorageObject() -> void
+Themia.Modules.Storage.Entities.StorageObject.TenantId.get -> Themia.Framework.Core.Abstractions.Tenancy.TenantId?
+Themia.Modules.Storage.Entities.StorageObject.TenantId.set -> void
+Themia.Modules.Storage.StorageScope

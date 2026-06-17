@@ -157,6 +157,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Themia.Storage.IntegrationT
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Themia.Modules.Storage", "src\modules\Themia.Modules.Storage\Themia.Modules.Storage.csproj", "{6184E058-09E1-4BC5-943F-443CDD22DF03}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Themia.Modules.Storage.Tests", "tests\Themia.Modules.Storage.Tests\Themia.Modules.Storage.Tests.csproj", "{B35BF11B-A112-4E00-8EE4-DC51B3A8FAD7}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -1019,6 +1021,18 @@ Global
 		{6184E058-09E1-4BC5-943F-443CDD22DF03}.Release|x64.Build.0 = Release|Any CPU
 		{6184E058-09E1-4BC5-943F-443CDD22DF03}.Release|x86.ActiveCfg = Release|Any CPU
 		{6184E058-09E1-4BC5-943F-443CDD22DF03}.Release|x86.Build.0 = Release|Any CPU
+		{B35BF11B-A112-4E00-8EE4-DC51B3A8FAD7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B35BF11B-A112-4E00-8EE4-DC51B3A8FAD7}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B35BF11B-A112-4E00-8EE4-DC51B3A8FAD7}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{B35BF11B-A112-4E00-8EE4-DC51B3A8FAD7}.Debug|x64.Build.0 = Debug|Any CPU
+		{B35BF11B-A112-4E00-8EE4-DC51B3A8FAD7}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{B35BF11B-A112-4E00-8EE4-DC51B3A8FAD7}.Debug|x86.Build.0 = Debug|Any CPU
+		{B35BF11B-A112-4E00-8EE4-DC51B3A8FAD7}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B35BF11B-A112-4E00-8EE4-DC51B3A8FAD7}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B35BF11B-A112-4E00-8EE4-DC51B3A8FAD7}.Release|x64.ActiveCfg = Release|Any CPU
+		{B35BF11B-A112-4E00-8EE4-DC51B3A8FAD7}.Release|x64.Build.0 = Release|Any CPU
+		{B35BF11B-A112-4E00-8EE4-DC51B3A8FAD7}.Release|x86.ActiveCfg = Release|Any CPU
+		{B35BF11B-A112-4E00-8EE4-DC51B3A8FAD7}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -1099,5 +1113,6 @@ Global
 		{7EDF2528-4594-4FF8-9E42-4C062C99206C} = {1F655D57-935D-D295-E882-5052ED9A6376}
 		{6023E083-5A7B-4A5B-A71E-FF3A05FB80F5} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 		{6184E058-09E1-4BC5-943F-443CDD22DF03} = {EC447DCF-ABFA-6E24-52A5-D7FD48A5C558}
+		{B35BF11B-A112-4E00-8EE4-DC51B3A8FAD7} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 	EndGlobalSection
 EndGlobal
