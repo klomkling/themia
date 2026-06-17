@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using Themia.Framework.Core.Abstractions.Tenancy;
 using Themia.Framework.Data.Abstractions.Repositories;
 using Themia.Framework.Data.Abstractions.UnitOfWork;
@@ -21,6 +22,7 @@ public sealed class TenantStorage : ITenantStorage
     private readonly IFileValidator validator;
     private readonly IFileScanner scanner;
     private readonly StorageModuleOptions options;
+    private readonly ILogger<TenantStorage> logger;
 
     /// <summary>Creates the service.</summary>
     /// <param name="provider">The storage backend.</param>
@@ -30,6 +32,7 @@ public sealed class TenantStorage : ITenantStorage
     /// <param name="validator">The upload validator.</param>
     /// <param name="scanner">The upload scanner.</param>
     /// <param name="options">The module options.</param>
+    /// <param name="logger">The logger.</param>
     public TenantStorage(
         IStorageProvider provider,
         IRepository<StorageObject, Guid> objects,
@@ -37,7 +40,8 @@ public sealed class TenantStorage : ITenantStorage
         ITenantContext tenantContext,
         IFileValidator validator,
         IFileScanner scanner,
-        StorageModuleOptions options)
+        StorageModuleOptions options,
+        ILogger<TenantStorage> logger)
     {
         ArgumentNullException.ThrowIfNull(provider);
         ArgumentNullException.ThrowIfNull(objects);
@@ -46,6 +50,7 @@ public sealed class TenantStorage : ITenantStorage
         ArgumentNullException.ThrowIfNull(validator);
         ArgumentNullException.ThrowIfNull(scanner);
         ArgumentNullException.ThrowIfNull(options);
+        ArgumentNullException.ThrowIfNull(logger);
         this.provider = provider;
         this.objects = objects;
         this.unitOfWork = unitOfWork;
@@ -53,6 +58,7 @@ public sealed class TenantStorage : ITenantStorage
         this.validator = validator;
         this.scanner = scanner;
         this.options = options;
+        this.logger = logger;
     }
 
     /// <inheritdoc />
@@ -135,27 +141,40 @@ public sealed class TenantStorage : ITenantStorage
                 await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
             }
         }
-        catch
+#pragma warning disable THEMIA101 // Deliberate: only the nested compensation catch logs (a distinct secondary error) before surfacing both via AggregateException; the outer catch itself just rethrows the original.
+        catch (Exception primary) when (primary is not OperationCanceledException)
         {
-            if (rowWasCreated)
+            // Do not compensate on cancellation — the reservation row is left for the future reconcile
+            // sweep. Compensation runs in its own try/catch so it can never bury the original error.
+            try
             {
-                // Compensate: the reservation row was created this call but the blob write failed —
-                // remove it (soft-delete) so no metadata is left without a blob.
-                objects.Remove(row);
+                if (rowWasCreated)
+                {
+                    // Compensate: the reservation row was created this call but the blob write failed —
+                    // remove it (soft-delete) so no metadata is left without a blob.
+                    objects.Remove(row);
+                }
+                else
+                {
+                    // Overwrite case: restore (don't soft-delete) the pre-existing object's prior metadata.
+                    // Deleting it would silently lose the user's object whose previous blob is still present.
+                    row.ContentType = priorContentType;
+                    row.SizeBytes = priorSize;
+                    row.ETag = priorETag;
+                    objects.Update(row);
+                }
+
+                await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
             }
-            else
+            catch (Exception compensation) when (compensation is not OperationCanceledException)
             {
-                // Overwrite case: restore (don't soft-delete) the pre-existing object's prior metadata.
-                // Deleting it would silently lose the user's object whose previous blob is still present.
-                row.ContentType = priorContentType;
-                row.SizeBytes = priorSize;
-                row.ETag = priorETag;
-                objects.Update(row);
+                logger.LogError(compensation, "Storage compensation failed for key {Key}; metadata may diverge from the blob state.", key);
+                throw new AggregateException(primary, compensation);
             }
 
-            await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
             throw;
         }
+#pragma warning restore THEMIA101
 
         return new StoredObject(row.Id, row.Key, row.SizeBytes, row.ContentType);
     }
@@ -192,8 +211,17 @@ public sealed class TenantStorage : ITenantStorage
         objects.Remove(row); // soft-delete (StorageObject : ISoftDeletable)
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 
-        // Best-effort blob delete; an orphaned blob is swept by the 0.5.5 reconcile job.
-        await provider.DeleteAsync(StorageScope.PhysicalKey(tenantContext.CurrentTenantId, key), cancellationToken).ConfigureAwait(false);
+        // Best-effort blob delete; a backend failure must not fail the already-committed logical
+        // delete. An orphaned blob is swept by the 0.5.5 reconcile job.
+        var physicalKey = StorageScope.PhysicalKey(tenantContext.CurrentTenantId, key);
+        try
+        {
+            await provider.DeleteAsync(physicalKey, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogWarning(ex, "Best-effort blob delete failed for key {Key}; left for reconcile.", key);
+        }
     }
 
     /// <inheritdoc />

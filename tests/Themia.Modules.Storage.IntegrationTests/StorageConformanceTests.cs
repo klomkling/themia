@@ -16,6 +16,42 @@ file sealed class StubCurrentUserAccessor(string? userId) : ICurrentUserAccessor
     public string? UserId { get; } = userId;
 }
 
+/// <summary>Wraps a real provider but throws on the Nth <see cref="PutAsync"/> (1-based) so the
+/// metadata-first compensation path can be exercised. Reads/deletes delegate to the inner provider.</summary>
+file sealed class ThrowingStorageProvider(IStorageProvider inner, int throwOnPutNumber) : IStorageProvider
+{
+    private int puts;
+
+    public Task<StorageObjectInfo> PutAsync(string key, Stream content, StoragePutOptions options, CancellationToken cancellationToken = default)
+    {
+        if (Interlocked.Increment(ref puts) == throwOnPutNumber)
+        {
+            throw new InvalidOperationException("Simulated backend write failure.");
+        }
+
+        return inner.PutAsync(key, content, options, cancellationToken);
+    }
+
+    public Task<StorageReadResult?> GetAsync(string key, CancellationToken cancellationToken = default) =>
+        inner.GetAsync(key, cancellationToken);
+
+    public Task<bool> ExistsAsync(string key, CancellationToken cancellationToken = default) =>
+        inner.ExistsAsync(key, cancellationToken);
+
+    public Task DeleteAsync(string key, CancellationToken cancellationToken = default) =>
+        inner.DeleteAsync(key, cancellationToken);
+
+    public Task<Uri> GetPresignedUrlAsync(string key, PresignedUrlRequest request, CancellationToken cancellationToken = default) =>
+        inner.GetPresignedUrlAsync(key, request, cancellationToken);
+}
+
+/// <summary>An <see cref="IFileScanner"/> that always reports the content as a threat.</summary>
+file sealed class RejectingScanner : Themia.Modules.Storage.Scanning.IFileScanner
+{
+    public Task<Themia.Modules.Storage.Scanning.FileScanResult> ScanAsync(Stream content, CancellationToken cancellationToken = default) =>
+        Task.FromResult(new Themia.Modules.Storage.Scanning.FileScanResult(false, "EICAR"));
+}
+
 public abstract class StorageConformanceTests
 {
     protected abstract void ConfigurePeer(IServiceCollection services, IConfiguration configuration);
@@ -30,7 +66,13 @@ public abstract class StorageConformanceTests
         public async ValueTask DisposeAsync() { await Inner.DisposeAsync(); await Provider.DisposeAsync(); }
     }
 
-    protected Scope NewScope(TenantId? tenant, long quota = 1_000_000, string localRoot = "")
+    protected Scope NewScope(
+        TenantId? tenant,
+        long quota = 1_000_000,
+        string localRoot = "",
+        Action<StorageModuleOptions>? configureOptions = null,
+        Action<IServiceCollection>? configureServices = null,
+        Func<IStorageProvider, IStorageProvider>? providerOverride = null)
     {
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?> { ["ConnectionStrings:Default"] = ConnectionString })
@@ -40,7 +82,11 @@ public abstract class StorageConformanceTests
         services.AddSingleton<IConfiguration>(configuration);
         services.AddScoped<ITenantContext>(_ => new TenantContext(tenant));
         ConfigurePeer(services, configuration);
-        services.AddThemiaStorage(o => o.DefaultTenantQuotaBytes = quota)
+        var builder = services.AddThemiaStorage(o =>
+            {
+                o.DefaultTenantQuotaBytes = quota;
+                configureOptions?.Invoke(o);
+            })
             .UseLocal(o =>
             {
                 o.RootPath = string.IsNullOrEmpty(localRoot)
@@ -48,6 +94,20 @@ public abstract class StorageConformanceTests
                     : localRoot;
                 o.SigningKey = "integration-signing-key-please-change!";
             });
+
+        configureServices?.Invoke(services);
+
+        // Replace the registered backend with a wrapper (e.g. a throwing fake) so compensation/best-effort
+        // paths can be exercised against the real EF/Dapper repo + UoW.
+        if (providerOverride is not null)
+        {
+            var descriptor = builder.Services.Last(d => d.ServiceType == typeof(IStorageProvider));
+            Func<IServiceProvider, IStorageProvider> factory = descriptor.ImplementationFactory is { } f
+                ? sp => (IStorageProvider)f(sp)
+                : _ => (IStorageProvider)descriptor.ImplementationInstance!;
+            services.RemoveAll<IStorageProvider>();
+            services.AddSingleton<IStorageProvider>(sp => providerOverride(factory(sp)));
+        }
 
         services.RemoveAll<ICurrentUserAccessor>();
         services.AddSingleton<ICurrentUserAccessor>(new StubCurrentUserAccessor("test-user"));
@@ -171,5 +231,92 @@ public abstract class StorageConformanceTests
         Assert.NotNull(read);
         using var reader = new StreamReader(read!.Content);
         Assert.Equal("v2-longer", await reader.ReadToEndAsync());
+    }
+
+    [Fact]
+    public async Task Failed_blob_write_on_new_key_rolls_back_reservation_and_frees_quota()
+    {
+        // A new-key Put whose blob write throws must roll back the reservation row entirely: the key
+        // must not exist afterward, and the reserved bytes must not be charged against the quota.
+        await ResetAsync();
+        var sharedRoot = Path.Combine(Path.GetTempPath(), "themia-storage-it", Guid.NewGuid().ToString("N"));
+
+        await using (var failing = NewScope(new TenantId("acme"), quota: 8, localRoot: sharedRoot,
+            providerOverride: inner => new ThrowingStorageProvider(inner, throwOnPutNumber: 1)))
+        {
+            await Assert.ThrowsAnyAsync<Exception>(
+                () => failing.Storage.PutAsync("k.txt", Bytes("12345"), new StoragePutOptions("text/plain")));
+        }
+
+        await using (var s = NewScope(new TenantId("acme"), quota: 8, localRoot: sharedRoot))
+        {
+            Assert.False(await s.Storage.ExistsAsync("k.txt"));      // reservation rolled back
+            // Quota freed: a fresh 5-byte Put fits under the tight 8-byte quota.
+            var stored = await s.Storage.PutAsync("k.txt", Bytes("12345"), new StoragePutOptions("text/plain"));
+            Assert.Equal(5, stored.SizeBytes);
+        }
+    }
+
+    [Fact]
+    public async Task Failed_blob_write_on_overwrite_preserves_original_metadata()
+    {
+        // Seed an object (Put #1 succeeds), then a second Put whose blob write throws (Put #2). The
+        // original object's metadata must be preserved and it must remain readable (its blob is intact).
+        await ResetAsync();
+        var sharedRoot = Path.Combine(Path.GetTempPath(), "themia-storage-it", Guid.NewGuid().ToString("N"));
+
+        await using var s = NewScope(new TenantId("acme"), localRoot: sharedRoot,
+            providerOverride: inner => new ThrowingStorageProvider(inner, throwOnPutNumber: 2));
+
+        var original = await s.Storage.PutAsync("k.txt", Bytes("hello"), new StoragePutOptions("text/plain"));
+        Assert.Equal(5, original.SizeBytes);
+
+        await Assert.ThrowsAnyAsync<Exception>(
+            () => s.Storage.PutAsync("k.txt", Bytes("123456789"), new StoragePutOptions("application/json")));
+
+        // Metadata unchanged from the original write.
+        var read = await s.Storage.GetAsync("k.txt");
+        Assert.NotNull(read);
+        Assert.Equal("text/plain", read!.ContentType);
+        using var reader = new StreamReader(read.Content);
+        Assert.Equal("hello", await reader.ReadToEndAsync());
+    }
+
+    [Fact]
+    public async Task Disallowed_content_type_is_rejected_and_persists_nothing()
+    {
+        await ResetAsync();
+        await using var s = NewScope(new TenantId("acme"),
+            configureOptions: o => o.AllowedContentTypes = ["text/plain"]);
+
+        await Assert.ThrowsAsync<StorageValidationException>(
+            () => s.Storage.PutAsync("k.txt", Bytes("data"), new StoragePutOptions("application/json")));
+        Assert.False(await s.Storage.ExistsAsync("k.txt"));
+    }
+
+    [Fact]
+    public async Task Scan_rejection_throws_and_persists_nothing()
+    {
+        await ResetAsync();
+        await using var s = NewScope(new TenantId("acme"), configureServices: services =>
+        {
+            services.RemoveAll<Themia.Modules.Storage.Scanning.IFileScanner>();
+            services.AddSingleton<Themia.Modules.Storage.Scanning.IFileScanner, RejectingScanner>();
+        });
+
+        await Assert.ThrowsAsync<StorageScanException>(
+            () => s.Storage.PutAsync("k.txt", Bytes("data"), new StoragePutOptions("text/plain")));
+        Assert.False(await s.Storage.ExistsAsync("k.txt"));
+    }
+
+    [Fact]
+    public async Task Oversize_stream_is_rejected_by_the_buffer_cap_and_persists_nothing()
+    {
+        await ResetAsync();
+        await using var s = NewScope(new TenantId("acme"), configureOptions: o => o.MaxObjectSizeBytes = 4);
+
+        await Assert.ThrowsAsync<StorageValidationException>(
+            () => s.Storage.PutAsync("k.txt", Bytes("0123456789"), new StoragePutOptions("text/plain")));
+        Assert.False(await s.Storage.ExistsAsync("k.txt"));
     }
 }

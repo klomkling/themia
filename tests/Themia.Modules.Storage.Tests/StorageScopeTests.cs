@@ -33,4 +33,11 @@ public sealed class StorageScopeTests
     {
         Assert.Throws<ArgumentException>(() => StorageScope.PhysicalKey(new TenantId("acme"), key));
     }
+
+    [Fact]
+    public void Tenant_id_equal_to_platform_prefix_is_rejected()
+    {
+        // A tenant id equal to "_platform" would collide with platform objects at the blob layer.
+        Assert.Throws<ArgumentException>(() => StorageScope.PhysicalKey(new TenantId("_platform"), "k"));
+    }
 }

@@ -12,9 +12,10 @@ public static class StorageScope
 
     /// <summary>Builds the physical key for <paramref name="logicalKey"/> under <paramref name="tenantId"/>.</summary>
     /// <param name="tenantId">The owning tenant, or <see langword="null"/> for a platform object.</param>
-    /// <param name="logicalKey">The caller's key (sanitized: no leading '/', no '..' segments).</param>
+    /// <param name="logicalKey">The caller's key (validated — rejected if it has a leading '/' or a '..' segment).</param>
     /// <returns>The physical key <c>{tenant}/{key}</c> (or <c>_platform/{key}</c>).</returns>
-    /// <exception cref="ArgumentException">The key is blank, absolute, or contains a '..' segment.</exception>
+    /// <exception cref="ArgumentException">The key is blank, absolute, or contains a '..' segment,
+    /// or the tenant id equals the reserved platform prefix.</exception>
     public static string PhysicalKey(TenantId? tenantId, string logicalKey)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(logicalKey);
@@ -22,6 +23,13 @@ public static class StorageScope
         if (normalized.StartsWith('/') || normalized.Split('/').Contains(".."))
         {
             throw new ArgumentException($"Invalid object key '{logicalKey}': absolute paths and '..' segments are not allowed.", nameof(logicalKey));
+        }
+
+        // A tenant whose id equals the platform prefix would collide with platform objects at the
+        // blob layer, breaking isolation — reject it.
+        if (tenantId is { } t && string.Equals(t.Value, PlatformPrefix, StringComparison.Ordinal))
+        {
+            throw new ArgumentException($"Tenant id '{PlatformPrefix}' is reserved for platform objects.", nameof(tenantId));
         }
 
         var prefix = tenantId?.Value ?? PlatformPrefix;
