@@ -81,6 +81,10 @@ public sealed class TenantStorage : ITenantStorage
 
         // Metadata-first: reserve the row (quota-checked) in a transaction, then write the blob.
         StorageObject row = null!;
+        var rowWasCreated = false;
+        var priorContentType = string.Empty;
+        long priorSize = 0;
+        string? priorETag = null;
         await unitOfWork.ExecuteInTransactionAsync(async ct =>
         {
             var existing = await objects.FirstOrDefaultAsync(new StorageObjectByKeySpec(key), ct).ConfigureAwait(false);
@@ -95,12 +99,18 @@ public sealed class TenantStorage : ITenantStorage
 
             if (existing is null)
             {
+                rowWasCreated = true;
                 row = new StorageObject { Key = key, ContentType = putOptions.ContentType, SizeBytes = size };
                 row.SetId(Guid.CreateVersion7());
                 await objects.AddAsync(row, ct).ConfigureAwait(false);
             }
             else
             {
+                // Capture the prior metadata so a failed blob write can be rolled back without
+                // soft-deleting the user's pre-existing object (whose old blob is still present).
+                priorContentType = existing.ContentType;
+                priorSize = existing.SizeBytes;
+                priorETag = existing.ETag;
                 existing.ContentType = putOptions.ContentType;
                 existing.SizeBytes = size;
                 objects.Update(existing);
@@ -122,8 +132,22 @@ public sealed class TenantStorage : ITenantStorage
         }
         catch
         {
-            // Compensate: the metadata row committed but the blob write failed — remove the reservation.
-            objects.Remove(row);
+            if (rowWasCreated)
+            {
+                // Compensate: the reservation row was created this call but the blob write failed —
+                // remove it (soft-delete) so no metadata is left without a blob.
+                objects.Remove(row);
+            }
+            else
+            {
+                // Overwrite case: restore (don't soft-delete) the pre-existing object's prior metadata.
+                // Deleting it would silently lose the user's object whose previous blob is still present.
+                row.ContentType = priorContentType;
+                row.SizeBytes = priorSize;
+                row.ETag = priorETag;
+                objects.Update(row);
+            }
+
             await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
             throw;
         }
