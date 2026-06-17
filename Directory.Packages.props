@@ -78,6 +78,10 @@
     <PackageVersion Include="Microsoft.Data.SqlClient" Version="6.1.5" />
     <PackageVersion Include="Testcontainers.MySql" Version="4.12.0" />
     <PackageVersion Include="Testcontainers.MsSql" Version="4.12.0" />
+    <!-- Storage (Themia.Modules.Storage.S3): AWS S3 SDK (also drives Cloudflare R2 via a configured ServiceUrl) -->
+    <PackageVersion Include="AWSSDK.S3" Version="4.0.6" />
+    <!-- Storage integration tests: S3-compatible server (MinIO) via Testcontainers (same family as the others) -->
+    <PackageVersion Include="Testcontainers.Minio" Version="4.12.0" />
     <!-- Identity (Themia.Modules.Identity): argon2id password hashing -->
     <PackageVersion Include="Konscious.Security.Cryptography.Argon2" Version="1.3.1" />
     <!-- Identity tests: controllable clock -->
