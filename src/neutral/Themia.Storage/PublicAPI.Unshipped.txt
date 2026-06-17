@@ -1,0 +1,46 @@
+#nullable enable
+Themia.Storage.IStorageProvider
+Themia.Storage.IStorageProvider.DeleteAsync(string! key, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Storage.IStorageProvider.ExistsAsync(string! key, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!
+Themia.Storage.IStorageProvider.GetAsync(string! key, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Storage.StorageReadResult?>!
+Themia.Storage.IStorageProvider.GetPresignedUrlAsync(string! key, Themia.Storage.PresignedUrlRequest request, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Uri!>!
+Themia.Storage.IStorageProvider.PutAsync(string! key, System.IO.Stream! content, Themia.Storage.StoragePutOptions options, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Storage.StorageObjectInfo!>!
+Themia.Storage.PresignedUrlOperation
+Themia.Storage.PresignedUrlOperation.Get = 0 -> Themia.Storage.PresignedUrlOperation
+Themia.Storage.PresignedUrlOperation.Put = 1 -> Themia.Storage.PresignedUrlOperation
+Themia.Storage.PresignedUrlRequest
+Themia.Storage.PresignedUrlRequest.ContentType.get -> string?
+Themia.Storage.PresignedUrlRequest.ContentType.init -> void
+Themia.Storage.PresignedUrlRequest.Expiry.get -> System.TimeSpan
+Themia.Storage.PresignedUrlRequest.Expiry.init -> void
+Themia.Storage.PresignedUrlRequest.Operation.get -> Themia.Storage.PresignedUrlOperation
+Themia.Storage.PresignedUrlRequest.Operation.init -> void
+Themia.Storage.PresignedUrlRequest.PresignedUrlRequest() -> void
+Themia.Storage.PresignedUrlRequest.PresignedUrlRequest(Themia.Storage.PresignedUrlOperation Operation, System.TimeSpan Expiry, string? ContentType = null) -> void
+Themia.Storage.StorageObjectInfo
+Themia.Storage.StorageObjectInfo.ContentType.get -> string!
+Themia.Storage.StorageObjectInfo.ContentType.init -> void
+Themia.Storage.StorageObjectInfo.ETag.get -> string?
+Themia.Storage.StorageObjectInfo.ETag.init -> void
+Themia.Storage.StorageObjectInfo.Key.get -> string!
+Themia.Storage.StorageObjectInfo.Key.init -> void
+Themia.Storage.StorageObjectInfo.Length.get -> long
+Themia.Storage.StorageObjectInfo.Length.init -> void
+Themia.Storage.StorageObjectInfo.StorageObjectInfo(string! Key, long Length, string! ContentType, string? ETag) -> void
+Themia.Storage.StoragePutOptions
+Themia.Storage.StoragePutOptions.ContentType.get -> string!
+Themia.Storage.StoragePutOptions.ContentType.init -> void
+Themia.Storage.StoragePutOptions.Metadata.get -> System.Collections.Generic.IReadOnlyDictionary<string!, string!>?
+Themia.Storage.StoragePutOptions.Metadata.init -> void
+Themia.Storage.StoragePutOptions.Overwrite.get -> bool
+Themia.Storage.StoragePutOptions.Overwrite.init -> void
+Themia.Storage.StoragePutOptions.StoragePutOptions() -> void
+Themia.Storage.StoragePutOptions.StoragePutOptions(string! ContentType, System.Collections.Generic.IReadOnlyDictionary<string!, string!>? Metadata = null, bool Overwrite = true) -> void
+Themia.Storage.StorageReadResult
+Themia.Storage.StorageReadResult.Content.get -> System.IO.Stream!
+Themia.Storage.StorageReadResult.Content.init -> void
+Themia.Storage.StorageReadResult.ContentType.get -> string!
+Themia.Storage.StorageReadResult.ContentType.init -> void
+Themia.Storage.StorageReadResult.Length.get -> long
+Themia.Storage.StorageReadResult.Length.init -> void
+Themia.Storage.StorageReadResult.StorageReadResult(System.IO.Stream! Content, string! ContentType, long Length) -> void
