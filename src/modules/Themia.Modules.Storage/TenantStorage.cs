@@ -72,7 +72,11 @@ public sealed class TenantStorage : ITenantStorage
         var buffer = await BufferWithCapAsync(content, options.MaxObjectSizeBytes, cancellationToken).ConfigureAwait(false);
         var size = buffer.Length;
 
-        var validation = validator.Validate(key, putOptions.ContentType, size);
+        // BufferWithCapAsync leaves the buffer at position 0; pass it so a future content-sniffing
+        // validator can inspect the bytes (the default validator ignores it). Reset to 0 afterward so
+        // the scan/store below read from the start.
+        var validation = validator.Validate(key, putOptions.ContentType, size, buffer);
+        buffer.Position = 0;
         if (!validation.IsValid)
         {
             throw new StorageValidationException(validation.Error ?? "Upload failed validation.");
@@ -196,7 +200,8 @@ public sealed class TenantStorage : ITenantStorage
     /// <inheritdoc />
     public async Task<Uri> GetUploadUrlAsync(string key, string contentType, long sizeBytes, TimeSpan expiry, CancellationToken cancellationToken = default)
     {
-        var validation = validator.Validate(key, contentType, sizeBytes);
+        // Presigned upload: only the declared metadata is known here, no bytes to sniff.
+        var validation = validator.Validate(key, contentType, sizeBytes, content: null);
         if (!validation.IsValid)
         {
             throw new StorageValidationException(validation.Error ?? "Upload failed validation.");

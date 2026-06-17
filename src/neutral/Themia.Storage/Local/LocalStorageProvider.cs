@@ -8,6 +8,7 @@ public sealed class LocalStorageProvider : IStorageProvider
     private const string ContentTypeSuffix = ".contenttype";
 
     private readonly LocalStorageOptions options;
+    private readonly LocalUrlSigner? signer;
 
     /// <summary>Creates the provider.</summary>
     /// <param name="options">The filesystem options.</param>
@@ -16,6 +17,7 @@ public sealed class LocalStorageProvider : IStorageProvider
         ArgumentNullException.ThrowIfNull(options);
         ArgumentException.ThrowIfNullOrWhiteSpace(options.RootPath);
         this.options = options;
+        this.signer = string.IsNullOrWhiteSpace(options.SigningKey) ? null : new LocalUrlSigner(options.SigningKey);
     }
 
     /// <inheritdoc />
@@ -88,10 +90,14 @@ public sealed class LocalStorageProvider : IStorageProvider
     /// <inheritdoc />
     public Task<Uri> GetPresignedUrlAsync(string key, PresignedUrlRequest request, CancellationToken cancellationToken = default)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(options.SigningKey);
+        if (signer is null)
+        {
+            throw new ArgumentException("SigningKey must be set to issue presigned URLs.", nameof(request));
+        }
+
         ResolvePath(key); // validates the key
         var op = request.Operation == PresignedUrlOperation.Put ? "put" : "get";
-        var token = new LocalUrlSigner(options.SigningKey).Sign(key, request.Operation, DateTimeOffset.UtcNow.Add(request.Expiry));
+        var token = signer.Sign(key, request.Operation, DateTimeOffset.UtcNow.Add(request.Expiry));
         // Relative URI the module's MapThemiaStorageEndpoints _local route materializes + verifies.
         // The token signs the PHYSICAL key + op; the endpoint calls the provider directly with this key.
         var uri = new Uri($"_local/{op}?key={Uri.EscapeDataString(key)}&token={Uri.EscapeDataString(token)}", UriKind.Relative);
@@ -102,12 +108,7 @@ public sealed class LocalStorageProvider : IStorageProvider
     // resolved full path stays within the root.
     private string ResolvePath(string key)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(key);
-        var normalized = key.Replace('\\', '/');
-        if (normalized.StartsWith('/') || normalized.Split('/').Contains(".."))
-        {
-            throw new ArgumentException($"Invalid object key '{key}': absolute paths and '..' segments are not allowed.", nameof(key));
-        }
+        var normalized = StorageKey.NormalizeAndValidate(key);
 
         var rootFull = Path.GetFullPath(options.RootPath);
         var full = Path.GetFullPath(Path.Combine(rootFull, normalized));

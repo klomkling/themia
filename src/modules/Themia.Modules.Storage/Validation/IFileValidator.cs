@@ -21,6 +21,9 @@ public interface IFileValidator
     /// <param name="key">The logical key.</param>
     /// <param name="contentType">The declared content type.</param>
     /// <param name="sizeBytes">The object size in bytes.</param>
+    /// <param name="content">The buffered upload content when available (server-proxied uploads), or null
+    /// for a declared-only reservation (presigned uploads). A future content-sniffing validator inspects it
+    /// when non-null; the default validator ignores it.</param>
     /// <returns>The validation result.</returns>
-    FileValidationResult Validate(string key, string contentType, long sizeBytes);
+    FileValidationResult Validate(string key, string contentType, long sizeBytes, System.IO.Stream? content);
 }

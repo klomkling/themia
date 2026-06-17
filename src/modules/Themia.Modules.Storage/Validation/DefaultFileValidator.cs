@@ -16,7 +16,7 @@ public sealed class DefaultFileValidator : IFileValidator
     }
 
     /// <inheritdoc />
-    public FileValidationResult Validate(string key, string contentType, long sizeBytes)
+    public FileValidationResult Validate(string key, string contentType, long sizeBytes, System.IO.Stream? content)
     {
         if (sizeBytes > options.MaxObjectSizeBytes)
         {

@@ -1,5 +1,7 @@
 #nullable enable
 Themia.Storage.IStorageProvider
+Themia.Storage.StorageKey
+static Themia.Storage.StorageKey.NormalizeAndValidate(string! key) -> string!
 Themia.Storage.Local.LocalStorageOptions
 Themia.Storage.Local.LocalStorageOptions.LocalStorageOptions() -> void
 Themia.Storage.Local.LocalStorageOptions.RootPath.get -> string!

@@ -50,10 +50,10 @@ Themia.Modules.Storage.Validation.FileValidationResult.Error.init -> void
 static Themia.Modules.Storage.Validation.FileValidationResult.Valid.get -> Themia.Modules.Storage.Validation.FileValidationResult
 static Themia.Modules.Storage.Validation.FileValidationResult.Invalid(string! error) -> Themia.Modules.Storage.Validation.FileValidationResult
 Themia.Modules.Storage.Validation.IFileValidator
-Themia.Modules.Storage.Validation.IFileValidator.Validate(string! key, string! contentType, long sizeBytes) -> Themia.Modules.Storage.Validation.FileValidationResult
+Themia.Modules.Storage.Validation.IFileValidator.Validate(string! key, string! contentType, long sizeBytes, System.IO.Stream? content) -> Themia.Modules.Storage.Validation.FileValidationResult
 Themia.Modules.Storage.Validation.DefaultFileValidator
 Themia.Modules.Storage.Validation.DefaultFileValidator.DefaultFileValidator(Themia.Modules.Storage.StorageModuleOptions! options) -> void
-Themia.Modules.Storage.Validation.DefaultFileValidator.Validate(string! key, string! contentType, long sizeBytes) -> Themia.Modules.Storage.Validation.FileValidationResult
+Themia.Modules.Storage.Validation.DefaultFileValidator.Validate(string! key, string! contentType, long sizeBytes, System.IO.Stream? content) -> Themia.Modules.Storage.Validation.FileValidationResult
 Themia.Modules.Storage.Scanning.FileScanResult
 Themia.Modules.Storage.Scanning.FileScanResult.FileScanResult() -> void
 Themia.Modules.Storage.Scanning.FileScanResult.FileScanResult(bool IsClean, string? Threat) -> void

@@ -11,8 +11,8 @@ internal sealed class StorageObjectByKeySpec : Specification<StorageObject>
 }
 
 /// <summary>All objects in the ambient tenant (soft-deleted rows are excluded by the framework filter).
-/// Used to sum current usage for the per-tenant quota check.</summary>
+/// Used to sum current usage for the per-tenant quota check. No Criteria — an empty specification matches
+/// every row under the ambient tenant filter.</summary>
 internal sealed class AllStorageObjectsSpec : Specification<StorageObject>
 {
-    public AllStorageObjectsSpec() => Where(o => o.SizeBytes >= 0);
 }

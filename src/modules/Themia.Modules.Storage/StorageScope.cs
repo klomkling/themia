@@ -1,4 +1,5 @@
 using Themia.Framework.Core.Abstractions.Tenancy;
+using Themia.Storage;
 
 namespace Themia.Modules.Storage;
 
@@ -18,12 +19,7 @@ public static class StorageScope
     /// or the tenant id equals the reserved platform prefix.</exception>
     public static string PhysicalKey(TenantId? tenantId, string logicalKey)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(logicalKey);
-        var normalized = logicalKey.Replace('\\', '/');
-        if (normalized.StartsWith('/') || normalized.Split('/').Contains(".."))
-        {
-            throw new ArgumentException($"Invalid object key '{logicalKey}': absolute paths and '..' segments are not allowed.", nameof(logicalKey));
-        }
+        var normalized = StorageKey.NormalizeAndValidate(logicalKey);
 
         // A tenant whose id equals the platform prefix would collide with platform objects at the
         // blob layer, breaking isolation — reject it.
