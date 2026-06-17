@@ -1,1 +1,4 @@
 #nullable enable
+Themia.AspNetCore.Exceptions.RateLimitException
+Themia.AspNetCore.Exceptions.RateLimitException.RateLimitException(string! message, int retryAfterSeconds, string? errorCode = null, System.Collections.Generic.IReadOnlyDictionary<string!, object?>? metadata = null) -> void
+Themia.AspNetCore.Exceptions.RateLimitException.RetryAfterSeconds.get -> int
