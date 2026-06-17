@@ -18,6 +18,73 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.5.2] - 2026-06-16
+
+### Added
+
+- **Pluggable external/OAuth login for Themia Identity.** New contracts in
+  `Themia.Modules.Identity.Abstractions` (`IExternalAuthProvider`,
+  `ExternalAuthRequest`/`ExternalIdentity`/`ExternalAuthResult`, `IExternalLoginService` +
+  `ExternalLoginResult`, `IExternalAuthenticationFlow` +
+  `ExternalLoginFlowResult`/`ExternalLoginOutcome`, `IExternalAuthenticationHooks`, the
+  `ExternalLoginLink` entity, and `IUserService.CreateExternalUserAsync`) let any OAuth/OIDC
+  provider plug into the same auth pipeline as password login.
+- **`identity.external_logins` table** — tenant-scoped FluentMigrator migration
+  (PostgreSQL + SQL Server) with a filtered-unique index per tenant + platform, plus EF Core and
+  Dapper mappings. `ExternalLoginService` ships in the Identity core (`Themia.Modules.Identity`)
+  and runs on both data peers: it resolves an existing link, otherwise auto-links by **verified**
+  email, otherwise provisions a password-less user via the new password-less
+  `CreateExternalUserAsync`.
+- **`Themia.Modules.Identity.AspNetCore` external-auth stack** — a generic `OidcExternalAuthProvider`
+  (server-side authorization-code→token exchange + id-token validation via JWKS/RS256 with
+  `ConfigurationManager` auto-refresh, or HS256 with a channel secret), an
+  `IExternalAuthProviderRegistry`, and a fluent
+  `AddThemiaExternalAuth().AddGoogle(...).AddLine(...).AddProvider(...)/.AddOidc(...)` builder.
+  `ExternalAuthenticationFlow` orchestrates the exchange, and `IExternalAuthenticationHooks`
+  exposes DI-replaceable extension points.
+- **Opt-in `MapIdentityExternalAuthEndpoints()`** — exposes
+  `POST /auth/external/{provider}` (headless code-exchange) returning the **same**
+  `AuthResponse { accessToken, expiresIn, refreshToken }` as login and rotating through
+  `/auth/refresh`.
+- **Reference providers: Google** (standard OIDC) and **LINE** (OIDC-ish, HS256 channel secret).
+  Facebook / Microsoft / Telegram are deferred additive providers.
+
+### Security
+
+- **Auto-link only on a verified provider email.** A link is created automatically only when the
+  provider asserts a verified email; an unverified email never links and is never persisted.
+- **Server-side code exchange** keeps the client secret off the wire (never exposed or logged),
+  with the id-token issuer / audience / signature / expiry all validated and the PKCE
+  `code_verifier` forwarded. Provider failures return a **uniform 401** (404 only for an unknown
+  provider). The flow is headless: the client owns `state` (CSRF).
+- **Token-bound nonce validation.** If the id-token carries a `nonce` claim the client must supply
+  the matching value (and vice-versa); the check is skipped only when neither side asserts a nonce.
+  This closes the bypass where omitting the nonce field would skip validation on a token that
+  actually carries one.
+- **Verified-email auto-link is gated on account state.** A deactivated or locked-out account is
+  never auto-linked to a new external credential (it is returned un-linked for the flow's
+  active/lockout gate to block), so a later re-activation cannot silently inherit an external login.
+- **Concurrent first-login is race-safe.** A lost race on the `(provider, subject)` link index *or*
+  on the new user's unique name/email index is retried (bounded): the next pass resolves the
+  existing link, auto-links by verified email, or derives a fresh user name — instead of surfacing
+  a 500. The provisioning of a new user and its link remains atomic in one transaction.
+- **Bounded discovery/JWKS connection age.** The OIDC discovery/JWKS client held by the singleton
+  provider uses a `PooledConnectionLifetime` so DNS/endpoint changes are picked up despite the
+  long-lived `ConfigurationManager`.
+- **Refresh honours account state.** `IAuthenticationFlow.RefreshAsync` now rejects a refresh whose
+  user is deactivated or locked out (returning `Invalid`), so deactivation/lockout takes effect
+  immediately instead of only when the refresh token expires — closing a bypass that also predated
+  the external-login slice.
+- **Platform external login is repeatable.** The external-link lookup gained a platform (global,
+  `tenant_id IS NULL`) fallback gated on `AllowPlatformLogin`, mirroring `FindByEmailAsync`. Without
+  it, a platform user's second external login could fail on a data layer that hides global rows from
+  tenant scopes (Dapper's default `IncludeGlobalRecordsForTenants=false`).
+- **Failed transactions no longer leak EF change-tracker state.** `EfUnitOfWork.ExecuteInTransactionAsync`
+  clears the change tracker when the work/save throws, so a retry on the same scoped `DbContext`
+  (e.g. the race-retry loop) does not re-attempt the rolled-back writes.
+- **`email_verified` accepts a string boolean.** Some OIDC providers serialize the claim as `"true"`
+  rather than a JSON boolean; both forms are now honoured.
+
 ## [0.5.1] - 2026-06-15
 
 ### Added

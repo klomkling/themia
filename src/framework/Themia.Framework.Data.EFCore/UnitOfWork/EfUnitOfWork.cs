@@ -64,9 +64,21 @@ public sealed class EfUnitOfWork(ThemiaDbContext context, IDataFilterScope filte
         await strategy.ExecuteAsync(async () =>
         {
             await using var tx = await context.Database.BeginTransactionAsync(cancellationToken);
-            await work(cancellationToken);
-            await SaveAsync(cancellationToken);
-            await tx.CommitAsync(cancellationToken);
+            try
+            {
+                await work(cancellationToken);
+                await SaveAsync(cancellationToken);
+                await tx.CommitAsync(cancellationToken);
+            }
+            catch
+            {
+                // The transaction rolled back, so the entities staged by `work` no longer exist in the
+                // database — but EF still tracks them (Added/Modified). Discard that tracker state so a
+                // caller that retries on the same scoped DbContext (e.g. a concurrency-race retry loop)
+                // does not re-attempt the failed writes against a clean transaction.
+                context.ChangeTracker.Clear();
+                throw;
+            }
         });
     }
 

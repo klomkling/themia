@@ -34,8 +34,8 @@ public sealed class PostgresIdentityFixture : IAsyncLifetime
         await connection.OpenAsync();
         await using var command = connection.CreateCommand();
         command.CommandText =
-            "TRUNCATE identity.refresh_tokens, identity.user_tokens, identity.user_claims, identity.role_claims, " +
-            "identity.user_roles, identity.users, identity.roles RESTART IDENTITY CASCADE;";
+            "TRUNCATE identity.external_logins, identity.refresh_tokens, identity.user_tokens, identity.user_claims, " +
+            "identity.role_claims, identity.user_roles, identity.users, identity.roles RESTART IDENTITY CASCADE;";
         await command.ExecuteNonQueryAsync();
     }
 }

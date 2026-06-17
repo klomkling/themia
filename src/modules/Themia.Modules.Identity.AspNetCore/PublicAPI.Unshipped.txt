@@ -64,3 +64,93 @@ Themia.Modules.Identity.AspNetCore.Endpoints.AuthResponse.RefreshToken.get -> st
 Themia.Modules.Identity.AspNetCore.Endpoints.AuthResponse.RefreshToken.init -> void
 Themia.Modules.Identity.AspNetCore.Endpoints.IdentityAuthEndpointRouteBuilderExtensions
 static Themia.Modules.Identity.AspNetCore.Endpoints.IdentityAuthEndpointRouteBuilderExtensions.MapIdentityAuthEndpoints(this Microsoft.AspNetCore.Routing.IEndpointRouteBuilder! endpoints) -> Microsoft.AspNetCore.Routing.IEndpointRouteBuilder!
+Themia.Modules.Identity.AspNetCore.External.OidcProviderConfig
+Themia.Modules.Identity.AspNetCore.External.OidcProviderConfig.OidcProviderConfig() -> void
+Themia.Modules.Identity.AspNetCore.External.OidcProviderConfig.Name.get -> string!
+Themia.Modules.Identity.AspNetCore.External.OidcProviderConfig.Name.init -> void
+Themia.Modules.Identity.AspNetCore.External.OidcProviderConfig.TokenEndpoint.get -> System.Uri!
+Themia.Modules.Identity.AspNetCore.External.OidcProviderConfig.TokenEndpoint.init -> void
+Themia.Modules.Identity.AspNetCore.External.OidcProviderConfig.ClientId.get -> string!
+Themia.Modules.Identity.AspNetCore.External.OidcProviderConfig.ClientId.init -> void
+Themia.Modules.Identity.AspNetCore.External.OidcProviderConfig.ClientSecret.get -> string!
+Themia.Modules.Identity.AspNetCore.External.OidcProviderConfig.ClientSecret.init -> void
+Themia.Modules.Identity.AspNetCore.External.OidcProviderConfig.Scopes.get -> System.Collections.Generic.IReadOnlyList<string!>!
+Themia.Modules.Identity.AspNetCore.External.OidcProviderConfig.Scopes.init -> void
+Themia.Modules.Identity.AspNetCore.External.OidcProviderConfig.Issuer.get -> string!
+Themia.Modules.Identity.AspNetCore.External.OidcProviderConfig.Issuer.init -> void
+Themia.Modules.Identity.AspNetCore.External.OidcProviderConfig.Audience.get -> string!
+Themia.Modules.Identity.AspNetCore.External.OidcProviderConfig.Audience.init -> void
+Themia.Modules.Identity.AspNetCore.External.OidcProviderConfig.MetadataAddress.get -> System.Uri?
+Themia.Modules.Identity.AspNetCore.External.OidcProviderConfig.MetadataAddress.init -> void
+Themia.Modules.Identity.AspNetCore.External.OidcProviderConfig.SymmetricSecret.get -> string?
+Themia.Modules.Identity.AspNetCore.External.OidcProviderConfig.SymmetricSecret.init -> void
+Themia.Modules.Identity.AspNetCore.External.OidcProviderConfig.SubjectClaim.get -> string!
+Themia.Modules.Identity.AspNetCore.External.OidcProviderConfig.SubjectClaim.init -> void
+Themia.Modules.Identity.AspNetCore.External.OidcProviderConfig.EmailClaim.get -> string!
+Themia.Modules.Identity.AspNetCore.External.OidcProviderConfig.EmailClaim.init -> void
+Themia.Modules.Identity.AspNetCore.External.OidcProviderConfig.EmailVerifiedClaim.get -> string!
+Themia.Modules.Identity.AspNetCore.External.OidcProviderConfig.EmailVerifiedClaim.init -> void
+Themia.Modules.Identity.AspNetCore.External.OidcProviderConfig.NameClaim.get -> string!
+Themia.Modules.Identity.AspNetCore.External.OidcProviderConfig.NameClaim.init -> void
+Themia.Modules.Identity.AspNetCore.External.OidcProviderConfig.EmailAlwaysVerified.get -> bool
+Themia.Modules.Identity.AspNetCore.External.OidcProviderConfig.EmailAlwaysVerified.init -> void
+Themia.Modules.Identity.AspNetCore.External.OidcExternalAuthProvider
+Themia.Modules.Identity.AspNetCore.External.OidcExternalAuthProvider.OidcExternalAuthProvider(Themia.Modules.Identity.AspNetCore.External.OidcProviderConfig! config, System.Net.Http.IHttpClientFactory! httpClientFactory, System.TimeProvider! timeProvider, Microsoft.Extensions.Logging.ILoggerFactory! loggerFactory) -> void
+Themia.Modules.Identity.AspNetCore.External.OidcExternalAuthProvider.Name.get -> string!
+Themia.Modules.Identity.AspNetCore.External.OidcExternalAuthProvider.ClockSkew.get -> System.TimeSpan
+Themia.Modules.Identity.AspNetCore.External.OidcExternalAuthProvider.ClockSkew.init -> void
+Themia.Modules.Identity.AspNetCore.External.OidcExternalAuthProvider.ExchangeAsync(Themia.Modules.Identity.Abstractions.Authentication.ExternalAuthRequest request, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Identity.Abstractions.Authentication.ExternalAuthResult>!
+Themia.Modules.Identity.AspNetCore.External.IExternalAuthProviderRegistry
+Themia.Modules.Identity.AspNetCore.External.IExternalAuthProviderRegistry.TryGet(string! name, out Themia.Modules.Identity.Abstractions.Authentication.IExternalAuthProvider? provider) -> bool
+Themia.Modules.Identity.AspNetCore.External.ExternalAuthProviderRegistry
+Themia.Modules.Identity.AspNetCore.External.ExternalAuthProviderRegistry.ExternalAuthProviderRegistry(System.Collections.Generic.IEnumerable<Themia.Modules.Identity.Abstractions.Authentication.IExternalAuthProvider!>! providers) -> void
+Themia.Modules.Identity.AspNetCore.External.ExternalAuthProviderRegistry.TryGet(string! name, out Themia.Modules.Identity.Abstractions.Authentication.IExternalAuthProvider? provider) -> bool
+Themia.Modules.Identity.AspNetCore.Options.GoogleOptions
+Themia.Modules.Identity.AspNetCore.Options.GoogleOptions.GoogleOptions() -> void
+Themia.Modules.Identity.AspNetCore.Options.GoogleOptions.ClientId.get -> string!
+Themia.Modules.Identity.AspNetCore.Options.GoogleOptions.ClientId.set -> void
+Themia.Modules.Identity.AspNetCore.Options.GoogleOptions.ClientSecret.get -> string!
+Themia.Modules.Identity.AspNetCore.Options.GoogleOptions.ClientSecret.set -> void
+Themia.Modules.Identity.AspNetCore.Options.GoogleOptions.Scopes.get -> System.Collections.Generic.IReadOnlyList<string!>!
+Themia.Modules.Identity.AspNetCore.Options.GoogleOptions.Scopes.set -> void
+Themia.Modules.Identity.AspNetCore.Options.GoogleOptions.Validate() -> void
+Themia.Modules.Identity.AspNetCore.Options.LineOptions
+Themia.Modules.Identity.AspNetCore.Options.LineOptions.LineOptions() -> void
+Themia.Modules.Identity.AspNetCore.Options.LineOptions.ChannelId.get -> string!
+Themia.Modules.Identity.AspNetCore.Options.LineOptions.ChannelId.set -> void
+Themia.Modules.Identity.AspNetCore.Options.LineOptions.ChannelSecret.get -> string!
+Themia.Modules.Identity.AspNetCore.Options.LineOptions.ChannelSecret.set -> void
+Themia.Modules.Identity.AspNetCore.Options.LineOptions.EmailAlwaysVerified.get -> bool
+Themia.Modules.Identity.AspNetCore.Options.LineOptions.EmailAlwaysVerified.set -> void
+Themia.Modules.Identity.AspNetCore.Options.LineOptions.Scopes.get -> System.Collections.Generic.IReadOnlyList<string!>!
+Themia.Modules.Identity.AspNetCore.Options.LineOptions.Scopes.set -> void
+Themia.Modules.Identity.AspNetCore.Options.LineOptions.Validate() -> void
+Themia.Modules.Identity.AspNetCore.DependencyInjection.ExternalAuthServiceCollectionExtensions
+static Themia.Modules.Identity.AspNetCore.DependencyInjection.ExternalAuthServiceCollectionExtensions.AddThemiaExternalAuth(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services) -> Themia.Modules.Identity.AspNetCore.DependencyInjection.ExternalAuthBuilder!
+Themia.Modules.Identity.AspNetCore.DependencyInjection.ExternalAuthBuilder
+Themia.Modules.Identity.AspNetCore.DependencyInjection.ExternalAuthBuilder.Services.get -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+Themia.Modules.Identity.AspNetCore.DependencyInjection.ExternalAuthBuilder.AddGoogle(System.Action<Themia.Modules.Identity.AspNetCore.Options.GoogleOptions!>! configure) -> Themia.Modules.Identity.AspNetCore.DependencyInjection.ExternalAuthBuilder!
+Themia.Modules.Identity.AspNetCore.DependencyInjection.ExternalAuthBuilder.AddLine(System.Action<Themia.Modules.Identity.AspNetCore.Options.LineOptions!>! configure) -> Themia.Modules.Identity.AspNetCore.DependencyInjection.ExternalAuthBuilder!
+Themia.Modules.Identity.AspNetCore.DependencyInjection.ExternalAuthBuilder.AddOidc(Themia.Modules.Identity.AspNetCore.External.OidcProviderConfig! config) -> Themia.Modules.Identity.AspNetCore.DependencyInjection.ExternalAuthBuilder!
+Themia.Modules.Identity.AspNetCore.DependencyInjection.ExternalAuthBuilder.AddProvider(Themia.Modules.Identity.Abstractions.Authentication.IExternalAuthProvider! provider) -> Themia.Modules.Identity.AspNetCore.DependencyInjection.ExternalAuthBuilder!
+Themia.Modules.Identity.AspNetCore.DependencyInjection.ExternalAuthBuilder.AddProvider<TProvider>() -> Themia.Modules.Identity.AspNetCore.DependencyInjection.ExternalAuthBuilder!
+Themia.Modules.Identity.AspNetCore.Endpoints.ExternalLoginRequest
+Themia.Modules.Identity.AspNetCore.Endpoints.ExternalLoginRequest.Code.get -> string!
+Themia.Modules.Identity.AspNetCore.Endpoints.ExternalLoginRequest.Code.init -> void
+Themia.Modules.Identity.AspNetCore.Endpoints.ExternalLoginRequest.CodeVerifier.get -> string?
+Themia.Modules.Identity.AspNetCore.Endpoints.ExternalLoginRequest.CodeVerifier.init -> void
+Themia.Modules.Identity.AspNetCore.Endpoints.ExternalLoginRequest.ExternalLoginRequest(string! Code, string! RedirectUri, string? CodeVerifier = null, string? Nonce = null) -> void
+Themia.Modules.Identity.AspNetCore.Endpoints.ExternalLoginRequest.Nonce.get -> string?
+Themia.Modules.Identity.AspNetCore.Endpoints.ExternalLoginRequest.Nonce.init -> void
+Themia.Modules.Identity.AspNetCore.Endpoints.ExternalLoginRequest.RedirectUri.get -> string!
+Themia.Modules.Identity.AspNetCore.Endpoints.ExternalLoginRequest.RedirectUri.init -> void
+Themia.Modules.Identity.AspNetCore.Endpoints.IdentityExternalAuthEndpointRouteBuilderExtensions
+Themia.Modules.Identity.AspNetCore.External.ExternalAuthenticationFlow
+Themia.Modules.Identity.AspNetCore.External.ExternalAuthenticationFlow.AuthenticateAsync(string! provider, Themia.Modules.Identity.Abstractions.Authentication.ExternalAuthRequest request, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Identity.Abstractions.Authentication.ExternalLoginFlowResult>!
+Themia.Modules.Identity.AspNetCore.External.ExternalAuthenticationFlow.ExternalAuthenticationFlow(Themia.Modules.Identity.AspNetCore.External.IExternalAuthProviderRegistry! registry, Themia.Modules.Identity.Abstractions.Authentication.IExternalLoginService! externalLogins, Themia.Modules.Identity.Abstractions.IClaimsPrincipalFactory! principalFactory, Themia.Modules.Identity.Abstractions.Authentication.IAccessTokenService! accessTokens, Themia.Modules.Identity.Abstractions.Authentication.IRefreshTokenService! refreshTokens, Themia.Modules.Identity.Abstractions.Authentication.IExternalAuthenticationHooks! hooks, System.TimeProvider! timeProvider, Microsoft.Extensions.Logging.ILogger<Themia.Modules.Identity.AspNetCore.External.ExternalAuthenticationFlow!>! logger) -> void
+Themia.Modules.Identity.AspNetCore.External.ExternalAuthenticationHooksBase
+Themia.Modules.Identity.AspNetCore.External.ExternalAuthenticationHooksBase.ExternalAuthenticationHooksBase() -> void
+static Themia.Modules.Identity.AspNetCore.Endpoints.IdentityExternalAuthEndpointRouteBuilderExtensions.MapIdentityExternalAuthEndpoints(this Microsoft.AspNetCore.Routing.IEndpointRouteBuilder! endpoints) -> Microsoft.AspNetCore.Routing.IEndpointRouteBuilder!
+virtual Themia.Modules.Identity.AspNetCore.External.ExternalAuthenticationHooksBase.OnBeforeExternalLoginAsync(Themia.Modules.Identity.Abstractions.Authentication.BeforeExternalLoginContext! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+virtual Themia.Modules.Identity.AspNetCore.External.ExternalAuthenticationHooksBase.OnExternalLoginFailedAsync(Themia.Modules.Identity.Abstractions.Authentication.ExternalLoginFailedContext! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+virtual Themia.Modules.Identity.AspNetCore.External.ExternalAuthenticationHooksBase.OnExternalLoginSucceededAsync(Themia.Modules.Identity.Abstractions.Authentication.ExternalLoginSucceededContext! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!

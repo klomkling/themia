@@ -4,6 +4,8 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Time.Testing;
 using Themia.Framework.Core.Abstractions.Tenancy;
 using Themia.Framework.Data.Abstractions.Auditing;
+using Themia.Framework.Data.Abstractions.Repositories;
+using Themia.Framework.Data.Abstractions.UnitOfWork;
 using Themia.Modules.Identity.Abstractions;
 using Themia.Modules.Identity.Abstractions.Authentication;
 using Themia.Modules.Identity.Abstractions.Entities;
@@ -36,6 +38,9 @@ public abstract class IdentityStoreConformanceTests
         public IClaimService Claims => Inner.ServiceProvider.GetRequiredService<IClaimService>();
         public IUserTokenService Tokens => Inner.ServiceProvider.GetRequiredService<IUserTokenService>();
         public IRefreshTokenService RefreshTokens => Inner.ServiceProvider.GetRequiredService<IRefreshTokenService>();
+        public IExternalLoginService ExternalLogins => Inner.ServiceProvider.GetRequiredService<IExternalLoginService>();
+        public IRepository<ExternalLoginLink, Guid> Links => Inner.ServiceProvider.GetRequiredService<IRepository<ExternalLoginLink, Guid>>();
+        public IUnitOfWork UnitOfWork => Inner.ServiceProvider.GetRequiredService<IUnitOfWork>();
 
         public async ValueTask DisposeAsync()
         {
@@ -44,7 +49,7 @@ public abstract class IdentityStoreConformanceTests
         }
     }
 
-    protected Scope NewScope(TenantId? tenant, bool allowPlatformLogin = true, string auditUserId = "test-user", int? maxFailedAccessAttempts = null, TimeProvider? timeProvider = null)
+    protected Scope NewScope(TenantId? tenant, bool allowPlatformLogin = true, string auditUserId = "test-user", int? maxFailedAccessAttempts = null, TimeProvider? timeProvider = null, Action<IServiceCollection>? configureServices = null)
     {
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?> { ["ConnectionStrings:Default"] = ConnectionString })
@@ -70,6 +75,8 @@ public abstract class IdentityStoreConformanceTests
         // Override the framework null accessor with a deterministic audit user (no HttpContext here).
         services.RemoveAll<ICurrentUserAccessor>();
         services.AddSingleton<ICurrentUserAccessor>(new StubCurrentUserAccessor(auditUserId));
+
+        configureServices?.Invoke(services);
 
         var provider = services.BuildServiceProvider();
         return new Scope(provider, provider.CreateAsyncScope());
@@ -481,4 +488,354 @@ public abstract class IdentityStoreConformanceTests
         Assert.All(results.Where(r => r.Outcome != RefreshOutcome.Success),
             r => Assert.Contains(r.Outcome, new[] { RefreshOutcome.Invalid, RefreshOutcome.ReuseDetected }));
     }
+
+    [Fact] // existing link → same user, no create/link
+    public async Task External_existing_link_returns_same_user()
+    {
+        await ResetAsync();
+        await using var s = NewScope(new TenantId("acme"));
+
+        var first = await s.ExternalLogins.ResolveOrProvisionAsync(
+            new ExternalIdentity("Google", "sub-1", "ext1@acme.test", true, "Ext One"));
+        Assert.True(first.WasCreated);
+        Assert.True(first.WasLinked);
+
+        var second = await s.ExternalLogins.ResolveOrProvisionAsync(
+            new ExternalIdentity("Google", "sub-1", "ext1@acme.test", true, "Ext One"));
+        Assert.Equal(first.User.Id, second.User.Id);
+        Assert.False(second.WasCreated);
+        Assert.False(second.WasLinked);
+    }
+
+    [Fact] // verified-email match → link to existing user
+    public async Task External_verified_email_links_existing_user()
+    {
+        await ResetAsync();
+        await using var s = NewScope(new TenantId("acme"));
+
+        var seeded = await s.Users.CreateAsync("emailowner", "pw", "owner@acme.test");
+        Assert.True(seeded.Succeeded);
+
+        var result = await s.ExternalLogins.ResolveOrProvisionAsync(
+            new ExternalIdentity("Google", "sub-link", "owner@acme.test", true, null));
+        Assert.Equal(seeded.UserId, result.User.Id);
+        Assert.False(result.WasCreated);
+        Assert.True(result.WasLinked);
+    }
+
+    [Fact] // no match → create
+    public async Task External_no_match_creates_user()
+    {
+        await ResetAsync();
+        await using var s = NewScope(new TenantId("acme"));
+
+        var result = await s.ExternalLogins.ResolveOrProvisionAsync(
+            new ExternalIdentity("Google", "sub-new", "new@acme.test", true, null));
+        Assert.True(result.WasCreated);
+        Assert.True(result.WasLinked);
+        Assert.NotEqual(Guid.Empty, result.User.Id);
+    }
+
+    [Fact] // unverified email → create, never link
+    public async Task External_unverified_email_never_links()
+    {
+        await ResetAsync();
+        await using var s = NewScope(new TenantId("acme"));
+
+        var seeded = await s.Users.CreateAsync("verifiedowner", "pw", "v@acme.test");
+        Assert.True(seeded.Succeeded);
+
+        var result = await s.ExternalLogins.ResolveOrProvisionAsync(
+            new ExternalIdentity("Google", "sub-unverified", "v@acme.test", false, null));
+        Assert.True(result.WasCreated);
+        Assert.True(result.WasLinked);
+        Assert.NotEqual(seeded.UserId, result.User.Id);   // a different, freshly provisioned user
+    }
+
+    [Fact] // tenant isolation: a link created in tenant A is not seen in tenant B
+    public async Task External_link_is_tenant_isolated()
+    {
+        await ResetAsync();
+        Guid userInA;
+        await using (var a = NewScope(new TenantId("a")))
+        {
+            var first = await a.ExternalLogins.ResolveOrProvisionAsync(
+                new ExternalIdentity("Google", "shared-sub", "shared@x.test", true, null));
+            userInA = first.User.Id;
+        }
+
+        await using (var b = NewScope(new TenantId("b")))
+        {
+            var inB = await b.ExternalLogins.ResolveOrProvisionAsync(
+                new ExternalIdentity("Google", "shared-sub", "shared@x.test", true, null));
+            Assert.NotEqual(userInA, inB.User.Id);   // tenant b does not see tenant a's link → new user
+            Assert.True(inB.WasCreated);
+        }
+    }
+
+    [Fact] // concurrency: a lost provision race re-resolves to the winner's user instead of throwing 500
+    public async Task External_provision_race_falls_back_to_existing_user()
+    {
+        await ResetAsync();
+        var tenant = new TenantId("acme");
+
+        // The "winner" — a user a concurrent first-login would have provisioned and linked.
+        Guid winnerUserId;
+        await using (var seed = NewScope(tenant))
+        {
+            var w = await seed.Users.CreateExternalUserAsync("race-winner", null, false);
+            Assert.True(w.Succeeded);
+            winnerUserId = w.UserId!.Value;
+        }
+
+        // Simulate the race: a decorating IUserService commits the winner's (provider, subject) link in an
+        // independent scope *after* the service's link lookup missed but *before* its own CreateLinkAsync —
+        // the exact window the filtered-unique index guards. The decorator runs once.
+        await using (var s = NewScope(tenant, configureServices: ConfigureRaceWinner))
+        {
+            var result = await s.ExternalLogins.ResolveOrProvisionAsync(
+                new ExternalIdentity("Google", "race-sub", null, false, null));
+
+            // The UniqueConstraintException path re-resolved the winner instead of surfacing a 500.
+            Assert.Equal(winnerUserId, result.User.Id);
+            Assert.False(result.WasCreated);
+            Assert.False(result.WasLinked);
+        }
+
+        // Exactly one link exists, and the rolled-back loser user never persisted.
+        await using (var verify = NewScope(tenant))
+        {
+            var link = await verify.Links.FirstOrDefaultAsync(
+                new Themia.Modules.Identity.Specifications.ExternalLoginByProviderKeySpec("google", "race-sub"));
+            Assert.NotNull(link);
+            Assert.Equal(winnerUserId, link!.UserId);
+        }
+
+        void ConfigureRaceWinner(IServiceCollection services)
+        {
+            services.Decorate<IUserService>((inner, sp) =>
+                new RaceWinnerUserService(inner, sp, winnerUserId, "google", "race-sub"));
+        }
+    }
+
+    [Fact] // a deactivated account is never auto-linked: returned un-linked for the flow gate to block
+    public async Task External_auto_link_skipped_for_inactive_user()
+    {
+        await ResetAsync();
+        await using var s = NewScope(new TenantId("acme"));
+
+        var seeded = await s.Users.CreateAsync("inactiveowner", "pw", "inactive@acme.test");
+        Assert.True(seeded.Succeeded);
+        Assert.True(await s.Users.SetActiveAsync(seeded.UserId!.Value, false));
+
+        var result = await s.ExternalLogins.ResolveOrProvisionAsync(
+            new ExternalIdentity("Google", "sub-inactive", "inactive@acme.test", true, null));
+
+        Assert.Equal(seeded.UserId, result.User.Id);   // matched the existing (deactivated) account
+        Assert.False(result.WasCreated);
+        Assert.False(result.WasLinked);                // but did NOT bind a link to it
+
+        var link = await s.Links.FirstOrDefaultAsync(
+            new Themia.Modules.Identity.Specifications.ExternalLoginByProviderKeySpec("google", "sub-inactive"));
+        Assert.Null(link);
+    }
+
+    [Fact] // a user-name collision lost to a concurrent provision retries with a suffixed name, not a 500
+    public async Task External_user_name_collision_race_retries_with_suffixed_name()
+    {
+        await ResetAsync();
+        var tenant = new TenantId("acme");
+
+        // The "winner" occupies the user name our identity's email local-part derives ("collide"),
+        // committed mid-flight (after our name probe, before our insert) by the decorator below — forcing
+        // the duplicate-name path that previously surfaced a 500.
+        await using var s = NewScope(tenant, configureServices: ConfigureNameRaceWinner);
+
+        var result = await s.ExternalLogins.ResolveOrProvisionAsync(
+            new ExternalIdentity("Google", "collide-sub", "collide@acme.test", true, null));
+
+        Assert.True(result.WasCreated);                       // provisioned a new user...
+        Assert.True(result.WasLinked);
+        Assert.StartsWith("collide_", result.User.UserName);  // ...with a disambiguated name
+
+        static void ConfigureNameRaceWinner(IServiceCollection services)
+        {
+            services.Decorate<IUserService>((inner, sp) =>
+                new RaceWinnerNameUserService(inner, sp, "collide"));
+        }
+    }
+
+    [Fact] // a platform (global) user's repeated external login resolves the existing link, not a re-insert
+    public async Task External_platform_user_relink_resolves_existing_link()
+    {
+        await ResetAsync();
+
+        // Seed a platform (TenantId == null) user with an email.
+        await using (var system = NewScope(tenant: null))
+        {
+            Assert.True((await system.Users.CreateAsync("padmin", "pw", "padmin@x.test")).Succeeded);
+        }
+
+        // First external login from a TENANT scope auto-links to the platform user (verified email).
+        Guid platformUserId;
+        await using (var t = NewScope(new TenantId("acme")))
+        {
+            var first = await t.ExternalLogins.ResolveOrProvisionAsync(
+                new ExternalIdentity("Google", "psub", "padmin@x.test", true, null));
+            Assert.False(first.WasCreated);
+            Assert.True(first.WasLinked);
+            Assert.Null(first.User.TenantId);          // resolved the platform user
+            platformUserId = first.User.Id;
+        }
+
+        // Second login must resolve the existing platform link — not re-insert it and hit the platform
+        // unique index (which, on a data layer that hides global rows from tenant scopes, was a 500).
+        await using (var t = NewScope(new TenantId("acme")))
+        {
+            var second = await t.ExternalLogins.ResolveOrProvisionAsync(
+                new ExternalIdentity("Google", "psub", "padmin@x.test", true, null));
+            Assert.Equal(platformUserId, second.User.Id);
+            Assert.False(second.WasCreated);
+            Assert.False(second.WasLinked);
+        }
+    }
+}
+
+/// <summary>Test-only DI helper: replaces a registered <typeparamref name="T"/> with a decorator.</summary>
+file static class DecorateExtensions
+{
+    public static void Decorate<T>(this IServiceCollection services, Func<T, IServiceProvider, T> decorate)
+        where T : class
+    {
+        var descriptor = services.Last(d => d.ServiceType == typeof(T));
+        services.Remove(descriptor);
+        services.Add(ServiceDescriptor.Describe(
+            typeof(T),
+            sp => decorate((T)CreateInner(descriptor, sp), sp),
+            descriptor.Lifetime));
+
+        static object CreateInner(ServiceDescriptor d, IServiceProvider sp) =>
+            d.ImplementationInstance
+            ?? d.ImplementationFactory?.Invoke(sp)
+            ?? ActivatorUtilities.CreateInstance(sp, d.ImplementationType!);
+    }
+}
+
+/// <summary>Decorating <see cref="IUserService"/> that, on its first <see cref="CreateExternalUserAsync"/>
+/// call, commits a conflicting external-login link in an independent scope (the concurrent winner), then
+/// delegates. This deterministically forces the link-insert that follows to hit the filtered-unique index,
+/// a stand-in for true parallelism (which would be flaky).</summary>
+file sealed class RaceWinnerUserService(
+    IUserService inner, IServiceProvider rootProvider, Guid winnerUserId, string provider, string subject)
+    : IUserService
+{
+    private int raced;
+
+    public async Task<UserCreationResult> CreateExternalUserAsync(
+        string userName, string? email, bool emailVerified, CancellationToken cancellationToken = default)
+    {
+        if (Interlocked.Exchange(ref raced, 1) == 0)
+        {
+            await CommitWinnerLinkAsync(cancellationToken);
+        }
+
+        return await inner.CreateExternalUserAsync(userName, email, emailVerified, cancellationToken);
+    }
+
+    private async Task CommitWinnerLinkAsync(CancellationToken cancellationToken)
+    {
+        // A fresh scope = a separate connection/transaction, so this link survives the rollback the
+        // service's own transaction performs when its duplicate insert violates the unique index.
+        await using var scope = rootProvider.CreateAsyncScope();
+        var links = scope.ServiceProvider.GetRequiredService<IRepository<ExternalLoginLink, Guid>>();
+        var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+        var clock = scope.ServiceProvider.GetRequiredService<TimeProvider>();
+
+        var link = new ExternalLoginLink
+        {
+            UserId = winnerUserId,
+            Provider = provider,
+            ExternalId = subject,
+            TenantId = scope.ServiceProvider.GetRequiredService<ITenantContext>().CurrentTenantId,
+            CreatedAt = clock.GetUtcNow(),
+        };
+        link.SetId(Guid.CreateVersion7());
+        await links.AddAsync(link, cancellationToken);
+        await unitOfWork.SaveChangesAsync(cancellationToken);
+    }
+
+    public Task<UserCreationResult> CreateAsync(string userName, string password, string? email = null, CancellationToken cancellationToken = default)
+        => inner.CreateAsync(userName, password, email, cancellationToken);
+    public Task<User?> FindByIdAsync(Guid id, CancellationToken cancellationToken = default)
+        => inner.FindByIdAsync(id, cancellationToken);
+    public Task<User?> FindByUserNameAsync(string userName, CancellationToken cancellationToken = default)
+        => inner.FindByUserNameAsync(userName, cancellationToken);
+    public Task<User?> FindByEmailAsync(string email, CancellationToken cancellationToken = default)
+        => inner.FindByEmailAsync(email, cancellationToken);
+    public Task<bool> SetPasswordAsync(Guid userId, string password, CancellationToken cancellationToken = default)
+        => inner.SetPasswordAsync(userId, password, cancellationToken);
+    public Task<PasswordVerificationResult> VerifyPasswordAsync(string userName, string password, CancellationToken cancellationToken = default)
+        => inner.VerifyPasswordAsync(userName, password, cancellationToken);
+    public Task<bool> SetActiveAsync(Guid userId, bool isActive, CancellationToken cancellationToken = default)
+        => inner.SetActiveAsync(userId, isActive, cancellationToken);
+    public Task<bool> DeleteAsync(Guid userId, CancellationToken cancellationToken = default)
+        => inner.DeleteAsync(userId, cancellationToken);
+}
+
+/// <summary>Decorating <see cref="IUserService"/> that, on its first <see cref="CreateExternalUserAsync"/>
+/// call, commits a conflicting user (occupying <paramref name="winnerUserName"/>) in an independent scope,
+/// then delegates — so the service's own insert hits the filtered-unique name index. A deterministic
+/// stand-in for a true concurrent provision racing the same derived user name.</summary>
+file sealed class RaceWinnerNameUserService(
+    IUserService inner, IServiceProvider rootProvider, string winnerUserName)
+    : IUserService
+{
+    private int raced;
+
+    public async Task<UserCreationResult> CreateExternalUserAsync(
+        string userName, string? email, bool emailVerified, CancellationToken cancellationToken = default)
+    {
+        if (Interlocked.Exchange(ref raced, 1) == 0)
+        {
+            await CommitWinnerUserAsync(cancellationToken);
+        }
+
+        return await inner.CreateExternalUserAsync(userName, email, emailVerified, cancellationToken);
+    }
+
+    private async Task CommitWinnerUserAsync(CancellationToken cancellationToken)
+    {
+        await using var scope = rootProvider.CreateAsyncScope();
+        var users = scope.ServiceProvider.GetRequiredService<IRepository<User, Guid>>();
+        var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+        var tenant = scope.ServiceProvider.GetRequiredService<ITenantContext>().CurrentTenantId;
+
+        var user = new User
+        {
+            UserName = winnerUserName,
+            NormalizedUserName = Themia.Modules.Identity.Services.IdentityScope.Normalize(winnerUserName),
+            TenantId = tenant,
+            IsActive = true,
+        };
+        user.SetId(Guid.CreateVersion7());
+        await users.AddAsync(user, cancellationToken);
+        await unitOfWork.SaveChangesAsync(cancellationToken);
+    }
+
+    public Task<UserCreationResult> CreateAsync(string userName, string password, string? email = null, CancellationToken cancellationToken = default)
+        => inner.CreateAsync(userName, password, email, cancellationToken);
+    public Task<User?> FindByIdAsync(Guid id, CancellationToken cancellationToken = default)
+        => inner.FindByIdAsync(id, cancellationToken);
+    public Task<User?> FindByUserNameAsync(string userName, CancellationToken cancellationToken = default)
+        => inner.FindByUserNameAsync(userName, cancellationToken);
+    public Task<User?> FindByEmailAsync(string email, CancellationToken cancellationToken = default)
+        => inner.FindByEmailAsync(email, cancellationToken);
+    public Task<bool> SetPasswordAsync(Guid userId, string password, CancellationToken cancellationToken = default)
+        => inner.SetPasswordAsync(userId, password, cancellationToken);
+    public Task<PasswordVerificationResult> VerifyPasswordAsync(string userName, string password, CancellationToken cancellationToken = default)
+        => inner.VerifyPasswordAsync(userName, password, cancellationToken);
+    public Task<bool> SetActiveAsync(Guid userId, bool isActive, CancellationToken cancellationToken = default)
+        => inner.SetActiveAsync(userId, isActive, cancellationToken);
+    public Task<bool> DeleteAsync(Guid userId, CancellationToken cancellationToken = default)
+        => inner.DeleteAsync(userId, cancellationToken);
 }

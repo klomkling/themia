@@ -7,6 +7,10 @@
     <PackageVersion Include="xunit" Version="2.9.3" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
     <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.9" />
+    <!-- Identity external login (0.5.2): OIDC discovery/JWKS for Google. IdentityModel pinned to 8.0.1
+         to match the version JwtBearer 10.0.9 already resolves transitively. (Microsoft.Extensions.Http /
+         IHttpClientFactory comes from the Microsoft.AspNetCore.App framework reference — no extra pin.) -->
+    <PackageVersion Include="Microsoft.IdentityModel.Protocols.OpenIdConnect" Version="8.0.1" />
     <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.9" />
     <PackageVersion Include="Microsoft.AspNetCore.TestHost" Version="8.0.27" Condition="'$(TargetFramework)' == 'net8.0' or '$(TargetFramework)' == ''" />
     <PackageVersion Include="Microsoft.AspNetCore.TestHost" Version="10.0.9" Condition="'$(TargetFramework)' == 'net10.0'" />

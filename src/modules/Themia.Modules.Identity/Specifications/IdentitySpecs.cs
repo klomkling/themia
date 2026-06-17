@@ -160,3 +160,25 @@ internal sealed class ActiveRefreshTokensByUserSpec : Specification<RefreshToken
     public ActiveRefreshTokensByUserSpec(Guid userId, DateTimeOffset now) =>
         Where(t => t.UserId == userId && t.RevokedAt == null && t.ExpiresAt > now);
 }
+
+/// <summary>The external-login link matching a provider and provider subject within the ambient
+/// tenant. The framework tenant filter isolates it, so the same external account can map to a
+/// different user per tenant.</summary>
+internal sealed class ExternalLoginByProviderKeySpec : Specification<ExternalLoginLink>
+{
+    public ExternalLoginByProviderKeySpec(string provider, string externalId) =>
+        Where(l => l.Provider == provider && l.ExternalId == externalId);
+}
+
+/// <summary>Finds a platform (global) external-login link by provider and subject, bypassing the tenant
+/// filter. The <c>TenantId == null</c> predicate guarantees only a genuine platform link matches — never
+/// another tenant's — so it is safe to resolve from a tenant scope (mirrors the platform user specs and
+/// the <c>AllowPlatformLogin</c> fallback in <c>IUserService.FindByEmailAsync</c>).</summary>
+internal sealed class PlatformExternalLoginByProviderKeySpec : Specification<ExternalLoginLink>
+{
+    public PlatformExternalLoginByProviderKeySpec(string provider, string externalId)
+    {
+        Where(l => l.Provider == provider && l.ExternalId == externalId && l.TenantId == null);
+        WithoutTenantFilter();
+    }
+}

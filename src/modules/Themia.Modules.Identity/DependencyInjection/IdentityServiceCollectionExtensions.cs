@@ -60,6 +60,7 @@ public static class IdentityServiceCollectionExtensions
         services.TryAddScoped<IClaimService, ClaimService>();
         services.TryAddScoped<IUserTokenService, UserTokenService>();
         services.TryAddScoped<IRefreshTokenService, RefreshTokenService>();
+        services.TryAddScoped<IExternalLoginService, ExternalLoginService>();
         services.TryAddScoped<IClaimsPrincipalFactory, ClaimsPrincipalFactory>();
 
         // Dapper adopters: contribute mappings to the registry they already registered.

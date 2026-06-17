@@ -13,6 +13,16 @@ public interface IUserService
     /// <returns>A <see cref="UserCreationResult"/>.</returns>
     Task<UserCreationResult> CreateAsync(string userName, string password, string? email = null, CancellationToken cancellationToken = default);
 
+    /// <summary>Creates an active, password-less user from an external identity. The username is
+    /// caller-supplied (already derived + unique); <paramref name="emailVerified"/> sets EmailConfirmed.</summary>
+    /// <param name="userName">The derived, unique login name.</param>
+    /// <param name="email">An optional email address.</param>
+    /// <param name="emailVerified">Whether the provider asserts the email is verified; sets EmailConfirmed.</param>
+    /// <param name="cancellationToken">A cancellation token.</param>
+    /// <returns>A <see cref="UserCreationResult"/>.</returns>
+    Task<UserCreationResult> CreateExternalUserAsync(
+        string userName, string? email, bool emailVerified, CancellationToken cancellationToken = default);
+
     /// <summary>Finds a user by id within the ambient tenant.</summary>
     /// <param name="id">The user id.</param>
     /// <param name="cancellationToken">A cancellation token.</param>
