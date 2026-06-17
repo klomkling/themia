@@ -1,6 +1,8 @@
 #nullable enable
 const Themia.Modules.Storage.StorageScope.PlatformPrefix = "_platform" -> string!
 static Themia.Modules.Storage.EntityConfiguration.StorageModelBuilderExtensions.ApplyThemiaStorage(this Microsoft.EntityFrameworkCore.ModelBuilder! modelBuilder) -> Microsoft.EntityFrameworkCore.ModelBuilder!
+override Themia.Modules.Storage.Migrations.StorageSchemaMigration.Down() -> void
+override Themia.Modules.Storage.Migrations.StorageSchemaMigration.Up() -> void
 static Themia.Modules.Storage.Mapping.StorageDapperMappings.Apply(Themia.Framework.Data.Dapper.Mapping.EntityMappingRegistry! registry) -> void
 static Themia.Modules.Storage.StorageScope.PhysicalKey(Themia.Framework.Core.Abstractions.Tenancy.TenantId? tenantId, string! logicalKey) -> string!
 Themia.Modules.Storage.EntityConfiguration.StorageModelBuilderExtensions
@@ -18,4 +20,6 @@ Themia.Modules.Storage.Entities.StorageObject.StorageObject() -> void
 Themia.Modules.Storage.Entities.StorageObject.TenantId.get -> Themia.Framework.Core.Abstractions.Tenancy.TenantId?
 Themia.Modules.Storage.Entities.StorageObject.TenantId.set -> void
 Themia.Modules.Storage.Mapping.StorageDapperMappings
+Themia.Modules.Storage.Migrations.StorageSchemaMigration
+Themia.Modules.Storage.Migrations.StorageSchemaMigration.StorageSchemaMigration() -> void
 Themia.Modules.Storage.StorageScope
