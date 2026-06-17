@@ -29,6 +29,33 @@ public sealed class AuthenticationFlowRefreshTests
     }
 
     [Fact]
+    public async Task Refresh_rejected_when_user_is_inactive()
+    {
+        // A deactivated account must not keep minting tokens via refresh even with a valid refresh token.
+        var refresh = new FakeRefreshTokenService
+        {
+            RotateResult = RefreshValidationResult.Success(new User { UserName = "u", IsActive = false }, Successor()),
+        };
+        var result = await Build(refresh, new RecordingHooks()).RefreshAsync("token");
+        Assert.Equal(RefreshRotationOutcome.Invalid, result.Outcome);
+        Assert.Null(result.Tokens);
+    }
+
+    [Fact]
+    public async Task Refresh_rejected_when_user_is_locked_out()
+    {
+        var refresh = new FakeRefreshTokenService
+        {
+            RotateResult = RefreshValidationResult.Success(
+                new User { UserName = "u", LockoutEnabled = true, LockoutEnd = DateTimeOffset.UtcNow.AddMinutes(10) },
+                Successor()),
+        };
+        var result = await Build(refresh, new RecordingHooks()).RefreshAsync("token");
+        Assert.Equal(RefreshRotationOutcome.Invalid, result.Outcome);
+        Assert.Null(result.Tokens);
+    }
+
+    [Fact]
     public async Task Refresh_invalid_returns_invalid()
     {
         var refresh = new FakeRefreshTokenService { RotateResult = RefreshValidationResult.Invalid() };

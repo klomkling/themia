@@ -71,6 +71,19 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 - **Bounded discovery/JWKS connection age.** The OIDC discovery/JWKS client held by the singleton
   provider uses a `PooledConnectionLifetime` so DNS/endpoint changes are picked up despite the
   long-lived `ConfigurationManager`.
+- **Refresh honours account state.** `IAuthenticationFlow.RefreshAsync` now rejects a refresh whose
+  user is deactivated or locked out (returning `Invalid`), so deactivation/lockout takes effect
+  immediately instead of only when the refresh token expires — closing a bypass that also predated
+  the external-login slice.
+- **Platform external login is repeatable.** The external-link lookup gained a platform (global,
+  `tenant_id IS NULL`) fallback gated on `AllowPlatformLogin`, mirroring `FindByEmailAsync`. Without
+  it, a platform user's second external login could fail on a data layer that hides global rows from
+  tenant scopes (Dapper's default `IncludeGlobalRecordsForTenants=false`).
+- **Failed transactions no longer leak EF change-tracker state.** `EfUnitOfWork.ExecuteInTransactionAsync`
+  clears the change tracker when the work/save throws, so a retry on the same scoped `DbContext`
+  (e.g. the race-retry loop) does not re-attempt the rolled-back writes.
+- **`email_verified` accepts a string boolean.** Some OIDC providers serialize the claim as `"true"`
+  rather than a JSON boolean; both forms are now honoured.
 
 ## [0.5.1] - 2026-06-15
 

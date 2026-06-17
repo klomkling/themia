@@ -120,6 +120,18 @@ public sealed class AuthenticationFlow : IAuthenticationFlow
                 _ => RefreshRotationResult.Invalid(),
             };
         }
+
+        // A deactivated or locked-out account must not keep minting tokens via refresh — otherwise
+        // deactivation/lockout only takes effect when the refresh token finally expires (up to its full
+        // lifetime). Mirrors the login gate (IUserService.VerifyPasswordAsync) and the external-login
+        // gate via the shared UserLockoutExtensions predicate. The rotation already persisted; the
+        // undelivered successor simply expires unused (same tradeoff as the late hook deny below).
+        if (!user.IsActive || user.IsLockedOut(timeProvider.GetUtcNow()))
+        {
+            logger.LogWarning("Refresh rejected for user {UserId}: account inactive or locked out.", user.Id);
+            return RefreshRotationResult.Invalid();
+        }
+
         var principal = await principalFactory.CreateAsync(user, AuthenticationType, cancellationToken).ConfigureAwait(false);
         var access = accessTokens.Issue(principal);
         var tokens = new AuthTokens(access.Token, AuthTokenIssuer.ExpiresInSeconds(timeProvider, access.ExpiresAt), replacement.RawToken);

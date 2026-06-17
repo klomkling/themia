@@ -664,6 +664,41 @@ public abstract class IdentityStoreConformanceTests
                 new RaceWinnerNameUserService(inner, sp, "collide"));
         }
     }
+
+    [Fact] // a platform (global) user's repeated external login resolves the existing link, not a re-insert
+    public async Task External_platform_user_relink_resolves_existing_link()
+    {
+        await ResetAsync();
+
+        // Seed a platform (TenantId == null) user with an email.
+        await using (var system = NewScope(tenant: null))
+        {
+            Assert.True((await system.Users.CreateAsync("padmin", "pw", "padmin@x.test")).Succeeded);
+        }
+
+        // First external login from a TENANT scope auto-links to the platform user (verified email).
+        Guid platformUserId;
+        await using (var t = NewScope(new TenantId("acme")))
+        {
+            var first = await t.ExternalLogins.ResolveOrProvisionAsync(
+                new ExternalIdentity("Google", "psub", "padmin@x.test", true, null));
+            Assert.False(first.WasCreated);
+            Assert.True(first.WasLinked);
+            Assert.Null(first.User.TenantId);          // resolved the platform user
+            platformUserId = first.User.Id;
+        }
+
+        // Second login must resolve the existing platform link — not re-insert it and hit the platform
+        // unique index (which, on a data layer that hides global rows from tenant scopes, was a 500).
+        await using (var t = NewScope(new TenantId("acme")))
+        {
+            var second = await t.ExternalLogins.ResolveOrProvisionAsync(
+                new ExternalIdentity("Google", "psub", "padmin@x.test", true, null));
+            Assert.Equal(platformUserId, second.User.Id);
+            Assert.False(second.WasCreated);
+            Assert.False(second.WasLinked);
+        }
+    }
 }
 
 /// <summary>Test-only DI helper: replaces a registered <typeparamref name="T"/> with a decorator.</summary>

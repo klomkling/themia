@@ -290,6 +290,16 @@ public sealed class OidcExternalAuthProvider : IExternalAuthProvider
     private static string? GetClaim(JsonWebToken token, string name) =>
         token.TryGetPayloadValue<string>(name, out var value) ? value : null;
 
-    private static bool ReadBool(JsonWebToken token, string name) =>
-        token.TryGetPayloadValue<bool>(name, out var value) && value;
+    private static bool ReadBool(JsonWebToken token, string name)
+    {
+        if (token.TryGetPayloadValue<bool>(name, out var value))
+        {
+            return value;
+        }
+
+        // Some OIDC providers serialize a boolean claim (e.g. email_verified) as a JSON string
+        // ("true"/"false") rather than a real boolean; accept that form too.
+        return token.TryGetPayloadValue<string>(name, out var text)
+            && bool.TryParse(text, out var parsed) && parsed;
+    }
 }

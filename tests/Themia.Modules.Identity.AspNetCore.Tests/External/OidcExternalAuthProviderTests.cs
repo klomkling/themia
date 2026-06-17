@@ -218,6 +218,38 @@ public sealed class OidcExternalAuthProviderTests
         Assert.False(result.Identity!.Value.EmailVerified);
     }
 
+    [Fact]
+    public async Task ExchangeAsync_email_verified_accepts_string_boolean_from_provider()
+    {
+        // Some OIDC providers serialize email_verified as the JSON string "true" rather than a boolean.
+        const string secret = "this-is-a-32-byte-minimum-secret!!";
+        var idToken = TestIdTokens.SignHs256(secret, Issuer, ClientId, Now, Now.AddMinutes(5),
+            new Dictionary<string, object>
+            {
+                ["sub"] = "G2",
+                ["email"] = "user@idp.test",
+                ["email_verified"] = "true",
+            });
+        var handler = StubHttpMessageHandler.Json(HttpStatusCode.OK, TokenResponse(idToken));
+        var config = new OidcProviderConfig
+        {
+            Name = "custom",
+            TokenEndpoint = TokenEndpoint,
+            ClientId = ClientId,
+            ClientSecret = "secret",
+            Issuer = Issuer,
+            Audience = ClientId,
+            SymmetricSecret = secret,
+            EmailAlwaysVerified = false,
+        };
+        var provider = Provider(config, HttpClientReturning(handler), Clock());
+
+        var result = await provider.ExchangeAsync(Request());
+
+        Assert.True(result.Succeeded);
+        Assert.True(result.Identity!.Value.EmailVerified);
+    }
+
     // ----- nonce validation ----------------------------------------------------------------------
 
     private static ExternalAuthRequest RequestWithNonce(string nonce) =>

@@ -169,3 +169,16 @@ internal sealed class ExternalLoginByProviderKeySpec : Specification<ExternalLog
     public ExternalLoginByProviderKeySpec(string provider, string externalId) =>
         Where(l => l.Provider == provider && l.ExternalId == externalId);
 }
+
+/// <summary>Finds a platform (global) external-login link by provider and subject, bypassing the tenant
+/// filter. The <c>TenantId == null</c> predicate guarantees only a genuine platform link matches — never
+/// another tenant's — so it is safe to resolve from a tenant scope (mirrors the platform user specs and
+/// the <c>AllowPlatformLogin</c> fallback in <c>IUserService.FindByEmailAsync</c>).</summary>
+internal sealed class PlatformExternalLoginByProviderKeySpec : Specification<ExternalLoginLink>
+{
+    public PlatformExternalLoginByProviderKeySpec(string provider, string externalId)
+    {
+        Where(l => l.Provider == provider && l.ExternalId == externalId && l.TenantId == null);
+        WithoutTenantFilter();
+    }
+}

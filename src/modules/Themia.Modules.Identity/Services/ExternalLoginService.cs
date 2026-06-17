@@ -28,6 +28,7 @@ public sealed class ExternalLoginService : IExternalLoginService
     private readonly IUnitOfWork unitOfWork;
     private readonly TimeProvider timeProvider;
     private readonly IDataFilterScope filterScope;
+    private readonly IdentityModuleOptions options;
 
     /// <summary>Creates the service.</summary>
     /// <param name="users">The user repository.</param>
@@ -36,13 +37,15 @@ public sealed class ExternalLoginService : IExternalLoginService
     /// <param name="unitOfWork">The unit of work.</param>
     /// <param name="timeProvider">The time provider.</param>
     /// <param name="filterScope">The data filter scope used for platform-aware writes.</param>
+    /// <param name="options">The Identity module options (for the platform-login fallback).</param>
     public ExternalLoginService(
         IRepository<User, Guid> users,
         IRepository<ExternalLoginLink, Guid> links,
         IUserService userService,
         IUnitOfWork unitOfWork,
         TimeProvider timeProvider,
-        IDataFilterScope filterScope)
+        IDataFilterScope filterScope,
+        IdentityModuleOptions options)
     {
         ArgumentNullException.ThrowIfNull(users);
         ArgumentNullException.ThrowIfNull(links);
@@ -50,12 +53,14 @@ public sealed class ExternalLoginService : IExternalLoginService
         ArgumentNullException.ThrowIfNull(unitOfWork);
         ArgumentNullException.ThrowIfNull(timeProvider);
         ArgumentNullException.ThrowIfNull(filterScope);
+        ArgumentNullException.ThrowIfNull(options);
         this.users = users;
         this.links = links;
         this.userService = userService;
         this.unitOfWork = unitOfWork;
         this.timeProvider = timeProvider;
         this.filterScope = filterScope;
+        this.options = options;
     }
 
     /// <inheritdoc />
@@ -91,17 +96,11 @@ public sealed class ExternalLoginService : IExternalLoginService
     private async Task<ExternalLoginResult> ResolveOrProvisionCoreAsync(
         string provider, ExternalIdentity identity, CancellationToken cancellationToken)
     {
-        // Existing link: the framework tenant filter isolates the lookup, so a link from another
-        // tenant never matches.
-        var link = await links
-            .FirstOrDefaultAsync(new ExternalLoginByProviderKeySpec(provider, identity.Subject), cancellationToken)
-            .ConfigureAwait(false);
-        if (link is not null)
+        // Existing link (tenant-scoped, then the platform fallback when AllowPlatformLogin is set —
+        // mirroring IUserService.FindByEmailAsync).
+        if (await ResolveExistingLinkAsync(provider, identity.Subject, cancellationToken).ConfigureAwait(false) is { } existingLink)
         {
-            var linked = await IdentityScope.ResolveUserAsync(users, link.UserId, cancellationToken).ConfigureAwait(false)
-                ?? throw new InvalidOperationException(
-                    $"External link '{provider}:{identity.Subject}' references user '{link.UserId}', which does not resolve in scope.");
-            return new ExternalLoginResult(linked, WasCreated: false, WasLinked: false);
+            return existingLink;
         }
 
         // Auto-link by verified email only: an unverified email must never adopt an existing account.
@@ -122,7 +121,10 @@ public sealed class ExternalLoginService : IExternalLoginService
                     return new ExternalLoginResult(existing, WasCreated: false, WasLinked: false);
                 }
 
-                await CreateLinkAsync(existing, provider, identity.Subject, cancellationToken).ConfigureAwait(false);
+                // Wrap in a transaction so a lost link-insert race rolls back and (on EF) clears the
+                // change tracker, keeping the caller's retry clean.
+                await unitOfWork.ExecuteInTransactionAsync(
+                    ct => CreateLinkAsync(existing, provider, identity.Subject, ct), cancellationToken).ConfigureAwait(false);
                 return new ExternalLoginResult(existing, WasCreated: false, WasLinked: true);
             }
         }
@@ -131,6 +133,47 @@ public sealed class ExternalLoginService : IExternalLoginService
         // CreateLinkAsync run inside one transaction so a link-insert failure rolls the new user back —
         // no orphaned user that would dead-end the next login on a duplicate user name.
         return await ProvisionAndLinkAsync(provider, identity, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>Resolves an existing (provider, subject) link to its user: the tenant-scoped link first,
+    /// then — when <see cref="IdentityModuleOptions.AllowPlatformLogin"/> is set — the platform (global)
+    /// link. Returns <see langword="null"/> when no link exists. The platform fallback matters on a data
+    /// layer that does not surface global (<c>tenant_id IS NULL</c>) rows to a tenant scope (e.g. Dapper
+    /// with the default <c>IncludeGlobalRecordsForTenants=false</c>): without it, a platform user's second
+    /// external login would re-insert the link and hit the platform unique index.</summary>
+    private async Task<ExternalLoginResult?> ResolveExistingLinkAsync(
+        string provider, string subject, CancellationToken cancellationToken)
+    {
+        var link = await links
+            .FirstOrDefaultAsync(new ExternalLoginByProviderKeySpec(provider, subject), cancellationToken)
+            .ConfigureAwait(false);
+        if (link is not null)
+        {
+            var user = await IdentityScope.ResolveUserAsync(users, link.UserId, cancellationToken).ConfigureAwait(false)
+                ?? throw new InvalidOperationException(
+                    $"External link '{provider}:{subject}' references user '{link.UserId}', which does not resolve in scope.");
+            return new ExternalLoginResult(user, WasCreated: false, WasLinked: false);
+        }
+
+        if (!options.AllowPlatformLogin)
+        {
+            return null;
+        }
+
+        var platformLink = await links
+            .FirstOrDefaultAsync(new PlatformExternalLoginByProviderKeySpec(provider, subject), cancellationToken)
+            .ConfigureAwait(false);
+        if (platformLink is null)
+        {
+            return null;
+        }
+
+        var platformUser = await users
+            .FirstOrDefaultAsync(new PlatformUserByIdSpec(platformLink.UserId), cancellationToken)
+            .ConfigureAwait(false)
+            ?? throw new InvalidOperationException(
+                $"Platform external link '{provider}:{subject}' references user '{platformLink.UserId}', which does not resolve.");
+        return new ExternalLoginResult(platformUser, WasCreated: false, WasLinked: false);
     }
 
     /// <summary>Provisions a password-less user and links it to the external identity inside a single
