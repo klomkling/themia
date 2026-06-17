@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <PackageId>Themia.Modules.Storage</PackageId>
+    <Description>Tenant-aware object storage — key-prefix isolation, DB-backed metadata + per-tenant quota over EF or Dapper, validation/scan seams, and a Local/S3/R2 backend builder. FluentMigrator schema (PostgreSQL + SQL Server).</Description>
+    <PackageTags>themia;storage;object-storage;multi-tenancy;s3;r2;efcore;dapper</PackageTags>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../neutral/Themia.Storage/Themia.Storage.csproj" />
+    <ProjectReference Include="../../neutral/Themia.Storage.S3/Themia.Storage.S3.csproj" />
+    <ProjectReference Include="../../framework/Themia.Framework.Core/Themia.Framework.Core.csproj" />
+    <ProjectReference Include="../../framework/Themia.Framework.Data.Abstractions/Themia.Framework.Data.Abstractions.csproj" />
+    <ProjectReference Include="../../framework/Themia.Framework.Data.EFCore/Themia.Framework.Data.EFCore.csproj" />
+    <ProjectReference Include="../../framework/Themia.Framework.Data.Dapper/Themia.Framework.Data.Dapper.csproj" />
+    <ProjectReference Include="../../neutral/Themia.Data.Migrations/Themia.Data.Migrations.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" />
+    <PackageReference Include="FluentMigrator" />
+    <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+  <ItemGroup>
+    <AdditionalFiles Include="PublicAPI.Shipped.txt" />
+    <AdditionalFiles Include="PublicAPI.Unshipped.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Themia.Modules.Storage.Tests" />
+    <InternalsVisibleTo Include="Themia.Modules.Storage.IntegrationTests" />
+  </ItemGroup>
+</Project>
