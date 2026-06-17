@@ -18,6 +18,34 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.5.3] - 2026-06-17
+
+### Added
+
+- **`Themia.Storage`** (neutral core, `net8.0;net10.0`) — a framework-free object-storage
+  abstraction: `IStorageProvider` (`Put`/`Get`/`Exists`/`Delete`/`GetPresignedUrl` over opaque
+  keys) and a **Local filesystem backend** (`LocalStorageProvider`) with key sanitization
+  (traversal/absolute keys rejected) and HMAC-SHA256 presigned URLs (`LocalUrlSigner`) that give
+  the Local backend the same time-limited, tamper-evident URLs as S3/R2.
+- **`Themia.Storage.S3`** (neutral, `net8.0;net10.0`) — an S3-compatible backend
+  (`S3StorageProvider`, on `AWSSDK.S3`) that also drives **Cloudflare R2** and MinIO via a
+  configured `ServiceUrl` + path-style addressing.
+- **`Themia.Modules.Storage`** (net10.0) — tenant-aware object storage: `ITenantStorage` with
+  **tenant key-prefix isolation**, DB-backed object metadata + **per-tenant quota** over the
+  `storage.storage_objects` FluentMigrator schema (PostgreSQL + SQL Server), runnable on either
+  data peer (**EF Core or Dapper**), DI-replaceable `IFileValidator` / `IFileScanner` seams, an
+  `AddThemiaStorage().UseLocal()/UseS3()/UseR2()` builder, and an opt-in
+  `MapThemiaStorageEndpoints` presigned-direct upload/download flow.
+
+### Security
+
+- **Tenant isolation by construction** — every physical blob key is prefixed with the ambient
+  tenant id, so one tenant can never address another's objects.
+- **Upload validation** — size and content-type are validated (`IFileValidator`) before a write,
+  with a DI-replaceable scan seam (`IFileScanner`) for malware checks.
+- **Presigned-direct transfer** keeps object bytes off the application server (the client transfers
+  straight to/from the backend), and secrets / credentials / presigned URLs are never logged.
+
 ## [0.5.2] - 2026-06-16
 
 ### Added

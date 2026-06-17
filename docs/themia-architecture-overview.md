@@ -114,7 +114,7 @@ you the target: `neutral/` = net8.0;net10.0, everything else = net10.0 (tooling 
 | `Themia.Modules.ExceptionLogging` (+ `Themia.Exceptional.*`) | PowerACC/Idevs custom Dapper dialect engine (3 DB). *typed-exceptions + ProblemDetails split out to standalone neutral `Themia.AspNetCore`* | **✅ specced** |
 | `Themia.Modules.Identity` (+ `.Abstractions`) | ezy-assets `Jwt/Authentication/RoleAccess/TenantContext/LineLogin` + claims/policies + Zenity Identity.Example | **✅ built** (0.5.0 — tenant-aware user/role/claim store, argon2id, `ICurrentUser`, EF+Dapper, PostgreSQL+SQL Server FM schema) |
 | `Themia.Modules.Identity.AspNetCore` | ezy-assets JWT + authentication flows | **✅ built** (0.5.2 — external/OAuth login: pluggable providers + Google/LINE, `AddThemiaExternalAuth`, `MapIdentityExternalAuthEndpoints`; Facebook/Microsoft/Telegram deferred additive providers — on top of 0.5.1 JWT issuance, rotating refresh tokens, `IAuthenticationFlow`, `MapIdentityAuthEndpoints`) |
-| `Themia.Modules.Storage` | **ezy-assets** S3/Local + **Idevs** `CloudUploadStorage` + **PowerACC** ClamAV scan | ⬜ **P1 — next to spec** |
+| `Themia.Modules.Storage` | **ezy-assets** S3/Local + **Idevs** `CloudUploadStorage` + **PowerACC** ClamAV scan | ✅ **built** (0.5.3 — Local + S3/R2 backends, tenant-aware metadata + quota, EF+Dapper, PostgreSQL+SQL Server FM schema) |
 | `Themia.Modules.Notifications` | ezy-assets `NotificationDispatcher`/Email/OTP/`Sms2Pro` | ⬜ to-spec |
 | `Themia.Modules.Pdf` | **ezy-assets** Contract/Proposal PDF + **Idevs** `PdfOptionsBuilder`/PuppeteerSharp + PowerACC reporting | ⬜ to-spec |
 | `Themia.Modules.Export` | **Idevs** `IReportBaseModel`/`IdevsExportRequest`/ClosedXML (Excel) | ⬜ to-spec |
@@ -258,7 +258,7 @@ spec). Later phases extend (SQLite, Oracle) without public-surface breaks.
 > `0.4.0` Phase-1 modules → … → `1.0.0`).
 
 - **Phase 0 — Rename** `zenity`/`zenity-v2` → `Themia.Framework.*`/`Themia.Modules.*` (separate task).
-- **Phase 1 — Core cross-cutting:** Scheduling ✅, ExceptionLogging ✅, **Identity**, **Storage**
+- **Phase 1 — Core cross-cutting:** Scheduling ✅, ExceptionLogging ✅, **Identity** ✅, Storage ✅
   (+ multi-DB SqlServer/MySql/Postgres baseline).
 - **Phase 2 — Productivity:** Notifications, Pdf, Export.
 - **Phase 3 — Advanced:** Geo, AI, Audit; Sequences EF-port; SourceGenerator/analyzer merge.
@@ -271,6 +271,7 @@ spec). Later phases extend (SQLite, Oracle) without public-surface breaks.
 - ✅ `docs/superpowers/specs/2026-06-01-themia-exceptional-design.md`
 - ✅ `docs/superpowers/specs/2026-06-14-themia-identity-core-design.md` (Identity core — 0.5.0)
 - ✅ `docs/superpowers/specs/2026-06-15-themia-identity-jwt-design.md` (Identity JWT — 0.5.1)
+- ✅ `docs/superpowers/specs/2026-06-17-themia-storage-design.md` (Storage — 0.5.3) · `docs/superpowers/plans/2026-06-17-themia-storage-0.5.3.md`
 - ⬜ Phase 0 framework rename (`0.2.0`) — own spec when started
 - ⬜ Storage, Notifications, Pdf, Export, … (one spec each, this catalog as parent)
 

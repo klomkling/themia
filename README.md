@@ -5,7 +5,7 @@ A **.NET 10** application framework — a **framework core** plus a catalog of *
 non-Themia apps (e.g. a net8 Serenity app) can consume them. All packages ship under the
 `Themia.*` NuGet prefix.
 
-> **Status:** active development, released through **`0.5.2`**. Shipped so far: the build-time
+> **Status:** active development, released through **`0.5.3`**. Shipped so far: the build-time
 > **tooling** (`Themia.SourceGenerator`, `Themia.Analyzers`, `Themia.Generators.Abstractions`);
 > the **framework core** (`Themia.Framework.Core`, `Themia.Caching`, `Themia.Logging`,
 > `Themia.MultiTenancy`, `Themia.Mediator`, `Themia.Services`, `Themia.Framework.AspNetCore`); a
@@ -15,7 +15,8 @@ non-Themia apps (e.g. a net8 Serenity app) can consume them. All packages ship u
 > `Themia.Quartz`, `Themia.Exceptional.*`); and the first **modules**
 > (`Themia.Modules.Scheduling` with persistent Quartz, `Themia.Modules.Identity` tenant-aware
 > Identity core, `Themia.Modules.Identity.AspNetCore` JWT + rotating refresh tokens + pluggable
-> external/OAuth login). The
+> external/OAuth login), and `Themia.Modules.Storage` (tenant-aware object storage over Local +
+> S3/R2 backends). The
 > architecture overview, module specs, and implementation plans live under
 > [`docs/`](docs/); the full release history is in [CHANGELOG.md](CHANGELOG.md).
 
@@ -28,7 +29,7 @@ Layered, with a strict downward dependency direction:
 | **Tooling** (build-time) | `netstandard2.0` | `Themia.SourceGenerator`, `Themia.Analyzers`, `Themia.Generators.Abstractions` |
 | **Framework core** | `net10.0` | `Themia.Framework.Core`, `Themia.Framework.AspNetCore`, `Themia.Framework.Data.Abstractions` / `.EFCore(.SqlServer/.PostgreSql)` / `.Dapper(.SqlServer/.MySql/.PostgreSql)`, `Themia.MultiTenancy`, `Themia.Mediator`, `Themia.Caching`, `Themia.Logging`, `Themia.Services` |
 | **Neutral cores** | `net8.0;net10.0` | `Themia.DependencyInjection`, `Themia.Data.Migrations`, `Themia.Quartz`, `Themia.Exceptional(.SqlServer/.MySql/.PostgreSql)`, `Themia.AspNetCore` |
-| **Modules** | `net10.0` | `Themia.Modules.Scheduling`, `Themia.Modules.Identity(.Abstractions)`, `Themia.Modules.Identity.AspNetCore`, … (ExceptionLogging, Storage planned) |
+| **Modules** | `net10.0` | `Themia.Modules.Scheduling`, `Themia.Modules.Identity(.Abstractions)`, `Themia.Modules.Identity.AspNetCore`, `Themia.Modules.Storage`, … (ExceptionLogging planned) |
 
 Two rules drive the design:
 
@@ -97,6 +98,28 @@ Telegram are deferred additive providers. LINE emits no `email_verified` claim, 
 login never auto-links to an existing account (opt in via `LineOptions.EmailAlwaysVerified` if you
 trust LINE's email verification).
 
+## Storage
+
+`Themia.Modules.Storage` adds tenant-aware object storage over a Local filesystem or S3/R2 backend.
+Every object's physical key is prefixed with the ambient tenant, so isolation holds by
+construction; object metadata and a per-tenant quota are tracked in the `storage.storage_objects`
+table (FluentMigrator schema, PostgreSQL + SQL Server) on either the EF Core or Dapper data peer.
+
+```csharp
+builder.Services
+    .AddThemiaStorage()
+    .UseLocal(o => { o.RootPath = "/var/themia/blobs"; o.SigningKey = "…"; })  // or .UseS3(…) / .UseR2(…)
+    .AddValidation()   // size + content-type checks via IFileValidator
+    .AddScanning();    // DI-replaceable IFileScanner seam (NullFileScanner by default)
+
+// opt-in presigned-direct upload/download endpoints
+app.MapThemiaStorageEndpoints();
+```
+
+Uploads are size- and content-type-validated before a write; the opt-in `MapThemiaStorageEndpoints`
+flow issues presigned URLs so clients transfer bytes straight to/from the backend, keeping object
+content off the application server. Secrets, credentials, and presigned URLs are never logged.
+
 ## Documentation
 
 - [Architecture overview & module catalog](docs/themia-architecture-overview.md)
@@ -104,6 +127,7 @@ trust LINE's email verification).
 - [Identity core design](docs/superpowers/specs/2026-06-14-themia-identity-core-design.md)
 - [Identity JWT design (0.5.1)](docs/superpowers/specs/2026-06-15-themia-identity-jwt-design.md)
 - [Identity external/OAuth login design (0.5.2)](docs/superpowers/specs/2026-06-16-themia-identity-external-login-design.md)
+- [Storage design (0.5.3)](docs/superpowers/specs/2026-06-17-themia-storage-design.md) · [implementation plan](docs/superpowers/plans/2026-06-17-themia-storage-0.5.3.md)
 - [Scheduling (Quartz) design](docs/superpowers/specs/2026-06-01-themia-quartz-scheduling-design.md)
 - [Exception logging design](docs/superpowers/specs/2026-06-01-themia-exceptional-design.md)
 - [Release strategy & CHANGELOG conventions](docs/superpowers/specs/2026-06-01-themia-release-strategy-design.md)
