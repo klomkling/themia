@@ -128,10 +128,12 @@ the blob backend) with no shared transaction, so `PutAsync` is **metadata-first*
 2. scan — `IFileScanner` (no-op by default; server-proxied path only — presigned uploads scan at the
    complete step / async, a future concern while scanning is a no-op).
 3. **reserve, inside one UoW transaction** (`ExecuteInTransactionAsync`): compute current tenant usage
-   (`SUM(size_bytes)`), reject if `usage − existingSize + newSize > quota`, then upsert the
-   `storage_objects` row with the new size and commit. The committed row makes a concurrent put see the
-   reserved size, so two racing puts cannot both pass the check (the same transactional compare-and-set
-   pattern the refresh-token rotation uses).
+   (`SUM(size_bytes)` over the tenant's rows, excluding the key being replaced), reject if
+   `usage + newSize > quota`, then upsert the `storage_objects` row with the new size and commit. This is
+   **transactional but best-effort** under high concurrency — quota-by-sum has no unique index to
+   compare-and-set against, so two simultaneous puts could each read the pre-commit sum and overshoot
+   slightly. Strict serialization (a per-tenant usage row updated with a conditional `UPDATE`, or a
+   `SERIALIZABLE` transaction) is a **0.5.5** hardening, not this slice.
 4. write the blob via `IStorageProvider`.
 
 If the blob write fails after the row commits, the reserved row is best-effort deleted in a
@@ -252,7 +254,7 @@ the next available minor and another module shipping in between can shift the ex
 |---|---|---|
 | **0.5.3** *(this spec)* | **Foundation** | Neutral core (`Themia.Storage`) + Local + S3/R2 (`Themia.Storage.S3`); module (`ITenantStorage`) with tenant key-prefix isolation, DB metadata + race-safe quota over EF/Dapper + FM schema, `IFileValidator` (size + content-type allowlist), `IFileScanner` no-op seam, the `AddThemiaStorage().UseLocal/UseS3/UseR2` builder, and opt-in presigned-direct endpoints. |
 | **0.5.4** | **Content trust** | `Themia.Storage.ClamAV` — the `IFileScanner` implementation (donor: PowerACC), stream-scan on server-proxied upload + a post-upload scan hook for presigned uploads; plus the magic-byte content-sniffing `IFileValidator` (validate by content, not extension). |
-| **0.5.5** | **Scale & ops** | Server-side multipart / `TransferUtility` for large server-proxied uploads; per-tenant quota override rows; the orphan-blob reconcile job; and a `Themia.Analyzers` rule (THEMIA10x) flagging raw `IStorageProvider` use outside the module (tenant-prefix bypass). |
+| **0.5.5** | **Scale & ops** | Strict quota serialization (per-tenant usage row with a conditional `UPDATE`, replacing the best-effort SUM); server-side multipart / `TransferUtility` for large server-proxied uploads; per-tenant quota override rows; the orphan-blob reconcile job; and a `Themia.Analyzers` rule (THEMIA10x) flagging raw `IStorageProvider` use outside the module (tenant-prefix bypass). |
 | *later (additive, uncommitted)* | **More backends** | Azure Blob and GCS provider packages (`Themia.Storage.AzureBlob` / `.Gcs`); an optional per-tenant-bucket isolation mode. Built only if a consumer needs them (YAGNI). |
 
 Phase boundary unchanged: all Storage slices are **Phase 1** and stay in the **0.5.x** line; **0.6.0**
