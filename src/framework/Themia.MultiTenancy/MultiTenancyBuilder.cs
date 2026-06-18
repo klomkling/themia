@@ -176,6 +176,7 @@ public static class MultiTenancyServiceCollectionExtensions
             services.Configure<MultiTenancyOptions>(o =>
             {
                 o.HeaderName = snapshot.HeaderName;
+                o.ClaimType = snapshot.ClaimType;
                 o.PathPrefix = snapshot.PathPrefix;
                 o.DefaultTenantIdentifier = snapshot.DefaultTenantIdentifier;
                 o.UseDefaultStrategies = snapshot.UseDefaultStrategies;

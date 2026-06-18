@@ -54,7 +54,7 @@ public class ClaimsTenantResolutionStrategyTests
         Assert.False(result.Success);
         Assert.Null(result.Tenant);
         Assert.Equal("tenant_id", result.Source);
-        Assert.Equal("Claim not present", result.Reason);
+        Assert.Equal("Claim missing or not a valid tenant identifier", result.Reason);
     }
 
     [Fact]
@@ -66,6 +66,33 @@ public class ClaimsTenantResolutionStrategyTests
         var result = await strategy.ResolveAsync(context);
 
         Assert.False(result.Success);
+    }
+
+    [Theory]
+    [InlineData("bad:tenant")]   // colon is outside the tenant-id charset
+    [InlineData("a/b")]          // path separator
+    [InlineData("has space")]
+    public async Task ResolveAsync_WithInvalidClaimValue_ReturnsNotFound(string claimValue)
+    {
+        var strategy = new ClaimsTenantResolutionStrategy(_options, _logger);
+        var context = ContextWithClaims(new() { ["tenant_id"] = claimValue });
+
+        var result = await strategy.ResolveAsync(context);
+
+        Assert.False(result.Success);
+        Assert.Null(result.Tenant);
+    }
+
+    [Fact]
+    public async Task ResolveAsync_WithGuidClaim_ResolvesTenant()
+    {
+        var strategy = new ClaimsTenantResolutionStrategy(_options, _logger);
+        var context = ContextWithClaims(new() { ["tenant_id"] = "0f8fad5b-d9cb-469f-a165-70867728950e" });
+
+        var result = await strategy.ResolveAsync(context);
+
+        Assert.True(result.Success);
+        Assert.Equal("0f8fad5b-d9cb-469f-a165-70867728950e", result.Tenant!.Identifier);
     }
 
     [Fact]

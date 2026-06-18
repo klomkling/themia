@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Themia.Framework.Core.Abstractions.Tenancy;
 using Themia.MultiTenancy.Abstractions;
 
 namespace Themia.MultiTenancy.Strategies;
@@ -33,16 +34,19 @@ public sealed class ClaimsTenantResolutionStrategy : ITenantResolutionStrategy
 
         var claimType = _options.Value.ClaimType;
 
-        if (context.Claims.TryGetValue(claimType, out var tenantIdentifier) && !string.IsNullOrWhiteSpace(tenantIdentifier))
+        // Validate the claim through TenantId before trusting it. This path has no ITenantStore
+        // round-trip (the store would otherwise implicitly reject unknown ids), so the claim is
+        // external input that must satisfy the same tenant-id charset/length the framework keys on.
+        if (context.Claims.TryGetValue(claimType, out var claimValue) && TenantId.TryFrom(claimValue, out var tenantId))
         {
-            _logger.LogDebug("Tenant identifier {Tenant} found in claim {Claim}", tenantIdentifier, claimType);
+            _logger.LogDebug("Tenant {Tenant} resolved from claim {Claim}", tenantId.Value, claimType);
             // The claim is the tenant: return a fully resolved minimal tenant so DefaultTenantResolver
             // returns it directly and bypasses ITenantStore (no catalog required). TenantInfo requires
-            // both Id and Identifier, so both take the claim value.
-            var tenant = new TenantInfo(tenantIdentifier, tenantIdentifier);
+            // both Id and Identifier, so both take the validated claim value.
+            var tenant = new TenantInfo(tenantId.Value, tenantId.Value);
             return Task.FromResult(TenantResolutionResult.Resolved(tenant, claimType));
         }
 
-        return Task.FromResult(TenantResolutionResult.NotFound(claimType, "Claim not present"));
+        return Task.FromResult(TenantResolutionResult.NotFound(claimType, "Claim missing or not a valid tenant identifier"));
     }
 }

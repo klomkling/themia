@@ -86,6 +86,27 @@ public readonly record struct TenantId
         string.IsNullOrWhiteSpace(value) ? null : new TenantId(value);
 
     /// <summary>
+    /// Attempts to create a tenant identifier from string input without throwing.
+    /// </summary>
+    /// <param name="value">Tenant id value.</param>
+    /// <param name="tenantId">The created identifier when valid; otherwise <c>default</c>.</param>
+    /// <returns><c>true</c> when <paramref name="value"/> is a valid tenant identifier; otherwise <c>false</c>.</returns>
+    public static bool TryFrom(string? value, out TenantId tenantId)
+    {
+        if (!string.IsNullOrWhiteSpace(value)
+            && value.Length >= MinLength
+            && value.Length <= MaxLength
+            && IsValidFormat(value))
+        {
+            tenantId = new TenantId(value);
+            return true;
+        }
+
+        tenantId = default;
+        return false;
+    }
+
+    /// <summary>
     /// Creates a tenant identifier from a 32-bit integer, encoded as its invariant decimal string.
     /// </summary>
     /// <param name="value">Tenant id as an integer.</param>

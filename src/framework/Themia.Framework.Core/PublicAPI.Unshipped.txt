@@ -6,5 +6,6 @@ Themia.Framework.Core.Abstractions.Tenancy.TenantId.TryAsGuid(out System.Guid va
 Themia.Framework.Core.Abstractions.Tenancy.TenantId.TryAsInt32(out int value) -> bool
 Themia.Framework.Core.Abstractions.Tenancy.TenantId.TryAsInt64(out long value) -> bool
 static Themia.Framework.Core.Abstractions.Tenancy.TenantId.From(System.Guid value) -> Themia.Framework.Core.Abstractions.Tenancy.TenantId
+static Themia.Framework.Core.Abstractions.Tenancy.TenantId.TryFrom(string? value, out Themia.Framework.Core.Abstractions.Tenancy.TenantId tenantId) -> bool
 static Themia.Framework.Core.Abstractions.Tenancy.TenantId.From(int value) -> Themia.Framework.Core.Abstractions.Tenancy.TenantId
 static Themia.Framework.Core.Abstractions.Tenancy.TenantId.From(long value) -> Themia.Framework.Core.Abstractions.Tenancy.TenantId

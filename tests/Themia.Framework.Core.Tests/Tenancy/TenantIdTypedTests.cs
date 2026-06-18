@@ -114,4 +114,36 @@ public class TenantIdTypedTests
     {
         Assert.False(new TenantId("acme").TryAsGuid(out _));
     }
+
+    [Theory]
+    [InlineData("acme")]
+    [InlineData("tenant-1")]
+    [InlineData("tenant_2")]
+    [InlineData("42")]
+    public void TryFrom_ReturnsTrue_ForValidValue(string value)
+    {
+        Assert.True(TenantId.TryFrom(value, out var tenantId));
+        Assert.Equal(value, tenantId.Value);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("bad:tenant")]
+    [InlineData("a/b")]
+    [InlineData("has space")]
+    public void TryFrom_ReturnsFalse_ForInvalidValue(string? value)
+    {
+        Assert.False(TenantId.TryFrom(value, out var tenantId));
+        Assert.Equal(default, tenantId);
+    }
+
+    [Fact]
+    public void TryFrom_ReturnsFalse_ForOverlongValue()
+    {
+        var tooLong = new string('a', TenantId.MaxLength + 1);
+
+        Assert.False(TenantId.TryFrom(tooLong, out _));
+    }
 }
