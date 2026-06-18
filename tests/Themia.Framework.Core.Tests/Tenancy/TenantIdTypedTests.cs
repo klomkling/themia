@@ -146,4 +146,13 @@ public class TenantIdTypedTests
 
         Assert.False(TenantId.TryFrom(tooLong, out _));
     }
+
+    [Fact]
+    public void TryFrom_ReturnsTrue_ForMaxLengthValue()
+    {
+        var maxLen = new string('a', TenantId.MaxLength);
+
+        Assert.True(TenantId.TryFrom(maxLen, out var tenantId));
+        Assert.Equal(maxLen, tenantId.Value);
+    }
 }

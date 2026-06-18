@@ -170,17 +170,11 @@ public static class MultiTenancyServiceCollectionExtensions
         services.AddOptions<MultiTenancyOptions>();
         if (captured is not null)
         {
-            // Copy the already-captured values into the options registration; do NOT call
-            // configureOptions again here to avoid invoking the user callback a second time.
+            // Apply the already-captured values to the options registration via CopyTo (defined on
+            // MultiTenancyOptions next to the properties); do NOT call configureOptions again here, to
+            // avoid invoking the user callback a second time.
             var snapshot = captured;
-            services.Configure<MultiTenancyOptions>(o =>
-            {
-                o.HeaderName = snapshot.HeaderName;
-                o.ClaimType = snapshot.ClaimType;
-                o.PathPrefix = snapshot.PathPrefix;
-                o.DefaultTenantIdentifier = snapshot.DefaultTenantIdentifier;
-                o.UseDefaultStrategies = snapshot.UseDefaultStrategies;
-            });
+            services.Configure<MultiTenancyOptions>(snapshot.CopyTo);
         }
 
         // Register the validator and bind ValidateOnStart so misconfiguration surfaces at startup

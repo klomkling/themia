@@ -51,6 +51,10 @@ public readonly record struct TenantId
         Value = value;
     }
 
+    // Unchecked construction for callers that have already validated the value (e.g. TryFrom),
+    // avoiding a second validation pass. Private so every public construction path stays validating.
+    private TenantId(string value, bool alreadyValidated) => Value = value;
+
     /// <summary>
     /// Gets the tenant identifier value.
     /// </summary>
@@ -98,7 +102,7 @@ public readonly record struct TenantId
             && value.Length <= MaxLength
             && IsValidFormat(value))
         {
-            tenantId = new TenantId(value);
+            tenantId = new TenantId(value, alreadyValidated: true);
             return true;
         }
 
