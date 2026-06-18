@@ -1,4 +1,4 @@
-# Themia.MultiTenancy — Typed TenantId + Claims Resolution (0.6.0) Implementation Plan
+# Themia.MultiTenancy — Typed TenantId + Claims Resolution (0.5.6) Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -26,7 +26,7 @@
 | `src/framework/Themia.MultiTenancy/MultiTenancyBuilder.cs` | `UseClaimsStrategy()` wiring | Modify |
 | `tests/Themia.MultiTenancy.Tests/Configuration/ServiceCollectionExtensionsTests.cs` | Wiring registration test | Modify |
 | `src/framework/Themia.MultiTenancy/PublicAPI.Unshipped.txt` | Track new public API | Modify |
-| `Directory.Build.props` | Version bump to 0.6.0 | Modify |
+| `Directory.Build.props` | Version bump to 0.5.6 | Modify |
 
 Run all commands from `Packages/themia/`.
 
@@ -686,7 +686,7 @@ git commit -m "chore: track claims strategy + ClaimType in PublicAPI.Unshipped"
 
 ---
 
-## Task 9: Version bump to 0.6.0 and full verification
+## Task 9: Version bump to 0.5.6 and full verification
 
 **Files:**
 - Modify: `Directory.Build.props`
@@ -696,7 +696,7 @@ git commit -m "chore: track claims strategy + ClaimType in PublicAPI.Unshipped"
 In `Directory.Build.props`, change the version line (inside the `Label="Version"` PropertyGroup):
 
 ```xml
-    <Version>0.6.0</Version>
+    <Version>0.5.6</Version>
 ```
 
 (from `<Version>0.5.5</Version>`)
@@ -715,7 +715,7 @@ Expected: All tests pass (including the new `TenantIdTypedTests`, `ClaimsTenantR
 
 ```bash
 git add Directory.Build.props
-git commit -m "chore: bump version to 0.6.0 (MultiTenancy typed TenantId + claims)"
+git commit -m "chore: bump version to 0.5.6 (MultiTenancy typed TenantId + claims)"
 ```
 
 ---
@@ -730,7 +730,7 @@ git commit -m "chore: bump version to 0.6.0 (MultiTenancy typed TenantId + claim
 - §4 tenant+user identity (docs only, no new API) → no task required by design. ✓
 - §6 testing (TenantId units, strategy units, empty-store resolution, clean build/TWAE, PublicAPI) → Tasks 1–8. ✓
 - §5 out of scope (generic `TTenantId`, combined accessor, DB-per-tenant routing) → no tasks, correctly omitted. ✓
-- Version 0.6.0 → Task 9. ✓
+- Version 0.5.6 → Task 9. ✓
 
 **2. Placeholder scan:** No TBD/TODO/"handle edge cases"/"similar to Task N" — every code and PublicAPI step is literal. ✓
 

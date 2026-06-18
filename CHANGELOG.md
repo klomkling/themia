@@ -2,10 +2,19 @@
 
 All notable changes to the **Themia** packages are documented here.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
-and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 All Themia packages share a **single version** (single-version monorepo); each
 released version tags the whole set.
+
+**Versioning policy (pre-1.0).** Following [SemVer](https://semver.org/spec/v2.0.0.html)'s allowance
+that anything may change before 1.0, Themia uses a milestone-based scheme while in `0.x`:
+
+- **MINOR** (`0.x.0`) — a new module/package or a phase boundary (e.g. `0.5.0` = Identity module).
+- **PATCH** (`0.x.y`) — backwards-compatible additive features **and** fixes within a milestone.
+- **MAJOR** — reserved; breaking changes pre-1.0 are flagged **(breaking)** here and in
+  [MIGRATION.md](MIGRATION.md).
+
+At `1.0` this switches to strict SemVer (every backwards-compatible feature → MINOR).
 
 Categories: **Added**, **Changed**, **Deprecated**, **Removed**, **Fixed**, **Security**.
 Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.md](MIGRATION.md).
@@ -17,6 +26,22 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
   [Older releases](#older-releases). The current (and most recent) year stays inline.
 
 ## [Unreleased]
+
+## [0.5.6] - 2026-06-18
+
+### Added
+
+- **Typed `TenantId` construct/extract** in `Themia.Framework.Core` — `TenantId.From(int)`/`From(long)`/
+  `From(Guid)` factories (canonical string encoding: invariant decimal for integers, lowercase `"D"`
+  format for GUIDs) plus `AsInt32()`/`AsInt64()`/`AsGuid()` (throw `FormatException` on mismatch) and
+  no-throw `TryAsInt32`/`TryAsInt64`/`TryAsGuid`. Lets int/long/guid apps adopt the string-keyed
+  `TenantId` without hand-formatting at every call site, and centralizes the canonical encoding in one
+  place so round-tripping can't drift.
+- **`ClaimsTenantResolutionStrategy`** in `Themia.MultiTenancy` — resolves the tenant from an
+  authenticated principal's claim (claim type via `MultiTenancyOptions.ClaimType`, default `tenant_id`),
+  opt-in via `MultiTenancyBuilder.UseClaimsStrategy()`. Returns a fully **resolved** result carrying a
+  minimal `TenantInfo` built from the claim, so resolution needs **no `ITenantStore` catalog** — the
+  claim *is* the tenant. The natural fit for JWT apps (coord #0003).
 
 ## [0.5.5] - 2026-06-18
 

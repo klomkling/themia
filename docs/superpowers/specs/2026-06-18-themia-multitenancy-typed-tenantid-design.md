@@ -1,4 +1,4 @@
-# Themia.MultiTenancy — Typed TenantId + claims resolution (0.6.0) Design
+# Themia.MultiTenancy — Typed TenantId + claims resolution (0.5.6) Design
 
 **Status:** Draft (2026-06-18)
 **Scope:** Additive, **non-breaking** enhancements to the tenancy core so JWT/int/guid apps adopt
@@ -26,7 +26,9 @@ row-level `tenant_id` typing matters **less**, not more. A canonical string key 
 its string form) covers all four representations at the storage boundary; the consumer works in its
 native type at its own boundary via typed construct/extract.
 
-Ships at **0.6.0** (version ≠ phase; 0.6.0 also opens Phase 2). Single shared monorepo version.
+Ships at **0.5.6** (a backwards-compatible additive feature — same class as 0.5.4/0.5.5; under the
+project's pre-1.0 policy MINOR is reserved for new modules / phase boundaries, so this is a PATCH).
+Single shared monorepo version.
 
 ## 2. `TenantId` — typed construct/extract (Core, additive)
 
