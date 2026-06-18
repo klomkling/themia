@@ -1,4 +1,24 @@
 #nullable enable
+Themia.AspNetCore.Mapping.IProblemMappable
+Themia.AspNetCore.Mapping.IProblemMappable.ToProblemMapping() -> Themia.AspNetCore.Mapping.ProblemMapping!
+Themia.AspNetCore.Mapping.ProblemMapping
+Themia.AspNetCore.Mapping.ProblemMapping.ProblemMapping(int Status, string? ErrorCode = null, System.Collections.Generic.IReadOnlyDictionary<string!, object?>? Metadata = null, string? ValidationPropertyName = null, int? RetryAfterSeconds = null) -> void
+Themia.AspNetCore.Mapping.ProblemMapping.ErrorCode.get -> string?
+Themia.AspNetCore.Mapping.ProblemMapping.ErrorCode.init -> void
+Themia.AspNetCore.Mapping.ProblemMapping.Metadata.get -> System.Collections.Generic.IReadOnlyDictionary<string!, object?>?
+Themia.AspNetCore.Mapping.ProblemMapping.Metadata.init -> void
+Themia.AspNetCore.Mapping.ProblemMapping.RetryAfterSeconds.get -> int?
+Themia.AspNetCore.Mapping.ProblemMapping.RetryAfterSeconds.init -> void
+Themia.AspNetCore.Mapping.ProblemMapping.Status.get -> int
+Themia.AspNetCore.Mapping.ProblemMapping.Status.init -> void
+Themia.AspNetCore.Mapping.ProblemMapping.ValidationPropertyName.get -> string?
+Themia.AspNetCore.Mapping.ProblemMapping.ValidationPropertyName.init -> void
+Themia.AspNetCore.Mapping.ProblemMappingRegistry
+Themia.AspNetCore.Mapping.ProblemMappingRegistry.ProblemMappingRegistry() -> void
+Themia.AspNetCore.Mapping.ProblemMappingRegistry.Register<TException>(System.Func<TException, Themia.AspNetCore.Mapping.ProblemMapping!>! mapper) -> void
+Themia.AspNetCore.Mapping.ProblemMappingRegistry.TryMap(System.Exception! exception, out Themia.AspNetCore.Mapping.ProblemMapping! mapping) -> bool
+Themia.AspNetCore.ServiceCollectionExtensions
+Themia.AspNetCore.ServiceCollectionExtensions.AddThemiaProblemMapping<TException>(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Func<TException, Themia.AspNetCore.Mapping.ProblemMapping!>! mapper) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
 Themia.AspNetCore.Exceptions.RateLimitException
 Themia.AspNetCore.Exceptions.RateLimitException.RateLimitException(string! message, int retryAfterSeconds, string? errorCode = null, System.Collections.Generic.IReadOnlyDictionary<string!, object?>? metadata = null) -> void
 Themia.AspNetCore.Exceptions.RateLimitException.RetryAfterSeconds.get -> int

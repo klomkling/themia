@@ -2,8 +2,11 @@ using System.Diagnostics;
 using System.Text.Json;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.WebUtilities;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Themia.AspNetCore.Exceptions;
+using Themia.AspNetCore.Mapping;
 
 namespace Themia.AspNetCore;
 
@@ -50,10 +53,59 @@ public sealed class ProblemDetailsMiddleware(
         catch (ExternalServiceException ex) { await WriteAsync(context, 503, "Service unavailable", ex, traceId, LogLevel.Error); }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Unhandled exception for {Method} {Path} (TraceId: {TraceId})",
-                context.Request.Method, context.Request.Path, traceId);
-            await WriteGenericAsync(context, 500, "Server error", "An unexpected error occurred.", traceId);
+            if (TryGetMapping(context, ex, out var mapping))
+            {
+                await WriteMappedAsync(context, ex, mapping, traceId);
+            }
+            else
+            {
+                logger.LogError(ex, "Unhandled exception for {Method} {Path} (TraceId: {TraceId})",
+                    context.Request.Method, context.Request.Path, traceId);
+                await WriteGenericAsync(context, 500, "Server error", "An unexpected error occurred.", traceId);
+            }
         }
+    }
+
+    // Consumer-exception seam: an exception that implements IProblemMappable maps itself (no DI needed);
+    // otherwise a registry registered via AddThemiaProblemMapping is consulted. RequestServices may be
+    // null (e.g. unit tests constructing the middleware directly), so the lookup is null-safe.
+    private static bool TryGetMapping(HttpContext ctx, Exception ex, out ProblemMapping mapping)
+    {
+        if (ex is IProblemMappable mappable) { mapping = mappable.ToProblemMapping(); return true; }
+        var registry = ctx.RequestServices?.GetService<ProblemMappingRegistry>();
+        if (registry is not null && registry.TryMap(ex, out mapping)) return true;
+        mapping = null!;
+        return false;
+    }
+
+    private async Task WriteMappedAsync(HttpContext ctx, Exception ex, ProblemMapping mapping, string traceId)
+    {
+        var status = mapping.Status;
+        var level = status >= 500 ? LogLevel.Error : LogLevel.Warning;
+        var title = ReasonPhrases.GetReasonPhrase(status);
+        if (string.IsNullOrEmpty(title)) title = "Error";
+        logger.Log(level, ex, "Mapped consumer exception {Exception} -> {Status} for {Method} {Path} (TraceId: {TraceId})",
+            ex.GetType().Name, status, ctx.Request.Method, ctx.Request.Path, traceId);
+
+        ProblemDetails problem = mapping.ValidationPropertyName is { } prop
+            ? new ValidationProblemDetails(new Dictionary<string, string[]> { [prop] = [ex.Message] })
+            : new ProblemDetails();
+        problem.Status = status;
+        problem.Title = title;
+        problem.Detail = ex.Message;
+        problem.Instance = ctx.Request.Path;
+
+        // Consumer metadata first, then reserved keys last so they can't be overridden.
+        AddMetadata(problem, mapping.Metadata);
+        problem.Extensions["traceId"] = traceId;
+        if (mapping.ErrorCode is not null) problem.Extensions["errorCode"] = mapping.ErrorCode;
+        if (mapping.RetryAfterSeconds is { } ra)
+        {
+            problem.Extensions["retryAfterSeconds"] = ra;
+            ctx.Response.Headers.RetryAfter = ra.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        }
+
+        await WriteProblemAsync(ctx, problem, status, traceId);
     }
 
     private async Task WriteAsync(HttpContext ctx, int status, string title, ThemiaException ex, string traceId, LogLevel level)

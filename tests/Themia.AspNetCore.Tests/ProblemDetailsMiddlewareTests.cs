@@ -1,12 +1,23 @@
 using System.Text.Json;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Features;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Themia.AspNetCore.Exceptions;
+using Themia.AspNetCore.Mapping;
 using Xunit;
 
 namespace Themia.AspNetCore.Tests;
+
+/// <summary>A consumer exception that maps itself via <see cref="IProblemMappable"/>.</summary>
+file sealed class MappableException(ProblemMapping mapping) : Exception("mapped boom"), IProblemMappable
+{
+    public ProblemMapping ToProblemMapping() => mapping;
+}
+
+/// <summary>A plain consumer exception with no Themia awareness (mapped via the registry).</summary>
+file sealed class SomeConsumerException() : Exception("dup boom");
 
 public sealed class ProblemDetailsMiddlewareTests
 {
@@ -231,6 +242,80 @@ public sealed class ProblemDetailsMiddlewareTests
         // generic 500 path — only client-initiated cancellation is treated specially.
         var (status, _) = await InvokeWith(new OperationCanceledException());
         Assert.Equal(500, status);
+    }
+
+    [Fact]
+    public async Task IProblemMappable_consumer_exception_is_mapped()
+    {
+        var (status, body) = await InvokeWith(new MappableException(new ProblemMapping(404, ErrorCode: "X")));
+
+        Assert.Equal(404, status);
+        Assert.Equal(404, body.GetProperty("status").GetInt32());
+        Assert.Equal("X", body.GetProperty("errorCode").GetString());
+        Assert.False(string.IsNullOrEmpty(body.GetProperty("traceId").GetString()));
+    }
+
+    [Fact]
+    public async Task IProblemMappable_validation_maps_to_400_errors_dict()
+    {
+        var (status, body) = await InvokeWith(
+            new MappableException(new ProblemMapping(400, ValidationPropertyName: "Email")));
+
+        Assert.Equal(400, status);
+        Assert.Equal("mapped boom", body.GetProperty("errors").GetProperty("Email")[0].GetString());
+    }
+
+    [Fact]
+    public async Task IProblemMappable_retry_after_maps_to_429_header()
+    {
+        var ctx = new DefaultHttpContext();
+        ctx.Request.Path = "/x";
+        ctx.Response.Body = new MemoryStream();
+        var mw = new ProblemDetailsMiddleware(
+            _ => throw new MappableException(new ProblemMapping(429, RetryAfterSeconds: 15)),
+            NullLogger<ProblemDetailsMiddleware>.Instance);
+
+        await mw.InvokeAsync(ctx);
+
+        Assert.Equal(429, ctx.Response.StatusCode);
+        Assert.Equal("15", ctx.Response.Headers.RetryAfter);
+        ctx.Response.Body.Position = 0;
+        using var doc = JsonDocument.Parse(await new StreamReader(ctx.Response.Body).ReadToEndAsync());
+        Assert.Equal(15, doc.RootElement.GetProperty("retryAfterSeconds").GetInt32());
+    }
+
+    [Fact]
+    public async Task Registered_mapping_maps_consumer_exception()
+    {
+        var services = new ServiceCollection();
+        services.AddThemiaProblemMapping<SomeConsumerException>(_ => new ProblemMapping(409, ErrorCode: "DUP"));
+        using var provider = services.BuildServiceProvider();
+
+        var ctx = new DefaultHttpContext { RequestServices = provider };
+        ctx.Request.Path = "/x";
+        ctx.Response.Body = new MemoryStream();
+        var mw = new ProblemDetailsMiddleware(
+            _ => throw new SomeConsumerException(),
+            NullLogger<ProblemDetailsMiddleware>.Instance);
+
+        await mw.InvokeAsync(ctx);
+
+        Assert.Equal(409, ctx.Response.StatusCode);
+        ctx.Response.Body.Position = 0;
+        using var doc = JsonDocument.Parse(await new StreamReader(ctx.Response.Body).ReadToEndAsync());
+        Assert.Equal(409, doc.RootElement.GetProperty("status").GetInt32());
+        Assert.Equal("DUP", doc.RootElement.GetProperty("errorCode").GetString());
+    }
+
+    [Fact]
+    public async Task Unmapped_exception_still_500()
+    {
+        // Neither IProblemMappable nor registered (InvokeWith leaves RequestServices null) -> generic 500.
+        var (status, body) = await InvokeWith(new SomeConsumerException());
+
+        Assert.Equal(500, status);
+        Assert.Equal("An unexpected error occurred.", body.GetProperty("detail").GetString());
+        Assert.DoesNotContain("dup boom", body.GetProperty("detail").GetString());
     }
 
     /// <summary>A value that fails System.Text.Json serialization (self-referencing cycle).</summary>

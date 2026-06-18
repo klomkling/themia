@@ -18,6 +18,19 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.5.5] - 2026-06-18
+
+### Added
+
+- **Consumer-exception → ProblemDetails mapping** in `Themia.AspNetCore` — `IProblemMappable` (implement on
+  a consumer exception) and `services.AddThemiaProblemMapping<TException>(...)` (register a mapper for a
+  type you don't own). Lets existing apps adopt `UseThemiaProblemDetails()` **without** replacing their
+  exception types or rewriting throw sites. Both seams feed one write path and emit the same contract as
+  the typed exceptions: `traceId`/`errorCode`/metadata extensions, a `ValidationProblemDetails` 400 `errors`
+  dictionary (via `ValidationPropertyName`), and `Retry-After` header + `retryAfterSeconds` extension (via
+  `RetryAfterSeconds`). Unblocks the ezy-assets middleware swap over its own ~585-throw-site taxonomy
+  (coord #0002).
+
 ## [0.5.4] - 2026-06-18
 
 ### Added
