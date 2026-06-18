@@ -37,7 +37,8 @@ In `Themia.Framework.Core.Abstractions.Tenancy.TenantId` (a `readonly record str
 **Construct** (canonical string encoding, invariant culture):
 - `static TenantId From(int value)` → `value.ToString(InvariantCulture)` (decimal digits).
 - `static TenantId From(long value)` → invariant decimal.
-- `static TenantId From(Guid value)` → `value.ToString("D")` lowercased (hyphenated hex).
+- `static TenantId From(Guid value)` → `value.ToString("D")` (hyphenated hex; `"D"` is already
+  lowercase in .NET — no extra lowercasing).
 
 All three encodings fall within the existing charset (digits; `D`-format = hex + `-`), so **the existing
 validation is unchanged** and always passes for these factories.
@@ -59,23 +60,28 @@ every call site.
 A built-in `ITenantResolutionStrategy` (the interface is already public; this is the natural fit for JWT
 apps) in `Themia.MultiTenancy/Strategies/`:
 
-- `ClaimsTenantResolutionStrategy(string claimType)` — reads `TenantResolutionContext.Claims[claimType]`
-  (the `Claims` dict is already populated by `TenantResolutionMiddleware` from `HttpContext.User.Claims`;
-  the strategy is host-agnostic, exactly like `HeaderTenantResolutionStrategy` reads `context.Headers`).
-  On a present/non-blank value it returns `TenantResolutionResult.Identified(value, claimType)`; on
-  absent/blank it returns `TenantResolutionResult.NotFound(claimType, …)` — same contract as the other
-  strategies. The claim value is used verbatim as the canonical string identifier (the consumer's
-  int/guid is its own concern via the typed `TenantId.From`/`As` members in §2).
-- **No `ITenantStore` catalog required** (covers coord items 1 & 4): the claim *is* the tenant. The
-  default resolver path is `Identifier → ITenantStore.FindByIdentifierAsync` (which a catalog-less app
-  has no row for). For the no-catalog case, `DefaultTenantResolver` already **bypasses the store when a
-  strategy returns a full `result.Tenant`** — so the claims strategy can return `TenantResolutionResult`
-  carrying a minimal `TenantInfo` built straight from the claim, requiring no catalog lookup. (Apps that
-  DO have a catalog return only the identifier and let the store resolve/validate as today.) The exact
-  return shape (identifier-only vs. inline `TenantInfo`, or a `validateAgainstStore` toggle) is a plan
-  detail; the design commitment is: resolution works with no `ITenantStore` populated.
-- Wired on `MultiTenancyBuilder` (e.g. `UseClaimsStrategy(claimType)`), mirroring the existing
-  `UseHeaderStrategy`/`UsePathStrategy` registration shape.
+- `ClaimsTenantResolutionStrategy` reads `TenantResolutionContext.Claims[claimType]` (the `Claims` dict
+  is already populated by `TenantResolutionMiddleware` from `HttpContext.User.Claims`; the strategy is
+  host-agnostic, exactly like `HeaderTenantResolutionStrategy` reads `context.Headers`). The claim value
+  is used verbatim as the canonical string identifier (the consumer's int/guid is its own concern via
+  the typed `TenantId.From`/`As` members in §2).
+- **Returns `Resolved`, not `Identified` — this is the no-catalog mechanism** (covers coord items 1 & 4).
+  On a present/non-blank claim it returns `TenantResolutionResult.Resolved(new TenantInfo(Id: value,
+  Identifier: value), claimType)`; absent/blank → `TenantResolutionResult.NotFound(claimType, …)`.
+  Rationale (traced through `DefaultTenantResolver`): a result carrying a non-null `Tenant` is returned
+  **directly, bypassing `ITenantStore`**; an `Identified` result (identifier only) instead routes through
+  `ITenantStore.FindByIdentifierAsync`, which yields *nothing* against an empty store — defeating the
+  no-catalog guarantee. So the claim *is* the tenant: build a minimal `TenantInfo` from it (both `Id` and
+  `Identifier` are required non-null on `TenantInfo`, so both take the claim value) and skip the catalog.
+  **Single-mode by design:** this strategy never consults a store. An app that wants catalog
+  enrichment/validation keeps using the Header/Path strategies + a populated `ITenantStore` (no hard
+  catalog requirement exists for the JWT case today — see §1). No `validateAgainstStore` toggle.
+- **Configuration** mirrors the options-driven shape of the existing strategies: add a `ClaimType`
+  property to `MultiTenancyOptions`, expose an **arg-less** `MultiTenancyBuilder.UseClaimsStrategy()`
+  that registers via `AddStrategy<ClaimsTenantResolutionStrategy>()` (singleton — the strategy is
+  stateless), and have the ctor read `IOptions<MultiTenancyOptions>` for the claim type, exactly like
+  `HeaderTenantResolutionStrategy` reads `HeaderName`. (A parameterized `UseClaimsStrategy(claimType)`
+  would need a factory registration and would *not* match the existing `AddStrategy<T>()` shape.)
 
 ## 4. Tenant + user identity (docs only — no new framework API)
 
@@ -99,9 +105,11 @@ for that composition, not a combined framework accessor.
 - `TenantId` units: `From(int/long/Guid)` → expected `Value`; `AsInt32/AsInt64/AsGuid` round-trip;
   `TryAs*` true/false paths; `As*` throws `FormatException` on a mismatched value; a `Guid`-from-`From`
   round-trips through `AsGuid`.
-- `ClaimsTenantResolutionStrategy` units: claim present → `Identified(value, claimType)`; claim
-  absent/blank → `NotFound`; configured claim type honored. (Drive it with a `TenantResolutionContext`
-  carrying a `Claims` dict — no host/`HttpContext` needed.)
+- `ClaimsTenantResolutionStrategy` units: claim present → `Resolved` with a `TenantInfo` whose `Id` and
+  `Identifier` both equal the claim value; claim absent/blank → `NotFound`; configured `ClaimType`
+  honored. (Drive it with a `TenantResolutionContext` carrying a `Claims` dict — no host/`HttpContext`
+  needed.)
 - No-catalog resolution: `DefaultTenantResolver` + claims strategy resolves a tenant with an **empty
-  `ITenantStore`** (the design's core coord-item-4 guarantee).
+  `ITenantStore`** (the design's core coord-item-4 guarantee — asserts the `Resolved` result bypasses
+  the store).
 - Neutral-core/MultiTenancy TFMs + PublicAPI tracked; build clean (TWAE).
