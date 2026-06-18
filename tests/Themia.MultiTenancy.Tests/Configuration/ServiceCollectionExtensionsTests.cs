@@ -1,5 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Xunit;
+using Themia.MultiTenancy;
 using Themia.MultiTenancy.Abstractions;
 using Themia.MultiTenancy.Strategies;
 using Themia.MultiTenancy.Stores;
@@ -260,6 +262,61 @@ public class ServiceCollectionExtensionsTests
 
         var accessorDescriptors = services.Where(s => s.ServiceType == typeof(ITenantAccessor)).ToList();
         Assert.Single(accessorDescriptors);
+    }
+
+    [Fact]
+    public void AddThemiaMultiTenancy_DoesNotRegisterClaimsStrategy_ByDefault()
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+
+        services.AddThemiaMultiTenancy();
+
+        var provider = services.BuildServiceProvider();
+        var strategies = provider.GetServices<ITenantResolutionStrategy>();
+
+        Assert.DoesNotContain(strategies, s => s is ClaimsTenantResolutionStrategy);
+    }
+
+    [Fact]
+    public void AddThemiaMultiTenancy_WithUseClaimsStrategy_ShouldRegisterClaimsStrategy()
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+
+        services.AddThemiaMultiTenancy(configure: builder => builder.UseClaimsStrategy());
+
+        var provider = services.BuildServiceProvider();
+        var strategies = provider.GetServices<ITenantResolutionStrategy>();
+
+        Assert.Contains(strategies, s => s is ClaimsTenantResolutionStrategy);
+    }
+
+    [Fact]
+    public void AddThemiaMultiTenancy_HonorsConfiguredClaimType()
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+
+        services.AddThemiaMultiTenancy(configureOptions: o => o.ClaimType = "tid");
+
+        var provider = services.BuildServiceProvider();
+        var options = provider.GetRequiredService<IOptions<MultiTenancyOptions>>().Value;
+
+        Assert.Equal("tid", options.ClaimType);
+    }
+
+    [Fact]
+    public void AddThemiaMultiTenancy_WithBlankClaimType_FailsValidation()
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddThemiaMultiTenancy(configureOptions: o => o.ClaimType = " ");
+
+        var provider = services.BuildServiceProvider();
+        var options = provider.GetRequiredService<IOptions<MultiTenancyOptions>>();
+
+        Assert.Throws<OptionsValidationException>(() => _ = options.Value);
     }
 }
 

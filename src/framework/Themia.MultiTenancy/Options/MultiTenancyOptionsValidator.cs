@@ -25,6 +25,12 @@ internal sealed class MultiTenancyOptionsValidator : IValidateOptions<MultiTenan
             return ValidateOptionsResult.Fail("HeaderName contains invalid characters (control characters or colons are not allowed)");
         }
 
+        // ClaimType drives the claims strategy; a blank value would silently resolve no tenant.
+        if (string.IsNullOrWhiteSpace(options.ClaimType))
+        {
+            return ValidateOptionsResult.Fail("ClaimType cannot be null or whitespace");
+        }
+
         return ValidateOptionsResult.Success;
     }
 }

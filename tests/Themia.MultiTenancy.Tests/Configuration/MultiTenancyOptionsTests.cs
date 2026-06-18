@@ -47,4 +47,20 @@ public class MultiTenancyOptionsTests
 
         Assert.False(options.UseDefaultStrategies);
     }
+
+    [Fact]
+    public void ClaimType_DefaultsToTenantId()
+    {
+        var options = new MultiTenancyOptions();
+
+        Assert.Equal("tenant_id", options.ClaimType);
+    }
+
+    [Fact]
+    public void ClaimType_IsSettable()
+    {
+        var options = new MultiTenancyOptions { ClaimType = "tid" };
+
+        Assert.Equal("tid", options.ClaimType);
+    }
 }

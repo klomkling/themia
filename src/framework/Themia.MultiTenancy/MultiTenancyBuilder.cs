@@ -55,6 +55,15 @@ public sealed class MultiTenancyBuilder
     }
 
     /// <summary>
+    /// Uses the claims strategy (resolves the tenant from an authenticated principal's claim;
+    /// claim type configured via <see cref="MultiTenancyOptions.ClaimType"/>, default tenant_id).
+    /// </summary>
+    public MultiTenancyBuilder UseClaimsStrategy()
+    {
+        return AddStrategy<ClaimsTenantResolutionStrategy>();
+    }
+
+    /// <summary>
     /// Seeds the in-memory tenant store with tenants.
     /// </summary>
     public MultiTenancyBuilder SeedTenants(IEnumerable<TenantInfo> tenants)
@@ -161,16 +170,11 @@ public static class MultiTenancyServiceCollectionExtensions
         services.AddOptions<MultiTenancyOptions>();
         if (captured is not null)
         {
-            // Copy the already-captured values into the options registration; do NOT call
-            // configureOptions again here to avoid invoking the user callback a second time.
+            // Apply the already-captured values to the options registration via CopyTo (defined on
+            // MultiTenancyOptions next to the properties); do NOT call configureOptions again here, to
+            // avoid invoking the user callback a second time.
             var snapshot = captured;
-            services.Configure<MultiTenancyOptions>(o =>
-            {
-                o.HeaderName = snapshot.HeaderName;
-                o.PathPrefix = snapshot.PathPrefix;
-                o.DefaultTenantIdentifier = snapshot.DefaultTenantIdentifier;
-                o.UseDefaultStrategies = snapshot.UseDefaultStrategies;
-            });
+            services.Configure<MultiTenancyOptions>(snapshot.CopyTo);
         }
 
         // Register the validator and bind ValidateOnStart so misconfiguration surfaces at startup

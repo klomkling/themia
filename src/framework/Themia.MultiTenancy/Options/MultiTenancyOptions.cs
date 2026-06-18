@@ -11,6 +11,11 @@ public sealed class MultiTenancyOptions
     public string HeaderName { get; set; } = "X-Tenant-ID";
 
     /// <summary>
+    /// Claim type inspected for the tenant identifier by the claims strategy (default: tenant_id).
+    /// </summary>
+    public string ClaimType { get; set; } = "tenant_id";
+
+    /// <summary>
     /// Optional path prefix segment used for tenant identification (e.g., /{tenantId}/api).
     /// </summary>
     public string? PathPrefix { get; set; }
@@ -29,4 +34,22 @@ public sealed class MultiTenancyOptions
     /// otherwise no tenant resolution will occur.
     /// </remarks>
     public bool UseDefaultStrategies { get; set; } = true;
+
+    /// <summary>
+    /// Copies every configurable value from this instance onto <paramref name="target"/>.
+    /// </summary>
+    /// <remarks>
+    /// Lives next to the property declarations so adding a new option means updating the copy in the
+    /// same place — the previous field-by-field copy lived in the DI registration and silently dropped
+    /// newly added options. Keep this in sync with the properties above.
+    /// </remarks>
+    /// <param name="target">The options instance to copy values onto.</param>
+    internal void CopyTo(MultiTenancyOptions target)
+    {
+        target.HeaderName = HeaderName;
+        target.ClaimType = ClaimType;
+        target.PathPrefix = PathPrefix;
+        target.DefaultTenantIdentifier = DefaultTenantIdentifier;
+        target.UseDefaultStrategies = UseDefaultStrategies;
+    }
 }
