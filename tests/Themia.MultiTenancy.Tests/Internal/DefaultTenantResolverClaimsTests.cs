@@ -3,23 +3,25 @@ using Microsoft.Extensions.Options;
 using Xunit;
 using Themia.MultiTenancy.Abstractions;
 using Themia.MultiTenancy.Internal;
-using Themia.MultiTenancy.Stores;
 using Themia.MultiTenancy.Strategies;
+using Themia.MultiTenancy.Tests.TestUtilities;
 
 namespace Themia.MultiTenancy.Tests.Internal;
 
 public class DefaultTenantResolverClaimsTests
 {
     [Fact]
-    public async Task ResolveAsync_WithClaimsStrategyAndEmptyStore_ResolvesTenant()
+    public async Task ResolveAsync_WithClaimsStrategy_ResolvesWithoutConsultingStore()
     {
         var options = Options.Create(new MultiTenancyOptions());
         var claimsStrategy = new ClaimsTenantResolutionStrategy(
             options, NullLogger<ClaimsTenantResolutionStrategy>.Instance);
-        var emptyStore = new InMemoryTenantStore();
+        // Empty store that records every lookup, so we can prove the store is bypassed
+        // (the no-catalog guarantee), not merely that resolution happened to succeed.
+        var store = new FakeTenantStore();
         var resolver = new DefaultTenantResolver(
             new ITenantResolutionStrategy[] { claimsStrategy },
-            emptyStore,
+            store,
             NullLogger<DefaultTenantResolver>.Instance);
 
         var context = new TenantResolutionContext(
@@ -31,5 +33,6 @@ public class DefaultTenantResolverClaimsTests
 
         Assert.NotNull(tenant);
         Assert.Equal("acme", tenant!.Identifier);
+        Assert.Equal(0, store.FindCallCount);
     }
 }

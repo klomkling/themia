@@ -28,16 +28,24 @@ public class TenantIdTypedTests
         Assert.Equal("0f8fad5b-d9cb-469f-a165-70867728950e", TenantId.From(guid).Value);
     }
 
-    [Fact]
-    public void FromInt_RoundTripsThroughAsInt32()
+    [Theory]
+    [InlineData(123)]
+    [InlineData(-7)]
+    [InlineData(int.MinValue)]
+    [InlineData(int.MaxValue)]
+    public void FromInt_RoundTripsThroughAsInt32(int value)
     {
-        Assert.Equal(123, TenantId.From(123).AsInt32());
+        Assert.Equal(value, TenantId.From(value).AsInt32());
     }
 
-    [Fact]
-    public void FromLong_RoundTripsThroughAsInt64()
+    [Theory]
+    [InlineData(123L)]
+    [InlineData(-7L)]
+    [InlineData(long.MinValue)]
+    [InlineData(long.MaxValue)]
+    public void FromLong_RoundTripsThroughAsInt64(long value)
     {
-        Assert.Equal(123L, TenantId.From(123L).AsInt64());
+        Assert.Equal(value, TenantId.From(value).AsInt64());
     }
 
     [Fact]
@@ -54,9 +62,23 @@ public class TenantIdTypedTests
     }
 
     [Fact]
+    public void AsInt64_Throws_ForNonIntegerValue()
+    {
+        Assert.Throws<FormatException>(() => new TenantId("not-a-number").AsInt64());
+    }
+
+    [Fact]
     public void AsGuid_Throws_ForNonGuidValue()
     {
         Assert.Throws<FormatException>(() => new TenantId("acme").AsGuid());
+    }
+
+    [Fact]
+    public void AsGuid_Throws_ForNonHyphenatedGuid()
+    {
+        // "N" format (32 hex digits, no hyphens) passes the TenantId charset but is not the
+        // canonical "D" encoding From(Guid) produces, so AsGuid must reject it.
+        Assert.Throws<FormatException>(() => new TenantId("0f8fad5bd9cb469fa16570867728950e").AsGuid());
     }
 
     [Fact]
@@ -71,6 +93,20 @@ public class TenantIdTypedTests
     {
         Assert.False(new TenantId("acme").TryAsInt32(out var value));
         Assert.Equal(0, value);
+    }
+
+    [Fact]
+    public void TryAsInt64_ReturnsTrue_ForValueBeyondInt32()
+    {
+        Assert.True(new TenantId("9223372036854775807").TryAsInt64(out var value));
+        Assert.Equal(long.MaxValue, value);
+    }
+
+    [Fact]
+    public void TryAsInt64_ReturnsFalse_ForNonIntegerValue()
+    {
+        Assert.False(new TenantId("acme").TryAsInt64(out var value));
+        Assert.Equal(0L, value);
     }
 
     [Fact]
