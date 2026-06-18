@@ -1,1 +1,7 @@
 #nullable enable
+Themia.MultiTenancy.MultiTenancyBuilder.UseClaimsStrategy() -> Themia.MultiTenancy.MultiTenancyBuilder!
+Themia.MultiTenancy.MultiTenancyOptions.ClaimType.get -> string!
+Themia.MultiTenancy.MultiTenancyOptions.ClaimType.set -> void
+Themia.MultiTenancy.Strategies.ClaimsTenantResolutionStrategy
+Themia.MultiTenancy.Strategies.ClaimsTenantResolutionStrategy.ClaimsTenantResolutionStrategy(Microsoft.Extensions.Options.IOptions<Themia.MultiTenancy.MultiTenancyOptions!>! options, Microsoft.Extensions.Logging.ILogger<Themia.MultiTenancy.Strategies.ClaimsTenantResolutionStrategy!>! logger) -> void
+Themia.MultiTenancy.Strategies.ClaimsTenantResolutionStrategy.ResolveAsync(Themia.MultiTenancy.Abstractions.TenantResolutionContext! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.MultiTenancy.Abstractions.TenantResolutionResult!>!

@@ -55,6 +55,15 @@ public sealed class MultiTenancyBuilder
     }
 
     /// <summary>
+    /// Uses the claims strategy (resolves the tenant from an authenticated principal's claim;
+    /// claim type configured via <see cref="MultiTenancyOptions.ClaimType"/>, default tenant_id).
+    /// </summary>
+    public MultiTenancyBuilder UseClaimsStrategy()
+    {
+        return AddStrategy<ClaimsTenantResolutionStrategy>();
+    }
+
+    /// <summary>
     /// Seeds the in-memory tenant store with tenants.
     /// </summary>
     public MultiTenancyBuilder SeedTenants(IEnumerable<TenantInfo> tenants)

@@ -261,6 +261,34 @@ public class ServiceCollectionExtensionsTests
         var accessorDescriptors = services.Where(s => s.ServiceType == typeof(ITenantAccessor)).ToList();
         Assert.Single(accessorDescriptors);
     }
+
+    [Fact]
+    public void AddThemiaMultiTenancy_DoesNotRegisterClaimsStrategy_ByDefault()
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+
+        services.AddThemiaMultiTenancy();
+
+        var provider = services.BuildServiceProvider();
+        var strategies = provider.GetServices<ITenantResolutionStrategy>();
+
+        Assert.DoesNotContain(strategies, s => s is ClaimsTenantResolutionStrategy);
+    }
+
+    [Fact]
+    public void AddThemiaMultiTenancy_WithUseClaimsStrategy_ShouldRegisterClaimsStrategy()
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+
+        services.AddThemiaMultiTenancy(configure: builder => builder.UseClaimsStrategy());
+
+        var provider = services.BuildServiceProvider();
+        var strategies = provider.GetServices<ITenantResolutionStrategy>();
+
+        Assert.Contains(strategies, s => s is ClaimsTenantResolutionStrategy);
+    }
 }
 
 /// <summary>

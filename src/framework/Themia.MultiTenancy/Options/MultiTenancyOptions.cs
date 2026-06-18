@@ -11,6 +11,11 @@ public sealed class MultiTenancyOptions
     public string HeaderName { get; set; } = "X-Tenant-ID";
 
     /// <summary>
+    /// Claim type inspected for the tenant identifier by the claims strategy (default: tenant_id).
+    /// </summary>
+    public string ClaimType { get; set; } = "tenant_id";
+
+    /// <summary>
     /// Optional path prefix segment used for tenant identification (e.g., /{tenantId}/api).
     /// </summary>
     public string? PathPrefix { get; set; }
