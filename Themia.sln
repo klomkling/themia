@@ -167,6 +167,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Themia.Modules.Storage.Dapp
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Themia.Modules.Storage.AspNetCore.IntegrationTests", "tests\Themia.Modules.Storage.AspNetCore.IntegrationTests\Themia.Modules.Storage.AspNetCore.IntegrationTests.csproj", "{59D79364-8A90-47EB-8B61-2850384DF1E3}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Themia.MultiTenancy.Mediator", "src\framework\Themia.MultiTenancy.Mediator\Themia.MultiTenancy.Mediator.csproj", "{B92D5DD7-7667-4403-86F5-0C0449EE4EDF}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Themia.MultiTenancy.Mediator.Tests", "tests\Themia.MultiTenancy.Mediator.Tests\Themia.MultiTenancy.Mediator.Tests.csproj", "{1B1D8F13-9EC8-46A2-BCC8-1792D58ECD34}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -1089,6 +1093,30 @@ Global
 		{59D79364-8A90-47EB-8B61-2850384DF1E3}.Release|x64.Build.0 = Release|Any CPU
 		{59D79364-8A90-47EB-8B61-2850384DF1E3}.Release|x86.ActiveCfg = Release|Any CPU
 		{59D79364-8A90-47EB-8B61-2850384DF1E3}.Release|x86.Build.0 = Release|Any CPU
+		{B92D5DD7-7667-4403-86F5-0C0449EE4EDF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B92D5DD7-7667-4403-86F5-0C0449EE4EDF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B92D5DD7-7667-4403-86F5-0C0449EE4EDF}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{B92D5DD7-7667-4403-86F5-0C0449EE4EDF}.Debug|x64.Build.0 = Debug|Any CPU
+		{B92D5DD7-7667-4403-86F5-0C0449EE4EDF}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{B92D5DD7-7667-4403-86F5-0C0449EE4EDF}.Debug|x86.Build.0 = Debug|Any CPU
+		{B92D5DD7-7667-4403-86F5-0C0449EE4EDF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B92D5DD7-7667-4403-86F5-0C0449EE4EDF}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B92D5DD7-7667-4403-86F5-0C0449EE4EDF}.Release|x64.ActiveCfg = Release|Any CPU
+		{B92D5DD7-7667-4403-86F5-0C0449EE4EDF}.Release|x64.Build.0 = Release|Any CPU
+		{B92D5DD7-7667-4403-86F5-0C0449EE4EDF}.Release|x86.ActiveCfg = Release|Any CPU
+		{B92D5DD7-7667-4403-86F5-0C0449EE4EDF}.Release|x86.Build.0 = Release|Any CPU
+		{1B1D8F13-9EC8-46A2-BCC8-1792D58ECD34}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1B1D8F13-9EC8-46A2-BCC8-1792D58ECD34}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1B1D8F13-9EC8-46A2-BCC8-1792D58ECD34}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{1B1D8F13-9EC8-46A2-BCC8-1792D58ECD34}.Debug|x64.Build.0 = Debug|Any CPU
+		{1B1D8F13-9EC8-46A2-BCC8-1792D58ECD34}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{1B1D8F13-9EC8-46A2-BCC8-1792D58ECD34}.Debug|x86.Build.0 = Debug|Any CPU
+		{1B1D8F13-9EC8-46A2-BCC8-1792D58ECD34}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1B1D8F13-9EC8-46A2-BCC8-1792D58ECD34}.Release|Any CPU.Build.0 = Release|Any CPU
+		{1B1D8F13-9EC8-46A2-BCC8-1792D58ECD34}.Release|x64.ActiveCfg = Release|Any CPU
+		{1B1D8F13-9EC8-46A2-BCC8-1792D58ECD34}.Release|x64.Build.0 = Release|Any CPU
+		{1B1D8F13-9EC8-46A2-BCC8-1792D58ECD34}.Release|x86.ActiveCfg = Release|Any CPU
+		{1B1D8F13-9EC8-46A2-BCC8-1792D58ECD34}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -1174,5 +1202,7 @@ Global
 		{BE16E601-9E9D-43EA-A936-8D60B9F66C49} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 		{A93C8691-B083-4FC4-881C-0FA06DC0F8EA} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 		{59D79364-8A90-47EB-8B61-2850384DF1E3} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
+		{B92D5DD7-7667-4403-86F5-0C0449EE4EDF} = {E0AD1809-C64F-3D39-45E0-E424261CE16D}
+		{1B1D8F13-9EC8-46A2-BCC8-1792D58ECD34} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 	EndGlobalSection
 EndGlobal
