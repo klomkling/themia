@@ -5,3 +5,14 @@ Themia.MultiTenancy.MultiTenancyOptions.ClaimType.set -> void
 Themia.MultiTenancy.Strategies.ClaimsTenantResolutionStrategy
 Themia.MultiTenancy.Strategies.ClaimsTenantResolutionStrategy.ClaimsTenantResolutionStrategy(Microsoft.Extensions.Options.IOptions<Themia.MultiTenancy.MultiTenancyOptions!>! options, Microsoft.Extensions.Logging.ILogger<Themia.MultiTenancy.Strategies.ClaimsTenantResolutionStrategy!>! logger) -> void
 Themia.MultiTenancy.Strategies.ClaimsTenantResolutionStrategy.ResolveAsync(Themia.MultiTenancy.Abstractions.TenantResolutionContext! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.MultiTenancy.Abstractions.TenantResolutionResult!>!
+Themia.MultiTenancy.ISkipTenantValidation
+Themia.MultiTenancy.TenantGuard
+Themia.MultiTenancy.TenantGuardOptions
+Themia.MultiTenancy.TenantGuardOptions.TenantGuardOptions() -> void
+Themia.MultiTenancy.TenantGuardOptions.PrivilegedRoles.get -> System.Collections.Generic.IReadOnlyCollection<string!>!
+Themia.MultiTenancy.TenantGuardOptions.PrivilegedRoles.set -> void
+Themia.MultiTenancy.TenantGuardVerdict
+Themia.MultiTenancy.TenantGuardVerdict.Allow = 0 -> Themia.MultiTenancy.TenantGuardVerdict
+Themia.MultiTenancy.TenantGuardVerdict.Unauthenticated = 1 -> Themia.MultiTenancy.TenantGuardVerdict
+Themia.MultiTenancy.TenantGuardVerdict.NoTenant = 2 -> Themia.MultiTenancy.TenantGuardVerdict
+static Themia.MultiTenancy.TenantGuard.Evaluate(System.Security.Claims.ClaimsPrincipal? principal, Themia.MultiTenancy.Abstractions.TenantInfo? currentTenant, bool skipRequested, System.Collections.Generic.IReadOnlyCollection<string!>! privilegedRoles) -> Themia.MultiTenancy.TenantGuardVerdict
