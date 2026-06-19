@@ -46,10 +46,12 @@ public class TenantGuardBehaviorTests
     [Fact]
     public async Task Unauthenticated_Throws_WhenNoPrincipal()
     {
-        var behavior = Build<TestRequest>(principal: null, tenant: Tenant, null, out _);
+        var behavior = Build<TestRequest>(principal: null, tenant: Tenant, null, out var logger);
 
         await Assert.ThrowsAsync<UnauthorizedException>(() =>
             behavior.HandleAsync(new TestRequest(), _ => Task.FromResult("unused"), CancellationToken.None));
+
+        Assert.Empty(logger.Entries); // warn only on NoTenant, never on Unauthenticated
     }
 
     [Fact]

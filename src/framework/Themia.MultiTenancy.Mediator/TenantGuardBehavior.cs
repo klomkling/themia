@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
@@ -46,17 +47,16 @@ public sealed class TenantGuardBehavior<TRequest, TResponse>(
             case TenantGuardVerdict.Unauthenticated:
                 throw new UnauthorizedException("Authentication is required.");
             case TenantGuardVerdict.NoTenant:
+                // No user identifier is logged (no PII); TraceId correlates this to the auth/access
+                // log, which already carries the identity.
                 logger.LogWarning(
-                    "Authenticated principal with no usable tenant for {RequestType} (UserId: {UserId}, Roles: {Roles})",
-                    typeof(TRequest).Name, UserId(principal), Roles(principal));
+                    "Authenticated principal with no usable tenant for {RequestType} (Roles: {Roles}, TraceId: {TraceId})",
+                    typeof(TRequest).Name, Roles(principal), Activity.Current?.Id);
                 throw new ForbiddenException("A tenant context is required for this request.");
             default:
                 return await next(cancellationToken).ConfigureAwait(false);
         }
     }
-
-    private static string? UserId(ClaimsPrincipal? principal) =>
-        principal?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
 
     private static string Roles(ClaimsPrincipal? principal) =>
         principal is null ? string.Empty : string.Join(",", principal.FindAll(ClaimTypes.Role).Select(c => c.Value));

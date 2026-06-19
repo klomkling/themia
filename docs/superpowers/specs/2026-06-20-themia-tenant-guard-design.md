@@ -142,8 +142,9 @@ does not re-register it.
 - `UnauthorizedException` → **401**, `ForbiddenException` → **403** via the existing
   `ProblemDetailsMiddleware` type→status map (`Themia.AspNetCore`). No new mapping is added.
 - **WARN is logged only on `NoTenant`** (the surprising "authenticated but tenant-less" case), with
-  `RequestType` (`typeof(TRequest).Name`), the `NameIdentifier` claim as `UserId`, and the role claims.
-  **No name/email/PII** is logged. `Unauthenticated` and `Allow` are not logged by the guard (auth
+  `RequestType` (`typeof(TRequest).Name`), the role claims, and the current `Activity` `TraceId`. **No
+  user identifier or other PII is logged** — TraceId correlates the entry to the auth/access log, which
+  already carries the identity. `Unauthenticated` and `Allow` are not logged by the guard (auth
   middleware owns 401 diagnostics; allowed requests are routine).
 - Logs via `ILogger<T>` only; one log per handled verdict (no double-logging).
 
