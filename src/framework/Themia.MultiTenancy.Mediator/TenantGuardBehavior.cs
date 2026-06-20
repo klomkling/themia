@@ -56,7 +56,9 @@ public sealed class TenantGuardBehavior<TRequest, TResponse>(
                 // No user identifier is logged (no PII); TraceId correlates this to the auth/access log.
                 logger.LogWarning(
                     "Authenticated principal with no usable tenant for {RequestType} (Roles: {Roles}, TraceId: {TraceId})",
-                    typeof(TRequest).Name, Roles(principal), Activity.Current?.Id);
+                    typeof(TRequest).Name,
+                    Roles(principal),
+                    Activity.Current?.Id ?? httpContextAccessor.HttpContext?.TraceIdentifier);
                 throw new ForbiddenException("A tenant context is required for this request.");
             default:
                 // Fail closed: only an explicit Allow proceeds. A verdict added to the enum later must
