@@ -14,7 +14,8 @@ public static class TenantGuardServiceCollectionExtensions
     /// Call this before other behavior registrations so the guard runs early — the Themia mediator
     /// executes behaviors in DI registration order (see the <c>Themia.Mediator</c> pipeline
     /// composition), so register it ahead of validation and the handler. Idempotent: calling it more
-    /// than once registers the behavior only once.
+    /// than once registers the behavior only once. Requires <c>AddThemiaMultiTenancy</c>, which provides
+    /// the <c>ITenantAccessor</c> and <c>IHttpContextAccessor</c> the behavior depends on.
     /// </summary>
     /// <param name="services">The service collection.</param>
     /// <param name="configure">Optional configuration for <see cref="TenantGuardOptions"/>.</param>

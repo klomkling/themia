@@ -65,16 +65,20 @@ public class TenantGuardBehaviorTests
     [Fact]
     public async Task NoTenant_ThrowsForbidden_AndLogsWarning_WhenAuthedTenantless()
     {
-        var behavior = Build<TestRequest>(Authed("User"), tenant: null, null, out var logger);
+        // Principal carries a user identifier so the no-PII assertion is meaningful (proves a present
+        // NameIdentifier is NOT written to the log), not vacuous.
+        var principal = new ClaimsPrincipal(new ClaimsIdentity(
+            [new Claim(ClaimTypes.NameIdentifier, "user-9f3c"), new Claim(ClaimTypes.Role, "User")],
+            authenticationType: "test", ClaimTypes.Name, ClaimTypes.Role));
+        var behavior = Build<TestRequest>(principal, tenant: null, null, out var logger);
 
         await Assert.ThrowsAsync<ForbiddenException>(() =>
             behavior.HandleAsync(new TestRequest(), _ => Task.FromResult("unused"), CancellationToken.None));
 
         var warning = Assert.Single(logger.Entries);
         Assert.Equal(LogLevel.Warning, warning.Level);
-        // Locks the no-PII contract: the message names the request type and carries no user identifier.
-        Assert.Contains(nameof(TestRequest), warning.Message);
-        Assert.DoesNotContain("UserId", warning.Message);
+        Assert.Contains(nameof(TestRequest), warning.Message);   // request type present
+        Assert.DoesNotContain("user-9f3c", warning.Message);     // the user identifier is NOT logged (no PII)
     }
 
     [Fact]

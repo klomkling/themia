@@ -73,7 +73,7 @@ public class TenantGuardTests
         Assert.Empty(new TenantGuardOptions { PrivilegedRoles = null! }.PrivilegedRoles);
 
     [Fact]
-    public void DefaultVerdict_IsNotAllow() =>
+    public void DefaultVerdict_IsUnauthenticated() =>
         // A zero-initialized verdict must fail safe (deny), never proceed.
-        Assert.NotEqual(TenantGuardVerdict.Allow, default(TenantGuardVerdict));
+        Assert.Equal(TenantGuardVerdict.Unauthenticated, default(TenantGuardVerdict));
 }
