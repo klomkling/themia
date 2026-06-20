@@ -100,6 +100,45 @@ public class TenantGuardBehaviorTests
 
         Assert.Equal("ok", result);
     }
+
+    private static TenantGuardBehavior<TestRequest, string> BuildWithValidator(
+        TenantInfo? tenant, Func<TenantInfo, bool> validator) =>
+        new(
+            new HttpContextAccessor { HttpContext = new DefaultHttpContext { User = Authed("User") } },
+            new FakeTenantAccessor(tenant),
+            Options.Create(new TenantGuardOptions { TenantValidator = validator }),
+            new CapturingLogger<TenantGuardBehavior<TestRequest, string>>());
+
+    [Fact]
+    public async Task TenantValidator_Rejecting_DeniesAsForbidden()
+    {
+        var behavior = BuildWithValidator(Tenant, _ => false);
+
+        await Assert.ThrowsAsync<ForbiddenException>(() =>
+            behavior.HandleAsync(new TestRequest(), _ => Task.FromResult("unused"), CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task TenantValidator_Accepting_InvokesNext()
+    {
+        var behavior = BuildWithValidator(Tenant, t => t.Identifier == "acme");
+
+        var result = await behavior.HandleAsync(new TestRequest(), _ => Task.FromResult("ok"), CancellationToken.None);
+
+        Assert.Equal("ok", result);
+    }
+
+    [Fact]
+    public async Task TenantValidator_NonPositiveIntTenant_DeniedAsForbidden()
+    {
+        // ezy's case (coord #0006): a numeric int>0 validator rejects tenant_id "0".
+        var behavior = BuildWithValidator(
+            new TenantInfo("0", "0"),
+            t => int.TryParse(t.Identifier, out var id) && id > 0);
+
+        await Assert.ThrowsAsync<ForbiddenException>(() =>
+            behavior.HandleAsync(new TestRequest(), _ => Task.FromResult("unused"), CancellationToken.None));
+    }
 }
 
 internal sealed record TestRequest : IRequest<string>;
