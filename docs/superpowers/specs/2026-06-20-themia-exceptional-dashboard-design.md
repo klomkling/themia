@@ -48,7 +48,8 @@ namespace Themia.Exceptional.AspNetCore;
 public sealed class ExceptionalDashboardOptions
 {
     /// Gate for every dashboard request. Null ⇒ all requests are denied (fail-closed).
-    public Func<HttpContext, ValueTask<bool>>? Authorize { get; set; }
+    /// (Func&lt;HttpContext, Task&lt;bool&gt;&gt; — matches the existing Themia.Quartz dashboard's Authorize.)
+    public Func<HttpContext, Task<bool>>? Authorize { get; set; }
 
     /// Default rows per page when the request omits pageSize. Default 50.
     public int DefaultPageSize { get; set; } = 50;
@@ -106,8 +107,10 @@ if (options.Authorize is null) { warn-once; return 404; }
 if (!await options.Authorize(httpContext)) return 404;
 ```
 - **404, not 403**, for both unset and denied — hides the panel's existence from non-admins.
-- When `Authorize` is null, log a **one-time WARN** ("dashboard mounted without an Authorize predicate;
-  all requests denied") via `ILogger`, so the misconfiguration is visible without exposing data.
+- When `Authorize` is null, log a **WARN at mount time** ("dashboard mounted at {path} without an
+  Authorize predicate; all requests are denied") via `ILogger` (resolved from
+  `IEndpointRouteBuilder.ServiceProvider`), so the misconfiguration is visible at startup without
+  exposing data. Logging eagerly at mount is simpler than a per-request one-time flag and equally visible.
 - The gate is the only auth mechanism; consumers can still layer `.RequireAuthorization(...)` on the
   returned route group if they prefer, but it is not required by this design.
 
