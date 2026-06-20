@@ -23,7 +23,7 @@
       this value. Bump here to cut a release. Split per-package later only if
       release cadences genuinely diverge.
     -->
-    <Version>0.5.7</Version>
+    <Version>0.5.8</Version>
   </PropertyGroup>
 
   <PropertyGroup Label="Package metadata">
