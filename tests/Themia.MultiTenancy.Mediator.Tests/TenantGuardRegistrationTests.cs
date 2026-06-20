@@ -18,7 +18,8 @@ public class TenantGuardRegistrationTests
 
         Assert.Contains(services, d =>
             d.ServiceType == typeof(IPipelineBehavior<,>) &&
-            d.ImplementationType == typeof(TenantGuardBehavior<,>));
+            d.ImplementationType == typeof(TenantGuardBehavior<,>) &&
+            d.Lifetime == ServiceLifetime.Scoped);
     }
 
     [Fact]

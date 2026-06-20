@@ -55,4 +55,20 @@ public class TenantGuardTests
     public void EmptyPrivilegedRoles_NoBypass() =>
         Assert.Equal(TenantGuardVerdict.NoTenant,
             TenantGuard.Evaluate(Authed("SaaSAdmin"), currentTenant: null, false, []));
+
+    [Fact]
+    public void Skip_Bypasses_WhenAuthedTenantlessAndNonPrivileged() =>
+        // skip must win even on a path that would otherwise be NoTenant (proves skip precedes the
+        // privileged-role/tenant checks, not just the unauthenticated one).
+        Assert.Equal(TenantGuardVerdict.Allow,
+            TenantGuard.Evaluate(Authed("User"), currentTenant: null, skipRequested: true, Privileged));
+
+    [Fact]
+    public void Evaluate_Throws_WhenPrivilegedRolesNull() =>
+        Assert.Throws<ArgumentNullException>(() =>
+            TenantGuard.Evaluate(Authed("User"), Tenant, false, null!));
+
+    [Fact]
+    public void TenantGuardOptions_NullPrivilegedRoles_ResetsToEmpty() =>
+        Assert.Empty(new TenantGuardOptions { PrivilegedRoles = null! }.PrivilegedRoles);
 }

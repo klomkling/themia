@@ -39,6 +39,8 @@ public static class TenantGuard
         bool skipRequested,
         IReadOnlyCollection<string> privilegedRoles)
     {
+        ArgumentNullException.ThrowIfNull(privilegedRoles);
+
         if (skipRequested)
         {
             return TenantGuardVerdict.Allow;

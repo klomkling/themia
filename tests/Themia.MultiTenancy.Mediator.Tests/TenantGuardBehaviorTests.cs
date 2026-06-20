@@ -34,13 +34,21 @@ public class TenantGuardBehaviorTests
     }
 
     [Fact]
-    public async Task Allow_InvokesNext_WhenAuthedWithTenant()
+    public async Task Allow_InvokesNext_AndForwardsCancellationToken_WhenAuthedWithTenant()
     {
         var behavior = Build<TestRequest>(Authed("User"), Tenant, null, out _);
+        using var cts = new CancellationTokenSource();
+        var nextCalled = false;
+        CancellationToken received = default;
 
-        var result = await behavior.HandleAsync(new TestRequest(), _ => Task.FromResult("ok"), CancellationToken.None);
+        var result = await behavior.HandleAsync(
+            new TestRequest(),
+            ct => { nextCalled = true; received = ct; return Task.FromResult("ok"); },
+            cts.Token);
 
         Assert.Equal("ok", result);
+        Assert.True(nextCalled);
+        Assert.Equal(cts.Token, received); // the caller's token is forwarded, not default
     }
 
     [Fact]
@@ -62,7 +70,11 @@ public class TenantGuardBehaviorTests
         await Assert.ThrowsAsync<ForbiddenException>(() =>
             behavior.HandleAsync(new TestRequest(), _ => Task.FromResult("unused"), CancellationToken.None));
 
-        Assert.Contains(logger.Entries, e => e.Level == LogLevel.Warning);
+        var warning = Assert.Single(logger.Entries);
+        Assert.Equal(LogLevel.Warning, warning.Level);
+        // Locks the no-PII contract: the message names the request type and carries no user identifier.
+        Assert.Contains(nameof(TestRequest), warning.Message);
+        Assert.DoesNotContain("UserId", warning.Message);
     }
 
     [Fact]

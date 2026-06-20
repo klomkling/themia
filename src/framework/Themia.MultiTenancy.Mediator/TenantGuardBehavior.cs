@@ -44,6 +44,8 @@ public sealed class TenantGuardBehavior<TRequest, TResponse>(
         var verdict = TenantGuard.Evaluate(principal, tenantAccessor.Current, skip, options.Value.PrivilegedRoles);
         switch (verdict)
         {
+            case TenantGuardVerdict.Allow:
+                return await next(cancellationToken).ConfigureAwait(false);
             case TenantGuardVerdict.Unauthenticated:
                 throw new UnauthorizedException("Authentication is required.");
             case TenantGuardVerdict.NoTenant:
@@ -54,7 +56,9 @@ public sealed class TenantGuardBehavior<TRequest, TResponse>(
                     typeof(TRequest).Name, Roles(principal), Activity.Current?.Id);
                 throw new ForbiddenException("A tenant context is required for this request.");
             default:
-                return await next(cancellationToken).ConfigureAwait(false);
+                // Fail closed: only an explicit Allow proceeds. A verdict added to the enum later must
+                // never slip through to next() — deny it here (mapped to 500) until handled explicitly.
+                throw new InvalidOperationException($"Unhandled tenant guard verdict: {verdict}.");
         }
     }
 
