@@ -122,11 +122,15 @@ public class TenantGuardBehaviorTests
     [Fact]
     public async Task TenantValidator_Accepting_InvokesNext()
     {
-        var behavior = BuildWithValidator<TestRequest>(Authed("User"), Tenant, null, t => t.Identifier == "acme");
+        // Record the argument so this proves the validator was actually consulted with the resolved
+        // tenant — not just that an allow-outcome happened to coincide with the no-validator path.
+        TenantInfo? seen = null;
+        var behavior = BuildWithValidator<TestRequest>(Authed("User"), Tenant, null, t => { seen = t; return true; });
 
         var result = await behavior.HandleAsync(new TestRequest(), _ => Task.FromResult("ok"), CancellationToken.None);
 
         Assert.Equal("ok", result);
+        Assert.Same(Tenant, seen);
     }
 
     [Fact]
