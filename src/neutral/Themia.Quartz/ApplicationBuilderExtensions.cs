@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.FileProviders;
+using Microsoft.Extensions.Logging;
 using Quartz;
 using Themia.Quartz;
 using Themia.Quartz.Dashboard;
@@ -108,17 +109,46 @@ public static class ThemiaQuartzApplicationBuilderExtensions
                 "(e.g. \"/jobs\"). An empty or \"/\" value would mount the dashboard at the application root.");
         }
 
-        // Deny-all authorize gate over the dashboard path. null Authorize => always 403.
+        // DeniedStatusCode must be an HTTP error status. A 2xx/3xx (or 0/negative) would "deny" with a
+        // non-error response, silently defeating the gate — fail fast on that misconfiguration.
+        if (options.DeniedStatusCode is < 400 or > 599)
+        {
+            throw new InvalidOperationException(
+                "Themia.Quartz: ThemiaQuartzOptions.DeniedStatusCode must be an HTTP error status (400-599). " +
+                $"Got {options.DeniedStatusCode}.");
+        }
+
+        // Deny-all authorize gate over the dashboard path. null Authorize => always denied.
+        // The deny status is configurable (ThemiaQuartzOptions.DeniedStatusCode, default 404).
         app.Use(async (context, next) =>
         {
             if (context.Request.Path.StartsWithSegments(rootPath, StringComparison.OrdinalIgnoreCase))
             {
-                var allowed = options.Authorize is null
-                    ? false
-                    : await options.Authorize(context).ConfigureAwait(false);
+                bool allowed;
+                if (options.Authorize is null)
+                {
+                    allowed = false;
+                }
+                else
+                {
+                    try
+                    {
+                        allowed = await options.Authorize(context).ConfigureAwait(false);
+                    }
+                    catch (Exception ex) when (ex is not OperationCanceledException)
+                    {
+                        // A throwing Authorize predicate is a consumer bug — fail closed (deny), not 500,
+                        // consistent with the Themia.Exceptional dashboard. OCE propagates as cancellation.
+                        context.RequestServices.GetService<ILoggerFactory>()?
+                            .CreateLogger("Themia.Quartz")
+                            .LogError(ex, "Themia.Quartz dashboard Authorize predicate threw; denying request.");
+                        allowed = false;
+                    }
+                }
+
                 if (!allowed)
                 {
-                    context.Response.StatusCode = StatusCodes.Status403Forbidden;
+                    context.Response.StatusCode = options.DeniedStatusCode;
                     return;
                 }
             }

@@ -96,6 +96,50 @@ public sealed class MapThemiaQuartzGuardTests
         }
     }
 
+    [Fact]
+    public async Task NonErrorDeniedStatusCode_Throws()
+    {
+        // A 2xx deny status would "deny" with success — must be rejected at startup.
+        var factory = new StdSchedulerFactory(new System.Collections.Specialized.NameValueCollection
+        {
+            ["quartz.scheduler.instanceName"] = $"GuardTestScheduler_{Guid.NewGuid():N}",
+        });
+        var scheduler = await factory.GetScheduler();
+        await scheduler.Start();
+        try
+        {
+            var builder = new HostBuilder()
+                .ConfigureWebHost(web =>
+                {
+                    web.UseTestServer();
+                    web.ConfigureServices(services =>
+                    {
+                        services.AddThemiaQuartz(o =>
+                        {
+                            o.Scheduler = scheduler;
+                            o.VirtualPathRoot = "/jobs";
+                            o.Authorize = _ => Task.FromResult(true);
+                            o.DeniedStatusCode = 200;   // not an error status — must be rejected
+                        });
+                        services.AddSingleton<IExecutionHistoryStore>(new InProcExecutionHistoryStore());
+                    });
+                    web.Configure(app =>
+                    {
+                        app.UseThemiaQuartz();
+                        app.UseRouting();
+                        app.UseEndpoints(e => e.MapThemiaQuartz());
+                    });
+                });
+
+            var ex = await Assert.ThrowsAnyAsync<Exception>(async () => await builder.StartAsync());
+            Assert.Contains("DeniedStatusCode", UnwrapMessage(ex));
+        }
+        finally
+        {
+            await scheduler.Shutdown(waitForJobsToComplete: false);
+        }
+    }
+
     // Walk the exception chain (may be wrapped by host startup) for the first InvalidOperationException.
     private static string UnwrapMessage(Exception ex)
     {
