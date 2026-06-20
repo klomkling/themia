@@ -41,7 +41,15 @@ public sealed class TenantGuardBehavior<TRequest, TResponse>(
         var skip = request is ISkipTenantValidation;
         var principal = httpContextAccessor.HttpContext?.User;
 
-        var verdict = TenantGuard.Evaluate(principal, tenantAccessor.Current, skip, options.Value.PrivilegedRoles);
+        // A resolved tenant that fails the consumer's validity check (e.g. a non-positive int id) is
+        // treated as no tenant, so the guard denies it (403) rather than admitting an invalid tenant.
+        var tenant = tenantAccessor.Current;
+        if (tenant is not null && options.Value.TenantValidator is { } isUsable && !IsUsable(isUsable, tenant))
+        {
+            tenant = null;
+        }
+
+        var verdict = TenantGuard.Evaluate(principal, tenant, skip, options.Value.PrivilegedRoles);
         switch (verdict)
         {
             case TenantGuardVerdict.Allow:
@@ -69,4 +77,19 @@ public sealed class TenantGuardBehavior<TRequest, TResponse>(
 
     private static string Roles(ClaimsPrincipal? principal) =>
         principal is null ? string.Empty : string.Join(",", principal.FindAll(ClaimTypes.Role).Select(c => c.Value));
+
+    private bool IsUsable(Func<TenantInfo, bool> validator, TenantInfo tenant)
+    {
+        try
+        {
+            return validator(tenant);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // A throwing validator is a consumer bug — fail closed (treat the tenant as unusable → 403),
+            // consistent with the Authorize-predicate-throws handling. OCE propagates as cancellation.
+            logger.LogError(ex, "TenantValidator threw for {RequestType}; treating the tenant as unusable.", typeof(TRequest).Name);
+            return false;
+        }
+    }
 }

@@ -1,4 +1,6 @@
 #nullable enable
+Themia.MultiTenancy.TenantGuardOptions.TenantValidator.get -> System.Func<Themia.MultiTenancy.Abstractions.TenantInfo!, bool>?
+Themia.MultiTenancy.TenantGuardOptions.TenantValidator.set -> void
 Themia.MultiTenancy.MultiTenancyBuilder.UseClaimsStrategy() -> Themia.MultiTenancy.MultiTenancyBuilder!
 Themia.MultiTenancy.MultiTenancyOptions.ClaimType.get -> string!
 Themia.MultiTenancy.MultiTenancyOptions.ClaimType.set -> void
