@@ -95,6 +95,15 @@ public sealed class DashboardSmokeTests
     }
 
     [Fact]
+    public async Task Denied_WhenAuthorizeThrows_FailsClosed()
+    {
+        // A throwing Authorize predicate must fail closed (deny status), not surface a 500.
+        await using var scope = await StartHostAsync(authorize: _ => throw new InvalidOperationException("auth bug"));
+        var response = await scope.CreateClient().GetAsync("/jobs");
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
     public async Task SchedulerIndex_WhenAuthorized_Returns200WithHtml()
     {
         await using var scope = await StartHostAsync(authorize: _ => Task.FromResult(true));

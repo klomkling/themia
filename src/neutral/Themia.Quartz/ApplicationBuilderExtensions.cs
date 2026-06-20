@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.FileProviders;
+using Microsoft.Extensions.Logging;
 using Quartz;
 using Themia.Quartz;
 using Themia.Quartz.Dashboard;
@@ -123,9 +124,28 @@ public static class ThemiaQuartzApplicationBuilderExtensions
         {
             if (context.Request.Path.StartsWithSegments(rootPath, StringComparison.OrdinalIgnoreCase))
             {
-                var allowed = options.Authorize is null
-                    ? false
-                    : await options.Authorize(context).ConfigureAwait(false);
+                bool allowed;
+                if (options.Authorize is null)
+                {
+                    allowed = false;
+                }
+                else
+                {
+                    try
+                    {
+                        allowed = await options.Authorize(context).ConfigureAwait(false);
+                    }
+                    catch (Exception ex) when (ex is not OperationCanceledException)
+                    {
+                        // A throwing Authorize predicate is a consumer bug — fail closed (deny), not 500,
+                        // consistent with the Themia.Exceptional dashboard. OCE propagates as cancellation.
+                        context.RequestServices.GetService<ILoggerFactory>()?
+                            .CreateLogger("Themia.Quartz")
+                            .LogError(ex, "Themia.Quartz dashboard Authorize predicate threw; denying request.");
+                        allowed = false;
+                    }
+                }
+
                 if (!allowed)
                 {
                     context.Response.StatusCode = options.DeniedStatusCode;
