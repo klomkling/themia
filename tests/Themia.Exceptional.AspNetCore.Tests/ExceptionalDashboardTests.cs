@@ -189,4 +189,15 @@ public class ExceptionalDashboardTests
         Assert.Equal(1, store.LastFilter!.Page);
         Assert.Equal(1, store.LastFilter.PageSize);
     }
+
+    [Fact]
+    public async Task List_EncodesConfiguredTitle()
+    {
+        // The Title flows options -> DashboardHtml -> <title>/<h1>; a markup title must be encoded.
+        var client = await ServerAsync(new FakeExceptionStore(Sample()),
+            o => { o.Authorize = _ => Task.FromResult(true); o.Title = "<script>t()</script>"; });
+        var body = await (await client.GetAsync("/exceptions")).Content.ReadAsStringAsync();
+        Assert.Contains("&lt;script&gt;t()&lt;/script&gt;", body);
+        Assert.DoesNotContain("<script>t()</script>", body);
+    }
 }
