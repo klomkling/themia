@@ -200,4 +200,56 @@ public class ExceptionalDashboardTests
         Assert.Contains("&lt;script&gt;t()&lt;/script&gt;", body);
         Assert.DoesNotContain("<script>t()</script>", body);
     }
+
+    [Fact]
+    public async Task List_AuthorizeCancelled_DoesNotMaskAs404()
+    {
+        // OperationCanceledException is cancellation flow, not a denial — it must propagate, never 404.
+        var client = await ServerAsync(new FakeExceptionStore(Sample()),
+            o => o.Authorize = _ => throw new OperationCanceledException());
+        try
+        {
+            var res = await client.GetAsync("/exceptions");
+            Assert.NotEqual(HttpStatusCode.NotFound, res.StatusCode);
+        }
+        catch (OperationCanceledException)
+        {
+            // Propagated as cancellation — correct; it was NOT swallowed into a 404 deny.
+        }
+    }
+
+    [Fact]
+    public async Task List_MalformedDateParams_AreIgnored_Not500()
+    {
+        var client = await ServerAsync(new FakeExceptionStore(Sample()), o => o.Authorize = _ => Task.FromResult(true));
+        var res = await client.GetAsync("/exceptions?from=not-a-date&to=also-bad");
+        Assert.Equal(HttpStatusCode.OK, res.StatusCode);
+    }
+
+    [Fact]
+    public void MapThemiaExceptional_RejectsInvalidPaging()
+    {
+        using var host = new HostBuilder()
+            .ConfigureWebHost(web =>
+            {
+                web.UseTestServer();
+                web.ConfigureServices(s => { s.AddRouting(); s.AddSingleton<IExceptionStore>(new FakeExceptionStore()); });
+                web.Configure(app =>
+                {
+                    app.UseRouting();
+                    // MaxPageSize < DefaultPageSize must be rejected at mount.
+                    app.UseEndpoints(e => e.MapThemiaExceptional("/exceptions", o => o.MaxPageSize = 0));
+                });
+            })
+            .Build();
+
+        // The mount-time validation throws during pipeline build; the host may wrap it, so walk the chain.
+        var ex = Assert.ThrowsAny<Exception>(() => host.Start());
+        var found = false;
+        for (var e = (Exception?)ex; e is not null; e = e.InnerException)
+        {
+            if (e is ArgumentOutOfRangeException) { found = true; break; }
+        }
+        Assert.True(found, $"Expected ArgumentOutOfRangeException in the chain, got: {ex}");
+    }
 }

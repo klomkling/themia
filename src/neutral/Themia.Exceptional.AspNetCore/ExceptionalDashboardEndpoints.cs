@@ -77,10 +77,12 @@ public static class ExceptionalDashboardEndpoints
         {
             return await options.Authorize(ctx).ConfigureAwait(false);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             // A throwing Authorize predicate (e.g. a flaky identity lookup) must fail closed — deny and
             // hide (404), never 500 or serve data. Logged at the boundary, not swallowed silently.
+            // OperationCanceledException is excluded: a client abort is cancellation flow, not a denial,
+            // and must propagate (the host treats it as cancellation, not a server error).
             ctx.RequestServices.GetService<ILoggerFactory>()?
                 .CreateLogger("Themia.Exceptional.AspNetCore")
                 .LogError(ex, "Exceptions dashboard Authorize predicate threw; denying request.");
