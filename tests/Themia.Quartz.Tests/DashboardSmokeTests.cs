@@ -34,7 +34,7 @@ public sealed class DashboardSmokeTests
     // Middleware order: UseThemiaQuartz (gate + static files + Services bridge) must run before
     // UseRouting so that the authorize gate and embedded content serving intercept requests before
     // the endpoint dispatcher. MapThemiaQuartz inside UseEndpoints registers the controller route.
-    private static async Task<TestHostScope> StartHostAsync(Func<HttpContext, Task<bool>>? authorize)
+    private static async Task<TestHostScope> StartHostAsync(Func<HttpContext, Task<bool>>? authorize, int? deniedStatus = null)
     {
         // Uniquely-named scheduler (not the process-global default) so concurrently-running test
         // classes don't share scheduler state.
@@ -56,6 +56,10 @@ public sealed class DashboardSmokeTests
                         o.Scheduler = scheduler;
                         o.VirtualPathRoot = "/jobs";
                         o.Authorize = authorize;
+                        if (deniedStatus is { } ds)
+                        {
+                            o.DeniedStatusCode = ds;
+                        }
                     });
                     services.AddSingleton<IExecutionHistoryStore>(new InProcExecutionHistoryStore());
                 });
@@ -72,10 +76,20 @@ public sealed class DashboardSmokeTests
     }
 
     [Fact]
-    public async Task DeniedByDefault_Returns403()
+    public async Task DeniedByDefault_Returns404()
     {
         // Unset Authorize (null) is the documented deny-all default — validate THAT, not an explicit false.
+        // Default deny status is 404 (hides the route from unauthenticated probes; matches the
+        // Themia.Exceptional dashboard).
         await using var scope = await StartHostAsync(authorize: null);
+        var response = await scope.CreateClient().GetAsync("/jobs");
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Denied_HonorsConfiguredStatusCode()
+    {
+        await using var scope = await StartHostAsync(authorize: null, deniedStatus: StatusCodes.Status403Forbidden);
         var response = await scope.CreateClient().GetAsync("/jobs");
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }

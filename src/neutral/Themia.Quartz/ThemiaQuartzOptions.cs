@@ -80,6 +80,13 @@ public sealed class ThemiaQuartzOptions
     /// </summary>
     public Func<HttpContext, Task<bool>>? Authorize { get; set; }
 
+    /// <summary>
+    /// HTTP status returned when the <see cref="Authorize"/> gate denies a dashboard request. Default
+    /// <c>404</c> (Not Found), which doesn't reveal the route to an unauthenticated probe and matches the
+    /// Themia.Exceptional dashboard. Set to <c>403</c> if you prefer an explicit Forbidden.
+    /// </summary>
+    public int DeniedStatusCode { get; set; } = StatusCodes.Status404NotFound;
+
     internal string? ContentRootDirectory => null;
 
     internal string? ViewsRootDirectory => null;

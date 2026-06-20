@@ -93,6 +93,8 @@ Themia.Quartz.ThemiaQuartzOptions.DefaultSelectedType.get -> Themia.Quartz.Dashb
 Themia.Quartz.ThemiaQuartzOptions.DefaultSelectedType.set -> void
 Themia.Quartz.ThemiaQuartzOptions.DefaultTimeFormat.get -> string!
 Themia.Quartz.ThemiaQuartzOptions.DefaultTimeFormat.set -> void
+Themia.Quartz.ThemiaQuartzOptions.DeniedStatusCode.get -> int
+Themia.Quartz.ThemiaQuartzOptions.DeniedStatusCode.set -> void
 Themia.Quartz.ThemiaQuartzOptions.EnableEdit.get -> bool
 Themia.Quartz.ThemiaQuartzOptions.EnableEdit.set -> void
 Themia.Quartz.ThemiaQuartzOptions.Logo.get -> string!

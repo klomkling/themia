@@ -108,7 +108,8 @@ public static class ThemiaQuartzApplicationBuilderExtensions
                 "(e.g. \"/jobs\"). An empty or \"/\" value would mount the dashboard at the application root.");
         }
 
-        // Deny-all authorize gate over the dashboard path. null Authorize => always 403.
+        // Deny-all authorize gate over the dashboard path. null Authorize => always denied.
+        // The deny status is configurable (ThemiaQuartzOptions.DeniedStatusCode, default 404).
         app.Use(async (context, next) =>
         {
             if (context.Request.Path.StartsWithSegments(rootPath, StringComparison.OrdinalIgnoreCase))
@@ -118,7 +119,7 @@ public static class ThemiaQuartzApplicationBuilderExtensions
                     : await options.Authorize(context).ConfigureAwait(false);
                 if (!allowed)
                 {
-                    context.Response.StatusCode = StatusCodes.Status403Forbidden;
+                    context.Response.StatusCode = options.DeniedStatusCode;
                     return;
                 }
             }
