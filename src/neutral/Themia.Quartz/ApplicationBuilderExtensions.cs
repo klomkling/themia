@@ -108,6 +108,15 @@ public static class ThemiaQuartzApplicationBuilderExtensions
                 "(e.g. \"/jobs\"). An empty or \"/\" value would mount the dashboard at the application root.");
         }
 
+        // DeniedStatusCode must be an HTTP error status. A 2xx/3xx (or 0/negative) would "deny" with a
+        // non-error response, silently defeating the gate — fail fast on that misconfiguration.
+        if (options.DeniedStatusCode is < 400 or > 599)
+        {
+            throw new InvalidOperationException(
+                "Themia.Quartz: ThemiaQuartzOptions.DeniedStatusCode must be an HTTP error status (400-599). " +
+                $"Got {options.DeniedStatusCode}.");
+        }
+
         // Deny-all authorize gate over the dashboard path. null Authorize => always denied.
         // The deny status is configurable (ThemiaQuartzOptions.DeniedStatusCode, default 404).
         app.Use(async (context, next) =>
