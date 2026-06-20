@@ -14,12 +14,12 @@ internal static class DashboardHtml
         "th,td{border:1px solid #ddd;padding:4px 8px;text-align:left;vertical-align:top}th{background:#f5f5f5}" +
         "pre{background:#f8f8f8;padding:8px;overflow:auto;white-space:pre-wrap}a{color:#0366d6}</style>";
 
-    public static string Enc(string? value) => WebUtility.HtmlEncode(value ?? string.Empty);
+    internal static string Enc(string? value) => WebUtility.HtmlEncode(value ?? string.Empty);
 
-    public static string Page(string title, string body) =>
+    internal static string Page(string title, string body) =>
         $"<!doctype html><html><head><meta charset=\"utf-8\"><title>{Enc(title)}</title>{Style}</head><body>{body}</body></html>";
 
-    public static string List(string title, string path, IReadOnlyList<ExceptionEntry> items, int total, ExceptionFilter filter)
+    internal static string List(string title, string path, IReadOnlyList<ExceptionEntry> items, int total, ExceptionFilter filter)
     {
         var sb = new StringBuilder();
         sb.Append("<h1>").Append(Enc(title)).Append("</h1>");
@@ -64,7 +64,7 @@ internal static class DashboardHtml
         return Page(title, sb.ToString());
     }
 
-    public static string Detail(string title, string path, ExceptionEntry e, bool showRequestBody)
+    internal static string Detail(string title, string path, ExceptionEntry e, bool showRequestBody)
     {
         var sb = new StringBuilder();
         sb.Append("<p><a href=\"").Append(Enc(path)).Append("\">&larr; back</a></p>");

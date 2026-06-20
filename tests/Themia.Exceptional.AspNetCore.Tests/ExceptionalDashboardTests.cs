@@ -123,6 +123,24 @@ public class ExceptionalDashboardTests
     }
 
     [Fact]
+    public async Task Detail_NoAuthorize_Returns404()
+    {
+        var client = await ServerAsync(new FakeExceptionStore(Sample()), configure: null);
+        var res = await client.GetAsync($"/exceptions/{KnownGuid}");
+        Assert.Equal(HttpStatusCode.NotFound, res.StatusCode);
+    }
+
+    [Fact]
+    public async Task Detail_ShowRequestBodyTrue_IncludesBody()
+    {
+        var entry = Sample();
+        entry.RequestBody = "body-marker-abc";
+        var client = await ServerAsync(new FakeExceptionStore(entry), o => { o.Authorize = _ => Task.FromResult(true); o.ShowRequestBody = true; });
+        var body = await (await client.GetAsync($"/exceptions/{KnownGuid}")).Content.ReadAsStringAsync();
+        Assert.Contains("body-marker-abc", body);
+    }
+
+    [Fact]
     public async Task Detail_ShowRequestBodyFalse_OmitsBody()
     {
         var entry = Sample();
