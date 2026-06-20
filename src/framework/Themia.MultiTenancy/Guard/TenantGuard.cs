@@ -4,18 +4,19 @@ using Themia.MultiTenancy.Abstractions;
 namespace Themia.MultiTenancy;
 
 /// <summary>
-/// Outcome of a tenant-presence evaluation.
+/// Outcome of a tenant-presence evaluation. The default value (0) is a deny
+/// (<see cref="Unauthenticated"/>), so a zero-initialized verdict fails safe rather than proceeding.
 /// </summary>
 public enum TenantGuardVerdict
 {
-    /// <summary>The request may proceed.</summary>
-    Allow = 0,
-
     /// <summary>No authenticated principal — the caller must authenticate (maps to HTTP 401).</summary>
-    Unauthenticated = 1,
+    Unauthenticated = 0,
 
     /// <summary>Authenticated but no usable tenant is resolved (maps to HTTP 403).</summary>
-    NoTenant = 2,
+    NoTenant = 1,
+
+    /// <summary>The request may proceed.</summary>
+    Allow = 2,
 }
 
 /// <summary>

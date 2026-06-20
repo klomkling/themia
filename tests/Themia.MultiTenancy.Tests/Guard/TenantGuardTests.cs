@@ -71,4 +71,9 @@ public class TenantGuardTests
     [Fact]
     public void TenantGuardOptions_NullPrivilegedRoles_ResetsToEmpty() =>
         Assert.Empty(new TenantGuardOptions { PrivilegedRoles = null! }.PrivilegedRoles);
+
+    [Fact]
+    public void DefaultVerdict_IsNotAllow() =>
+        // A zero-initialized verdict must fail safe (deny), never proceed.
+        Assert.NotEqual(TenantGuardVerdict.Allow, default(TenantGuardVerdict));
 }

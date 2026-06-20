@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Themia.Mediator.Abstractions;
 
 namespace Themia.MultiTenancy.Mediator;
@@ -10,8 +11,10 @@ public static class TenantGuardServiceCollectionExtensions
 {
     /// <summary>
     /// Registers <see cref="TenantGuardBehavior{TRequest, TResponse}"/> as a Mediator pipeline behavior.
-    /// Call this so the guard runs early in the pipeline (execution order follows registration order),
-    /// before validation and the handler.
+    /// Call this before other behavior registrations so the guard runs early — the Themia mediator
+    /// executes behaviors in DI registration order (see the <c>Themia.Mediator</c> pipeline
+    /// composition), so register it ahead of validation and the handler. Idempotent: calling it more
+    /// than once registers the behavior only once.
     /// </summary>
     /// <param name="services">The service collection.</param>
     /// <param name="configure">Optional configuration for <see cref="TenantGuardOptions"/>.</param>
@@ -28,7 +31,10 @@ public static class TenantGuardServiceCollectionExtensions
             services.Configure(configure);
         }
 
-        services.AddScoped(typeof(IPipelineBehavior<,>), typeof(TenantGuardBehavior<,>));
+        // TryAddEnumerable dedupes by (service, implementation, lifetime) so a double call doesn't
+        // register the guard twice (which would run it twice in the pipeline).
+        services.TryAddEnumerable(
+            ServiceDescriptor.Scoped(typeof(IPipelineBehavior<,>), typeof(TenantGuardBehavior<,>)));
         return services;
     }
 }

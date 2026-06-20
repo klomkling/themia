@@ -45,4 +45,17 @@ public class TenantGuardRegistrationTests
         var options = provider.GetRequiredService<IOptions<TenantGuardOptions>>().Value;
         Assert.Empty(options.PrivilegedRoles);
     }
+
+    [Fact]
+    public void AddThemiaTenantGuard_CalledTwice_RegistersBehaviorOnce()
+    {
+        var services = new ServiceCollection();
+
+        services.AddThemiaTenantGuard();
+        services.AddThemiaTenantGuard();
+
+        Assert.Single(services, d =>
+            d.ServiceType == typeof(IPipelineBehavior<,>) &&
+            d.ImplementationType == typeof(TenantGuardBehavior<,>));
+    }
 }
