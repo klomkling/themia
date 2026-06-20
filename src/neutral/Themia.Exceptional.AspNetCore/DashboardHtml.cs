@@ -51,13 +51,13 @@ internal static class DashboardHtml
         if (hasPrev)
         {
             sb.Append("<a href=\"").Append(Enc(path)).Append("?page=").Append(filter.Page - 1)
-              .Append("&pageSize=").Append(filter.PageSize).Append("\">Prev</a> ");
+              .Append("&amp;pageSize=").Append(filter.PageSize).Append("\">Prev</a> ");
         }
         sb.Append("Page ").Append(filter.Page).Append(" (").Append(total).Append(" total) ");
         if (hasNext)
         {
             sb.Append("<a href=\"").Append(Enc(path)).Append("?page=").Append(filter.Page + 1)
-              .Append("&pageSize=").Append(filter.PageSize).Append("\">Next</a>");
+              .Append("&amp;pageSize=").Append(filter.PageSize).Append("\">Next</a>");
         }
         sb.Append("</p>");
 
