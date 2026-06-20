@@ -84,7 +84,8 @@ public static class ExceptionalDashboardEndpoints
     private static int ParseInt(StringValues raw, int fallback, int min, int max)
     {
         var value = int.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed) ? parsed : fallback;
-        return Math.Clamp(value, min, max);
+        // Math.Max guards against a misconfigured MaxPageSize < min (would make Clamp throw).
+        return Math.Clamp(value, min, Math.Max(min, max));
     }
 
     private static string? NullIfEmpty(StringValues raw) => string.IsNullOrWhiteSpace(raw) ? null : raw.ToString();
