@@ -18,7 +18,8 @@ public sealed class ExceptionalDashboardOptions
     /// <summary>Page heading and document title. Default "Exceptions".</summary>
     public string Title { get; set; } = "Exceptions";
 
-    /// <summary>Whether the detail view renders the captured request body (sensitive; only ever shown
-    /// behind <see cref="Authorize"/>). Default <c>true</c>.</summary>
+    /// <summary>Whether the detail view renders the captured request body. Default <c>true</c> (shown only
+    /// behind <see cref="Authorize"/>). Request bodies can contain secrets/PII; prefer scrubbing them at
+    /// capture time, and set this to <c>false</c> if even authorized viewers should not see them.</summary>
     public bool ShowRequestBody { get; set; } = true;
 }

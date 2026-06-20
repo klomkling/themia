@@ -5,8 +5,11 @@ using Themia.Exceptional;
 
 namespace Themia.Exceptional.AspNetCore;
 
-/// <summary>Pure, self-contained HTML rendering for the exceptions dashboard. Every dynamic value is
-/// HTML-encoded — exception data (messages, request bodies, URLs) is attacker-influenceable.</summary>
+/// <summary>Pure, self-contained HTML rendering for the exceptions dashboard. Every <em>string</em>
+/// value is HTML-encoded via <see cref="Enc"/>; all attacker-influenceable fields (messages, request
+/// bodies, URLs, the mount path) are string-typed and pass through it. Non-string values (Guid, int,
+/// bool, formatted dates) are emitted raw — their <c>ToString()</c> cannot produce HTML metacharacters.
+/// When adding a new string value, route it through <see cref="Enc"/>.</summary>
 internal static class DashboardHtml
 {
     private const string Style =

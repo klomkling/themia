@@ -30,6 +30,10 @@ public static class ExceptionalDashboardEndpoints
         var options = new ExceptionalDashboardOptions();
         configure?.Invoke(options);
 
+        // Fail fast on misconfiguration so a config typo surfaces at startup, not as silently clamped paging.
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(options.DefaultPageSize);
+        ArgumentOutOfRangeException.ThrowIfLessThan(options.MaxPageSize, options.DefaultPageSize);
+
         if (options.Authorize is null)
         {
             var logger = endpoints.ServiceProvider.GetService<ILoggerFactory>()?.CreateLogger("Themia.Exceptional.AspNetCore");
@@ -62,8 +66,27 @@ public static class ExceptionalDashboardEndpoints
         await WriteHtmlAsync(ctx, DashboardHtml.Detail(options.Title, path, entry, options.ShowRequestBody), ct).ConfigureAwait(false);
     }
 
-    private static async Task<bool> AuthorizedAsync(HttpContext ctx, ExceptionalDashboardOptions options) =>
-        options.Authorize is not null && await options.Authorize(ctx).ConfigureAwait(false);
+    private static async Task<bool> AuthorizedAsync(HttpContext ctx, ExceptionalDashboardOptions options)
+    {
+        if (options.Authorize is null)
+        {
+            return false;
+        }
+
+        try
+        {
+            return await options.Authorize(ctx).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            // A throwing Authorize predicate (e.g. a flaky identity lookup) must fail closed — deny and
+            // hide (404), never 500 or serve data. Logged at the boundary, not swallowed silently.
+            ctx.RequestServices.GetService<ILoggerFactory>()?
+                .CreateLogger("Themia.Exceptional.AspNetCore")
+                .LogError(ex, "Exceptions dashboard Authorize predicate threw; denying request.");
+            return false;
+        }
+    }
 
     private static ExceptionFilter BuildFilter(IQueryCollection query, ExceptionalDashboardOptions options)
     {

@@ -11,14 +11,21 @@ internal sealed class FakeExceptionStore : IExceptionStore
 
     public ExceptionFilter? LastFilter { get; private set; }
 
+    /// <summary>When set, ListAsync/GetAsync throw it (simulates a store/DB failure).</summary>
+    public Exception? FailWith { get; init; }
+
     public Task<PagedResult<ExceptionEntry>> ListAsync(ExceptionFilter filter, CancellationToken cancellationToken = default)
     {
         LastFilter = filter;
+        if (FailWith is not null) throw FailWith;
         return Task.FromResult(new PagedResult<ExceptionEntry> { Items = _entries, Total = _entries.Count });
     }
 
-    public Task<ExceptionEntry?> GetAsync(Guid guid, CancellationToken cancellationToken = default) =>
-        Task.FromResult(_entries.FirstOrDefault(e => e.Guid == guid));
+    public Task<ExceptionEntry?> GetAsync(Guid guid, CancellationToken cancellationToken = default)
+    {
+        if (FailWith is not null) throw FailWith;
+        return Task.FromResult(_entries.FirstOrDefault(e => e.Guid == guid));
+    }
 
     public Task LogAsync(ExceptionEntry entry, CancellationToken cancellationToken = default) => Task.CompletedTask;
     public Task<int> CountAsync(ExceptionFilter filter, CancellationToken cancellationToken = default) => Task.FromResult(_entries.Count);

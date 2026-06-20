@@ -146,7 +146,47 @@ public class ExceptionalDashboardTests
         var entry = Sample();
         entry.RequestBody = "secret-token-xyz";
         var client = await ServerAsync(new FakeExceptionStore(entry), o => { o.Authorize = _ => Task.FromResult(true); o.ShowRequestBody = false; });
-        var body = await (await client.GetAsync($"/exceptions/{KnownGuid}")).Content.ReadAsStringAsync();
-        Assert.DoesNotContain("secret-token-xyz", body);
+        var res = await client.GetAsync($"/exceptions/{KnownGuid}");
+        Assert.Equal(HttpStatusCode.OK, res.StatusCode); // page still renders, just without the body
+        Assert.DoesNotContain("secret-token-xyz", await res.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
+    public async Task List_AuthorizeThrows_Returns404()
+    {
+        // A throwing Authorize predicate must fail closed (deny + hide), not 500.
+        var client = await ServerAsync(new FakeExceptionStore(Sample()),
+            o => o.Authorize = _ => throw new InvalidOperationException("auth backend down"));
+        var res = await client.GetAsync("/exceptions");
+        Assert.Equal(HttpStatusCode.NotFound, res.StatusCode);
+    }
+
+    [Fact]
+    public async Task List_StoreThrows_NotServedAs200()
+    {
+        // Auth passes, then the store fails — the error must propagate, never be swallowed into a 200.
+        var store = new FakeExceptionStore(Sample()) { FailWith = new InvalidOperationException("db down") };
+        var client = await ServerAsync(store, o => o.Authorize = _ => Task.FromResult(true));
+        try
+        {
+            var res = await client.GetAsync("/exceptions");
+            Assert.NotEqual(HttpStatusCode.OK, res.StatusCode);
+        }
+        catch (InvalidOperationException)
+        {
+            // TestServer may rethrow the unhandled exception — also acceptable (not a swallowed 200).
+        }
+    }
+
+    [Fact]
+    public async Task List_ClampsPageAndPageSizeUpToMinimum()
+    {
+        var store = new FakeExceptionStore(Sample());
+        var client = await ServerAsync(store, o => o.Authorize = _ => Task.FromResult(true));
+
+        await client.GetAsync("/exceptions?page=0&pageSize=0");
+
+        Assert.Equal(1, store.LastFilter!.Page);
+        Assert.Equal(1, store.LastFilter.PageSize);
     }
 }
