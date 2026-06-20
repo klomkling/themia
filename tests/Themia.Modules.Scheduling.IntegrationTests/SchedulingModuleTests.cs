@@ -414,10 +414,14 @@ public sealed class SqlServerCaseSensitiveCollationTests : IAsyncLifetime
         // Pooling=False so each disposed provider closes its SQL connections immediately. The test runs two
         // "processes" against one container; with pooling on, process 1's shut-down scheduler can leave a
         // pooled connection holding a lock that deadlocks process 2's migration replay.
+        // Command Timeout=120: under parallel CI load the SQL Server container gets starved and Quartz's
+        // schema-validation query can exceed the 30s default, surfacing as a misleading
+        // "schema validation failed" (inner: "Execution Timeout Expired"). The longer timeout rides out
+        // transient contention without masking a real schema problem.
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["ConnectionStrings:Default"] = container.GetConnectionString() + ";Pooling=False",
+                ["ConnectionStrings:Default"] = container.GetConnectionString() + ";Pooling=False;Command Timeout=120",
             })
             .Build();
 
