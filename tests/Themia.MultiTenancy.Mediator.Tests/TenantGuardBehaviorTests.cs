@@ -101,18 +101,19 @@ public class TenantGuardBehaviorTests
         Assert.Equal("ok", result);
     }
 
-    private static TenantGuardBehavior<TestRequest, string> BuildWithValidator(
-        TenantInfo? tenant, Func<TenantInfo, bool> validator) =>
+    private static TenantGuardBehavior<TReq, string> BuildWithValidator<TReq>(
+        ClaimsPrincipal? principal, TenantInfo? tenant, string[]? privileged, Func<TenantInfo, bool>? validator)
+        where TReq : IRequest<string> =>
         new(
-            new HttpContextAccessor { HttpContext = new DefaultHttpContext { User = Authed("User") } },
+            new HttpContextAccessor { HttpContext = principal is null ? null : new DefaultHttpContext { User = principal } },
             new FakeTenantAccessor(tenant),
-            Options.Create(new TenantGuardOptions { TenantValidator = validator }),
-            new CapturingLogger<TenantGuardBehavior<TestRequest, string>>());
+            Options.Create(new TenantGuardOptions { PrivilegedRoles = privileged ?? [], TenantValidator = validator }),
+            new CapturingLogger<TenantGuardBehavior<TReq, string>>());
 
     [Fact]
     public async Task TenantValidator_Rejecting_DeniesAsForbidden()
     {
-        var behavior = BuildWithValidator(Tenant, _ => false);
+        var behavior = BuildWithValidator<TestRequest>(Authed("User"), Tenant, null, _ => false);
 
         await Assert.ThrowsAsync<ForbiddenException>(() =>
             behavior.HandleAsync(new TestRequest(), _ => Task.FromResult("unused"), CancellationToken.None));
@@ -121,7 +122,7 @@ public class TenantGuardBehaviorTests
     [Fact]
     public async Task TenantValidator_Accepting_InvokesNext()
     {
-        var behavior = BuildWithValidator(Tenant, t => t.Identifier == "acme");
+        var behavior = BuildWithValidator<TestRequest>(Authed("User"), Tenant, null, t => t.Identifier == "acme");
 
         var result = await behavior.HandleAsync(new TestRequest(), _ => Task.FromResult("ok"), CancellationToken.None);
 
@@ -132,9 +133,52 @@ public class TenantGuardBehaviorTests
     public async Task TenantValidator_NonPositiveIntTenant_DeniedAsForbidden()
     {
         // ezy's case (coord #0006): a numeric int>0 validator rejects tenant_id "0".
-        var behavior = BuildWithValidator(
-            new TenantInfo("0", "0"),
+        var behavior = BuildWithValidator<TestRequest>(
+            Authed("User"), new TenantInfo("0", "0"), null,
             t => int.TryParse(t.Identifier, out var id) && id > 0);
+
+        await Assert.ThrowsAsync<ForbiddenException>(() =>
+            behavior.HandleAsync(new TestRequest(), _ => Task.FromResult("unused"), CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task TenantValidator_RejectsButPrivilegedRole_StillInvokesNext()
+    {
+        // Precedence: privileged-role bypass beats the validator-nulled tenant.
+        var behavior = BuildWithValidator<TestRequest>(Authed("SaaSAdmin"), Tenant, ["SaaSAdmin"], _ => false);
+
+        var result = await behavior.HandleAsync(new TestRequest(), _ => Task.FromResult("ok"), CancellationToken.None);
+
+        Assert.Equal("ok", result);
+    }
+
+    [Fact]
+    public async Task TenantValidator_RejectsButSkipRequest_StillInvokesNext()
+    {
+        // Precedence: ISkipTenantValidation bypasses everything, including a validator-nulled tenant.
+        var behavior = BuildWithValidator<SkippableRequest>(Authed("User"), Tenant, null, _ => false);
+
+        var result = await behavior.HandleAsync(new SkippableRequest(), _ => Task.FromResult("ok"), CancellationToken.None);
+
+        Assert.Equal("ok", result);
+    }
+
+    [Fact]
+    public async Task TenantValidator_Unauthenticated_StillUnauthorized()
+    {
+        // Precedence: auth check sits above the validator — a passing validator can't promote anonymous.
+        var behavior = BuildWithValidator<TestRequest>(principal: null, Tenant, null, _ => true);
+
+        await Assert.ThrowsAsync<UnauthorizedException>(() =>
+            behavior.HandleAsync(new TestRequest(), _ => Task.FromResult("unused"), CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task TenantValidator_Throws_DeniesAsForbidden()
+    {
+        // A throwing validator fails closed (denied), not 500.
+        var behavior = BuildWithValidator<TestRequest>(
+            Authed("User"), Tenant, null, _ => throw new InvalidOperationException("validator bug"));
 
         await Assert.ThrowsAsync<ForbiddenException>(() =>
             behavior.HandleAsync(new TestRequest(), _ => Task.FromResult("unused"), CancellationToken.None));
