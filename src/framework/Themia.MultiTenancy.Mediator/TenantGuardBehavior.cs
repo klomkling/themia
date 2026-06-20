@@ -49,8 +49,11 @@ public sealed class TenantGuardBehavior<TRequest, TResponse>(
             case TenantGuardVerdict.Unauthenticated:
                 throw new UnauthorizedException("Authentication is required.");
             case TenantGuardVerdict.NoTenant:
-                // No user identifier is logged (no PII); TraceId correlates this to the auth/access
-                // log, which already carries the identity.
+                // Deliberate domain log at the decision point: carries the Mediator RequestType + roles
+                // that the HTTP-boundary ProblemDetailsMiddleware (which also logs this ForbiddenException
+                // at Warning) cannot see. The two are complementary and correlated by TraceId — this is
+                // origin-context + boundary-mapping, not catch-rethrow double-logging.
+                // No user identifier is logged (no PII); TraceId correlates this to the auth/access log.
                 logger.LogWarning(
                     "Authenticated principal with no usable tenant for {RequestType} (Roles: {Roles}, TraceId: {TraceId})",
                     typeof(TRequest).Name, Roles(principal), Activity.Current?.Id);
