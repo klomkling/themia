@@ -1,0 +1,6 @@
+#nullable enable
+Themia.MultiTenancy.Mediator.TenantGuardBehavior<TRequest, TResponse>
+Themia.MultiTenancy.Mediator.TenantGuardBehavior<TRequest, TResponse>.TenantGuardBehavior(Microsoft.AspNetCore.Http.IHttpContextAccessor! httpContextAccessor, Themia.MultiTenancy.Abstractions.ITenantAccessor! tenantAccessor, Microsoft.Extensions.Options.IOptions<Themia.MultiTenancy.TenantGuardOptions!>! options, Microsoft.Extensions.Logging.ILogger<Themia.MultiTenancy.Mediator.TenantGuardBehavior<TRequest, TResponse>!>! logger) -> void
+Themia.MultiTenancy.Mediator.TenantGuardBehavior<TRequest, TResponse>.HandleAsync(TRequest request, Themia.Mediator.Pipelines.RequestHandlerContinuation<TResponse>! next, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<TResponse>!
+Themia.MultiTenancy.Mediator.TenantGuardServiceCollectionExtensions
+static Themia.MultiTenancy.Mediator.TenantGuardServiceCollectionExtensions.AddThemiaTenantGuard(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Themia.MultiTenancy.TenantGuardOptions!>? configure = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!

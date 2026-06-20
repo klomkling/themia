@@ -23,7 +23,7 @@
       this value. Bump here to cut a release. Split per-package later only if
       release cadences genuinely diverge.
     -->
-    <Version>0.5.6</Version>
+    <Version>0.5.7</Version>
   </PropertyGroup>
 
   <!--
@@ -38,7 +38,7 @@
     3.0.x line is a different package layout not paired with Microsoft.Data.Sqlite 10.0.9. The
     affected native lib is reached only by our own test fixtures (SQLite is never shipped and never
     processes untrusted input). Revisit when Microsoft.Data.Sqlite ships a build referencing a fixed
-    SQLitePCLRaw. Tracking: TODO(sarawut) open an issue to follow the upstream fix.
+    SQLitePCLRaw. Tracking: https://github.com/klomkling/themia/issues/112.
   -->
   <ItemGroup Label="Security audit suppressions">
     <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-2m69-gcr7-jv3q" />
