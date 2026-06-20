@@ -26,24 +26,6 @@
     <Version>0.5.7</Version>
   </PropertyGroup>
 
-  <!--
-    Security audit suppressions (NuGetAudit). Each entry MUST cite the advisory, why it is
-    unfixable today, the blast radius, and the revisit trigger.
-
-    GHSA-2m69-gcr7-jv3q (high): SQLitePCLRaw.lib.e_sqlite3 <= 2.1.11 bundles a SQLite native
-    library with a CVE. Pulled transitively, TEST-ONLY, via Microsoft.Data.Sqlite /
-    Microsoft.EntityFrameworkCore.Sqlite 10.0.9 (both already at the latest published version) ->
-    SQLitePCLRaw.bundle_e_sqlite3 2.1.11 -> lib.e_sqlite3 2.1.11. The advisory lists **no patched
-    version** (the 2.1.x line ends at 2.1.11), so it cannot be remediated by a version bump; the
-    3.0.x line is a different package layout not paired with Microsoft.Data.Sqlite 10.0.9. The
-    affected native lib is reached only by our own test fixtures (SQLite is never shipped and never
-    processes untrusted input). Revisit when Microsoft.Data.Sqlite ships a build referencing a fixed
-    SQLitePCLRaw. Tracking: https://github.com/klomkling/themia/issues/112.
-  -->
-  <ItemGroup Label="Security audit suppressions">
-    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-2m69-gcr7-jv3q" />
-  </ItemGroup>
-
   <PropertyGroup Label="Package metadata">
     <Authors>Sarawut Phaekuntod</Authors>
     <Company>Idevs</Company>

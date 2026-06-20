@@ -1,8 +1,18 @@
 <Project>
   <PropertyGroup>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
   </PropertyGroup>
   <ItemGroup>
+    <!-- Transitive pin (test-only, via Microsoft.Data.Sqlite/EntityFrameworkCore.Sqlite 10.0.9):
+         force the SQLitePCLRaw family to 3.x. The 2.1.x bundle pulls SQLitePCLRaw.lib.e_sqlite3 2.1.11,
+         which carries the high-severity SQLite-native CVE GHSA-2m69-gcr7-jv3q (NU1903, fixes #112). The
+         3.x reorg drops lib.e_sqlite3 entirely (native lib is now SourceGear.sqlite3 3.50.x, outside the
+         advisory's <=2.1.11 range), clearing the advisory at the graph level — no NuGetAuditSuppress
+         needed. Microsoft.Data.Sqlite 10.0.9 (nominally core 2.1.11) runs cleanly on core 3.0.3 here:
+         full suite green. Revisit if MDS publishes its own SQLitePCLRaw 3.x baseline. -->
+    <PackageVersion Include="SQLitePCLRaw.core" Version="3.0.3" />
+    <PackageVersion Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.3" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.6.0" />
     <PackageVersion Include="xunit" Version="2.9.3" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
