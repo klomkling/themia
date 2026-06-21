@@ -12,6 +12,9 @@ namespace Themia.Pdf;
 internal sealed class PuppeteerPdfRenderer : IPdfRenderer, IAsyncDisposable, IDisposable
 {
     private readonly ThemiaPdfOptions _options;
+    // Snapshot of the launch args so a post-construction mutation of the caller's (mutable) array
+    // can't change what the singleton launches; mirrors PdfRenderOptions' init-only immutability.
+    private readonly string[] _launchArgs;
     private readonly ILogger<PuppeteerPdfRenderer> _logger;
     private readonly SemaphoreSlim _browserLock = new(1, 1);
     // volatile: the outer fast-path read in EnsureBrowserAsync runs outside the lock, so the
@@ -22,6 +25,7 @@ internal sealed class PuppeteerPdfRenderer : IPdfRenderer, IAsyncDisposable, IDi
     public PuppeteerPdfRenderer(ThemiaPdfOptions options, ILogger<PuppeteerPdfRenderer> logger)
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
+        _launchArgs = options.LaunchArgs.ToArray();
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -75,7 +79,7 @@ internal sealed class PuppeteerPdfRenderer : IPdfRenderer, IAsyncDisposable, IDi
         var launchOptions = new LaunchOptions
         {
             Headless = _options.Headless,
-            Args = _options.LaunchArgs,
+            Args = _launchArgs,
         };
 
         if (!string.IsNullOrEmpty(_options.ExecutablePath))

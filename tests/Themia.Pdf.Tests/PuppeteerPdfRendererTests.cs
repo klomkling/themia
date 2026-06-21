@@ -36,26 +36,19 @@ public sealed class PuppeteerPdfRendererTests
             () => sut.RenderHtmlAsync("<p>hi</p>", ct: new CancellationToken(canceled: true)));
     }
 
-    [Theory]
-    [InlineData(PdfPaperFormat.A4)]
-    [InlineData(PdfPaperFormat.A3)]
-    [InlineData(PdfPaperFormat.Letter)]
-    [InlineData(PdfPaperFormat.Legal)]
-    [InlineData(PdfPaperFormat.Tabloid)]
-    public void ToPdfOptions_MapsEveryPaperFormat(PdfPaperFormat format)
+    [Fact]
+    public void ToPdfOptions_MapsEveryPaperFormat()
     {
-        var expected = format switch
-        {
-            PdfPaperFormat.A3 => PaperFormat.A3,
-            PdfPaperFormat.Letter => PaperFormat.Letter,
-            PdfPaperFormat.Legal => PaperFormat.Legal,
-            PdfPaperFormat.Tabloid => PaperFormat.Tabloid,
-            _ => PaperFormat.A4,
-        };
+        // Literal expectations (not a switch mirroring production) so an identical mis-edit in both
+        // places can't hide. Covers all 5 PdfPaperFormat values incl. the A4 default arm.
+        Assert.Equal(PaperFormat.A4, Map(PdfPaperFormat.A4));
+        Assert.Equal(PaperFormat.A3, Map(PdfPaperFormat.A3));
+        Assert.Equal(PaperFormat.Letter, Map(PdfPaperFormat.Letter));
+        Assert.Equal(PaperFormat.Legal, Map(PdfPaperFormat.Legal));
+        Assert.Equal(PaperFormat.Tabloid, Map(PdfPaperFormat.Tabloid));
 
-        var mapped = PuppeteerPdfRenderer.ToPdfOptions(new PdfRenderOptions { PaperFormat = format });
-
-        Assert.Equal(expected, mapped.Format);
+        static PaperFormat Map(PdfPaperFormat f) =>
+            PuppeteerPdfRenderer.ToPdfOptions(new PdfRenderOptions { PaperFormat = f }).Format;
     }
 
     [Fact]
