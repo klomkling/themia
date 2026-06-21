@@ -1,1 +1,21 @@
 #nullable enable
+Themia.Pdf.PdfPaperFormat
+Themia.Pdf.PdfPaperFormat.A3 = 1 -> Themia.Pdf.PdfPaperFormat
+Themia.Pdf.PdfPaperFormat.A4 = 0 -> Themia.Pdf.PdfPaperFormat
+Themia.Pdf.PdfPaperFormat.Legal = 3 -> Themia.Pdf.PdfPaperFormat
+Themia.Pdf.PdfPaperFormat.Letter = 2 -> Themia.Pdf.PdfPaperFormat
+Themia.Pdf.PdfPaperFormat.Tabloid = 4 -> Themia.Pdf.PdfPaperFormat
+Themia.Pdf.PdfRenderOptions
+Themia.Pdf.PdfRenderOptions.PdfRenderOptions() -> void
+Themia.Pdf.PdfRenderOptions.MarginBottom.get -> string!
+Themia.Pdf.PdfRenderOptions.MarginBottom.set -> void
+Themia.Pdf.PdfRenderOptions.MarginLeft.get -> string!
+Themia.Pdf.PdfRenderOptions.MarginLeft.set -> void
+Themia.Pdf.PdfRenderOptions.MarginRight.get -> string!
+Themia.Pdf.PdfRenderOptions.MarginRight.set -> void
+Themia.Pdf.PdfRenderOptions.MarginTop.get -> string!
+Themia.Pdf.PdfRenderOptions.MarginTop.set -> void
+Themia.Pdf.PdfRenderOptions.PaperFormat.get -> Themia.Pdf.PdfPaperFormat
+Themia.Pdf.PdfRenderOptions.PaperFormat.set -> void
+Themia.Pdf.PdfRenderOptions.PrintBackground.get -> bool
+Themia.Pdf.PdfRenderOptions.PrintBackground.set -> void
