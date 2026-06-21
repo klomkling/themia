@@ -9,7 +9,7 @@ namespace Themia.Pdf;
 /// browser (guarded by a semaphore), reuses it across renders, and disposes it on
 /// <see cref="DisposeAsync"/>.
 /// </summary>
-internal sealed class PuppeteerPdfRenderer : IPdfRenderer, IAsyncDisposable
+internal sealed class PuppeteerPdfRenderer : IPdfRenderer, IAsyncDisposable, IDisposable
 {
     private readonly ThemiaPdfOptions _options;
     private readonly ILogger<PuppeteerPdfRenderer> _logger;
@@ -106,6 +106,15 @@ internal sealed class PuppeteerPdfRenderer : IPdfRenderer, IAsyncDisposable
             Right = o.MarginRight,
         },
     };
+
+    public void Dispose()
+    {
+        // Synchronous path: browser is null until first render, so this is safe in DI teardown
+        // before any render has occurred. If a browser was launched, callers should prefer
+        // DisposeAsync to avoid blocking.
+        _browser?.Dispose();
+        _browserLock.Dispose();
+    }
 
     public async ValueTask DisposeAsync()
     {

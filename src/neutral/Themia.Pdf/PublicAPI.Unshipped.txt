@@ -35,3 +35,5 @@ Themia.Pdf.IHtmlTemplateRenderer
 Themia.Pdf.IHtmlTemplateRenderer.Render(string! template, object! model) -> string!
 Themia.Pdf.IPdfRenderer
 Themia.Pdf.IPdfRenderer.RenderHtmlAsync(string! html, Themia.Pdf.PdfRenderOptions? options = null, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<byte[]!>!
+Microsoft.Extensions.DependencyInjection.ThemiaPdfServiceCollectionExtensions
+static Microsoft.Extensions.DependencyInjection.ThemiaPdfServiceCollectionExtensions.AddThemiaPdf(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Themia.Pdf.ThemiaPdfOptions!>? configure = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
