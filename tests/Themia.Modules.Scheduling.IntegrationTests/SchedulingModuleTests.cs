@@ -360,7 +360,8 @@ public sealed class SqlServerCaseSensitiveCollationTests : IAsyncLifetime
         var p1 = BuildServices();
         try
         {
-            await new SchedulingModule(new SchedulingModuleOptions { SchedulerName = "cs-test" }).InitializeAsync(p1);
+            await RunWithMigrationDeadlockRetry(() =>
+                new SchedulingModule(new SchedulingModuleOptions { SchedulerName = "cs-test" }).InitializeAsync(p1));
             LogContext.SetCurrentLogProvider(p1.GetRequiredService<ILoggerFactory>());
             // Build the scheduler (this runs AdoJobStore ValidateSchema against the uppercase qrtz_* tables —
             // the actual CS-collation prefix check) but do NOT Start() it: Start spawns the AdoJobStore
@@ -396,7 +397,8 @@ public sealed class SqlServerCaseSensitiveCollationTests : IAsyncLifetime
             }
 
             LogContext.SetCurrentLogProvider(p2.GetRequiredService<ILoggerFactory>());
-            await new SchedulingModule(new SchedulingModuleOptions { SchedulerName = "cs-test" }).InitializeAsync(p2);
+            await RunWithMigrationDeadlockRetry(() =>
+                new SchedulingModule(new SchedulingModuleOptions { SchedulerName = "cs-test" }).InitializeAsync(p2));
 
             // The durable job survived the replay and is readable through the rebuilt scheduler.
             var scheduler2 = await p2.GetRequiredService<ISchedulerFactory>().GetScheduler();
@@ -431,6 +433,40 @@ public sealed class SqlServerCaseSensitiveCollationTests : IAsyncLifetime
         services.AddSingleton<IDatabaseProvider>(new FakeDatabaseProvider(DatabaseProviderNames.SqlServer));
         new SchedulingModule(new SchedulingModuleOptions { SchedulerName = "cs-test" }).ConfigureServices(services);
         return services.BuildServiceProvider();
+    }
+
+    // FluentMigrator's VersionInfo bootstrap (CREATE/ALTER of the VersionInfo table) intermittently loses a
+    // SQL Server schema-modification-lock deadlock on the shared CS container under parallel CI load. The
+    // victim transaction rolls back cleanly and MigrateUp is idempotent, so a bounded retry rides out the
+    // transient deadlock. (#82 cut the main trigger by not Start()ing scheduler1; this clears the residual
+    // flake at the source — both process 1 and process 2 apply migrations and either can be the victim.)
+    private static async Task RunWithMigrationDeadlockRetry(Func<ValueTask> migrate, int maxAttempts = 4)
+    {
+        for (var attempt = 1; ; attempt++)
+        {
+            try
+            {
+                await migrate();
+                return;
+            }
+            catch (Exception ex) when (attempt < maxAttempts && IsDeadlock(ex))
+            {
+                await Task.Delay(TimeSpan.FromMilliseconds(250 * attempt));
+            }
+        }
+
+        static bool IsDeadlock(Exception ex)
+        {
+            for (var e = ex; e is not null; e = e.InnerException)
+            {
+                if (e.Message.Contains("deadlock", StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
     }
 
     public Task InitializeAsync() => container.StartAsync();
