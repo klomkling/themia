@@ -19,3 +19,15 @@ Themia.Pdf.PdfRenderOptions.PaperFormat.get -> Themia.Pdf.PdfPaperFormat
 Themia.Pdf.PdfRenderOptions.PaperFormat.set -> void
 Themia.Pdf.PdfRenderOptions.PrintBackground.get -> bool
 Themia.Pdf.PdfRenderOptions.PrintBackground.set -> void
+Themia.Pdf.ThemiaPdfOptions
+Themia.Pdf.ThemiaPdfOptions.ThemiaPdfOptions() -> void
+Themia.Pdf.ThemiaPdfOptions.ConfigureHandlebars.get -> System.Action<HandlebarsDotNet.IHandlebars!>?
+Themia.Pdf.ThemiaPdfOptions.ConfigureHandlebars.set -> void
+Themia.Pdf.ThemiaPdfOptions.DisableAutoDownload.get -> bool
+Themia.Pdf.ThemiaPdfOptions.DisableAutoDownload.set -> void
+Themia.Pdf.ThemiaPdfOptions.ExecutablePath.get -> string?
+Themia.Pdf.ThemiaPdfOptions.ExecutablePath.set -> void
+Themia.Pdf.ThemiaPdfOptions.Headless.get -> bool
+Themia.Pdf.ThemiaPdfOptions.Headless.set -> void
+Themia.Pdf.ThemiaPdfOptions.LaunchArgs.get -> string![]!
+Themia.Pdf.ThemiaPdfOptions.LaunchArgs.set -> void
