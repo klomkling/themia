@@ -104,5 +104,8 @@
     <PackageVersion Include="Quartz" Version="3.18.1" />
     <PackageVersion Include="Quartz.Serialization.SystemTextJson" Version="3.18.1" />
     <PackageVersion Include="Quartz.Extensions.Hosting" Version="3.18.1" />
+    <!-- Pdf (Themia.Pdf neutral core): headless Chromium renderer -->
+    <PackageVersion Include="PuppeteerSharp" Version="20.0.5" />
+    <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.9" />
   </ItemGroup>
 </Project>

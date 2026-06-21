@@ -27,6 +27,16 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-06-21
+
+### Added
+
+- `Themia.Pdf` — neutral HTML→PDF rendering core. `IHtmlTemplateRenderer` (Handlebars.Net template
+  merge) and `IPdfRenderer` (PuppeteerSharp headless-Chromium HTML→PDF) with a managed browser
+  lifecycle, configurable Chromium provisioning (`ExecutablePath` / `DisableAutoDownload`), and an
+  `AddThemiaPdf` DI extension. Targets `net8.0;net10.0`. First Phase-2 package. (ported from
+  ezy-assets `ContractPdfService`)
+
 ## [0.5.6] - 2026-06-18
 
 ### Added
