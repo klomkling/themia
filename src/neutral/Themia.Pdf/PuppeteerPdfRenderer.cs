@@ -7,7 +7,7 @@ namespace Themia.Pdf;
 /// <summary>
 /// PuppeteerSharp-backed <see cref="IPdfRenderer"/>. Lazily launches a single headless Chromium
 /// browser (guarded by a semaphore), reuses it across renders, and disposes it on
-/// <see cref="DisposeAsync"/>.
+/// <see cref="DisposeAsync"/> (or <see cref="Dispose"/> for non-async teardown).
 /// </summary>
 internal sealed class PuppeteerPdfRenderer : IPdfRenderer, IAsyncDisposable, IDisposable
 {
@@ -28,12 +28,18 @@ internal sealed class PuppeteerPdfRenderer : IPdfRenderer, IAsyncDisposable, IDi
     public async Task<byte[]> RenderHtmlAsync(string html, PdfRenderOptions? options = null, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(html);
+        ct.ThrowIfCancellationRequested();
         var opts = options ?? new PdfRenderOptions();
 
         var browser = await EnsureBrowserAsync(ct).ConfigureAwait(false);
 
+        // PuppeteerSharp's page methods don't take a CancellationToken, so honor ct between
+        // stages — combined with the WaitAsync(ct) in EnsureBrowserAsync this is the available
+        // granularity (a SetContent/PdfData call already in flight runs to completion). Render
+        // failures propagate untouched to the top-level handler (THEMIA101: no log-and-rethrow).
         await using var page = await browser.NewPageAsync().ConfigureAwait(false);
         await page.SetContentAsync(html).ConfigureAwait(false);
+        ct.ThrowIfCancellationRequested();
         return await page.PdfDataAsync(ToPdfOptions(opts)).ConfigureAwait(false);
     }
 
@@ -52,6 +58,9 @@ internal sealed class PuppeteerPdfRenderer : IPdfRenderer, IAsyncDisposable, IDi
                 return _browser;
             }
 
+            // A non-null _browser here is dead/disconnected — dispose it before relaunching so the
+            // old websocket + Chromium process don't leak.
+            _browser?.Dispose();
             _browser = await LaunchAsync().ConfigureAwait(false);
             return _browser;
         }
@@ -90,7 +99,8 @@ internal sealed class PuppeteerPdfRenderer : IPdfRenderer, IAsyncDisposable, IDi
         return browser;
     }
 
-    private static PdfOptions ToPdfOptions(PdfRenderOptions o) => new()
+    // internal (not private) so the pure format/margin mapping can be unit-tested without Chromium.
+    internal static PdfOptions ToPdfOptions(PdfRenderOptions o) => new()
     {
         Format = o.PaperFormat switch
         {
@@ -112,6 +122,7 @@ internal sealed class PuppeteerPdfRenderer : IPdfRenderer, IAsyncDisposable, IDi
 
     public void Dispose()
     {
+        // Single-shot guard: first caller wins; a second Dispose/DisposeAsync is a no-op.
         if (Interlocked.Exchange(ref _disposed, 1) != 0)
         {
             return;
@@ -121,11 +132,14 @@ internal sealed class PuppeteerPdfRenderer : IPdfRenderer, IAsyncDisposable, IDi
         // Browser.Dispose() blocks on its async close, so the process is still shut down;
         // an async host disposes via DisposeAsync below, which closes cooperatively.
         _browser?.Dispose();
-        _browserLock.Dispose();
+        // _browserLock is intentionally NOT disposed: SemaphoreSlim only needs disposal when its
+        // AvailableWaitHandle was accessed (we never do), and disposing it while an in-flight
+        // render is between WaitAsync and Release would make that Release throw ObjectDisposedException.
     }
 
     public async ValueTask DisposeAsync()
     {
+        // Single-shot guard: first caller wins; a second Dispose/DisposeAsync is a no-op.
         if (Interlocked.Exchange(ref _disposed, 1) != 0)
         {
             return;
@@ -137,6 +151,6 @@ internal sealed class PuppeteerPdfRenderer : IPdfRenderer, IAsyncDisposable, IDi
             _browser.Dispose();
         }
 
-        _browserLock.Dispose();
+        // _browserLock intentionally not disposed — see Dispose() for rationale.
     }
 }

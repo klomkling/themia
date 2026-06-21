@@ -8,17 +8,17 @@ Themia.Pdf.PdfPaperFormat.Tabloid = 4 -> Themia.Pdf.PdfPaperFormat
 Themia.Pdf.PdfRenderOptions
 Themia.Pdf.PdfRenderOptions.PdfRenderOptions() -> void
 Themia.Pdf.PdfRenderOptions.MarginBottom.get -> string!
-Themia.Pdf.PdfRenderOptions.MarginBottom.set -> void
+Themia.Pdf.PdfRenderOptions.MarginBottom.init -> void
 Themia.Pdf.PdfRenderOptions.MarginLeft.get -> string!
-Themia.Pdf.PdfRenderOptions.MarginLeft.set -> void
+Themia.Pdf.PdfRenderOptions.MarginLeft.init -> void
 Themia.Pdf.PdfRenderOptions.MarginRight.get -> string!
-Themia.Pdf.PdfRenderOptions.MarginRight.set -> void
+Themia.Pdf.PdfRenderOptions.MarginRight.init -> void
 Themia.Pdf.PdfRenderOptions.MarginTop.get -> string!
-Themia.Pdf.PdfRenderOptions.MarginTop.set -> void
+Themia.Pdf.PdfRenderOptions.MarginTop.init -> void
 Themia.Pdf.PdfRenderOptions.PaperFormat.get -> Themia.Pdf.PdfPaperFormat
-Themia.Pdf.PdfRenderOptions.PaperFormat.set -> void
+Themia.Pdf.PdfRenderOptions.PaperFormat.init -> void
 Themia.Pdf.PdfRenderOptions.PrintBackground.get -> bool
-Themia.Pdf.PdfRenderOptions.PrintBackground.set -> void
+Themia.Pdf.PdfRenderOptions.PrintBackground.init -> void
 Themia.Pdf.ThemiaPdfOptions
 Themia.Pdf.ThemiaPdfOptions.ThemiaPdfOptions() -> void
 Themia.Pdf.ThemiaPdfOptions.ConfigureHandlebars.get -> System.Action<HandlebarsDotNet.IHandlebars!>?
