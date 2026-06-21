@@ -1,7 +1,7 @@
 namespace Themia.Pdf;
 
 /// <summary>
-/// Per-render output options for IPdfRenderer. Defaults match the ported ezy-assets
+/// Per-render output options for <see cref="IPdfRenderer"/>. Defaults match the ported ezy-assets
 /// contract renderer: A4, printed backgrounds, 20 mm top/bottom and 15 mm left/right margins.
 /// </summary>
 public sealed class PdfRenderOptions

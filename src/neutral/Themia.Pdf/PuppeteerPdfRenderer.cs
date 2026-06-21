@@ -14,7 +14,10 @@ internal sealed class PuppeteerPdfRenderer : IPdfRenderer, IAsyncDisposable, IDi
     private readonly ThemiaPdfOptions _options;
     private readonly ILogger<PuppeteerPdfRenderer> _logger;
     private readonly SemaphoreSlim _browserLock = new(1, 1);
-    private IBrowser? _browser;
+    // volatile: the outer fast-path read in EnsureBrowserAsync runs outside the lock, so the
+    // canonical double-checked-locking form requires a fresh read of the published reference.
+    private volatile IBrowser? _browser;
+    private int _disposed;
 
     public PuppeteerPdfRenderer(ThemiaPdfOptions options, ILogger<PuppeteerPdfRenderer> logger)
     {
@@ -109,15 +112,25 @@ internal sealed class PuppeteerPdfRenderer : IPdfRenderer, IAsyncDisposable, IDi
 
     public void Dispose()
     {
-        // Synchronous path: browser is null until first render, so this is safe in DI teardown
-        // before any render has occurred. If a browser was launched, callers should prefer
-        // DisposeAsync to avoid blocking.
+        if (Interlocked.Exchange(ref _disposed, 1) != 0)
+        {
+            return;
+        }
+
+        // Synchronous path (e.g. a non-async DI container teardown). PuppeteerSharp's
+        // Browser.Dispose() blocks on its async close, so the process is still shut down;
+        // an async host disposes via DisposeAsync below, which closes cooperatively.
         _browser?.Dispose();
         _browserLock.Dispose();
     }
 
     public async ValueTask DisposeAsync()
     {
+        if (Interlocked.Exchange(ref _disposed, 1) != 0)
+        {
+            return;
+        }
+
         if (_browser is not null)
         {
             await _browser.CloseAsync().ConfigureAwait(false);
