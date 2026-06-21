@@ -31,3 +31,5 @@ Themia.Pdf.ThemiaPdfOptions.Headless.get -> bool
 Themia.Pdf.ThemiaPdfOptions.Headless.set -> void
 Themia.Pdf.ThemiaPdfOptions.LaunchArgs.get -> string![]!
 Themia.Pdf.ThemiaPdfOptions.LaunchArgs.set -> void
+Themia.Pdf.IHtmlTemplateRenderer
+Themia.Pdf.IHtmlTemplateRenderer.Render(string! template, object! model) -> string!
