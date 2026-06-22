@@ -149,3 +149,23 @@ Themia.Modules.Notifications.Dispatch.ResolvedPreferences.EnabledChannels.get ->
 Themia.Modules.Notifications.Dispatch.ResolvedPreferences.EnabledChannels.init -> void
 Themia.Modules.Notifications.Dispatch.ResolvedPreferences.Locale.get -> string?
 Themia.Modules.Notifications.Dispatch.ResolvedPreferences.Locale.init -> void
+Themia.Modules.Notifications.Dispatch.INotificationDispatcher
+Themia.Modules.Notifications.Dispatch.INotificationDispatcher.DispatchAsync(Themia.Modules.Notifications.Dispatch.NotificationRequest! request, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Modules.Notifications.Dispatch.NotificationRequest
+Themia.Modules.Notifications.Dispatch.NotificationRequest.NotificationRequest() -> void
+Themia.Modules.Notifications.Dispatch.NotificationRequest.UserId.get -> string!
+Themia.Modules.Notifications.Dispatch.NotificationRequest.UserId.init -> void
+Themia.Modules.Notifications.Dispatch.NotificationRequest.Channels.get -> System.Collections.Generic.IReadOnlyList<Themia.Notifications.NotificationChannel>!
+Themia.Modules.Notifications.Dispatch.NotificationRequest.Channels.init -> void
+Themia.Modules.Notifications.Dispatch.NotificationRequest.Recipients.get -> System.Collections.Generic.IReadOnlyDictionary<Themia.Notifications.NotificationChannel, string!>?
+Themia.Modules.Notifications.Dispatch.NotificationRequest.Recipients.init -> void
+Themia.Modules.Notifications.Dispatch.NotificationRequest.Subject.get -> string?
+Themia.Modules.Notifications.Dispatch.NotificationRequest.Subject.init -> void
+Themia.Modules.Notifications.Dispatch.NotificationRequest.Body.get -> string?
+Themia.Modules.Notifications.Dispatch.NotificationRequest.Body.init -> void
+Themia.Modules.Notifications.Dispatch.NotificationRequest.Template.get -> string?
+Themia.Modules.Notifications.Dispatch.NotificationRequest.Template.init -> void
+Themia.Modules.Notifications.Dispatch.NotificationRequest.Model.get -> object?
+Themia.Modules.Notifications.Dispatch.NotificationRequest.Model.init -> void
+Themia.Modules.Notifications.Dispatch.NotificationRequest.ScheduledFor.get -> System.DateTimeOffset?
+Themia.Modules.Notifications.Dispatch.NotificationRequest.ScheduledFor.init -> void
