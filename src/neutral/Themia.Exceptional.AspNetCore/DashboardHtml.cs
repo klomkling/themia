@@ -12,15 +12,11 @@ namespace Themia.Exceptional.AspNetCore;
 /// When adding a new string value, route it through <see cref="Enc"/>.</summary>
 internal static class DashboardHtml
 {
-    private const string Style =
-        "<style>body{font:14px system-ui,sans-serif;margin:1rem}table{border-collapse:collapse;width:100%}" +
-        "th,td{border:1px solid #ddd;padding:4px 8px;text-align:left;vertical-align:top}th{background:#f5f5f5}" +
-        "pre{background:#f8f8f8;padding:8px;overflow:auto;white-space:pre-wrap}a{color:#0366d6}</style>";
-
     internal static string Enc(string? value) => WebUtility.HtmlEncode(value ?? string.Empty);
 
-    internal static string Page(string title, string body) =>
-        $"<!doctype html><html><head><meta charset=\"utf-8\"><title>{Enc(title)}</title>{Style}</head><body>{body}</body></html>";
+    internal static string Page(string title, string path, string body) =>
+        "<!doctype html><html><head><meta charset=\"utf-8\"><title>" + Enc(title) +
+        "</title><link rel=\"stylesheet\" href=\"" + Enc(path) + "/dashboard.css\"></head><body>" + body + "</body></html>";
 
     internal static string List(string title, string path, IReadOnlyList<ExceptionEntry> items, int total, ExceptionFilter filter)
     {
@@ -64,7 +60,7 @@ internal static class DashboardHtml
         }
         sb.Append("</p>");
 
-        return Page(title, sb.ToString());
+        return Page(title, path, sb.ToString());
     }
 
     internal static string Detail(string title, string path, ExceptionEntry e, bool showRequestBody)
@@ -97,7 +93,7 @@ internal static class DashboardHtml
             sb.Append("<h2>Request body</h2><pre>").Append(Enc(e.RequestBody)).Append("</pre>");
         }
 
-        return Page(title, sb.ToString());
+        return Page(title, path, sb.ToString());
     }
 
     private static void Row(StringBuilder sb, string key, string? value) =>

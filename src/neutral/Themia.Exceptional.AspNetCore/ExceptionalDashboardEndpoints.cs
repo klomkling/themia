@@ -44,6 +44,11 @@ public static class ExceptionalDashboardEndpoints
         var group = endpoints.MapGroup(path);
         group.MapGet("", (HttpContext ctx, IExceptionStore store, CancellationToken ct) => HandleListAsync(ctx, store, options, path, ct));
         group.MapGet("{guid:guid}", (Guid guid, HttpContext ctx, IExceptionStore store, CancellationToken ct) => HandleDetailAsync(ctx, store, options, path, guid, ct));
+        group.MapGet("dashboard.css", (HttpContext ctx) =>
+        {
+            ctx.Response.ContentType = "text/css; charset=utf-8";
+            return ctx.Response.WriteAsync(DashboardCss.Content);
+        });
         return group;
     }
 
