@@ -34,7 +34,7 @@ public static class NotificationsServiceCollectionExtensions
         configure?.Invoke(options);
         options.Validate();
 
-        services.AddSingleton(options);
+        services.TryAddSingleton(options);
         services.TryAddSingleton(TimeProvider.System);
         services.AddLogging();
 

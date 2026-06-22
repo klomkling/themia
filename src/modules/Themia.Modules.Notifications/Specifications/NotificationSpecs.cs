@@ -32,7 +32,10 @@ internal sealed class NotificationPreferencesSpec : Specification<NotificationPr
     {
         if (userId is not null)
         {
-            Where(x => x.UserId == userId);
+            // Include the tenant-wide defaults (null UserId) alongside the user's own rows: the resolver
+            // requires both so a tenant default can apply when the user has no specific row. With no userId,
+            // keep no filter so every row in the tenant is returned.
+            Where(x => x.UserId == userId || x.UserId == null);
         }
     }
 }

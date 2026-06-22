@@ -108,6 +108,10 @@ internal sealed class OutboxDrainer(
                 Body = row.Body, // already rendered at enqueue
             };
 
+            // forward-note: per-tenant sender/provider-config resolution is deferred — v1 resolves the global
+            // sender here. WHEN a tenant-aware sender is wired, the drainer must set the ambient tenant for the
+            // row (row.TenantId) BEFORE resolving config, else IProviderConfigResolver resolves with a null
+            // tenant and silently falls back to the global config.
             var result = await SendAsync(sp, message, ct).ConfigureAwait(false);
             if (!result.Succeeded)
             {
