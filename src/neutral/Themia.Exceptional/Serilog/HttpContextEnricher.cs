@@ -1,4 +1,6 @@
+using System.Text.Json;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Primitives;
 using Serilog.Core;
 using Serilog.Events;
 using Themia.Exceptional.Middleware;
@@ -47,6 +49,8 @@ public sealed class HttpContextEnricher : ILogEventEnricher
         // Cookie/Authorization are intentionally never read.
         if (http.Items.TryGetValue(RequestBodyLoggingMiddleware.BodyItemKey, out var body) && body is string bodyText)
             Add(logEvent, propertyFactory, "RequestBody", bodyText);
+        if (options.CaptureRequestContext)
+            Add(logEvent, propertyFactory, "RequestContext", BuildRequestContext(http, options.Redactor));
     }
 
     private static void Add(LogEvent logEvent, ILogEventPropertyFactory factory, string name, object? value)
@@ -54,5 +58,57 @@ public sealed class HttpContextEnricher : ILogEventEnricher
         if (value is null or "")
             return;
         logEvent.AddPropertyIfAbsent(factory.CreateProperty(name, value));
+    }
+
+    private static readonly JsonSerializerOptions ContextJson = new() { WriteIndented = false };
+
+    private static string BuildRequestContext(HttpContext http, Func<string, string, string?>? redactor)
+    {
+        var request = http.Request;
+        var ctx = new Dictionary<string, Dictionary<string, string?>>
+        {
+            ["headers"] = Collect(request.Headers, redactor),
+            ["cookies"] = Collect(request.Cookies.Select(c => new KeyValuePair<string, StringValues>(c.Key, c.Value)), redactor),
+            ["queryString"] = Collect(request.Query, redactor),
+            ["form"] = TryForm(request, redactor),
+            ["serverVariables"] = ServerVariables(http, redactor),
+        };
+        return JsonSerializer.Serialize(ctx, ContextJson);
+    }
+
+    private static Dictionary<string, string?> Collect(
+        IEnumerable<KeyValuePair<string, StringValues>> pairs, Func<string, string, string?>? redactor)
+    {
+        var map = new Dictionary<string, string?>(StringComparer.Ordinal);
+        foreach (var (key, values) in pairs)
+        {
+            var raw = values.ToString();
+            var stored = redactor is null ? raw : redactor(key, raw);
+            if (stored is not null)
+                map[key] = stored;
+        }
+        return map;
+    }
+
+    private static Dictionary<string, string?> TryForm(HttpRequest request, Func<string, string, string?>? redactor)
+    {
+        // Only read an already-buffered form; never force-read/rewind the body from the logging path.
+        if (!request.HasFormContentType)
+            return new Dictionary<string, string?>();
+        try { return Collect(request.Form, redactor); }
+        catch { return new Dictionary<string, string?>(); }
+    }
+
+    private static Dictionary<string, string?> ServerVariables(HttpContext http, Func<string, string, string?>? redactor)
+    {
+        var raw = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["REMOTE_ADDR"] = http.Connection.RemoteIpAddress?.ToString() ?? "",
+            ["SERVER_NAME"] = http.Request.Host.Host,
+            ["SERVER_PORT"] = http.Request.Host.Port?.ToString() ?? "",
+            ["REQUEST_METHOD"] = http.Request.Method,
+            ["SERVER_PROTOCOL"] = http.Request.Protocol,
+        };
+        return Collect(raw.Select(kv => new KeyValuePair<string, StringValues>(kv.Key, kv.Value)), redactor);
     }
 }
