@@ -38,3 +38,23 @@ Themia.Notifications.ISmsSender
 Themia.Notifications.ISmsSender.SendAsync(Themia.Notifications.NotificationMessage! message, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Notifications.NotificationResult!>!
 Themia.Notifications.IPushSender
 Themia.Notifications.IPushSender.SendAsync(Themia.Notifications.NotificationMessage! message, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Notifications.NotificationResult!>!
+Themia.Notifications.Providers.SmtpEmailOptions
+Themia.Notifications.Providers.SmtpEmailOptions.SmtpEmailOptions() -> void
+Themia.Notifications.Providers.SmtpEmailOptions.Host.get -> string!
+Themia.Notifications.Providers.SmtpEmailOptions.Host.set -> void
+Themia.Notifications.Providers.SmtpEmailOptions.Port.get -> int
+Themia.Notifications.Providers.SmtpEmailOptions.Port.set -> void
+Themia.Notifications.Providers.SmtpEmailOptions.UseSsl.get -> bool
+Themia.Notifications.Providers.SmtpEmailOptions.UseSsl.set -> void
+Themia.Notifications.Providers.SmtpEmailOptions.UserName.get -> string?
+Themia.Notifications.Providers.SmtpEmailOptions.UserName.set -> void
+Themia.Notifications.Providers.SmtpEmailOptions.Password.get -> string?
+Themia.Notifications.Providers.SmtpEmailOptions.Password.set -> void
+Themia.Notifications.Providers.SmtpEmailOptions.FromAddress.get -> string!
+Themia.Notifications.Providers.SmtpEmailOptions.FromAddress.set -> void
+Themia.Notifications.Providers.SmtpEmailOptions.FromDisplayName.get -> string?
+Themia.Notifications.Providers.SmtpEmailOptions.FromDisplayName.set -> void
+Themia.Notifications.Providers.SmtpEmailOptions.IsBodyHtml.get -> bool
+Themia.Notifications.Providers.SmtpEmailOptions.IsBodyHtml.set -> void
+Themia.Notifications.Providers.SmtpEmailOptions.PickupDirectory.get -> string?
+Themia.Notifications.Providers.SmtpEmailOptions.PickupDirectory.set -> void
