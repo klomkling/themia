@@ -93,17 +93,18 @@ public static class ExceptionalDashboardEndpoints
     {
         // Auth gate runs FIRST: a denied request must 404 regardless of any token presented.
         if (!await AuthorizedAsync(ctx, options).ConfigureAwait(false)) { ctx.Response.StatusCode = StatusCodes.Status404NotFound; return; }
-        if (!ValidCsrf(ctx)) { ctx.Response.StatusCode = StatusCodes.Status400BadRequest; return; }
+        if (!await ValidCsrfAsync(ctx, ct).ConfigureAwait(false)) { ctx.Response.StatusCode = StatusCodes.Status400BadRequest; return; }
 
         await action(guid, ct).ConfigureAwait(false);
         ctx.Response.StatusCode = StatusCodes.Status303SeeOther;
         ctx.Response.Headers.Location = path; // back to the list
     }
 
-    private static bool ValidCsrf(HttpContext ctx)
+    private static async Task<bool> ValidCsrfAsync(HttpContext ctx, CancellationToken ct)
     {
         var cookie = ctx.Request.Cookies[CsrfCookie];
-        var form = ctx.Request.HasFormContentType ? ctx.Request.Form["__token"].ToString() : null;
+        // ReadFormAsync (not the sync Request.Form) — Kestrel disallows synchronous body reads by default.
+        var form = ctx.Request.HasFormContentType ? (await ctx.Request.ReadFormAsync(ct).ConfigureAwait(false))["__token"].ToString() : null;
         if (string.IsNullOrEmpty(cookie) || string.IsNullOrEmpty(form) ||
             !CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(cookie), Encoding.UTF8.GetBytes(form)))
         {

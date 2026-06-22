@@ -108,7 +108,7 @@ internal static class DashboardHtml
             sb.Append("<form class=\"actions\" method=\"post\" action=\"").Append(Enc(path)).Append('/').Append(e.Guid).Append("/protect\">")
               .Append("<input type=\"hidden\" name=\"__token\" value=\"").Append(Enc(csrfToken)).Append("\">")
               .Append("<button type=\"submit\">").Append(e.IsProtected ? "Protected" : "Protect").Append("</button></form> ");
-            sb.Append("<form class=\"actions\" method=\"post\" action=\"").Append(Enc(path)).Append('/').Append(e.Guid).Append("/delete\" onsubmit=\"return confirm('Delete?')\">")
+            sb.Append("<form class=\"actions\" method=\"post\" action=\"").Append(Enc(path)).Append('/').Append(e.Guid).Append("/delete\">")
               .Append("<input type=\"hidden\" name=\"__token\" value=\"").Append(Enc(csrfToken)).Append("\">")
               .Append("<button type=\"submit\">Delete</button></form>");
         }

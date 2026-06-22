@@ -24,5 +24,6 @@ public sealed class AddRequestContextColumn : Migration
     }
 
     /// <inheritdoc />
-    public override void Down() => Delete.Column("RequestContext").FromTable("Exceptions");
+    public override void Down() =>
+        IfDatabase("postgresql", "mysql", "sqlserver").Delete.Column("RequestContext").FromTable("Exceptions");
 }
