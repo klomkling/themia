@@ -1,7 +1,11 @@
 # Themia Notifications (multi-channel dispatcher) — Design
 
-**Status:** Approved (brainstorming) — ready for implementation plan
+**Status:** Approved (brainstorming) — hardened after a /scrutinize pass — ready for implementation plan
 **Date:** 2026-06-22
+**Scrutiny revisions (2026-06-22):** templating no longer depends on `Themia.Pdf` (avoids dragging
+PuppeteerSharp/Chromium into notification consumers); drain signal fires post-commit and poll-interval
+is the documented latency floor in multi-instance; v1 SMS is fire-and-forget only (provider-managed OTP
+stays in Identity); per-engine outbox claim strategy specified; in-app writes directly (not via outbox).
 **Origin:** ezy-assets notification surface (port + generalize). Drivers: ezy has **no production email
 sender** (only `LoggerEmailService`), a real SMS provider (`Sms2ProOTPService`), and logging-only
 workflow/notification dispatch (`IWorkflowNotificationSink` / `INotificationDispatcher`).
@@ -46,8 +50,13 @@ packages so it can be built and reviewed in phases:
 - **Push provider** (FCM/APNs device-token management) — `IPushSender` defined, no concrete provider.
 - **SaaS provider integrations** (SendGrid / Sms2Pro / FCM) — thin consumer-supplied or follow-on
   packages, not built here.
-- **OTP generation/verification** — stays an **Identity** concern; Notifications only *sends* the SMS
-  the OTP flow hands it.
+- **OTP — generation, verification, AND provider-managed OTP send — stay in Identity/ezy, fully out of
+  scope.** v1 SMS is **fire-and-forget plain messages only** (enqueue → drain → send, no synchronous
+  return to the caller). ezy's real SMS path (`Sms2ProOTPService`) is *provider-managed*:
+  `SendProviderManagedOTPAsync` returns a `ReferenceCode`/`Token` **synchronously** and the same provider
+  verifies it — so it can neither be split "Identity generates / Notifications sends" nor routed through
+  the async outbox (the caller needs the provider's reference in its response). Notifications does not
+  attempt to model OTP; it sends ordinary SMS a caller hands it.
 - Domain events, recipient resolution, business "when to send" — stay in **ezy** (app domain).
 - Bulk/campaign features, analytics, click tracking.
 
@@ -66,7 +75,7 @@ src/neutral/Themia.Notifications/            net8.0;net10.0   (stateless core)
   Abstractions/ IEmailSender, ISmsSender, IPushSender, INotificationTemplateRenderer
   NotificationMessage.cs, NotificationResult.cs, NotificationChannel.cs
   Providers/ SmtpEmailSender, LoggerEmailSender(noop), HttpSmsSenderBase, LoggerSmsSender
-  Templating/ HandlebarsNotificationRenderer  (wraps Themia.Pdf IHtmlTemplateRenderer)
+  Templating/ INotificationTemplateRenderer, HandlebarsNotificationRenderer  (Handlebars.Net directly)
   DependencyInjection/ ThemiaNotificationsServiceCollectionExtensions  (AddThemiaNotifications)
   PublicAPI.*.txt
 
@@ -81,8 +90,13 @@ src/modules/Themia.Modules.Notifications/    net10.0          (tenant/stateful)
   PublicAPI.*.txt
 ```
 
-**Dependencies:** core depends on `Themia.Pdf` (`IHtmlTemplateRenderer`) + DI/Logging abstractions
-(no framework). Module depends on the core + `Themia.Framework.Core` (entities/tenancy),
+**Dependencies:** core depends on **`Handlebars.Net`** (directly — already pinned in the repo) +
+DI/Logging abstractions. It deliberately does **not** depend on `Themia.Pdf`: `IHtmlTemplateRenderer`
+lives in the `Themia.Pdf` package alongside `IPdfRenderer`, which references **PuppeteerSharp**, so a
+dependency would transitively pull a ~150 MB Chromium-downloading library into every email/SMS
+consumer. Both packages use the same engine (Handlebars.Net) via their own thin renderers; if the
+duplication ever matters, extract a shared `Themia.Templating` package both reference (future, YAGNI).
+Module depends on the core + `Themia.Framework.Core` (entities/tenancy),
 `Themia.Framework.Data.EFCore`/`.Dapper`, `Themia.Data.Migrations`, and the ASP.NET hosting
 abstractions (for the `BackgroundService` drainer).
 
@@ -113,8 +127,10 @@ public interface IPushSender  { Task<NotificationResult> SendAsync(NotificationM
 
 - Senders are **stateless, provider-backed**. On provider failure they **throw** — the drainer owns
   retry; senders don't retry themselves (THEMIA101: no log-and-rethrow).
-- Bodies render through `HandlebarsNotificationRenderer` over the Themia.Pdf `IHtmlTemplateRenderer`
-  (one engine, no second template stack). `Body` set ⇒ used verbatim; else `Template` + `Model` merged.
+- Bodies render through `HandlebarsNotificationRenderer`, which uses **`Handlebars.Net` directly** — the
+  same engine the Pdf core uses, but **not** via the `Themia.Pdf` package (which would drag
+  PuppeteerSharp/Chromium in; see Dependencies). `Body` set ⇒ used verbatim; else `Template` + `Model`
+  merged.
 - Built-in providers: `SmtpEmailSender` (System.Net.Mail/MailKit — chosen in the plan), `LoggerEmailSender`,
   `HttpSmsSenderBase` (a base for HTTP SMS providers like Sms2Pro), `LoggerSmsSender`.
 
@@ -122,34 +138,57 @@ public interface IPushSender  { Task<NotificationResult> SendAsync(NotificationM
 
 `OutboxMessage` (tenant-scoped, `SoftDeletableEntity`-style audit): `Id, TenantId, Channel, Recipient,
 Subject, Body, Status (pending|sending|sent|failed|dead), Attempts, NextAttemptAt, ScheduledFor?,
-CreatedAt, SentAt?, LastError`. Schema via FluentMigrator with `IfDatabase("postgresql"/"mysql"/"sqlserver")`
-+ the unsupported-provider guard; index on `(status, next_attempt_at)` for the drain query and
-`(tenant_id, ...)` for isolation.
+LeaseOwner?, LeaseExpiresAt?, CreatedAt, SentAt?, LastError`. Schema via FluentMigrator with
+`IfDatabase("postgresql"/"mysql"/"sqlserver")` + the unsupported-provider guard; index on
+`(status, next_attempt_at)` for the drain/claim query and `(tenant_id, ...)` for isolation.
 
 **Enqueue is transactional:** `IOutboxStore.EnqueueAsync` writes the row in the **caller's
 `IUnitOfWork` transaction**, so a notification commits atomically with the work that triggered it
-(no "sent but the transaction rolled back").
+(no "sent but the transaction rolled back"). *Verified feasible on both peers:* the Dapper UoW flushes
+staged writes on the ambient `IDapperConnectionContext.CurrentTransaction` (`DapperUnitOfWork.SaveChangesAsync`
+reuses an in-flight transaction), and the mediator `TransactionBehavior` supplies that ambient
+transaction; EF uses the same `DbContext`/`SaveChanges`. The outbox store must resolve from the **same
+request scope** as the caller so it shares that connection/context.
 
 ### Module — near-real-time drainer
 
 `OutboxDrainer : BackgroundService`:
-- **Signaled drain:** `DrainSignal` (an in-process channel/event) is kicked on every enqueue, so the
-  drainer wakes immediately → OTP/verification arrive in ~provider latency.
-- **Periodic poll:** every *N* seconds (config, default ~5s) as a backstop for retries and
-  `ScheduledFor` future-dated rows.
-- **Claim with a lease:** rows are claimed (status→`sending` + a lease/owner+expiry, via an atomic
-  conditional update) so multiple app instances never double-send; a stale lease is reclaimable.
+- **Signaled drain (single-instance optimization):** `DrainSignal` (an in-process channel/event) is
+  kicked **after the enqueuing transaction commits** (not at enqueue time — pre-commit the row isn't
+  visible to the drainer's connection and would be missed). On signal the drainer wakes and drains.
+- **Latency floor:** the signal is **in-process**, so it only lowers latency on the *same* instance. In
+  a **multi-instance** deployment a request handled by instance A doesn't wake the drainer on instance
+  B, so **delivery latency is bounded by the poll interval** there. This is the documented contract:
+  near-real-time, not synchronous — sub-poll latency is best-effort (single-instance), not guaranteed.
+  (Latency-critical flows that truly need "now" — e.g. provider-managed OTP — are out of scope; see §7.)
+- **Periodic poll:** every *N* seconds (config, default ~5s) — the real backstop for retries,
+  `ScheduledFor` future-dated rows, and cross-instance delivery.
+- **Claim with a lease — per engine (the correctness core):** rows are claimed atomically so concurrent
+  drainers across instances never double-send, using the engine's skip-locked idiom via the dialect
+  (`IfDatabase`):
+  - **PostgreSQL / MySQL 8+ / MariaDB:** `SELECT id ... WHERE status='pending' AND next_attempt_at<=now
+    ORDER BY next_attempt_at LIMIT @batch FOR UPDATE SKIP LOCKED`, then `UPDATE ... SET status='sending',
+    lease_owner=@owner, lease_expires_at=@exp` in the same transaction.
+  - **SQL Server:** `UPDATE TOP(@batch) Notifications.Outbox WITH (READPAST, UPDLOCK, ROWLOCK)
+    SET status='sending', lease_owner=@owner, lease_expires_at=@exp OUTPUT inserted.* WHERE status='pending'
+    AND next_attempt_at<=@now` (single statement; `READPAST` skips locked rows).
+  - A **stale lease** (`lease_expires_at < now` while still `sending` — a crashed drainer) is reclaimable
+    on the next poll. Columns `lease_owner`, `lease_expires_at` added to `OutboxMessage`.
 - **Backoff:** failed send → `Attempts++`, `NextAttemptAt = now + backoff(Attempts)` (exponential,
   capped), `LastError` set; past a max-attempts cap → `dead`. Success → `sent` + `SentAt`.
 - Dispatches by `Channel` to the matching `I*Sender`, resolving the **per-tenant provider config**.
+  (In-app is **not** drained — see below.)
 
 ### Module — dispatcher, preferences, in-app, per-tenant config
 
 - `INotificationDispatcher.DispatchAsync(notification, ct)` → `PreferenceResolver` resolves the
   recipient set + enabled channels (+ locale) from **`NotificationPreference`** (per-tenant, optional
-  per-user) → **enqueues one `OutboxMessage` per channel**.
-- **In-app** channel: the drainer "sends" by persisting an **`InAppNotification`** record (queryable by
-  the app: tenant/user, title, body, read flag, created), not an external call.
+  per-user) → for each **external** channel (email/SMS/push) **enqueues one `OutboxMessage`**.
+- **In-app** channel: written **directly** as an **`InAppNotification`** record (tenant/user, title,
+  body, read flag, created) within the dispatch transaction — **not** routed through the outbox/drainer.
+  In-app has no external provider to retry and is durable the moment it's written, so the outbox hop
+  (and a second copy of the body) would be pure overhead. The outbox + drainer exist only for channels
+  with a flaky external provider.
 - **`TenantProviderConfig`**: per-tenant SMTP/SMS credentials + from-address/sender-id, resolved at
   send time with a global-config fallback.
 - All four entities are tenant-isolated through the framework filter (EF query filter / Dapper
