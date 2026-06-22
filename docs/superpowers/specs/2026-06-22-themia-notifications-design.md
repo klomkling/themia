@@ -9,8 +9,8 @@ stays in Identity); per-engine outbox claim strategy specified; in-app writes di
 **Origin:** ezy-assets notification surface (port + generalize). Drivers: ezy has **no production email
 sender** (only `LoggerEmailService`), a real SMS provider (`Sms2ProOTPService`), and logging-only
 workflow/notification dispatch (`IWorkflowNotificationSink` / `INotificationDispatcher`).
-**Target version:** 0.7.0 (new packages; Phase-2 boundary — the Notifications module of the
-Notifications/Pdf/Export trio).
+**Target version:** 0.6.2 (PATCH within the 0.6 Phase-2 milestone — the Notifications module of the
+Notifications/Pdf/Export trio, continuing the 0.6.0 Pdf / 0.6.1 Exceptional cadence).
 
 ---
 
@@ -234,7 +234,8 @@ CI note: needs the Testcontainers engines + a test SMTP server; gated like the o
 
 ## Versioning, changelog, coord
 
-- Bump `Directory.Build.props` `<Version>` `0.6.1 → 0.7.0` (new packages; Notifications module).
+- Bump `Directory.Build.props` `<Version>` `0.6.1 → 0.6.2` (Notifications module, PATCH within the 0.6
+  Phase-2 milestone).
 - CHANGELOG **Added** — `Themia.Notifications` (neutral senders + templating) and
   `Themia.Modules.Notifications` (transactional outbox + near-real-time drainer + dispatcher +
   preferences + in-app + per-tenant provider config).
