@@ -96,3 +96,7 @@ Themia.Modules.Notifications.Entities.TenantProviderConfig.FromAddress.set -> vo
 Themia.Modules.Notifications.Entities.TenantProviderConfig.UseSsl.get -> bool
 Themia.Modules.Notifications.Entities.TenantProviderConfig.UseSsl.set -> void
 Themia.Modules.Notifications.Entities.TenantProviderConfig.SetId(System.Guid id) -> void
+Themia.Modules.Notifications.Migrations.NotificationsSchemaMigration
+Themia.Modules.Notifications.Migrations.NotificationsSchemaMigration.NotificationsSchemaMigration() -> void
+override Themia.Modules.Notifications.Migrations.NotificationsSchemaMigration.Up() -> void
+override Themia.Modules.Notifications.Migrations.NotificationsSchemaMigration.Down() -> void
