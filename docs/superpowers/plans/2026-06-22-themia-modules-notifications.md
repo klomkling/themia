@@ -1743,7 +1743,7 @@ git commit -am "feat: add per-tenant provider config resolver"
 - Create: `DependencyInjection/NotificationsServiceCollectionExtensions.cs`
 - Test: `tests/Themia.Modules.Notifications.Tests/DependencyInjection/AddThemiaNotificationsModuleTests.cs`
 
-- [ ] **Step 1: Write the failing test** — build a `ServiceCollection`, call `AddThemiaNotificationsModule(o => o.ConnectionStringName = "X")` with the EF peer flag, assert: `INotificationDispatcher`, `IOutboxStore`, `IPreferenceResolver`, `IProviderConfigResolver`, `DrainSignal`, the dialect, and a hosted `OutboxDrainer` are registered; options validated (blank conn string throws). Use `services.BuildServiceProvider()` and `GetRequiredService`/`GetServices<IHostedService>()`.
+- [ ] **Step 1: Write the failing test** — build a `ServiceCollection`, call `AddThemiaNotificationsModule(o => o.ConnectionStringName = "X")`, assert the module's OWN registrations resolve: `INotificationDispatcher`, `IOutboxStore`, `IInAppNotificationStore`, `INotificationPreferenceStore`, `ITenantProviderConfigStore`, `IPreferenceResolver`, `IProviderConfigResolver`, `DrainSignal` (singleton), and a hosted `OutboxDrainer` (`GetServices<IHostedService>()` contains an `OutboxDrainer`). Assert options validation (blank `ConnectionStringName` throws via `Validate`). Do NOT assert `INotificationsSqlDialect` here — it is registered by the PROVIDER package (`AddThemiaNotificationsPostgreSql` etc.), not by `AddThemiaNotificationsModule` (the drainer depends on it but the dialect registration is the adopter's provider choice). To resolve `IOutboxStore`/stores in the test you'll need the framework repository services registered — for a pure DI-registration test, asserting the ServiceDescriptors are present (via `services.Any(d => d.ServiceType == typeof(...))`) is sufficient and avoids standing up a DB.
 
 - [ ] **Step 2: Implement `NotificationsModule`** — mirrors `StorageModule`: ctor takes `MigrationEngine`, `InitializeAsync` reads `options.ConnectionStringName` and runs `ThemiaMigrations.Run(engine, conn, typeof(NotificationsSchemaMigration).Assembly)`.
 
@@ -1799,13 +1799,32 @@ public sealed class NotificationsModule : ThemiaModuleBase
 }
 ```
 
-- [ ] **Step 3: Implement `NotificationsServiceCollectionExtensions`** — the registration entry point. Takes the `MigrationEngine` (to pick the dialect) and the connection string name (the dialect needs the resolved string at build time → resolve lazily from `IConfiguration` in a factory). Registers the dialect singleton, `DrainSignal` singleton, the stores/dispatcher/resolvers scoped, and `AddHostedService<OutboxDrainer>()`. Mirrors Storage's `ContributeDapperMappings` scan. Choose EF vs Dapper store impls via a `NotificationsBuilder.UseEf()/UseDapper()` (default EF), matching how Storage selects a backend.
+- [ ] **Step 3: Implement `NotificationsServiceCollectionExtensions`** — the registration entry point. Registers `DrainSignal` (singleton), the peer-agnostic single stores + outbox store + resolvers + dispatcher (scoped), the Dapper mappings (via a `ContributeDapperMappings` scan mirroring Storage), and `AddHostedService<OutboxDrainer>()`. It does **NOT** register `INotificationsSqlDialect` — that comes from the provider package (`AddThemiaNotificationsPostgreSql`/`MySql`/`SqlServer`). Returns `IServiceCollection` (no builder needed — stores are peer-agnostic; there is no backend to select).
 
 ```csharp
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Themia.Framework.Data.Dapper.Mapping;   // EntityMappingRegistry (confirm namespace)
+using Themia.Modules.Notifications.Config;
+using Themia.Modules.Notifications.Dispatch;
+using Themia.Modules.Notifications.Mapping;
+using Themia.Modules.Notifications.Outbox;
+using Themia.Modules.Notifications.Stores;
+
+namespace Themia.Modules.Notifications.DependencyInjection;
+
+/// <summary>Registers the Themia Notifications module services (outbox, drainer, dispatcher, stores, resolvers).</summary>
 public static class NotificationsServiceCollectionExtensions
 {
-    public static NotificationsBuilder AddThemiaNotificationsModule(
-        this IServiceCollection services, MigrationEngine engine, Action<NotificationsModuleOptions>? configure = null)
+    /// <summary>
+    /// Adds the Notifications module. The adopter must ALSO register: (1) a provider dialect via
+    /// <c>AddThemiaNotifications{PostgreSql|MySql|SqlServer}(...)</c> (the drainer needs <c>INotificationsSqlDialect</c>);
+    /// (2) the neutral senders via <c>AddThemiaNotifications(...)</c> (the drainer needs <c>IEmailSender</c> etc.);
+    /// (3) a framework data peer (EF + <c>modelBuilder.ApplyThemiaNotifications()</c>, or Dapper); and run the module's
+    /// <c>InitializeAsync</c> to apply the schema migration.
+    /// </summary>
+    public static IServiceCollection AddThemiaNotificationsModule(
+        this IServiceCollection services, Action<NotificationsModuleOptions>? configure = null)
     {
         ArgumentNullException.ThrowIfNull(services);
         var options = new NotificationsModuleOptions();
@@ -1815,39 +1834,30 @@ public static class NotificationsServiceCollectionExtensions
         services.TryAddSingleton(TimeProvider.System);
         services.AddLogging();
 
-        // Dialect: resolve the connection string lazily from IConfiguration at first use.
-        services.TryAddSingleton<INotificationsSqlDialect>(sp =>
-        {
-            var cfg = sp.GetRequiredService<IConfiguration>();
-            var conn = cfg.GetConnectionString(options.ConnectionStringName)
-                ?? throw new InvalidOperationException($"Connection string '{options.ConnectionStringName}' was not found.");
-            return engine switch
-            {
-                MigrationEngine.Postgres => new PostgresNotificationsDialect(conn),
-                MigrationEngine.MySql => new MySqlNotificationsDialect(conn),
-                MigrationEngine.SqlServer => new SqlServerNotificationsDialect(conn),
-                _ => throw new ArgumentOutOfRangeException(nameof(engine), engine, "Unsupported engine."),
-            };
-        });
-
         services.TryAddSingleton<DrainSignal>();
+        services.TryAddScoped<IOutboxStore, OutboxStore>();
+        services.TryAddScoped<IInAppNotificationStore, InAppNotificationStore>();
+        services.TryAddScoped<INotificationPreferenceStore, NotificationPreferenceStore>();
+        services.TryAddScoped<ITenantProviderConfigStore, TenantProviderConfigStore>();
         services.TryAddScoped<IPreferenceResolver, PreferenceResolver>();
         services.TryAddScoped<IProviderConfigResolver, ProviderConfigResolver>();
         services.TryAddScoped<INotificationDispatcher, NotificationDispatcher>();
 
-        ContributeDapperMappings(services);
+        ContributeDapperMappings(services);          // mirror Storage: scan for the registered EntityMappingRegistry, call NotificationsDapperMappings.Apply
         services.AddHostedService<OutboxDrainer>();
-        return new NotificationsBuilder(services);
+        return services;
     }
-    // UseEf()/UseDapper() register the store + outbox impls; default to EF in the builder ctor.
+
+    // Copy Storage's ContributeDapperMappings idiom verbatim (scan services for the EntityMappingRegistry singleton; Apply if present).
+    private static void ContributeDapperMappings(IServiceCollection services) { /* per StorageServiceCollectionExtensions */ }
 }
 ```
 
-> The EF stores need the adopter's `ThemiaDbContext`; the adopter must call `modelBuilder.ApplyThemiaNotifications()` in their context (documented). The Dapper stores need the framework Dapper services already registered. The drainer's `IEmailSender`/`ISmsSender`/`IPushSender` come from the neutral core's `AddThemiaNotifications(...)` — document that adopters call both.
+> The drainer's `INotificationsSqlDialect` comes from the provider package; its `IEmailSender`/`ISmsSender`/`IPushSender` come from the neutral core's `AddThemiaNotifications(...)`. Document (in the DI XML doc, as above) that an adopter calls all of: `AddThemiaNotifications(...)` (senders) + `AddThemiaNotificationsModule(...)` (this) + `AddThemiaNotifications{Provider}(...)` (dialect) + a data peer with `ApplyThemiaNotifications()`, then runs `NotificationsModule.InitializeAsync`. Confirm the `EntityMappingRegistry` namespace and the `ContributeDapperMappings` scan against `src/modules/Themia.Modules.Storage/DependencyInjection/StorageServiceCollectionExtensions.cs`.
 
 - [ ] **Step 4: Run** — Expected: PASS.
 
-- [ ] **Step 5: Finalize `PublicAPI.Unshipped.txt`** — `NotificationsModule`, `NotificationsServiceCollectionExtensions`, `NotificationsBuilder`. Clean build (`--no-incremental`) → no `RS0016`.
+- [ ] **Step 5: Finalize `PublicAPI.Unshipped.txt`** — `NotificationsModule` (+ both ctors, Descriptor, InitializeAsync) and `NotificationsServiceCollectionExtensions.AddThemiaNotificationsModule`. (No `NotificationsBuilder` — the extension returns `IServiceCollection`.) Clean build (`--no-incremental`) → no `RS0016`.
 
 - [ ] **Step 6: Commit**
 
@@ -1863,9 +1873,9 @@ git commit -am "feat: add NotificationsModule and AddThemiaNotificationsModule D
 - Create: `tests/Themia.Modules.Notifications.IntegrationTests/DispatchEndToEndTests.cs`
 - Modify (if needed): `Config`/sender wiring for per-tenant SMTP
 
-- [ ] **Step 1: Write the end-to-end test** (Postgres at minimum; parametrize to 3 engines) — boot a host with `AddThemiaNotifications()` (core, fake `IEmailSender` recording sends) + `AddThemiaNotificationsModule(Postgres, ...)` + EF peer + a tenant context; run the module's `InitializeAsync` to migrate; `INotificationDispatcher.DispatchAsync` an Email request; `SaveChanges`; kick `DrainSignal`; start the host; await the fake recording the send; assert the outbox row is `sent`. Also assert tenant isolation: a row for tenant A is not visible when querying as tenant B through the stores.
+- [ ] **Step 1: Write the end-to-end test** (Postgres) — boot a host with `AddThemiaNotifications()` (core, with a fake `IEmailSender` recording sends, registered AFTER so it wins) + `AddThemiaNotificationsModule(...)` + `AddThemiaNotificationsPostgreSql(...)` (dialect) + EF peer (`ApplyThemiaNotifications`) + a tenant context; run `NotificationsModule.InitializeAsync` to migrate; resolve `INotificationDispatcher`, `DispatchAsync` an Email request; commit via `IUnitOfWork.SaveChangesAsync`; kick `DrainSignal`; start the host (`IHostedService.StartAsync` / run the drainer); await the fake recording the send (with a timeout); assert the outbox row is `sent` (status=2). Also assert tenant isolation: an in-app row staged for tenant A is not visible when listing as tenant B through `IInAppNotificationStore`.
 
-- [ ] **Step 2: Wire per-tenant SMTP** — if the per-tenant credential path isn't exercised, add a thin `TenantAwareSmtpEmailSender` (in this module) that wraps the core SMTP send but pulls creds from `IProviderConfigResolver` (falling back to global `SmtpEmailOptions`). Register it via a `NotificationsBuilder.UsePerTenantSmtp()` opt-in. Only build this if the e2e test needs it; otherwise document the seam and defer (YAGNI — the resolver already exists for consumers to use).
+- [ ] **Step 2: Per-tenant SMTP (defer unless the e2e needs it — YAGNI)** — the `IProviderConfigResolver` seam already exists for consumers. Only if you want to exercise the per-tenant credential path end-to-end, add a thin `TenantAwareSmtpEmailSender` in this module that resolves creds from `IProviderConfigResolver` (falling back to global `SmtpEmailOptions`) and register it via a standalone extension `AddTenantAwareSmtpEmailSender(...)` (mirroring the core's `AddThemiaSmtpEmailSender`; `Replace` the `IEmailSender`). Otherwise document the seam and skip — do not add a builder for it.
 
 - [ ] **Step 3: Run** — `dotnet test tests/Themia.Modules.Notifications.IntegrationTests` — Expected: all PASS (Docker required).
 
