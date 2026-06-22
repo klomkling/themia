@@ -68,7 +68,7 @@ public static class ExceptionalDashboardEndpoints
         var entry = await store.GetAsync(guid, ct).ConfigureAwait(false);
         if (entry is null) { ctx.Response.StatusCode = StatusCodes.Status404NotFound; return; }
 
-        await WriteHtmlAsync(ctx, DashboardHtml.Detail(options.Title, path, entry, options.ShowRequestBody), ct).ConfigureAwait(false);
+        await WriteHtmlAsync(ctx, DashboardHtml.Detail(options.Title, path, entry, options.ShowRequestBody, options.ShowRequestContext), ct).ConfigureAwait(false);
     }
 
     private static async Task<bool> AuthorizedAsync(HttpContext ctx, ExceptionalDashboardOptions options)

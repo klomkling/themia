@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Net;
 using System.Text;
+using System.Text.Json;
 using Themia.Exceptional;
 
 namespace Themia.Exceptional.AspNetCore;
@@ -63,14 +64,14 @@ internal static class DashboardHtml
         return Page(title, path, sb.ToString());
     }
 
-    internal static string Detail(string title, string path, ExceptionEntry e, bool showRequestBody)
+    internal static string Detail(string title, string path, ExceptionEntry e, bool showRequestBody, bool showRequestContext)
     {
         var sb = new StringBuilder();
         sb.Append("<p><a href=\"").Append(Enc(path)).Append("\">&larr; back</a></p>");
-        sb.Append("<h1>").Append(Enc(e.Type)).Append("</h1>");
+        sb.Append("<h1 class=\"type type-err\">").Append(Enc(e.Type)).Append("</h1>");
         sb.Append("<p>").Append(Enc(e.Message)).Append("</p>");
 
-        sb.Append("<table>");
+        sb.Append("<table class=\"meta\">");
         Row(sb, "Guid", e.Guid.ToString());
         Row(sb, "Application", e.ApplicationName);
         Row(sb, "Machine", e.MachineName);
@@ -87,13 +88,78 @@ internal static class DashboardHtml
         Row(sb, "Protected", e.IsProtected.ToString());
         sb.Append("</table>");
 
-        sb.Append("<h2>Detail</h2><pre>").Append(Enc(e.Detail)).Append("</pre>");
-        if (showRequestBody && e.RequestBody is not null)
+        // Parse the stored Detail JSON and render the stack trace with real line breaks (the old UI
+        // dumped the whole escaped-JSON blob). Fall back to the raw text if it is not valid JSON.
+        var (stackTrace, inner, data) = ParseDetail(e.Detail);
+        if (stackTrace is not null)
         {
-            sb.Append("<h2>Request body</h2><pre>").Append(Enc(e.RequestBody)).Append("</pre>");
+            sb.Append("<h2>Stack Trace</h2><pre>").Append(Enc(stackTrace)).Append("</pre>");
+            if (!string.IsNullOrEmpty(inner))
+                sb.Append("<h2>Inner Exception</h2><pre>").Append(Enc(inner)).Append("</pre>");
+            if (!string.IsNullOrEmpty(data))
+                sb.Append("<h2>Data</h2><pre>").Append(Enc(data)).Append("</pre>");
+        }
+        else
+        {
+            sb.Append("<h2>Detail</h2><pre>").Append(Enc(e.Detail)).Append("</pre>");
         }
 
+        if (showRequestBody && e.RequestBody is not null)
+            sb.Append("<h2>Request Body</h2><pre>").Append(Enc(e.RequestBody)).Append("</pre>");
+
+        if (showRequestContext && e.RequestContext is not null)
+            AppendRequestContext(sb, e.RequestContext);
+
         return Page(title, path, sb.ToString());
+    }
+
+    private static (string? StackTrace, string? Inner, string? Data) ParseDetail(string detail)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(detail);
+            var root = doc.RootElement;
+            string? Get(string n) => root.TryGetProperty(n, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() : null;
+            string? data = root.TryGetProperty("Data", out var d) && d.ValueKind == JsonValueKind.Object ? d.GetRawText() : null;
+            return (Get("StackTrace"), Get("Inner"), data);
+        }
+        catch (JsonException)
+        {
+            return (null, null, null);
+        }
+    }
+
+    private static readonly (string Key, string Heading)[] ContextGroups =
+    {
+        ("serverVariables", "Server Variables"),
+        ("requestHeaders", "Request Headers"), // tolerate either key spelling
+        ("headers", "Request Headers"),
+        ("cookies", "Cookies"),
+        ("queryString", "QueryString"),
+        ("form", "Form"),
+    };
+
+    private static void AppendRequestContext(StringBuilder sb, string requestContext)
+    {
+        JsonDocument doc;
+        try { doc = JsonDocument.Parse(requestContext); }
+        catch (JsonException) { return; }
+        using (doc)
+        {
+            foreach (var (key, heading) in ContextGroups)
+            {
+                if (!doc.RootElement.TryGetProperty(key, out var group) || group.ValueKind != JsonValueKind.Object)
+                    continue;
+                var rows = new StringBuilder();
+                foreach (var prop in group.EnumerateObject())
+                    rows.Append("<tr><th>").Append(Enc(prop.Name)).Append("</th><td>")
+                        .Append(Enc(prop.Value.ValueKind == JsonValueKind.String ? prop.Value.GetString() : prop.Value.GetRawText()))
+                        .Append("</td></tr>");
+                if (rows.Length == 0)
+                    continue;
+                sb.Append("<h2>").Append(Enc(heading)).Append("</h2><table>").Append(rows).Append("</table>");
+            }
+        }
     }
 
     private static void Row(StringBuilder sb, string key, string? value) =>

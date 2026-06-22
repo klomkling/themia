@@ -44,11 +44,11 @@ public class DashboardHtmlTests
         var e = Entry("boom");
         e.RequestBody = "<script>steal()</script>";
 
-        var shown = DashboardHtml.Detail("Exceptions", "/exceptions", e, showRequestBody: true);
+        var shown = DashboardHtml.Detail("Exceptions", "/exceptions", e, showRequestBody: true, showRequestContext: false);
         Assert.Contains("&lt;script&gt;steal()&lt;/script&gt;", shown);
         Assert.DoesNotContain("<script>steal()</script>", shown);
 
-        var hidden = DashboardHtml.Detail("Exceptions", "/exceptions", e, showRequestBody: false);
+        var hidden = DashboardHtml.Detail("Exceptions", "/exceptions", e, showRequestBody: false, showRequestContext: false);
         Assert.DoesNotContain("steal()", hidden);
     }
 }
