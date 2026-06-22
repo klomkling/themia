@@ -58,3 +58,8 @@ Themia.Notifications.Providers.SmtpEmailOptions.IsBodyHtml.get -> bool
 Themia.Notifications.Providers.SmtpEmailOptions.IsBodyHtml.set -> void
 Themia.Notifications.Providers.SmtpEmailOptions.PickupDirectory.get -> string?
 Themia.Notifications.Providers.SmtpEmailOptions.PickupDirectory.set -> void
+Themia.Notifications.Providers.HttpSmsSenderBase
+Themia.Notifications.Providers.HttpSmsSenderBase.HttpSmsSenderBase(System.Net.Http.HttpClient! httpClient) -> void
+abstract Themia.Notifications.Providers.HttpSmsSenderBase.BuildRequest(Themia.Notifications.NotificationMessage! message) -> System.Net.Http.HttpRequestMessage!
+abstract Themia.Notifications.Providers.HttpSmsSenderBase.Interpret(System.Net.HttpStatusCode status, string! responseBody) -> Themia.Notifications.NotificationResult!
+Themia.Notifications.Providers.HttpSmsSenderBase.SendAsync(Themia.Notifications.NotificationMessage! message, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Notifications.NotificationResult!>!
