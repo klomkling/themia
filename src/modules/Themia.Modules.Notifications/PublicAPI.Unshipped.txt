@@ -102,3 +102,5 @@ override Themia.Modules.Notifications.Migrations.NotificationsSchemaMigration.Up
 override Themia.Modules.Notifications.Migrations.NotificationsSchemaMigration.Down() -> void
 Themia.Modules.Notifications.EntityConfiguration.ThemiaNotificationsModelBuilderExtensions
 static Themia.Modules.Notifications.EntityConfiguration.ThemiaNotificationsModelBuilderExtensions.ApplyThemiaNotifications(this Microsoft.EntityFrameworkCore.ModelBuilder! modelBuilder) -> Microsoft.EntityFrameworkCore.ModelBuilder!
+Themia.Modules.Notifications.Mapping.NotificationsDapperMappings
+static Themia.Modules.Notifications.Mapping.NotificationsDapperMappings.Apply(Themia.Framework.Data.Dapper.Mapping.EntityMappingRegistry! registry) -> void
