@@ -1,0 +1,14 @@
+#nullable enable
+Themia.Modules.Notifications.NotificationsModuleOptions
+Themia.Modules.Notifications.NotificationsModuleOptions.NotificationsModuleOptions() -> void
+Themia.Modules.Notifications.NotificationsModuleOptions.ConnectionStringName.get -> string!
+Themia.Modules.Notifications.NotificationsModuleOptions.ConnectionStringName.set -> void
+Themia.Modules.Notifications.NotificationsModuleOptions.DrainIntervalSeconds.get -> int
+Themia.Modules.Notifications.NotificationsModuleOptions.DrainIntervalSeconds.set -> void
+Themia.Modules.Notifications.NotificationsModuleOptions.MaxBatchSize.get -> int
+Themia.Modules.Notifications.NotificationsModuleOptions.MaxBatchSize.set -> void
+Themia.Modules.Notifications.NotificationsModuleOptions.MaxAttempts.get -> int
+Themia.Modules.Notifications.NotificationsModuleOptions.MaxAttempts.set -> void
+Themia.Modules.Notifications.NotificationsModuleOptions.LeaseSeconds.get -> int
+Themia.Modules.Notifications.NotificationsModuleOptions.LeaseSeconds.set -> void
+Themia.Modules.Notifications.NotificationsModuleOptions.Validate() -> void
