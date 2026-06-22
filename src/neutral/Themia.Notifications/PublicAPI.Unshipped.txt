@@ -1,1 +1,28 @@
 #nullable enable
+Themia.Notifications.NotificationChannel
+Themia.Notifications.NotificationChannel.Email = 0 -> Themia.Notifications.NotificationChannel
+Themia.Notifications.NotificationChannel.Sms = 1 -> Themia.Notifications.NotificationChannel
+Themia.Notifications.NotificationChannel.InApp = 2 -> Themia.Notifications.NotificationChannel
+Themia.Notifications.NotificationChannel.Push = 3 -> Themia.Notifications.NotificationChannel
+Themia.Notifications.NotificationMessage
+Themia.Notifications.NotificationMessage.NotificationMessage() -> void
+Themia.Notifications.NotificationMessage.Channel.get -> Themia.Notifications.NotificationChannel
+Themia.Notifications.NotificationMessage.Channel.init -> void
+Themia.Notifications.NotificationMessage.Recipient.get -> string!
+Themia.Notifications.NotificationMessage.Recipient.init -> void
+Themia.Notifications.NotificationMessage.Subject.get -> string?
+Themia.Notifications.NotificationMessage.Subject.init -> void
+Themia.Notifications.NotificationMessage.Body.get -> string?
+Themia.Notifications.NotificationMessage.Body.init -> void
+Themia.Notifications.NotificationMessage.Template.get -> string?
+Themia.Notifications.NotificationMessage.Template.init -> void
+Themia.Notifications.NotificationMessage.Model.get -> object?
+Themia.Notifications.NotificationMessage.Model.init -> void
+Themia.Notifications.NotificationMessage.Metadata.get -> System.Collections.Generic.IReadOnlyDictionary<string!, string!>?
+Themia.Notifications.NotificationMessage.Metadata.init -> void
+Themia.Notifications.NotificationResult
+Themia.Notifications.NotificationResult.Succeeded.get -> bool
+Themia.Notifications.NotificationResult.ProviderMessageId.get -> string?
+Themia.Notifications.NotificationResult.Error.get -> string?
+static Themia.Notifications.NotificationResult.Success(string? providerMessageId = null) -> Themia.Notifications.NotificationResult!
+static Themia.Notifications.NotificationResult.Failure(string! error) -> Themia.Notifications.NotificationResult!
