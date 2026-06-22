@@ -1614,19 +1614,20 @@ public interface INotificationDispatcher
 }
 ```
 
-- [ ] **Step 3: Write the failing test** — fakes for `IPreferenceResolver`, `IOutboxStore`, `IInAppNotificationStore`, `INotificationTemplateRenderer`, `ITenantContext`, `TimeProvider`. Assert:
-  - Email+Sms request with both enabled → 2 outbox rows enqueued, bodies rendered (Template+Model), `NextAttemptAt == now` (or `ScheduledFor`), status pending.
-  - InApp channel → no outbox row, one `InAppNotification` written with title=Subject.
+- [ ] **Step 3: Write the failing test** — fakes for `IPreferenceResolver`, `IOutboxStore`, `IRepository<InAppNotification, Guid>` (a recording fake whose `AddAsync` captures the staged entity — it does NOT save), `INotificationTemplateRenderer`, `ITenantContext` (use the real `TenantContext` or a tiny stub), `TimeProvider` (use `TimeProvider.System` or a fixed fake). Assert:
+  - Email+Sms request with both enabled → 2 outbox rows enqueued (fake `IOutboxStore` captures them), bodies rendered (Template+Model), `NextAttemptAt == now` (or `ScheduledFor`), status pending.
+  - InApp channel → no outbox row, one `InAppNotification` STAGED on the repository fake with title=Subject (and the fake's SaveChanges is never called — staging only).
   - A channel disabled by preference → not enqueued.
   - Body provided verbatim → renderer not called.
+  - Recipient missing for a requested external channel → that channel is skipped (no outbox row).
 
 - [ ] **Step 4: Implement `NotificationDispatcher`** (internal)
 
 ```csharp
 using Themia.Framework.Core.Abstractions.Tenancy;
+using Themia.Framework.Data.Abstractions.Repositories;
 using Themia.Modules.Notifications.Entities;
 using Themia.Modules.Notifications.Outbox;
-using Themia.Modules.Notifications.Stores;
 using Themia.Notifications;
 
 namespace Themia.Modules.Notifications.Dispatch;
@@ -1634,7 +1635,7 @@ namespace Themia.Modules.Notifications.Dispatch;
 internal sealed class NotificationDispatcher(
     IPreferenceResolver preferences,
     IOutboxStore outbox,
-    IInAppNotificationStore inApp,
+    IRepository<InAppNotification, Guid> inAppRepository,
     INotificationTemplateRenderer renderer,
     ITenantContext tenantContext,
     TimeProvider time) : INotificationDispatcher
@@ -1642,7 +1643,7 @@ internal sealed class NotificationDispatcher(
     public async Task DispatchAsync(NotificationRequest request, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(request);
-        var resolved = await preferences.ResolveAsync(request.UserId, request.Channels, ct);
+        var resolved = await preferences.ResolveAsync(request.UserId, request.Channels, ct).ConfigureAwait(false);
         var body = request.Body ?? (request.Template is null ? string.Empty : renderer.Render(request.Template, request.Model ?? new object()));
         var now = time.GetUtcNow();
         var tenant = tenantContext.CurrentTenantId;
@@ -1660,7 +1661,8 @@ internal sealed class NotificationDispatcher(
                     CreatedAt = now,
                 };
                 notification.SetId(Guid.NewGuid()); // framework: Entity<TId>.Id has a protected setter; use SetId
-                await inApp.AddAsync(notification, ct);
+                // Stage-only (no SaveChanges) so in-app commits atomically with the caller's UoW — same contract as the outbox.
+                await inAppRepository.AddAsync(notification, ct).ConfigureAwait(false);
                 continue;
             }
 
@@ -1680,13 +1682,13 @@ internal sealed class NotificationDispatcher(
                 CreatedAt = now,
             };
             message.SetId(Guid.NewGuid());
-            await outbox.EnqueueAsync(message, ct);
+            await outbox.EnqueueAsync(message, ct).ConfigureAwait(false);
         }
     }
 }
 ```
 
-> `InAppNotificationStore.AddAsync` in Task 6 calls `SaveChanges`, which would break the "stage in caller's UoW" contract. **Resolve this in this task:** split the in-app store into a stage-only `Add` (no SaveChanges) used by the dispatcher, OR have the dispatcher use the EF `DbContext` / Dapper UoW directly. Simplest: change `IInAppNotificationStore.AddAsync` to stage only (remove its `SaveChanges`), and make the standalone in-app write API (for app code that wants immediate persistence) a separate `AddAndSaveAsync`. Update Task 6's tests accordingly. Pick one and keep the whole module consistent — the dispatcher must not commit.
+> **Seam resolution (the cross-task interaction):** the dispatcher must NOT commit — it stages within the caller's unit of work so the notification is atomic with the triggering work. So it stages in-app via `IRepository<InAppNotification, Guid>.AddAsync` directly (stage-only, like `IOutboxStore` does for the outbox), NOT via `IInAppNotificationStore.AddAsync` (which calls `SaveChanges` and stays for app code that wants an immediate, standalone in-app write — e.g. an API endpoint). No change to `IInAppNotificationStore` or its Task 6 tests is needed. The caller (or a mediator `TransactionBehavior`) commits both the outbox rows and the in-app row together.
 
 - [ ] **Step 5: Run** — Expected: PASS.
 
