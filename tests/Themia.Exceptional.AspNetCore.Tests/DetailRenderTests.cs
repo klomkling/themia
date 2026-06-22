@@ -59,6 +59,39 @@ public sealed class DetailRenderTests
     }
 
     [Fact]
+    public void Detail_RendersInnerAndData_WhenStackTraceNull()
+    {
+        var entry = new ExceptionEntry
+        {
+            Type = "System.InvalidOperationException",
+            Message = "boom",
+            Detail = "{\"Message\":\"m\",\"Type\":\"T\",\"StackTrace\":null,\"Inner\":\"the inner ex\",\"Data\":null}",
+        };
+
+        var html = DashboardHtml.Detail("Exceptions", "/exceptions", entry, showRequestBody: true, showRequestContext: true);
+
+        Assert.Contains("Inner Exception", html);
+        Assert.Contains("the inner ex", html);
+        Assert.DoesNotContain("\\\"StackTrace\\\"", html);   // not the raw escaped-JSON blob
+    }
+
+    [Fact]
+    public void Detail_DoesNotThrow_OnNonObjectDetailJson()
+    {
+        var entry = new ExceptionEntry
+        {
+            Type = "System.InvalidOperationException",
+            Message = "boom",
+            Detail = "[1,2,3]",   // valid JSON, but not an object
+        };
+
+        var html = DashboardHtml.Detail("Exceptions", "/exceptions", entry, showRequestBody: true, showRequestContext: true);
+
+        Assert.Contains("<h2>Detail</h2>", html);   // raw text rendered under a Detail heading
+        Assert.Contains("[1,2,3]", html);
+    }
+
+    [Fact]
     public void Detail_FallsBackOnMalformedDetailJson()
     {
         var entry = new ExceptionEntry

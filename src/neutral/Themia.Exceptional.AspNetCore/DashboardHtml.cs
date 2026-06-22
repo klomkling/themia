@@ -113,12 +113,14 @@ internal static class DashboardHtml
               .Append("<button type=\"submit\">Delete</button></form>");
         }
 
-        // Parse the stored Detail JSON and render the stack trace with real line breaks (the old UI
-        // dumped the whole escaped-JSON blob). Fall back to the raw text if it is not valid JSON.
-        var (stackTrace, inner, data) = ParseDetail(e.Detail);
-        if (stackTrace is not null)
+        // Parse the stored Detail JSON and render the structured sections (stack trace with real line
+        // breaks; the old UI dumped the whole escaped-JSON blob). Fall back to the raw text only when the
+        // Detail is not a JSON object — render whatever sections are present even if StackTrace is null.
+        var (parsed, stackTrace, inner, data) = ParseDetail(e.Detail);
+        if (parsed)
         {
-            sb.Append("<h2>Stack Trace</h2><pre>").Append(Enc(stackTrace)).Append("</pre>");
+            if (!string.IsNullOrEmpty(stackTrace))
+                sb.Append("<h2>Stack Trace</h2><pre>").Append(Enc(stackTrace)).Append("</pre>");
             if (!string.IsNullOrEmpty(inner))
                 sb.Append("<h2>Inner Exception</h2><pre>").Append(Enc(inner)).Append("</pre>");
             if (!string.IsNullOrEmpty(data))
@@ -138,26 +140,29 @@ internal static class DashboardHtml
         return Page(title, path, sb.ToString());
     }
 
-    private static (string? StackTrace, string? Inner, string? Data) ParseDetail(string detail)
+    private static (bool Parsed, string? StackTrace, string? Inner, string? Data) ParseDetail(string detail)
     {
         try
         {
             using var doc = JsonDocument.Parse(detail);
             var root = doc.RootElement;
+            // Only treat object roots as structured Detail; a valid JSON array/number/string would make
+            // TryGetProperty throw (InvalidOperationException, not caught here) — guard before any access.
+            if (root.ValueKind != JsonValueKind.Object)
+                return (false, null, null, null);
             string? Get(string n) => root.TryGetProperty(n, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() : null;
             string? data = root.TryGetProperty("Data", out var d) && d.ValueKind == JsonValueKind.Object ? d.GetRawText() : null;
-            return (Get("StackTrace"), Get("Inner"), data);
+            return (true, Get("StackTrace"), Get("Inner"), data);
         }
         catch (JsonException)
         {
-            return (null, null, null);
+            return (false, null, null, null);
         }
     }
 
     private static readonly (string Key, string Heading)[] ContextGroups =
     {
         ("serverVariables", "Server Variables"),
-        ("requestHeaders", "Request Headers"), // tolerate either key spelling
         ("headers", "Request Headers"),
         ("cookies", "Cookies"),
         ("queryString", "QueryString"),

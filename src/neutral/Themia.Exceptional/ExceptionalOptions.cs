@@ -43,12 +43,13 @@ public sealed class ExceptionalOptions
     public RequestContextRedactor? Redactor { get; set; } = DefaultRedactor;
 
     private static readonly Regex SecretKey = new(
-        "authorization|^cookie$|^set-cookie$|password|secret|token|apikey|session",
+        "authorization|^cookie$|^set-cookie$|password|secret|token|api[-_]?key|session|\\.aspnetcore",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     /// <summary>Default redactor: masks values whose key names a categorical secret
-    /// (Authorization/Cookie/Set-Cookie or contains password/secret/token/apikey/session) to
-    /// <c>"***"</c>; returns all other values unchanged.</summary>
+    /// (Authorization/Cookie/Set-Cookie, contains password/secret/token/api[-_]?key/session, or is an
+    /// ASP.NET Core auth/session cookie such as <c>.AspNetCore.Cookies</c>) to <c>"***"</c>; returns all
+    /// other values unchanged.</summary>
     public static string? DefaultRedactor(string key, string value)
         => SecretKey.IsMatch(key) ? "***" : value;
 

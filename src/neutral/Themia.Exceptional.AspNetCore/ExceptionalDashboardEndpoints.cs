@@ -70,8 +70,8 @@ public static class ExceptionalDashboardEndpoints
 
         var filter = BuildFilter(ctx.Request.Query, options);
         var result = await store.ListAsync(filter, ct).ConfigureAwait(false);
-        var token = options.EnableActions ? IssueCsrf(ctx) : null;
-        await WriteHtmlAsync(ctx, DashboardHtml.List(options.Title, path, result.Items, result.Total, filter, DateTime.UtcNow, token), ct).ConfigureAwait(false);
+        // The list page renders no POST forms, so it needs no CSRF token (and must not set the cookie).
+        await WriteHtmlAsync(ctx, DashboardHtml.List(options.Title, path, result.Items, result.Total, filter, DateTime.UtcNow), ct).ConfigureAwait(false);
     }
 
     private static async Task HandleDetailAsync(HttpContext ctx, IExceptionStore store, ExceptionalDashboardOptions options, string path, Guid guid, CancellationToken ct)

@@ -110,7 +110,11 @@ public sealed class HttpContextEnricher : ILogEventEnricher
         if (!request.HasFormContentType)
             return new Dictionary<string, string?>();
         try { return Collect(request.Form, redactor); }
-        catch { return new Dictionary<string, string?>(); }
+        catch (Exception ex)
+        {
+            global::Serilog.Debugging.SelfLog.WriteLine("Themia.Exceptional: request form capture failed: {0}", ex);
+            return new Dictionary<string, string?>();
+        }
     }
 
     private static Dictionary<string, string?> ServerVariables(HttpContext http, RequestContextRedactor? redactor)
