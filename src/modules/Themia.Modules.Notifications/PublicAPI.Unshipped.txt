@@ -12,3 +12,83 @@ Themia.Modules.Notifications.NotificationsModuleOptions.MaxAttempts.set -> void
 Themia.Modules.Notifications.NotificationsModuleOptions.LeaseSeconds.get -> int
 Themia.Modules.Notifications.NotificationsModuleOptions.LeaseSeconds.set -> void
 Themia.Modules.Notifications.NotificationsModuleOptions.Validate() -> void
+Themia.Modules.Notifications.Entities.OutboxStatus
+Themia.Modules.Notifications.Entities.OutboxStatus.Pending = 0 -> Themia.Modules.Notifications.Entities.OutboxStatus
+Themia.Modules.Notifications.Entities.OutboxStatus.Sending = 1 -> Themia.Modules.Notifications.Entities.OutboxStatus
+Themia.Modules.Notifications.Entities.OutboxStatus.Sent = 2 -> Themia.Modules.Notifications.Entities.OutboxStatus
+Themia.Modules.Notifications.Entities.OutboxStatus.Failed = 3 -> Themia.Modules.Notifications.Entities.OutboxStatus
+Themia.Modules.Notifications.Entities.OutboxStatus.Dead = 4 -> Themia.Modules.Notifications.Entities.OutboxStatus
+Themia.Modules.Notifications.Entities.OutboxMessage
+Themia.Modules.Notifications.Entities.OutboxMessage.OutboxMessage() -> void
+Themia.Modules.Notifications.Entities.OutboxMessage.TenantId.get -> Themia.Framework.Core.Abstractions.Tenancy.TenantId?
+Themia.Modules.Notifications.Entities.OutboxMessage.TenantId.set -> void
+Themia.Modules.Notifications.Entities.OutboxMessage.Channel.get -> Themia.Notifications.NotificationChannel
+Themia.Modules.Notifications.Entities.OutboxMessage.Channel.set -> void
+Themia.Modules.Notifications.Entities.OutboxMessage.Recipient.get -> string!
+Themia.Modules.Notifications.Entities.OutboxMessage.Recipient.set -> void
+Themia.Modules.Notifications.Entities.OutboxMessage.Subject.get -> string?
+Themia.Modules.Notifications.Entities.OutboxMessage.Subject.set -> void
+Themia.Modules.Notifications.Entities.OutboxMessage.Body.get -> string!
+Themia.Modules.Notifications.Entities.OutboxMessage.Body.set -> void
+Themia.Modules.Notifications.Entities.OutboxMessage.Status.get -> Themia.Modules.Notifications.Entities.OutboxStatus
+Themia.Modules.Notifications.Entities.OutboxMessage.Status.set -> void
+Themia.Modules.Notifications.Entities.OutboxMessage.Attempts.get -> int
+Themia.Modules.Notifications.Entities.OutboxMessage.Attempts.set -> void
+Themia.Modules.Notifications.Entities.OutboxMessage.NextAttemptAt.get -> System.DateTimeOffset
+Themia.Modules.Notifications.Entities.OutboxMessage.NextAttemptAt.set -> void
+Themia.Modules.Notifications.Entities.OutboxMessage.ScheduledFor.get -> System.DateTimeOffset?
+Themia.Modules.Notifications.Entities.OutboxMessage.ScheduledFor.set -> void
+Themia.Modules.Notifications.Entities.OutboxMessage.LeaseOwner.get -> string?
+Themia.Modules.Notifications.Entities.OutboxMessage.LeaseOwner.set -> void
+Themia.Modules.Notifications.Entities.OutboxMessage.LeaseExpiresAt.get -> System.DateTimeOffset?
+Themia.Modules.Notifications.Entities.OutboxMessage.LeaseExpiresAt.set -> void
+Themia.Modules.Notifications.Entities.OutboxMessage.CreatedAt.get -> System.DateTimeOffset
+Themia.Modules.Notifications.Entities.OutboxMessage.CreatedAt.set -> void
+Themia.Modules.Notifications.Entities.OutboxMessage.SentAt.get -> System.DateTimeOffset?
+Themia.Modules.Notifications.Entities.OutboxMessage.SentAt.set -> void
+Themia.Modules.Notifications.Entities.OutboxMessage.LastError.get -> string?
+Themia.Modules.Notifications.Entities.OutboxMessage.LastError.set -> void
+Themia.Modules.Notifications.Entities.InAppNotification
+Themia.Modules.Notifications.Entities.InAppNotification.InAppNotification() -> void
+Themia.Modules.Notifications.Entities.InAppNotification.TenantId.get -> Themia.Framework.Core.Abstractions.Tenancy.TenantId?
+Themia.Modules.Notifications.Entities.InAppNotification.TenantId.set -> void
+Themia.Modules.Notifications.Entities.InAppNotification.UserId.get -> string!
+Themia.Modules.Notifications.Entities.InAppNotification.UserId.set -> void
+Themia.Modules.Notifications.Entities.InAppNotification.Title.get -> string!
+Themia.Modules.Notifications.Entities.InAppNotification.Title.set -> void
+Themia.Modules.Notifications.Entities.InAppNotification.Body.get -> string!
+Themia.Modules.Notifications.Entities.InAppNotification.Body.set -> void
+Themia.Modules.Notifications.Entities.InAppNotification.IsRead.get -> bool
+Themia.Modules.Notifications.Entities.InAppNotification.IsRead.set -> void
+Themia.Modules.Notifications.Entities.InAppNotification.ReadAt.get -> System.DateTimeOffset?
+Themia.Modules.Notifications.Entities.InAppNotification.ReadAt.set -> void
+Themia.Modules.Notifications.Entities.NotificationPreference
+Themia.Modules.Notifications.Entities.NotificationPreference.NotificationPreference() -> void
+Themia.Modules.Notifications.Entities.NotificationPreference.TenantId.get -> Themia.Framework.Core.Abstractions.Tenancy.TenantId?
+Themia.Modules.Notifications.Entities.NotificationPreference.TenantId.set -> void
+Themia.Modules.Notifications.Entities.NotificationPreference.UserId.get -> string?
+Themia.Modules.Notifications.Entities.NotificationPreference.UserId.set -> void
+Themia.Modules.Notifications.Entities.NotificationPreference.Channel.get -> Themia.Notifications.NotificationChannel
+Themia.Modules.Notifications.Entities.NotificationPreference.Channel.set -> void
+Themia.Modules.Notifications.Entities.NotificationPreference.IsEnabled.get -> bool
+Themia.Modules.Notifications.Entities.NotificationPreference.IsEnabled.set -> void
+Themia.Modules.Notifications.Entities.NotificationPreference.Locale.get -> string?
+Themia.Modules.Notifications.Entities.NotificationPreference.Locale.set -> void
+Themia.Modules.Notifications.Entities.TenantProviderConfig
+Themia.Modules.Notifications.Entities.TenantProviderConfig.TenantProviderConfig() -> void
+Themia.Modules.Notifications.Entities.TenantProviderConfig.TenantId.get -> Themia.Framework.Core.Abstractions.Tenancy.TenantId?
+Themia.Modules.Notifications.Entities.TenantProviderConfig.TenantId.set -> void
+Themia.Modules.Notifications.Entities.TenantProviderConfig.Channel.get -> Themia.Notifications.NotificationChannel
+Themia.Modules.Notifications.Entities.TenantProviderConfig.Channel.set -> void
+Themia.Modules.Notifications.Entities.TenantProviderConfig.Host.get -> string?
+Themia.Modules.Notifications.Entities.TenantProviderConfig.Host.set -> void
+Themia.Modules.Notifications.Entities.TenantProviderConfig.Port.get -> int?
+Themia.Modules.Notifications.Entities.TenantProviderConfig.Port.set -> void
+Themia.Modules.Notifications.Entities.TenantProviderConfig.Username.get -> string?
+Themia.Modules.Notifications.Entities.TenantProviderConfig.Username.set -> void
+Themia.Modules.Notifications.Entities.TenantProviderConfig.Password.get -> string?
+Themia.Modules.Notifications.Entities.TenantProviderConfig.Password.set -> void
+Themia.Modules.Notifications.Entities.TenantProviderConfig.FromAddress.get -> string?
+Themia.Modules.Notifications.Entities.TenantProviderConfig.FromAddress.set -> void
+Themia.Modules.Notifications.Entities.TenantProviderConfig.UseSsl.get -> bool
+Themia.Modules.Notifications.Entities.TenantProviderConfig.UseSsl.set -> void
