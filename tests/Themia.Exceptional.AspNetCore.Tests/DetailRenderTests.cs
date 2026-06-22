@@ -40,4 +40,37 @@ public sealed class DetailRenderTests
         var html = DashboardHtml.Detail("Exceptions", "/exceptions", Entry(), showRequestBody: true, showRequestContext: false);
         Assert.DoesNotContain("Request Headers", html);
     }
+
+    [Fact]
+    public void Detail_EncodesRequestContextKeys()
+    {
+        var entry = new ExceptionEntry
+        {
+            Type = "System.InvalidOperationException",
+            Message = "boom",
+            Detail = "{}",
+            RequestContext = "{\"headers\":{\"<img src=x onerror=alert(1)>\":\"v\"},\"cookies\":{},\"queryString\":{},\"form\":{},\"serverVariables\":{}}",
+        };
+
+        var html = DashboardHtml.Detail("Exceptions", "/exceptions", entry, showRequestBody: true, showRequestContext: true);
+
+        Assert.Contains("&lt;img src=x onerror=alert(1)&gt;", html); // key HTML-encoded
+        Assert.DoesNotContain("<img src=x onerror=alert(1)>", html); // raw key never emitted
+    }
+
+    [Fact]
+    public void Detail_FallsBackOnMalformedDetailJson()
+    {
+        var entry = new ExceptionEntry
+        {
+            Type = "System.InvalidOperationException",
+            Message = "boom",
+            Detail = "not json {",
+        };
+
+        var html = DashboardHtml.Detail("Exceptions", "/exceptions", entry, showRequestBody: true, showRequestContext: true);
+
+        Assert.Contains("<h2>Detail</h2>", html);   // raw text rendered under a Detail heading
+        Assert.Contains("not json {", html);
+    }
 }

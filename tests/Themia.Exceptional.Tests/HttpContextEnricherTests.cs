@@ -164,6 +164,32 @@ public class HttpContextEnricherTests
     }
 
     [Fact]
+    public void Enricher_DropsEntry_WhenRedactorReturnsNull()
+    {
+        var http = new DefaultHttpContext();
+        http.Request.Headers["drop-me"] = "x";
+        http.Request.Headers["keep-me"] = "y";
+        var accessor = new HttpContextAccessor { HttpContext = http };
+        var options = new ExceptionalOptions
+        {
+            ApplicationName = "App",
+            CaptureRequestContext = true,
+            Redactor = (key, value) => key == "drop-me" ? null : value,
+        };
+        var enricher = new HttpContextEnricher(accessor, options);
+        var evt = NewEvent();
+
+        enricher.Enrich(evt, new LogEventPropertyFactory());
+
+        var json = Assert.IsType<ScalarValue>(evt.Properties["RequestContext"]).Value as string;
+        Assert.NotNull(json);
+        using var doc = JsonDocument.Parse(json!);
+        var headers = doc.RootElement.GetProperty("headers");
+        Assert.False(headers.TryGetProperty("drop-me", out _));
+        Assert.Equal("y", headers.GetProperty("keep-me").GetString());
+    }
+
+    [Fact]
     public void NoRequestContext_WhenDisabled()
     {
         var http = new DefaultHttpContext();

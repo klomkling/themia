@@ -54,7 +54,17 @@ public sealed class HttpContextEnricher : ILogEventEnricher
         if (http.Items.TryGetValue(RequestBodyLoggingMiddleware.BodyItemKey, out var body) && body is string bodyText)
             Add(logEvent, propertyFactory, "RequestBody", bodyText);
         if (options.CaptureRequestContext)
-            Add(logEvent, propertyFactory, "RequestContext", BuildRequestContext(http, options.Redactor));
+        {
+            string? requestContext = null;
+            try { requestContext = BuildRequestContext(http, options.Redactor); }
+            catch (Exception ex)
+            {
+                // Logging path: never throw. A buggy custom Redactor or serialization edge must not drop
+                // the error being logged — capture the failure to SelfLog and omit RequestContext only.
+                global::Serilog.Debugging.SelfLog.WriteLine("Themia.Exceptional: RequestContext capture failed: {0}", ex);
+            }
+            Add(logEvent, propertyFactory, "RequestContext", requestContext);
+        }
     }
 
     private static void Add(LogEvent logEvent, ILogEventPropertyFactory factory, string name, object? value)
@@ -66,7 +76,7 @@ public sealed class HttpContextEnricher : ILogEventEnricher
 
     private static readonly JsonSerializerOptions ContextJson = new() { WriteIndented = false };
 
-    private static string BuildRequestContext(HttpContext http, Func<string, string, string?>? redactor)
+    private static string BuildRequestContext(HttpContext http, RequestContextRedactor? redactor)
     {
         var request = http.Request;
         var ctx = new Dictionary<string, Dictionary<string, string?>>
@@ -81,7 +91,7 @@ public sealed class HttpContextEnricher : ILogEventEnricher
     }
 
     private static Dictionary<string, string?> Collect(
-        IEnumerable<KeyValuePair<string, StringValues>> pairs, Func<string, string, string?>? redactor)
+        IEnumerable<KeyValuePair<string, StringValues>> pairs, RequestContextRedactor? redactor)
     {
         var map = new Dictionary<string, string?>(StringComparer.Ordinal);
         foreach (var (key, values) in pairs)
@@ -94,7 +104,7 @@ public sealed class HttpContextEnricher : ILogEventEnricher
         return map;
     }
 
-    private static Dictionary<string, string?> TryForm(HttpRequest request, Func<string, string, string?>? redactor)
+    private static Dictionary<string, string?> TryForm(HttpRequest request, RequestContextRedactor? redactor)
     {
         // Only read an already-buffered form; never force-read/rewind the body from the logging path.
         if (!request.HasFormContentType)
@@ -103,7 +113,7 @@ public sealed class HttpContextEnricher : ILogEventEnricher
         catch { return new Dictionary<string, string?>(); }
     }
 
-    private static Dictionary<string, string?> ServerVariables(HttpContext http, Func<string, string, string?>? redactor)
+    private static Dictionary<string, string?> ServerVariables(HttpContext http, RequestContextRedactor? redactor)
     {
         var raw = new Dictionary<string, string>(StringComparer.Ordinal)
         {

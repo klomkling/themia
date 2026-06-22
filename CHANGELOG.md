@@ -41,8 +41,11 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
   New options `EnableActions` and `ShowRequestContext`.
 
 ### Security
-- Request-context capture is **off by default**; the default `Redactor` keeps Authorization tokens and
-  session cookies out of the store. Consumers opting in own the data-protection trade-off.
+- Request-context capture is **off by default**. When enabled, the default `Redactor` masks the
+  `Authorization`/`Cookie`/`Set-Cookie` headers and values whose key matches a secret-name pattern
+  (`password`/`secret`/`token`/`apikey`/`session`). Other captured values — including cookies whose
+  names don't match that pattern — are stored as-is; consumers needing stricter scrubbing supply a
+  custom `Redactor`, and `Redactor = null` captures everything raw.
 
 ## [0.6.0] - 2026-06-21
 

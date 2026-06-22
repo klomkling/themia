@@ -2,6 +2,10 @@ using System.Text.RegularExpressions;
 
 namespace Themia.Exceptional;
 
+/// <summary>Redacts a single captured request-context entry: returns the value to store, a masked
+/// value, or <see langword="null"/> to drop the entry. Receives the entry's key and raw value.</summary>
+public delegate string? RequestContextRedactor(string key, string value);
+
 /// <summary>Configuration for the Themia exception-logging engine and capture pipeline.</summary>
 public sealed class ExceptionalOptions
 {
@@ -36,7 +40,7 @@ public sealed class ExceptionalOptions
     /// <see cref="DefaultRedactor"/> (masks only categorical secrets). Set to <see langword="null"/> to
     /// capture everything verbatim (the host then owns that data-protection choice).
     /// </summary>
-    public Func<string, string, string?>? Redactor { get; set; } = DefaultRedactor;
+    public RequestContextRedactor? Redactor { get; set; } = DefaultRedactor;
 
     private static readonly Regex SecretKey = new(
         "authorization|^cookie$|^set-cookie$|password|secret|token|apikey|session",

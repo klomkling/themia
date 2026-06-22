@@ -20,8 +20,9 @@ Themia.Exceptional.ExceptionalOptions.CaptureQueryString.get -> bool
 Themia.Exceptional.ExceptionalOptions.CaptureQueryString.set -> void
 Themia.Exceptional.ExceptionalOptions.CaptureRequestContext.get -> bool
 Themia.Exceptional.ExceptionalOptions.CaptureRequestContext.set -> void
-Themia.Exceptional.ExceptionalOptions.Redactor.get -> System.Func<string!, string!, string?>?
+Themia.Exceptional.ExceptionalOptions.Redactor.get -> Themia.Exceptional.RequestContextRedactor?
 Themia.Exceptional.ExceptionalOptions.Redactor.set -> void
+Themia.Exceptional.RequestContextRedactor
 static Themia.Exceptional.ExceptionalOptions.DefaultRedactor(string! key, string! value) -> string?
 Themia.Exceptional.ExceptionalOptions.CaptureRequestBody.get -> bool
 Themia.Exceptional.ExceptionalOptions.CaptureRequestBody.set -> void
