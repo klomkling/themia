@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Security.Cryptography;
 using System.Text;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -49,6 +50,17 @@ public static class ExceptionalDashboardEndpoints
             ctx.Response.ContentType = "text/css; charset=utf-8";
             return ctx.Response.WriteAsync(DashboardCss.Content);
         });
+
+        if (options.EnableActions)
+        {
+            group.MapPost("{guid:guid}/protect", (Guid guid, HttpContext ctx, IExceptionStore store, CancellationToken ct) =>
+                HandleActionAsync(ctx, options, path, guid, store.ProtectAsync, ct));
+            group.MapPost("{guid:guid}/delete", (Guid guid, HttpContext ctx, IExceptionStore store, CancellationToken ct) =>
+                HandleActionAsync(ctx, options, path, guid, store.DeleteAsync, ct));
+            group.MapPost("{guid:guid}/hard-delete", (Guid guid, HttpContext ctx, IExceptionStore store, CancellationToken ct) =>
+                HandleActionAsync(ctx, options, path, guid, store.HardDeleteAsync, ct));
+        }
+
         return group;
     }
 
@@ -58,7 +70,8 @@ public static class ExceptionalDashboardEndpoints
 
         var filter = BuildFilter(ctx.Request.Query, options);
         var result = await store.ListAsync(filter, ct).ConfigureAwait(false);
-        await WriteHtmlAsync(ctx, DashboardHtml.List(options.Title, path, result.Items, result.Total, filter, DateTime.UtcNow), ct).ConfigureAwait(false);
+        var token = options.EnableActions ? IssueCsrf(ctx) : null;
+        await WriteHtmlAsync(ctx, DashboardHtml.List(options.Title, path, result.Items, result.Total, filter, DateTime.UtcNow, token), ct).ConfigureAwait(false);
     }
 
     private static async Task HandleDetailAsync(HttpContext ctx, IExceptionStore store, ExceptionalDashboardOptions options, string path, Guid guid, CancellationToken ct)
@@ -68,7 +81,62 @@ public static class ExceptionalDashboardEndpoints
         var entry = await store.GetAsync(guid, ct).ConfigureAwait(false);
         if (entry is null) { ctx.Response.StatusCode = StatusCodes.Status404NotFound; return; }
 
-        await WriteHtmlAsync(ctx, DashboardHtml.Detail(options.Title, path, entry, options.ShowRequestBody, options.ShowRequestContext), ct).ConfigureAwait(false);
+        var token = options.EnableActions ? IssueCsrf(ctx) : null;
+        await WriteHtmlAsync(ctx, DashboardHtml.Detail(options.Title, path, entry, options.ShowRequestBody, options.ShowRequestContext, token), ct).ConfigureAwait(false);
+    }
+
+    private const string CsrfCookie = "__themia_csrf";
+
+    private static async Task HandleActionAsync(
+        HttpContext ctx, ExceptionalDashboardOptions options, string path, Guid guid,
+        Func<Guid, CancellationToken, Task<bool>> action, CancellationToken ct)
+    {
+        // Auth gate runs FIRST: a denied request must 404 regardless of any token presented.
+        if (!await AuthorizedAsync(ctx, options).ConfigureAwait(false)) { ctx.Response.StatusCode = StatusCodes.Status404NotFound; return; }
+        if (!ValidCsrf(ctx)) { ctx.Response.StatusCode = StatusCodes.Status400BadRequest; return; }
+
+        await action(guid, ct).ConfigureAwait(false);
+        ctx.Response.StatusCode = StatusCodes.Status303SeeOther;
+        ctx.Response.Headers.Location = path; // back to the list
+    }
+
+    private static bool ValidCsrf(HttpContext ctx)
+    {
+        var cookie = ctx.Request.Cookies[CsrfCookie];
+        var form = ctx.Request.HasFormContentType ? ctx.Request.Form["__token"].ToString() : null;
+        if (string.IsNullOrEmpty(cookie) || string.IsNullOrEmpty(form) ||
+            !CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(cookie), Encoding.UTF8.GetBytes(form)))
+        {
+            return false;
+        }
+
+        // Same-origin: Origin (preferred) or Referer host must equal the request host.
+        var host = ctx.Request.Host.Value;
+        var origin = ctx.Request.Headers.Origin.ToString();
+        if (!string.IsNullOrEmpty(origin))
+        {
+            return Uri.TryCreate(origin, UriKind.Absolute, out var o) && string.Equals(o.Authority, host, StringComparison.OrdinalIgnoreCase);
+        }
+
+        var referer = ctx.Request.Headers.Referer.ToString();
+        return !string.IsNullOrEmpty(referer) && Uri.TryCreate(referer, UriKind.Absolute, out var r) && string.Equals(r.Authority, host, StringComparison.OrdinalIgnoreCase);
+    }
+
+    // Issues (and persists) the per-session CSRF token, returning it for embedding in rendered forms.
+    private static string IssueCsrf(HttpContext ctx)
+    {
+        var existing = ctx.Request.Cookies[CsrfCookie];
+        if (!string.IsNullOrEmpty(existing)) return existing;
+
+        var token = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+        ctx.Response.Cookies.Append(CsrfCookie, token, new CookieOptions
+        {
+            HttpOnly = true,
+            SameSite = SameSiteMode.Strict,
+            Secure = ctx.Request.IsHttps,
+            Path = "/",
+        });
+        return token;
     }
 
     private static async Task<bool> AuthorizedAsync(HttpContext ctx, ExceptionalDashboardOptions options)

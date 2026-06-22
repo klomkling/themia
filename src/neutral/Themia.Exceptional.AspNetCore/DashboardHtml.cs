@@ -19,8 +19,9 @@ internal static class DashboardHtml
         "<!doctype html><html><head><meta charset=\"utf-8\"><title>" + Enc(title) +
         "</title><link rel=\"stylesheet\" href=\"" + Enc(path) + "/dashboard.css\"></head><body>" + body + "</body></html>";
 
-    internal static string List(string title, string path, IReadOnlyList<ExceptionEntry> items, int total, ExceptionFilter filter, DateTime utcNow)
+    internal static string List(string title, string path, IReadOnlyList<ExceptionEntry> items, int total, ExceptionFilter filter, DateTime utcNow, string? csrfToken = null)
     {
+        _ = csrfToken; // Accepted to keep List/Detail signatures aligned; per-row actions are a later addition.
         var sb = new StringBuilder();
         sb.Append("<h1>").Append(Enc(title)).Append("</h1>");
 
@@ -78,7 +79,7 @@ internal static class DashboardHtml
         return $"{(int)span.TotalDays} days ago";
     }
 
-    internal static string Detail(string title, string path, ExceptionEntry e, bool showRequestBody, bool showRequestContext)
+    internal static string Detail(string title, string path, ExceptionEntry e, bool showRequestBody, bool showRequestContext, string? csrfToken = null)
     {
         var sb = new StringBuilder();
         sb.Append("<p><a href=\"").Append(Enc(path)).Append("\">&larr; back</a></p>");
@@ -101,6 +102,16 @@ internal static class DashboardHtml
         Row(sb, "Last log", e.LastLogDate.ToString("u", CultureInfo.InvariantCulture));
         Row(sb, "Protected", e.IsProtected.ToString());
         sb.Append("</table>");
+
+        if (csrfToken is not null)
+        {
+            sb.Append("<form class=\"actions\" method=\"post\" action=\"").Append(Enc(path)).Append('/').Append(e.Guid).Append("/protect\">")
+              .Append("<input type=\"hidden\" name=\"__token\" value=\"").Append(Enc(csrfToken)).Append("\">")
+              .Append("<button type=\"submit\">").Append(e.IsProtected ? "Protected" : "Protect").Append("</button></form> ");
+            sb.Append("<form class=\"actions\" method=\"post\" action=\"").Append(Enc(path)).Append('/').Append(e.Guid).Append("/delete\" onsubmit=\"return confirm('Delete?')\">")
+              .Append("<input type=\"hidden\" name=\"__token\" value=\"").Append(Enc(csrfToken)).Append("\">")
+              .Append("<button type=\"submit\">Delete</button></form>");
+        }
 
         // Parse the stored Detail JSON and render the stack trace with real line breaks (the old UI
         // dumped the whole escaped-JSON blob). Fall back to the raw text if it is not valid JSON.

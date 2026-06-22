@@ -27,10 +27,19 @@ internal sealed class FakeExceptionStore : IExceptionStore
         return Task.FromResult(_entries.FirstOrDefault(e => e.Guid == guid));
     }
 
+    /// <summary>Guids passed to ProtectAsync, recorded for action-endpoint assertions.</summary>
+    public List<Guid> Protected { get; } = [];
+
+    /// <summary>Guids passed to DeleteAsync, recorded for action-endpoint assertions.</summary>
+    public List<Guid> Deleted { get; } = [];
+
+    /// <summary>Guids passed to HardDeleteAsync, recorded for action-endpoint assertions.</summary>
+    public List<Guid> HardDeleted { get; } = [];
+
     public Task LogAsync(ExceptionEntry entry, CancellationToken cancellationToken = default) => Task.CompletedTask;
     public Task<int> CountAsync(ExceptionFilter filter, CancellationToken cancellationToken = default) => Task.FromResult(_entries.Count);
-    public Task<bool> ProtectAsync(Guid guid, CancellationToken cancellationToken = default) => Task.FromResult(false);
-    public Task<bool> DeleteAsync(Guid guid, CancellationToken cancellationToken = default) => Task.FromResult(false);
-    public Task<bool> HardDeleteAsync(Guid guid, CancellationToken cancellationToken = default) => Task.FromResult(false);
+    public Task<bool> ProtectAsync(Guid guid, CancellationToken cancellationToken = default) { Protected.Add(guid); return Task.FromResult(true); }
+    public Task<bool> DeleteAsync(Guid guid, CancellationToken cancellationToken = default) { Deleted.Add(guid); return Task.FromResult(true); }
+    public Task<bool> HardDeleteAsync(Guid guid, CancellationToken cancellationToken = default) { HardDeleted.Add(guid); return Task.FromResult(true); }
     public Task<int> PurgeAsync(DateTime olderThanUtc, CancellationToken cancellationToken = default) => Task.FromResult(0);
 }
