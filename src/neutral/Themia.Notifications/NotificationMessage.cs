@@ -1,7 +1,7 @@
 namespace Themia.Notifications;
 
 /// <summary>A single notification to send. Either <see cref="Body"/> is pre-rendered, or
-/// <see cref="Template"/> + <see cref="Model"/> are merged by an <c>INotificationTemplateRenderer</c>.</summary>
+/// <see cref="Template"/> + <see cref="Model"/> are merged by an <see cref="INotificationTemplateRenderer"/>.</summary>
 public sealed class NotificationMessage
 {
     /// <summary>The delivery channel.</summary>

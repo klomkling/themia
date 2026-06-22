@@ -26,3 +26,9 @@ Themia.Notifications.NotificationResult.ProviderMessageId.get -> string?
 Themia.Notifications.NotificationResult.Error.get -> string?
 static Themia.Notifications.NotificationResult.Success(string? providerMessageId = null) -> Themia.Notifications.NotificationResult!
 static Themia.Notifications.NotificationResult.Failure(string! error) -> Themia.Notifications.NotificationResult!
+Themia.Notifications.INotificationTemplateRenderer
+Themia.Notifications.INotificationTemplateRenderer.Render(string! template, object! model) -> string!
+Themia.Notifications.ThemiaNotificationsOptions
+Themia.Notifications.ThemiaNotificationsOptions.ThemiaNotificationsOptions() -> void
+Themia.Notifications.ThemiaNotificationsOptions.ConfigureHandlebars.get -> System.Action<HandlebarsDotNet.IHandlebars!>?
+Themia.Notifications.ThemiaNotificationsOptions.ConfigureHandlebars.set -> void
