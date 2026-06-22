@@ -14,7 +14,7 @@ internal sealed class PreferenceResolver(INotificationPreferenceStore store) : I
         string userId, IReadOnlyList<NotificationChannel> requested, CancellationToken ct = default)
     {
         // The store returns the user's rows plus the tenant-wide defaults (null UserId).
-        var preferences = await store.ListAsync(userId, ct);
+        var preferences = await store.ListAsync(userId, ct).ConfigureAwait(false);
 
         var enabled = requested
             .Where(channel => IsEnabled(channel, userId, preferences))
