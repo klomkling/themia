@@ -100,3 +100,5 @@ Themia.Modules.Notifications.Migrations.NotificationsSchemaMigration
 Themia.Modules.Notifications.Migrations.NotificationsSchemaMigration.NotificationsSchemaMigration() -> void
 override Themia.Modules.Notifications.Migrations.NotificationsSchemaMigration.Up() -> void
 override Themia.Modules.Notifications.Migrations.NotificationsSchemaMigration.Down() -> void
+Themia.Modules.Notifications.EntityConfiguration.ThemiaNotificationsModelBuilderExtensions
+static Themia.Modules.Notifications.EntityConfiguration.ThemiaNotificationsModelBuilderExtensions.ApplyThemiaNotifications(this Microsoft.EntityFrameworkCore.ModelBuilder! modelBuilder) -> Microsoft.EntityFrameworkCore.ModelBuilder!
