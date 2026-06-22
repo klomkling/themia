@@ -27,6 +27,23 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-06-22
+
+### Added
+- `Themia.Exceptional` — opt-in request-context capture (`ExceptionalOptions.CaptureRequestContext`)
+  recording request headers, cookies, query, form, and server variables into a new nullable
+  `RequestContext` column, with a configurable `Redactor` (default masks Authorization/Cookie/secret-named
+  values; set to `null` to capture raw). A new forward-only migration adds the column across SQL Server /
+  MySQL / PostgreSQL.
+- `Themia.Exceptional.AspNetCore` — StackExchange.Exceptional-style dashboard: formatted stack trace,
+  request-context sections (Server Variables / Headers / Cookies / Query / Form), relative time + summary
+  header in the list, and protect/delete actions (POST behind a self-contained double-submit CSRF token).
+  New options `EnableActions` and `ShowRequestContext`.
+
+### Security
+- Request-context capture is **off by default**; the default `Redactor` keeps Authorization tokens and
+  session cookies out of the store. Consumers opting in own the data-protection trade-off.
+
 ## [0.6.0] - 2026-06-21
 
 ### Added
