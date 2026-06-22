@@ -1,6 +1,9 @@
 namespace Themia.Notifications.Providers;
 
 /// <summary>SMTP provider configuration for <see cref="SmtpEmailSender"/>.</summary>
+/// <remarks><c>System.Net.Mail.SmtpClient</c> has limited support on Linux/macOS — it does not
+/// negotiate modern AUTH/STARTTLS. Production hosts that require those should register a custom
+/// <see cref="IEmailSender"/> backed by a library such as MailKit instead of using this provider.</remarks>
 public sealed class SmtpEmailOptions
 {
     /// <summary>SMTP host. Required (ignored when <see cref="PickupDirectory"/> is set).</summary>

@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Themia.Notifications;
+using Themia.Notifications.Providers;
 using Xunit;
 
 namespace Themia.Notifications.Tests;
@@ -36,6 +37,18 @@ public sealed class ThemiaNotificationsServiceCollectionExtensionsTests
         services.AddThemiaNotifications();                  // TryAdd must not override
         var sp = services.BuildServiceProvider();
         Assert.IsType<FakeEmail>(sp.GetRequiredService<IEmailSender>());
+    }
+
+    [Fact]
+    public void AddThemiaSmtpEmailSender_MakesSmtpTheEmailSender()
+    {
+        var sp = new ServiceCollection().AddLogging()
+            .AddThemiaNotifications()
+            .AddThemiaSmtpEmailSender(o => { o.Host = "localhost"; o.FromAddress = "x@y.z"; })
+            .BuildServiceProvider();
+
+        Assert.IsType<SmtpEmailSender>(sp.GetRequiredService<IEmailSender>());
+        Assert.Single(sp.GetServices<IEmailSender>());   // Replace removed the logger default
     }
 
     private sealed class FakeEmail : IEmailSender

@@ -24,4 +24,22 @@ public static class ThemiaNotificationsServiceCollectionExtensions
         services.TryAddSingleton<ISmsSender, LoggerSmsSender>();
         return services;
     }
+
+    /// <summary>Replaces the default email sender with <c>SmtpEmailSender</c> over the configured
+    /// <see cref="Themia.Notifications.Providers.SmtpEmailOptions"/>. Call alongside
+    /// <see cref="AddThemiaNotifications"/> to enable real SMTP delivery.</summary>
+    public static IServiceCollection AddThemiaSmtpEmailSender(
+        this IServiceCollection services,
+        Action<SmtpEmailOptions> configure)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(configure);
+
+        var options = new SmtpEmailOptions();
+        configure(options);
+        services.AddSingleton(options);
+        // Replace so SMTP wins over the TryAdd logger default regardless of call order.
+        services.Replace(ServiceDescriptor.Singleton<IEmailSender, SmtpEmailSender>());
+        return services;
+    }
 }

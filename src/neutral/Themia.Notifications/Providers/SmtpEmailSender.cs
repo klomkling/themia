@@ -13,9 +13,13 @@ internal sealed class SmtpEmailSender(SmtpEmailOptions options, INotificationTem
         ArgumentNullException.ThrowIfNull(message);
         cancellationToken.ThrowIfCancellationRequested();
 
-        var body = message.Body ?? (message.Template is not null ? renderer.Render(message.Template, message.Model ?? new { }) : string.Empty);
-        var subject = message.Subject is not null && message.Model is not null && message.Body is null
-            ? renderer.Render(message.Subject, message.Model)   // subject may also be a template
+        var body = message.Body ?? (message.Template is not null
+            ? renderer.Render(message.Template, message.Model ?? new { })
+            : string.Empty);
+
+        var subject = message.Subject is not null && message.Model is not null
+                      && message.Subject.Contains("{{", StringComparison.Ordinal)
+            ? renderer.Render(message.Subject, message.Model)
             : message.Subject ?? string.Empty;
 
         using var mail = new MailMessage
