@@ -1137,14 +1137,21 @@ git commit -am "feat: add exponential backoff policy for the outbox drainer"
 
 ---
 
-### Task 9: INotificationsSqlDialect + 3 engine dialects (atomic claim)
+### Task 9: INotificationsSqlDialect + 3 per-provider dialect packages (atomic claim)
 
 This is the correctness core. Each dialect provides the skip-locked claim SQL, the complete/fail/reclaim SQL, and a connection factory — modeled on `IExceptionalSqlDialect`.
 
+**PACKAGING (decided 2026-06-22 — supersedes the spec's single-package drawing):** Follow the `Themia.Exceptional` per-provider pattern. The **driver-free core** (`Themia.Modules.Notifications`) defines the **public** `INotificationsSqlDialect` + `ClaimedOutboxRow`; the concrete dialects + their drivers ship as **three new packages**, each referencing the core + ONE driver, so a consumer pulls only the driver they use. Read `src/neutral/Themia.Exceptional.PostgreSql/` (+ `.MySql/`, `.SqlServer/`) — their `.csproj`, their dialect class, and their DI registration extension — and mirror that structure exactly.
+
 **Files:**
-- Create: `Outbox/ClaimedOutboxRow.cs`, `Outbox/INotificationsSqlDialect.cs`
-- Create: `Outbox/PostgresNotificationsDialect.cs`, `MySqlNotificationsDialect.cs`, `SqlServerNotificationsDialect.cs`
-- Test (integration): `tests/Themia.Modules.Notifications.IntegrationTests/OutboxClaimConcurrencyTests.cs`
+- Create in core: `Outbox/ClaimedOutboxRow.cs` (**public** record), `Outbox/INotificationsSqlDialect.cs` (**public** interface). No driver added to the core csproj — the interface uses only `System.Data.Common.DbConnection`.
+- Create package `src/modules/Themia.Modules.Notifications.PostgreSql/`: `.csproj` (net10.0, ProjectReference core, PackageReference `Npgsql` + `Dapper`), `PostgresNotificationsDialect.cs`, a DI extension `NotificationsPostgreSqlServiceCollectionExtensions.AddThemiaNotificationsPostgreSql(connStringName?)` registering `INotificationsSqlDialect`, `PublicAPI.*.txt`, `InternalsVisibleTo` the IntegrationTests.
+- Create package `src/modules/Themia.Modules.Notifications.MySql/`: same shape, `MySqlConnector` driver, `MySqlNotificationsDialect.cs`, `AddThemiaNotificationsMySql`.
+- Create package `src/modules/Themia.Modules.Notifications.SqlServer/`: same shape, `Microsoft.Data.SqlClient` driver, `SqlServerNotificationsDialect.cs`, `AddThemiaNotificationsSqlServer`.
+- Add all three to `Themia.sln`.
+- Test (integration): `tests/Themia.Modules.Notifications.IntegrationTests/OutboxClaimConcurrencyTests.cs` — references all three provider packages.
+
+> Each dialect's `CreateConnection()` returns its driver's connection (`new NpgsqlConnection(connString)` etc.). The connection string is resolved from `IConfiguration` (`GetConnectionString(name)`) at registration or first use — mirror how the Exceptional provider package's DI extension obtains it. The DI extensions are the public entry points; the dialect classes themselves may be `internal` to their package (only `INotificationsSqlDialect` crosses the assembly boundary).
 
 - [ ] **Step 1: Define `ClaimedOutboxRow`** (the columns the drainer needs to send + update)
 
@@ -1153,8 +1160,8 @@ using Themia.Notifications;
 
 namespace Themia.Modules.Notifications.Outbox;
 
-/// <summary>A row claimed from the outbox for delivery.</summary>
-internal sealed record ClaimedOutboxRow(
+/// <summary>A row claimed from the outbox for delivery. Public so the per-provider dialect packages can return it.</summary>
+public sealed record ClaimedOutboxRow(
     Guid Id,
     string? TenantId,
     NotificationChannel Channel,
@@ -1174,9 +1181,9 @@ namespace Themia.Modules.Notifications.Outbox;
 /// <summary>
 /// Engine-specific SQL for the outbox drainer. The drainer uses its own connection
 /// (it serves all tenants), so this bypasses the tenant filter by design — the
-/// sanctioned data-layer raw-connection path.
+/// sanctioned data-layer raw-connection path. Public so per-provider packages implement it.
 /// </summary>
-internal interface INotificationsSqlDialect
+public interface INotificationsSqlDialect
 {
     /// <summary>Opens a new connection to the drain database.</summary>
     DbConnection CreateConnection();
@@ -1198,7 +1205,7 @@ internal interface INotificationsSqlDialect
 }
 ```
 
-- [ ] **Step 3: Implement `PostgresNotificationsDialect`** — `FOR UPDATE SKIP LOCKED` in a transaction. Use Dapper (already referenced transitively via the framework Dapper package) or raw `DbCommand`. Parameterized.
+- [ ] **Step 3: Implement `PostgresNotificationsDialect`** — `FOR UPDATE SKIP LOCKED` in a transaction. Parameterized via Dapper. **NOTE:** this class lives in the `Themia.Modules.Notifications.PostgreSql` package — use namespace `Themia.Modules.Notifications.PostgreSql` (NOT `.Outbox` as the snippet shows); it `implements Themia.Modules.Notifications.Outbox.INotificationsSqlDialect` from the core. Same applies to the MySql/SqlServer dialects (their own package namespaces). The status int literals (0 pending,1 sending,2 sent,3 failed,4 dead) match `OutboxStatus`.
 
 ```csharp
 using System.Data.Common;
@@ -1283,10 +1290,10 @@ const string claimSql = """
 
 - [ ] **Step 7: Run** — `dotnet test tests/Themia.Modules.Notifications.IntegrationTests --filter OutboxClaimConcurrencyTests` — Expected: PASS on all engines (Docker required).
 
-- [ ] **Step 8: Commit** (`internal` types — no PublicAPI changes)
+- [ ] **Step 8: PublicAPI + Commit** — core gains public `INotificationsSqlDialect` + `ClaimedOutboxRow` (add to the core's `PublicAPI.Unshipped.txt`); each provider package gets its own `PublicAPI.*.txt` listing its public DI extension (dialect classes are `internal` to their package). Clean `--no-incremental` build of all four projects → no RS0016.
 
 ```bash
-git commit -am "feat: add per-engine atomic outbox claim dialects (skip-locked)"
+git commit -am "feat: add per-engine atomic outbox claim dialects (per-provider packages, skip-locked)"
 ```
 
 ---
