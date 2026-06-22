@@ -39,11 +39,11 @@
     <PackageVersion Include="SqlKata" Version="4.0.1" />
     <!-- Exceptional (0.3.0): raw Npgsql driver + FluentMigrator schema + System.Text.Json store -->
     <PackageVersion Include="Npgsql" Version="10.0.3" />
-    <PackageVersion Include="FluentMigrator" Version="7.2.0" />
+    <PackageVersion Include="FluentMigrator" Version="8.0.1" />
     <!-- Reference only the provider runners Themia supports (PostgreSQL/MySQL/SQL Server) instead of the
          FluentMigrator.Runner meta-package: it drags in unused providers (Db2/Oracle/Hana/…), and the
          x64-only IBM.Data.Db2.dll forces ReSharper/Rider to launch tests as x64 (broken on Apple Silicon). -->
-    <PackageVersion Include="FluentMigrator.Runner.Postgres" Version="7.2.0" />
+    <PackageVersion Include="FluentMigrator.Runner.Postgres" Version="8.0.1" />
     <PackageVersion Include="FluentMigrator.Runner.MySql" Version="7.2.0" />
     <PackageVersion Include="FluentMigrator.Runner.SqlServer" Version="7.2.0" />
     <!-- MultiTenancy tests: Microsoft.Data.Sqlite is a REAL database for the DapperTenantStore tests
