@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Net;
 using System.Text;
+using System.Text.Json;
 using Themia.Exceptional;
 
 namespace Themia.Exceptional.AspNetCore;
@@ -12,22 +13,22 @@ namespace Themia.Exceptional.AspNetCore;
 /// When adding a new string value, route it through <see cref="Enc"/>.</summary>
 internal static class DashboardHtml
 {
-    private const string Style =
-        "<style>body{font:14px system-ui,sans-serif;margin:1rem}table{border-collapse:collapse;width:100%}" +
-        "th,td{border:1px solid #ddd;padding:4px 8px;text-align:left;vertical-align:top}th{background:#f5f5f5}" +
-        "pre{background:#f8f8f8;padding:8px;overflow:auto;white-space:pre-wrap}a{color:#0366d6}</style>";
-
     internal static string Enc(string? value) => WebUtility.HtmlEncode(value ?? string.Empty);
 
-    internal static string Page(string title, string body) =>
-        $"<!doctype html><html><head><meta charset=\"utf-8\"><title>{Enc(title)}</title>{Style}</head><body>{body}</body></html>";
+    internal static string Page(string title, string path, string body) =>
+        "<!doctype html><html><head><meta charset=\"utf-8\"><title>" + Enc(title) +
+        "</title><link rel=\"stylesheet\" href=\"" + Enc(path) + "/dashboard.css\"></head><body>" + body + "</body></html>";
 
-    internal static string List(string title, string path, IReadOnlyList<ExceptionEntry> items, int total, ExceptionFilter filter)
+    internal static string List(string title, string path, IReadOnlyList<ExceptionEntry> items, int total, ExceptionFilter filter, DateTime utcNow, string? csrfToken = null)
     {
+        _ = csrfToken; // Accepted to keep List/Detail signatures aligned; per-row actions are a later addition.
         var sb = new StringBuilder();
         sb.Append("<h1>").Append(Enc(title)).Append("</h1>");
 
-        sb.Append("<form method=\"get\" action=\"").Append(Enc(path)).Append("\">")
+        var last = items.Count > 0 ? Relative(items[0].LastLogDate, utcNow) : "—";
+        sb.Append("<p class=\"summary\"><strong>").Append(total).Append(" errors</strong> (last: ").Append(Enc(last)).Append(")</p>");
+
+        sb.Append("<form class=\"filter\" method=\"get\" action=\"").Append(Enc(path)).Append("\">")
           .Append("<input name=\"q\" value=\"").Append(Enc(filter.Search)).Append("\" placeholder=\"search\"> ")
           .Append("<input name=\"app\" value=\"").Append(Enc(filter.ApplicationName)).Append("\" placeholder=\"app\"> ")
           .Append("<input name=\"tenant\" value=\"").Append(Enc(filter.TenantId)).Append("\" placeholder=\"tenant\"> ")
@@ -37,9 +38,10 @@ internal static class DashboardHtml
         foreach (var e in items)
         {
             sb.Append("<tr>")
-              .Append("<td>").Append(Enc(e.LastLogDate.ToString("u", CultureInfo.InvariantCulture))).Append("</td>")
+              .Append("<td><time title=\"").Append(Enc(e.LastLogDate.ToString("u", CultureInfo.InvariantCulture))).Append("\">")
+              .Append(Enc(Relative(e.LastLogDate, utcNow))).Append("</time></td>")
               .Append("<td>").Append(Enc(e.ApplicationName)).Append("</td>")
-              .Append("<td><a href=\"").Append(Enc(path)).Append('/').Append(e.Guid).Append("\">").Append(Enc(e.Type)).Append("</a></td>")
+              .Append("<td class=\"type type-err\"><a href=\"").Append(Enc(path)).Append('/').Append(e.Guid).Append("\">").Append(Enc(e.Type)).Append("</a></td>")
               .Append("<td>").Append(Enc(e.Message)).Append("</td>")
               .Append("<td>").Append(Enc(e.StatusCode?.ToString(CultureInfo.InvariantCulture))).Append("</td>")
               .Append("<td>").Append(e.DuplicateCount).Append("</td>")
@@ -64,17 +66,27 @@ internal static class DashboardHtml
         }
         sb.Append("</p>");
 
-        return Page(title, sb.ToString());
+        return Page(title, path, sb.ToString());
     }
 
-    internal static string Detail(string title, string path, ExceptionEntry e, bool showRequestBody)
+    private static string Relative(DateTime utc, DateTime now)
+    {
+        var span = now - utc;
+        if (span < TimeSpan.Zero) span = TimeSpan.Zero;
+        if (span.TotalSeconds < 60) return $"{(int)span.TotalSeconds} secs ago";
+        if (span.TotalMinutes < 60) return $"{(int)span.TotalMinutes} mins ago";
+        if (span.TotalHours < 24) return $"{(int)span.TotalHours} hours ago";
+        return $"{(int)span.TotalDays} days ago";
+    }
+
+    internal static string Detail(string title, string path, ExceptionEntry e, bool showRequestBody, bool showRequestContext, string? csrfToken = null)
     {
         var sb = new StringBuilder();
         sb.Append("<p><a href=\"").Append(Enc(path)).Append("\">&larr; back</a></p>");
-        sb.Append("<h1>").Append(Enc(e.Type)).Append("</h1>");
+        sb.Append("<h1 class=\"type type-err\">").Append(Enc(e.Type)).Append("</h1>");
         sb.Append("<p>").Append(Enc(e.Message)).Append("</p>");
 
-        sb.Append("<table>");
+        sb.Append("<table class=\"meta\">");
         Row(sb, "Guid", e.Guid.ToString());
         Row(sb, "Application", e.ApplicationName);
         Row(sb, "Machine", e.MachineName);
@@ -91,13 +103,93 @@ internal static class DashboardHtml
         Row(sb, "Protected", e.IsProtected.ToString());
         sb.Append("</table>");
 
-        sb.Append("<h2>Detail</h2><pre>").Append(Enc(e.Detail)).Append("</pre>");
-        if (showRequestBody && e.RequestBody is not null)
+        if (csrfToken is not null)
         {
-            sb.Append("<h2>Request body</h2><pre>").Append(Enc(e.RequestBody)).Append("</pre>");
+            sb.Append("<form class=\"actions\" method=\"post\" action=\"").Append(Enc(path)).Append('/').Append(e.Guid).Append("/protect\">")
+              .Append("<input type=\"hidden\" name=\"__token\" value=\"").Append(Enc(csrfToken)).Append("\">")
+              .Append("<button type=\"submit\">").Append(e.IsProtected ? "Protected" : "Protect").Append("</button></form> ");
+            sb.Append("<form class=\"actions\" method=\"post\" action=\"").Append(Enc(path)).Append('/').Append(e.Guid).Append("/delete\">")
+              .Append("<input type=\"hidden\" name=\"__token\" value=\"").Append(Enc(csrfToken)).Append("\">")
+              .Append("<button type=\"submit\">Delete</button></form>");
         }
 
-        return Page(title, sb.ToString());
+        // Parse the stored Detail JSON and render the structured sections (stack trace with real line
+        // breaks; the old UI dumped the whole escaped-JSON blob). Fall back to the raw text only when the
+        // Detail is not a JSON object — render whatever sections are present even if StackTrace is null.
+        var (parsed, stackTrace, inner, data) = ParseDetail(e.Detail);
+        if (parsed)
+        {
+            if (!string.IsNullOrEmpty(stackTrace))
+                sb.Append("<h2>Stack Trace</h2><pre>").Append(Enc(stackTrace)).Append("</pre>");
+            if (!string.IsNullOrEmpty(inner))
+                sb.Append("<h2>Inner Exception</h2><pre>").Append(Enc(inner)).Append("</pre>");
+            if (!string.IsNullOrEmpty(data))
+                sb.Append("<h2>Data</h2><pre>").Append(Enc(data)).Append("</pre>");
+        }
+        else
+        {
+            sb.Append("<h2>Detail</h2><pre>").Append(Enc(e.Detail)).Append("</pre>");
+        }
+
+        if (showRequestBody && e.RequestBody is not null)
+            sb.Append("<h2>Request Body</h2><pre>").Append(Enc(e.RequestBody)).Append("</pre>");
+
+        if (showRequestContext && e.RequestContext is not null)
+            AppendRequestContext(sb, e.RequestContext);
+
+        return Page(title, path, sb.ToString());
+    }
+
+    private static (bool Parsed, string? StackTrace, string? Inner, string? Data) ParseDetail(string detail)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(detail);
+            var root = doc.RootElement;
+            // Only treat object roots as structured Detail; a valid JSON array/number/string would make
+            // TryGetProperty throw (InvalidOperationException, not caught here) — guard before any access.
+            if (root.ValueKind != JsonValueKind.Object)
+                return (false, null, null, null);
+            string? Get(string n) => root.TryGetProperty(n, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() : null;
+            string? data = root.TryGetProperty("Data", out var d) && d.ValueKind == JsonValueKind.Object ? d.GetRawText() : null;
+            return (true, Get("StackTrace"), Get("Inner"), data);
+        }
+        catch (JsonException)
+        {
+            return (false, null, null, null);
+        }
+    }
+
+    private static readonly (string Key, string Heading)[] ContextGroups =
+    {
+        ("serverVariables", "Server Variables"),
+        ("headers", "Request Headers"),
+        ("cookies", "Cookies"),
+        ("queryString", "QueryString"),
+        ("form", "Form"),
+    };
+
+    private static void AppendRequestContext(StringBuilder sb, string requestContext)
+    {
+        JsonDocument doc;
+        try { doc = JsonDocument.Parse(requestContext); }
+        catch (JsonException) { return; }
+        using (doc)
+        {
+            foreach (var (key, heading) in ContextGroups)
+            {
+                if (!doc.RootElement.TryGetProperty(key, out var group) || group.ValueKind != JsonValueKind.Object)
+                    continue;
+                var rows = new StringBuilder();
+                foreach (var prop in group.EnumerateObject())
+                    rows.Append("<tr><th>").Append(Enc(prop.Name)).Append("</th><td>")
+                        .Append(Enc(prop.Value.ValueKind == JsonValueKind.String ? prop.Value.GetString() : prop.Value.GetRawText()))
+                        .Append("</td></tr>");
+                if (rows.Length == 0)
+                    continue;
+                sb.Append("<h2>").Append(Enc(heading)).Append("</h2><table>").Append(rows).Append("</table>");
+            }
+        }
     }
 
     private static void Row(StringBuilder sb, string key, string? value) =>

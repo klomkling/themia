@@ -38,8 +38,8 @@ public sealed class SqlServerExceptionalDialect : IExceptionalSqlDialect
     /// <inheritdoc />
     public string InsertSql => """
         INSERT INTO [Exceptions]
-        ([Guid],[ApplicationName],[MachineName],[Type],[Source],[Message],[Detail],[Host],[Url],[HttpMethod],[IpAddress],[StatusCode],[ErrorHash],[DuplicateCount],[TenantId],[CreationDate],[LastLogDate],[DeletionDate],[IsProtected],[RequestBody])
-        VALUES (@Guid,@ApplicationName,@MachineName,@Type,@Source,@Message,@Detail,@Host,@Url,@HttpMethod,@IpAddress,@StatusCode,@ErrorHash,@DuplicateCount,@TenantId,@CreationDate,@LastLogDate,@DeletionDate,@IsProtected,@RequestBody);
+        ([Guid],[ApplicationName],[MachineName],[Type],[Source],[Message],[Detail],[Host],[Url],[HttpMethod],[IpAddress],[StatusCode],[ErrorHash],[DuplicateCount],[TenantId],[CreationDate],[LastLogDate],[DeletionDate],[IsProtected],[RequestBody],[RequestContext])
+        VALUES (@Guid,@ApplicationName,@MachineName,@Type,@Source,@Message,@Detail,@Host,@Url,@HttpMethod,@IpAddress,@StatusCode,@ErrorHash,@DuplicateCount,@TenantId,@CreationDate,@LastLogDate,@DeletionDate,@IsProtected,@RequestBody,@RequestContext);
         """;
 
     /// <inheritdoc />

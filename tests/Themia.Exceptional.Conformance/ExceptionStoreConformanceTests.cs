@@ -179,6 +179,21 @@ public abstract class ExceptionStoreConformanceTests
 
     [Fact]
     [Trait("Category", "Integration")]
+    public async Task Insert_And_Get_RoundTripsRequestContext()
+    {
+        var store = Store;
+        var entry = ExceptionEntryFactory.FromException(new InvalidOperationException("ctx"), "IntegrationApp");
+        entry.RequestContext = "{\"headers\":{\"User-Agent\":\"Edge\"},\"cookies\":{}}";
+        await store.LogAsync(entry);
+
+        var loaded = await store.GetAsync(entry.Guid);
+
+        Assert.NotNull(loaded);
+        Assert.Equal(entry.RequestContext, loaded!.RequestContext);
+    }
+
+    [Fact]
+    [Trait("Category", "Integration")]
     public async Task ListAsync_FiltersByDateRange_KindLocal_DoesNotThrow_AndReturnsRow()
     {
         var store = Store;

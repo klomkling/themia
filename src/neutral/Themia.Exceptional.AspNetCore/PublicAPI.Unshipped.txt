@@ -6,10 +6,14 @@ Themia.Exceptional.AspNetCore.ExceptionalDashboardOptions.Authorize.get -> Syste
 Themia.Exceptional.AspNetCore.ExceptionalDashboardOptions.Authorize.set -> void
 Themia.Exceptional.AspNetCore.ExceptionalDashboardOptions.DefaultPageSize.get -> int
 Themia.Exceptional.AspNetCore.ExceptionalDashboardOptions.DefaultPageSize.set -> void
+Themia.Exceptional.AspNetCore.ExceptionalDashboardOptions.EnableActions.get -> bool
+Themia.Exceptional.AspNetCore.ExceptionalDashboardOptions.EnableActions.set -> void
 Themia.Exceptional.AspNetCore.ExceptionalDashboardOptions.MaxPageSize.get -> int
 Themia.Exceptional.AspNetCore.ExceptionalDashboardOptions.MaxPageSize.set -> void
 Themia.Exceptional.AspNetCore.ExceptionalDashboardOptions.ShowRequestBody.get -> bool
 Themia.Exceptional.AspNetCore.ExceptionalDashboardOptions.ShowRequestBody.set -> void
+Themia.Exceptional.AspNetCore.ExceptionalDashboardOptions.ShowRequestContext.get -> bool
+Themia.Exceptional.AspNetCore.ExceptionalDashboardOptions.ShowRequestContext.set -> void
 Themia.Exceptional.AspNetCore.ExceptionalDashboardOptions.Title.get -> string!
 Themia.Exceptional.AspNetCore.ExceptionalDashboardOptions.Title.set -> void
 static Themia.Exceptional.AspNetCore.ExceptionalDashboardEndpoints.MapThemiaExceptional(this Microsoft.AspNetCore.Routing.IEndpointRouteBuilder! endpoints, string! path = "/exceptions", System.Action<Themia.Exceptional.AspNetCore.ExceptionalDashboardOptions!>? configure = null) -> Microsoft.AspNetCore.Routing.RouteGroupBuilder!

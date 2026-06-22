@@ -1,5 +1,7 @@
 #nullable enable
 const Themia.Exceptional.Middleware.RequestBodyLoggingMiddleware.BodyItemKey = "Themia.Exceptional.RequestBody" -> string!
+override Themia.Exceptional.Migrations.AddRequestContextColumn.Down() -> void
+override Themia.Exceptional.Migrations.AddRequestContextColumn.Up() -> void
 override Themia.Exceptional.Migrations.ExceptionLogMigration.Down() -> void
 override Themia.Exceptional.Migrations.ExceptionLogMigration.Up() -> void
 static Themia.Exceptional.ExceptionEntryFactory.FromException(System.Exception! exception, string! applicationName, System.DateTime? utcNow = null) -> Themia.Exceptional.ExceptionEntry!
@@ -16,6 +18,12 @@ Themia.Exceptional.ExceptionalOptions.ApplicationName.get -> string!
 Themia.Exceptional.ExceptionalOptions.ApplicationName.set -> void
 Themia.Exceptional.ExceptionalOptions.CaptureQueryString.get -> bool
 Themia.Exceptional.ExceptionalOptions.CaptureQueryString.set -> void
+Themia.Exceptional.ExceptionalOptions.CaptureRequestContext.get -> bool
+Themia.Exceptional.ExceptionalOptions.CaptureRequestContext.set -> void
+Themia.Exceptional.ExceptionalOptions.Redactor.get -> Themia.Exceptional.RequestContextRedactor?
+Themia.Exceptional.ExceptionalOptions.Redactor.set -> void
+Themia.Exceptional.RequestContextRedactor
+static Themia.Exceptional.ExceptionalOptions.DefaultRedactor(string! key, string! value) -> string?
 Themia.Exceptional.ExceptionalOptions.CaptureRequestBody.get -> bool
 Themia.Exceptional.ExceptionalOptions.CaptureRequestBody.set -> void
 Themia.Exceptional.ExceptionalOptions.ExceptionalOptions() -> void
@@ -66,6 +74,8 @@ Themia.Exceptional.ExceptionEntry.Type.get -> string!
 Themia.Exceptional.ExceptionEntry.Type.set -> void
 Themia.Exceptional.ExceptionEntry.RequestBody.get -> string?
 Themia.Exceptional.ExceptionEntry.RequestBody.set -> void
+Themia.Exceptional.ExceptionEntry.RequestContext.get -> string?
+Themia.Exceptional.ExceptionEntry.RequestContext.set -> void
 Themia.Exceptional.ExceptionEntry.Url.get -> string?
 Themia.Exceptional.ExceptionEntry.Url.set -> void
 Themia.Exceptional.ExceptionEntryFactory
@@ -127,6 +137,8 @@ Themia.Exceptional.IExceptionStore.PurgeAsync(System.DateTime olderThanUtc, Syst
 Themia.Exceptional.Middleware.RequestBodyLoggingMiddleware
 Themia.Exceptional.Middleware.RequestBodyLoggingMiddleware.InvokeAsync(Microsoft.AspNetCore.Http.HttpContext! context) -> System.Threading.Tasks.Task!
 Themia.Exceptional.Middleware.RequestBodyLoggingMiddleware.RequestBodyLoggingMiddleware(Microsoft.AspNetCore.Http.RequestDelegate! next, Themia.Exceptional.ExceptionalOptions! options) -> void
+Themia.Exceptional.Migrations.AddRequestContextColumn
+Themia.Exceptional.Migrations.AddRequestContextColumn.AddRequestContextColumn() -> void
 Themia.Exceptional.Migrations.ExceptionLogMigration
 Themia.Exceptional.Migrations.ExceptionLogMigration.ExceptionLogMigration() -> void
 Themia.Exceptional.PagedResult<T>

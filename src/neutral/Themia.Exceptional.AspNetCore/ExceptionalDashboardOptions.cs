@@ -22,4 +22,12 @@ public sealed class ExceptionalDashboardOptions
     /// behind <see cref="Authorize"/>). Request bodies can contain secrets/PII; prefer scrubbing them at
     /// capture time, and set this to <c>false</c> if even authorized viewers should not see them.</summary>
     public bool ShowRequestBody { get; set; } = true;
+
+    /// <summary>Whether protect/delete actions (POST) are exposed in the UI and accepted. Default <c>true</c>.
+    /// Still gated by <see cref="Authorize"/> and a same-origin double-submit token.</summary>
+    public bool EnableActions { get; set; } = true;
+
+    /// <summary>Whether the detail view renders the captured request-context sections (headers/cookies/
+    /// query/form/server variables) when present. Default <c>true</c>.</summary>
+    public bool ShowRequestContext { get; set; } = true;
 }

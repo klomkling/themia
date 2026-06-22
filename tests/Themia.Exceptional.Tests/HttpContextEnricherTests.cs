@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.AspNetCore.Http;
 using Serilog.Core;
 using Serilog.Events;
@@ -138,6 +139,69 @@ public class HttpContextEnricherTests
         enricher.Enrich(evt, new LogEventPropertyFactory());
 
         Assert.False(evt.Properties.ContainsKey("StatusCode"));
+    }
+
+    [Fact]
+    public void Captures_Headers_Redacted_WhenEnabled()
+    {
+        var http = new DefaultHttpContext();
+        http.Request.Headers["User-Agent"] = "Edge";
+        http.Request.Headers["Authorization"] = "Bearer secret";
+        var accessor = new HttpContextAccessor { HttpContext = http };
+        var options = new ExceptionalOptions { ApplicationName = "App", CaptureRequestContext = true };
+        var enricher = new HttpContextEnricher(accessor, options);
+        var evt = NewEvent();
+
+        enricher.Enrich(evt, new LogEventPropertyFactory());
+
+        Assert.True(evt.Properties.TryGetValue("RequestContext", out var prop));
+        var json = Assert.IsType<ScalarValue>(prop).Value as string;
+        Assert.NotNull(json);
+        using var doc = JsonDocument.Parse(json!);
+        var headers = doc.RootElement.GetProperty("headers");
+        Assert.Equal("Edge", headers.GetProperty("User-Agent").GetString());
+        Assert.Equal("***", headers.GetProperty("Authorization").GetString());
+    }
+
+    [Fact]
+    public void Enricher_DropsEntry_WhenRedactorReturnsNull()
+    {
+        var http = new DefaultHttpContext();
+        http.Request.Headers["drop-me"] = "x";
+        http.Request.Headers["keep-me"] = "y";
+        var accessor = new HttpContextAccessor { HttpContext = http };
+        var options = new ExceptionalOptions
+        {
+            ApplicationName = "App",
+            CaptureRequestContext = true,
+            Redactor = (key, value) => key == "drop-me" ? null : value,
+        };
+        var enricher = new HttpContextEnricher(accessor, options);
+        var evt = NewEvent();
+
+        enricher.Enrich(evt, new LogEventPropertyFactory());
+
+        var json = Assert.IsType<ScalarValue>(evt.Properties["RequestContext"]).Value as string;
+        Assert.NotNull(json);
+        using var doc = JsonDocument.Parse(json!);
+        var headers = doc.RootElement.GetProperty("headers");
+        Assert.False(headers.TryGetProperty("drop-me", out _));
+        Assert.Equal("y", headers.GetProperty("keep-me").GetString());
+    }
+
+    [Fact]
+    public void NoRequestContext_WhenDisabled()
+    {
+        var http = new DefaultHttpContext();
+        http.Request.Headers["User-Agent"] = "Edge";
+        var accessor = new HttpContextAccessor { HttpContext = http };
+        var enricher = new HttpContextEnricher(accessor,
+            new ExceptionalOptions { ApplicationName = "App", CaptureRequestContext = false });
+        var evt = NewEvent();
+
+        enricher.Enrich(evt, new LogEventPropertyFactory());
+
+        Assert.False(evt.Properties.ContainsKey("RequestContext"));
     }
 
     [Fact]

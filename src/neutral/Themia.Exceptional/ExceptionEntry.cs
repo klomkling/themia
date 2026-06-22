@@ -65,4 +65,8 @@ public sealed class ExceptionEntry
 
     /// <summary>Captured request body, when the request-body middleware is enabled.</summary>
     public string? RequestBody { get; set; }
+
+    /// <summary>Captured request context (headers/cookies/query/form/server variables) as a JSON
+    /// document, when request-context capture is enabled. Redacted at capture time.</summary>
+    public string? RequestContext { get; set; }
 }

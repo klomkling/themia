@@ -55,6 +55,7 @@ public sealed class ExceptionalSerilogSink : ILogEventSink
         entry.IpAddress = Read(logEvent, "IpAddress");
         entry.TenantId = Read(logEvent, "TenantId");
         entry.RequestBody = Read(logEvent, "RequestBody");
+        entry.RequestContext = Read(logEvent, "RequestContext");
         if (logEvent.Properties.TryGetValue("StatusCode", out var sc) && sc is ScalarValue { Value: int code })
             entry.StatusCode = code;
     }
