@@ -141,3 +141,11 @@ Themia.Modules.Notifications.Outbox.INotificationsSqlDialect.ClaimAsync(System.D
 Themia.Modules.Notifications.Outbox.INotificationsSqlDialect.CompleteAsync(System.Data.Common.DbConnection! connection, System.Guid id, System.DateTimeOffset sentAt, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!
 Themia.Modules.Notifications.Outbox.INotificationsSqlDialect.CreateConnection() -> System.Data.Common.DbConnection!
 Themia.Modules.Notifications.Outbox.INotificationsSqlDialect.FailAsync(System.Data.Common.DbConnection! connection, System.Guid id, int attempts, System.DateTimeOffset nextAttemptAt, bool dead, string! error, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!
+Themia.Modules.Notifications.Dispatch.IPreferenceResolver
+Themia.Modules.Notifications.Dispatch.IPreferenceResolver.ResolveAsync(string! userId, System.Collections.Generic.IReadOnlyList<Themia.Notifications.NotificationChannel>! requested, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Notifications.Dispatch.ResolvedPreferences!>!
+Themia.Modules.Notifications.Dispatch.ResolvedPreferences
+Themia.Modules.Notifications.Dispatch.ResolvedPreferences.ResolvedPreferences(System.Collections.Generic.IReadOnlyList<Themia.Notifications.NotificationChannel>! EnabledChannels, string? Locale) -> void
+Themia.Modules.Notifications.Dispatch.ResolvedPreferences.EnabledChannels.get -> System.Collections.Generic.IReadOnlyList<Themia.Notifications.NotificationChannel>!
+Themia.Modules.Notifications.Dispatch.ResolvedPreferences.EnabledChannels.init -> void
+Themia.Modules.Notifications.Dispatch.ResolvedPreferences.Locale.get -> string?
+Themia.Modules.Notifications.Dispatch.ResolvedPreferences.Locale.init -> void
