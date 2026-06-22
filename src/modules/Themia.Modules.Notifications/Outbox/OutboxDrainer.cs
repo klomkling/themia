@@ -34,7 +34,7 @@ internal sealed class OutboxDrainer(
                 int drained;
                 do
                 {
-                    drained = await DrainOnceAsync(stoppingToken);
+                    drained = await DrainOnceAsync(stoppingToken).ConfigureAwait(false);
                 }
                 while (drained == options.MaxBatchSize && !stoppingToken.IsCancellationRequested); // keep draining a full batch
 
@@ -43,7 +43,7 @@ internal sealed class OutboxDrainer(
                 pollCts.CancelAfter(TimeSpan.FromSeconds(options.DrainIntervalSeconds));
                 try
                 {
-                    await signal.WaitAsync(pollCts.Token);
+                    await signal.WaitAsync(pollCts.Token).ConfigureAwait(false);
                 }
                 catch (OperationCanceledException) when (!stoppingToken.IsCancellationRequested)
                 {
@@ -59,7 +59,7 @@ internal sealed class OutboxDrainer(
                 logger.LogError(ex, "Outbox drain cycle failed; backing off before retry.");
                 try
                 {
-                    await Task.Delay(TimeSpan.FromSeconds(options.DrainIntervalSeconds), stoppingToken);
+                    await Task.Delay(TimeSpan.FromSeconds(options.DrainIntervalSeconds), stoppingToken).ConfigureAwait(false);
                 }
                 catch (OperationCanceledException)
                 {
@@ -74,10 +74,13 @@ internal sealed class OutboxDrainer(
     {
         var now = time.GetUtcNow();
         var leaseExpires = now.AddSeconds(options.LeaseSeconds);
+        // ponytail: one drain connection held across the batch's sends — fine for a single drainer
+        // (one open connection at a time); if multiple drainers or slow providers make
+        // connection-hold-time matter, claim+close then reopen per result.
         await using var connection = dialect.CreateConnection();
-        await connection.OpenAsync(ct);
+        await connection.OpenAsync(ct).ConfigureAwait(false);
 
-        var claimed = await dialect.ClaimAsync(connection, leaseOwner, now, leaseExpires, options.MaxBatchSize, ct);
+        var claimed = await dialect.ClaimAsync(connection, leaseOwner, now, leaseExpires, options.MaxBatchSize, ct).ConfigureAwait(false);
         if (claimed.Count == 0)
         {
             return 0;
@@ -87,7 +90,7 @@ internal sealed class OutboxDrainer(
         foreach (var row in claimed)
         {
             ct.ThrowIfCancellationRequested();
-            await DeliverAsync(scope.ServiceProvider, connection, row, ct);
+            await DeliverAsync(scope.ServiceProvider, connection, row, ct).ConfigureAwait(false);
         }
 
         return claimed.Count;
@@ -105,13 +108,13 @@ internal sealed class OutboxDrainer(
                 Body = row.Body, // already rendered at enqueue
             };
 
-            var result = await SendAsync(sp, message, ct);
+            var result = await SendAsync(sp, message, ct).ConfigureAwait(false);
             if (!result.Succeeded)
             {
                 throw new InvalidOperationException(result.Error ?? "Sender reported failure.");
             }
 
-            await dialect.CompleteAsync(connection, row.Id, time.GetUtcNow(), ct);
+            await dialect.CompleteAsync(connection, row.Id, time.GetUtcNow(), ct).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
@@ -120,11 +123,11 @@ internal sealed class OutboxDrainer(
         catch (FormatException ex)
         {
             // A malformed address/body is permanent — retrying cannot help, so dead-letter immediately.
-            await FailRowAsync(connection, row, permanent: true, ex, ct);
+            await FailRowAsync(connection, row, permanent: true, ex, ct).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
-            await FailRowAsync(connection, row, permanent: false, ex, ct);
+            await FailRowAsync(connection, row, permanent: false, ex, ct).ConfigureAwait(false);
         }
     }
 
@@ -132,9 +135,9 @@ internal sealed class OutboxDrainer(
     private static async Task<NotificationResult> SendAsync(IServiceProvider sp, NotificationMessage message, CancellationToken ct) =>
         message.Channel switch
         {
-            NotificationChannel.Email => await sp.GetRequiredService<IEmailSender>().SendAsync(message, ct),
-            NotificationChannel.Sms => await sp.GetRequiredService<ISmsSender>().SendAsync(message, ct),
-            NotificationChannel.Push => await sp.GetRequiredService<IPushSender>().SendAsync(message, ct),
+            NotificationChannel.Email => await sp.GetRequiredService<IEmailSender>().SendAsync(message, ct).ConfigureAwait(false),
+            NotificationChannel.Sms => await sp.GetRequiredService<ISmsSender>().SendAsync(message, ct).ConfigureAwait(false),
+            NotificationChannel.Push => await sp.GetRequiredService<IPushSender>().SendAsync(message, ct).ConfigureAwait(false),
             _ => throw new NotSupportedException($"Channel {message.Channel} is not deliverable via the outbox."),
         };
 
@@ -154,7 +157,7 @@ internal sealed class OutboxDrainer(
             attempts,
             dead ? "dead-lettered" : "will retry");
 
-        await dialect.FailAsync(connection, row.Id, attempts, next, dead, Truncate(ex.Message, MaxErrorLength), ct);
+        await dialect.FailAsync(connection, row.Id, attempts, next, dead, Truncate(ex.Message, MaxErrorLength), ct).ConfigureAwait(false);
     }
 
     private static string Truncate(string s, int max) => s.Length <= max ? s : s[..max];

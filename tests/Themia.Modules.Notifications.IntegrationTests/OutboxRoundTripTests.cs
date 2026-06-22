@@ -96,6 +96,24 @@ public sealed class OutboxRoundTripTests : IAsyncLifetime
         Assert.Equal(MaxAttempts, recorder.Attempts);
     }
 
+    [Fact]
+    public async Task Sender_throwing_FormatException_dead_letters_immediately_without_retry()
+    {
+        var sender = new ThrowingEmailSender(new FormatException("malformed recipient address"));
+        await using var provider = BuildProvider(sender);
+
+        var id = await EnqueueEmailAsync(provider, "not-an-address", "Hi", "Body");
+
+        var drainer = CreateDrainer(provider);
+        await DrainAsync(drainer);
+
+        Assert.Equal(1, sender.Attempts);
+
+        var (status, attempts, _) = await ReadRowAsync(id);
+        Assert.Equal((int)OutboxStatus.Dead, status); // 4 — permanent, no retry
+        Assert.Equal(1, attempts);
+    }
+
     private const int MaxAttempts = 3;
 
     private ServiceProvider BuildProvider(IEmailSender emailSender)
@@ -204,6 +222,17 @@ public sealed class OutboxRoundTripTests : IAsyncLifetime
 
             Sent.Add(message);
             return Task.FromResult(NotificationResult.Success());
+        }
+    }
+
+    private sealed class ThrowingEmailSender(Exception toThrow) : IEmailSender
+    {
+        public int Attempts { get; private set; }
+
+        public Task<NotificationResult> SendAsync(NotificationMessage message, CancellationToken cancellationToken = default)
+        {
+            Attempts++;
+            throw toThrow;
         }
     }
 }

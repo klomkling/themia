@@ -18,5 +18,5 @@ public sealed class DrainSignal
     /// <summary>Completes when a signal is available or the token cancels.</summary>
     /// <param name="ct">A token that cancels the wait.</param>
     /// <returns>A task that completes once a signal has been read.</returns>
-    public async Task WaitAsync(CancellationToken ct) => await channel.Reader.ReadAsync(ct);
+    public async Task WaitAsync(CancellationToken ct) => await channel.Reader.ReadAsync(ct).ConfigureAwait(false);
 }
