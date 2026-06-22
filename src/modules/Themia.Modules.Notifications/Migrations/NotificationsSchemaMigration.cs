@@ -14,8 +14,9 @@ public sealed class NotificationsSchemaMigration : Migration
     private const string SchemaName = "notifications";
 
     /// <summary>Maps a datetime column to the engine-appropriate type. MySQL's FluentMigrator generator
-    /// does not support <c>DateTimeOffset</c>, so each engine uses its own timestamp type (mirrors the
-    /// established convention in <c>ExceptionLogMigration</c>).</summary>
+    /// does not support <c>DateTimeOffset</c>, so MySQL uses <c>DATETIME(6)</c> while PostgreSQL and SQL
+    /// Server use <c>datetimeoffset</c> — the latter chosen over <c>ExceptionLogMigration</c>'s
+    /// <c>datetime2</c> on SQL Server to preserve timezone fidelity for the lease/scheduling columns.</summary>
     private delegate ICreateTableColumnOptionOrWithColumnSyntax DateTimeType(ICreateTableColumnAsTypeSyntax column);
 
     /// <inheritdoc />
