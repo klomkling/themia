@@ -63,3 +63,5 @@ Themia.Notifications.Providers.HttpSmsSenderBase.HttpSmsSenderBase(System.Net.Ht
 abstract Themia.Notifications.Providers.HttpSmsSenderBase.BuildRequest(Themia.Notifications.NotificationMessage! message) -> System.Net.Http.HttpRequestMessage!
 abstract Themia.Notifications.Providers.HttpSmsSenderBase.Interpret(System.Net.HttpStatusCode status, string! responseBody) -> Themia.Notifications.NotificationResult!
 Themia.Notifications.Providers.HttpSmsSenderBase.SendAsync(Themia.Notifications.NotificationMessage! message, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Notifications.NotificationResult!>!
+Microsoft.Extensions.DependencyInjection.ThemiaNotificationsServiceCollectionExtensions
+static Microsoft.Extensions.DependencyInjection.ThemiaNotificationsServiceCollectionExtensions.AddThemiaNotifications(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Themia.Notifications.ThemiaNotificationsOptions!>? configure = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
