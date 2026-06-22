@@ -169,3 +169,5 @@ Themia.Modules.Notifications.Dispatch.NotificationRequest.Model.get -> object?
 Themia.Modules.Notifications.Dispatch.NotificationRequest.Model.init -> void
 Themia.Modules.Notifications.Dispatch.NotificationRequest.ScheduledFor.get -> System.DateTimeOffset?
 Themia.Modules.Notifications.Dispatch.NotificationRequest.ScheduledFor.init -> void
+Themia.Modules.Notifications.Config.IProviderConfigResolver
+Themia.Modules.Notifications.Config.IProviderConfigResolver.ResolveAsync(Themia.Notifications.NotificationChannel channel, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Notifications.Entities.TenantProviderConfig?>!
