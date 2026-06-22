@@ -27,6 +27,17 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.6.2] - 2026-06-22
+
+### Added
+- `Themia.Notifications` — neutral notification sending core. `NotificationMessage` model, channel
+  senders (`IEmailSender` / `ISmsSender` / `IPushSender` seam), an `INotificationTemplateRenderer`
+  (Handlebars.Net, used directly — no PuppeteerSharp/Chromium coupling), an SMTP email provider
+  (`SmtpEmailSender` + `SmtpEmailOptions`, `System.Net.Mail`), an HTTP-SMS provider base
+  (`HttpSmsSenderBase`), logger dev stubs, and an `AddThemiaNotifications` DI extension. Targets
+  `net8.0;net10.0`. First slice of the Notifications module (the tenant-aware outbox/dispatcher follows
+  in `Themia.Modules.Notifications`).
+
 ## [0.6.1] - 2026-06-22
 
 ### Added

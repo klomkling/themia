@@ -1,0 +1,68 @@
+#nullable enable
+Themia.Notifications.NotificationChannel
+Themia.Notifications.NotificationChannel.Email = 0 -> Themia.Notifications.NotificationChannel
+Themia.Notifications.NotificationChannel.Sms = 1 -> Themia.Notifications.NotificationChannel
+Themia.Notifications.NotificationChannel.InApp = 2 -> Themia.Notifications.NotificationChannel
+Themia.Notifications.NotificationChannel.Push = 3 -> Themia.Notifications.NotificationChannel
+Themia.Notifications.NotificationMessage
+Themia.Notifications.NotificationMessage.NotificationMessage() -> void
+Themia.Notifications.NotificationMessage.Channel.get -> Themia.Notifications.NotificationChannel
+Themia.Notifications.NotificationMessage.Channel.init -> void
+Themia.Notifications.NotificationMessage.Recipient.get -> string!
+Themia.Notifications.NotificationMessage.Recipient.init -> void
+Themia.Notifications.NotificationMessage.Subject.get -> string?
+Themia.Notifications.NotificationMessage.Subject.init -> void
+Themia.Notifications.NotificationMessage.Body.get -> string?
+Themia.Notifications.NotificationMessage.Body.init -> void
+Themia.Notifications.NotificationMessage.Template.get -> string?
+Themia.Notifications.NotificationMessage.Template.init -> void
+Themia.Notifications.NotificationMessage.Model.get -> object?
+Themia.Notifications.NotificationMessage.Model.init -> void
+Themia.Notifications.NotificationMessage.Metadata.get -> System.Collections.Generic.IReadOnlyDictionary<string!, string!>?
+Themia.Notifications.NotificationMessage.Metadata.init -> void
+Themia.Notifications.NotificationResult
+Themia.Notifications.NotificationResult.Succeeded.get -> bool
+Themia.Notifications.NotificationResult.ProviderMessageId.get -> string?
+Themia.Notifications.NotificationResult.Error.get -> string?
+static Themia.Notifications.NotificationResult.Success(string? providerMessageId = null) -> Themia.Notifications.NotificationResult!
+static Themia.Notifications.NotificationResult.Failure(string! error) -> Themia.Notifications.NotificationResult!
+Themia.Notifications.INotificationTemplateRenderer
+Themia.Notifications.INotificationTemplateRenderer.Render(string! template, object! model) -> string!
+Themia.Notifications.ThemiaNotificationsOptions
+Themia.Notifications.ThemiaNotificationsOptions.ThemiaNotificationsOptions() -> void
+Themia.Notifications.ThemiaNotificationsOptions.ConfigureHandlebars.get -> System.Action<HandlebarsDotNet.IHandlebars!>?
+Themia.Notifications.ThemiaNotificationsOptions.ConfigureHandlebars.set -> void
+Themia.Notifications.IEmailSender
+Themia.Notifications.IEmailSender.SendAsync(Themia.Notifications.NotificationMessage! message, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Notifications.NotificationResult!>!
+Themia.Notifications.ISmsSender
+Themia.Notifications.ISmsSender.SendAsync(Themia.Notifications.NotificationMessage! message, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Notifications.NotificationResult!>!
+Themia.Notifications.IPushSender
+Themia.Notifications.IPushSender.SendAsync(Themia.Notifications.NotificationMessage! message, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Notifications.NotificationResult!>!
+Themia.Notifications.Providers.SmtpEmailOptions
+Themia.Notifications.Providers.SmtpEmailOptions.SmtpEmailOptions() -> void
+Themia.Notifications.Providers.SmtpEmailOptions.Host.get -> string!
+Themia.Notifications.Providers.SmtpEmailOptions.Host.set -> void
+Themia.Notifications.Providers.SmtpEmailOptions.Port.get -> int
+Themia.Notifications.Providers.SmtpEmailOptions.Port.set -> void
+Themia.Notifications.Providers.SmtpEmailOptions.UseSsl.get -> bool
+Themia.Notifications.Providers.SmtpEmailOptions.UseSsl.set -> void
+Themia.Notifications.Providers.SmtpEmailOptions.UserName.get -> string?
+Themia.Notifications.Providers.SmtpEmailOptions.UserName.set -> void
+Themia.Notifications.Providers.SmtpEmailOptions.Password.get -> string?
+Themia.Notifications.Providers.SmtpEmailOptions.Password.set -> void
+Themia.Notifications.Providers.SmtpEmailOptions.FromAddress.get -> string!
+Themia.Notifications.Providers.SmtpEmailOptions.FromAddress.set -> void
+Themia.Notifications.Providers.SmtpEmailOptions.FromDisplayName.get -> string?
+Themia.Notifications.Providers.SmtpEmailOptions.FromDisplayName.set -> void
+Themia.Notifications.Providers.SmtpEmailOptions.IsBodyHtml.get -> bool
+Themia.Notifications.Providers.SmtpEmailOptions.IsBodyHtml.set -> void
+Themia.Notifications.Providers.SmtpEmailOptions.PickupDirectory.get -> string?
+Themia.Notifications.Providers.SmtpEmailOptions.PickupDirectory.set -> void
+Themia.Notifications.Providers.HttpSmsSenderBase
+Themia.Notifications.Providers.HttpSmsSenderBase.HttpSmsSenderBase(System.Net.Http.HttpClient! httpClient) -> void
+abstract Themia.Notifications.Providers.HttpSmsSenderBase.BuildRequest(Themia.Notifications.NotificationMessage! message) -> System.Net.Http.HttpRequestMessage!
+abstract Themia.Notifications.Providers.HttpSmsSenderBase.Interpret(System.Net.HttpStatusCode status, string! responseBody) -> Themia.Notifications.NotificationResult!
+Themia.Notifications.Providers.HttpSmsSenderBase.SendAsync(Themia.Notifications.NotificationMessage! message, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Notifications.NotificationResult!>!
+Microsoft.Extensions.DependencyInjection.ThemiaNotificationsServiceCollectionExtensions
+static Microsoft.Extensions.DependencyInjection.ThemiaNotificationsServiceCollectionExtensions.AddThemiaNotifications(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Themia.Notifications.ThemiaNotificationsOptions!>? configure = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static Microsoft.Extensions.DependencyInjection.ThemiaNotificationsServiceCollectionExtensions.AddThemiaSmtpEmailSender(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Themia.Notifications.Providers.SmtpEmailOptions!>! configure) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
