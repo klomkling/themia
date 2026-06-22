@@ -12,6 +12,10 @@ Themia.Modules.Notifications.NotificationsModuleOptions.MaxAttempts.set -> void
 Themia.Modules.Notifications.NotificationsModuleOptions.LeaseSeconds.get -> int
 Themia.Modules.Notifications.NotificationsModuleOptions.LeaseSeconds.set -> void
 Themia.Modules.Notifications.NotificationsModuleOptions.Validate() -> void
+Themia.Modules.Notifications.Outbox.DrainSignal
+Themia.Modules.Notifications.Outbox.DrainSignal.DrainSignal() -> void
+Themia.Modules.Notifications.Outbox.DrainSignal.Signal() -> void
+Themia.Modules.Notifications.Outbox.DrainSignal.WaitAsync(System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!
 Themia.Modules.Notifications.Entities.OutboxStatus
 Themia.Modules.Notifications.Entities.OutboxStatus.Pending = 0 -> Themia.Modules.Notifications.Entities.OutboxStatus
 Themia.Modules.Notifications.Entities.OutboxStatus.Sending = 1 -> Themia.Modules.Notifications.Entities.OutboxStatus
