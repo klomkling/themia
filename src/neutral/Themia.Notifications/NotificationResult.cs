@@ -22,6 +22,11 @@ public sealed class NotificationResult
     /// <summary>Creates a success result.</summary>
     public static NotificationResult Success(string? providerMessageId = null) => new(true, providerMessageId, null);
 
-    /// <summary>Creates a failure result.</summary>
-    public static NotificationResult Failure(string error) => new(false, null, error);
+    /// <summary>Creates a failure result. Built-in senders throw on provider failure instead; this is
+    /// for custom senders that represent a provider rejection as a result rather than an exception.</summary>
+    public static NotificationResult Failure(string error)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(error);
+        return new(false, null, error);
+    }
 }

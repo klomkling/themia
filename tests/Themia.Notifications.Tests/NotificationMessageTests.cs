@@ -34,4 +34,8 @@ public sealed class NotificationMessageTests
         Assert.False(bad.Succeeded);
         Assert.Equal("smtp down", bad.Error);
     }
+
+    [Fact]
+    public void Result_Failure_RejectsEmptyError()
+        => Assert.Throws<System.ArgumentException>(() => NotificationResult.Failure(""));
 }

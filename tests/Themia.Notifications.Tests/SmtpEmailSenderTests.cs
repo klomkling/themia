@@ -92,6 +92,25 @@ public sealed class SmtpEmailSenderTests
     }
 
     [Fact]
+    public async Task Send_EmptyBodyAndTemplate_SendsEmptyBody()
+    {
+        var dir = Directory.CreateTempSubdirectory("themia-smtp-").FullName;
+        try
+        {
+            var sut = new SmtpEmailSender(
+                new SmtpEmailOptions { Host = "localhost", FromAddress = "noreply@themia.test", PickupDirectory = dir },
+                new HandlebarsNotificationRenderer(new ThemiaNotificationsOptions()));
+
+            var r = await sut.SendAsync(new NotificationMessage
+            { Channel = NotificationChannel.Email, Recipient = "u@e.com", Subject = "Hi" });  // no Body, no Template
+
+            Assert.True(r.Succeeded);
+            Assert.Single(Directory.EnumerateFiles(dir, "*.eml"));
+        }
+        finally { Directory.Delete(dir, recursive: true); }
+    }
+
+    [Fact]
     public async Task Send_NullMessage_Throws()
     {
         var sut = new SmtpEmailSender(new SmtpEmailOptions { Host = "localhost", FromAddress = "x@y.z" },

@@ -42,6 +42,10 @@ public static class ThemiaNotificationsServiceCollectionExtensions
 
         var options = new SmtpEmailOptions();
         configure(options);
+        ArgumentException.ThrowIfNullOrWhiteSpace(options.FromAddress);
+        // Host is required for real delivery; ignored only when writing to a pickup directory (dev/test).
+        if (string.IsNullOrWhiteSpace(options.PickupDirectory))
+            ArgumentException.ThrowIfNullOrWhiteSpace(options.Host);
         services.Replace(ServiceDescriptor.Singleton(options));
         services.Replace(ServiceDescriptor.Singleton<IEmailSender, SmtpEmailSender>());
         return services;

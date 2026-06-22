@@ -63,6 +63,11 @@ public sealed class ThemiaNotificationsServiceCollectionExtensionsTests
         Assert.NotNull(sp.GetRequiredService<INotificationTemplateRenderer>());
     }
 
+    [Fact]
+    public void AddThemiaSmtpEmailSender_RejectsEmptyFromAddress()
+        => Assert.Throws<System.ArgumentException>(() =>
+            new ServiceCollection().AddLogging().AddThemiaSmtpEmailSender(o => { o.Host = "smtp.test"; /* no FromAddress */ }));
+
     private sealed class FakeEmail : IEmailSender
     {
         public Task<NotificationResult> SendAsync(NotificationMessage m, CancellationToken ct = default) => Task.FromResult(NotificationResult.Success());

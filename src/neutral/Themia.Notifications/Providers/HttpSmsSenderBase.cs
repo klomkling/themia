@@ -5,6 +5,10 @@ namespace Themia.Notifications.Providers;
 /// <summary>Base for HTTP-based SMS providers. Subclasses build the provider request and interpret the
 /// response; this base owns the POST + read. Reuse one <see cref="HttpClient"/> (e.g. via
 /// <c>IHttpClientFactory</c>) per the .NET HttpClient guidance.</summary>
+/// <remarks>This base does not throw on a non-success HTTP status; it passes the status and body to
+/// <see cref="Interpret"/>, which decides whether a failed status becomes a
+/// <see cref="NotificationResult.Failure"/> or (for a provider/transport failure a subclass cannot
+/// represent) an exception.</remarks>
 public abstract class HttpSmsSenderBase(HttpClient httpClient) : ISmsSender
 {
     /// <summary>Builds the provider-specific HTTP request for <paramref name="message"/>.</summary>
