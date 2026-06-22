@@ -1,5 +1,7 @@
 #nullable enable
 const Themia.Exceptional.Middleware.RequestBodyLoggingMiddleware.BodyItemKey = "Themia.Exceptional.RequestBody" -> string!
+override Themia.Exceptional.Migrations.AddRequestContextColumn.Down() -> void
+override Themia.Exceptional.Migrations.AddRequestContextColumn.Up() -> void
 override Themia.Exceptional.Migrations.ExceptionLogMigration.Down() -> void
 override Themia.Exceptional.Migrations.ExceptionLogMigration.Up() -> void
 static Themia.Exceptional.ExceptionEntryFactory.FromException(System.Exception! exception, string! applicationName, System.DateTime? utcNow = null) -> Themia.Exceptional.ExceptionEntry!
@@ -134,6 +136,8 @@ Themia.Exceptional.IExceptionStore.PurgeAsync(System.DateTime olderThanUtc, Syst
 Themia.Exceptional.Middleware.RequestBodyLoggingMiddleware
 Themia.Exceptional.Middleware.RequestBodyLoggingMiddleware.InvokeAsync(Microsoft.AspNetCore.Http.HttpContext! context) -> System.Threading.Tasks.Task!
 Themia.Exceptional.Middleware.RequestBodyLoggingMiddleware.RequestBodyLoggingMiddleware(Microsoft.AspNetCore.Http.RequestDelegate! next, Themia.Exceptional.ExceptionalOptions! options) -> void
+Themia.Exceptional.Migrations.AddRequestContextColumn
+Themia.Exceptional.Migrations.AddRequestContextColumn.AddRequestContextColumn() -> void
 Themia.Exceptional.Migrations.ExceptionLogMigration
 Themia.Exceptional.Migrations.ExceptionLogMigration.ExceptionLogMigration() -> void
 Themia.Exceptional.PagedResult<T>
