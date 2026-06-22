@@ -8,7 +8,7 @@ internal sealed class LoggerSmsSender(ILogger<LoggerSmsSender> logger) : ISmsSen
     public Task<NotificationResult> SendAsync(NotificationMessage message, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(message);
-        logger.LogInformation("Themia.Notifications (logger sms): to {Recipient}", message.Recipient);
+        logger.LogInformation("Themia.Notifications (logger sms): to {Recipient}", RecipientRedaction.Mask(message.Recipient));
         return Task.FromResult(NotificationResult.Success());
     }
 }

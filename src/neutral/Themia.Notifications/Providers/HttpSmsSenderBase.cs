@@ -17,9 +17,12 @@ public abstract class HttpSmsSenderBase(HttpClient httpClient) : ISmsSender
     public async Task<NotificationResult> SendAsync(NotificationMessage message, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(message);
+        cancellationToken.ThrowIfCancellationRequested();
         using var request = BuildRequest(message);
+        ArgumentNullException.ThrowIfNull(request);
         using var response = await httpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
         var body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-        return Interpret(response.StatusCode, body);
+        var result = Interpret(response.StatusCode, body);
+        return result ?? throw new InvalidOperationException($"{GetType().Name}.Interpret returned null.");
     }
 }

@@ -51,6 +51,18 @@ public sealed class ThemiaNotificationsServiceCollectionExtensionsTests
         Assert.Single(sp.GetServices<IEmailSender>());   // Replace removed the logger default
     }
 
+    [Fact]
+    public void AddThemiaSmtpEmailSender_AloneResolvesSmtpSender()
+    {
+        // Without a prior AddThemiaNotifications, the renderer must still be present.
+        var sp = new ServiceCollection().AddLogging()
+            .AddThemiaSmtpEmailSender(o => { o.Host = "localhost"; o.FromAddress = "x@y.z"; })
+            .BuildServiceProvider();
+
+        Assert.IsType<Themia.Notifications.Providers.SmtpEmailSender>(sp.GetRequiredService<IEmailSender>());
+        Assert.NotNull(sp.GetRequiredService<INotificationTemplateRenderer>());
+    }
+
     private sealed class FakeEmail : IEmailSender
     {
         public Task<NotificationResult> SendAsync(NotificationMessage m, CancellationToken ct = default) => Task.FromResult(NotificationResult.Success());

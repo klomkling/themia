@@ -67,6 +67,31 @@ public sealed class SmtpEmailSenderTests
     }
 
     [Fact]
+    public async Task Send_RendersSubjectTemplate_WhenModelNull_NoTokenLeak()
+    {
+        var dir = Directory.CreateTempSubdirectory("themia-smtp-").FullName;
+        try
+        {
+            var sut = new SmtpEmailSender(
+                new SmtpEmailOptions { Host = "localhost", FromAddress = "noreply@themia.test", PickupDirectory = dir },
+                new HandlebarsNotificationRenderer(new ThemiaNotificationsOptions()));
+
+            await sut.SendAsync(new NotificationMessage
+            {
+                Channel = NotificationChannel.Email,
+                Recipient = "u@e.com",
+                Subject = "Order {{id}} shipped",
+                Body = "<p>x</p>",
+                Model = null,   // templated subject, no model
+            });
+
+            var text = await File.ReadAllTextAsync(Directory.EnumerateFiles(dir, "*.eml").Single());
+            Assert.DoesNotContain("{{", text);   // tokens must not leak to the recipient
+        }
+        finally { Directory.Delete(dir, recursive: true); }
+    }
+
+    [Fact]
     public async Task Send_NullMessage_Throws()
     {
         var sut = new SmtpEmailSender(new SmtpEmailOptions { Host = "localhost", FromAddress = "x@y.z" },

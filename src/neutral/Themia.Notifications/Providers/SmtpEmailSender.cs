@@ -17,9 +17,8 @@ internal sealed class SmtpEmailSender(SmtpEmailOptions options, INotificationTem
             ? renderer.Render(message.Template, message.Model ?? new { })
             : string.Empty);
 
-        var subject = message.Subject is not null && message.Model is not null
-                      && message.Subject.Contains("{{", StringComparison.Ordinal)
-            ? renderer.Render(message.Subject, message.Model)
+        var subject = message.Subject is not null && message.Subject.Contains("{{", StringComparison.Ordinal)
+            ? renderer.Render(message.Subject, message.Model ?? new { })
             : message.Subject ?? string.Empty;
 
         using var mail = new MailMessage

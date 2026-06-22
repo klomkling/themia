@@ -35,10 +35,14 @@ public static class ThemiaNotificationsServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(configure);
 
+        // Ensure the renderer SmtpEmailSender depends on exists even if AddThemiaNotifications wasn't
+        // called first; TryAdd means a host-configured renderer/options still win.
+        services.TryAddSingleton(new ThemiaNotificationsOptions());
+        services.TryAddSingleton<INotificationTemplateRenderer, HandlebarsNotificationRenderer>();
+
         var options = new SmtpEmailOptions();
         configure(options);
-        services.AddSingleton(options);
-        // Replace so SMTP wins over the TryAdd logger default regardless of call order.
+        services.Replace(ServiceDescriptor.Singleton(options));
         services.Replace(ServiceDescriptor.Singleton<IEmailSender, SmtpEmailSender>());
         return services;
     }

@@ -8,7 +8,7 @@ internal sealed class LoggerEmailSender(ILogger<LoggerEmailSender> logger) : IEm
     public Task<NotificationResult> SendAsync(NotificationMessage message, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(message);
-        logger.LogInformation("Themia.Notifications (logger email): to {Recipient} subject {Subject}", message.Recipient, message.Subject);
+        logger.LogInformation("Themia.Notifications (logger email): to {Recipient} subject {Subject}", RecipientRedaction.Mask(message.Recipient), message.Subject);
         return Task.FromResult(NotificationResult.Success());
     }
 }
