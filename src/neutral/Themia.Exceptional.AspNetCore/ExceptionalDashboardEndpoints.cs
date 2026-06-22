@@ -58,7 +58,7 @@ public static class ExceptionalDashboardEndpoints
 
         var filter = BuildFilter(ctx.Request.Query, options);
         var result = await store.ListAsync(filter, ct).ConfigureAwait(false);
-        await WriteHtmlAsync(ctx, DashboardHtml.List(options.Title, path, result.Items, result.Total, filter), ct).ConfigureAwait(false);
+        await WriteHtmlAsync(ctx, DashboardHtml.List(options.Title, path, result.Items, result.Total, filter, DateTime.UtcNow), ct).ConfigureAwait(false);
     }
 
     private static async Task HandleDetailAsync(HttpContext ctx, IExceptionStore store, ExceptionalDashboardOptions options, string path, Guid guid, CancellationToken ct)

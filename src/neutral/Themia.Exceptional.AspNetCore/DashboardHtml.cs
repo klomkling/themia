@@ -19,12 +19,15 @@ internal static class DashboardHtml
         "<!doctype html><html><head><meta charset=\"utf-8\"><title>" + Enc(title) +
         "</title><link rel=\"stylesheet\" href=\"" + Enc(path) + "/dashboard.css\"></head><body>" + body + "</body></html>";
 
-    internal static string List(string title, string path, IReadOnlyList<ExceptionEntry> items, int total, ExceptionFilter filter)
+    internal static string List(string title, string path, IReadOnlyList<ExceptionEntry> items, int total, ExceptionFilter filter, DateTime utcNow)
     {
         var sb = new StringBuilder();
         sb.Append("<h1>").Append(Enc(title)).Append("</h1>");
 
-        sb.Append("<form method=\"get\" action=\"").Append(Enc(path)).Append("\">")
+        var last = items.Count > 0 ? Relative(items[0].LastLogDate, utcNow) : "—";
+        sb.Append("<p class=\"summary\"><strong>").Append(total).Append(" errors</strong> (last: ").Append(Enc(last)).Append(")</p>");
+
+        sb.Append("<form class=\"filter\" method=\"get\" action=\"").Append(Enc(path)).Append("\">")
           .Append("<input name=\"q\" value=\"").Append(Enc(filter.Search)).Append("\" placeholder=\"search\"> ")
           .Append("<input name=\"app\" value=\"").Append(Enc(filter.ApplicationName)).Append("\" placeholder=\"app\"> ")
           .Append("<input name=\"tenant\" value=\"").Append(Enc(filter.TenantId)).Append("\" placeholder=\"tenant\"> ")
@@ -34,9 +37,10 @@ internal static class DashboardHtml
         foreach (var e in items)
         {
             sb.Append("<tr>")
-              .Append("<td>").Append(Enc(e.LastLogDate.ToString("u", CultureInfo.InvariantCulture))).Append("</td>")
+              .Append("<td><time title=\"").Append(Enc(e.LastLogDate.ToString("u", CultureInfo.InvariantCulture))).Append("\">")
+              .Append(Enc(Relative(e.LastLogDate, utcNow))).Append("</time></td>")
               .Append("<td>").Append(Enc(e.ApplicationName)).Append("</td>")
-              .Append("<td><a href=\"").Append(Enc(path)).Append('/').Append(e.Guid).Append("\">").Append(Enc(e.Type)).Append("</a></td>")
+              .Append("<td class=\"type type-err\"><a href=\"").Append(Enc(path)).Append('/').Append(e.Guid).Append("\">").Append(Enc(e.Type)).Append("</a></td>")
               .Append("<td>").Append(Enc(e.Message)).Append("</td>")
               .Append("<td>").Append(Enc(e.StatusCode?.ToString(CultureInfo.InvariantCulture))).Append("</td>")
               .Append("<td>").Append(e.DuplicateCount).Append("</td>")
@@ -62,6 +66,16 @@ internal static class DashboardHtml
         sb.Append("</p>");
 
         return Page(title, path, sb.ToString());
+    }
+
+    private static string Relative(DateTime utc, DateTime now)
+    {
+        var span = now - utc;
+        if (span < TimeSpan.Zero) span = TimeSpan.Zero;
+        if (span.TotalSeconds < 60) return $"{(int)span.TotalSeconds} secs ago";
+        if (span.TotalMinutes < 60) return $"{(int)span.TotalMinutes} mins ago";
+        if (span.TotalHours < 24) return $"{(int)span.TotalHours} hours ago";
+        return $"{(int)span.TotalDays} days ago";
     }
 
     internal static string Detail(string title, string path, ExceptionEntry e, bool showRequestBody, bool showRequestContext)
