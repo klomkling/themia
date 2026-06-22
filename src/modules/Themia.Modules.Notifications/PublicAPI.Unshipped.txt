@@ -104,3 +104,13 @@ Themia.Modules.Notifications.EntityConfiguration.ThemiaNotificationsModelBuilder
 static Themia.Modules.Notifications.EntityConfiguration.ThemiaNotificationsModelBuilderExtensions.ApplyThemiaNotifications(this Microsoft.EntityFrameworkCore.ModelBuilder! modelBuilder) -> Microsoft.EntityFrameworkCore.ModelBuilder!
 Themia.Modules.Notifications.Mapping.NotificationsDapperMappings
 static Themia.Modules.Notifications.Mapping.NotificationsDapperMappings.Apply(Themia.Framework.Data.Dapper.Mapping.EntityMappingRegistry! registry) -> void
+Themia.Modules.Notifications.Stores.IInAppNotificationStore
+Themia.Modules.Notifications.Stores.IInAppNotificationStore.AddAsync(Themia.Modules.Notifications.Entities.InAppNotification! notification, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Modules.Notifications.Stores.IInAppNotificationStore.ListForUserAsync(string! userId, bool unreadOnly, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Themia.Modules.Notifications.Entities.InAppNotification!>!>!
+Themia.Modules.Notifications.Stores.IInAppNotificationStore.MarkReadAsync(System.Guid id, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!
+Themia.Modules.Notifications.Stores.INotificationPreferenceStore
+Themia.Modules.Notifications.Stores.INotificationPreferenceStore.ListAsync(string? userId, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Themia.Modules.Notifications.Entities.NotificationPreference!>!>!
+Themia.Modules.Notifications.Stores.INotificationPreferenceStore.UpsertAsync(Themia.Modules.Notifications.Entities.NotificationPreference! preference, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Modules.Notifications.Stores.ITenantProviderConfigStore
+Themia.Modules.Notifications.Stores.ITenantProviderConfigStore.FindAsync(Themia.Notifications.NotificationChannel channel, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Notifications.Entities.TenantProviderConfig?>!
+Themia.Modules.Notifications.Stores.ITenantProviderConfigStore.UpsertAsync(Themia.Modules.Notifications.Entities.TenantProviderConfig! config, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
