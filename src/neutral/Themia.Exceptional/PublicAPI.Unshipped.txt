@@ -66,6 +66,8 @@ Themia.Exceptional.ExceptionEntry.Type.get -> string!
 Themia.Exceptional.ExceptionEntry.Type.set -> void
 Themia.Exceptional.ExceptionEntry.RequestBody.get -> string?
 Themia.Exceptional.ExceptionEntry.RequestBody.set -> void
+Themia.Exceptional.ExceptionEntry.RequestContext.get -> string?
+Themia.Exceptional.ExceptionEntry.RequestContext.set -> void
 Themia.Exceptional.ExceptionEntry.Url.get -> string?
 Themia.Exceptional.ExceptionEntry.Url.set -> void
 Themia.Exceptional.ExceptionEntryFactory

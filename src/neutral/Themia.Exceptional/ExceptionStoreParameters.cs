@@ -38,6 +38,7 @@ public static class ExceptionStoreParameters
         p.Add("DuplicateCount", entry.DuplicateCount);
         p.Add("TenantId", entry.TenantId);
         p.Add("RequestBody", entry.RequestBody);
+        p.Add("RequestContext", entry.RequestContext);
         p.Add("IsProtected", entry.IsProtected);
         AddTemporal(p, "CreationDate", entry.CreationDate, temporalDbType);
         AddTemporal(p, "LastLogDate", entry.LastLogDate, temporalDbType);

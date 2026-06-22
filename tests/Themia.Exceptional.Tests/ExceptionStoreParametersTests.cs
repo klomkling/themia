@@ -70,4 +70,15 @@ public class ExceptionStoreParametersTests
         var p = ExceptionStoreParameters.Purge(DateTime.UtcNow, DbType.DateTime2);
         Assert.Contains("OlderThan", p.ParameterNames);
     }
+
+    [Fact]
+    public void Insert_IncludesRequestContext()
+    {
+        var entry = new ExceptionEntry { RequestContext = "{\"headers\":{}}" };
+
+        var p = ExceptionStoreParameters.Insert(entry, temporalDbType: null);
+
+        Assert.Contains("RequestContext", p.ParameterNames);
+        Assert.Equal("{\"headers\":{}}", p.Get<string?>("RequestContext"));
+    }
 }
