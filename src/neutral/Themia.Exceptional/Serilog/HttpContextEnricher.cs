@@ -9,7 +9,10 @@ namespace Themia.Exceptional.Serilog;
 
 /// <summary>
 /// Adds HTTP request context (Url/HttpMethod/Host/IpAddress/StatusCode/RequestBody) to log events.
-/// Never reads Cookie/Authorization, so secrets cannot leak into stored exceptions.
+/// The base capture never reads Cookie/Authorization. When <see cref="ExceptionalOptions.CaptureRequestContext"/>
+/// is enabled it additionally captures headers/cookies/query/form/server variables — each value run
+/// through <see cref="ExceptionalOptions.Redactor"/>, whose default masks Authorization/Cookie and
+/// secret-named values so live tokens are not stored.
 /// </summary>
 /// <remarks>
 /// The captured <c>Url</c> omits the query string by default, since query parameters commonly carry
@@ -46,7 +49,8 @@ public sealed class HttpContextEnricher : ILogEventEnricher
         // → status is the middleware's job.
         if (http.Response.HasStarted || http.Response.StatusCode != StatusCodes.Status200OK)
             Add(logEvent, propertyFactory, "StatusCode", http.Response.StatusCode);
-        // Cookie/Authorization are intentionally never read.
+        // Base capture never reads Cookie/Authorization; the opt-in RequestContext below captures them
+        // (redacted via options.Redactor) only when CaptureRequestContext is set.
         if (http.Items.TryGetValue(RequestBodyLoggingMiddleware.BodyItemKey, out var body) && body is string bodyText)
             Add(logEvent, propertyFactory, "RequestBody", bodyText);
         if (options.CaptureRequestContext)
