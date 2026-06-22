@@ -87,6 +87,7 @@ tests/Themia.Modules.Notifications.IntegrationTests/      # Testcontainers × 3 
 - Every public type/member gets XML docs (clean under `TreatWarningsAsErrors`; `RS0016` on undocumented public API). Add new public API lines to `PublicAPI.Unshipped.txt` in the same task that introduces them.
 - Never log credentials or full recipient PII (mask via the core's `RecipientRedaction` where a recipient must appear in a log).
 - **Entity Id assignment:** `Entity<TId>.Id` has a `protected set` (framework convention). Each entity exposes `public void SetId(Guid id) => Id = id;` (added in Task 2). NEVER write `Id = Guid.NewGuid()` in an object initializer — construct the entity, then call `entity.SetId(Guid.NewGuid())`. (`TenantId`, `CreatedAt`, and the operational columns are normal public setters.)
+- **Data-access seam (UPDATED after Task 6 — supersedes the EF/Dapper store-pair design below):** The peer-agnostic seam is the framework repository abstraction in `Themia.Framework.Data.Abstractions` — `IRepository<T, Guid>` (writes: `AddAsync`, `Update`), `IReadRepository<T, Guid>` (reads: `ListAsync(spec)`, `FirstOrDefaultAsync(spec)`), `IUnitOfWork` (`SaveChangesAsync`), and `ISpecification<T>`. A SINGLE store class per concern injects these; the framework binds them to EF or Dapper based on which the adopter registered. **Do NOT write `EfXStore` + `DapperXStore` pairs** (they would be identical) and **do NOT inject `ThemiaDbContext` / `DbContext` directly** — `EfRepository.AddAsync` stamps `ITenantEntity.TenantId`, so `context.Set<T>().Add` + `SaveChanges` leaves `tenant_id = NULL` and BREAKS tenant isolation. Reads filter by tenant automatically through the repository. There is NO public raw pending-sink (`IPendingOperationSink`/`DapperUnitOfWork` are internal); stage writes via `IRepository.AddAsync` and flush via `IUnitOfWork.SaveChangesAsync`. (`TenantStorage` is the reference: it injects `IRepository<StorageObject, Guid>` + `IUnitOfWork`.) The ONLY raw-connection path in this module is the drainer's per-engine claim dialect (Task 9), which opens its OWN connection (`new NpgsqlConnection(...)` etc.) — that is analyzer-clean (THEMIA103 only flags `IDapperConnectionContext.GetOpenConnectionAsync`, not fresh connections) and correct, because the drainer is cross-tenant infra.
 - TDD: write the failing test, run it red, implement minimally, run it green, commit. Commit messages imperative, no co-author trailers.
 - Run `dotnet build Themia.sln --no-incremental` before finishing a task that adds public API, to surface `RS0016`.
 
@@ -972,10 +973,10 @@ git commit -am "feat: add in-app/preference/provider-config stores (EF + Dapper 
 ### Task 7: IOutboxStore — transactional enqueue (both peers)
 
 **Files:**
-- Create: `Outbox/IOutboxStore.cs`, `Outbox/EfOutboxStore.cs`, `Outbox/DapperOutboxStore.cs`
+- Create: `Outbox/IOutboxStore.cs`, `Outbox/OutboxStore.cs`
 - Test: `tests/Themia.Modules.Notifications.IntegrationTests/OutboxEnqueueTransactionTests.cs`
 
-The contract: `EnqueueAsync` stages the insert in the **caller's** unit of work so the row commits atomically with the triggering work. For EF, `Add` to the context (the caller commits via `SaveChanges`); for Dapper, enqueue a pending insert on the ambient UoW. **It does not commit on its own** — that is the whole point (rollback-safety). A separate `EnqueueAndSaveAsync` convenience is **not** added (YAGNI; the dispatcher and tests drive `SaveChanges`).
+The contract: `EnqueueAsync` stages the insert in the **caller's** unit of work so the row commits atomically with the triggering work. It uses the peer-agnostic `IRepository<OutboxMessage, Guid>.AddAsync` (which stamps `TenantId`) and does **NOT** call `SaveChanges` — the caller's `IUnitOfWork.SaveChangesAsync` commits it (rollback-safety). A single `OutboxStore` works over EF or Dapper (whichever the adopter registered). No `EfOutboxStore`/`DapperOutboxStore` split (see the Conventions "Data-access seam" note). A separate `EnqueueAndSaveAsync` convenience is **not** added (YAGNI; the dispatcher and tests drive `SaveChanges`).
 
 - [ ] **Step 1: Define `IOutboxStore`**
 
@@ -995,63 +996,62 @@ public interface IOutboxStore
 }
 ```
 
-- [ ] **Step 2: Write the failing integration test** — prove rollback-safety on Postgres:
+- [ ] **Step 2: Write the failing integration test** — prove rollback-safety on Postgres. Reuse the Task 6 integration-test bootstrap (`tests/.../InAppNotificationStoreTests.cs` / `TestNotificationsDbContext.cs`) for building a tenant-scoped EF service provider. Resolve `IOutboxStore` + `IUnitOfWork` from the scope; the "did it persist" assertion counts rows via a direct query helper (as Task 6's test does).
 
 ```csharp
+// EnqueueAsync stages but does NOT commit; without SaveChanges the row must not persist.
 [Fact]
-public async Task Enqueue_rolls_back_with_the_caller_transaction()
+public async Task Enqueue_without_save_does_not_persist()
 {
-    await using var scope = BuildEfScope();   // helper from the fixture; EF peer, tenant set
+    await using var scope = BuildScope();   // tenant-scoped EF provider (Task 6 bootstrap)
     var store = scope.ServiceProvider.GetRequiredService<IOutboxStore>();
-    var ctx = scope.ServiceProvider.GetRequiredService<ThemiaDbContext>();
-
     await store.EnqueueAsync(NewEmail("a@example.com"));
-    // deliberately do NOT call SaveChanges -> dispose scope discards the change
-    scope.Dispose();
-
+    // no SaveChanges -> dispose discards
+    await scope.DisposeAsync();
     Assert.Equal(0, await CountOutboxAsync());
 }
 
 [Fact]
 public async Task Enqueue_then_save_persists_the_row()
 {
-    await using var scope = BuildEfScope();
+    await using var scope = BuildScope();
     var store = scope.ServiceProvider.GetRequiredService<IOutboxStore>();
-    var ctx = scope.ServiceProvider.GetRequiredService<ThemiaDbContext>();
+    var uow = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
     await store.EnqueueAsync(NewEmail("a@example.com"));
-    await ctx.SaveChangesAsync();
+    await uow.SaveChangesAsync();
     Assert.Equal(1, await CountOutboxAsync());
 }
 ```
 
-- [ ] **Step 3: Implement `EfOutboxStore`**
+> `NewEmail(addr)` builds a pending `OutboxMessage` (Channel=Email, Status=Pending, Attempts=0, NextAttemptAt=now, CreatedAt=now) and calls `SetId(Guid.NewGuid())`.
+
+- [ ] **Step 3: Implement `OutboxStore`** — single, peer-agnostic, repository-backed (mirrors `TenantStorage`'s constructor injection):
 
 ```csharp
-using Themia.Framework.Data.EFCore;
+using Themia.Framework.Data.Abstractions.Repositories;
 using Themia.Modules.Notifications.Entities;
 
 namespace Themia.Modules.Notifications.Outbox;
 
-internal sealed class EfOutboxStore(ThemiaDbContext context) : IOutboxStore
+internal sealed class OutboxStore(IRepository<OutboxMessage, Guid> repository) : IOutboxStore
 {
-    // Stages the insert; the caller's SaveChanges commits it (rollback-safe).
+    // Stages the insert (repository stamps TenantId); the caller's IUnitOfWork.SaveChangesAsync commits it (rollback-safe).
     public Task EnqueueAsync(OutboxMessage message, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(message);
-        context.Set<OutboxMessage>().Add(message);
-        return Task.CompletedTask;
+        return repository.AddAsync(message, ct);
     }
 }
 ```
 
-- [ ] **Step 4: Implement `DapperOutboxStore`** — enqueue a pending insert on the ambient Dapper UoW (`IPendingOperationSink`/`IUnitOfWork`), mirroring how Storage stages a Dapper insert. The row is flushed when the caller calls `IUnitOfWork.SaveChangesAsync` on the shared `IDapperConnectionContext.CurrentTransaction`. Full code per Storage's pattern.
+> Confirm `IRepository<T, Guid>.AddAsync` signature against `src/framework/Themia.Framework.Data.Abstractions/Repositories/IRepository.cs` — if `AddAsync` itself flushes (some repos do), instead inject the repository's staging method. The contract that MUST hold: after `EnqueueAsync` without a `SaveChangesAsync`, nothing is persisted (the rollback test proves it). If `AddAsync` auto-saves, adjust to the staging API the framework exposes and update the test's expectation, but keep rollback-safety — flag it if the framework offers no stage-without-save path.
 
-- [ ] **Step 5: Run** — Expected: both tests PASS. (Add a Dapper-peer variant of the rollback test, building a Dapper scope.)
+- [ ] **Step 4: Run** — Expected: both tests PASS.
 
-- [ ] **Step 6: PublicAPI + Commit**
+- [ ] **Step 5: PublicAPI (`IOutboxStore`) + Commit**
 
 ```bash
-git commit -am "feat: add transactional IOutboxStore (EF + Dapper peers)"
+git commit -am "feat: add transactional IOutboxStore (repository-backed, peer-agnostic)"
 ```
 
 ---

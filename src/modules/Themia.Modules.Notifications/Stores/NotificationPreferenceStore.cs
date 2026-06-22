@@ -5,9 +5,10 @@ using Themia.Modules.Notifications.Specifications;
 
 namespace Themia.Modules.Notifications.Stores;
 
-/// <summary>Dapper peer of <see cref="INotificationPreferenceStore"/>. Reads go through the tenant-seeded
-/// read repository; writes are staged on the repository and flushed via the unit of work.</summary>
-internal sealed class DapperNotificationPreferenceStore(
+/// <summary>Repository-backed <see cref="INotificationPreferenceStore"/>. Peer-agnostic: the framework binds the
+/// injected repository / unit of work to EF or Dapper. The repository stamps the tenant on insert and applies
+/// the tenant + soft-delete query filters by construction — the store never re-filters by tenant.</summary>
+internal sealed class NotificationPreferenceStore(
     IRepository<NotificationPreference, Guid> preferences,
     IUnitOfWork unitOfWork) : INotificationPreferenceStore
 {

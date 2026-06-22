@@ -5,10 +5,10 @@ using Themia.Modules.Notifications.Specifications;
 
 namespace Themia.Modules.Notifications.Stores;
 
-/// <summary>Dapper peer of <see cref="IInAppNotificationStore"/>. Reads go through the tenant-seeded
-/// read repository (the framework applies the tenant predicate + soft-delete filter by construction);
-/// writes are staged on the repository and flushed via the unit of work.</summary>
-internal sealed class DapperInAppNotificationStore(
+/// <summary>Repository-backed <see cref="IInAppNotificationStore"/>. Peer-agnostic: the framework binds the
+/// injected repository / unit of work to EF or Dapper. The repository stamps the tenant on insert and applies
+/// the tenant + soft-delete query filters by construction — the store never re-filters by tenant.</summary>
+internal sealed class InAppNotificationStore(
     IRepository<InAppNotification, Guid> notifications,
     IUnitOfWork unitOfWork) : IInAppNotificationStore
 {

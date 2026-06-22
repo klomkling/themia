@@ -39,7 +39,7 @@ public sealed class InAppNotificationStoreTests : IAsyncLifetime
         services.AddScoped<ITenantContext>(_ => new TenantContext(tenant));
         services.AddThemiaPostgres<TestNotificationsDbContext>(configuration);
         services.AddThemiaDataRepositories<TestNotificationsDbContext>();
-        services.AddScoped<IInAppNotificationStore, EfInAppNotificationStore>();
+        services.AddScoped<IInAppNotificationStore, InAppNotificationStore>();
 
         provider = services.BuildServiceProvider();
         return provider.CreateAsyncScope();
