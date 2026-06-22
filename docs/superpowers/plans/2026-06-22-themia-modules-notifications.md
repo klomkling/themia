@@ -86,6 +86,7 @@ tests/Themia.Modules.Notifications.IntegrationTests/      # Testcontainers × 3 
 - THEMIA101: no log-and-rethrow. The drainer logs a send failure **once** (it owns the outcome); request-path code lets exceptions propagate to `ProblemDetailsMiddleware`.
 - Every public type/member gets XML docs (clean under `TreatWarningsAsErrors`; `RS0016` on undocumented public API). Add new public API lines to `PublicAPI.Unshipped.txt` in the same task that introduces them.
 - Never log credentials or full recipient PII (mask via the core's `RecipientRedaction` where a recipient must appear in a log).
+- **Entity Id assignment:** `Entity<TId>.Id` has a `protected set` (framework convention). Each entity exposes `public void SetId(Guid id) => Id = id;` (added in Task 2). NEVER write `Id = Guid.NewGuid()` in an object initializer — construct the entity, then call `entity.SetId(Guid.NewGuid())`. (`TenantId`, `CreatedAt`, and the operational columns are normal public setters.)
 - TDD: write the failing test, run it red, implement minimally, run it green, commit. Commit messages imperative, no co-author trailers.
 - Run `dotnet build Themia.sln --no-incremental` before finishing a task that adds public API, to surface `RS0016`.
 
@@ -1643,23 +1644,23 @@ internal sealed class NotificationDispatcher(
         {
             if (channel == NotificationChannel.InApp)
             {
-                await inApp.AddAsync(new InAppNotification
+                var notification = new InAppNotification
                 {
-                    Id = Guid.NewGuid(),
                     TenantId = tenant,
                     UserId = request.UserId,
                     Title = request.Subject ?? string.Empty,
                     Body = body,
                     CreatedAt = now,
-                }, ct);
+                };
+                notification.SetId(Guid.NewGuid()); // framework: Entity<TId>.Id has a protected setter; use SetId
+                await inApp.AddAsync(notification, ct);
                 continue;
             }
 
             var recipient = request.Recipients?.GetValueOrDefault(channel);
             if (string.IsNullOrWhiteSpace(recipient)) continue; // no address for this channel
-            await outbox.EnqueueAsync(new OutboxMessage
+            var message = new OutboxMessage
             {
-                Id = Guid.NewGuid(),
                 TenantId = tenant,
                 Channel = channel,
                 Recipient = recipient,
@@ -1670,7 +1671,9 @@ internal sealed class NotificationDispatcher(
                 NextAttemptAt = request.ScheduledFor ?? now,
                 ScheduledFor = request.ScheduledFor,
                 CreatedAt = now,
-            }, ct);
+            };
+            message.SetId(Guid.NewGuid());
+            await outbox.EnqueueAsync(message, ct);
         }
     }
 }
