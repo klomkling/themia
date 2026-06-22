@@ -32,3 +32,9 @@ Themia.Notifications.ThemiaNotificationsOptions
 Themia.Notifications.ThemiaNotificationsOptions.ThemiaNotificationsOptions() -> void
 Themia.Notifications.ThemiaNotificationsOptions.ConfigureHandlebars.get -> System.Action<HandlebarsDotNet.IHandlebars!>?
 Themia.Notifications.ThemiaNotificationsOptions.ConfigureHandlebars.set -> void
+Themia.Notifications.IEmailSender
+Themia.Notifications.IEmailSender.SendAsync(Themia.Notifications.NotificationMessage! message, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Notifications.NotificationResult!>!
+Themia.Notifications.ISmsSender
+Themia.Notifications.ISmsSender.SendAsync(Themia.Notifications.NotificationMessage! message, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Notifications.NotificationResult!>!
+Themia.Notifications.IPushSender
+Themia.Notifications.IPushSender.SendAsync(Themia.Notifications.NotificationMessage! message, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Notifications.NotificationResult!>!
