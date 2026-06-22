@@ -116,3 +116,24 @@ Themia.Modules.Notifications.Stores.INotificationPreferenceStore.UpsertAsync(The
 Themia.Modules.Notifications.Stores.ITenantProviderConfigStore
 Themia.Modules.Notifications.Stores.ITenantProviderConfigStore.FindAsync(Themia.Notifications.NotificationChannel channel, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Notifications.Entities.TenantProviderConfig?>!
 Themia.Modules.Notifications.Stores.ITenantProviderConfigStore.UpsertAsync(Themia.Modules.Notifications.Entities.TenantProviderConfig! config, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Modules.Notifications.Outbox.ClaimedOutboxRow
+Themia.Modules.Notifications.Outbox.ClaimedOutboxRow.ClaimedOutboxRow(System.Guid Id, string? TenantId, Themia.Notifications.NotificationChannel Channel, string! Recipient, string? Subject, string! Body, int Attempts) -> void
+Themia.Modules.Notifications.Outbox.ClaimedOutboxRow.Attempts.get -> int
+Themia.Modules.Notifications.Outbox.ClaimedOutboxRow.Attempts.init -> void
+Themia.Modules.Notifications.Outbox.ClaimedOutboxRow.Body.get -> string!
+Themia.Modules.Notifications.Outbox.ClaimedOutboxRow.Body.init -> void
+Themia.Modules.Notifications.Outbox.ClaimedOutboxRow.Channel.get -> Themia.Notifications.NotificationChannel
+Themia.Modules.Notifications.Outbox.ClaimedOutboxRow.Channel.init -> void
+Themia.Modules.Notifications.Outbox.ClaimedOutboxRow.Id.get -> System.Guid
+Themia.Modules.Notifications.Outbox.ClaimedOutboxRow.Id.init -> void
+Themia.Modules.Notifications.Outbox.ClaimedOutboxRow.Recipient.get -> string!
+Themia.Modules.Notifications.Outbox.ClaimedOutboxRow.Recipient.init -> void
+Themia.Modules.Notifications.Outbox.ClaimedOutboxRow.Subject.get -> string?
+Themia.Modules.Notifications.Outbox.ClaimedOutboxRow.Subject.init -> void
+Themia.Modules.Notifications.Outbox.ClaimedOutboxRow.TenantId.get -> string?
+Themia.Modules.Notifications.Outbox.ClaimedOutboxRow.TenantId.init -> void
+Themia.Modules.Notifications.Outbox.INotificationsSqlDialect
+Themia.Modules.Notifications.Outbox.INotificationsSqlDialect.ClaimAsync(System.Data.Common.DbConnection! connection, string! leaseOwner, System.DateTimeOffset now, System.DateTimeOffset leaseExpiresAt, int batchSize, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Themia.Modules.Notifications.Outbox.ClaimedOutboxRow!>!>!
+Themia.Modules.Notifications.Outbox.INotificationsSqlDialect.CompleteAsync(System.Data.Common.DbConnection! connection, System.Guid id, System.DateTimeOffset sentAt, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!
+Themia.Modules.Notifications.Outbox.INotificationsSqlDialect.CreateConnection() -> System.Data.Common.DbConnection!
+Themia.Modules.Notifications.Outbox.INotificationsSqlDialect.FailAsync(System.Data.Common.DbConnection! connection, System.Guid id, int attempts, System.DateTimeOffset nextAttemptAt, bool dead, string! error, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!

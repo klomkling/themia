@@ -27,6 +27,9 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/modules/Themia.Modules.Notifications/Themia.Modules.Notifications.csproj" />
+    <ProjectReference Include="../../src/modules/Themia.Modules.Notifications.PostgreSql/Themia.Modules.Notifications.PostgreSql.csproj" />
+    <ProjectReference Include="../../src/modules/Themia.Modules.Notifications.MySql/Themia.Modules.Notifications.MySql.csproj" />
+    <ProjectReference Include="../../src/modules/Themia.Modules.Notifications.SqlServer/Themia.Modules.Notifications.SqlServer.csproj" />
     <ProjectReference Include="../../src/framework/Themia.Framework.Data.EFCore.PostgreSql/Themia.Framework.Data.EFCore.PostgreSql.csproj" />
     <ProjectReference Include="../../src/framework/Themia.Framework.Data.Dapper.PostgreSql/Themia.Framework.Data.Dapper.PostgreSql.csproj" />
     <ProjectReference Include="../../src/framework/Themia.MultiTenancy/Themia.MultiTenancy.csproj" />
