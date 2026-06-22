@@ -27,6 +27,25 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.6.3] - 2026-06-23
+
+### Added
+- `Themia.Modules.Notifications` — tenant-aware notifications module over the `Themia.Notifications`
+  core. A transactional outbox (`IOutboxStore`, staged in the caller's unit of work), a
+  near-real-time background drainer (`OutboxDrainer` + `DrainSignal`) with per-engine atomic claim
+  (PostgreSQL/MySQL `FOR UPDATE SKIP LOCKED`, SQL Server `READPAST/UPDLOCK` + `OUTPUT`), lease-based
+  reclaim of crashed drainers, and exponential backoff → dead-letter (a `FormatException` is treated
+  as a permanent failure). An `INotificationDispatcher` routes events to channels via per-tenant/user
+  `NotificationPreference` (external channels enqueue; in-app writes directly). In-app notification
+  store, per-tenant `TenantProviderConfig` resolver, EF Core + Dapper store peers over one
+  FluentMigrator schema (PostgreSQL + MySQL + SQL Server), and an `AddThemiaNotificationsModule` DI
+  extension. Targets `net10.0`.
+- `Themia.Modules.Notifications.PostgreSql` / `Themia.Modules.Notifications.MySql` /
+  `Themia.Modules.Notifications.SqlServer` — per-provider packages, each bundling the engine's
+  Notifications SQL dialect (atomic outbox claim) and its database driver, registered via
+  `AddThemiaNotificationsPostgreSql` / `AddThemiaNotificationsMySql` / `AddThemiaNotificationsSqlServer`.
+  Target `net10.0`.
+
 ## [0.6.2] - 2026-06-22
 
 ### Added
