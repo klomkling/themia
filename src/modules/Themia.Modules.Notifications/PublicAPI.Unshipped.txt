@@ -48,6 +48,7 @@ Themia.Modules.Notifications.Entities.OutboxMessage.SentAt.get -> System.DateTim
 Themia.Modules.Notifications.Entities.OutboxMessage.SentAt.set -> void
 Themia.Modules.Notifications.Entities.OutboxMessage.LastError.get -> string?
 Themia.Modules.Notifications.Entities.OutboxMessage.LastError.set -> void
+Themia.Modules.Notifications.Entities.OutboxMessage.SetId(System.Guid id) -> void
 Themia.Modules.Notifications.Entities.InAppNotification
 Themia.Modules.Notifications.Entities.InAppNotification.InAppNotification() -> void
 Themia.Modules.Notifications.Entities.InAppNotification.TenantId.get -> Themia.Framework.Core.Abstractions.Tenancy.TenantId?
@@ -62,6 +63,7 @@ Themia.Modules.Notifications.Entities.InAppNotification.IsRead.get -> bool
 Themia.Modules.Notifications.Entities.InAppNotification.IsRead.set -> void
 Themia.Modules.Notifications.Entities.InAppNotification.ReadAt.get -> System.DateTimeOffset?
 Themia.Modules.Notifications.Entities.InAppNotification.ReadAt.set -> void
+Themia.Modules.Notifications.Entities.InAppNotification.SetId(System.Guid id) -> void
 Themia.Modules.Notifications.Entities.NotificationPreference
 Themia.Modules.Notifications.Entities.NotificationPreference.NotificationPreference() -> void
 Themia.Modules.Notifications.Entities.NotificationPreference.TenantId.get -> Themia.Framework.Core.Abstractions.Tenancy.TenantId?
@@ -74,6 +76,7 @@ Themia.Modules.Notifications.Entities.NotificationPreference.IsEnabled.get -> bo
 Themia.Modules.Notifications.Entities.NotificationPreference.IsEnabled.set -> void
 Themia.Modules.Notifications.Entities.NotificationPreference.Locale.get -> string?
 Themia.Modules.Notifications.Entities.NotificationPreference.Locale.set -> void
+Themia.Modules.Notifications.Entities.NotificationPreference.SetId(System.Guid id) -> void
 Themia.Modules.Notifications.Entities.TenantProviderConfig
 Themia.Modules.Notifications.Entities.TenantProviderConfig.TenantProviderConfig() -> void
 Themia.Modules.Notifications.Entities.TenantProviderConfig.TenantId.get -> Themia.Framework.Core.Abstractions.Tenancy.TenantId?
@@ -92,3 +95,4 @@ Themia.Modules.Notifications.Entities.TenantProviderConfig.FromAddress.get -> st
 Themia.Modules.Notifications.Entities.TenantProviderConfig.FromAddress.set -> void
 Themia.Modules.Notifications.Entities.TenantProviderConfig.UseSsl.get -> bool
 Themia.Modules.Notifications.Entities.TenantProviderConfig.UseSsl.set -> void
+Themia.Modules.Notifications.Entities.TenantProviderConfig.SetId(System.Guid id) -> void

@@ -33,4 +33,8 @@ public sealed class TenantProviderConfig : AuditableEntity<Guid>, ITenantEntity
 
     /// <summary>Whether SMTP uses SSL/STARTTLS.</summary>
     public bool UseSsl { get; set; } = true;
+
+    /// <summary>Assigns the identifier for a new (transient) config.</summary>
+    /// <param name="id">A client-generated identifier.</param>
+    public void SetId(Guid id) => Id = id;
 }

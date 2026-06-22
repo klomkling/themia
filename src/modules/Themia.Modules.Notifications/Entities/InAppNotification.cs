@@ -23,4 +23,8 @@ public sealed class InAppNotification : AuditableEntity<Guid>, ITenantEntity
 
     /// <summary>When it was read, if read.</summary>
     public DateTimeOffset? ReadAt { get; set; }
+
+    /// <summary>Assigns the identifier for a new (transient) notification.</summary>
+    /// <param name="id">A client-generated identifier.</param>
+    public void SetId(Guid id) => Id = id;
 }

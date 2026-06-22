@@ -24,4 +24,8 @@ public sealed class NotificationPreference : AuditableEntity<Guid>, ITenantEntit
 
     /// <summary>Preferred locale (e.g. "th-TH"), or null for the app default.</summary>
     public string? Locale { get; set; }
+
+    /// <summary>Assigns the identifier for a new (transient) preference.</summary>
+    /// <param name="id">A client-generated identifier.</param>
+    public void SetId(Guid id) => Id = id;
 }

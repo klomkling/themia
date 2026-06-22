@@ -51,4 +51,8 @@ public sealed class OutboxMessage : Entity<Guid>, ITenantEntity
 
     /// <summary>The last failure message, if any (never contains credentials/PII).</summary>
     public string? LastError { get; set; }
+
+    /// <summary>Assigns the identifier for a new (transient) message.</summary>
+    /// <param name="id">A client-generated identifier.</param>
+    public void SetId(Guid id) => Id = id;
 }
