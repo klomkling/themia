@@ -1,3 +1,5 @@
+using System.Text.RegularExpressions;
+
 namespace Themia.Exceptional;
 
 /// <summary>Configuration for the Themia exception-logging engine and capture pipeline.</summary>
@@ -20,6 +22,31 @@ public sealed class ExceptionalOptions
     /// commonly carry secrets (<c>?token=</c>, <c>?api_key=</c>) that would otherwise be persisted.
     /// </summary>
     public bool CaptureQueryString { get; set; }
+
+    /// <summary>
+    /// Capture request context (headers, cookies, query, form, server variables) into the stored
+    /// <see cref="ExceptionEntry.RequestContext"/>. Off by default — it persists more request data, so
+    /// it is opt-in (and runs through <see cref="Redactor"/>).
+    /// </summary>
+    public bool CaptureRequestContext { get; set; }
+
+    /// <summary>
+    /// Per key/value redaction applied to every captured request-context entry: returns the value to
+    /// store, a masked value, or <see langword="null"/> to drop the entry. Defaults to
+    /// <see cref="DefaultRedactor"/> (masks only categorical secrets). Set to <see langword="null"/> to
+    /// capture everything verbatim (the host then owns that data-protection choice).
+    /// </summary>
+    public Func<string, string, string?>? Redactor { get; set; } = DefaultRedactor;
+
+    private static readonly Regex SecretKey = new(
+        "authorization|^cookie$|^set-cookie$|password|secret|token|apikey|session",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    /// <summary>Default redactor: masks values whose key names a categorical secret
+    /// (Authorization/Cookie/Set-Cookie or contains password/secret/token/apikey/session) to
+    /// <c>"***"</c>; returns all other values unchanged.</summary>
+    public static string? DefaultRedactor(string key, string value)
+        => SecretKey.IsMatch(key) ? "***" : value;
 
     /// <summary>Validates the options. Throws <see cref="InvalidOperationException"/> on invalid configuration.</summary>
     public void Validate()

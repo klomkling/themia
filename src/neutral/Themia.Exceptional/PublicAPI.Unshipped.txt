@@ -16,6 +16,11 @@ Themia.Exceptional.ExceptionalOptions.ApplicationName.get -> string!
 Themia.Exceptional.ExceptionalOptions.ApplicationName.set -> void
 Themia.Exceptional.ExceptionalOptions.CaptureQueryString.get -> bool
 Themia.Exceptional.ExceptionalOptions.CaptureQueryString.set -> void
+Themia.Exceptional.ExceptionalOptions.CaptureRequestContext.get -> bool
+Themia.Exceptional.ExceptionalOptions.CaptureRequestContext.set -> void
+Themia.Exceptional.ExceptionalOptions.Redactor.get -> System.Func<string!, string!, string?>?
+Themia.Exceptional.ExceptionalOptions.Redactor.set -> void
+static Themia.Exceptional.ExceptionalOptions.DefaultRedactor(string! key, string! value) -> string?
 Themia.Exceptional.ExceptionalOptions.CaptureRequestBody.get -> bool
 Themia.Exceptional.ExceptionalOptions.CaptureRequestBody.set -> void
 Themia.Exceptional.ExceptionalOptions.ExceptionalOptions() -> void
