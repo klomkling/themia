@@ -1,6 +1,6 @@
 using Microsoft.IdentityModel.Tokens;
-using Themia.Modules.Identity.AspNetCore.Options;
-using Themia.Modules.Identity.AspNetCore.Signing;
+using Themia.Modules.Identity.Tokens.AspNetCore.Options;
+using Themia.Modules.Identity.Tokens.AspNetCore.Signing;
 using Xunit;
 
 namespace Themia.Modules.Identity.AspNetCore.Tests;

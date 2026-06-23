@@ -8,9 +8,9 @@ using Microsoft.IdentityModel.Tokens;
 using Themia.Modules.Identity.Abstractions;
 using Themia.Modules.Identity.Abstractions.Authentication;
 using Themia.Modules.Identity.AspNetCore.Authentication;
-using Themia.Modules.Identity.AspNetCore.Options;
-using Themia.Modules.Identity.AspNetCore.Signing;
-using Themia.Modules.Identity.AspNetCore.Tokens;
+using Themia.Modules.Identity.Tokens.AspNetCore.Options;
+using Themia.Modules.Identity.Tokens.AspNetCore.Signing;
+using Themia.Modules.Identity.Tokens.AspNetCore.Tokens;
 
 namespace Themia.Modules.Identity.AspNetCore.DependencyInjection;
 

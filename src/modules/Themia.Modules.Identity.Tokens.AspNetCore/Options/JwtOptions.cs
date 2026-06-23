@@ -1,6 +1,6 @@
 using System.Text;
 
-namespace Themia.Modules.Identity.AspNetCore.Options;
+namespace Themia.Modules.Identity.Tokens.AspNetCore.Options;
 
 /// <summary>JWT access-token + validation configuration. Validated at registration (fail-fast),
 /// mirroring <c>IdentityModuleOptions.Validate()</c>.</summary>

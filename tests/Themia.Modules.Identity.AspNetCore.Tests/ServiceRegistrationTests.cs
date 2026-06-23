@@ -2,8 +2,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Themia.Modules.Identity.Abstractions.Authentication;
 using Themia.Modules.Identity.AspNetCore.Authentication;
 using Themia.Modules.Identity.AspNetCore.DependencyInjection;
-using Themia.Modules.Identity.AspNetCore.Options;
-using Themia.Modules.Identity.AspNetCore.Signing;
+using Themia.Modules.Identity.Tokens.AspNetCore.Options;
+using Themia.Modules.Identity.Tokens.AspNetCore.Signing;
 using Themia.Modules.Identity.DependencyInjection;
 using Xunit;
 

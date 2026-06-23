@@ -1,8 +1,8 @@
 using System.Text;
 using Microsoft.IdentityModel.Tokens;
-using Themia.Modules.Identity.AspNetCore.Options;
+using Themia.Modules.Identity.Tokens.AspNetCore.Options;
 
-namespace Themia.Modules.Identity.AspNetCore.Signing;
+namespace Themia.Modules.Identity.Tokens.AspNetCore.Signing;
 
 /// <summary>HS256 symmetric signing provider keyed from <see cref="JwtOptions.SigningKey"/>.</summary>
 public sealed class SymmetricSigningCredentialsProvider : IJwtSigningCredentialsProvider

@@ -2,10 +2,10 @@ using Themia.Modules.Identity.Abstractions;
 using Themia.Modules.Identity.Abstractions.Authentication;
 using Themia.Modules.Identity.Abstractions.Entities;
 
-namespace Themia.Modules.Identity.AspNetCore.Authentication;
+namespace Themia.Modules.Identity.Tokens.AspNetCore.Authentication;
 
 /// <summary>Builds a Themia access + refresh token pair for a user. Shared by the password
-/// (<see cref="AuthenticationFlow"/>) and external-login (<c>ExternalAuthenticationFlow</c>) flows so both
+/// (<c>AuthenticationFlow</c>) and external-login (<c>ExternalAuthenticationFlow</c>) flows so both
 /// mint structurally identical first-class tokens — any change to the issue sequence (claims, audit,
 /// session binding) lands in one place instead of drifting between two copies.</summary>
 internal static class AuthTokenIssuer

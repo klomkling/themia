@@ -2,9 +2,9 @@ using System.Security.Claims;
 using Microsoft.Extensions.Time.Testing;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
-using Themia.Modules.Identity.AspNetCore.Options;
-using Themia.Modules.Identity.AspNetCore.Signing;
-using Themia.Modules.Identity.AspNetCore.Tokens;
+using Themia.Modules.Identity.Tokens.AspNetCore.Options;
+using Themia.Modules.Identity.Tokens.AspNetCore.Signing;
+using Themia.Modules.Identity.Tokens.AspNetCore.Tokens;
 using Xunit;
 
 namespace Themia.Modules.Identity.AspNetCore.Tests;

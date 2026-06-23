@@ -1,4 +1,4 @@
-using Themia.Modules.Identity.AspNetCore.Options;
+using Themia.Modules.Identity.Tokens.AspNetCore.Options;
 using Xunit;
 
 namespace Themia.Modules.Identity.AspNetCore.Tests;

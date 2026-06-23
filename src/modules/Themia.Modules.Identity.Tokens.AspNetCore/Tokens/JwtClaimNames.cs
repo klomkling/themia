@@ -1,7 +1,7 @@
 using System.Security.Claims;
 using Microsoft.IdentityModel.JsonWebTokens;
 
-namespace Themia.Modules.Identity.AspNetCore.Tokens;
+namespace Themia.Modules.Identity.Tokens.AspNetCore.Tokens;
 
 /// <summary>Standard short JWT claim names emitted on the wire for OAuth2/OIDC/gateway interop.
 /// The validated server-side principal still carries the long <see cref="ClaimTypes"/> URIs

@@ -2,10 +2,10 @@ using System.Security.Claims;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 using Themia.Modules.Identity.Abstractions.Authentication;
-using Themia.Modules.Identity.AspNetCore.Options;
-using Themia.Modules.Identity.AspNetCore.Signing;
+using Themia.Modules.Identity.Tokens.AspNetCore.Options;
+using Themia.Modules.Identity.Tokens.AspNetCore.Signing;
 
-namespace Themia.Modules.Identity.AspNetCore.Tokens;
+namespace Themia.Modules.Identity.Tokens.AspNetCore.Tokens;
 
 /// <summary>Default <see cref="IAccessTokenService"/>. Mints a signed JWT from the principal's claims,
 /// stamping issuer/audience/expiry from <see cref="JwtOptions"/>.</summary>
