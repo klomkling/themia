@@ -27,6 +27,30 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.6.4] - 2026-06-23
+
+> **Upgrade straight to 0.6.4 — skip 0.6.3.** Because of a release-pipeline race (the 0.6.3
+> publish job sat in the `nuget` approval gate while the fixes below merged, then published the
+> *original* 0.6.3 commit and the later release runs self-skipped on the now-existing tag), the
+> packages published as **0.6.3 do not contain the two fixes below** — they shipped FluentMigrator
+> 7.2.0 and the deadlock-prone MySQL claim. 0.6.4 is 0.6.3 *as intended*. See [MIGRATION.md](MIGRATION.md#064).
+
+### Fixed
+- `Themia.Modules.Notifications.MySql` — the outbox claim deadlocked under concurrent drainers
+  (`MySqlException: Deadlock found when trying to get lock`). InnoDB's default REPEATABLE READ takes
+  gap/next-key locks on the `(status, next_attempt_at)` range scan that two claimers can deadlock on
+  even with `FOR UPDATE SKIP LOCKED` (which only skips row locks). The claim transaction now runs at
+  `READ COMMITTED` (no gap locks) with a bounded retry on error 1213. PostgreSQL and SQL Server are
+  unaffected.
+
+### Changed
+- Bumped **FluentMigrator** and its PostgreSQL/MySQL/SQL Server runners `7.2.0 → 8.0.1`. Transparent
+  to consumers using `ThemiaMigrations.Run(...)`; see [MIGRATION.md](MIGRATION.md#064) if you
+  reference the FluentMigrator runner packages directly.
+- Grouped Dependabot updates by package family (FluentMigrator, EF Core, Testcontainers, Quartz,
+  Serilog, AWS SDK, Roslyn, ASP.NET Core, Microsoft.Extensions, xUnit) so a shared version moves in a
+  single PR — prevents the split, mutually-conflicting per-package PRs that triggered this release race.
+
 ## [0.6.3] - 2026-06-23
 
 ### Added
