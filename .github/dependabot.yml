@@ -7,7 +7,46 @@ updates:
     open-pull-requests-limit: 10
     labels:
       - dependencies
+    # Cohesive multi-package families are grouped so a single shared version moves in ONE PR
+    # (incl. major bumps). Without this, families that pin one core version across several packages
+    # — e.g. FluentMigrator + its per-engine runners — produce separate, mutually-conflicting PRs
+    # that Dependabot then auto-closes as "no longer updatable". Pattern groups are listed BEFORE
+    # the catch-all nuget-minor-patch so a matching dependency joins its family group first.
     groups:
+      fluentmigrator:
+        patterns:
+          - "FluentMigrator*"
+      efcore:
+        patterns:
+          - "Microsoft.EntityFrameworkCore*"
+          - "Npgsql*"
+          - "EFCore.NamingConventions"
+      testcontainers:
+        patterns:
+          - "Testcontainers*"
+      quartz:
+        patterns:
+          - "Quartz*"
+      serilog:
+        patterns:
+          - "Serilog*"
+      aws-sdk:
+        patterns:
+          - "AWSSDK*"
+      roslyn:
+        patterns:
+          - "Microsoft.CodeAnalysis*"
+      aspnetcore:
+        patterns:
+          - "Microsoft.AspNetCore.*"
+      microsoft-extensions:
+        patterns:
+          - "Microsoft.Extensions.*"
+      xunit:
+        patterns:
+          - "xunit*"
+      # Catch-all for everything else: bundle remaining minor/patch updates into one PR.
+      # Must stay LAST — it has no patterns, so it would otherwise grab every dependency first.
       nuget-minor-patch:
         update-types:
           - minor
@@ -20,3 +59,7 @@ updates:
     labels:
       - ci
       - dependencies
+    groups:
+      github-actions:
+        patterns:
+          - "*"
