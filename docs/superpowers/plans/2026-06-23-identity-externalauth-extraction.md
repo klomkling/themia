@@ -489,7 +489,9 @@ git commit -m "feat: re-home external-flow registration into AddThemiaExternalAu
 
 ---
 
-### Task 7: Move OIDC tests + add the BYO end-to-end test
+### Task 7: Add the BYO end-to-end test
+
+> **Execution note (amended):** Task 5 had to fold the OIDC unit-test relocation forward (moving the external source broke the test projects, so keeping the solution green required moving the tests in the same commit, `c47206e`). The `Themia.Modules.Identity.ExternalAuth.AspNetCore.Tests` project already exists with the moved `OidcExternalAuthProviderTests`, `ExternalAuthBuilderTests`, `ExternalAuthenticationFlowTests` + helpers (and a local copy of the 3 shared token/principal `Fakes`). The integration tests' usings were fixed too. So Task 7 reduces to **just the BYO end-to-end test** below (Step 4); Steps 1–3/6 are already done. Task 6 (re-home flow/hooks registration + external-only guard) still needs doing and comes first.
 
 **Files:**
 - Create test project: `tests/Themia.Modules.Identity.ExternalAuth.AspNetCore.Tests/…` (if not created in Task 6)
