@@ -22,7 +22,7 @@
          IHttpClientFactory comes from the Microsoft.AspNetCore.App framework reference — no extra pin.) -->
     <PackageVersion Include="Microsoft.IdentityModel.Protocols.OpenIdConnect" Version="8.0.1" />
     <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.9" />
-    <PackageVersion Include="Microsoft.AspNetCore.TestHost" Version="8.0.27" Condition="'$(TargetFramework)' == 'net8.0' or '$(TargetFramework)' == ''" />
+    <PackageVersion Include="Microsoft.AspNetCore.TestHost" Version="8.0.28" Condition="'$(TargetFramework)' == 'net8.0' or '$(TargetFramework)' == ''" />
     <PackageVersion Include="Microsoft.AspNetCore.TestHost" Version="10.0.9" Condition="'$(TargetFramework)' == 'net10.0'" />
     <!-- Microsoft.Extensions.* aligned at 10.0.8 (10.0 multitargets net8.0, so the net8 legs stay valid). -->
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="10.0.9" />
@@ -89,10 +89,10 @@
     <PackageVersion Include="Testcontainers.MySql" Version="4.12.0" />
     <PackageVersion Include="Testcontainers.MsSql" Version="4.12.0" />
     <!-- Storage (Themia.Modules.Storage.S3): AWS S3 SDK (also drives Cloudflare R2 via a configured ServiceUrl) -->
-    <PackageVersion Include="AWSSDK.S3" Version="4.0.6" />
+    <PackageVersion Include="AWSSDK.S3" Version="4.0.25.3" />
     <!-- Transitive AWSSDK.Core pinned to the patched 4.0.3.3 (CVE-2026-22611 / GHSA-9cvc-h2w8-phrp):
          AWSSDK.S3 4.0.6 resolves Core 4.0.0.16, which NuGetAudit flags (TreatWarningsAsErrors). -->
-    <PackageVersion Include="AWSSDK.Core" Version="4.0.3.3" />
+    <PackageVersion Include="AWSSDK.Core" Version="4.0.9.7" />
     <!-- Storage integration tests: S3-compatible server (MinIO) via Testcontainers (same family as the others) -->
     <PackageVersion Include="Testcontainers.Minio" Version="4.12.0" />
     <!-- Identity (Themia.Modules.Identity): argon2id password hashing -->
