@@ -1,6 +1,8 @@
+using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
+using Themia.Modules.Identity.Abstractions;
 using Themia.Modules.Identity.Abstractions.Authentication;
 using Themia.Modules.Identity.ExternalAuth.AspNetCore.External;
 using Themia.Modules.Identity.ExternalAuth.AspNetCore.Options;
@@ -23,7 +25,41 @@ public static class ExternalAuthServiceCollectionExtensions
         services.AddHttpClient();
         services.TryAddSingleton(TimeProvider.System);
         services.TryAddSingleton<IExternalAuthProviderRegistry, ExternalAuthProviderRegistry>();
+
+        // The external-login flow + default no-op hooks live here (not in AddThemiaIdentityAspNetCore)
+        // so a bring-your-own-user-store consumer gets them without the local/password wiring. The flow
+        // resolves IExternalLoginService and the token seams at runtime; call ValidateThemiaExternalAuth
+        // once wiring is complete to fail fast if any are missing.
+        services.TryAddScoped<IExternalAuthenticationFlow, External.ExternalAuthenticationFlow>();
+        services.TryAddScoped<IExternalAuthenticationHooks, External.ExternalAuthenticationHooksBase>();
         return new ExternalAuthBuilder(services);
+    }
+
+    /// <summary>Fail-fast check that the external-login flow's runtime dependencies are registered:
+    /// <see cref="IExternalLoginService"/> (the bring-your-own user-store seam), and the token seams
+    /// <see cref="IAccessTokenService"/> / <see cref="IRefreshTokenService"/> / <see cref="IClaimsPrincipalFactory"/>.
+    /// Deliberately does NOT require <c>IUserService</c> — the external flow never uses it.</summary>
+    /// <param name="services">The service collection.</param>
+    /// <returns>The same service collection.</returns>
+    /// <exception cref="InvalidOperationException">One or more required services are not registered.</exception>
+    public static IServiceCollection ValidateThemiaExternalAuth(this IServiceCollection services)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        static bool Has(IServiceCollection s, Type t) => s.Any(d => d.ServiceType == t);
+        var missing = new List<string>();
+        if (!Has(services, typeof(IExternalLoginService))) missing.Add(nameof(IExternalLoginService));
+        if (!Has(services, typeof(IAccessTokenService))) missing.Add(nameof(IAccessTokenService));
+        if (!Has(services, typeof(IRefreshTokenService))) missing.Add(nameof(IRefreshTokenService));
+        if (!Has(services, typeof(IClaimsPrincipalFactory))) missing.Add(nameof(IClaimsPrincipalFactory));
+        if (missing.Count > 0)
+        {
+            throw new InvalidOperationException(
+                "Themia external auth requires these services to be registered: " + string.Join(", ", missing) +
+                ". Register your IExternalLoginService (and IAccessTokenService via AddThemiaIdentityTokens, " +
+                "plus IRefreshTokenService / IClaimsPrincipalFactory).");
+        }
+
+        return services;
     }
 }
 

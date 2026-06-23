@@ -37,8 +37,11 @@ public sealed class ServiceRegistrationTests
         Assert.Contains(services, d => d.ServiceType == typeof(IAccessTokenService));
         Assert.Contains(services, d => d.ServiceType == typeof(IAuthenticationFlow));
         Assert.Contains(services, d => d.ServiceType == typeof(IAuthenticationHooks));
-        Assert.Contains(services, d => d.ServiceType == typeof(IExternalAuthenticationFlow));
-        Assert.Contains(services, d => d.ServiceType == typeof(IExternalAuthenticationHooks));
+
+        // The external-login flow/hooks are now owned by AddThemiaExternalAuth (ExternalAuth package),
+        // not AddThemiaIdentityAspNetCore — so they are intentionally absent here.
+        Assert.DoesNotContain(services, d => d.ServiceType == typeof(IExternalAuthenticationFlow));
+        Assert.DoesNotContain(services, d => d.ServiceType == typeof(IExternalAuthenticationHooks));
     }
 
     [Fact]
