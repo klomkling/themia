@@ -16,9 +16,10 @@ namespace Themia.Modules.Identity.AspNetCore.External;
 /// secret (<see cref="OidcProviderConfig.SymmetricSecret"/>).</summary>
 /// <remarks>Reuses the same <see cref="JsonWebTokenHandler"/> validation idioms as the 0.5.1 access
 /// token slice (<c>MapInboundClaims=false</c>, explicit issuer/audience/lifetime), and a fixed
-/// <see cref="TimeProvider"/> for deterministic lifetime validation. The asymmetric path resolves and
-/// auto-refreshes signing keys through <see cref="ConfigurationManager{T}"/>, so a key rotation at the
-/// IdP recovers without a process restart.</remarks>
+/// <see cref="TimeProvider"/> for deterministic lifetime validation. The asymmetric path resolves
+/// signing keys through a cached <see cref="ConfigurationManager{T}"/>; on a signature failure that looks
+/// like a key rotation it fetches fresh metadata + JWKS directly and retries once, so a rotation at the
+/// IdP recovers within the same request without a process restart.</remarks>
 public sealed class OidcExternalAuthProvider : IExternalAuthProvider
 {
     /// <summary>The named-<see cref="HttpClient"/> prefix; the suffix is the provider name.</summary>
@@ -37,6 +38,7 @@ public sealed class OidcExternalAuthProvider : IExternalAuthProvider
     private readonly TimeProvider timeProvider;
     private readonly ILogger<OidcExternalAuthProvider> logger;
     private readonly ConfigurationManager<OpenIdConnectConfiguration>? configManager;
+    private readonly HttpDocumentRetriever? documentRetriever;
 
     /// <summary>Creates the provider.</summary>
     /// <param name="config">The provider configuration.</param>
@@ -76,7 +78,7 @@ public sealed class OidcExternalAuthProvider : IExternalAuthProvider
             // held for the provider's (singleton) lifetime by ConfigurationManager; the named client's
             // handler is configured with a bounded PooledConnectionLifetime (see ExternalAuthBuilder) so
             // socket-level connection age is recycled despite not rotating the HttpClient instance.
-            var documentRetriever = new HttpDocumentRetriever(
+            documentRetriever = new HttpDocumentRetriever(
                 httpClientFactory.CreateClient(HttpClientPrefix + config.Name));
             configManager = new ConfigurationManager<OpenIdConnectConfiguration>(
                 config.MetadataAddress!.AbsoluteUri,
@@ -203,10 +205,16 @@ public sealed class OidcExternalAuthProvider : IExternalAuthProvider
         }
 
         // A rotation race (token signed by a new key not yet in our cached metadata) looks like a
-        // signature failure. Force a metadata refresh and retry exactly once so login recovers.
+        // signature failure. Fetch fresh metadata + JWKS directly and retry exactly once so login
+        // recovers immediately. We bypass ConfigurationManager.RequestRefresh() for this retry because
+        // since IdentityModel 8.x it is rate-limited by RefreshInterval (a refresh-flooding guard), so an
+        // in-request forced refresh is a no-op until the interval elapses. Reaching this path requires a
+        // *successful* token-endpoint code exchange, so the direct fetch is not an unauthenticated refresh
+        // vector. We still nudge the cached manager so subsequent logins pick up the rotated keys.
+        var refreshed = await OpenIdConnectConfigurationRetriever.GetAsync(
+            config.MetadataAddress!.AbsoluteUri, documentRetriever!, cancellationToken);
         configManager!.RequestRefresh();
-        var refreshedKeys = await GetSigningKeysAsync(cancellationToken);
-        return await ValidateWithKeysAsync(idToken, refreshedKeys, AsymmetricAlgorithms);
+        return await ValidateWithKeysAsync(idToken, refreshed.SigningKeys, AsymmetricAlgorithms);
     }
 
     private async Task<ICollection<SecurityKey>> GetSigningKeysAsync(CancellationToken cancellationToken)

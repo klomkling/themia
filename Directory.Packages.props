@@ -17,10 +17,19 @@
     <PackageVersion Include="xunit" Version="2.9.3" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
     <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.9" />
-    <!-- Identity external login (0.5.2): OIDC discovery/JWKS for Google. IdentityModel pinned to 8.0.1
-         to match the version JwtBearer 10.0.9 already resolves transitively. (Microsoft.Extensions.Http /
-         IHttpClientFactory comes from the Microsoft.AspNetCore.App framework reference — no extra pin.) -->
-    <PackageVersion Include="Microsoft.IdentityModel.Protocols.OpenIdConnect" Version="8.0.1" />
+    <!-- Identity external login (0.5.2): OIDC discovery/JWKS for Google. The whole Microsoft.IdentityModel.*
+         family is pinned to ONE version (8.19.1) — it must be version-consistent, and JwtBearer 10.0.9 only
+         pulls 8.0.1 transitively, so we override the family explicitly (bump these together). 8.19 rate-limits
+         ConfigurationManager.RequestRefresh() (a refresh-flooding guard), so OidcExternalAuthProvider does a
+         direct one-shot metadata/JWKS fetch on a rotation signature-failure instead (see that class). Bump as
+         a unit; see MIGRATION.md 0.6.5. (Microsoft.Extensions.Http / IHttpClientFactory comes from the
+         Microsoft.AspNetCore.App framework reference — no extra pin.) -->
+    <PackageVersion Include="Microsoft.IdentityModel.Protocols.OpenIdConnect" Version="8.19.1" />
+    <PackageVersion Include="Microsoft.IdentityModel.Protocols" Version="8.19.1" />
+    <PackageVersion Include="Microsoft.IdentityModel.Tokens" Version="8.19.1" />
+    <PackageVersion Include="Microsoft.IdentityModel.JsonWebTokens" Version="8.19.1" />
+    <PackageVersion Include="Microsoft.IdentityModel.Logging" Version="8.19.1" />
+    <PackageVersion Include="System.IdentityModel.Tokens.Jwt" Version="8.19.1" />
     <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.9" />
     <PackageVersion Include="Microsoft.AspNetCore.TestHost" Version="8.0.28" Condition="'$(TargetFramework)' == 'net8.0' or '$(TargetFramework)' == ''" />
     <PackageVersion Include="Microsoft.AspNetCore.TestHost" Version="10.0.9" Condition="'$(TargetFramework)' == 'net10.0'" />
