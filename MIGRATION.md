@@ -10,6 +10,48 @@ with the *why* and concrete upgrade steps.
 - Each entry states: **What changed**, **Why**, and **How to upgrade** (before → after).
 - Non-breaking changes are *not* listed here — see the CHANGELOG.
 
+## 0.6.4
+
+### Upgrade straight to 0.6.4 — do not use 0.6.3
+
+**What changed:** the packages published as **0.6.3 are incomplete** and should be skipped. A
+release-pipeline race published 0.6.3 from its original commit *before* two fixes (below) merged,
+then the corrected release runs self-skipped because the `v0.6.3` tag already existed. 0.6.4 is
+0.6.3 *as intended*.
+
+**Why:** the 0.6.3 publish job waited in the `nuget` environment approval gate while
+`Themia.Modules.Notifications` follow-ups merged to `main`; when it was approved it built the stale
+tagged commit, and the later push-triggered runs hit the "tag already exists → skip" guard. NuGet
+versions are immutable, so the fix is a new version, not a re-publish.
+
+**How to upgrade:**
+
+- If you installed any `Themia.*` **0.6.3** package, bump to **0.6.4** (same API surface; no code
+  changes). 0.6.3 is recommended for unlisting on nuget.org.
+- Nothing else is required for the Notifications API itself — 0.6.4 only adds the MySQL deadlock fix
+  and the FluentMigrator bump described next.
+
+### FluentMigrator 7.2.0 → 8.0.1
+
+**What changed:** the `FluentMigrator` core and the `FluentMigrator.Runner.Postgres` /
+`FluentMigrator.Runner.MySql` / `FluentMigrator.Runner.SqlServer` packages moved to **8.0.1** (a major
+version).
+
+**Why:** stay current with the migration engine; the split per-runner Dependabot PRs could never land
+the shared-version bump on their own (each moved the same `FluentMigrator` coordinate and conflicted),
+so the four packages are bumped together. Validated against every FluentMigrator-backed integration
+suite (Data.Migrations, Scheduling, Exceptional, Notifications) on PostgreSQL/MySQL/SQL Server.
+
+**How to upgrade:**
+
+- **No action** if you run migrations through Themia (`ThemiaMigrations.Run(...)`,
+  `NotificationsModule.InitializeAsync`, the Scheduling/Exceptional modules) — the bump is transitive
+  and behavior-compatible across the supported engines.
+- **Only if you reference the `FluentMigrator*` packages directly** in your own project (e.g.
+  hand-authored migrations or a custom runner): align your reference to `8.0.1` and review the
+  [FluentMigrator 8.0 release notes](https://github.com/fluentmigrator/fluentmigrator/releases) for
+  any of your own usages.
+
 ## 0.4.9
 
 ### Themia analyzers now run in adopter builds
