@@ -12,7 +12,7 @@ namespace Themia.Modules.Identity.ExternalAuth.AspNetCore.External;
 /// missing/rejected or a hook deny) yields a typed result the endpoint collapses to a uniform 401
 /// (except <see cref="ExternalLoginOutcome.ProviderNotFound"/> → 404). The token terminus mirrors the
 /// 0.5.1 password flow exactly, so external tokens are first-class Themia access + refresh pairs.</summary>
-public sealed class ExternalAuthenticationFlow : IExternalAuthenticationFlow
+internal sealed class ExternalAuthenticationFlow : IExternalAuthenticationFlow
 {
     private const string AuthenticationType = "Bearer";
 

@@ -21,19 +21,10 @@ Themia.Modules.Identity.ExternalAuth.AspNetCore.Endpoints.IdentityExternalAuthEn
 Themia.Modules.Identity.ExternalAuth.AspNetCore.External.ExternalAuthProviderRegistry
 Themia.Modules.Identity.ExternalAuth.AspNetCore.External.ExternalAuthProviderRegistry.ExternalAuthProviderRegistry(System.Collections.Generic.IEnumerable<Themia.Modules.Identity.Abstractions.Authentication.IExternalAuthProvider!>! providers) -> void
 Themia.Modules.Identity.ExternalAuth.AspNetCore.External.ExternalAuthProviderRegistry.TryGet(string! name, out Themia.Modules.Identity.Abstractions.Authentication.IExternalAuthProvider? provider) -> bool
-Themia.Modules.Identity.ExternalAuth.AspNetCore.External.ExternalAuthenticationFlow
-Themia.Modules.Identity.ExternalAuth.AspNetCore.External.ExternalAuthenticationFlow.AuthenticateAsync(string! provider, Themia.Modules.Identity.Abstractions.Authentication.ExternalAuthRequest request, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Identity.Abstractions.Authentication.ExternalLoginFlowResult>!
-Themia.Modules.Identity.ExternalAuth.AspNetCore.External.ExternalAuthenticationFlow.ExternalAuthenticationFlow(Themia.Modules.Identity.ExternalAuth.AspNetCore.External.IExternalAuthProviderRegistry! registry, Themia.Modules.Identity.Abstractions.Authentication.IExternalLoginService! externalLogins, Themia.Modules.Identity.Abstractions.IClaimsPrincipalFactory! principalFactory, Themia.Modules.Identity.Abstractions.Authentication.IAccessTokenService! accessTokens, Themia.Modules.Identity.Abstractions.Authentication.IRefreshTokenService! refreshTokens, Themia.Modules.Identity.Abstractions.Authentication.IExternalAuthenticationHooks! hooks, System.TimeProvider! timeProvider, Microsoft.Extensions.Logging.ILogger<Themia.Modules.Identity.ExternalAuth.AspNetCore.External.ExternalAuthenticationFlow!>! logger) -> void
 Themia.Modules.Identity.ExternalAuth.AspNetCore.External.ExternalAuthenticationHooksBase
 Themia.Modules.Identity.ExternalAuth.AspNetCore.External.ExternalAuthenticationHooksBase.ExternalAuthenticationHooksBase() -> void
 Themia.Modules.Identity.ExternalAuth.AspNetCore.External.IExternalAuthProviderRegistry
 Themia.Modules.Identity.ExternalAuth.AspNetCore.External.IExternalAuthProviderRegistry.TryGet(string! name, out Themia.Modules.Identity.Abstractions.Authentication.IExternalAuthProvider? provider) -> bool
-Themia.Modules.Identity.ExternalAuth.AspNetCore.External.OidcExternalAuthProvider
-Themia.Modules.Identity.ExternalAuth.AspNetCore.External.OidcExternalAuthProvider.ClockSkew.get -> System.TimeSpan
-Themia.Modules.Identity.ExternalAuth.AspNetCore.External.OidcExternalAuthProvider.ClockSkew.init -> void
-Themia.Modules.Identity.ExternalAuth.AspNetCore.External.OidcExternalAuthProvider.ExchangeAsync(Themia.Modules.Identity.Abstractions.Authentication.ExternalAuthRequest request, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Identity.Abstractions.Authentication.ExternalAuthResult>!
-Themia.Modules.Identity.ExternalAuth.AspNetCore.External.OidcExternalAuthProvider.Name.get -> string!
-Themia.Modules.Identity.ExternalAuth.AspNetCore.External.OidcExternalAuthProvider.OidcExternalAuthProvider(Themia.Modules.Identity.ExternalAuth.AspNetCore.External.OidcProviderConfig! config, System.Net.Http.IHttpClientFactory! httpClientFactory, System.TimeProvider! timeProvider, Microsoft.Extensions.Logging.ILoggerFactory! loggerFactory) -> void
 Themia.Modules.Identity.ExternalAuth.AspNetCore.External.OidcProviderConfig
 Themia.Modules.Identity.ExternalAuth.AspNetCore.External.OidcProviderConfig.Audience.get -> string!
 Themia.Modules.Identity.ExternalAuth.AspNetCore.External.OidcProviderConfig.Audience.init -> void

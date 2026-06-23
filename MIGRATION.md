@@ -10,6 +10,28 @@ with the *why* and concrete upgrade steps.
 - Each entry states: **What changed**, **Why**, and **How to upgrade** (before → after).
 - Non-breaking changes are *not* listed here — see the CHANGELOG.
 
+## 0.6.7
+
+### `OidcExternalAuthProvider` and `ExternalAuthenticationFlow` are now `internal`
+
+**What changed:** the two concrete external-auth implementations in
+`Themia.Modules.Identity.ExternalAuth.AspNetCore` — `OidcExternalAuthProvider` and
+`ExternalAuthenticationFlow` — changed from `public` to `internal`. They are still registered and used
+exactly as before; only direct references to the concrete types break.
+
+**Why:** both are pure DI implementations behind `IExternalAuthProvider` and `IExternalAuthenticationFlow`.
+Consumers register them through `AddThemiaExternalAuth()` and resolve the interfaces, so the concrete types
+were never part of the intended surface. They were briefly public in 0.6.6 (their first release); narrowing
+them now — before any consumer depends on them — keeps the package surface to the interfaces.
+
+**How to upgrade:**
+
+- **No action** for normal use — `AddThemiaExternalAuth()`, the builder, the endpoints, and the
+  `IExternalAuthProvider` / `IExternalAuthenticationFlow` abstractions are unchanged.
+- **If you referenced `OidcExternalAuthProvider` or `ExternalAuthenticationFlow` directly** (only possible
+  on 0.6.6), depend on the interface instead: resolve `IExternalAuthProvider` / `IExternalAuthenticationFlow`
+  from DI, or register a provider via the `AddThemiaExternalAuth().AddOidc(...)/.AddProvider(...)` builder.
+
 ## 0.6.6
 
 ### External-auth + JWT-issuance types extracted into two new packages
@@ -40,7 +62,11 @@ full Identity user-store stack — external login in particular now works over a
 
 - **Bundled consumers** (you already reference `Themia.Modules.Identity.AspNetCore`) — **update `using`
   directives only.** That package re-references both new packages, so every moved type is still available
-  at runtime; only the namespaces changed.
+  at runtime; only the namespaces changed. **One exception if you use external login:** the external-auth
+  flow is no longer auto-registered by `AddThemiaIdentityAspNetCore` — you must add `AddThemiaExternalAuth()`
+  yourself (it was previously wired implicitly). If you map `MapIdentityExternalAuthEndpoints` without it,
+  the endpoint resolves no `IExternalAuthenticationFlow` and fails on the first request rather than at
+  startup, so also call `ValidateThemiaExternalAuth()` during startup to fail-fast on a missing seam.
 - **Bring-your-own (BYO) adoption** — reference the new package(s) directly and:
   - call `AddThemiaIdentityTokens` (Tokens) and/or `AddThemiaExternalAuth` (ExternalAuth);
   - register `IExternalLoginService`, `IRefreshTokenService`, and `IClaimsPrincipalFactory`;

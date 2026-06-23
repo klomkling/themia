@@ -56,7 +56,7 @@ public static class IdentityAuthEndpointRouteBuilderExtensions
         {
             throw new UnauthorizedException(GenericAuthFailure);
         }
-        return Results.Ok(new AuthResponse(tokens.AccessToken, tokens.ExpiresInSeconds, tokens.RefreshToken));
+        return Results.Ok(AuthResponse.FromTokens(tokens));
     }
 
     private static async Task<IResult> RefreshAsync(RefreshRequest request, IAuthenticationFlow flow, CancellationToken cancellationToken)
@@ -71,7 +71,7 @@ public static class IdentityAuthEndpointRouteBuilderExtensions
         {
             throw new UnauthorizedException(GenericAuthFailure);
         }
-        return Results.Ok(new AuthResponse(tokens.AccessToken, tokens.ExpiresInSeconds, tokens.RefreshToken));
+        return Results.Ok(AuthResponse.FromTokens(tokens));
     }
 
     private static async Task<IResult> LogoutAsync(LogoutRequest request, IAuthenticationFlow flow, CancellationToken cancellationToken)

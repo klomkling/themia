@@ -27,6 +27,24 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.6.7] - 2026-06-23
+
+### Added
+- `AuthResponse.FromTokens(AuthTokens)` (in `Themia.Modules.Identity.Abstractions`) — a single mapper
+  for the `AuthTokens.ExpiresInSeconds` → `AuthResponse.ExpiresIn` wire bridge, replacing the positional
+  construction repeated at the login, refresh, and external-login endpoints.
+
+### Changed
+- **(breaking)** `OidcExternalAuthProvider` and `ExternalAuthenticationFlow` (in
+  `Themia.Modules.Identity.ExternalAuth.AspNetCore`) are now `internal`. They are pure DI implementations
+  resolved through `IExternalAuthProvider` / `IExternalAuthenticationFlow`; consumers never need the
+  concrete types. See [MIGRATION.md](MIGRATION.md#067).
+
+### Fixed
+- Documentation: the 0.6.6 MIGRATION note now warns bundled consumers that external login is no longer
+  auto-wired by `AddThemiaIdentityAspNetCore` — they must call `AddThemiaExternalAuth()` (and
+  `ValidateThemiaExternalAuth()` to fail-fast) or the endpoint 500s on first request.
+
 ## [0.6.6] - 2026-06-23
 
 ### Added

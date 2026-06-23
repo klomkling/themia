@@ -31,6 +31,17 @@ public sealed class ExternalAuthRegistrationTests
     }
 
     [Fact]
+    public void AddThemiaExternalAuth_called_twice_registers_flow_once()
+    {
+        var services = new ServiceCollection();
+
+        services.AddThemiaExternalAuth();
+        services.AddThemiaExternalAuth();
+
+        Assert.Single(services, d => d.ServiceType == typeof(IExternalAuthenticationFlow));
+    }
+
+    [Fact]
     public void ValidateThemiaExternalAuth_passes_when_all_seams_are_present()
     {
         var services = new ServiceCollection();
