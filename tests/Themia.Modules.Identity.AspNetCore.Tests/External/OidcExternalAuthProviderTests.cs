@@ -582,6 +582,51 @@ public sealed class OidcExternalAuthProviderTests
         Assert.False(result.Succeeded);
         Assert.Equal(1, jwksFetches); // no rotation refetch for a non-key failure
     }
+
+    [Fact]
+    public async Task ExchangeAsync_asymmetric_returns_failure_when_token_still_invalid_after_refresh()
+    {
+        // Rotation triggers a refetch that succeeds (HTTP 200), but the refreshed JWKS still doesn't
+        // contain the token's signing key (e.g. a second rotation / genuinely unknown key). The retry must
+        // fail cleanly — not throw, and not return a token.
+        var tokenKey = TestIdTokens.NewRsaKey();
+        var staleKey = TestIdTokens.NewRsaKey();
+        var otherKey = TestIdTokens.NewRsaKey();
+        var idToken = TestIdTokens.SignRs256(tokenKey, Issuer, ClientId, Now, Now.AddMinutes(5),
+            new Dictionary<string, object> { ["sub"] = "G1", ["email"] = "user@gmail.test" });
+
+        var discoveryJson = JsonSerializer.Serialize(new { issuer = Issuer, jwks_uri = JwksUri.AbsoluteUri });
+        var tokenJson = TokenResponse(idToken);
+        var jwksFetches = 0;
+        var handler = new StubHttpMessageHandler(req =>
+        {
+            string body;
+            if (req.RequestUri == MetadataAddress)
+            {
+                body = discoveryJson;
+            }
+            else if (req.RequestUri == JwksUri)
+            {
+                // Both fetches succeed but neither serves the token's signing key.
+                body = Interlocked.Increment(ref jwksFetches) == 1 ? staleKey.JwksJson : otherKey.JwksJson;
+            }
+            else
+            {
+                body = tokenJson;
+            }
+
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(body, System.Text.Encoding.UTF8, "application/json"),
+            });
+        });
+        var provider = Provider(AsymmetricConfig(), HttpClientReturning(handler), Clock());
+
+        var result = await provider.ExchangeAsync(Request());
+
+        Assert.False(result.Succeeded);
+        Assert.True(jwksFetches >= 2); // a rotation refetch happened, but the key still wasn't found
+    }
 }
 
 /// <summary>An <see cref="IHttpClientFactory"/> that always hands back the same client.</summary>

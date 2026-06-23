@@ -230,10 +230,16 @@ public sealed class OidcExternalAuthProvider : IExternalAuthProvider
             refreshed = await OpenIdConnectConfigurationRetriever.GetAsync(
                 config.MetadataAddress!.AbsoluteUri, documentRetriever!, cancellationToken);
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw; // genuine caller cancellation — propagate
+        }
+        catch (Exception ex)
         {
             // A transient metadata/JWKS fetch failure is an expected operational error, not a server
             // fault: surface it as an invalid id_token (caller maps to a clean auth failure), don't throw.
+            // Gating on the token (not the exception type) keeps an HttpClient request-timeout — which
+            // surfaces as a TaskCanceledException unrelated to our token — on this degradation path.
             logger.LogWarning(
                 ex, "External provider {Provider} metadata refresh after a suspected key rotation failed.",
                 config.Name);
@@ -275,8 +281,10 @@ public sealed class OidcExternalAuthProvider : IExternalAuthProvider
     {
         if (!result.IsValid)
         {
+            // Log the failure class (type name only — never the token) to aid diagnosis without leaking.
             logger.LogInformation(
-                "External provider {Provider} id_token failed validation.", config.Name);
+                "External provider {Provider} id_token failed validation ({Reason}).",
+                config.Name, result.Exception?.GetType().Name ?? "unknown");
             return null;
         }
 
