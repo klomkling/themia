@@ -90,7 +90,18 @@ internal sealed class OutboxDrainer(
         foreach (var row in claimed)
         {
             ct.ThrowIfCancellationRequested();
-            await DeliverAsync(scope.ServiceProvider, connection, row, ct).ConfigureAwait(false);
+            try
+            {
+                await DeliverAsync(scope.ServiceProvider, connection, row, ct).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                throw; // shutdown — abort cleanly
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Outbox row {Id} could not be finalized; leaving for lease re-claim.", row.Id);
+            }
         }
 
         return claimed.Count;
@@ -124,9 +135,10 @@ internal sealed class OutboxDrainer(
         {
             throw; // host stop — let the cycle observe cancellation, do not record as a failure.
         }
-        catch (FormatException ex)
+        catch (Exception ex) when (ex is FormatException or NotSupportedException)
         {
-            // A malformed address/body is permanent — retrying cannot help, so dead-letter immediately.
+            // A malformed address/body (FormatException) or an undeliverable channel routed to the outbox
+            // (NotSupportedException) is permanent — retrying cannot help, so dead-letter immediately.
             await FailRowAsync(connection, row, permanent: true, ex, ct).ConfigureAwait(false);
         }
         catch (Exception ex)
@@ -149,7 +161,7 @@ internal sealed class OutboxDrainer(
     {
         var attempts = row.Attempts + 1;
         var dead = permanent || BackoffPolicy.IsDead(attempts, options.MaxAttempts);
-        var next = BackoffPolicy.NextAttemptAt(time.GetUtcNow(), attempts, options.MaxAttempts);
+        var next = BackoffPolicy.NextAttemptAt(time.GetUtcNow(), attempts);
 
         // Log once, with safe context only (no recipient PII, no credentials). The drainer owns the
         // outcome (THEMIA101: no log-and-rethrow) — record it on the row instead of propagating.

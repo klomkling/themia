@@ -210,6 +210,46 @@ public class NotificationDispatcherTests
     }
 
     [Fact]
+    public async Task Dispatch_throws_when_no_channels_requested()
+    {
+        var dispatcher = Build(
+            [NotificationChannel.Email], new RecordingOutboxStore(), new RecordingInAppRepository(),
+            new RecordingRenderer(), DateTimeOffset.UnixEpoch);
+
+        var ex = await Assert.ThrowsAsync<ArgumentException>(() => dispatcher.DispatchAsync(new NotificationRequest
+        {
+            UserId = "user-1",
+            Channels = [],
+            Body = "x",
+        }));
+        Assert.Equal("request", ex.ParamName);
+    }
+
+    [Fact]
+    public async Task Dispatch_with_scheduled_for_sets_next_attempt_and_scheduled_for()
+    {
+        var now = DateTimeOffset.UnixEpoch;
+        var scheduledFor = now.AddHours(6);
+        var outbox = new RecordingOutboxStore();
+        var dispatcher = Build(
+            [NotificationChannel.Email], outbox, new RecordingInAppRepository(),
+            new RecordingRenderer(), now);
+
+        await dispatcher.DispatchAsync(new NotificationRequest
+        {
+            UserId = "user-1",
+            Channels = [NotificationChannel.Email],
+            Recipients = new Dictionary<NotificationChannel, string> { [NotificationChannel.Email] = "to@example.com" },
+            Body = "x",
+            ScheduledFor = scheduledFor,
+        });
+
+        var message = Assert.Single(outbox.Enqueued);
+        Assert.Equal(scheduledFor, message.NextAttemptAt);
+        Assert.Equal(scheduledFor, message.ScheduledFor);
+    }
+
+    [Fact]
     public async Task Dispatch_skips_external_channel_with_missing_recipient()
     {
         var outbox = new RecordingOutboxStore();

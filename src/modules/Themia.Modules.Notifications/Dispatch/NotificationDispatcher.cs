@@ -17,6 +17,7 @@ internal sealed class NotificationDispatcher(
     public async Task DispatchAsync(NotificationRequest request, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(request);
+        if (request.Channels.Count == 0) throw new ArgumentException("At least one channel is required.", nameof(request));
         var resolved = await preferences.ResolveAsync(request.UserId, request.Channels, ct).ConfigureAwait(false);
         var body = request.Body ?? (request.Template is null ? string.Empty : renderer.Render(request.Template, request.Model ?? new object()));
         var now = time.GetUtcNow();

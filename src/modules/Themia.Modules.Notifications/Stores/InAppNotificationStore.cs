@@ -10,7 +10,8 @@ namespace Themia.Modules.Notifications.Stores;
 /// the tenant + soft-delete query filters by construction — the store never re-filters by tenant.</summary>
 internal sealed class InAppNotificationStore(
     IRepository<InAppNotification, Guid> notifications,
-    IUnitOfWork unitOfWork) : IInAppNotificationStore
+    IUnitOfWork unitOfWork,
+    TimeProvider time) : IInAppNotificationStore
 {
     public async Task AddAsync(InAppNotification notification, CancellationToken ct = default)
     {
@@ -31,7 +32,7 @@ internal sealed class InAppNotificationStore(
         }
 
         entity.IsRead = true;
-        entity.ReadAt = DateTimeOffset.UtcNow;
+        entity.ReadAt = time.GetUtcNow();
         notifications.Update(entity);
         await unitOfWork.SaveChangesAsync(ct).ConfigureAwait(false);
         return true;

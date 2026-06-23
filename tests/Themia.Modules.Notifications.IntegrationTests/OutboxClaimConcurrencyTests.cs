@@ -111,6 +111,25 @@ public abstract class OutboxClaimConcurrencyTests
         Assert.DoesNotContain(freshId, claimedIds);
     }
 
+    [Fact]
+    public async Task Claimed_row_maps_subject_body_and_recipient_to_the_right_fields()
+    {
+        // Distinct, recognizable values per column catch a positional tuple transposition in the dialect.
+        var now = DateTimeOffset.UtcNow;
+        var id = Guid.NewGuid();
+        await InsertRowAsync(id, status: 0, nextAttemptAt: now, scheduledFor: null,
+            subject: "SUBJ-x", body: "BODY-x", recipient: "recip-x@example.com");
+
+        await using var conn = Dialect.CreateConnection();
+        await conn.OpenAsync();
+        var claimed = await Dialect.ClaimAsync(conn, "drainer", now, now.AddMinutes(2), 10, default);
+
+        var row = Assert.Single(claimed, r => r.Id == id);
+        Assert.Equal("SUBJ-x", row.Subject);
+        Assert.Equal("BODY-x", row.Body);
+        Assert.Equal("recip-x@example.com", row.Recipient);
+    }
+
     private async Task ResetClaimedToPendingAsync(DateTimeOffset now)
     {
         await using var conn = Dialect.CreateConnection();
@@ -131,7 +150,8 @@ public abstract class OutboxClaimConcurrencyTests
 
     private async Task InsertRowAsync(
         Guid id, int status, DateTimeOffset nextAttemptAt, DateTimeOffset? scheduledFor,
-        string? leaseOwner = null, DateTimeOffset? leaseExpiresAt = null)
+        string? leaseOwner = null, DateTimeOffset? leaseExpiresAt = null,
+        string? subject = null, string body = "hello", string recipient = "to@example.com")
     {
         await using var conn = Dialect.CreateConnection();
         await conn.OpenAsync();
@@ -140,15 +160,16 @@ public abstract class OutboxClaimConcurrencyTests
             (id, tenant_id, channel, recipient, subject, body, status, attempts,
              next_attempt_at, scheduled_for, lease_owner, lease_expires_at, created_at, sent_at, last_error)
             VALUES
-            (@id, NULL, @channel, @recipient, NULL, @body, @status, 0,
+            (@id, NULL, @channel, @recipient, @subject, @body, @status, 0,
              @next, @scheduled, @owner, @exp, @created, NULL, NULL)
             """;
         await conn.ExecuteAsync(sql, new
         {
             id,
             channel = (int)NotificationChannel.Email,
-            recipient = "to@example.com",
-            body = "hello",
+            recipient,
+            subject,
+            body,
             status,
             next = nextAttemptAt,
             scheduled = scheduledFor,

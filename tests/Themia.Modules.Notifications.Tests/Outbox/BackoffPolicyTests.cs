@@ -13,14 +13,14 @@ public class BackoffPolicyTests
     [InlineData(3, 8)]     // attempt 3 -> ~8s
     public void NextAttempt_grows_exponentially(int attempts, int expectedSeconds)
     {
-        var next = BackoffPolicy.NextAttemptAt(Now, attempts, maxAttempts: 5);
+        var next = BackoffPolicy.NextAttemptAt(Now, attempts);
         Assert.Equal(Now.AddSeconds(expectedSeconds), next);
     }
 
     [Fact]
     public void NextAttempt_is_capped()
     {
-        var next = BackoffPolicy.NextAttemptAt(Now, attempts: 20, maxAttempts: 50);
+        var next = BackoffPolicy.NextAttemptAt(Now, attempts: 20);
         Assert.True(next - Now <= BackoffPolicy.MaxDelay);
     }
 
