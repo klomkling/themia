@@ -11,7 +11,15 @@ public readonly record struct AuthTokens(string AccessToken, int ExpiresInSecond
 /// <param name="AccessToken">The serialized JWT.</param>
 /// <param name="ExpiresIn">Access-token lifetime remaining, in seconds.</param>
 /// <param name="RefreshToken">The opaque refresh token.</param>
-public sealed record AuthResponse(string AccessToken, int ExpiresIn, string RefreshToken);
+public sealed record AuthResponse(string AccessToken, int ExpiresIn, string RefreshToken)
+{
+    /// <summary>Maps an issued <see cref="AuthTokens"/> pair to the wire response, bridging the
+    /// internal <c>ExpiresInSeconds</c> field to the wire <c>ExpiresIn</c> name.</summary>
+    /// <param name="tokens">The issued token pair.</param>
+    /// <returns>The response contract.</returns>
+    public static AuthResponse FromTokens(AuthTokens tokens) =>
+        new(tokens.AccessToken, tokens.ExpiresInSeconds, tokens.RefreshToken);
+}
 
 /// <summary>The outcome of a login attempt. Every non-success collapses to a uniform 401 at the
 /// boundary; the distinction exists for internal/audit use only.</summary>

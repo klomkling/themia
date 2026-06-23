@@ -19,6 +19,7 @@ Themia.Modules.Identity.Abstractions.Authentication.AuthResponse.ExpiresIn.get -
 Themia.Modules.Identity.Abstractions.Authentication.AuthResponse.ExpiresIn.init -> void
 Themia.Modules.Identity.Abstractions.Authentication.AuthResponse.RefreshToken.get -> string!
 Themia.Modules.Identity.Abstractions.Authentication.AuthResponse.RefreshToken.init -> void
+static Themia.Modules.Identity.Abstractions.Authentication.AuthResponse.FromTokens(Themia.Modules.Identity.Abstractions.Authentication.AuthTokens tokens) -> Themia.Modules.Identity.Abstractions.Authentication.AuthResponse!
 Themia.Modules.Identity.Abstractions.Authentication.AuthTokens
 Themia.Modules.Identity.Abstractions.Authentication.AuthTokens.AccessToken.get -> string!
 Themia.Modules.Identity.Abstractions.Authentication.AuthTokens.AccessToken.init -> void

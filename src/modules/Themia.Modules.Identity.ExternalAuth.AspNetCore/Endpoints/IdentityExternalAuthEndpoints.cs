@@ -49,7 +49,7 @@ public static class IdentityExternalAuthEndpointRouteBuilderExtensions
 
         if (result.Succeeded && result.Tokens is { } tokens)
         {
-            return Results.Ok(new AuthResponse(tokens.AccessToken, tokens.ExpiresInSeconds, tokens.RefreshToken));
+            return Results.Ok(AuthResponse.FromTokens(tokens));
         }
 
         if (result.Outcome == ExternalLoginOutcome.ProviderNotFound)

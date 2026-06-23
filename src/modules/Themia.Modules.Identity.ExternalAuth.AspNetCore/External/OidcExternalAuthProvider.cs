@@ -20,7 +20,7 @@ namespace Themia.Modules.Identity.ExternalAuth.AspNetCore.External;
 /// signing keys through a cached <see cref="ConfigurationManager{T}"/>; on a signature failure that looks
 /// like a key rotation it fetches fresh metadata + JWKS directly and retries once, so a rotation at the
 /// IdP recovers within the same request without a process restart.</remarks>
-public sealed class OidcExternalAuthProvider : IExternalAuthProvider
+internal sealed class OidcExternalAuthProvider : IExternalAuthProvider
 {
     /// <summary>The named-<see cref="HttpClient"/> prefix; the suffix is the provider name.</summary>
     internal const string HttpClientPrefix = "Themia.Identity.ExternalAuth:";

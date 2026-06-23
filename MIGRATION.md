@@ -40,7 +40,11 @@ full Identity user-store stack — external login in particular now works over a
 
 - **Bundled consumers** (you already reference `Themia.Modules.Identity.AspNetCore`) — **update `using`
   directives only.** That package re-references both new packages, so every moved type is still available
-  at runtime; only the namespaces changed.
+  at runtime; only the namespaces changed. **One exception if you use external login:** the external-auth
+  flow is no longer auto-registered by `AddThemiaIdentityAspNetCore` — you must add `AddThemiaExternalAuth()`
+  yourself (it was previously wired implicitly). If you map `MapIdentityExternalAuthEndpoints` without it,
+  the endpoint resolves no `IExternalAuthenticationFlow` and fails on the first request rather than at
+  startup, so also call `ValidateThemiaExternalAuth()` during startup to fail-fast on a missing seam.
 - **Bring-your-own (BYO) adoption** — reference the new package(s) directly and:
   - call `AddThemiaIdentityTokens` (Tokens) and/or `AddThemiaExternalAuth` (ExternalAuth);
   - register `IExternalLoginService`, `IRefreshTokenService`, and `IClaimsPrincipalFactory`;
