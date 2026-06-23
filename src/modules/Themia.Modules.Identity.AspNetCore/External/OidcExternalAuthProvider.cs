@@ -83,7 +83,14 @@ public sealed class OidcExternalAuthProvider : IExternalAuthProvider
             configManager = new ConfigurationManager<OpenIdConnectConfiguration>(
                 config.MetadataAddress!.AbsoluteUri,
                 new OpenIdConnectConfigurationRetriever(),
-                documentRetriever);
+                documentRetriever)
+            {
+                // Floor the refresh cooldown so the post-rotation RequestRefresh() actually re-primes the
+                // cache on a later poll (default RefreshInterval is 5 min); the auth-code-gated direct
+                // fetch already handles the in-request rotation, this just stops every subsequent login
+                // taking that direct path until the 12 h automatic refresh.
+                RefreshInterval = ConfigurationManager<OpenIdConnectConfiguration>.MinimumRefreshInterval,
+            };
         }
     }
 
@@ -191,39 +198,57 @@ public sealed class OidcExternalAuthProvider : IExternalAuthProvider
         if (config.SymmetricSecret is { } secret)
         {
             var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secret));
-            return await ValidateWithKeysAsync(idToken, [key], SymmetricAlgorithms);
+            return TokenOrNull(await ValidateCoreAsync(idToken, [key], SymmetricAlgorithms));
         }
 
-        // Asymmetric (RS256): keys come from OIDC discovery + JWKS, auto-refreshed on rotation. The
-        // algorithm allow-list pins RS256, blocking alg-confusion (an HS256 token signed with the public
-        // key as a MAC secret) and alg:none by allow-list rather than relying on key typing alone.
-        var signingKeys = await GetSigningKeysAsync(cancellationToken);
-        var validated = await ValidateWithKeysAsync(idToken, signingKeys, AsymmetricAlgorithms);
-        if (validated is not null)
-        {
-            return validated;
-        }
-
-        // A rotation race (token signed by a new key not yet in our cached metadata) looks like a
-        // signature failure. Fetch fresh metadata + JWKS directly and retry exactly once so login
-        // recovers immediately. We bypass ConfigurationManager.RequestRefresh() for this retry because
-        // since IdentityModel 8.x it is rate-limited by RefreshInterval (a refresh-flooding guard), so an
-        // in-request forced refresh is a no-op until the interval elapses. Reaching this path requires a
-        // *successful* token-endpoint code exchange, so the direct fetch is not an unauthenticated refresh
-        // vector. We still nudge the cached manager so subsequent logins pick up the rotated keys.
-        var refreshed = await OpenIdConnectConfigurationRetriever.GetAsync(
-            config.MetadataAddress!.AbsoluteUri, documentRetriever!, cancellationToken);
-        configManager!.RequestRefresh();
-        return await ValidateWithKeysAsync(idToken, refreshed.SigningKeys, AsymmetricAlgorithms);
-    }
-
-    private async Task<ICollection<SecurityKey>> GetSigningKeysAsync(CancellationToken cancellationToken)
-    {
+        // Asymmetric (RS256): keys come from OIDC discovery + JWKS. The algorithm allow-list pins RS256,
+        // blocking alg-confusion (an HS256 token signed with the public key as a MAC secret) and alg:none
+        // by allow-list rather than relying on key typing alone.
         var configuration = await configManager!.GetConfigurationAsync(cancellationToken);
-        return configuration.SigningKeys;
+        var result = await ValidateCoreAsync(idToken, configuration.SigningKeys, AsymmetricAlgorithms);
+        if (result.IsValid)
+        {
+            return (JsonWebToken)result.SecurityToken;
+        }
+
+        // Only a *missing signing key* looks like an IdP key rotation; other failures (expired,
+        // wrong issuer/audience, tampered signature) can't be cured by refetching keys, so don't.
+        if (result.Exception is not SecurityTokenSignatureKeyNotFoundException)
+        {
+            return TokenOrNull(result);
+        }
+
+        // Rotation race: the token is signed by a key not yet in our cached metadata. Fetch fresh
+        // metadata + JWKS directly and retry once so login recovers in-request. We bypass the cached
+        // ConfigurationManager here because since IdentityModel 8.x its RequestRefresh() is rate-limited
+        // by RefreshInterval (a refresh-flooding guard), so an in-request forced refresh is a no-op until
+        // the interval elapses. Reaching this path requires a *successful* token-endpoint code exchange,
+        // so the direct fetch is not an unauthenticated refresh vector.
+        OpenIdConnectConfiguration refreshed;
+        try
+        {
+            refreshed = await OpenIdConnectConfigurationRetriever.GetAsync(
+                config.MetadataAddress!.AbsoluteUri, documentRetriever!, cancellationToken);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // A transient metadata/JWKS fetch failure is an expected operational error, not a server
+            // fault: surface it as an invalid id_token (caller maps to a clean auth failure), don't throw.
+            logger.LogWarning(
+                ex, "External provider {Provider} metadata refresh after a suspected key rotation failed.",
+                config.Name);
+            return null;
+        }
+
+        logger.LogInformation(
+            "External provider {Provider} refreshed signing keys after a suspected key rotation.", config.Name);
+        // Nudge the cached manager so it picks up the rotated keys on a later poll (RefreshInterval is set
+        // to the minimum in the constructor so this isn't perpetually rate-limited).
+        configManager!.RequestRefresh();
+        return TokenOrNull(await ValidateCoreAsync(idToken, refreshed.SigningKeys, AsymmetricAlgorithms));
     }
 
-    private async Task<JsonWebToken?> ValidateWithKeysAsync(
+    private async Task<TokenValidationResult> ValidateCoreAsync(
         string idToken,
         IEnumerable<SecurityKey> signingKeys,
         IEnumerable<string> validAlgorithms)
@@ -243,7 +268,11 @@ public sealed class OidcExternalAuthProvider : IExternalAuthProvider
             LifetimeValidator = ValidateLifetime,
         };
 
-        var result = await Handler.ValidateTokenAsync(idToken, parameters);
+        return await Handler.ValidateTokenAsync(idToken, parameters);
+    }
+
+    private JsonWebToken? TokenOrNull(TokenValidationResult result)
+    {
         if (!result.IsValid)
         {
             logger.LogInformation(
