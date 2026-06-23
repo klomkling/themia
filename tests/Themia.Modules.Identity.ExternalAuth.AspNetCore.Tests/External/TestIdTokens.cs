@@ -3,7 +3,7 @@ using System.Text;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 
-namespace Themia.Modules.Identity.AspNetCore.Tests.External;
+namespace Themia.Modules.Identity.ExternalAuth.AspNetCore.Tests.External;
 
 /// <summary>Test helpers that mint id_tokens (HS256 for the symmetric path, RS256 + a stub JWKS
 /// document for the asymmetric path) so the provider can be exercised end-to-end without a live IdP.</summary>

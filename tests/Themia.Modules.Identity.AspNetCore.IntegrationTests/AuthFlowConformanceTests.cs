@@ -19,9 +19,9 @@ using Themia.AspNetCore;
 using Themia.Framework.Core.Abstractions.Tenancy;
 using Themia.Framework.Data.Abstractions.Auditing;
 using Themia.Modules.Identity.Abstractions;
+using Themia.Modules.Identity.Abstractions.Authentication;
 using Themia.Modules.Identity.AspNetCore.DependencyInjection;
 using Themia.Modules.Identity.AspNetCore.Endpoints;
-using Themia.Modules.Identity.AspNetCore.Options;
 using Themia.Modules.Identity.DependencyInjection;
 using Xunit;
 

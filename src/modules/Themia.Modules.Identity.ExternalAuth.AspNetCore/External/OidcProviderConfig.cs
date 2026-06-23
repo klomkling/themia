@@ -1,4 +1,4 @@
-namespace Themia.Modules.Identity.AspNetCore.External;
+namespace Themia.Modules.Identity.ExternalAuth.AspNetCore.External;
 
 /// <summary>Immutable configuration for an OIDC-style external-auth provider. Holds the token-endpoint
 /// exchange parameters, the expected token issuer/audience, the signing-key strategy

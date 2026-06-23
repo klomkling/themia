@@ -1,6 +1,6 @@
 using System.Net;
 
-namespace Themia.Modules.Identity.AspNetCore.Tests.External;
+namespace Themia.Modules.Identity.ExternalAuth.AspNetCore.Tests.External;
 
 /// <summary>A test <see cref="HttpMessageHandler"/> that returns a response built by a per-request
 /// factory, recording the requests it saw so tests can assert on the outbound exchange.</summary>

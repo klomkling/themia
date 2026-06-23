@@ -357,6 +357,8 @@ git mv $S/Endpoints/IdentityExternalAuthEndpoints.cs $E/Endpoints/
 git mv $S/Options/ExternalAuthOptions.cs $E/Options/
 ```
 
+- [ ] **Step 1b (plan amendment — discovered during execution): relocate `AuthResponse` to Abstractions.** `IdentityExternalAuthEndpoints.cs` returns `AuthResponse` (`public sealed record AuthResponse(string AccessToken, int ExpiresIn, string RefreshToken)`), which is declared in the STAYING `Endpoints/IdentityAuthEndpoints.cs` and also used by the staying local endpoints — so the moved endpoint can't reach it without a cycle. Move the `AuthResponse` record into `src/modules/Themia.Modules.Identity.Abstractions/Authentication/AuthenticationFlowContracts.cs` (next to its sibling `AuthTokens`), namespace `Themia.Modules.Identity.Abstractions.Authentication`. Both endpoint files then `using Themia.Modules.Identity.Abstractions.Authentication;` (they already do for `AuthTokens`). Update PublicAPI: remove `AuthResponse*` lines from `Identity.AspNetCore/PublicAPI.*.txt`, add them to `Abstractions/PublicAPI.Unshipped.txt`.
+
 - [ ] **Step 2: Renamespace** — in every moved file, `namespace Themia.Modules.Identity.AspNetCore.<Sub>` → `Themia.Modules.Identity.ExternalAuth.AspNetCore.<Sub>`, and update intra-set usings (`…AspNetCore.External` → `…ExternalAuth.AspNetCore.External`, `…AspNetCore.Options` (ExternalAuthOptions) → `…ExternalAuth.AspNetCore.Options`, `…AspNetCore.DependencyInjection` → `…ExternalAuth.AspNetCore.DependencyInjection`). Update the `AuthTokenIssuer` using in `ExternalAuthenticationFlow.cs` to `Themia.Modules.Identity.Tokens.AspNetCore.Authentication`.
 
 ```bash

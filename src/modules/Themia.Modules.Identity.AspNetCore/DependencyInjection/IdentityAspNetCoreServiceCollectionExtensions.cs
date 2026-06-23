@@ -8,6 +8,7 @@ using Microsoft.IdentityModel.Tokens;
 using Themia.Modules.Identity.Abstractions;
 using Themia.Modules.Identity.Abstractions.Authentication;
 using Themia.Modules.Identity.AspNetCore.Authentication;
+using Themia.Modules.Identity.ExternalAuth.AspNetCore.External;
 using Themia.Modules.Identity.Tokens.AspNetCore.DependencyInjection;
 using Themia.Modules.Identity.Tokens.AspNetCore.Options;
 using Themia.Modules.Identity.Tokens.AspNetCore.Signing;
@@ -62,8 +63,8 @@ public static class IdentityAspNetCoreServiceCollectionExtensions
         // (from AddThemiaIdentityServices) and IExternalAuthProviderRegistry (from AddThemiaExternalAuth);
         // both are resolved at runtime, so the registration order of those calls does not matter. The flow
         // is inert unless the host also maps MapIdentityExternalAuthEndpoints and registers a provider.
-        services.TryAddScoped<IExternalAuthenticationFlow, External.ExternalAuthenticationFlow>();
-        services.TryAddScoped<IExternalAuthenticationHooks, External.ExternalAuthenticationHooksBase>();
+        services.TryAddScoped<IExternalAuthenticationFlow, ExternalAuthenticationFlow>();
+        services.TryAddScoped<IExternalAuthenticationHooks, ExternalAuthenticationHooksBase>();
 
         return services;
     }

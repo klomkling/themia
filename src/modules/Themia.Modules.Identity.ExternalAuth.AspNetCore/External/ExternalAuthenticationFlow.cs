@@ -4,7 +4,7 @@ using Themia.Modules.Identity.Abstractions.Authentication;
 using Themia.Modules.Identity.Abstractions.Entities;
 using Themia.Modules.Identity.Tokens.AspNetCore.Authentication;
 
-namespace Themia.Modules.Identity.AspNetCore.External;
+namespace Themia.Modules.Identity.ExternalAuth.AspNetCore.External;
 
 /// <summary>Default <see cref="IExternalAuthenticationFlow"/>. Owns the external-login sequence
 /// (provider resolve → before-gate → exchange → resolve/provision → post-gate → issue) and invokes

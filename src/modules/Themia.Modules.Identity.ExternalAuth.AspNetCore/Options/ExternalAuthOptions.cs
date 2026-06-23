@@ -1,4 +1,4 @@
-namespace Themia.Modules.Identity.AspNetCore.Options;
+namespace Themia.Modules.Identity.ExternalAuth.AspNetCore.Options;
 
 /// <summary>Google OAuth credentials.</summary>
 public sealed class GoogleOptions

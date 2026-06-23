@@ -11,6 +11,7 @@
     <ProjectReference Include="../../framework/Themia.Framework.AspNetCore/Themia.Framework.AspNetCore.csproj" />
     <ProjectReference Include="../../neutral/Themia.AspNetCore/Themia.AspNetCore.csproj" />
     <ProjectReference Include="..\Themia.Modules.Identity.Tokens.AspNetCore\Themia.Modules.Identity.Tokens.AspNetCore.csproj" />
+    <ProjectReference Include="..\Themia.Modules.Identity.ExternalAuth.AspNetCore\Themia.Modules.Identity.ExternalAuth.AspNetCore.csproj" />
   </ItemGroup>
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />

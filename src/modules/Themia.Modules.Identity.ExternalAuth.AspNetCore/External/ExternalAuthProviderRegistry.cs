@@ -1,7 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using Themia.Modules.Identity.Abstractions.Authentication;
 
-namespace Themia.Modules.Identity.AspNetCore.External;
+namespace Themia.Modules.Identity.ExternalAuth.AspNetCore.External;
 
 /// <summary>Resolves a registered <see cref="IExternalAuthProvider"/> by its (case-insensitive) name.</summary>
 public interface IExternalAuthProviderRegistry

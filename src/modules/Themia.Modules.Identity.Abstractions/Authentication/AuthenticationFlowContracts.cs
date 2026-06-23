@@ -6,6 +6,13 @@ namespace Themia.Modules.Identity.Abstractions.Authentication;
 /// <param name="RefreshToken">The opaque refresh token.</param>
 public readonly record struct AuthTokens(string AccessToken, int ExpiresInSeconds, string RefreshToken);
 
+/// <summary>Issued token pair response (the HTTP/JSON contract returned by the auth endpoints). Shared by
+/// the local-auth endpoints and the external-auth endpoint (which live in separate packages).</summary>
+/// <param name="AccessToken">The serialized JWT.</param>
+/// <param name="ExpiresIn">Access-token lifetime remaining, in seconds.</param>
+/// <param name="RefreshToken">The opaque refresh token.</param>
+public sealed record AuthResponse(string AccessToken, int ExpiresIn, string RefreshToken);
+
 /// <summary>The outcome of a login attempt. Every non-success collapses to a uniform 401 at the
 /// boundary; the distinction exists for internal/audit use only.</summary>
 public enum LoginOutcome

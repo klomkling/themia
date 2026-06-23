@@ -1,6 +1,6 @@
 using Themia.Modules.Identity.Abstractions.Authentication;
 
-namespace Themia.Modules.Identity.AspNetCore.External;
+namespace Themia.Modules.Identity.ExternalAuth.AspNetCore.External;
 
 /// <summary>No-op <see cref="IExternalAuthenticationHooks"/>. Registered by default via <c>TryAdd</c>;
 /// adopters subclass and override only the hooks they need.</summary>

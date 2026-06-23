@@ -8,7 +8,7 @@ using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using Microsoft.IdentityModel.Tokens;
 using Themia.Modules.Identity.Abstractions.Authentication;
 
-namespace Themia.Modules.Identity.AspNetCore.External;
+namespace Themia.Modules.Identity.ExternalAuth.AspNetCore.External;
 
 /// <summary>An <see cref="IExternalAuthProvider"/> that performs the OAuth/OIDC server-side code
 /// exchange and validates the returned id_token. Supports two signing-key strategies:

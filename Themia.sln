@@ -203,6 +203,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Themia.Modules.Identity.Tok
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Themia.Modules.Identity.ExternalAuth.AspNetCore", "src\modules\Themia.Modules.Identity.ExternalAuth.AspNetCore\Themia.Modules.Identity.ExternalAuth.AspNetCore.csproj", "{D43CC10D-0190-4C1C-A408-7F96183B8AAB}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Themia.Modules.Identity.ExternalAuth.AspNetCore.Tests", "tests\Themia.Modules.Identity.ExternalAuth.AspNetCore.Tests\Themia.Modules.Identity.ExternalAuth.AspNetCore.Tests.csproj", "{6E1A2A26-8176-4C2F-A2C6-924774B876C5}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -1341,6 +1343,18 @@ Global
 		{D43CC10D-0190-4C1C-A408-7F96183B8AAB}.Release|x64.Build.0 = Release|Any CPU
 		{D43CC10D-0190-4C1C-A408-7F96183B8AAB}.Release|x86.ActiveCfg = Release|Any CPU
 		{D43CC10D-0190-4C1C-A408-7F96183B8AAB}.Release|x86.Build.0 = Release|Any CPU
+		{6E1A2A26-8176-4C2F-A2C6-924774B876C5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6E1A2A26-8176-4C2F-A2C6-924774B876C5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6E1A2A26-8176-4C2F-A2C6-924774B876C5}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{6E1A2A26-8176-4C2F-A2C6-924774B876C5}.Debug|x64.Build.0 = Debug|Any CPU
+		{6E1A2A26-8176-4C2F-A2C6-924774B876C5}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{6E1A2A26-8176-4C2F-A2C6-924774B876C5}.Debug|x86.Build.0 = Debug|Any CPU
+		{6E1A2A26-8176-4C2F-A2C6-924774B876C5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6E1A2A26-8176-4C2F-A2C6-924774B876C5}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6E1A2A26-8176-4C2F-A2C6-924774B876C5}.Release|x64.ActiveCfg = Release|Any CPU
+		{6E1A2A26-8176-4C2F-A2C6-924774B876C5}.Release|x64.Build.0 = Release|Any CPU
+		{6E1A2A26-8176-4C2F-A2C6-924774B876C5}.Release|x86.ActiveCfg = Release|Any CPU
+		{6E1A2A26-8176-4C2F-A2C6-924774B876C5}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -1444,5 +1458,6 @@ Global
 		{139391FC-4BAE-47B6-AC1B-722B5DA85975} = {EC447DCF-ABFA-6E24-52A5-D7FD48A5C558}
 		{F7934C25-5FEE-4C12-A5F2-6E360671969B} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 		{D43CC10D-0190-4C1C-A408-7F96183B8AAB} = {EC447DCF-ABFA-6E24-52A5-D7FD48A5C558}
+		{6E1A2A26-8176-4C2F-A2C6-924774B876C5} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 	EndGlobalSection
 EndGlobal

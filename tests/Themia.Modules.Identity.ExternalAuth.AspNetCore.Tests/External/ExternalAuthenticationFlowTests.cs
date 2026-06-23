@@ -3,10 +3,10 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
 using Themia.Modules.Identity.Abstractions.Authentication;
 using Themia.Modules.Identity.Abstractions.Entities;
-using Themia.Modules.Identity.AspNetCore.External;
+using Themia.Modules.Identity.ExternalAuth.AspNetCore.External;
 using Xunit;
 
-namespace Themia.Modules.Identity.AspNetCore.Tests.External;
+namespace Themia.Modules.Identity.ExternalAuth.AspNetCore.Tests.External;
 
 public sealed class ExternalAuthenticationFlowTests
 {

@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Routing;
 using Themia.AspNetCore.Exceptions;
 using Themia.Modules.Identity.Abstractions.Authentication;
 
-namespace Themia.Modules.Identity.AspNetCore.Endpoints;
+namespace Themia.Modules.Identity.ExternalAuth.AspNetCore.Endpoints;
 
 /// <summary>External-login request body. The client performs the OAuth/OIDC authorization-code step
 /// itself and posts the resulting code (plus the redirect URI it used and an optional PKCE verifier).</summary>

@@ -2,10 +2,10 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 using Themia.Modules.Identity.Abstractions.Authentication;
-using Themia.Modules.Identity.AspNetCore.External;
-using Themia.Modules.Identity.AspNetCore.Options;
+using Themia.Modules.Identity.ExternalAuth.AspNetCore.External;
+using Themia.Modules.Identity.ExternalAuth.AspNetCore.Options;
 
-namespace Themia.Modules.Identity.AspNetCore.DependencyInjection;
+namespace Themia.Modules.Identity.ExternalAuth.AspNetCore.DependencyInjection;
 
 /// <summary>Registers the Themia Identity external-auth (OAuth/OIDC) providers, the provider registry,
 /// and a named <see cref="HttpClient"/> per provider.</summary>

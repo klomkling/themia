@@ -20,12 +20,6 @@ public sealed record RefreshRequest(string RefreshToken);
 /// <param name="All">When true, revoke all of the user's sessions; default false.</param>
 public sealed record LogoutRequest(string RefreshToken, bool All = false);
 
-/// <summary>Issued token pair response.</summary>
-/// <param name="AccessToken">The serialized JWT.</param>
-/// <param name="ExpiresIn">Access-token lifetime remaining, in seconds.</param>
-/// <param name="RefreshToken">The opaque refresh token.</param>
-public sealed record AuthResponse(string AccessToken, int ExpiresIn, string RefreshToken);
-
 /// <summary>Maps the opt-in login/refresh/logout endpoints. The host owns the route prefix
 /// (e.g. <c>app.MapGroup("/auth").MapIdentityAuthEndpoints()</c>). Each endpoint is thin: it binds the
 /// DTO and delegates to <see cref="IAuthenticationFlow"/>. Failures throw a uniform 401 through the

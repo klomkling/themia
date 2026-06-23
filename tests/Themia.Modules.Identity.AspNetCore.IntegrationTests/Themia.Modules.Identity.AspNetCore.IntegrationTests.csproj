@@ -23,6 +23,8 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/modules/Themia.Modules.Identity.AspNetCore/Themia.Modules.Identity.AspNetCore.csproj" />
+    <ProjectReference Include="../../src/modules/Themia.Modules.Identity.ExternalAuth.AspNetCore/Themia.Modules.Identity.ExternalAuth.AspNetCore.csproj" />
+    <ProjectReference Include="../../src/modules/Themia.Modules.Identity.Tokens.AspNetCore/Themia.Modules.Identity.Tokens.AspNetCore.csproj" />
     <ProjectReference Include="../../src/modules/Themia.Modules.Identity/Themia.Modules.Identity.csproj" />
     <ProjectReference Include="../../src/modules/Themia.Modules.Identity.Abstractions/Themia.Modules.Identity.Abstractions.csproj" />
     <ProjectReference Include="../../src/framework/Themia.Framework.AspNetCore/Themia.Framework.AspNetCore.csproj" />
