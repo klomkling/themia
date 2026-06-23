@@ -27,6 +27,27 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.6.6] - 2026-06-23
+
+### Added
+- **`Themia.Modules.Identity.Tokens.AspNetCore`** — persistence-free JWT access-token issuance, extracted
+  from `Themia.Modules.Identity.AspNetCore`: `AccessTokenService` (the default `IAccessTokenService`),
+  symmetric signing, `JwtOptions`, the shared `AuthTokenIssuer`, and the `AddThemiaIdentityTokens`
+  registration. Depends only on `Themia.Modules.Identity.Abstractions` — no user store required.
+- **`Themia.Modules.Identity.ExternalAuth.AspNetCore`** — external OAuth/OIDC login, extracted from
+  `Themia.Modules.Identity.AspNetCore`: `OidcExternalAuthProvider`, the provider registry, the
+  `AddThemiaExternalAuth` builder, the external-login flow/hooks, `MapIdentityExternalAuthEndpoints`, and
+  the `ValidateThemiaExternalAuth` external-only DI guard (requires `IExternalLoginService` + the token
+  seams but **not** `IUserService`). Depends only on `Themia.Modules.Identity.Abstractions`, enabling
+  bring-your-own-user-store external login.
+
+### Changed
+- **(breaking)** The external-auth and JWT-issuance types — plus the `AuthResponse` response record —
+  moved out of `Themia.Modules.Identity.AspNetCore` into the two new packages (namespace changes);
+  `AuthResponse` now lives in `Themia.Modules.Identity.Abstractions.Authentication`. Bundled consumers
+  update `using` directives only — `Themia.Modules.Identity.AspNetCore` re-references both new packages, so
+  the types stay available. See [MIGRATION.md](MIGRATION.md#066).
+
 ## [0.6.5] - 2026-06-23
 
 ### Changed
