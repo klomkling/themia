@@ -8,6 +8,7 @@ using Microsoft.IdentityModel.Tokens;
 using Themia.Modules.Identity.Abstractions;
 using Themia.Modules.Identity.Abstractions.Authentication;
 using Themia.Modules.Identity.AspNetCore.Authentication;
+using Themia.Modules.Identity.Tokens.AspNetCore.DependencyInjection;
 using Themia.Modules.Identity.Tokens.AspNetCore.Options;
 using Themia.Modules.Identity.Tokens.AspNetCore.Signing;
 using Themia.Modules.Identity.Tokens.AspNetCore.Tokens;
@@ -46,18 +47,14 @@ public static class IdentityAspNetCoreServiceCollectionExtensions
                 "must be registered).");
         }
 
-        var options = new JwtOptions();
-        configure(options);
-        options.Validate();
-        services.TryAddSingleton(options);
+        // Validate JwtOptions and register the JWT access-token issuance stack (JwtOptions, TimeProvider,
+        // signing provider, IAccessTokenService) via the persistence-free Tokens package.
+        services.AddThemiaIdentityTokens(configure);
 
         // The authentication flow depends on ILogger<T>; ensure logging is resolvable even on a
         // bare ServiceCollection. AddLogging is idempotent/TryAdd-based.
         services.AddLogging();
 
-        services.TryAddSingleton(TimeProvider.System);
-        services.TryAddSingleton<IJwtSigningCredentialsProvider, SymmetricSigningCredentialsProvider>();
-        services.TryAddSingleton<IAccessTokenService, AccessTokenService>();
         services.TryAddScoped<IAuthenticationFlow, AuthenticationFlow>();
         services.TryAddScoped<IAuthenticationHooks, AuthenticationHooksBase>();
 

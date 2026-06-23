@@ -1,7 +1,7 @@
 using Themia.Modules.Identity.Tokens.AspNetCore.Options;
 using Xunit;
 
-namespace Themia.Modules.Identity.AspNetCore.Tests;
+namespace Themia.Modules.Identity.Tokens.AspNetCore.Tests;
 
 public sealed class JwtOptionsTests
 {
