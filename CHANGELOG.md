@@ -27,6 +27,23 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.6.5] - 2026-06-23
+
+### Changed
+- Bumped the **`Microsoft.IdentityModel.*` family to 8.19.1** (Protocols, Protocols.OpenIdConnect,
+  Tokens, JsonWebTokens, Logging, and `System.IdentityModel.Tokens.Jwt`), pinned as a unit to override
+  the 8.0.1 that `JwtBearer 10.0.9` resolves transitively. Dependabot now groups the family
+  (`identitymodel`) so it always moves together. See [MIGRATION.md](MIGRATION.md#065).
+
+### Fixed
+- `OidcExternalAuthProvider` — key-rotation recovery under IdentityModel 8.x. The new versions
+  rate-limit `ConfigurationManager.RequestRefresh()` (a refresh-flooding guard), so the previous
+  "force a metadata refresh and retry in the same request" no longer refetched and a freshly-rotated
+  IdP signing key failed validation. The provider now fetches metadata + JWKS **directly** (one shot,
+  bypassing the cached manager's cooldown) on a rotation signature-failure and retries once, so login
+  recovers within the same request. Reaching that path requires a successful code exchange, so it is not
+  an unauthenticated refresh vector.
+
 ## [0.6.4] - 2026-06-23
 
 > **Upgrade straight to 0.6.4 — skip 0.6.3.** Because of a release-pipeline race (the 0.6.3

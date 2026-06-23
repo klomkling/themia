@@ -21,6 +21,13 @@ updates:
           - "Microsoft.EntityFrameworkCore*"
           - "Npgsql*"
           - "EFCore.NamingConventions"
+      identitymodel:
+        # The Microsoft.IdentityModel.* family must be version-consistent (a split bump breaks token
+        # validation); keep them in one PR. Note they are pinned to override JwtBearer's transitive
+        # version, so review the bump against the ASP.NET Core version — see MIGRATION.md 0.6.5.
+        patterns:
+          - "Microsoft.IdentityModel.*"
+          - "System.IdentityModel.Tokens.Jwt"
       testcontainers:
         patterns:
           - "Testcontainers*"

@@ -10,6 +10,30 @@ with the *why* and concrete upgrade steps.
 - Each entry states: **What changed**, **Why**, and **How to upgrade** (before → after).
 - Non-breaking changes are *not* listed here — see the CHANGELOG.
 
+## 0.6.5
+
+### Microsoft.IdentityModel.* bumped to 8.19.1 (whole family, pinned as a unit)
+
+**What changed:** the `Microsoft.IdentityModel.*` family — `Protocols`, `Protocols.OpenIdConnect`,
+`Tokens`, `JsonWebTokens`, `Logging`, and `System.IdentityModel.Tokens.Jwt` — moved from 8.0.1 to
+**8.19.1**, and `OidcExternalAuthProvider`'s key-rotation recovery was reworked for the new behavior.
+
+**Why:** the family must be version-consistent, and `JwtBearer 10.0.9` only pulls 8.0.1 transitively, so
+Themia pins the family explicitly to override it. IdentityModel 8.x also **rate-limits
+`ConfigurationManager.RequestRefresh()`** (a refresh-flooding guard); the old "force-refresh and retry in
+the same request" became a no-op until the refresh interval elapsed, so a token signed by a freshly
+rotated IdP key failed to validate. The provider now does a **direct one-shot metadata/JWKS fetch** on a
+rotation signature-failure (bypassing the cooldown) and retries once — rotation still recovers within the
+same request. (That path is only reachable after a successful authorization-code exchange, so it is not an
+unauthenticated refresh vector.)
+
+**How to upgrade:**
+
+- **No action** for normal use — external-login behavior is unchanged; rotation recovery still works.
+- **If you reference `Microsoft.IdentityModel.*` directly** in your own project, align to **8.19.1** (bump
+  the whole family together — a split version breaks token validation). Dependabot now groups them
+  (`identitymodel`); review such bumps against your ASP.NET Core / `JwtBearer` version.
+
 ## 0.6.4
 
 ### Upgrade straight to 0.6.4 — do not use 0.6.3
