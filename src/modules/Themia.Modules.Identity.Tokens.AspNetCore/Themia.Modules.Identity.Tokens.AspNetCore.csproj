@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <PackageId>Themia.Modules.Identity.Tokens.AspNetCore</PackageId>
+    <Description>Persistence-free JWT access-token issuance for Themia Identity — AccessTokenService, symmetric signing, JwtOptions, and the shared access+refresh token issuer. No EF/Dapper, no user store.</Description>
+    <PackageTags>themia;identity;jwt;tokens;authentication;aspnetcore</PackageTags>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Themia.Modules.Identity.Abstractions/Themia.Modules.Identity.Abstractions.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.IdentityModel.JsonWebTokens" />
+    <PackageReference Include="Microsoft.IdentityModel.Tokens" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+    <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+  <ItemGroup>
+    <AdditionalFiles Include="PublicAPI.Shipped.txt" />
+    <AdditionalFiles Include="PublicAPI.Unshipped.txt" />
+  </ItemGroup>
+</Project>

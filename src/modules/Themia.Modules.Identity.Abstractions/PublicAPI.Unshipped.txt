@@ -11,6 +11,14 @@ Themia.Modules.Identity.Abstractions.Authentication.AuthenticationHookContext.Au
 Themia.Modules.Identity.Abstractions.Authentication.AuthenticationHookContext.DenialReason.get -> string?
 Themia.Modules.Identity.Abstractions.Authentication.AuthenticationHookContext.Deny(string? reason = null) -> void
 Themia.Modules.Identity.Abstractions.Authentication.AuthenticationHookContext.IsDenied.get -> bool
+Themia.Modules.Identity.Abstractions.Authentication.AuthResponse
+Themia.Modules.Identity.Abstractions.Authentication.AuthResponse.AccessToken.get -> string!
+Themia.Modules.Identity.Abstractions.Authentication.AuthResponse.AccessToken.init -> void
+Themia.Modules.Identity.Abstractions.Authentication.AuthResponse.AuthResponse(string! AccessToken, int ExpiresIn, string! RefreshToken) -> void
+Themia.Modules.Identity.Abstractions.Authentication.AuthResponse.ExpiresIn.get -> int
+Themia.Modules.Identity.Abstractions.Authentication.AuthResponse.ExpiresIn.init -> void
+Themia.Modules.Identity.Abstractions.Authentication.AuthResponse.RefreshToken.get -> string!
+Themia.Modules.Identity.Abstractions.Authentication.AuthResponse.RefreshToken.init -> void
 Themia.Modules.Identity.Abstractions.Authentication.AuthTokens
 Themia.Modules.Identity.Abstractions.Authentication.AuthTokens.AccessToken.get -> string!
 Themia.Modules.Identity.Abstractions.Authentication.AuthTokens.AccessToken.init -> void

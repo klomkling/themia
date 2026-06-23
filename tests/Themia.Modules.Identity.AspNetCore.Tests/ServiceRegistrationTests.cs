@@ -2,8 +2,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Themia.Modules.Identity.Abstractions.Authentication;
 using Themia.Modules.Identity.AspNetCore.Authentication;
 using Themia.Modules.Identity.AspNetCore.DependencyInjection;
-using Themia.Modules.Identity.AspNetCore.Options;
-using Themia.Modules.Identity.AspNetCore.Signing;
+using Themia.Modules.Identity.Tokens.AspNetCore.Options;
+using Themia.Modules.Identity.Tokens.AspNetCore.Signing;
 using Themia.Modules.Identity.DependencyInjection;
 using Xunit;
 
@@ -37,8 +37,11 @@ public sealed class ServiceRegistrationTests
         Assert.Contains(services, d => d.ServiceType == typeof(IAccessTokenService));
         Assert.Contains(services, d => d.ServiceType == typeof(IAuthenticationFlow));
         Assert.Contains(services, d => d.ServiceType == typeof(IAuthenticationHooks));
-        Assert.Contains(services, d => d.ServiceType == typeof(IExternalAuthenticationFlow));
-        Assert.Contains(services, d => d.ServiceType == typeof(IExternalAuthenticationHooks));
+
+        // The external-login flow/hooks are now owned by AddThemiaExternalAuth (ExternalAuth package),
+        // not AddThemiaIdentityAspNetCore — so they are intentionally absent here.
+        Assert.DoesNotContain(services, d => d.ServiceType == typeof(IExternalAuthenticationFlow));
+        Assert.DoesNotContain(services, d => d.ServiceType == typeof(IExternalAuthenticationHooks));
     }
 
     [Fact]

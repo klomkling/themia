@@ -10,7 +10,43 @@ with the *why* and concrete upgrade steps.
 - Each entry states: **What changed**, **Why**, and **How to upgrade** (before → after).
 - Non-breaking changes are *not* listed here — see the CHANGELOG.
 
-## 0.6.5
+## 0.6.6
+
+### External-auth + JWT-issuance types extracted into two new packages
+
+**What changed:** the external-OAuth/OIDC and JWT access-token types moved out of
+`Themia.Modules.Identity.AspNetCore` into two new packages — `Themia.Modules.Identity.Tokens.AspNetCore`
+(JWT issuance) and `Themia.Modules.Identity.ExternalAuth.AspNetCore` (external login) — each depending only
+on `Themia.Modules.Identity.Abstractions`. The `AuthResponse` response record moved down to the
+Abstractions package. All affected public types changed namespace:
+
+| Old (`Themia.Modules.Identity.AspNetCore.*`)        | New                                                            |
+| --------------------------------------------------- | ------------------------------------------------------------- |
+| `…Tokens.*` (e.g. `AccessTokenService`)             | `Themia.Modules.Identity.Tokens.AspNetCore.*`                 |
+| `…Signing.*`                                        | `Themia.Modules.Identity.Tokens.AspNetCore.*`                 |
+| `…Options.JwtOptions`                               | `Themia.Modules.Identity.Tokens.AspNetCore.*`                 |
+| `…Authentication.AuthTokenIssuer`                   | `Themia.Modules.Identity.Tokens.AspNetCore.*`                 |
+| `…External.*` (e.g. `OidcExternalAuthProvider`)     | `Themia.Modules.Identity.ExternalAuth.AspNetCore.*`           |
+| `…Endpoints.*` (external endpoints)                 | `Themia.Modules.Identity.ExternalAuth.AspNetCore.*`           |
+| `…Options.ExternalAuthOptions`                      | `Themia.Modules.Identity.ExternalAuth.AspNetCore.*`           |
+| `…DependencyInjection.ExternalAuth*`                | `Themia.Modules.Identity.ExternalAuth.AspNetCore.*`           |
+| `…Endpoints.AuthResponse`                           | `Themia.Modules.Identity.Abstractions.Authentication.AuthResponse` |
+
+**Why:** to let an adopter consume JWT issuance and/or external login without taking a dependency on the
+full Identity user-store stack — external login in particular now works over a bring-your-own
+`IExternalLoginService` with no `IUserService`.
+
+**How to upgrade:**
+
+- **Bundled consumers** (you already reference `Themia.Modules.Identity.AspNetCore`) — **update `using`
+  directives only.** That package re-references both new packages, so every moved type is still available
+  at runtime; only the namespaces changed.
+- **Bring-your-own (BYO) adoption** — reference the new package(s) directly and:
+  - call `AddThemiaIdentityTokens` (Tokens) and/or `AddThemiaExternalAuth` (ExternalAuth);
+  - register `IExternalLoginService`, `IRefreshTokenService`, and `IClaimsPrincipalFactory`;
+    `IAccessTokenService` is defaulted by the Tokens package (override only if you need custom issuance);
+  - or use the provider/registry directly to obtain a validated `ExternalIdentity`;
+  - call `ValidateThemiaExternalAuth()` at startup to fail-fast on a missing external-only seam.
 
 ### Microsoft.IdentityModel.* bumped to 8.19.1 (whole family, pinned as a unit)
 

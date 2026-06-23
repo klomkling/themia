@@ -1,0 +1,26 @@
+#nullable enable
+Themia.Modules.Identity.Tokens.AspNetCore.DependencyInjection.IdentityTokensServiceCollectionExtensions
+static Themia.Modules.Identity.Tokens.AspNetCore.DependencyInjection.IdentityTokensServiceCollectionExtensions.AddThemiaIdentityTokens(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Themia.Modules.Identity.Tokens.AspNetCore.Options.JwtOptions!>! configure) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+Themia.Modules.Identity.Tokens.AspNetCore.Options.JwtOptions
+Themia.Modules.Identity.Tokens.AspNetCore.Options.JwtOptions.JwtOptions() -> void
+Themia.Modules.Identity.Tokens.AspNetCore.Options.JwtOptions.AccessTokenLifetime.get -> System.TimeSpan
+Themia.Modules.Identity.Tokens.AspNetCore.Options.JwtOptions.AccessTokenLifetime.set -> void
+Themia.Modules.Identity.Tokens.AspNetCore.Options.JwtOptions.Audience.get -> string!
+Themia.Modules.Identity.Tokens.AspNetCore.Options.JwtOptions.Audience.set -> void
+Themia.Modules.Identity.Tokens.AspNetCore.Options.JwtOptions.ClockSkew.get -> System.TimeSpan
+Themia.Modules.Identity.Tokens.AspNetCore.Options.JwtOptions.ClockSkew.set -> void
+Themia.Modules.Identity.Tokens.AspNetCore.Options.JwtOptions.Issuer.get -> string!
+Themia.Modules.Identity.Tokens.AspNetCore.Options.JwtOptions.Issuer.set -> void
+Themia.Modules.Identity.Tokens.AspNetCore.Options.JwtOptions.SigningKey.get -> string!
+Themia.Modules.Identity.Tokens.AspNetCore.Options.JwtOptions.SigningKey.set -> void
+Themia.Modules.Identity.Tokens.AspNetCore.Options.JwtOptions.Validate() -> void
+Themia.Modules.Identity.Tokens.AspNetCore.Signing.IJwtSigningCredentialsProvider
+Themia.Modules.Identity.Tokens.AspNetCore.Signing.IJwtSigningCredentialsProvider.SigningCredentials.get -> Microsoft.IdentityModel.Tokens.SigningCredentials!
+Themia.Modules.Identity.Tokens.AspNetCore.Signing.IJwtSigningCredentialsProvider.ValidationKey.get -> Microsoft.IdentityModel.Tokens.SecurityKey!
+Themia.Modules.Identity.Tokens.AspNetCore.Signing.SymmetricSigningCredentialsProvider
+Themia.Modules.Identity.Tokens.AspNetCore.Signing.SymmetricSigningCredentialsProvider.SymmetricSigningCredentialsProvider(Themia.Modules.Identity.Tokens.AspNetCore.Options.JwtOptions! options) -> void
+Themia.Modules.Identity.Tokens.AspNetCore.Signing.SymmetricSigningCredentialsProvider.SigningCredentials.get -> Microsoft.IdentityModel.Tokens.SigningCredentials!
+Themia.Modules.Identity.Tokens.AspNetCore.Signing.SymmetricSigningCredentialsProvider.ValidationKey.get -> Microsoft.IdentityModel.Tokens.SecurityKey!
+Themia.Modules.Identity.Tokens.AspNetCore.Tokens.AccessTokenService
+Themia.Modules.Identity.Tokens.AspNetCore.Tokens.AccessTokenService.AccessTokenService(Themia.Modules.Identity.Tokens.AspNetCore.Signing.IJwtSigningCredentialsProvider! credentials, Themia.Modules.Identity.Tokens.AspNetCore.Options.JwtOptions! options, System.TimeProvider! timeProvider) -> void
+Themia.Modules.Identity.Tokens.AspNetCore.Tokens.AccessTokenService.Issue(System.Security.Claims.ClaimsPrincipal! principal) -> Themia.Modules.Identity.Abstractions.Authentication.AccessToken

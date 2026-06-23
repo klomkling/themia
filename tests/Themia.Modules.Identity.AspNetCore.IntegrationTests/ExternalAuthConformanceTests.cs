@@ -21,6 +21,8 @@ using Themia.Modules.Identity.Abstractions.Authentication;
 using Themia.Modules.Identity.AspNetCore.DependencyInjection;
 using Themia.Modules.Identity.AspNetCore.Endpoints;
 using Themia.Modules.Identity.DependencyInjection;
+using Themia.Modules.Identity.ExternalAuth.AspNetCore.DependencyInjection;
+using Themia.Modules.Identity.ExternalAuth.AspNetCore.Endpoints;
 using Xunit;
 
 namespace Themia.Modules.Identity.AspNetCore.IntegrationTests;

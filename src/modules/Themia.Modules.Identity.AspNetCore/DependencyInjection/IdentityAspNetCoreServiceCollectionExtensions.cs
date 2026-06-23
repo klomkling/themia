@@ -8,9 +8,10 @@ using Microsoft.IdentityModel.Tokens;
 using Themia.Modules.Identity.Abstractions;
 using Themia.Modules.Identity.Abstractions.Authentication;
 using Themia.Modules.Identity.AspNetCore.Authentication;
-using Themia.Modules.Identity.AspNetCore.Options;
-using Themia.Modules.Identity.AspNetCore.Signing;
-using Themia.Modules.Identity.AspNetCore.Tokens;
+using Themia.Modules.Identity.Tokens.AspNetCore.DependencyInjection;
+using Themia.Modules.Identity.Tokens.AspNetCore.Options;
+using Themia.Modules.Identity.Tokens.AspNetCore.Signing;
+using Themia.Modules.Identity.Tokens.AspNetCore.Tokens;
 
 namespace Themia.Modules.Identity.AspNetCore.DependencyInjection;
 
@@ -46,27 +47,19 @@ public static class IdentityAspNetCoreServiceCollectionExtensions
                 "must be registered).");
         }
 
-        var options = new JwtOptions();
-        configure(options);
-        options.Validate();
-        services.TryAddSingleton(options);
+        // Validate JwtOptions and register the JWT access-token issuance stack (JwtOptions, TimeProvider,
+        // signing provider, IAccessTokenService) via the persistence-free Tokens package.
+        services.AddThemiaIdentityTokens(configure);
 
         // The authentication flow depends on ILogger<T>; ensure logging is resolvable even on a
         // bare ServiceCollection. AddLogging is idempotent/TryAdd-based.
         services.AddLogging();
 
-        services.TryAddSingleton(TimeProvider.System);
-        services.TryAddSingleton<IJwtSigningCredentialsProvider, SymmetricSigningCredentialsProvider>();
-        services.TryAddSingleton<IAccessTokenService, AccessTokenService>();
         services.TryAddScoped<IAuthenticationFlow, AuthenticationFlow>();
         services.TryAddScoped<IAuthenticationHooks, AuthenticationHooksBase>();
 
-        // External-login flow + default no-op hooks. The flow additionally needs IExternalLoginService
-        // (from AddThemiaIdentityServices) and IExternalAuthProviderRegistry (from AddThemiaExternalAuth);
-        // both are resolved at runtime, so the registration order of those calls does not matter. The flow
-        // is inert unless the host also maps MapIdentityExternalAuthEndpoints and registers a provider.
-        services.TryAddScoped<IExternalAuthenticationFlow, External.ExternalAuthenticationFlow>();
-        services.TryAddScoped<IExternalAuthenticationHooks, External.ExternalAuthenticationHooksBase>();
+        // The external-login flow + default no-op hooks are registered by AddThemiaExternalAuth (in the
+        // ExternalAuth package), which bundled consumers call alongside this method.
 
         return services;
     }
