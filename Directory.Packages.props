@@ -116,5 +116,7 @@
     <!-- Pdf (Themia.Pdf neutral core): headless Chromium renderer -->
     <PackageVersion Include="PuppeteerSharp" Version="25.1.2" />
     <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.9" />
+    <!-- Export (Themia.Export.Excel): Excel backend; targets netstandard2.0/2.1, runs on net8+net10. -->
+    <PackageVersion Include="ClosedXML" Version="0.105.0" />
   </ItemGroup>
 </Project>
