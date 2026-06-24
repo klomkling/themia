@@ -9,12 +9,12 @@ public enum AggregateKind
     Label,
     /// <summary>Sum of the numeric values.</summary>
     Sum,
-    /// <summary>Count of non-null values.</summary>
+    /// <summary>Count of non-null values (null entries are excluded).</summary>
     Count,
-    /// <summary>Arithmetic mean of the numeric values.</summary>
+    /// <summary>Arithmetic mean of non-null numeric values (null entries are excluded).</summary>
     Average,
-    /// <summary>Smallest numeric value.</summary>
+    /// <summary>Smallest non-null numeric value (null entries are excluded).</summary>
     Min,
-    /// <summary>Largest numeric value.</summary>
+    /// <summary>Largest non-null numeric value (null entries are excluded).</summary>
     Max,
 }

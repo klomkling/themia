@@ -14,7 +14,7 @@ internal static class RowProjector
             var cells = new object?[colCount];
             for (var c = 0; c < colCount; c++)
             {
-                cells[c] = columns[c].Value(row);
+                cells[c] = columns[c].Selector(row);
             }
 
             matrix.Add(cells);

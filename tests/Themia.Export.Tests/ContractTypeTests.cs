@@ -8,13 +8,13 @@ public sealed class ContractTypeTests
     [Fact]
     public void ExportColumn_defaults_are_none_and_auto()
     {
-        var col = new ExportColumn<string> { Title = "Name", Value = s => s };
+        var col = new ExportColumn<string> { Title = "Name", Selector = s => s };
 
         Assert.Equal(AggregateKind.None, col.Aggregate);
         Assert.Equal(ColumnAlignment.Auto, col.Alignment);
         Assert.Null(col.NumberFormat);
         Assert.Null(col.Width);
-        Assert.Equal("hi", col.Value("hi"));
+        Assert.Equal("hi", col.Selector("hi"));
     }
 
     [Fact]

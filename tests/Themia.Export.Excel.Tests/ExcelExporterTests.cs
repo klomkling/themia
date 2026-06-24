@@ -12,8 +12,8 @@ public sealed class ExcelExporterTests
 
     private static readonly ExportColumn<Sale>[] Columns =
     [
-        new() { Title = "Product", Value = s => s.Product, Aggregate = AggregateKind.Label },
-        new() { Title = "Amount", Value = s => s.Amount, NumberFormat = "#,##0.00", Aggregate = AggregateKind.Sum },
+        new() { Title = "Product", Selector = s => s.Product, Aggregate = AggregateKind.Label },
+        new() { Title = "Amount", Selector = s => s.Amount, NumberFormat = "#,##0.00", Aggregate = AggregateKind.Sum },
     ];
 
     private static readonly Sale[] Rows = [new("Apple", 10m), new("Pear", 5m)];
@@ -75,7 +75,7 @@ public sealed class ExcelExporterTests
     {
         var cols = new ExportColumn<string>[]
         {
-            new() { Title = "Amount", Value = s => s, Aggregate = AggregateKind.Sum },
+            new() { Title = "Amount", Selector = s => s, Aggregate = AggregateKind.Sum },
         };
         Assert.Throws<InvalidOperationException>(() => new ExcelExporter().Export(new[] { "oops" }, cols));
     }
@@ -119,7 +119,7 @@ public sealed class ExcelExporterTests
         // Covers the decimal branch in ExcelExporter for AggregateKind.Average.
         var cols = new ExportColumn<Sale>[]
         {
-            new() { Title = "Amount", Value = s => s.Amount, Aggregate = AggregateKind.Average },
+            new() { Title = "Amount", Selector = s => s.Amount, Aggregate = AggregateKind.Average },
         };
         var rows = new[] { new Sale("A", 10m), new Sale("B", 20m) };
 
@@ -127,5 +127,87 @@ public sealed class ExcelExporterTests
 
         // Layout: title row 1, data rows 2..3, summary row 4.
         Assert.Equal(15m, ws.Cell(4, 1).GetValue<decimal>()); // Average of 10 and 20
+    }
+
+    // Item C: Measure mode includes header row in width calculation.
+    [Fact]
+    public void Measure_mode_width_accounts_for_title_row()
+    {
+        // Title is much longer than the single data value, so the column must be sized
+        // for the title when Measure mode is used (since it now starts from titleRow).
+        var cols = new ExportColumn<Sale>[]
+        {
+            new() { Title = "A Very Long Column Title", Selector = s => s.Product },
+        };
+        var rows = new[] { new Sale("X", 1m) };
+
+        var ws = Open(new ExcelExporter().Export(rows, cols,
+            new ExcelExportOptions { WidthMode = ColumnWidthMode.Measure, WidthSampleRows = 1 }));
+
+        // The column must be wider than a trivially narrow threshold (title is 24 chars).
+        Assert.True(ws.Column(1).Width > 5, "Column should be wider than narrow data-only measure.");
+    }
+
+    // Item D: Summary cells carry column alignment.
+    [Fact]
+    public void Summary_cell_carries_column_alignment()
+    {
+        var cols = new ExportColumn<Sale>[]
+        {
+            new() { Title = "Amount", Selector = s => s.Amount, Aggregate = AggregateKind.Sum, Alignment = ColumnAlignment.Right },
+        };
+        var rows = new[] { new Sale("A", 10m), new Sale("B", 5m) };
+
+        var ws = Open(new ExcelExporter().Export(rows, cols));
+
+        // Layout: title=row1, data=rows2-3, summary=row4.
+        var summaryAlignment = ws.Cell(4, 1).Style.Alignment.Horizontal;
+        Assert.Equal(XLAlignmentHorizontalValues.Right, summaryAlignment);
+    }
+
+    // Item D: Summary cell also carries NumberFormat (existing test extended).
+    [Fact]
+    public void Summary_cell_carries_number_format()
+    {
+        // Reuse the shared Columns fixture which has NumberFormat="#,##0.00" on Amount.
+        var ws = Open(new ExcelExporter().Export(Rows, Columns));
+        // Summary row is row 4 (title=1, data=2-3, summary=4). Amount is column 2.
+        Assert.Equal("#,##0.00", ws.Cell(4, 2).Style.NumberFormat.Format);
+    }
+
+    // Item H: FreezeHeaderRow = false => SplitRow == 0.
+    [Fact]
+    public void No_freeze_when_FreezeHeaderRow_is_false()
+    {
+        var ws = Open(new ExcelExporter().Export(Rows, Columns,
+            new ExcelExportOptions { FreezeHeaderRow = false }));
+        Assert.Equal(0, ws.SheetView.SplitRow);
+    }
+
+    // Item H: Explicit column Width is respected.
+    [Fact]
+    public void Explicit_column_width_is_applied()
+    {
+        var cols = new ExportColumn<Sale>[]
+        {
+            new() { Title = "Product", Selector = s => s.Product, Width = 30 },
+        };
+
+        var ws = Open(new ExcelExporter().Export(Rows, cols));
+
+        Assert.Equal(30, ws.Column(1).Width);
+    }
+
+    // Item H: Two ReportHeader lines push the title to row 3.
+    [Fact]
+    public void Two_report_headers_push_title_to_row_three()
+    {
+        var headers = new ReportHeader[] { new("Header1"), new("Header2") };
+
+        var ws = Open(new ExcelExporter().Export(Rows, Columns, headers: headers));
+
+        Assert.Equal("Header1", ws.Cell(1, 1).GetString());
+        Assert.Equal("Header2", ws.Cell(2, 1).GetString());
+        Assert.Equal("Product", ws.Cell(3, 1).GetString()); // title pushed to row 3
     }
 }

@@ -45,4 +45,21 @@ public sealed class AggregateComputerTests
             () => AggregateComputer.Compute(AggregateKind.Sum, "Amount", new object?[] { 1, "oops" }));
         Assert.Contains("Amount", ex.Message);
     }
+
+    [Fact]
+    public void Bool_in_numeric_aggregate_throws_naming_column()
+    {
+        var ex = Assert.Throws<InvalidOperationException>(
+            () => AggregateComputer.Compute(AggregateKind.Sum, "IsActive", new object?[] { 1, true }));
+        Assert.Contains("IsActive", ex.Message);
+        Assert.Contains("Sum", ex.Message);
+    }
+
+    [Fact]
+    public void Enum_in_numeric_aggregate_throws_naming_column()
+    {
+        var ex = Assert.Throws<InvalidOperationException>(
+            () => AggregateComputer.Compute(AggregateKind.Sum, "Status", new object?[] { 1, AggregateKind.Sum }));
+        Assert.Contains("Status", ex.Message);
+    }
 }

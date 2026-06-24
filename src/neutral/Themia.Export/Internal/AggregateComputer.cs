@@ -36,6 +36,12 @@ internal static class AggregateComputer
                 continue;
             }
 
+            if (value is bool or Enum)
+            {
+                throw new InvalidOperationException(
+                    $"Column '{title}' has an {kind} aggregate but value '{value}' is not numeric.");
+            }
+
             try
             {
                 numbers.Add(Convert.ToDecimal(value, CultureInfo.InvariantCulture));

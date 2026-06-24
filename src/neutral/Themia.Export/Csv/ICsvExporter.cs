@@ -9,7 +9,10 @@ public interface ICsvExporter
     /// <param name="columns">The column descriptors (at least one).</param>
     /// <param name="headers">Optional title lines above the table.</param>
     /// <param name="fileName">Optional download name; defaults to <c>report-{timestamp}.csv</c>.</param>
-    /// <returns>The produced CSV file.</returns>
+    /// <returns>The produced CSV file as an <see cref="ExportResult"/>.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="rows"/> or <paramref name="columns"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentException"><paramref name="columns"/> is empty.</exception>
+    /// <exception cref="InvalidOperationException">A non-numeric value appears in an aggregated column.</exception>
     ExportResult Export<T>(
         IEnumerable<T> rows,
         IReadOnlyList<ExportColumn<T>> columns,

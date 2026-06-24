@@ -107,6 +107,12 @@ public sealed class ExcelExporter : IExcelExporter
                         cell.Value = s;
                         break;
                 }
+
+                var a = Map(columns[c].Alignment);
+                if (a is { } al)
+                {
+                    cell.Style.Alignment.Horizontal = al;
+                }
             }
 
             var summary = ws.Range(summaryRow, 1, summaryRow, colCount).Style;
@@ -115,7 +121,7 @@ public sealed class ExcelExporter : IExcelExporter
         }
 
         // 7) Column widths.
-        ApplyWidths(ws, columns, matrix, firstDataRow, options);
+        ApplyWidths(ws, columns, matrix, titleRow, firstDataRow, options);
 
         if (options.FreezeHeaderRow)
         {
@@ -147,6 +153,7 @@ public sealed class ExcelExporter : IExcelExporter
         IXLWorksheet ws,
         IReadOnlyList<ExportColumn<T>> columns,
         object?[][] matrix,
+        int titleRow,
         int firstDataRow,
         ExcelExportOptions options)
     {
@@ -170,7 +177,7 @@ public sealed class ExcelExporter : IExcelExporter
                     break;
 
                 case ColumnWidthMode.Measure when sample > 0:
-                    column.AdjustToContents(firstDataRow, firstDataRow + sample - 1);
+                    column.AdjustToContents(titleRow, firstDataRow + sample - 1);
                     break;
 
                 case ColumnWidthMode.Estimate:

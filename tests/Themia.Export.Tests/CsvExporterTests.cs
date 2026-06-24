@@ -11,8 +11,8 @@ public sealed class CsvExporterTests
 
     private static readonly ExportColumn<Sale>[] Columns =
     [
-        new() { Title = "Product", Value = s => s.Product, Aggregate = AggregateKind.Label },
-        new() { Title = "Amount", Value = s => s.Amount, Aggregate = AggregateKind.Sum },
+        new() { Title = "Product", Selector = s => s.Product, Aggregate = AggregateKind.Label },
+        new() { Title = "Amount", Selector = s => s.Amount, Aggregate = AggregateKind.Sum },
     ];
 
     private static string Text(ExportResult r) =>
@@ -39,7 +39,7 @@ public sealed class CsvExporterTests
     [Fact]
     public void Quotes_fields_with_comma_quote_or_newline()
     {
-        var cols = new ExportColumn<string>[] { new() { Title = "V", Value = s => s } };
+        var cols = new ExportColumn<string>[] { new() { Title = "V", Selector = s => s } };
         var rows = new[] { "a,b", "he said \"hi\"", "line1\nline2" };
 
         var lines = Text(new CsvExporter().Export(rows, cols)).Split("\r\n");
@@ -53,7 +53,7 @@ public sealed class CsvExporterTests
     public void Quotes_field_containing_bare_carriage_return()
     {
         // The Quote helper triggers on '\r' as well as '\n' and ','. Lock that behaviour.
-        var cols = new ExportColumn<string>[] { new() { Title = "V", Value = s => s } };
+        var cols = new ExportColumn<string>[] { new() { Title = "V", Selector = s => s } };
         var rows = new[] { "line1\rline2" };
 
         var lines = Text(new CsvExporter().Export(rows, cols)).Split("\r\n");
@@ -86,5 +86,24 @@ public sealed class CsvExporterTests
     {
         var bytes = new CsvExporter().Export(new[] { new Sale("กล้วย", 1m) }, Columns).Content;
         Assert.True(bytes is [0xEF, 0xBB, 0xBF, ..]);
+    }
+
+    // Item H: All AggregateKind.None => no summary row emitted.
+    [Fact]
+    public void No_summary_row_when_all_aggregates_are_none()
+    {
+        var cols = new ExportColumn<Sale>[]
+        {
+            new() { Title = "Product", Selector = s => s.Product },
+            new() { Title = "Amount", Selector = s => s.Amount },
+        };
+        var rows = new[] { new Sale("Apple", 10m) };
+
+        var lines = Text(new CsvExporter().Export(rows, cols)).Split("\r\n", StringSplitOptions.RemoveEmptyEntries);
+
+        // Expect only: header + one data row (no summary).
+        Assert.Equal(2, lines.Length);
+        Assert.Equal("Product,Amount", lines[0]);
+        Assert.Equal("Apple,10", lines[1]);
     }
 }

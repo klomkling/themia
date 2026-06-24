@@ -22,8 +22,8 @@ Themia.Export.ExportColumn<T>.NumberFormat.get -> string?
 Themia.Export.ExportColumn<T>.NumberFormat.init -> void
 Themia.Export.ExportColumn<T>.Title.get -> string!
 Themia.Export.ExportColumn<T>.Title.init -> void
-Themia.Export.ExportColumn<T>.Value.get -> System.Func<T, object?>!
-Themia.Export.ExportColumn<T>.Value.init -> void
+Themia.Export.ExportColumn<T>.Selector.get -> System.Func<T, object?>!
+Themia.Export.ExportColumn<T>.Selector.init -> void
 Themia.Export.ExportColumn<T>.Width.get -> double?
 Themia.Export.ExportColumn<T>.Width.init -> void
 Themia.Export.ExportResult
