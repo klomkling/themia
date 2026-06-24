@@ -39,3 +39,10 @@ Themia.Export.ReportHeader.Line.get -> string!
 Themia.Export.ReportHeader.Line.init -> void
 Themia.Export.ReportHeader.ReportHeader() -> void
 Themia.Export.ReportHeader.ReportHeader(string! Line) -> void
+Themia.Export.Csv.CsvExporter
+Themia.Export.Csv.CsvExporter.CsvExporter() -> void
+Themia.Export.Csv.CsvExporter.Export<T>(System.Collections.Generic.IEnumerable<T>! rows, System.Collections.Generic.IReadOnlyList<Themia.Export.ExportColumn<T>!>! columns, System.Collections.Generic.IEnumerable<Themia.Export.ReportHeader>? headers = null, string? fileName = null) -> Themia.Export.ExportResult!
+Themia.Export.Csv.ICsvExporter
+Themia.Export.Csv.ICsvExporter.Export<T>(System.Collections.Generic.IEnumerable<T>! rows, System.Collections.Generic.IReadOnlyList<Themia.Export.ExportColumn<T>!>! columns, System.Collections.Generic.IEnumerable<Themia.Export.ReportHeader>? headers = null, string? fileName = null) -> Themia.Export.ExportResult!
+Themia.Export.DependencyInjection.ExportServiceCollectionExtensions
+static Themia.Export.DependencyInjection.ExportServiceCollectionExtensions.AddThemiaExport(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
