@@ -117,7 +117,7 @@ you the target: `neutral/` = net8.0;net10.0, everything else = net10.0 (tooling 
 | `Themia.Modules.Storage` | **ezy-assets** S3/Local + **Idevs** `CloudUploadStorage` + **PowerACC** ClamAV scan | ✅ **built** (0.5.3 — Local + S3/R2 backends, tenant-aware metadata + quota, EF+Dapper, PostgreSQL+SQL Server FM schema) |
 | `Themia.Modules.Notifications` | ezy-assets `NotificationDispatcher`/Email/OTP/`Sms2Pro` | ⬜ to-spec |
 | `Themia.Modules.Pdf` | **ezy-assets** Contract/Proposal PDF + **Idevs** `PdfOptionsBuilder`/PuppeteerSharp + PowerACC reporting | ⬜ to-spec |
-| `Themia.Modules.Export` | **Idevs** `IReportBaseModel`/`IdevsExportRequest`/ClosedXML (Excel) | ⬜ to-spec |
+| `Themia.Export` + `Themia.Export.Excel` | **Idevs** `IReportBaseModel`/`IdevsExportRequest`/ClosedXML (Excel), de-Serenity-ized | ✅ **built** (0.7.x — two stateless neutral cores: typed columns, CSV + xlsx, computed summary rows; no tenant module — the transform is stateless) |
 | `Themia.Modules.Geo` | ezy-assets `ProjectGeocodingService` | ⬜ later |
 | `Themia.Modules.AI` | ezy-assets `GeminiAICaption`/`FallbackTextTranslation` | ⬜ later |
 | `Themia.Modules.Audit` | ezy-assets `AuditLogRepository` + Zenity audit | ⬜ later |
@@ -135,7 +135,7 @@ Lift into Themia.Mediator's pipeline (Zenity already provides mediator + pipelin
 |---|---|
 | `Storage/CloudUploadStorage(+Options)` | `Themia.Modules.Storage` |
 | `Helpers/PdfOptionsBuilder` + `Models/PageSize`/`PageMargin` (PuppeteerSharp) | `Themia.Modules.Pdf` |
-| `Models/IReportBaseModel`/`IdevsExportRequest`/`IdevsContentResult` (ClosedXML) | `Themia.Modules.Export` |
+| `Models/IReportBaseModel`/`IdevsExportRequest`/`IdevsContentResult` (ClosedXML) | `Themia.Export` / `Themia.Export.Excel` |
 | `Caching/TwoLevelCacheExtensions` | `Themia.Caching` |
 | `Logging/LogManager` | `Themia.Logging` |
 | `Utilities/SmartPagination`, `Extensions/*`, `CoreLibBootstrapper` | `Themia` utilities |
