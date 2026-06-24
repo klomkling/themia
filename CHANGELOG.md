@@ -27,6 +27,8 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.6.8] - 2026-06-24
+
 ### Added
 - **`Themia.Export`** — neutral tabular-data export contract + CSV writer: typed `ExportColumn<T>`
   selectors, report headers, and computed summary rows (`AggregateKind`). `net8.0;net10.0`, no
