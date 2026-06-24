@@ -41,17 +41,49 @@ public sealed class ExcelExporterTests
     }
 
     [Fact]
-    public void Summary_matches_csv_numbers_exactly()
+    public void Summary_value_matches_csv_computed_value()
     {
+        // Both formats share AggregateComputer, so the computed decimal value agrees.
+        // The rendered representation differs: CSV emits the raw invariant string and ignores
+        // NumberFormat; xlsx stores a double and applies NumberFormat.
         var excel = new ExcelExporter().Export(Rows, Columns);
         var ws = Open(excel);
         var excelSum = ws.Cell(4, 2).GetValue<decimal>();
 
-        // Same input through the CSV writer must yield the same summary number.
         var csv = new CsvExporter().Export(Rows, Columns);
         var csvText = System.Text.Encoding.UTF8.GetString(csv.Content);
         Assert.Contains("Product,15", csvText);
         Assert.Equal(15m, excelSum);
+    }
+
+    // Item 1: Duplicate column title throws ArgumentException with the duplicate name.
+    [Fact]
+    public void Duplicate_column_title_throws_argument_exception()
+    {
+        var cols = new ExportColumn<Sale>[]
+        {
+            new() { Title = "Amount", Selector = s => s.Amount },
+            new() { Title = "amount", Selector = s => s.Amount }, // same title, different case
+        };
+
+        var ex = Assert.Throws<ArgumentException>(() =>
+            new ExcelExporter().Export(Rows, cols));
+        Assert.Contains("amount", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    // Item 4: Title (header) cell carries column Alignment.
+    [Fact]
+    public void Title_cell_carries_column_alignment()
+    {
+        var cols = new ExportColumn<Sale>[]
+        {
+            new() { Title = "Amount", Selector = s => s.Amount, Alignment = ColumnAlignment.Right },
+        };
+
+        var ws = Open(new ExcelExporter().Export(Rows, cols));
+
+        // Title row is row 1 (no report headers).
+        Assert.Equal(XLAlignmentHorizontalValues.Right, ws.Cell(1, 1).Style.Alignment.Horizontal);
     }
 
     [Fact]

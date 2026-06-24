@@ -47,7 +47,7 @@ public sealed class CsvExporter : ICsvExporter
 
         foreach (var cells in matrix)
         {
-            AppendLine(sb, cells.Select(v => Quote(Render(v))));
+            AppendLine(sb, cells.Select(v => Quote(CellText.Invariant(v))));
         }
 
         if (columns.Any(c => c.Aggregate != AggregateKind.None))
@@ -55,8 +55,8 @@ public sealed class CsvExporter : ICsvExporter
             var summary = new string[colCount];
             for (var c = 0; c < colCount; c++)
             {
-                var value = AggregateComputer.Compute(columns[c].Aggregate, columns[c].Title, Column(matrix, c));
-                summary[c] = Quote(Render(value));
+                var value = AggregateComputer.Compute(columns[c].Aggregate, columns[c].Title, RowProjector.Column(matrix, c));
+                summary[c] = Quote(CellText.Invariant(value));
             }
 
             AppendLine(sb, summary);
@@ -72,21 +72,6 @@ public sealed class CsvExporter : ICsvExporter
         content.CopyTo(bytes, preamble.Length);
         return new ExportResult(bytes, CsvContentType, fileName ?? DefaultFileName());
     }
-
-    private static IEnumerable<object?> Column(object?[][] matrix, int c)
-    {
-        foreach (var row in matrix)
-        {
-            yield return row[c];
-        }
-    }
-
-    private static string Render(object? value) => value switch
-    {
-        null => string.Empty,
-        IFormattable f => f.ToString(null, CultureInfo.InvariantCulture),
-        _ => value.ToString() ?? string.Empty,
-    };
 
     private static string Quote(string field)
     {
@@ -104,5 +89,5 @@ public sealed class CsvExporter : ICsvExporter
     }
 
     private static string DefaultFileName() =>
-        "report-" + DateTime.Now.ToString("yyyyMMddHHmmss", CultureInfo.InvariantCulture) + ".csv";
+        "report-" + DateTime.Now.ToString("yyyyMMddHHmmssfff", CultureInfo.InvariantCulture) + ".csv";
 }

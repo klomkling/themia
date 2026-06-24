@@ -19,7 +19,9 @@ public interface IExcelExporter
     /// <param name="columns">The column descriptors (at least one).</param>
     /// <param name="options">Workbook options; <see langword="null"/> uses defaults.</param>
     /// <param name="headers">Optional title lines above the table.</param>
-    /// <param name="fileName">Optional download name; defaults to <c>report-{timestamp}.xlsx</c>.</param>
+    /// <param name="fileName">Optional download name; defaults to <c>report-{timestamp}.xlsx</c>.
+    /// Pass an explicit name when guaranteed uniqueness is required (the default includes millisecond
+    /// precision but is not collision-proof under concurrent calls).</param>
     /// <returns>The produced .xlsx file as an <see cref="Themia.Export.ExportResult"/>.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="rows"/> or <paramref name="columns"/> is <see langword="null"/>.</exception>
     /// <exception cref="ArgumentException"><paramref name="columns"/> is empty.</exception>

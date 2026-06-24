@@ -30,6 +30,20 @@ public sealed class ExcelExporter : IExcelExporter
 
         options ??= new ExcelExportOptions();
         var colCount = columns.Count;
+
+        // Detect duplicate titles before building the workbook — ClosedXML.CreateTable() requires
+        // unique header names and throws an opaque exception otherwise.
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var col in columns)
+        {
+            if (!seen.Add(col.Title))
+            {
+                throw new ArgumentException(
+                    $"Duplicate column title '{col.Title}'. Excel table column titles must be unique.",
+                    nameof(columns));
+            }
+        }
+
         var matrix = RowProjector.Project(rows, columns);
         var headerList = headers?.ToList() ?? [];
 
@@ -49,10 +63,15 @@ public sealed class ExcelExporter : IExcelExporter
         var rowCount = matrix.Length;
         var lastDataRow = firstDataRow + rowCount - 1; // == titleRow when rowCount == 0
 
-        // 2) Title row.
+        // 2) Title row (value + alignment).
         for (var c = 0; c < colCount; c++)
         {
             ws.Cell(titleRow, c + 1).Value = columns[c].Title;
+            var a = Map(columns[c].Alignment);
+            if (a is { } al)
+            {
+                ws.Cell(titleRow, c + 1).Style.Alignment.Horizontal = al;
+            }
         }
 
         // 3) Bulk-insert the data matrix in one call (no per-cell loop).
@@ -91,7 +110,7 @@ public sealed class ExcelExporter : IExcelExporter
             var summaryRow = Math.Max(titleRow, lastDataRow) + 1;
             for (var c = 0; c < colCount; c++)
             {
-                var value = AggregateComputer.Compute(columns[c].Aggregate, columns[c].Title, Column(matrix, c));
+                var value = AggregateComputer.Compute(columns[c].Aggregate, columns[c].Title, RowProjector.Column(matrix, c));
                 var cell = ws.Cell(summaryRow, c + 1);
                 switch (value)
                 {
@@ -133,14 +152,6 @@ public sealed class ExcelExporter : IExcelExporter
         return new ExportResult(stream.ToArray(), XlsxContentType, fileName ?? DefaultFileName());
     }
 
-    private static IEnumerable<object?> Column(object?[][] matrix, int c)
-    {
-        foreach (var row in matrix)
-        {
-            yield return row[c];
-        }
-    }
-
     private static XLAlignmentHorizontalValues? Map(ColumnAlignment alignment) => alignment switch
     {
         ColumnAlignment.Left => XLAlignmentHorizontalValues.Left,
@@ -176,18 +187,20 @@ public sealed class ExcelExporter : IExcelExporter
                 case ColumnWidthMode.None:
                     break;
 
-                case ColumnWidthMode.Measure when sample > 0:
-                    column.AdjustToContents(titleRow, firstDataRow + sample - 1);
+                case ColumnWidthMode.Measure:
+                    // Always measure from the title row; when there are no data rows the title
+                    // is the only row — measuring just the title is still correct.
+                    column.AdjustToContents(titleRow, sample > 0 ? firstDataRow + sample - 1 : titleRow);
                     break;
 
                 case ColumnWidthMode.Estimate:
                     var maxLen = columns[c].Title.Length;
                     for (var r = 0; r < sample; r++)
                     {
-                        var text = matrix[r][c]?.ToString();
-                        if (text is not null && text.Length > maxLen)
+                        var len = CellText.Invariant(matrix[r][c]).Length;
+                        if (len > maxLen)
                         {
-                            maxLen = text.Length;
+                            maxLen = len;
                         }
                     }
 
@@ -198,5 +211,5 @@ public sealed class ExcelExporter : IExcelExporter
     }
 
     private static string DefaultFileName() =>
-        "report-" + DateTime.Now.ToString("yyyyMMddHHmmss", CultureInfo.InvariantCulture) + ".xlsx";
+        "report-" + DateTime.Now.ToString("yyyyMMddHHmmssfff", CultureInfo.InvariantCulture) + ".xlsx";
 }

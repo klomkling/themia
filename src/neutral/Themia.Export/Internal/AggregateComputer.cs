@@ -3,7 +3,10 @@ using System.Globalization;
 namespace Themia.Export.Internal;
 
 /// <summary>Computes a column's summary-row cell. Shared by the CSV and Excel writers so both formats
-/// produce identical numbers (no Excel SUM() formulas).</summary>
+/// compute the summary through the same engine (no Excel SUM() formulas), guaranteeing that the
+/// computed <see cref="decimal"/> value agrees across formats. The rendered representation differs:
+/// CSV emits the raw invariant decimal string and ignores <c>NumberFormat</c>; Excel stores a typed
+/// numeric value (persisted as IEEE-754 double in xlsx) and applies <c>NumberFormat</c>.</summary>
 internal static class AggregateComputer
 {
     /// <summary>Computes the summary cell for one column.</summary>
