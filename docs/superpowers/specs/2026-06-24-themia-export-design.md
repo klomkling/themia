@@ -44,6 +44,14 @@ Rationale: CSV-only hosts never pull ClosedXML; a faster Excel backend (MiniExce
 `OpenXmlWriter`) can replace `Themia.Export.Excel` later behind the same contract without breaking
 consumers. Mirrors the per-backend split of `Themia.Exceptional.*`.
 
+**Dependency:** ClosedXML is **not yet** in `Directory.Packages.props` — the plan's first task pins it
+there (central package management; the csproj carries no version). It must target a version supporting
+`net8.0;net10.0`.
+
+**Known tradeoff (boxing):** `Func<T, object?>` boxes value-type cell values. Negligible at the target
+scale (2–5k rows); if a consumer ever pushes ~100k rows this is the first thing to revisit (e.g. a
+typed-column variant). Documented, not solved — YAGNI until measured.
+
 ## Contract — `Themia.Export`
 
 ```csharp
@@ -89,26 +97,54 @@ CSV writer behavior:
   is an Excel-presentation concern and is **ignored in CSV** (CSV is a data-interchange format; Excel
   format strings such as `#,##0.00;[Red]…` are not .NET format strings, so applying them is unsafe).
   RFC 4180 quoting: quote when the value contains `,` `"` CR or LF; escape `"` as `""`.
-- Summary row at the end computed from each column's `Aggregate` (`Label` writes literal text such as
-  "Total"; numeric aggregates compute over the column's values; `None` leaves the cell blank).
-- Content type `text/csv`; file name `report-yyyyMMddHHmmss.csv` unless the caller overrides
-  (overload/option — see below).
+- Optional summary row at the end, computed in C# per the shared **Aggregate semantics** below
+  (`Label` writes literal text such as "Total"; numeric aggregates fold the column's values; `None`
+  leaves the cell blank).
+- **Rectangular output:** every emitted line has exactly N fields. Report-header lines put their text
+  in field 1 and pad the remaining N-1 fields empty, so the file stays RFC-4180-valid (no ragged rows).
+- Content type `text/csv`; file name `report-yyyyMMddHHmmss.csv` unless the caller overrides via the
+  `fileName` parameter.
+
+## Aggregate semantics (shared by both writers — single engine)
+
+Aggregates are computed **once, in C#**, for both CSV and Excel, so the two formats can never disagree.
+No Excel `SUM()` formulas are emitted — the summary cell holds a pre-computed literal.
+
+- A column value participates in a numeric aggregate (`Sum`/`Average`/`Min`/`Max`) iff it converts via
+  `Convert.ToDecimal(value, CultureInfo.InvariantCulture)`. `null` is **skipped**. A non-null value
+  that fails to convert throws `InvalidOperationException` at export time (fail fast — a non-numeric
+  value in a summed column is a caller bug, not silently dropped).
+- `Count` = number of **non-null** values in the column.
+- `Average` = `Sum / Count` over the participating (non-null, numeric) values; `Count == 0` ⇒ blank.
+- `Min`/`Max` over the participating values; none ⇒ blank.
+- `Label` ⇒ the column's literal title text in the summary cell (e.g. "Total"); `None` ⇒ blank.
+- The computed numeric result is rendered with the column's `NumberFormat` in Excel (literal cell,
+  the format applies as a normal cell style) and invariant-culture in CSV.
 
 ## Excel backend — `Themia.Export.Excel`
 
 ```csharp
 namespace Themia.Export.Excel;
+// using ClosedXML.Excel;  // XLTableTheme is exposed directly — this package already depends on ClosedXML.
 
-/// <summary>Built-in ClosedXML table styles (ported subset of the Idevs TableTheme enum).</summary>
-public enum ExcelTableTheme { None, Light, Medium, Dark }
+public enum ColumnWidthMode
+{
+    Estimate,   // default: font-free width from sampled char lengths (deterministic, CI-safe)
+    Measure,    // opt-in: ClosedXML AdjustToContents glyph measurement (needs font metrics)
+    None,       // leave default widths
+}
 
 public sealed class ExcelExportOptions
 {
     public string SheetName { get; init; } = "Sheet1";
-    public ExcelTableTheme Theme { get; init; } = ExcelTableTheme.Medium;
+    /// <summary>Any ClosedXML table theme by full name (≈60 values, parity with the Idevs TableTheme
+    /// set). Null ⇒ a sensible default (TableStyleMedium2). Exposed directly because this package
+    /// already references ClosedXML; it does not leak into the neutral Themia.Export contract.</summary>
+    public XLTableTheme? TableTheme { get; init; }
     public string FontName { get; init; } = "Calibri";
     public bool FreezeHeaderRow { get; init; } = true;
-    public int WidthSampleRows { get; init; } = 50;   // smart width sample size; 0 => no auto-fit
+    public ColumnWidthMode WidthMode { get; init; } = ColumnWidthMode.Estimate;
+    public int WidthSampleRows { get; init; } = 50;   // rows sampled to size columns (Estimate/Measure)
 }
 
 public interface IExcelExporter
@@ -128,17 +164,23 @@ public interface IExcelExporter
    selectors in a single pass. No reflection; no re-enumeration of the source.
 2. **Report headers** — write each `ReportHeader.Line` at the top, merged across the column span.
 3. **Table** — write the title row, then bulk-insert the matrix with a single
-   `cell.InsertData(matrix)` (not a cell-by-cell loop), and wrap the block as a ClosedXML `Table`
-   with the chosen `ExcelTableTheme` so header styling + banding come from the theme.
+   `cell.InsertData(matrix)` (not a cell-by-cell loop), and wrap the **header + data** block as a
+   ClosedXML `Table` with the chosen `XLTableTheme` so header styling + banding come from the theme.
+   The table's native totals row (`ShowTotalsRow`) is **not** used — see step 5.
 4. **Column styling, once per column** — set `ws.Column(c).Style.NumberFormat.Format` and
-   `.Alignment.Horizontal` from each `ExportColumn`. Total style calls are O(columns), independent of
-   row count.
-5. **Summary row** — for columns whose `Aggregate != None`, emit one bottom row:
-   `Sum/Average/Min/Max/Count` as ClosedXML **formulas** (`SUM(C2:C{last})`, etc.) so Excel computes
-   them and they survive edits; `Label` writes literal text. Bold via the single summary-row range.
-6. **Widths** — explicit `Width` where provided; otherwise **smart width** measuring only the first
-   `WidthSampleRows` rows (default 50). **Never** `Columns().AdjustToContents()` over the whole
-   sheet. `WidthSampleRows = 0` disables fitting.
+   `.Alignment.Horizontal` from each `ExportColumn`. Number format + table theme compose (theme owns
+   colors/borders, the column style owns number format). Total style calls are O(columns),
+   independent of row count.
+5. **Summary row** — if any column has `Aggregate != None`, write **one literal row directly below
+   the table** (outside the table range): values are the C#-computed aggregates from the *Aggregate
+   semantics* above (no Excel formulas — so CSV and Excel match exactly). Bold + top border via the
+   single summary-row range; numeric cells carry the column `NumberFormat`.
+6. **Widths** — explicit `ExportColumn.Width` always wins. Otherwise per `WidthMode`:
+   `Estimate` (default) sizes each column from the **max character length** over the first
+   `WidthSampleRows` rows × a per-char factor (clamped to a max) — pure arithmetic, no font metrics,
+   deterministic on Linux CI; `Measure` opts into `column.AdjustToContents(firstRow, firstRow +
+   WidthSampleRows)` (glyph measurement, needs fonts); `None` leaves defaults. **Never**
+   `Columns().AdjustToContents()` over the whole sheet.
 7. Freeze the header row when `FreezeHeaderRow`; save the workbook to `byte[]`.
 
 Content type `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`; file name
@@ -177,10 +219,16 @@ download; extension/content-type are still owned by the backend.
   LF), summary-row math for each `AggregateKind`, empty-rows case, number-format application, typed
   selector invoked once per row.
 - **`Themia.Export.Excel.Tests`**: build a workbook, **re-open it with ClosedXML**, and assert cell
-  values, column-level number-format strings, summary **formulas** present, table + theme created,
-  header frozen, widths set without full-sheet auto-fit. Plus a **perf guard** — a 5,000-row export
-  completes under a small time budget (proves the no-auto-fit path stays fast), tagged
-  `[Trait("Category","Performance")]` so CI can scope it.
+  values, column-level number-format strings, the **summary row holds computed literals** (matching
+  the CSV writer's numbers exactly for the same input — the cross-format equality is the key
+  assertion), table + theme created, header frozen, and (in `Estimate` mode) widths set with **no
+  font measurement**. A non-numeric value in an aggregated column throws `InvalidOperationException`.
+- **Perf is guaranteed structurally, not by a wall-clock assert** (a timing budget on a shared CI
+  runner is inherently flaky and — under `--filter "Category!=Integration"` — would run in the release
+  gate). The structural guarantee: a 5,000-row export in `Estimate` mode completes and **calls no
+  full-sheet auto-fit / no glyph measurement** (the slow path is simply absent from the code).
+  A real timing benchmark, if wanted, lives as a local/manual `BenchmarkDotNet` harness outside the
+  test gate — never as a CI assertion.
 
 ## Out of scope (YAGNI — additive later, no contract break)
 
