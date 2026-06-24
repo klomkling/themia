@@ -27,6 +27,14 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+### Added
+- **`Themia.Export`** — neutral tabular-data export contract + CSV writer: typed `ExportColumn<T>`
+  selectors, report headers, and computed summary rows (`AggregateKind`). `net8.0;net10.0`, no
+  framework dependency, Serenity-free. `AddThemiaExport()` registers `ICsvExporter`.
+- **`Themia.Export.Excel`** — ClosedXML `.xlsx` backend over the same contract: themed tables,
+  per-column number format/alignment, computed summary rows, and font-free column sizing (no
+  full-sheet auto-fit). `AddThemiaExcelExport()` registers `IExcelExporter`.
+
 ## [0.6.7] - 2026-06-23
 
 ### Added

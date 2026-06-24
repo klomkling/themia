@@ -1,0 +1,48 @@
+#nullable enable
+Themia.Export.AggregateKind
+Themia.Export.AggregateKind.Average = 4 -> Themia.Export.AggregateKind
+Themia.Export.AggregateKind.Count = 3 -> Themia.Export.AggregateKind
+Themia.Export.AggregateKind.Label = 1 -> Themia.Export.AggregateKind
+Themia.Export.AggregateKind.Max = 6 -> Themia.Export.AggregateKind
+Themia.Export.AggregateKind.Min = 5 -> Themia.Export.AggregateKind
+Themia.Export.AggregateKind.None = 0 -> Themia.Export.AggregateKind
+Themia.Export.AggregateKind.Sum = 2 -> Themia.Export.AggregateKind
+Themia.Export.ColumnAlignment
+Themia.Export.ColumnAlignment.Auto = 0 -> Themia.Export.ColumnAlignment
+Themia.Export.ColumnAlignment.Center = 2 -> Themia.Export.ColumnAlignment
+Themia.Export.ColumnAlignment.Left = 1 -> Themia.Export.ColumnAlignment
+Themia.Export.ColumnAlignment.Right = 3 -> Themia.Export.ColumnAlignment
+Themia.Export.ExportColumn<T>
+Themia.Export.ExportColumn<T>.Aggregate.get -> Themia.Export.AggregateKind
+Themia.Export.ExportColumn<T>.Aggregate.init -> void
+Themia.Export.ExportColumn<T>.Alignment.get -> Themia.Export.ColumnAlignment
+Themia.Export.ExportColumn<T>.Alignment.init -> void
+Themia.Export.ExportColumn<T>.ExportColumn() -> void
+Themia.Export.ExportColumn<T>.NumberFormat.get -> string?
+Themia.Export.ExportColumn<T>.NumberFormat.init -> void
+Themia.Export.ExportColumn<T>.Title.get -> string!
+Themia.Export.ExportColumn<T>.Title.init -> void
+Themia.Export.ExportColumn<T>.Selector.get -> System.Func<T, object?>!
+Themia.Export.ExportColumn<T>.Selector.init -> void
+Themia.Export.ExportColumn<T>.Width.get -> double?
+Themia.Export.ExportColumn<T>.Width.init -> void
+Themia.Export.ExportResult
+Themia.Export.ExportResult.Content.get -> byte[]!
+Themia.Export.ExportResult.Content.init -> void
+Themia.Export.ExportResult.ContentType.get -> string!
+Themia.Export.ExportResult.ContentType.init -> void
+Themia.Export.ExportResult.ExportResult(byte[]! Content, string! ContentType, string! FileName) -> void
+Themia.Export.ExportResult.FileName.get -> string!
+Themia.Export.ExportResult.FileName.init -> void
+Themia.Export.ReportHeader
+Themia.Export.ReportHeader.Line.get -> string!
+Themia.Export.ReportHeader.Line.init -> void
+Themia.Export.ReportHeader.ReportHeader() -> void
+Themia.Export.ReportHeader.ReportHeader(string! Line) -> void
+Themia.Export.Csv.CsvExporter
+Themia.Export.Csv.CsvExporter.CsvExporter() -> void
+Themia.Export.Csv.CsvExporter.Export<T>(System.Collections.Generic.IEnumerable<T>! rows, System.Collections.Generic.IReadOnlyList<Themia.Export.ExportColumn<T>!>! columns, System.Collections.Generic.IEnumerable<Themia.Export.ReportHeader>? headers = null, string? fileName = null) -> Themia.Export.ExportResult!
+Themia.Export.Csv.ICsvExporter
+Themia.Export.Csv.ICsvExporter.Export<T>(System.Collections.Generic.IEnumerable<T>! rows, System.Collections.Generic.IReadOnlyList<Themia.Export.ExportColumn<T>!>! columns, System.Collections.Generic.IEnumerable<Themia.Export.ReportHeader>? headers = null, string? fileName = null) -> Themia.Export.ExportResult!
+Themia.Export.DependencyInjection.ExportServiceCollectionExtensions
+static Themia.Export.DependencyInjection.ExportServiceCollectionExtensions.AddThemiaExport(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!

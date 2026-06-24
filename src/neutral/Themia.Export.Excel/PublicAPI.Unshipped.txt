@@ -1,0 +1,26 @@
+#nullable enable
+Themia.Export.Excel.ColumnWidthMode
+Themia.Export.Excel.ColumnWidthMode.Estimate = 0 -> Themia.Export.Excel.ColumnWidthMode
+Themia.Export.Excel.ColumnWidthMode.Measure = 1 -> Themia.Export.Excel.ColumnWidthMode
+Themia.Export.Excel.ColumnWidthMode.None = 2 -> Themia.Export.Excel.ColumnWidthMode
+Themia.Export.Excel.ExcelExportOptions
+Themia.Export.Excel.ExcelExportOptions.ExcelExportOptions() -> void
+Themia.Export.Excel.ExcelExportOptions.FontName.get -> string!
+Themia.Export.Excel.ExcelExportOptions.FontName.init -> void
+Themia.Export.Excel.ExcelExportOptions.FreezeHeaderRow.get -> bool
+Themia.Export.Excel.ExcelExportOptions.FreezeHeaderRow.init -> void
+Themia.Export.Excel.ExcelExportOptions.SheetName.get -> string!
+Themia.Export.Excel.ExcelExportOptions.SheetName.init -> void
+Themia.Export.Excel.ExcelExportOptions.TableTheme.get -> ClosedXML.Excel.XLTableTheme?
+Themia.Export.Excel.ExcelExportOptions.TableTheme.init -> void
+Themia.Export.Excel.ExcelExportOptions.WidthMode.get -> Themia.Export.Excel.ColumnWidthMode
+Themia.Export.Excel.ExcelExportOptions.WidthMode.init -> void
+Themia.Export.Excel.ExcelExportOptions.WidthSampleRows.get -> int
+Themia.Export.Excel.ExcelExportOptions.WidthSampleRows.init -> void
+Themia.Export.Excel.IExcelExporter
+Themia.Export.Excel.IExcelExporter.Export<T>(System.Collections.Generic.IEnumerable<T>! rows, System.Collections.Generic.IReadOnlyList<Themia.Export.ExportColumn<T>!>! columns, Themia.Export.Excel.ExcelExportOptions? options = null, System.Collections.Generic.IEnumerable<Themia.Export.ReportHeader>? headers = null, string? fileName = null) -> Themia.Export.ExportResult!
+Themia.Export.Excel.DependencyInjection.ExcelExportServiceCollectionExtensions
+Themia.Export.Excel.ExcelExporter
+Themia.Export.Excel.ExcelExporter.ExcelExporter() -> void
+Themia.Export.Excel.ExcelExporter.Export<T>(System.Collections.Generic.IEnumerable<T>! rows, System.Collections.Generic.IReadOnlyList<Themia.Export.ExportColumn<T>!>! columns, Themia.Export.Excel.ExcelExportOptions? options = null, System.Collections.Generic.IEnumerable<Themia.Export.ReportHeader>? headers = null, string? fileName = null) -> Themia.Export.ExportResult!
+static Themia.Export.Excel.DependencyInjection.ExcelExportServiceCollectionExtensions.AddThemiaExcelExport(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
