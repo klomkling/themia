@@ -92,4 +92,40 @@ public sealed class ExcelExporterTests
         Assert.Equal("P4999", ws.Cell(5001, 1).GetString());
         Assert.Equal(12_497_500m, ws.Cell(5002, 2).GetValue<decimal>()); // Sum of 0..4999
     }
+
+    [Fact]
+    public void Empty_rows_writes_header_only_table_and_blank_summary()
+    {
+        // rowCount == 0: table is header-only; summaryRow == titleRow + 1 == 2.
+        // AggregateComputer.Compute(Sum, ...) over zero values returns null => no case in the
+        // switch matches => the cell is left blank. Label returns the title string.
+        var ws = Open(new ExcelExporter().Export(Array.Empty<Sale>(), Columns));
+
+        // Title row (row 1).
+        Assert.Equal("Product", ws.Cell(1, 1).GetString());
+        Assert.Equal("Amount", ws.Cell(1, 2).GetString());
+
+        // A table exists (header-only range).
+        Assert.NotEmpty(ws.Tables);
+
+        // Summary row is at row 2.
+        Assert.Equal("Product", ws.Cell(2, 1).GetString()); // Label => echoes title
+        Assert.True(ws.Cell(2, 2).IsEmpty());                // Sum over zero rows => null => blank
+    }
+
+    [Fact]
+    public void Non_sum_numeric_aggregate_flows_through_decimal_path()
+    {
+        // Covers the decimal branch in ExcelExporter for AggregateKind.Average.
+        var cols = new ExportColumn<Sale>[]
+        {
+            new() { Title = "Amount", Value = s => s.Amount, Aggregate = AggregateKind.Average },
+        };
+        var rows = new[] { new Sale("A", 10m), new Sale("B", 20m) };
+
+        var ws = Open(new ExcelExporter().Export(rows, cols));
+
+        // Layout: title row 1, data rows 2..3, summary row 4.
+        Assert.Equal(15m, ws.Cell(4, 1).GetValue<decimal>()); // Average of 10 and 20
+    }
 }

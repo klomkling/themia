@@ -50,6 +50,18 @@ public sealed class CsvExporterTests
     }
 
     [Fact]
+    public void Quotes_field_containing_bare_carriage_return()
+    {
+        // The Quote helper triggers on '\r' as well as '\n' and ','. Lock that behaviour.
+        var cols = new ExportColumn<string>[] { new() { Title = "V", Value = s => s } };
+        var rows = new[] { "line1\rline2" };
+
+        var lines = Text(new CsvExporter().Export(rows, cols)).Split("\r\n");
+
+        Assert.Equal("\"line1\rline2\"", lines[1]);
+    }
+
+    [Fact]
     public void Report_headers_are_padded_to_column_count()
     {
         var rows = new[] { new Sale("Apple", 10m) };
