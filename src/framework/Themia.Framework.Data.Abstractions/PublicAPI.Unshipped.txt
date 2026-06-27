@@ -56,11 +56,16 @@ Themia.Framework.Data.Abstractions.Exceptions.UnsupportedSpecificationException
 Themia.Framework.Data.Abstractions.Exceptions.UnsupportedSpecificationException.UnsupportedSpecificationException(string! message) -> void
 Themia.Framework.Data.Abstractions.Filtering.DataFilterScope
 Themia.Framework.Data.Abstractions.Filtering.DataFilterScope.BypassTenantFilter() -> System.IDisposable!
+Themia.Framework.Data.Abstractions.Filtering.DataFilterScope.BypassSoftDeleteFilter() -> System.IDisposable!
 Themia.Framework.Data.Abstractions.Filtering.DataFilterScope.DataFilterScope() -> void
 Themia.Framework.Data.Abstractions.Filtering.DataFilterScope.IsTenantFilterBypassed.get -> bool
+Themia.Framework.Data.Abstractions.Filtering.DataFilterScope.IsSoftDeleteFilterBypassed.get -> bool
+static Themia.Framework.Data.Abstractions.Filtering.DataFilterScope.SoftDeleteBypassedAmbient.get -> bool
 Themia.Framework.Data.Abstractions.Filtering.IDataFilterScope
 Themia.Framework.Data.Abstractions.Filtering.IDataFilterScope.BypassTenantFilter() -> System.IDisposable!
+Themia.Framework.Data.Abstractions.Filtering.IDataFilterScope.BypassSoftDeleteFilter() -> System.IDisposable!
 Themia.Framework.Data.Abstractions.Filtering.IDataFilterScope.IsTenantFilterBypassed.get -> bool
+Themia.Framework.Data.Abstractions.Filtering.IDataFilterScope.IsSoftDeleteFilterBypassed.get -> bool
 Themia.Framework.Data.Abstractions.Repositories.IBulkUpdateSetters<T>
 Themia.Framework.Data.Abstractions.Repositories.IBulkUpdateSetters<T>.Set<TProperty>(System.Linq.Expressions.Expression<System.Func<T, TProperty>!>! property, TProperty value) -> Themia.Framework.Data.Abstractions.Repositories.IBulkUpdateSetters<T>!
 Themia.Framework.Data.Abstractions.Repositories.IReadRepository<T, TKey>

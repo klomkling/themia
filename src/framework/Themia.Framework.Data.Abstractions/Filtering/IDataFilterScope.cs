@@ -11,4 +11,11 @@ public interface IDataFilterScope
     IDisposable BypassTenantFilter();
     /// <summary>True while a bypass scope is active on the current async flow.</summary>
     bool IsTenantFilterBypassed { get; }
+
+    /// <summary>Bypasses ONLY the soft-delete predicate until the returned scope is disposed.
+    /// Tenant isolation and audit remain enforced — this never reveals another tenant's rows.</summary>
+    IDisposable BypassSoftDeleteFilter();
+
+    /// <summary>True while a soft-delete bypass scope is active on the current async flow.</summary>
+    bool IsSoftDeleteFilterBypassed { get; }
 }
