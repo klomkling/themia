@@ -7,6 +7,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Themia.Framework.Core.Abstractions.Entities;
 using Themia.Framework.Core.Abstractions.Tenancy;
 using Themia.Framework.Data.Abstractions.Exceptions;
+using Themia.Framework.Data.Abstractions.Filtering;
 using Themia.Framework.Data.EFCore.Infrastructure;
 
 namespace Themia.Framework.Data.EFCore;
@@ -96,6 +97,14 @@ public abstract class ThemiaDbContext : DbContext
         TenantIsolationStrategy == TenantIsolationStrategy.RuntimeTenantAccess
             ? TenantContextAccessor.CurrentTenantId   // same source as the runtime filter
             : CurrentTenantId;                          // PerTenantModel: injected/constant (filter bakes a constant of this)
+
+    /// <summary>The ambient soft-delete bypass flag, referenced by the soft-delete query filter through
+    /// the captured <c>this</c> so EF re-evaluates it per query (mirrors the tenant filter's dynamism).</summary>
+    private bool SoftDeleteFilterBypassed => DataFilterScope.SoftDeleteBypassedAmbient;
+
+    private static readonly System.Reflection.PropertyInfo SoftDeleteBypassProperty =
+        typeof(ThemiaDbContext).GetProperty(nameof(SoftDeleteFilterBypassed),
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
 
     /// <summary>
     /// Gets the injected tenant context, when provided.
@@ -576,13 +585,17 @@ public abstract class ThemiaDbContext : DbContext
                 currentTenant,
                 IncludeGlobalRecordsForTenants);
 
-            // Combine with soft delete filter if entity supports it
+            // Combine with soft delete filter if entity supports it.
             Expression finalPredicate = tenantPredicate;
             if (EnableSoftDeleteFilters && typeof(ISoftDeletable).IsAssignableFrom(entityType.ClrType))
             {
                 var isDeletedProperty = Expression.Property(parameter, nameof(ISoftDeletable.IsDeleted));
                 var notDeleted = Expression.Equal(isDeletedProperty, Expression.Constant(false));
-                finalPredicate = Expression.AndAlso(tenantPredicate, notDeleted);
+                // bypass flag read through `this` so EF re-evaluates per query.
+                var bypass = Expression.Property(
+                    Expression.Constant(this, typeof(ThemiaDbContext)), SoftDeleteBypassProperty);
+                var softDeleteClause = Expression.OrElse(bypass, notDeleted);
+                finalPredicate = Expression.AndAlso(tenantPredicate, softDeleteClause);
             }
 
             var filter = Expression.Lambda(finalPredicate, parameter);
@@ -608,8 +621,10 @@ public abstract class ThemiaDbContext : DbContext
             var parameter = Expression.Parameter(entityType.ClrType, "entity");
             var isDeletedProperty = Expression.Property(parameter, nameof(ISoftDeletable.IsDeleted));
             var notDeleted = Expression.Equal(isDeletedProperty, Expression.Constant(false));
+            var bypass = Expression.Property(
+                Expression.Constant(this, typeof(ThemiaDbContext)), SoftDeleteBypassProperty);
 
-            var filter = Expression.Lambda(notDeleted, parameter);
+            var filter = Expression.Lambda(Expression.OrElse(bypass, notDeleted), parameter);
             entityType.SetQueryFilter(filter);
         }
     }
