@@ -118,6 +118,30 @@ public abstract class DataLayerConformanceTests
     }
 
     [Fact]
+    public async Task BypassSoftDeleteFilter_RevealsOwnSoftDeleted_SameTenant()
+    {
+        await ResetAsync();
+
+        Guid id;
+        await using (var a = await NewScopeAsync(new TenantId("a")))
+        {
+            var w = NewWidget("sd", 1);
+            id = w.Id;
+            await a.Repo.AddAsync(w);
+            await a.Uow.SaveChangesAsync();
+            a.Repo.Remove(w);
+            await a.Uow.SaveChangesAsync();
+        }
+
+        await using var a2 = await NewScopeAsync(new TenantId("a"));
+        using (a2.Filter.BypassSoftDeleteFilter())
+        {
+            var visible = await a2.Repo.ListAsync(new WidgetByNameSpec("sd"));
+            Assert.Single(visible); // soft-deleted row now visible to its own tenant
+        }
+    }
+
+    [Fact]
     public async Task BypassTenantFilter_StillHidesSoftDeleted()
     {
         await ResetAsync();

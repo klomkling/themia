@@ -23,10 +23,10 @@ public sealed class TenantPredicateTests
 
     private static readonly EntityMapping Map = EntityMapping.ForConvention<Doc>();
 
-    private static string Sql(TenantId? tenant, bool bypass, bool includeGlobalRecords = true)
+    private static string Sql(TenantId? tenant, bool bypass, bool includeGlobalRecords = true, bool bypassSoftDelete = false)
     {
         var q = new Query(Map.Table);
-        TenantPredicate.Apply<Doc>(q, tenant, includeGlobalRecords, bypassTenantFilter: bypass, Map);
+        TenantPredicate.Apply<Doc>(q, tenant, includeGlobalRecords, bypassTenantFilter: bypass, bypassSoftDeleteFilter: bypassSoftDelete, Map);
         return new PostgresCompiler().Compile(q).Sql.ToLowerInvariant();
     }
 
@@ -60,5 +60,13 @@ public sealed class TenantPredicateTests
         var sql = Sql(new TenantId("acme"), bypass: false, includeGlobalRecords: false);
         Assert.Contains("tenant_id", sql);
         Assert.DoesNotContain("is null", sql);
+    }
+
+    [Fact]
+    public void BypassSoftDelete_OmitsSoftDeleteClause_KeepsTenantClause()
+    {
+        var sql = Sql(new TenantId("acme"), bypass: false, bypassSoftDelete: true);
+        Assert.Contains("tenant_id", sql);
+        Assert.DoesNotContain("is_deleted", sql);
     }
 }

@@ -28,7 +28,8 @@ internal class DapperReadRepository<T, TKey>(
     protected EntityMapping Map => Registry.For<T>();
 
     // Seeds a query with the tenant predicate + soft-delete filter. The tenant predicate is omitted when
-    // either the ambient scope bypasses it or the spec opts out (ignoreTenantFilter); soft-delete always stays.
+    // either the ambient scope bypasses it or the spec opts out (ignoreTenantFilter); the soft-delete
+    // predicate is omitted when the ambient scope bypasses it.
     private protected Query Seeded(bool ignoreTenantFilter)
     {
         var map = Map;
@@ -38,6 +39,7 @@ internal class DapperReadRepository<T, TKey>(
             tenantContext.CurrentTenantId,
             options.IncludeGlobalRecordsForTenants,
             filterScope.IsTenantFilterBypassed || ignoreTenantFilter,
+            filterScope.IsSoftDeleteFilterBypassed,
             map);
         return q;
     }

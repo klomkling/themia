@@ -20,6 +20,7 @@ internal sealed class TenantQueryFactory(
             tenantContext.CurrentTenantId,
             options.IncludeGlobalRecordsForTenants,
             filterScope.IsTenantFilterBypassed,
+            filterScope.IsSoftDeleteFilterBypassed,
             map);
         return query;
     }
