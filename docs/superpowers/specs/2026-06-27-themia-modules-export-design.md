@@ -22,7 +22,7 @@ A tenant-aware module that runs exports **off the request thread** — on demand
 1. **Triggers:** both **on-demand** and **recurring (cron)**. Both converge on one execution path; only the trigger differs.
 2. **Data source:** keyed **`IExportDefinition`** registered in app DI. The persisted job stores only `{ definitionKey, parametersJson, format }`; the definition reconstructs rows + columns at run time. No delegates/in-memory rows are ever serialized.
 3. **Scope / filter:** three layers — **global** (tenant always; definition-level invariants such as "always `ctx.UserId`"), **per-schedule** (fixed `TParams` stored on the schedule, with _relative_ values resolved at fire-time), **per-request** (`TParams` on each submission). Per-request params can only narrow _within_ what the definition allows.
-4. **Delivery:** always persist to Storage; `SizeBytes ≤ AttachmentThresholdBytes` → email **attachment** (+ in-app), else a **signed download link** (+ in-app).
+4. **Delivery:** persist to Storage, then notify (email + in-app) with a **signed download link** (`GetDownloadUrlAsync`). **Link-only** — the Notifications stack has no attachment channel today (`NotificationRequest` / `NotificationMessage` carry no bytes), so size-threshold attachment delivery is deferred to a later spec. Delivery is **eventual** (Notifications outbox drain).
 5. **Retention:** fixed default (**7 days**), configurable; a recurring cleanup job deletes expired bytes and marks the run `Expired`.
 6. **Failure:** any exception → `Failed` + stored error + failure notification. **No retry.**
 7. **Soft-delete:** infra records soft-delete (recoverable/audited); produced bytes hard-delete at retention. Exports can **opt in to include soft-deleted business rows** via a new, sanctioned data-layer bypass (below).
@@ -42,6 +42,7 @@ Themia.Modules.Export  (net10.0, IThemiaModule)  ──► Themia.Modules.Storag
 
 - **Single package** `Themia.Modules.Export` (`net10.0` — module TFM policy). References both neutral writers so it produces CSV or xlsx out of the box. (The "CSV-only never pulls ClosedXML" rule is a neutral-core concern; a host installing async-export wants full export.)
 - **Dependencies:** `Themia.Export`, `Themia.Export.Excel`, `Themia.Modules.Storage`, `Themia.Modules.Scheduling`, `Themia.Modules.Notifications`, framework core + data.
+- **Scheduler seam + precondition:** the module schedules through the standard Quartz `ISchedulerFactory` / `IScheduler` registered by `SchedulingModule`. But Scheduling can be configured to register **no** scheduler (host-supplied). The module's `InitializeAsync` must assert an `ISchedulerFactory` is resolvable and fail fast at startup — never at first submit.
 - **Persistence:** the module owns `export_runs` and `export_schedules`. DDL is owned by **FluentMigrator** (one migration, `IfDatabase(...)` per engine — SQL Server / MySQL / PostgreSQL), the single schema authority for both layers — **no `dotnet ef migrations add`**, mirroring `Themia.Modules.Scheduling`. EF entities map to the tables for reads/writes. **No per-engine packages** (the single migration covers all three engines).
 - **Tenant isolation:** both tables carry `TenantId`; the data layer's tenant filter enforces isolation on every read/write. A tenant only ever sees its own runs/schedules.
 
@@ -108,14 +109,23 @@ public enum ExportRunStatus { Pending, Running, Succeeded, Failed, Expired }
 
 **On-demand**
 1. `SubmitAsync` → reject if `IncludeSoftDeleted && !definition.AllowsIncludeSoftDeleted` → persist `ExportRun` (`Pending`, TenantId, UserId, key, paramsJson, format, includeSoftDeleted) → enqueue a **one-shot Quartz job** carrying `{ runId }` → return the run.
-2. `ExportJob` fires → load run → `Running` → resolve `IExportDefinition` by key → build `ExportContext` → (if `IncludeSoftDeleted`) open `BypassSoftDeleteFilter()` scope → `definition.ExportAsync` → bytes.
+2. `ExportJob` fires → **open a DI scope and establish tenant context from the run's `TenantId`** (see _Background execution context_ below) → load run → `Running` → resolve `IExportDefinition` by key → build `ExportContext` → (if `IncludeSoftDeleted`) open `BypassSoftDeleteFilter()` scope → `definition.ExportAsync` → bytes.
 3. `ITenantStorage.PutAsync` at `exports/{tenantId}/{runId}.{ext}` → set `StorageKey`, `SizeBytes`, `ExpiresAt = now + Retention`, `Succeeded`, `CompletedAt`.
-4. Deliver via `INotificationDispatcher`: `SizeBytes ≤ AttachmentThresholdBytes` → attachment (+ in-app); else signed link via `GetDownloadUrlAsync(key, LinkTtl)` (+ in-app).
+4. Deliver via `INotificationDispatcher` (email + in-app) with a signed link from `GetDownloadUrlAsync(key, LinkTtl)`. Dispatch goes through the Notifications **outbox** → eventual.
 5. Any exception → `Failed` + error + failure notification. No retry.
 
 **Recurring** — `ScheduleAsync` persists an `ExportSchedule` and registers a **Quartz cron trigger** carrying `{ scheduleId }`. On fire: resolve schedule → resolve relative params against fire-time → run the same Submit→`ExportJob` path (fresh run). One execution path; only the trigger differs.
 
-**Cleanup** — a recurring `CleanupJob` (`CleanupCron`) queries `export_runs` where `ExpiresAt < now` and `Status = Succeeded` → `ITenantStorage.DeleteAsync` → mark `Expired`.
+**Cleanup** — a recurring `CleanupJob` (`CleanupCron`) finds expired runs **across all tenants** under a `BypassTenantFilter()` scope (`ExpiresAt < now`, `Status = Succeeded`), then processes them **grouped by tenant**: for each tenant it establishes tenant context (same mechanism as `ExportJob`), calls the tenant-scoped `ITenantStorage.DeleteAsync`, and marks the run `Expired`. (A single global pass can't delete tenant-scoped blobs — Storage is tenant-bound.)
+
+## Background execution context (tenant scope)
+
+Every job runs on a Quartz **background thread with no HTTP request**, so the data layer's tenant — resolved from an `AsyncLocal` that request middleware normally sets (`TenantContextAccessor.CurrentTenantId`, applied in `ThemiaDbContext.cs:69-77`) — is **unset**. Without establishing it, the definition's `RowsAsync`, the `export_runs`/`export_schedules` reads/writes, and cleanup all run with a null tenant (`EffectiveFilterTenantId is null` is a distinct, unsafe branch — `ThemiaDbContext.cs:285`). This is the single highest correctness risk and MUST be explicit:
+
+- `ExportJob`/`CleanupJob` **open a fresh DI scope per run** and set tenant context from the persisted `TenantId` — either by setting `TenantContextAccessor.CurrentTenantId` directly or by registering a background `ITenantContext` carrying that id — then **restore on exit** (the framework has no `RunAsTenant` helper today; the job owns this).
+- This wraps **everything tenant-bound**: definition execution, the `ITenantStorage` write, and the run-status update — they must all observe the same tenant.
+- The recurring path resolves `{scheduleId}` → schedule's `TenantId` → same scope. The cleanup path establishes tenant **per tenant group** (see _Cleanup_ above).
+- Consider extracting a small reusable `using var _ = tenantScope.Begin(tenantId);` helper in the framework if Scheduling/Notifications drains need the same thing — but that is additive, not required by this spec.
 
 ## Soft-delete bypass (framework addition, in this spec)
 
@@ -131,10 +141,11 @@ public interface IDataFilterScope
 }
 ```
 
-- **EF adapter** (`ThemiaDbContext` / `EfReadRepository`): when bypassed, drop the global filters and re-apply the **tenant** predicate (the mirror of today's `WithSoftDeleteOnly`, which re-applies soft-delete on tenant bypass). Tenant + audit stay enforced; only soft-deleted rows become visible.
-- **Dapper factory** (`TenantQueryFactory` / `TenantPredicate`): omit the `IsDeleted = false` predicate while keeping the tenant predicate.
-- **Honored identically by both layers** (the `IDataFilterScope` contract). Async-flow scoped (AsyncLocal), disposes cleanly.
-- **Export integration:** `ExportJob` opens the scope only when `IncludeSoftDeleted` is set _and_ the definition allows it. The bypass stays a one-line, reviewable scope — never scattered `IgnoreQueryFilters` calls.
+- **`DataFilterScope`:** add a **second** `AsyncLocal<bool>` for soft-delete bypass alongside the existing tenant one (today it is a single `AsyncLocal<bool>`), plus `BypassSoftDeleteFilter()` / `IsSoftDeleteFilterBypassed`.
+- **EF adapter — make the soft-delete clause AsyncLocal-conditional, do NOT re-derive tenant.** Today the combined filter ANDs the tenant predicate with a hard `IsDeleted == false` constant (`ThemiaDbContext.cs:583-585`). Change that clause to `softDeleteBypassed || !IsDeleted`, reading the new flag the same way the tenant predicate already reads the tenant at query time. **Do not** implement this as "`IgnoreQueryFilters()` + re-apply tenant" (the apparent mirror of `WithSoftDeleteOnly`): the tenant predicate is non-trivial (PerTenantModel constant-baking vs RuntimeTenantAccess AsyncLocal) and re-deriving it risks the exact divergence the codebase forbids (`ThemiaDbContext.cs:87`). Re-applying soft-delete on tenant bypass is trivial; re-deriving tenant on soft-delete bypass is not — they are not symmetric. The standalone soft-delete filter (`ApplySoftDeleteQueryFilters`, non-tenant entities) gets the same conditional clause.
+- **Dapper factory** (`TenantQueryFactory` / `TenantPredicate`): omit the `IsDeleted = false` clause while keeping the tenant predicate, gated on the same flag.
+- **Composition:** the existing tenant-bypass path uses `IgnoreQueryFilters()` and would drop the new conditional clause — acceptable, since export needs only soft-delete bypass (never combined with tenant bypass). State this explicitly so no one assumes the two compose.
+- **Export integration:** `ExportJob` opens the scope only when `IncludeSoftDeleted` is set _and_ the definition allows it. The bypass stays a one-line, reviewable scope — never scattered `IgnoreQueryFilters` calls. Tenant + audit remain fully enforced under it.
 
 ## Persistence (FluentMigrator, one migration, `IfDatabase` per engine)
 
@@ -150,7 +161,6 @@ public interface IDataFilterScope
 |---|---|---|
 | `Retention` | 7 days | `ExpiresAt = CompletedAt + Retention` |
 | `LinkTtl` | 1 hour | Signed download-URL TTL |
-| `AttachmentThresholdBytes` | 5 MB | Attach vs link cutoff |
 | `CleanupCron` | daily | `CleanupJob` cadence |
 
 ## Error handling
@@ -163,7 +173,9 @@ public interface IDataFilterScope
 
 - **Framework — `BypassSoftDeleteFilter` (the critical safety surface):** EF and Dapper both include soft-deleted rows under the scope while **tenant isolation + audit still hold**; scope is AsyncLocal-scoped and disposes correctly; nested with `BypassTenantFilter` behaves predictably.
 - **Module unit:** `ExportDefinition<TRow,TParams>` base — params deserialize + validate, format dispatch (Csv/Xlsx), headers; `IncludeSoftDeleted` gating (allowed vs rejected); relative-param resolution against a fixed fire-time.
-- **`ExportJob` integration** (fakes for `ITenantStorage` / `INotificationDispatcher` / definition registry): `Pending→Running→Succeeded`; storage key + `ExpiresAt` set; delivery attach-vs-link by size; failure → `Failed` + notify; soft-delete scope opened only when allowed + requested.
+- **`ExportJob` integration** (fakes for `ITenantStorage` / `INotificationDispatcher` / definition registry): `Pending→Running→Succeeded`; storage key + `ExpiresAt` set; delivery dispatches a signed-link notification; failure → `Failed` + notify; soft-delete scope opened only when allowed + requested.
+- **Background tenant scope:** a job for tenant A must read/write only tenant A's rows and storage even with no ambient request context; assert a job with tenant unset never silently operates null-tenant (the critical isolation test for background execution).
+- **Scheduler precondition:** `InitializeAsync` fails fast when no `ISchedulerFactory` is registered.
 - **Recurring:** cron fire → relative params resolved at fire-time → fresh run via the same path.
 - **Cleanup:** expired `Succeeded` runs → bytes deleted + `Expired`; soft-deleted run → bytes purged immediately.
 - **DB integration via Testcontainers** (SQL Server at minimum) for the store + FluentMigrator migration across engines; tenant isolation + soft-delete on the infra tables.
@@ -174,6 +186,7 @@ public interface IDataFilterScope
 - Persisted export _templates_.
 - Retry policies / dead-letter for failed exports (explicitly dropped — notify-on-every-failure).
 - Additional backends / formats (separate **Spec B**).
+- **Email-attachment delivery** — the Notifications stack carries no attachment channel today (`NotificationRequest` / `NotificationMessage`); adding one touches the dispatcher, outbox persistence, neutral message, and every `IEmailSender` provider. Deferred; v1 is link-only.
 - An ASP.NET package (`Themia.Modules.Export.AspNetCore`) — hosts call `IExportRequestService` directly.
 
 ## Catalog / roadmap
