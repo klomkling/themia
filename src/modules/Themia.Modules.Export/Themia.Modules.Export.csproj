@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <PackageId>Themia.Modules.Export</PackageId>
+    <Description>Tenant-aware asynchronous and scheduled export: keyed export definitions, Quartz-run jobs, file persisted to Storage, completion notification. Composes Themia.Export(.Excel), Storage, Scheduling, Notifications.</Description>
+    <PackageTags>themia;export;module;scheduling;async;report</PackageTags>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../framework/Themia.Framework.Core/Themia.Framework.Core.csproj" />
+    <ProjectReference Include="../../framework/Themia.Framework.Data.EFCore/Themia.Framework.Data.EFCore.csproj" />
+    <ProjectReference Include="../../framework/Themia.Framework.Data.Abstractions/Themia.Framework.Data.Abstractions.csproj" />
+    <ProjectReference Include="../../neutral/Themia.Data.Migrations/Themia.Data.Migrations.csproj" />
+    <ProjectReference Include="../../neutral/Themia.Export/Themia.Export.csproj" />
+    <ProjectReference Include="../../neutral/Themia.Export.Excel/Themia.Export.Excel.csproj" />
+    <ProjectReference Include="../Themia.Modules.Storage/Themia.Modules.Storage.csproj" />
+    <ProjectReference Include="../Themia.Modules.Scheduling/Themia.Modules.Scheduling.csproj" />
+    <ProjectReference Include="../Themia.Modules.Notifications/Themia.Modules.Notifications.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Options" />
+    <PackageReference Include="Quartz" />
+    <PackageReference Include="EFCore.NamingConventions" />
+    <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+  <ItemGroup>
+    <AdditionalFiles Include="PublicAPI.Shipped.txt" />
+    <AdditionalFiles Include="PublicAPI.Unshipped.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Themia.Modules.Export.Tests" />
+  </ItemGroup>
+</Project>

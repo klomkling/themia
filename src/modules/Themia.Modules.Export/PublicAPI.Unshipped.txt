@@ -1,0 +1,42 @@
+#nullable enable
+abstract Themia.Modules.Export.Definitions.ExportDefinition<TRow, TParams>.Columns(TParams parameters, Themia.Modules.Export.Definitions.ExportContext! context) -> System.Collections.Generic.IReadOnlyList<Themia.Export.ExportColumn<TRow>!>!
+abstract Themia.Modules.Export.Definitions.ExportDefinition<TRow, TParams>.Key.get -> string!
+abstract Themia.Modules.Export.Definitions.ExportDefinition<TRow, TParams>.RowsAsync(TParams parameters, Themia.Modules.Export.Definitions.ExportContext! context, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<TRow>!>!
+abstract Themia.Modules.Export.Definitions.ExportDefinition<TRow>.Columns(Themia.Modules.Export.Definitions.ExportContext! context) -> System.Collections.Generic.IReadOnlyList<Themia.Export.ExportColumn<TRow>!>!
+abstract Themia.Modules.Export.Definitions.ExportDefinition<TRow>.RowsAsync(Themia.Modules.Export.Definitions.ExportContext! context, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<TRow>!>!
+Themia.Modules.Export.Definitions.EmptyParams
+Themia.Modules.Export.Definitions.EmptyParams.EmptyParams() -> void
+Themia.Modules.Export.Definitions.ExportContext
+Themia.Modules.Export.Definitions.ExportContext.ExportContext() -> void
+Themia.Modules.Export.Definitions.ExportContext.FileName.get -> string?
+Themia.Modules.Export.Definitions.ExportContext.FileName.init -> void
+Themia.Modules.Export.Definitions.ExportContext.Format.get -> Themia.Modules.Export.ExportFormat
+Themia.Modules.Export.Definitions.ExportContext.Format.init -> void
+Themia.Modules.Export.Definitions.ExportContext.IncludeSoftDeleted.get -> bool
+Themia.Modules.Export.Definitions.ExportContext.IncludeSoftDeleted.init -> void
+Themia.Modules.Export.Definitions.ExportContext.ParametersJson.get -> string?
+Themia.Modules.Export.Definitions.ExportContext.ParametersJson.init -> void
+Themia.Modules.Export.Definitions.ExportContext.TenantId.get -> Themia.Framework.Core.Abstractions.Tenancy.TenantId?
+Themia.Modules.Export.Definitions.ExportContext.TenantId.init -> void
+Themia.Modules.Export.Definitions.ExportContext.UserId.get -> string?
+Themia.Modules.Export.Definitions.ExportContext.UserId.init -> void
+Themia.Modules.Export.Definitions.ExportDefinition<TRow, TParams>
+Themia.Modules.Export.Definitions.ExportDefinition<TRow, TParams>.ExportAsync(Themia.Modules.Export.Definitions.ExportContext! context, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<Themia.Export.ExportResult!>!
+Themia.Modules.Export.Definitions.ExportDefinition<TRow, TParams>.ExportDefinition(Themia.Export.Csv.ICsvExporter! csv, Themia.Export.Excel.IExcelExporter! excel) -> void
+Themia.Modules.Export.Definitions.ExportDefinition<TRow>
+Themia.Modules.Export.Definitions.ExportDefinition<TRow>.ExportDefinition(Themia.Export.Csv.ICsvExporter! csv, Themia.Export.Excel.IExcelExporter! excel) -> void
+Themia.Modules.Export.Definitions.IExportDefinition
+Themia.Modules.Export.Definitions.IExportDefinition.AllowsIncludeSoftDeleted.get -> bool
+Themia.Modules.Export.Definitions.IExportDefinition.ExportAsync(Themia.Modules.Export.Definitions.ExportContext! context, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<Themia.Export.ExportResult!>!
+Themia.Modules.Export.Definitions.IExportDefinition.Key.get -> string!
+Themia.Modules.Export.ExportFormat
+Themia.Modules.Export.ExportFormat.Csv = 0 -> Themia.Modules.Export.ExportFormat
+Themia.Modules.Export.ExportFormat.Xlsx = 1 -> Themia.Modules.Export.ExportFormat
+Themia.Modules.Export.ExportRunStatus
+Themia.Modules.Export.ExportRunStatus.Expired = 4 -> Themia.Modules.Export.ExportRunStatus
+Themia.Modules.Export.ExportRunStatus.Failed = 3 -> Themia.Modules.Export.ExportRunStatus
+Themia.Modules.Export.ExportRunStatus.Pending = 0 -> Themia.Modules.Export.ExportRunStatus
+Themia.Modules.Export.ExportRunStatus.Running = 1 -> Themia.Modules.Export.ExportRunStatus
+Themia.Modules.Export.ExportRunStatus.Succeeded = 2 -> Themia.Modules.Export.ExportRunStatus
+virtual Themia.Modules.Export.Definitions.ExportDefinition<TRow, TParams>.AllowsIncludeSoftDeleted.get -> bool
+virtual Themia.Modules.Export.Definitions.ExportDefinition<TRow, TParams>.Headers(TParams parameters, Themia.Modules.Export.Definitions.ExportContext! context) -> System.Collections.Generic.IEnumerable<Themia.Export.ReportHeader>!
