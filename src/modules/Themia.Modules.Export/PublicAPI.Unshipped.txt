@@ -96,3 +96,9 @@ override Themia.Modules.Export.Migrations.ExportSchemaMigration.Down() -> void
 override Themia.Modules.Export.Migrations.ExportSchemaMigration.Up() -> void
 Themia.Modules.Export.Migrations.ExportSchemaMigration
 Themia.Modules.Export.Migrations.ExportSchemaMigration.ExportSchemaMigration() -> void
+Themia.Modules.Export.Store.IExportRunStore
+Themia.Modules.Export.Store.IExportRunStore.CreateAsync(Themia.Modules.Export.Entities.ExportRun! run, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<Themia.Modules.Export.Entities.ExportRun!>!
+Themia.Modules.Export.Store.IExportRunStore.FindExpiredAcrossTenantsAsync(System.DateTimeOffset now, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Themia.Modules.Export.Entities.ExportRun!>!>!
+Themia.Modules.Export.Store.IExportRunStore.GetByIdIgnoringTenantAsync(System.Guid id, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<Themia.Modules.Export.Entities.ExportRun?>!
+Themia.Modules.Export.Store.IExportRunStore.ListAsync(string? userId, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Themia.Modules.Export.Entities.ExportRun!>!>!
+Themia.Modules.Export.Store.IExportRunStore.UpdateAsync(Themia.Modules.Export.Entities.ExportRun! run, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
