@@ -128,6 +128,7 @@ internal sealed class ThrowingDefinition : IExportDefinition
 internal sealed class FakeTenantStorage : ITenantStorage
 {
     public bool PutCalled { get; private set; }
+    public List<string> Deleted { get; } = [];
 
     public Task<StoredObject> PutAsync(string key, Stream content, StoragePutOptions options, CancellationToken cancellationToken = default)
     {
@@ -139,7 +140,10 @@ internal sealed class FakeTenantStorage : ITenantStorage
         => Task.FromResult(new Uri("https://x/dl"));
 
     public Task DeleteAsync(string key, CancellationToken cancellationToken = default)
-        => Task.CompletedTask;
+    {
+        Deleted.Add(key);
+        return Task.CompletedTask;
+    }
 
     public Task<StorageReadResult?> GetAsync(string key, CancellationToken cancellationToken = default)
         => Task.FromResult<StorageReadResult?>(null);
@@ -170,6 +174,8 @@ internal sealed class FakeDispatcher : INotificationDispatcher
 internal sealed class FakeJobContext : IJobExecutionContext
 {
     private FakeJobContext(JobDataMap map) => MergedJobDataMap = map;
+
+    public static FakeJobContext Empty() => new FakeJobContext(new JobDataMap());
 
     public static FakeJobContext WithRunId(Guid id)
     {
@@ -220,5 +226,14 @@ internal static class ExportDbFixtureJobExtensions
             LinkTtl = TimeSpan.FromHours(1),
         });
         return new ExportJob(store, registry, storage, notifier, new DataFilterScope(), opts, NullLogger<ExportJob>.Instance);
+    }
+
+    internal static CleanupJob BuildCleanupJob(
+        this ExportDbFixture fixture,
+        ITenantStorage storage)
+    {
+        var ctx = fixture.NewContext();
+        var store = new ExportRunStore(ctx, new DataFilterScope());
+        return new CleanupJob(store, storage, NullLogger<CleanupJob>.Instance);
     }
 }
