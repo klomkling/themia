@@ -86,8 +86,11 @@ internal sealed class ExportJob(
             run.Status = ExportRunStatus.Failed;
             run.Error = ex.Message;
             run.CompletedAt = DateTimeOffset.UtcNow;
-            await store.UpdateAsync(run, context.CancellationToken).ConfigureAwait(false);
-            await NotifyAsync(run, storageKey: null, succeeded: false, context.CancellationToken).ConfigureAwait(false);
+            // Use CancellationToken.None: the host may have cancelled context.CancellationToken
+            // during shutdown, which would prevent the Failed status from persisting and the
+            // failure notification from being sent, orphaning the run in Running state.
+            await store.UpdateAsync(run, CancellationToken.None).ConfigureAwait(false);
+            await NotifyAsync(run, storageKey: null, succeeded: false, CancellationToken.None).ConfigureAwait(false);
         }
     }
 
@@ -115,7 +118,7 @@ internal sealed class ExportJob(
         }
         else
         {
-            body = $"Your export '{run.DefinitionKey}' failed: {run.Error}";
+            body = $"Your export '{run.DefinitionKey}' could not be completed. Please try again or contact support.";
         }
 
         await notifier.DispatchAsync(

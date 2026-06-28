@@ -184,6 +184,13 @@ internal sealed class FakeJobContext : IJobExecutionContext
         return new FakeJobContext(map);
     }
 
+    public static FakeJobContext WithScheduleId(Guid id)
+    {
+        var map = new JobDataMap();
+        map[ExportScheduleJob.ScheduleIdKey] = id.ToString();
+        return new FakeJobContext(map);
+    }
+
     public JobDataMap MergedJobDataMap { get; }
     public CancellationToken CancellationToken => CancellationToken.None;
 
