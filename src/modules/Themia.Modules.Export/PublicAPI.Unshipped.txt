@@ -102,3 +102,11 @@ Themia.Modules.Export.Store.IExportRunStore.FindExpiredAcrossTenantsAsync(System
 Themia.Modules.Export.Store.IExportRunStore.GetByIdIgnoringTenantAsync(System.Guid id, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<Themia.Modules.Export.Entities.ExportRun?>!
 Themia.Modules.Export.Store.IExportRunStore.ListAsync(string? userId, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Themia.Modules.Export.Entities.ExportRun!>!>!
 Themia.Modules.Export.Store.IExportRunStore.UpdateAsync(Themia.Modules.Export.Entities.ExportRun! run, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
+Themia.Modules.Export.Definitions.IExportDefinitionRegistry
+Themia.Modules.Export.Definitions.IExportDefinitionRegistry.Find(string! key) -> Themia.Modules.Export.Definitions.IExportDefinition?
+Themia.Modules.Export.ExportModuleOptions
+Themia.Modules.Export.ExportModuleOptions.ExportModuleOptions() -> void
+Themia.Modules.Export.ExportModuleOptions.LinkTtl.get -> System.TimeSpan
+Themia.Modules.Export.ExportModuleOptions.LinkTtl.set -> void
+Themia.Modules.Export.ExportModuleOptions.Retention.get -> System.TimeSpan
+Themia.Modules.Export.ExportModuleOptions.Retention.set -> void
