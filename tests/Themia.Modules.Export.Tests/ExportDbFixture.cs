@@ -1,8 +1,17 @@
+using System.Collections.Specialized;
 using FluentMigrator.Runner;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
+using Quartz;
+using Quartz.Impl;
 using Testcontainers.PostgreSql;
+using Themia.Export;
+using Themia.Framework.Core.Abstractions.Tenancy;
+using Themia.Framework.Data.Abstractions.Filtering;
+using Themia.Modules.Export.Definitions;
+using Themia.Modules.Export.Requests;
+using Themia.Modules.Export.Store;
 using Xunit;
 
 namespace Themia.Modules.Export.Tests;
@@ -46,6 +55,38 @@ public sealed class ExportDbFixture : IAsyncLifetime
         await cmd.ExecuteNonQueryAsync();
     }
 
+    /// <summary>Creates a fresh, isolated in-memory Quartz scheduler (RAMJobStore). Each call gets a
+    /// unique instance name so test facts never share scheduled jobs. The scheduler is not started, so
+    /// scheduled jobs remain dormant — tests assert scheduling, not execution.</summary>
+    public async Task<IScheduler> NewMemoryScheduler()
+    {
+        var props = new NameValueCollection
+        {
+            ["quartz.scheduler.instanceName"] = $"export-test-{Guid.NewGuid():N}",
+            ["quartz.jobStore.type"] = "Quartz.Simpl.RAMJobStore, Quartz",
+            ["quartz.threadPool.threadCount"] = "1",
+        };
+        var factory = new StdSchedulerFactory(props);
+        return await factory.GetScheduler();
+    }
+
+    /// <summary>Wires an <see cref="IExportRequestService"/> over a fresh context: run + schedule stores,
+    /// a registry of stub definitions for the given keys (all disallowing soft-delete), a factory that
+    /// returns <paramref name="scheduler"/>, and a fixed tenant context.</summary>
+    public IExportRequestService BuildRequestService(
+        IScheduler scheduler, TenantId tenant, IReadOnlyList<string> definitions)
+    {
+        var ctx = NewContext();
+        var filterScope = new DataFilterScope();
+        var runStore = new ExportRunStore(ctx, filterScope);
+        var scheduleStore = new ExportScheduleStore(ctx, filterScope);
+        var registry = new ExportDefinitionRegistry(
+            definitions.Select(k => (IExportDefinition)new StubRequestDefinition(k)).ToList());
+        var schedulerFactory = new SingleSchedulerFactory(scheduler);
+        var tenantContext = new TenantContext(tenant);
+        return new ExportRequestService(runStore, scheduleStore, registry, schedulerFactory, tenantContext);
+    }
+
     private void RunMigrations()
     {
         var services = new ServiceCollection()
@@ -59,6 +100,29 @@ public sealed class ExportDbFixture : IAsyncLifetime
         using var scope = services.CreateScope();
         scope.ServiceProvider.GetRequiredService<IMigrationRunner>().MigrateUp();
     }
+}
+
+/// <summary>An <see cref="ISchedulerFactory"/> that always hands back a single, pre-built scheduler.</summary>
+internal sealed class SingleSchedulerFactory(IScheduler scheduler) : ISchedulerFactory
+{
+    public Task<IScheduler> GetScheduler(CancellationToken cancellationToken = default)
+        => Task.FromResult(scheduler);
+
+    public Task<IScheduler?> GetScheduler(string schedName, CancellationToken cancellationToken = default)
+        => Task.FromResult<IScheduler?>(scheduler);
+
+    public Task<IReadOnlyList<IScheduler>> GetAllSchedulers(CancellationToken cancellationToken = default)
+        => Task.FromResult<IReadOnlyList<IScheduler>>([scheduler]);
+}
+
+/// <summary>A keyed export definition that disallows soft-delete (drives the request-service guard tests).</summary>
+internal sealed class StubRequestDefinition(string key) : IExportDefinition
+{
+    public string Key => key;
+    public bool AllowsIncludeSoftDeleted => false;
+
+    public Task<ExportResult> ExportAsync(ExportContext context, CancellationToken cancellationToken)
+        => Task.FromResult(new ExportResult([1, 2, 3], "text/csv", "export.csv"));
 }
 
 /// <summary>Test helpers for <see cref="Entities.ExportRun"/>.</summary>

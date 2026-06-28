@@ -110,3 +110,58 @@ Themia.Modules.Export.ExportModuleOptions.LinkTtl.get -> System.TimeSpan
 Themia.Modules.Export.ExportModuleOptions.LinkTtl.set -> void
 Themia.Modules.Export.ExportModuleOptions.Retention.get -> System.TimeSpan
 Themia.Modules.Export.ExportModuleOptions.Retention.set -> void
+Themia.Modules.Export.Requests.IExportRequestService
+Themia.Modules.Export.Requests.IExportRequestService.SubmitAsync(Themia.Modules.Export.Requests.ExportSubmission! submission, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<Themia.Modules.Export.Requests.ExportRunView!>!
+Themia.Modules.Export.Requests.IExportRequestService.ScheduleAsync(Themia.Modules.Export.Requests.ExportScheduleRequest! request, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<System.Guid>!
+Themia.Modules.Export.Requests.IExportRequestService.ListRunsAsync(string? userId, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Themia.Modules.Export.Requests.ExportRunView!>!>!
+Themia.Modules.Export.Requests.IExportRequestService.GetRunAsync(System.Guid id, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<Themia.Modules.Export.Requests.ExportRunView?>!
+Themia.Modules.Export.Requests.ExportSubmission
+Themia.Modules.Export.Requests.ExportSubmission.ExportSubmission(string! DefinitionKey, string? ParametersJson, Themia.Modules.Export.ExportFormat Format, string? FileName = null, bool IncludeSoftDeleted = false, string? UserId = null) -> void
+Themia.Modules.Export.Requests.ExportSubmission.DefinitionKey.get -> string!
+Themia.Modules.Export.Requests.ExportSubmission.DefinitionKey.init -> void
+Themia.Modules.Export.Requests.ExportSubmission.ParametersJson.get -> string?
+Themia.Modules.Export.Requests.ExportSubmission.ParametersJson.init -> void
+Themia.Modules.Export.Requests.ExportSubmission.Format.get -> Themia.Modules.Export.ExportFormat
+Themia.Modules.Export.Requests.ExportSubmission.Format.init -> void
+Themia.Modules.Export.Requests.ExportSubmission.FileName.get -> string?
+Themia.Modules.Export.Requests.ExportSubmission.FileName.init -> void
+Themia.Modules.Export.Requests.ExportSubmission.IncludeSoftDeleted.get -> bool
+Themia.Modules.Export.Requests.ExportSubmission.IncludeSoftDeleted.init -> void
+Themia.Modules.Export.Requests.ExportSubmission.UserId.get -> string?
+Themia.Modules.Export.Requests.ExportSubmission.UserId.init -> void
+Themia.Modules.Export.Requests.ExportScheduleRequest
+Themia.Modules.Export.Requests.ExportScheduleRequest.ExportScheduleRequest(string! DefinitionKey, string! Cron, Themia.Modules.Export.ExportFormat Format, string? ParametersJson = null, bool IncludeSoftDeleted = false, string? UserId = null) -> void
+Themia.Modules.Export.Requests.ExportScheduleRequest.DefinitionKey.get -> string!
+Themia.Modules.Export.Requests.ExportScheduleRequest.DefinitionKey.init -> void
+Themia.Modules.Export.Requests.ExportScheduleRequest.Cron.get -> string!
+Themia.Modules.Export.Requests.ExportScheduleRequest.Cron.init -> void
+Themia.Modules.Export.Requests.ExportScheduleRequest.Format.get -> Themia.Modules.Export.ExportFormat
+Themia.Modules.Export.Requests.ExportScheduleRequest.Format.init -> void
+Themia.Modules.Export.Requests.ExportScheduleRequest.ParametersJson.get -> string?
+Themia.Modules.Export.Requests.ExportScheduleRequest.ParametersJson.init -> void
+Themia.Modules.Export.Requests.ExportScheduleRequest.IncludeSoftDeleted.get -> bool
+Themia.Modules.Export.Requests.ExportScheduleRequest.IncludeSoftDeleted.init -> void
+Themia.Modules.Export.Requests.ExportScheduleRequest.UserId.get -> string?
+Themia.Modules.Export.Requests.ExportScheduleRequest.UserId.init -> void
+Themia.Modules.Export.Requests.ExportRunView
+Themia.Modules.Export.Requests.ExportRunView.ExportRunView(System.Guid Id, string! DefinitionKey, Themia.Modules.Export.ExportFormat Format, Themia.Modules.Export.ExportRunStatus Status, string? StorageKey, long? SizeBytes, System.DateTimeOffset? ExpiresAt, string? Error, System.DateTimeOffset CreatedAt, System.DateTimeOffset? CompletedAt) -> void
+Themia.Modules.Export.Requests.ExportRunView.Id.get -> System.Guid
+Themia.Modules.Export.Requests.ExportRunView.Id.init -> void
+Themia.Modules.Export.Requests.ExportRunView.DefinitionKey.get -> string!
+Themia.Modules.Export.Requests.ExportRunView.DefinitionKey.init -> void
+Themia.Modules.Export.Requests.ExportRunView.Format.get -> Themia.Modules.Export.ExportFormat
+Themia.Modules.Export.Requests.ExportRunView.Format.init -> void
+Themia.Modules.Export.Requests.ExportRunView.Status.get -> Themia.Modules.Export.ExportRunStatus
+Themia.Modules.Export.Requests.ExportRunView.Status.init -> void
+Themia.Modules.Export.Requests.ExportRunView.StorageKey.get -> string?
+Themia.Modules.Export.Requests.ExportRunView.StorageKey.init -> void
+Themia.Modules.Export.Requests.ExportRunView.SizeBytes.get -> long?
+Themia.Modules.Export.Requests.ExportRunView.SizeBytes.init -> void
+Themia.Modules.Export.Requests.ExportRunView.ExpiresAt.get -> System.DateTimeOffset?
+Themia.Modules.Export.Requests.ExportRunView.ExpiresAt.init -> void
+Themia.Modules.Export.Requests.ExportRunView.Error.get -> string?
+Themia.Modules.Export.Requests.ExportRunView.Error.init -> void
+Themia.Modules.Export.Requests.ExportRunView.CreatedAt.get -> System.DateTimeOffset
+Themia.Modules.Export.Requests.ExportRunView.CreatedAt.init -> void
+Themia.Modules.Export.Requests.ExportRunView.CompletedAt.get -> System.DateTimeOffset?
+Themia.Modules.Export.Requests.ExportRunView.CompletedAt.init -> void
