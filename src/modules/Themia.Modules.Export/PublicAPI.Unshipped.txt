@@ -104,12 +104,23 @@ Themia.Modules.Export.Store.IExportRunStore.ListAsync(string? userId, System.Thr
 Themia.Modules.Export.Store.IExportRunStore.UpdateAsync(Themia.Modules.Export.Entities.ExportRun! run, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
 Themia.Modules.Export.Definitions.IExportDefinitionRegistry
 Themia.Modules.Export.Definitions.IExportDefinitionRegistry.Find(string! key) -> Themia.Modules.Export.Definitions.IExportDefinition?
+Themia.Modules.Export.ExportModule
+Themia.Modules.Export.ExportModule.ExportModule(Themia.Data.Migrations.MigrationEngine engine) -> void
+Themia.Modules.Export.ExportModule.ExportModule(Themia.Data.Migrations.MigrationEngine engine, Themia.Modules.Export.ExportModuleOptions! options) -> void
+override Themia.Modules.Export.ExportModule.Descriptor.get -> Themia.Framework.Core.Modules.ModuleDescriptor!
+override Themia.Modules.Export.ExportModule.InitializeAsync(System.IServiceProvider! serviceProvider, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
 Themia.Modules.Export.ExportModuleOptions
 Themia.Modules.Export.ExportModuleOptions.ExportModuleOptions() -> void
+Themia.Modules.Export.ExportModuleOptions.CleanupCron.get -> string!
+Themia.Modules.Export.ExportModuleOptions.CleanupCron.set -> void
+Themia.Modules.Export.ExportModuleOptions.ConnectionStringName.get -> string!
+Themia.Modules.Export.ExportModuleOptions.ConnectionStringName.set -> void
 Themia.Modules.Export.ExportModuleOptions.LinkTtl.get -> System.TimeSpan
 Themia.Modules.Export.ExportModuleOptions.LinkTtl.set -> void
 Themia.Modules.Export.ExportModuleOptions.Retention.get -> System.TimeSpan
 Themia.Modules.Export.ExportModuleOptions.Retention.set -> void
+Themia.Modules.Export.DependencyInjection.ExportModuleServiceCollectionExtensions
+static Themia.Modules.Export.DependencyInjection.ExportModuleServiceCollectionExtensions.AddThemiaExportModule(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Themia.Modules.Export.ExportModuleOptions!>? configure = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
 Themia.Modules.Export.Requests.IExportRequestService
 Themia.Modules.Export.Requests.IExportRequestService.SubmitAsync(Themia.Modules.Export.Requests.ExportSubmission! submission, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<Themia.Modules.Export.Requests.ExportRunView!>!
 Themia.Modules.Export.Requests.IExportRequestService.ScheduleAsync(Themia.Modules.Export.Requests.ExportScheduleRequest! request, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<System.Guid>!
