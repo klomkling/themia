@@ -33,7 +33,7 @@ internal sealed class CleanupJob(
                     run.Status = ExportRunStatus.Expired;
                     await store.UpdateAsync(run, context.CancellationToken).ConfigureAwait(false);
                 }
-                catch (Exception ex)
+                catch (Exception ex) when (ex is not OperationCanceledException)
                 {
                     logger.LogError(ex, "Failed to expire run {RunId}.", run.Id);
                 }
