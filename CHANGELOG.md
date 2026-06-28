@@ -27,6 +27,19 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.6.9] - 2026-06-29
+
+### Added
+- **`Themia.Modules.Export`** — tenant-aware async export module (`net10.0`). Exports are defined
+  via `IExportDefinition<TParams>` (keyed, registered by DI), triggered on-demand or on a cron
+  schedule via Quartz, and delivered as a signed Storage link. Completion and failure events
+  dispatch Notifications. A background cleanup job purges runs older than 7 days. FluentMigrator
+  schema covers PostgreSQL, SQL Server, and MySQL.
+- **`IDataFilterScope.BypassSoftDeleteFilter()`** (`Themia.Framework.Data.EFCore` and
+  `Themia.Framework.Data.Dapper.*`) — scoped opt-in that suppresses the `IsDeleted = false`
+  global query filter for a single export run when `IExportDefinition.AllowsIncludeSoftDeleted`
+  is `true`. Not intended for general use outside the export pipeline.
+
 ## [0.6.8] - 2026-06-24
 
 ### Added
