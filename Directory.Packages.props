@@ -98,10 +98,10 @@
     <PackageVersion Include="Testcontainers.MySql" Version="4.12.0" />
     <PackageVersion Include="Testcontainers.MsSql" Version="4.12.0" />
     <!-- Storage (Themia.Modules.Storage.S3): AWS S3 SDK (also drives Cloudflare R2 via a configured ServiceUrl) -->
-    <PackageVersion Include="AWSSDK.S3" Version="4.0.25.3" />
+    <PackageVersion Include="AWSSDK.S3" Version="4.0.100" />
     <!-- Transitive AWSSDK.Core pinned to the patched 4.0.3.3 (CVE-2026-22611 / GHSA-9cvc-h2w8-phrp):
          AWSSDK.S3 4.0.6 resolves Core 4.0.0.16, which NuGetAudit flags (TreatWarningsAsErrors). -->
-    <PackageVersion Include="AWSSDK.Core" Version="4.0.9.7" />
+    <PackageVersion Include="AWSSDK.Core" Version="4.0.100" />
     <!-- Storage integration tests: S3-compatible server (MinIO) via Testcontainers (same family as the others) -->
     <PackageVersion Include="Testcontainers.Minio" Version="4.12.0" />
     <!-- Identity (Themia.Modules.Identity): argon2id password hashing -->
