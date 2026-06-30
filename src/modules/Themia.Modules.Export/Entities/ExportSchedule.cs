@@ -13,7 +13,7 @@ public sealed class ExportSchedule : SoftDeletableEntity<Guid>, ITenantEntity
     public string? UserId { get; set; }
 
     /// <summary>The export definition key.</summary>
-    public string DefinitionKey { get; set; } = string.Empty;
+    public required string DefinitionKey { get; set; }
 
     /// <summary>The fixed filter/scope parameters (relative values resolved at fire time).</summary>
     public string? ParametersJson { get; set; }
@@ -22,7 +22,7 @@ public sealed class ExportSchedule : SoftDeletableEntity<Guid>, ITenantEntity
     public ExportFormat Format { get; set; }
 
     /// <summary>The Quartz cron expression.</summary>
-    public string Cron { get; set; } = string.Empty;
+    public required string Cron { get; set; }
 
     /// <summary>Whether the schedule is active.</summary>
     public bool Enabled { get; set; } = true;
@@ -30,6 +30,6 @@ public sealed class ExportSchedule : SoftDeletableEntity<Guid>, ITenantEntity
     /// <summary>Whether produced runs include soft-deleted rows.</summary>
     public bool IncludeSoftDeleted { get; set; }
 
-    /// <summary>Sets the identity (factory use).</summary>
-    public void SetId(Guid id) => Id = id;
+    /// <summary>Sets the identity once at creation (factory/test use).</summary>
+    internal void SetId(Guid id) => Id = id;
 }

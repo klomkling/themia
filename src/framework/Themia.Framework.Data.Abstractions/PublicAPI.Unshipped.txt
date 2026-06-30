@@ -60,7 +60,6 @@ Themia.Framework.Data.Abstractions.Filtering.DataFilterScope.BypassSoftDeleteFil
 Themia.Framework.Data.Abstractions.Filtering.DataFilterScope.DataFilterScope() -> void
 Themia.Framework.Data.Abstractions.Filtering.DataFilterScope.IsTenantFilterBypassed.get -> bool
 Themia.Framework.Data.Abstractions.Filtering.DataFilterScope.IsSoftDeleteFilterBypassed.get -> bool
-static Themia.Framework.Data.Abstractions.Filtering.DataFilterScope.SoftDeleteBypassedAmbient.get -> bool
 Themia.Framework.Data.Abstractions.Filtering.IDataFilterScope
 Themia.Framework.Data.Abstractions.Filtering.IDataFilterScope.BypassTenantFilter() -> System.IDisposable!
 Themia.Framework.Data.Abstractions.Filtering.IDataFilterScope.BypassSoftDeleteFilter() -> System.IDisposable!

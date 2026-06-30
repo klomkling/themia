@@ -29,7 +29,15 @@ internal sealed class ExportJob(
 
     public async Task Execute(IJobExecutionContext context)
     {
-        var runId = Guid.Parse(context.MergedJobDataMap.GetString(RunIdKey)!);
+        // GetString returns null for a missing key, so a single TryParse covers both missing and malformed.
+        var runIdValue = context.MergedJobDataMap.GetString(RunIdKey);
+        if (!Guid.TryParse(runIdValue, out var runId))
+        {
+            // Throw (not swallow) so Quartz surfaces the fault to monitoring rather than recording success.
+            throw new InvalidOperationException(
+                $"Export job invoked with missing or malformed '{RunIdKey}' job data ('{runIdValue}').");
+        }
+
         var run = await store.GetByIdIgnoringTenantAsync(runId, context.CancellationToken).ConfigureAwait(false);
         if (run is null)
         {
@@ -38,9 +46,10 @@ internal sealed class ExportJob(
         }
 
         using var _ = BackgroundTenantScope.Begin(run.TenantId);
+        string key;
         try
         {
-            run.Status = ExportRunStatus.Running;
+            run.MarkRunning(DateTimeOffset.UtcNow);
             await store.UpdateAsync(run, context.CancellationToken).ConfigureAwait(false);
 
             var definition = registry.Find(run.DefinitionKey)
@@ -60,21 +69,15 @@ internal sealed class ExportJob(
                 ? await RunWithSoftDeleteAsync(definition, exportContext, context.CancellationToken).ConfigureAwait(false)
                 : await definition.ExportAsync(exportContext, context.CancellationToken).ConfigureAwait(false);
 
-            var key = $"exports/{run.TenantId?.Value ?? "global"}/{run.Id:N}{Extension(run.Format)}";
+            key = $"exports/{run.TenantId?.Value ?? "global"}/{run.Id:N}{Extension(run.Format)}";
             using (var ms = new MemoryStream(result.Content))
             {
                 await storage.PutAsync(key, ms, new StoragePutOptions(result.ContentType), context.CancellationToken).ConfigureAwait(false);
             }
 
-            run.StorageKey = key;
-            run.FileName = result.FileName;
-            run.SizeBytes = result.Content.LongLength;
-            run.ExpiresAt = DateTimeOffset.UtcNow + options.Value.Retention;
-            run.Status = ExportRunStatus.Succeeded;
-            run.CompletedAt = DateTimeOffset.UtcNow;
+            var now = DateTimeOffset.UtcNow;
+            run.MarkSucceeded(key, result.FileName, result.Content.LongLength, now + options.Value.Retention, now);
             await store.UpdateAsync(run, context.CancellationToken).ConfigureAwait(false);
-
-            await NotifyAsync(run, key, succeeded: true, context.CancellationToken).ConfigureAwait(false);
         }
         catch (OperationCanceledException)
         {
@@ -83,14 +86,38 @@ internal sealed class ExportJob(
         catch (Exception ex)
         {
             logger.LogError(ex, "Export run {RunId} failed.", run.Id);
-            run.Status = ExportRunStatus.Failed;
-            run.Error = ex.Message;
-            run.CompletedAt = DateTimeOffset.UtcNow;
-            // Use CancellationToken.None: the host may have cancelled context.CancellationToken
-            // during shutdown, which would prevent the Failed status from persisting and the
-            // failure notification from being sent, orphaning the run in Running state.
+            await RecordFailureAsync(run, ex).ConfigureAwait(false);
+            return;
+        }
+
+        // Best-effort completion notification. The export already succeeded and is stored, so a notification
+        // failure must neither fail the job (which would re-run the export) nor undo the persisted Succeeded
+        // status — log it once and move on.
+        try
+        {
+            await NotifyAsync(run, key, succeeded: true, context.CancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogError(ex, "Export run {RunId} succeeded but sending its completion notification failed.", run.Id);
+        }
+    }
+
+    /// <summary>Persists the Failed status and dispatches the failure notification on the error path. Uses
+    /// <see cref="CancellationToken.None"/> so a host shutdown that cancelled the job token cannot leave the
+    /// run orphaned in Running. Any secondary failure here is logged (not rethrown), so it cannot mask the
+    /// original cause — but it is surfaced rather than swallowed silently.</summary>
+    private async Task RecordFailureAsync(ExportRun run, Exception cause)
+    {
+        run.MarkFailed(cause.Message, DateTimeOffset.UtcNow);
+        try
+        {
             await store.UpdateAsync(run, CancellationToken.None).ConfigureAwait(false);
             await NotifyAsync(run, storageKey: null, succeeded: false, CancellationToken.None).ConfigureAwait(false);
+        }
+        catch (Exception recordEx)
+        {
+            logger.LogError(recordEx, "Failed to record the failure of export run {RunId}; it may remain in Running.", run.Id);
         }
     }
 

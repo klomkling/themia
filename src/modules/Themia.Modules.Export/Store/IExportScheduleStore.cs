@@ -11,4 +11,7 @@ internal interface IExportScheduleStore
 
     /// <summary>Loads a schedule by id across tenants (the job then establishes that tenant's scope).</summary>
     Task<ExportSchedule?> GetByIdIgnoringTenantAsync(Guid id, CancellationToken cancellationToken);
+
+    /// <summary>Soft-deletes a schedule (used to compensate a persisted schedule whose trigger failed to register).</summary>
+    Task DeleteAsync(ExportSchedule schedule, CancellationToken cancellationToken);
 }

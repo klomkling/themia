@@ -13,8 +13,10 @@ public sealed class DataFilterScope : IDataFilterScope
     /// <inheritdoc />
     public bool IsSoftDeleteFilterBypassed => SoftDeleteBypassed.Value;
 
-    /// <summary>The ambient soft-delete bypass flag, read by the EF query filter expression at query time.</summary>
-    public static bool SoftDeleteBypassedAmbient => SoftDeleteBypassed.Value;
+    /// <summary>The ambient soft-delete bypass flag, read by the EF query filter expression at query time.
+    /// Internal because EF query filters compiled in <c>OnModelCreating</c> cannot capture a DI instance, so
+    /// the flag is exposed statically to the EFCore assembly only (via InternalsVisibleTo) — not as public API.</summary>
+    internal static bool SoftDeleteBypassedAmbient => SoftDeleteBypassed.Value;
 
     /// <inheritdoc />
     public IDisposable BypassTenantFilter()

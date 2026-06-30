@@ -1,10 +1,13 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Quartz;
 using Themia.Data.Migrations;
 using Themia.Framework.Core.Modules;
 using Themia.Modules.Export.Jobs;
 using Themia.Modules.Export.Migrations;
+using Themia.Modules.Export.Store;
 
 namespace Themia.Modules.Export;
 
@@ -73,6 +76,36 @@ public sealed class ExportModule : ThemiaModuleBase
         if (!await scheduler.CheckExists(job.Key, cancellationToken).ConfigureAwait(false))
         {
             await scheduler.ScheduleJob(job, trigger, cancellationToken).ConfigureAwait(false);
+        }
+
+        await ReconcileStaleRunsAsync(sp, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>Reconciles runs orphaned in <see cref="ExportRunStatus.Running"/> by a host restart: any run
+    /// that started before the grace cutoff is marked Failed so it does not linger forever. The grace period
+    /// leaves runs that are still actively executing (including on another instance) untouched.</summary>
+    private async Task ReconcileStaleRunsAsync(IServiceProvider sp, CancellationToken cancellationToken)
+    {
+        var store = sp.GetRequiredService<IExportRunStore>();
+        var logger = sp.GetService<ILogger<ExportModule>>() ?? (ILogger)NullLogger<ExportModule>.Instance;
+        var cutoff = DateTimeOffset.UtcNow - options.StaleRunGracePeriod;
+
+        var stale = await store.FindStaleRunningAcrossTenantsAsync(cutoff, cancellationToken).ConfigureAwait(false);
+        foreach (var group in stale.GroupBy(r => r.TenantId))
+        {
+            using var _ = BackgroundTenantScope.Begin(group.Key);
+            foreach (var run in group)
+            {
+                run.MarkFailed("Export was interrupted by a host restart and did not resume.", DateTimeOffset.UtcNow);
+                try
+                {
+                    await store.UpdateAsync(run, cancellationToken).ConfigureAwait(false);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    logger.LogError(ex, "Failed to reconcile stale running export {RunId}.", run.Id);
+                }
+            }
         }
     }
 }

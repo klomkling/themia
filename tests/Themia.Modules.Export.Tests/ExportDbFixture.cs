@@ -8,7 +8,6 @@ using Quartz.Impl;
 using Testcontainers.PostgreSql;
 using Themia.Export;
 using Themia.Framework.Core.Abstractions.Tenancy;
-using Themia.Framework.Data.Abstractions.Filtering;
 using Themia.Modules.Export.Definitions;
 using Themia.Modules.Export.Requests;
 using Themia.Modules.Export.Store;
@@ -77,9 +76,8 @@ public sealed class ExportDbFixture : IAsyncLifetime
         IScheduler scheduler, TenantId tenant, IReadOnlyList<string> definitions)
     {
         var ctx = NewContext();
-        var filterScope = new DataFilterScope();
-        var runStore = new ExportRunStore(ctx, filterScope);
-        var scheduleStore = new ExportScheduleStore(ctx, filterScope);
+        var runStore = new ExportRunStore(ctx);
+        var scheduleStore = new ExportScheduleStore(ctx);
         var registry = new ExportDefinitionRegistry(
             definitions.Select(k => (IExportDefinition)new StubRequestDefinition(k)).ToList());
         var schedulerFactory = new SingleSchedulerFactory(scheduler);

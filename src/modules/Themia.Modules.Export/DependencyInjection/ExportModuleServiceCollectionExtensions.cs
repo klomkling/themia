@@ -3,6 +3,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
+using Quartz;
 using Themia.Export.DependencyInjection;
 using Themia.Export.Excel.DependencyInjection;
 using Themia.Framework.Core.Abstractions.Tenancy;
@@ -27,10 +28,22 @@ public static class ExportModuleServiceCollectionExtensions
         this IServiceCollection services, Action<ExportModuleOptions>? configure = null)
     {
         ArgumentNullException.ThrowIfNull(services);
+
+        var optionsBuilder = services.AddOptions<ExportModuleOptions>();
         if (configure is not null)
         {
-            services.Configure(configure);
+            optionsBuilder.Configure(configure);
         }
+
+        optionsBuilder
+            .Validate(o => o.Retention > TimeSpan.Zero, "ExportModuleOptions.Retention must be positive.")
+            .Validate(o => o.LinkTtl > TimeSpan.Zero, "ExportModuleOptions.LinkTtl must be positive.")
+            .Validate(o => o.StaleRunGracePeriod > TimeSpan.Zero, "ExportModuleOptions.StaleRunGracePeriod must be positive.")
+            .Validate(o => !string.IsNullOrWhiteSpace(o.CleanupCron) && CronExpression.IsValidExpression(o.CleanupCron),
+                "ExportModuleOptions.CleanupCron must be a valid Quartz cron expression.")
+            .Validate(o => !string.IsNullOrWhiteSpace(o.ConnectionStringName),
+                "ExportModuleOptions.ConnectionStringName must be set.")
+            .ValidateOnStart();
 
         services.AddThemiaExport();
         services.AddThemiaExcelExport();

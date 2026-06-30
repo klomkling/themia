@@ -1,6 +1,5 @@
 using Microsoft.Extensions.Logging;
 using Quartz;
-using Themia.Modules.Export.Entities;
 using Themia.Modules.Export.Store;
 using Themia.Modules.Storage;
 
@@ -30,7 +29,7 @@ internal sealed class CleanupJob(
                         await storage.DeleteAsync(run.StorageKey, context.CancellationToken).ConfigureAwait(false);
                     }
 
-                    run.Status = ExportRunStatus.Expired;
+                    run.MarkExpired();
                     await store.UpdateAsync(run, context.CancellationToken).ConfigureAwait(false);
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
