@@ -1,0 +1,179 @@
+#nullable enable
+abstract Themia.Modules.Export.Definitions.ExportDefinition<TRow, TParams>.Columns(TParams parameters, Themia.Modules.Export.Definitions.ExportContext! context) -> System.Collections.Generic.IReadOnlyList<Themia.Export.ExportColumn<TRow>!>!
+abstract Themia.Modules.Export.Definitions.ExportDefinition<TRow, TParams>.Key.get -> string!
+abstract Themia.Modules.Export.Definitions.ExportDefinition<TRow, TParams>.RowsAsync(TParams parameters, Themia.Modules.Export.Definitions.ExportContext! context, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<TRow>!>!
+abstract Themia.Modules.Export.Definitions.ExportDefinition<TRow>.Columns(Themia.Modules.Export.Definitions.ExportContext! context) -> System.Collections.Generic.IReadOnlyList<Themia.Export.ExportColumn<TRow>!>!
+abstract Themia.Modules.Export.Definitions.ExportDefinition<TRow>.RowsAsync(Themia.Modules.Export.Definitions.ExportContext! context, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<TRow>!>!
+Themia.Modules.Export.Definitions.EmptyParams
+Themia.Modules.Export.Definitions.EmptyParams.EmptyParams() -> void
+Themia.Modules.Export.Definitions.ExportContext
+Themia.Modules.Export.Definitions.ExportContext.ExportContext() -> void
+Themia.Modules.Export.Definitions.ExportContext.FileName.get -> string?
+Themia.Modules.Export.Definitions.ExportContext.FileName.init -> void
+Themia.Modules.Export.Definitions.ExportContext.Format.get -> Themia.Modules.Export.ExportFormat
+Themia.Modules.Export.Definitions.ExportContext.Format.init -> void
+Themia.Modules.Export.Definitions.ExportContext.IncludeSoftDeleted.get -> bool
+Themia.Modules.Export.Definitions.ExportContext.IncludeSoftDeleted.init -> void
+Themia.Modules.Export.Definitions.ExportContext.ParametersJson.get -> string?
+Themia.Modules.Export.Definitions.ExportContext.ParametersJson.init -> void
+Themia.Modules.Export.Definitions.ExportContext.TenantId.get -> Themia.Framework.Core.Abstractions.Tenancy.TenantId?
+Themia.Modules.Export.Definitions.ExportContext.TenantId.init -> void
+Themia.Modules.Export.Definitions.ExportContext.UserId.get -> string?
+Themia.Modules.Export.Definitions.ExportContext.UserId.init -> void
+Themia.Modules.Export.Definitions.ExportDefinition<TRow, TParams>
+Themia.Modules.Export.Definitions.ExportDefinition<TRow, TParams>.ExportAsync(Themia.Modules.Export.Definitions.ExportContext! context, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<Themia.Export.ExportResult!>!
+Themia.Modules.Export.Definitions.ExportDefinition<TRow, TParams>.ExportDefinition(Themia.Export.Csv.ICsvExporter! csv, Themia.Export.Excel.IExcelExporter! excel) -> void
+Themia.Modules.Export.Definitions.ExportDefinition<TRow>
+Themia.Modules.Export.Definitions.ExportDefinition<TRow>.ExportDefinition(Themia.Export.Csv.ICsvExporter! csv, Themia.Export.Excel.IExcelExporter! excel) -> void
+Themia.Modules.Export.Definitions.IExportDefinition
+Themia.Modules.Export.Definitions.IExportDefinition.AllowsIncludeSoftDeleted.get -> bool
+Themia.Modules.Export.Definitions.IExportDefinition.ExportAsync(Themia.Modules.Export.Definitions.ExportContext! context, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<Themia.Export.ExportResult!>!
+Themia.Modules.Export.Definitions.IExportDefinition.Key.get -> string!
+Themia.Modules.Export.ExportFormat
+Themia.Modules.Export.ExportFormat.Csv = 0 -> Themia.Modules.Export.ExportFormat
+Themia.Modules.Export.ExportFormat.Xlsx = 1 -> Themia.Modules.Export.ExportFormat
+Themia.Modules.Export.ExportRunStatus
+Themia.Modules.Export.ExportRunStatus.Expired = 4 -> Themia.Modules.Export.ExportRunStatus
+Themia.Modules.Export.ExportRunStatus.Failed = 3 -> Themia.Modules.Export.ExportRunStatus
+Themia.Modules.Export.ExportRunStatus.Pending = 0 -> Themia.Modules.Export.ExportRunStatus
+Themia.Modules.Export.ExportRunStatus.Running = 1 -> Themia.Modules.Export.ExportRunStatus
+Themia.Modules.Export.ExportRunStatus.Succeeded = 2 -> Themia.Modules.Export.ExportRunStatus
+virtual Themia.Modules.Export.Definitions.ExportDefinition<TRow, TParams>.AllowsIncludeSoftDeleted.get -> bool
+virtual Themia.Modules.Export.Definitions.ExportDefinition<TRow, TParams>.Headers(TParams parameters, Themia.Modules.Export.Definitions.ExportContext! context) -> System.Collections.Generic.IEnumerable<Themia.Export.ReportHeader>!
+Themia.Modules.Export.ExportDbContext
+Themia.Modules.Export.ExportDbContext.ExportDbContext(Microsoft.EntityFrameworkCore.DbContextOptions<Themia.Modules.Export.ExportDbContext!>! options, Themia.Framework.Core.Abstractions.Tenancy.ITenantContext? tenantContext = null, Themia.Framework.Data.Abstractions.Filtering.IDataFilterScope? filterScope = null) -> void
+Themia.Modules.Export.ExportDbContext.Runs.get -> Microsoft.EntityFrameworkCore.DbSet<Themia.Modules.Export.Entities.ExportRun!>!
+Themia.Modules.Export.ExportDbContext.Schedules.get -> Microsoft.EntityFrameworkCore.DbSet<Themia.Modules.Export.Entities.ExportSchedule!>!
+Themia.Modules.Export.Entities.ExportRun
+Themia.Modules.Export.Entities.ExportRun.ExportRun() -> void
+Themia.Modules.Export.Entities.ExportRun.CompletedAt.get -> System.DateTimeOffset?
+Themia.Modules.Export.Entities.ExportRun.DefinitionKey.get -> string!
+Themia.Modules.Export.Entities.ExportRun.DefinitionKey.set -> void
+Themia.Modules.Export.Entities.ExportRun.Error.get -> string?
+Themia.Modules.Export.Entities.ExportRun.ExpiresAt.get -> System.DateTimeOffset?
+Themia.Modules.Export.Entities.ExportRun.FileName.get -> string?
+Themia.Modules.Export.Entities.ExportRun.FileName.set -> void
+Themia.Modules.Export.Entities.ExportRun.Format.get -> Themia.Modules.Export.ExportFormat
+Themia.Modules.Export.Entities.ExportRun.Format.set -> void
+Themia.Modules.Export.Entities.ExportRun.IncludeSoftDeleted.get -> bool
+Themia.Modules.Export.Entities.ExportRun.IncludeSoftDeleted.set -> void
+Themia.Modules.Export.Entities.ExportRun.MarkExpired() -> void
+Themia.Modules.Export.Entities.ExportRun.MarkFailed(string! error, System.DateTimeOffset completedAt) -> void
+Themia.Modules.Export.Entities.ExportRun.MarkRunning(System.DateTimeOffset startedAt) -> void
+Themia.Modules.Export.Entities.ExportRun.MarkSucceeded(string! storageKey, string! fileName, long sizeBytes, System.DateTimeOffset expiresAt, System.DateTimeOffset completedAt) -> void
+Themia.Modules.Export.Entities.ExportRun.ParametersJson.get -> string?
+Themia.Modules.Export.Entities.ExportRun.ParametersJson.set -> void
+Themia.Modules.Export.Entities.ExportRun.SizeBytes.get -> long?
+Themia.Modules.Export.Entities.ExportRun.StartedAt.get -> System.DateTimeOffset?
+Themia.Modules.Export.Entities.ExportRun.Status.get -> Themia.Modules.Export.ExportRunStatus
+Themia.Modules.Export.Entities.ExportRun.StorageKey.get -> string?
+Themia.Modules.Export.Entities.ExportRun.TenantId.get -> Themia.Framework.Core.Abstractions.Tenancy.TenantId?
+Themia.Modules.Export.Entities.ExportRun.TenantId.set -> void
+Themia.Modules.Export.Entities.ExportRun.UserId.get -> string?
+Themia.Modules.Export.Entities.ExportRun.UserId.set -> void
+Themia.Modules.Export.Entities.ExportSchedule
+Themia.Modules.Export.Entities.ExportSchedule.ExportSchedule() -> void
+Themia.Modules.Export.Entities.ExportSchedule.Cron.get -> string!
+Themia.Modules.Export.Entities.ExportSchedule.Cron.set -> void
+Themia.Modules.Export.Entities.ExportSchedule.DefinitionKey.get -> string!
+Themia.Modules.Export.Entities.ExportSchedule.DefinitionKey.set -> void
+Themia.Modules.Export.Entities.ExportSchedule.Enabled.get -> bool
+Themia.Modules.Export.Entities.ExportSchedule.Enabled.set -> void
+Themia.Modules.Export.Entities.ExportSchedule.Format.get -> Themia.Modules.Export.ExportFormat
+Themia.Modules.Export.Entities.ExportSchedule.Format.set -> void
+Themia.Modules.Export.Entities.ExportSchedule.IncludeSoftDeleted.get -> bool
+Themia.Modules.Export.Entities.ExportSchedule.IncludeSoftDeleted.set -> void
+Themia.Modules.Export.Entities.ExportSchedule.ParametersJson.get -> string?
+Themia.Modules.Export.Entities.ExportSchedule.ParametersJson.set -> void
+Themia.Modules.Export.Entities.ExportSchedule.TenantId.get -> Themia.Framework.Core.Abstractions.Tenancy.TenantId?
+Themia.Modules.Export.Entities.ExportSchedule.TenantId.set -> void
+Themia.Modules.Export.Entities.ExportSchedule.UserId.get -> string?
+Themia.Modules.Export.Entities.ExportSchedule.UserId.set -> void
+override Themia.Modules.Export.Migrations.ExportSchemaMigration.Down() -> void
+override Themia.Modules.Export.Migrations.ExportSchemaMigration.Up() -> void
+Themia.Modules.Export.Migrations.ExportSchemaMigration
+Themia.Modules.Export.Migrations.ExportSchemaMigration.ExportSchemaMigration() -> void
+Themia.Modules.Export.Store.IExportRunStore
+Themia.Modules.Export.Store.IExportRunStore.CreateAsync(Themia.Modules.Export.Entities.ExportRun! run, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<Themia.Modules.Export.Entities.ExportRun!>!
+Themia.Modules.Export.Store.IExportRunStore.FindExpiredAcrossTenantsAsync(System.DateTimeOffset now, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Themia.Modules.Export.Entities.ExportRun!>!>!
+Themia.Modules.Export.Store.IExportRunStore.FindStaleRunningAcrossTenantsAsync(System.DateTimeOffset cutoff, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Themia.Modules.Export.Entities.ExportRun!>!>!
+Themia.Modules.Export.Store.IExportRunStore.GetByIdAsync(System.Guid id, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<Themia.Modules.Export.Entities.ExportRun?>!
+Themia.Modules.Export.Store.IExportRunStore.GetByIdIgnoringTenantAsync(System.Guid id, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<Themia.Modules.Export.Entities.ExportRun?>!
+Themia.Modules.Export.Store.IExportRunStore.ListAsync(string? userId, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Themia.Modules.Export.Entities.ExportRun!>!>!
+Themia.Modules.Export.Store.IExportRunStore.UpdateAsync(Themia.Modules.Export.Entities.ExportRun! run, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
+Themia.Modules.Export.Definitions.IExportDefinitionRegistry
+Themia.Modules.Export.Definitions.IExportDefinitionRegistry.Find(string! key) -> Themia.Modules.Export.Definitions.IExportDefinition?
+Themia.Modules.Export.ExportModule
+Themia.Modules.Export.ExportModule.ExportModule(Themia.Data.Migrations.MigrationEngine engine) -> void
+Themia.Modules.Export.ExportModule.ExportModule(Themia.Data.Migrations.MigrationEngine engine, Themia.Modules.Export.ExportModuleOptions! options) -> void
+override Themia.Modules.Export.ExportModule.Descriptor.get -> Themia.Framework.Core.Modules.ModuleDescriptor!
+override Themia.Modules.Export.ExportModule.InitializeAsync(System.IServiceProvider! serviceProvider, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+Themia.Modules.Export.ExportModuleOptions
+Themia.Modules.Export.ExportModuleOptions.ExportModuleOptions() -> void
+Themia.Modules.Export.ExportModuleOptions.CleanupCron.get -> string!
+Themia.Modules.Export.ExportModuleOptions.CleanupCron.set -> void
+Themia.Modules.Export.ExportModuleOptions.ConnectionStringName.get -> string!
+Themia.Modules.Export.ExportModuleOptions.ConnectionStringName.set -> void
+Themia.Modules.Export.ExportModuleOptions.LinkTtl.get -> System.TimeSpan
+Themia.Modules.Export.ExportModuleOptions.LinkTtl.set -> void
+Themia.Modules.Export.ExportModuleOptions.Retention.get -> System.TimeSpan
+Themia.Modules.Export.ExportModuleOptions.Retention.set -> void
+Themia.Modules.Export.ExportModuleOptions.StaleRunGracePeriod.get -> System.TimeSpan
+Themia.Modules.Export.ExportModuleOptions.StaleRunGracePeriod.set -> void
+Themia.Modules.Export.DependencyInjection.ExportModuleServiceCollectionExtensions
+static Themia.Modules.Export.DependencyInjection.ExportModuleServiceCollectionExtensions.AddThemiaExportModule(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Themia.Modules.Export.ExportModuleOptions!>? configure = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+Themia.Modules.Export.Requests.IExportRequestService
+Themia.Modules.Export.Requests.IExportRequestService.SubmitAsync(Themia.Modules.Export.Requests.ExportSubmission! submission, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<Themia.Modules.Export.Requests.ExportRunView!>!
+Themia.Modules.Export.Requests.IExportRequestService.ScheduleAsync(Themia.Modules.Export.Requests.ExportScheduleRequest! request, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<System.Guid>!
+Themia.Modules.Export.Requests.IExportRequestService.ListRunsAsync(string? userId, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Themia.Modules.Export.Requests.ExportRunView!>!>!
+Themia.Modules.Export.Requests.IExportRequestService.GetRunAsync(System.Guid id, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<Themia.Modules.Export.Requests.ExportRunView?>!
+Themia.Modules.Export.Requests.ExportSubmission
+Themia.Modules.Export.Requests.ExportSubmission.ExportSubmission(string! DefinitionKey, string? ParametersJson, Themia.Modules.Export.ExportFormat Format, string? FileName = null, bool IncludeSoftDeleted = false, string? UserId = null) -> void
+Themia.Modules.Export.Requests.ExportSubmission.DefinitionKey.get -> string!
+Themia.Modules.Export.Requests.ExportSubmission.DefinitionKey.init -> void
+Themia.Modules.Export.Requests.ExportSubmission.ParametersJson.get -> string?
+Themia.Modules.Export.Requests.ExportSubmission.ParametersJson.init -> void
+Themia.Modules.Export.Requests.ExportSubmission.Format.get -> Themia.Modules.Export.ExportFormat
+Themia.Modules.Export.Requests.ExportSubmission.Format.init -> void
+Themia.Modules.Export.Requests.ExportSubmission.FileName.get -> string?
+Themia.Modules.Export.Requests.ExportSubmission.FileName.init -> void
+Themia.Modules.Export.Requests.ExportSubmission.IncludeSoftDeleted.get -> bool
+Themia.Modules.Export.Requests.ExportSubmission.IncludeSoftDeleted.init -> void
+Themia.Modules.Export.Requests.ExportSubmission.UserId.get -> string?
+Themia.Modules.Export.Requests.ExportSubmission.UserId.init -> void
+Themia.Modules.Export.Requests.ExportScheduleRequest
+Themia.Modules.Export.Requests.ExportScheduleRequest.ExportScheduleRequest(string! DefinitionKey, string! Cron, Themia.Modules.Export.ExportFormat Format, string? ParametersJson = null, bool IncludeSoftDeleted = false, string? UserId = null) -> void
+Themia.Modules.Export.Requests.ExportScheduleRequest.DefinitionKey.get -> string!
+Themia.Modules.Export.Requests.ExportScheduleRequest.DefinitionKey.init -> void
+Themia.Modules.Export.Requests.ExportScheduleRequest.Cron.get -> string!
+Themia.Modules.Export.Requests.ExportScheduleRequest.Cron.init -> void
+Themia.Modules.Export.Requests.ExportScheduleRequest.Format.get -> Themia.Modules.Export.ExportFormat
+Themia.Modules.Export.Requests.ExportScheduleRequest.Format.init -> void
+Themia.Modules.Export.Requests.ExportScheduleRequest.ParametersJson.get -> string?
+Themia.Modules.Export.Requests.ExportScheduleRequest.ParametersJson.init -> void
+Themia.Modules.Export.Requests.ExportScheduleRequest.IncludeSoftDeleted.get -> bool
+Themia.Modules.Export.Requests.ExportScheduleRequest.IncludeSoftDeleted.init -> void
+Themia.Modules.Export.Requests.ExportScheduleRequest.UserId.get -> string?
+Themia.Modules.Export.Requests.ExportScheduleRequest.UserId.init -> void
+Themia.Modules.Export.Requests.ExportRunView
+Themia.Modules.Export.Requests.ExportRunView.ExportRunView(System.Guid Id, string! DefinitionKey, Themia.Modules.Export.ExportFormat Format, Themia.Modules.Export.ExportRunStatus Status, string? StorageKey, long? SizeBytes, System.DateTimeOffset? ExpiresAt, string? Error, System.DateTimeOffset CreatedAt, System.DateTimeOffset? CompletedAt) -> void
+Themia.Modules.Export.Requests.ExportRunView.Id.get -> System.Guid
+Themia.Modules.Export.Requests.ExportRunView.Id.init -> void
+Themia.Modules.Export.Requests.ExportRunView.DefinitionKey.get -> string!
+Themia.Modules.Export.Requests.ExportRunView.DefinitionKey.init -> void
+Themia.Modules.Export.Requests.ExportRunView.Format.get -> Themia.Modules.Export.ExportFormat
+Themia.Modules.Export.Requests.ExportRunView.Format.init -> void
+Themia.Modules.Export.Requests.ExportRunView.Status.get -> Themia.Modules.Export.ExportRunStatus
+Themia.Modules.Export.Requests.ExportRunView.Status.init -> void
+Themia.Modules.Export.Requests.ExportRunView.StorageKey.get -> string?
+Themia.Modules.Export.Requests.ExportRunView.StorageKey.init -> void
+Themia.Modules.Export.Requests.ExportRunView.SizeBytes.get -> long?
+Themia.Modules.Export.Requests.ExportRunView.SizeBytes.init -> void
+Themia.Modules.Export.Requests.ExportRunView.ExpiresAt.get -> System.DateTimeOffset?
+Themia.Modules.Export.Requests.ExportRunView.ExpiresAt.init -> void
+Themia.Modules.Export.Requests.ExportRunView.Error.get -> string?
+Themia.Modules.Export.Requests.ExportRunView.Error.init -> void
+Themia.Modules.Export.Requests.ExportRunView.CreatedAt.get -> System.DateTimeOffset
+Themia.Modules.Export.Requests.ExportRunView.CreatedAt.init -> void
+Themia.Modules.Export.Requests.ExportRunView.CompletedAt.get -> System.DateTimeOffset?
+Themia.Modules.Export.Requests.ExportRunView.CompletedAt.init -> void

@@ -1,0 +1,12 @@
+using Themia.Modules.Export.Entities;
+
+namespace Themia.Modules.Export.Requests;
+
+/// <summary>The shared seam for creating a Pending run and scheduling its one-shot <c>ExportJob</c>. Used by
+/// both <see cref="IExportRequestService.SubmitAsync"/> (ambient tenant) and the schedule job (the schedule's
+/// tenant), so the run-creation + Quartz-scheduling logic lives in exactly one place.</summary>
+internal interface IExportRunEnqueuer
+{
+    /// <summary>Persists a Pending run for <paramref name="command"/>'s tenant and schedules a one-shot job firing now.</summary>
+    Task<ExportRun> EnqueueRunAsync(EnqueueRunCommand command, CancellationToken cancellationToken);
+}

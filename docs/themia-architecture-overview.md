@@ -118,6 +118,7 @@ you the target: `neutral/` = net8.0;net10.0, everything else = net10.0 (tooling 
 | `Themia.Modules.Notifications` | ezy-assets `NotificationDispatcher`/Email/OTP/`Sms2Pro` | ⬜ to-spec |
 | `Themia.Modules.Pdf` | **ezy-assets** Contract/Proposal PDF + **Idevs** `PdfOptionsBuilder`/PuppeteerSharp + PowerACC reporting | ⬜ to-spec |
 | `Themia.Export` + `Themia.Export.Excel` | **Idevs** `IReportBaseModel`/`IdevsExportRequest`/ClosedXML (Excel), de-Serenity-ized | ✅ **built** (0.6.8 — two stateless neutral cores: typed columns, CSV + xlsx, computed summary rows; no tenant module — the transform is stateless) |
+| `Themia.Modules.Export` | — (new; no prior source) | ✅ **built** (0.6.9 — tenant-aware async export module: `IExportDefinition<TParams>` keyed definitions; on-demand + cron Quartz jobs; Storage delivery via signed link; completion/failure Notifications; 7-day retention cleanup; opt-in `BypassSoftDeleteFilter` for full-data exports; FM schema, PostgreSQL+SQL Server+MySQL) |
 | `Themia.Modules.Geo` | ezy-assets `ProjectGeocodingService` | ⬜ later |
 | `Themia.Modules.AI` | ezy-assets `GeminiAICaption`/`FallbackTextTranslation` | ⬜ later |
 | `Themia.Modules.Audit` | ezy-assets `AuditLogRepository` + Zenity audit | ⬜ later |
@@ -235,6 +236,13 @@ framing no longer matches the code. Resolved direction:
    `docs/2026-06-11-efcore-sqlserver-find-isolation-issue.md`). Rule: flag direct `DbSet.Find*` and
    `Set<T>().Find*` calls outside the data layer, steering callers to the guarded APIs.
 
+**Export filter scope — `BypassSoftDeleteFilter` (added 0.6.9).** `IDataFilterScope` (on both
+EF Core and Dapper implementations) exposes `BypassSoftDeleteFilter()` — a scoped opt-in that
+suppresses the framework's `IsDeleted = false` global query filter for the duration of a single
+export run. Activated only when `IExportDefinition.AllowsIncludeSoftDeleted` is `true` and the
+caller sets the flag in `ExportContext`. Use outside export jobs requires explicit reviewer
+sign-off; a `Themia.Analyzers` rule flags ambient bypass outside the designated export scope.
+
 **Per-provider concurrency token** is the cross-cutting follow-up (the `ApplyConcurrencyTokens`
 landmine in `ThemiaDbContext`): Postgres `xmin` (no DDL), SQL Server `rowversion`, MySQL an
 app-updated token — FluentMigrator provisions the right column per engine, and the Dapper layer
@@ -260,7 +268,7 @@ spec). Later phases extend (SQLite, Oracle) without public-surface breaks.
 - **Phase 0 — Rename** `zenity`/`zenity-v2` → `Themia.Framework.*`/`Themia.Modules.*` (separate task).
 - **Phase 1 — Core cross-cutting:** Scheduling ✅, ExceptionLogging ✅, **Identity** ✅, Storage ✅
   (+ multi-DB SqlServer/MySql/Postgres baseline).
-- **Phase 2 — Productivity:** Notifications, Pdf, Export.
+- **Phase 2 — Productivity:** Notifications, Pdf, **Export** ✅.
 - **Phase 3 — Advanced:** Geo, AI, Audit; Sequences EF-port; SourceGenerator/analyzer merge.
 - **Ongoing — Strangler:** migrate Idevs.Net.CoreLib's Serenity-free infra into Themia per module.
 
@@ -273,7 +281,8 @@ spec). Later phases extend (SQLite, Oracle) without public-surface breaks.
 - ✅ `docs/superpowers/specs/2026-06-15-themia-identity-jwt-design.md` (Identity JWT — 0.5.1)
 - ✅ `docs/superpowers/specs/2026-06-17-themia-storage-design.md` (Storage — 0.5.3) · `docs/superpowers/plans/2026-06-17-themia-storage-0.5.3.md`
 - ⬜ Phase 0 framework rename (`0.2.0`) — own spec when started
-- ⬜ Storage, Notifications, Pdf, Export, … (one spec each, this catalog as parent)
+- ✅ Export — `docs/superpowers/specs/2026-06-27-themia-modules-export-design.md` + `docs/superpowers/plans/2026-06-27-themia-modules-export.md` (async export module — 0.6.9)
+- ⬜ Storage, Notifications, Pdf, … (one spec each, this catalog as parent)
 
 ## Identity JWT slice (0.5.1 — 2026-06-15)
 

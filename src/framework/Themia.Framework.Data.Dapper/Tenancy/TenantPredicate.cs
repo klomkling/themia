@@ -12,6 +12,7 @@ internal static class TenantPredicate
         TenantId? tenant,
         bool includeGlobalRecords,
         bool bypassTenantFilter,
+        bool bypassSoftDeleteFilter,
         EntityMapping map)
     {
         if (typeof(ITenantEntity).IsAssignableFrom(typeof(T)) && !bypassTenantFilter)
@@ -30,7 +31,7 @@ internal static class TenantPredicate
             }
         }
 
-        if (typeof(ISoftDeletable).IsAssignableFrom(typeof(T)))
+        if (typeof(ISoftDeletable).IsAssignableFrom(typeof(T)) && !bypassSoftDeleteFilter)
             query.Where(map.Column(nameof(ISoftDeletable.IsDeleted)), false);
     }
 }
