@@ -30,6 +30,10 @@ isolation, global fallback, CRUD) that the neutral spec intentionally left out.
   tenant-override → global-default fallback.
 - **Both data peers** — an EF Core store and a Dapper store over the **same schema**, both enforcing
   tenant isolation + soft-delete + audit through the framework layers.
+- **Framework prerequisite (small, sequenced first):** a per-query global-inclusion override on the
+  sanctioned Dapper path — `ITenantQueryFactory.For<T>(bool includeGlobalRecords)` — so the Dapper
+  resolve can include global rows for `PdfTemplate` without depending on the app-wide
+  `DapperDataOptions.IncludeGlobalRecordsForTenants` default. See Decision 4.
 - `IPdfDocumentRenderer` — render-by-key convenience composing the store with the neutral
   `IHtmlTemplateRenderer` + `IPdfRenderer`.
 - `IThemiaModule` implementation for module discovery.
@@ -100,17 +104,46 @@ engine the Dapper peer exists to serve, while adding cross-engine risk. Skipping
 engines correct by construction. Reversible later (add the marker + a per-engine token mapping) if a
 real contention case appears.
 
-### Decision 4 — Global rows use the framework's built-in support (not a new mechanism)
+### Decision 4 — Global-row inclusion: native on EF, one small framework addition on Dapper
 
-The framework already models "global/shared" rows as `TenantId == null` and includes them in
-tenant-scoped reads on **both** peers:
+The framework models "global/shared" rows as `TenantId == null`, but the two peers default
+differently, and the difference is load-bearing:
 
-- EF: `ThemiaDbContext.IncludeGlobalRecordsForTenants => true` and `BuildTenantPredicate` yield
-  `current-tenant rows OR global (null) rows`; `ValidateTenantAccess` mirrors it for `Find`.
-- Dapper: `TenantPredicate.Apply` emits `WHERE tenant_id = @t OR tenant_id IS NULL` when
-  `includeGlobalRecords` is set (SqlKata query, rendered per-engine by the framework SQL compiler).
+- **EF — works out of the box.** `ThemiaDbContext.IncludeGlobalRecordsForTenants => true` (default) and
+  `BuildTenantPredicate` yield `current-tenant rows OR global (null) rows`; `ValidateTenantAccess`
+  mirrors it for `Find`. The flag is **per-context**, and `PdfDbContext` is dedicated to
+  `PdfTemplate`, so the `true` default is safe — it never affects unrelated entities. No change
+  needed.
+- **Dapper — off by default, and the app switch is the wrong lever.**
+  `DapperDataOptions.IncludeGlobalRecordsForTenants` defaults to **`false`**, and
+  `TenantQueryFactory.For<T>()` reads that **app-wide** option. Under default config the Dapper
+  resolve would emit `WHERE tenant_id = @t` with no `OR tenant_id IS NULL`, so the global fallback
+  silently returns not-found. The module **cannot** fix this by flipping the option: it is a single
+  switch shared across every tenant entity on the Dapper layer, so setting it `true` to satisfy
+  `PdfTemplate` would change global-record semantics for all of the app's other Dapper entities.
 
-So "tenant-override → global fallback" is native, not invented here.
+**Resolution (framework prerequisite):** add a per-query override to the sanctioned Dapper path so a
+caller can opt a single query into global inclusion without touching the app-wide default:
+
+```csharp
+public interface ITenantQueryFactory
+{
+    Query For<T>();
+    Query For<T>(bool includeGlobalRecords);   // NEW — overrides DapperDataOptions for this query
+}
+```
+
+The plumbing already exists — `TenantPredicate.Apply(query, tenant, includeGlobalRecords, ...)` takes
+the flag as a parameter; only `For<T>()` hard-wires it from `options.IncludeGlobalRecordsForTenants`.
+The new overload passes the caller's value instead. The Dapper resolve calls
+`For<PdfTemplate>(includeGlobalRecords: true)`. This keeps resolution on the **sanctioned** query path
+(no hand-rolled raw SQL, so the Dapper analyzer gate stays satisfied) and confines the behavior change
+to the one query that asks for it.
+
+**Sequencing / coordination:** this framework change lands in `Themia.Framework.Data.Dapper`
+**before** the module store consumes it (its own commit, with a PublicAPI entry + a unit test that
+`For<T>(true)` emits the `OR tenant_id IS NULL` clause and `For<T>(false)` does not). The
+implementation plan orders it as task 0.
 
 ---
 
@@ -183,6 +216,11 @@ public sealed class PdfTemplate : SoftDeletableEntity<Guid>, ITenantEntity, IAud
     `(tenant_id, key)` does **not** enforce one-global-per-key; add the same two-index split (a
     functional/partial-equivalent) or a generated-column guard. Exact mechanism finalized in the
     plan.
+- **FluentMigrator caveat:** filtered/partial unique indexes and `NULLS NOT DISTINCT` are not
+  expressible through FluentMigrator's fluent index API — each `IfDatabase(...)` branch uses
+  `Execute.Sql(...)` raw DDL for the uniqueness indexes. Confirm the target PostgreSQL is 15+ for
+  `NULLS NOT DISTINCT`; otherwise use the two-partial-index form on all three engines (it works
+  everywhere and avoids the version dependency).
 - Index on `key` for resolution lookups (covered by the uniqueness indexes above).
 
 ### 3. `IPdfTemplateStore`
@@ -202,25 +240,36 @@ public interface IPdfTemplateStore
 }
 ```
 
-Two implementations over the same schema:
+Two implementations over the same schema. **Both write through the framework Unit of Work**
+(`IUnitOfWork` / `EfUnitOfWork` / `DapperUnitOfWork`), never a bare `DbContext.SaveChanges` — the
+tenant-write guards fire **only** on the UoW path (see Write asymmetry below), so a direct save would
+silently bypass them.
 
 - **`EfPdfTemplateStore`** — a `PdfDbContext : ThemiaDbContext` with a `DbSet<PdfTemplate>` and entity
-  configuration. Tenant + soft-delete + global-inclusion filters come from the base context; audit
-  fields from `SaveChanges`.
-- **`DapperPdfTemplateStore`** — `DapperRepository`/`ITenantQueryFactory.For<PdfTemplate>()` with the
-  tenant + global predicate pre-seeded; audit fields set through the Dapper layer's auditing hook.
+  configuration. Tenant + soft-delete + global-inclusion filters come from the base context (its
+  `IncludeGlobalRecordsForTenants` default `true` is safe — the context holds only `PdfTemplate`).
+  Writes flushed via `EfUnitOfWork` so `ValidateTenantWritesAsync` runs; audit fields stamped by the
+  context on save.
+- **`DapperPdfTemplateStore`** — reads via `ITenantQueryFactory.For<PdfTemplate>(includeGlobalRecords:
+  true)` (the Decision-4 override, so the global fallback is included regardless of the app-wide
+  option); writes via `DapperRepository` + `DapperUnitOfWork` (insert stamps `tenant_id` from the
+  ambient tenant; update/delete are tenant-scoped by primary key).
 
 Both are `internal` (consumers depend on `IPdfTemplateStore` via DI).
 
-**Resolution logic (identical intent on both peers):** query `WHERE key = @key` (framework filter
+**Resolution logic (identical intent on both peers):** query `WHERE key = @key` (framework predicate
 auto-adds `tenant = @t OR tenant IS NULL` and `is_deleted = false`), yielding at most one tenant row
 and one global row; prefer the tenant-owned row, else the global, else throw `TemplateNotFoundException`.
 
 **Write asymmetry (framework-enforced; documented as an API fact):** the framework blocks a tenant
 context from writing global (null-tenant) rows — only a **no-tenant (system) scope** may create or
-edit global defaults (`ThemiaDbContext.ValidateTenantWritesAsync`; the Dapper layer's
-`WHERE tenant_id = …` equivalent). The module documents this and does not add its own authorization
-(authz stays the app's concern, consistent with sibling modules).
+edit global defaults. On EF this is `ThemiaDbContext.ValidateTenantWritesAsync`, invoked by
+`EfUnitOfWork`; on Dapper it is `DapperUnitOfWork` — insert stamps `tenant_id` from the ambient tenant
+(so a tenant context creating a `TenantId = null` template gets a tenant-owned row, not a global one),
+and update/delete are scoped to the ambient tenant's rows (a no-tenant scope is scoped to
+`tenant_id IS NULL`). Both guarantees hold **only** because writes go through the UoW. The module
+documents this and does not add its own authorization (authz stays the app's concern, consistent with
+sibling modules).
 
 ### 4. `IPdfDocumentRenderer` (render-by-key)
 
@@ -241,6 +290,13 @@ Composition only: `store.ResolveAsync(key)` → `IHtmlTemplateRenderer.Render(tp
 `IPdfRenderer.RenderHtmlAsync(html, options, ct)` → bytes. No new rendering logic. `null` options ⇒
 neutral-core defaults (A4 / background / 20-20-15-15 margins).
 
+**Lifetime — must be `scoped` (not singleton).** It depends on the **tenant-scoped**
+`IPdfTemplateStore` (which reads the ambient tenant) while the neutral `IHtmlTemplateRenderer` /
+`IPdfRenderer` it also uses are **singletons** (they own the long-lived browser). Registering
+`IPdfDocumentRenderer` as a singleton would capture the scoped store — a captive dependency that
+freezes the first request's tenant into every later resolve (or fails DI scope validation at startup).
+Register it `scoped`; the singleton renderers inject into a scoped consumer safely.
+
 ### 5. DI + module
 
 ```csharp
@@ -252,8 +308,9 @@ public static IServiceCollection AddThemiaPdfModuleDapper(
 ```
 
 - The app calls the entry point matching its chosen data peer.
-- Each registers the matching `IPdfTemplateStore`, `IPdfDocumentRenderer`, and calls `AddThemiaPdf()`
-  (the neutral renderer) if not already present. Idempotent via `TryAdd*`.
+- Each registers the matching `IPdfTemplateStore` (**scoped**), `IPdfDocumentRenderer` (**scoped** —
+  see Component 4), and calls `AddThemiaPdf()` (the neutral renderer — **singletons**) if not already
+  present. Idempotent via `TryAdd*`.
 - `PdfModule : IThemiaModule` for discovery/migration wiring (mirror `ExportModule`).
 - `PdfModuleOptions` carries module-level config (kept minimal for v1; passes a `ConfigureHandlebars`
   hook through to the neutral options if needed).
@@ -291,14 +348,23 @@ configuration are `internal`.
 
 ## Testing strategy
 
+**Framework prerequisite (unit, in `Themia.Framework.Data.Dapper` tests):**
+
+- `ITenantQueryFactory.For<T>(includeGlobalRecords: true)` compiles a query whose SQL contains
+  `tenant_id = @t OR tenant_id IS NULL`; `For<T>(false)` (and the app-wide default) does not. Lands
+  with the framework change, before the module store.
+
 **Unit (no DB, no Chromium):**
 
 - Resolve precedence: tenant-owned row wins over global; global used when no tenant row; both absent
   ⇒ `TemplateNotFoundException`.
 - `IPdfDocumentRenderer.RenderAsync` composes resolve → merge → render (fakes for the neutral
   interfaces; assert the resolved body is what gets merged, and options flow through).
-- DI: each entry point registers the store + renderer + neutral core; idempotent; the correct store
-  impl is bound per entry point.
+- **Lifetime/tenant-isolation:** resolving through a scoped `IPdfDocumentRenderer` under tenant A then
+  tenant B returns each tenant's own template — guards against the captive-dependency regression
+  (Component 4). Assert DI scope validation passes (no scoped-into-singleton capture).
+- DI: each entry point registers the store + renderer (both **scoped**) + neutral core (**singleton**);
+  idempotent; the correct store impl is bound per entry point.
 
 **Integration (Testcontainers — real engines, per `dotnet.md`):**
 
@@ -306,8 +372,13 @@ configuration are `internal`.
   rules enforce one-per-tenant and one-global-per-key on each engine (insert-conflict assertions).
 - EF store CRUD + resolve on **SQL Server + PostgreSQL**.
 - Dapper store CRUD + resolve on **all three engines** (this is the peer that exercises MySQL).
-- Write asymmetry: a tenant-scoped context cannot create/edit a global row; a system (no-tenant)
-  scope can.
+- **Dapper global fallback specifically:** with the app-wide `DapperDataOptions` default (globals
+  off), a tenant with no own template still resolves the global default — proving the
+  `For<PdfTemplate>(includeGlobalRecords: true)` override works independently of the app option (the
+  finding-#1 regression test).
+- Write asymmetry: a tenant-scoped context cannot create/edit a global row (a `TenantId = null`
+  create under a tenant becomes tenant-owned); a system (no-tenant) scope creates/edits globals.
+  Verified on **both peers** through the framework UoW.
 - Cross-peer schema parity: a row written by the EF store is readable by the Dapper store and vice
   versa (SQL Server / Postgres).
 
@@ -322,6 +393,9 @@ configuration are `internal`.
 ## Versioning, changelog, coordination
 
 - Bump `Directory.Build.props` `<Version>` to the next Phase-2 `0.x.0` (new module package).
+- CHANGELOG **Added — `Themia.Framework.Data.Dapper`**: `ITenantQueryFactory.For<T>(bool
+  includeGlobalRecords)` overload (additive) — a per-query global-inclusion override. Ships first (the
+  Decision-4 prerequisite).
 - CHANGELOG **Added — `Themia.Modules.Pdf`**: tenant-aware HTML/PDF template store (EF + Dapper peers,
   SQL Server / PostgreSQL / MySQL-on-Dapper) with global-default fallback and a render-by-key service
   over the neutral `Themia.Pdf` core.
