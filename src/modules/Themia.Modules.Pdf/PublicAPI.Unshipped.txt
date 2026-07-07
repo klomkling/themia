@@ -1,4 +1,8 @@
 #nullable enable
+override Themia.Modules.Pdf.Migrations.PdfTemplateSchemaMigration.Down() -> void
+override Themia.Modules.Pdf.Migrations.PdfTemplateSchemaMigration.Up() -> void
+Themia.Modules.Pdf.Migrations.PdfTemplateSchemaMigration
+Themia.Modules.Pdf.Migrations.PdfTemplateSchemaMigration.PdfTemplateSchemaMigration() -> void
 Themia.Modules.Pdf.Store.IPdfTemplateStore
 Themia.Modules.Pdf.Store.IPdfTemplateStore.CreateAsync(Themia.Modules.Pdf.PdfTemplate! template, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Pdf.PdfTemplate!>!
 Themia.Modules.Pdf.Store.IPdfTemplateStore.DeleteAsync(System.Guid id, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
