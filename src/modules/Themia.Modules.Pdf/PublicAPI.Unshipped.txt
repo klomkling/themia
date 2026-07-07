@@ -24,3 +24,5 @@ Themia.Modules.Pdf.TemplateNotFoundException.Key.get -> string!
 Themia.Modules.Pdf.PdfDbContext
 Themia.Modules.Pdf.PdfDbContext.PdfDbContext(Microsoft.EntityFrameworkCore.DbContextOptions<Themia.Modules.Pdf.PdfDbContext!>! options, Themia.Framework.Core.Abstractions.Tenancy.ITenantContext? tenantContext = null) -> void
 Themia.Modules.Pdf.PdfDbContext.Templates.get -> Microsoft.EntityFrameworkCore.DbSet<Themia.Modules.Pdf.PdfTemplate!>!
+Themia.Modules.Pdf.Rendering.IPdfDocumentRenderer
+Themia.Modules.Pdf.Rendering.IPdfDocumentRenderer.RenderAsync(string! key, object! model, Themia.Pdf.PdfRenderOptions? options = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<byte[]!>!
