@@ -4,6 +4,7 @@
     <PackageId>Themia.Modules.Pdf</PackageId>
     <Description>Tenant-aware PDF/HTML template store with global-default fallback and render-by-key over Themia.Pdf. EF Core + Dapper peers.</Description>
     <PackageTags>themia;pdf;templates;multitenancy;html</PackageTags>
+    <NoWarn>$(NoWarn);RS0016;RS0017</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../../framework/Themia.Framework.Core/Themia.Framework.Core.csproj" />
