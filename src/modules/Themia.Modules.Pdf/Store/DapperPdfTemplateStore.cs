@@ -29,16 +29,7 @@ internal sealed class DapperPdfTemplateStore(
             template.AssignId(Guid.NewGuid());
         }
 
-        var ambient = tenantContext.CurrentTenantId;
-        if (template.TenantId is null && ambient is { } stamp)
-        {
-            template.TenantId = stamp;
-        }
-        else if (ambient is { } current && template.TenantId is { } target && target != current)
-        {
-            throw new InvalidOperationException(
-                $"Cannot create a template owned by tenant '{target}' from the '{current}' scope.");
-        }
+        PdfTemplateOwnership.ApplyOnCreate(template, tenantContext.CurrentTenantId);
 
         await repository.AddAsync(template, cancellationToken).ConfigureAwait(false);
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);

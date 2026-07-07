@@ -231,4 +231,13 @@ public abstract class PdfStoreConformanceTests
         await Assert.ThrowsAsync<InvalidOperationException>(
             () => acme.Store.CreateAsync(new PdfTemplate { Key = "f", Body = "v", TenantId = new TenantId("victim") }));
     }
+
+    [Fact]
+    public async Task System_scope_cannot_create_tenant_owned_row()
+    {
+        await ResetAsync();
+        await using var system = NewScope(tenant: null);
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => system.Store.CreateAsync(new PdfTemplate { Key = "s", Body = "v", TenantId = new TenantId("acme") }));
+    }
 }

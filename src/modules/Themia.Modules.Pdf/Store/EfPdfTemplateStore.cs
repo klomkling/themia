@@ -26,20 +26,11 @@ internal sealed class EfPdfTemplateStore(
             template.AssignId(Guid.NewGuid());
         }
 
-        var ambient = tenantContext.CurrentTenantId;
-        if (template.TenantId is null && ambient is { } stamp)
-        {
-            // Mirror EfRepository<T,TKey>.AddAsync: a tenant scope creating TenantId=null yields a
-            // tenant-owned row (never a global one). PdfDbContext.SaveChanges has no equivalent stamping
-            // (ValidateTenantWritesAsync only checks Modified/Deleted entries), so it must happen here.
-            // A no-tenant scope leaves it null => a global template.
-            template.TenantId = stamp;
-        }
-        else if (ambient is { } current && template.TenantId is { } target && target != current)
-        {
-            throw new InvalidOperationException(
-                $"Cannot create a template owned by tenant '{target}' from the '{current}' scope.");
-        }
+        // Mirror EfRepository<T,TKey>.AddAsync: a tenant scope creating TenantId=null yields a
+        // tenant-owned row (never a global one). PdfDbContext.SaveChanges has no equivalent stamping
+        // (ValidateTenantWritesAsync only checks Modified/Deleted entries), so it must happen here.
+        // A no-tenant scope leaves it null => a global template.
+        PdfTemplateOwnership.ApplyOnCreate(template, tenantContext.CurrentTenantId);
 
         db.Templates.Add(template);
         await UoW.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
