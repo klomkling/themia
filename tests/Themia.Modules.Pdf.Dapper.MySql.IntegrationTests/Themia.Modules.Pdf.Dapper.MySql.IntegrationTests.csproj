@@ -16,9 +16,8 @@
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
   </ItemGroup>
   <ItemGroup>
-    <!-- Shared conformance base + PdfPostgresFixture. -->
+    <!-- Shared conformance base + PdfMySqlFixture. -->
     <ProjectReference Include="../Themia.Modules.Pdf.IntegrationTests/Themia.Modules.Pdf.IntegrationTests.csproj" />
-    <ProjectReference Include="../../src/framework/Themia.Framework.Data.EFCore.PostgreSql/Themia.Framework.Data.EFCore.PostgreSql.csproj" />
-    <ProjectReference Include="../../src/framework/Themia.Framework.Data.EFCore.SqlServer/Themia.Framework.Data.EFCore.SqlServer.csproj" />
+    <ProjectReference Include="../../src/framework/Themia.Framework.Data.Dapper.MySql/Themia.Framework.Data.Dapper.MySql.csproj" />
   </ItemGroup>
 </Project>

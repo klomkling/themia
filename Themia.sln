@@ -227,6 +227,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Themia.Modules.Pdf.EFCore.I
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Themia.Modules.Pdf.Dapper.PostgreSql.IntegrationTests", "tests\Themia.Modules.Pdf.Dapper.PostgreSql.IntegrationTests\Themia.Modules.Pdf.Dapper.PostgreSql.IntegrationTests.csproj", "{BC5C01B1-4C7D-463B-ADEE-650932D59122}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Themia.Modules.Pdf.Dapper.SqlServer.IntegrationTests", "tests\Themia.Modules.Pdf.Dapper.SqlServer.IntegrationTests\Themia.Modules.Pdf.Dapper.SqlServer.IntegrationTests.csproj", "{3D61032D-9EAA-4CDB-AFB6-B40AA265AA14}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Themia.Modules.Pdf.Dapper.MySql.IntegrationTests", "tests\Themia.Modules.Pdf.Dapper.MySql.IntegrationTests\Themia.Modules.Pdf.Dapper.MySql.IntegrationTests.csproj", "{D55032CD-42DA-4726-B08E-18B4B08FD4AA}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -1509,6 +1513,30 @@ Global
 		{BC5C01B1-4C7D-463B-ADEE-650932D59122}.Release|x64.Build.0 = Release|Any CPU
 		{BC5C01B1-4C7D-463B-ADEE-650932D59122}.Release|x86.ActiveCfg = Release|Any CPU
 		{BC5C01B1-4C7D-463B-ADEE-650932D59122}.Release|x86.Build.0 = Release|Any CPU
+		{3D61032D-9EAA-4CDB-AFB6-B40AA265AA14}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3D61032D-9EAA-4CDB-AFB6-B40AA265AA14}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3D61032D-9EAA-4CDB-AFB6-B40AA265AA14}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{3D61032D-9EAA-4CDB-AFB6-B40AA265AA14}.Debug|x64.Build.0 = Debug|Any CPU
+		{3D61032D-9EAA-4CDB-AFB6-B40AA265AA14}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{3D61032D-9EAA-4CDB-AFB6-B40AA265AA14}.Debug|x86.Build.0 = Debug|Any CPU
+		{3D61032D-9EAA-4CDB-AFB6-B40AA265AA14}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3D61032D-9EAA-4CDB-AFB6-B40AA265AA14}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3D61032D-9EAA-4CDB-AFB6-B40AA265AA14}.Release|x64.ActiveCfg = Release|Any CPU
+		{3D61032D-9EAA-4CDB-AFB6-B40AA265AA14}.Release|x64.Build.0 = Release|Any CPU
+		{3D61032D-9EAA-4CDB-AFB6-B40AA265AA14}.Release|x86.ActiveCfg = Release|Any CPU
+		{3D61032D-9EAA-4CDB-AFB6-B40AA265AA14}.Release|x86.Build.0 = Release|Any CPU
+		{D55032CD-42DA-4726-B08E-18B4B08FD4AA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D55032CD-42DA-4726-B08E-18B4B08FD4AA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D55032CD-42DA-4726-B08E-18B4B08FD4AA}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{D55032CD-42DA-4726-B08E-18B4B08FD4AA}.Debug|x64.Build.0 = Debug|Any CPU
+		{D55032CD-42DA-4726-B08E-18B4B08FD4AA}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{D55032CD-42DA-4726-B08E-18B4B08FD4AA}.Debug|x86.Build.0 = Debug|Any CPU
+		{D55032CD-42DA-4726-B08E-18B4B08FD4AA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D55032CD-42DA-4726-B08E-18B4B08FD4AA}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D55032CD-42DA-4726-B08E-18B4B08FD4AA}.Release|x64.ActiveCfg = Release|Any CPU
+		{D55032CD-42DA-4726-B08E-18B4B08FD4AA}.Release|x64.Build.0 = Release|Any CPU
+		{D55032CD-42DA-4726-B08E-18B4B08FD4AA}.Release|x86.ActiveCfg = Release|Any CPU
+		{D55032CD-42DA-4726-B08E-18B4B08FD4AA}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -1624,5 +1652,7 @@ Global
 		{78E833A8-C84A-49EB-859B-D634D0E9429F} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 		{157FFAE9-2737-43B9-8DE3-EB4E41C4A5DF} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 		{BC5C01B1-4C7D-463B-ADEE-650932D59122} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
+		{3D61032D-9EAA-4CDB-AFB6-B40AA265AA14} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
+		{D55032CD-42DA-4726-B08E-18B4B08FD4AA} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 	EndGlobalSection
 EndGlobal
