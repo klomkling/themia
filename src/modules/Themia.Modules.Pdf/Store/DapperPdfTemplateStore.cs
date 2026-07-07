@@ -1,4 +1,5 @@
 using global::Dapper;
+using Themia.Framework.Core.Abstractions.Tenancy;
 using Themia.Framework.Data.Abstractions.Repositories;
 using Themia.Framework.Data.Abstractions.UnitOfWork;
 using Themia.Framework.Data.Dapper.Connection;
@@ -17,7 +18,8 @@ internal sealed class DapperPdfTemplateStore(
     ISqlCompiler compiler,
     IDapperConnectionContext connection,
     IRepository<PdfTemplate, Guid> repository,
-    IUnitOfWork unitOfWork) : IPdfTemplateStore
+    IUnitOfWork unitOfWork,
+    ITenantContext tenantContext) : IPdfTemplateStore
 {
     public async Task<PdfTemplate> CreateAsync(PdfTemplate template, CancellationToken cancellationToken = default)
     {
@@ -25,6 +27,17 @@ internal sealed class DapperPdfTemplateStore(
         if (template.Id == Guid.Empty)
         {
             template.AssignId(Guid.NewGuid());
+        }
+
+        var ambient = tenantContext.CurrentTenantId;
+        if (template.TenantId is null && ambient is { } stamp)
+        {
+            template.TenantId = stamp;
+        }
+        else if (ambient is { } current && template.TenantId is { } target && target != current)
+        {
+            throw new InvalidOperationException(
+                $"Cannot create a template owned by tenant '{target}' from the '{current}' scope.");
         }
 
         await repository.AddAsync(template, cancellationToken).ConfigureAwait(false);
@@ -35,22 +48,32 @@ internal sealed class DapperPdfTemplateStore(
     public async Task<PdfTemplate> UpdateAsync(PdfTemplate template, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(template);
-        repository.Update(template);
+        var owned = await FindOwnedAsync(template.Id, cancellationToken).ConfigureAwait(false)
+            ?? throw new TemplateNotFoundException(template.Key);
+        owned.Body = template.Body;
+        owned.Name = template.Name;
+        owned.Description = template.Description;
+        repository.Update(owned);
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-        return template;
+        return owned;
     }
 
     public async Task DeleteAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        var existing = await GetAsync(id, cancellationToken).ConfigureAwait(false);
-        if (existing is null)
+        var owned = await FindOwnedAsync(id, cancellationToken).ConfigureAwait(false);
+        if (owned is null)
         {
-            return; // idempotent delete
+            return; // idempotent; a row outside the caller's scope is a no-op, not an error
         }
 
-        repository.Remove(existing);
+        repository.Remove(owned);
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
     }
+
+    // Owned lookup: includeGlobalRecords:false => a tenant scope sees only its own rows, a system scope
+    // only globals — so writes touch only rows the current scope owns.
+    private Task<PdfTemplate?> FindOwnedAsync(Guid id, CancellationToken cancellationToken) =>
+        QueryFirstAsync(queries.For<PdfTemplate>(includeGlobalRecords: false).Where("id", id).Limit(1), cancellationToken);
 
     public Task<PdfTemplate?> GetAsync(Guid id, CancellationToken cancellationToken = default) =>
         QueryFirstAsync(queries.For<PdfTemplate>(includeGlobalRecords: true).Where("id", id).Limit(1), cancellationToken);
@@ -60,6 +83,7 @@ internal sealed class DapperPdfTemplateStore(
 
     public async Task<PdfTemplate> ResolveAsync(string key, CancellationToken cancellationToken = default)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(key);
         var candidates = await QueryListAsync(
             queries.For<PdfTemplate>(includeGlobalRecords: true).Where("key", key), cancellationToken).ConfigureAwait(false);
         return PdfTemplateResolver.PreferTenant(candidates) ?? throw new TemplateNotFoundException(key);

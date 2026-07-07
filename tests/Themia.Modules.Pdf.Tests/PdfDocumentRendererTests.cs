@@ -22,6 +22,37 @@ public sealed class PdfDocumentRendererTests
         Assert.Equal(pdf.Bytes, bytes);
     }
 
+    [Fact]
+    public async Task RenderAsync_rejects_null_or_blank_key()
+    {
+        var sut = new PdfDocumentRenderer(new FakeStore(new PdfTemplate { Key = "k", Body = "b" }), new FakeHtml(), new FakePdf());
+
+        await Assert.ThrowsAnyAsync<ArgumentException>(() => sut.RenderAsync(null!, new object()));
+        await Assert.ThrowsAnyAsync<ArgumentException>(() => sut.RenderAsync(" ", new object()));
+    }
+
+    [Fact]
+    public async Task RenderAsync_rejects_null_model()
+    {
+        var sut = new PdfDocumentRenderer(new FakeStore(new PdfTemplate { Key = "k", Body = "b" }), new FakeHtml(), new FakePdf());
+
+        await Assert.ThrowsAsync<ArgumentNullException>(() => sut.RenderAsync("invoice", null!));
+    }
+
+    [Fact]
+    public async Task RenderAsync_passes_options_and_token_through_unchanged()
+    {
+        var pdf = new FakePdf();
+        var sut = new PdfDocumentRenderer(new FakeStore(new PdfTemplate { Key = "invoice", Body = "b" }), new FakeHtml(), pdf);
+        var options = new PdfRenderOptions { PaperFormat = PdfPaperFormat.A3 };
+        using var cts = new CancellationTokenSource();
+
+        await sut.RenderAsync("invoice", new object(), options, cts.Token);
+
+        Assert.Same(options, pdf.LastOptions);
+        Assert.Equal(cts.Token, pdf.LastToken);
+    }
+
     private sealed class FakeStore(PdfTemplate t) : IPdfTemplateStore
     {
         public Task<PdfTemplate> ResolveAsync(string key, CancellationToken ct = default) => Task.FromResult(t);
@@ -43,8 +74,10 @@ public sealed class PdfDocumentRendererTests
     private sealed class FakePdf : IPdfRenderer
     {
         public string? LastHtml { get; private set; }
+        public PdfRenderOptions? LastOptions { get; private set; }
+        public CancellationToken LastToken { get; private set; }
         public byte[] Bytes { get; } = [1, 2, 3];
         public Task<byte[]> RenderHtmlAsync(string html, PdfRenderOptions? options = null, CancellationToken ct = default)
-        { LastHtml = html; return Task.FromResult(Bytes); }
+        { LastHtml = html; LastOptions = options; LastToken = ct; return Task.FromResult(Bytes); }
     }
 }

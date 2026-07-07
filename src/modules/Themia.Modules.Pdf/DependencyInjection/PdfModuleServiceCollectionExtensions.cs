@@ -86,7 +86,7 @@ public static class PdfModuleServiceCollectionExtensions
             .ValidateOnStart();
 
         services.AddThemiaPdf(); // neutral renderers (singletons)
-        services.TryAddSingleton<IDataFilterScope, DataFilterScope>();
+        services.TryAddScoped<IDataFilterScope, DataFilterScope>();
         services.TryAddScoped<IPdfDocumentRenderer, PdfDocumentRenderer>();
     }
 }

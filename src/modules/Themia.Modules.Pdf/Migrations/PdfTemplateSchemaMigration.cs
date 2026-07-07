@@ -78,7 +78,8 @@ public sealed class PdfTemplateSchemaMigration : Migration
     /// emulated with functional key parts that evaluate to <c>NULL</c> when the filter is false (MySQL
     /// treats each <c>NULL</c> as distinct in a unique index, so filtered-out rows do not collide).
     /// Soft-deleted rows are folded into the "filtered out" case so a deleted key can be re-created.
-    /// Finalized/verified when the MySQL increment lands; this branch is not exercised in the PG increment.</summary>
+    /// This functional-index uniqueness is verified by the MySQL conformance suite
+    /// (<c>Themia.Modules.Pdf.Dapper.MySql.IntegrationTests</c>).</summary>
     private void CreateMySqlUniqueIndexes()
     {
         Execute.Sql("CREATE UNIQUE INDEX ux_pdf_templates_tenant_key ON pdf_templates ((IF(tenant_id IS NULL OR is_deleted, NULL, tenant_id)), (IF(tenant_id IS NULL OR is_deleted, NULL, `key`)));");

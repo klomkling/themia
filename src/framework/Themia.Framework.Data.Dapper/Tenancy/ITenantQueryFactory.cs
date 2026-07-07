@@ -17,6 +17,9 @@ public interface ITenantQueryFactory
     /// </summary>
     /// <param name="includeGlobalRecords">
     /// Whether to include records where <c>tenant_id IS NULL</c>. Overrides <see cref="DapperDataOptions.IncludeGlobalRecordsForTenants"/>.
+    /// This flag only has effect when there IS an ambient tenant: with no ambient tenant the predicate
+    /// always restricts to <c>tenant_id IS NULL</c> (global rows), so the flag is a no-op in that case
+    /// (see <c>TenantPredicate.Apply</c>).
     /// </param>
     Query For<T>(bool includeGlobalRecords);
 }

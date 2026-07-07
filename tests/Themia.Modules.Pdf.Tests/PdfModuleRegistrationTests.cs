@@ -1,6 +1,10 @@
 using System.Text;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Themia.Framework.Core.Abstractions.Tenancy;
+using Themia.Framework.Data.EFCore.Abstractions;
 using Themia.Modules.Pdf.Rendering;
 using Themia.Modules.Pdf.Store;
 using Themia.Pdf;
@@ -36,6 +40,36 @@ public sealed class PdfModuleRegistrationTests
         services.AddThemiaPdfModuleEfCore();
         services.AddThemiaPdfModuleEfCore();
         Assert.Single(services, d => d.ServiceType == typeof(IPdfDocumentRenderer));
+    }
+
+    [Fact]
+    public void Blank_connection_string_name_fails_options_validation()
+    {
+        var services = new ServiceCollection();
+        services.AddThemiaPdfModuleEfCore(o => o.ConnectionStringName = " ");
+        using var provider = services.BuildServiceProvider();
+
+        // .Validate(...).ValidateOnStart() surfaces as OptionsValidationException on first .Value access.
+        Assert.Throws<OptionsValidationException>(
+            () => _ = provider.GetRequiredService<IOptions<PdfModuleOptions>>().Value);
+    }
+
+    [Fact]
+    public void EfCore_context_factory_rejects_unsupported_provider()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?> { ["ConnectionStrings:Default"] = "Host=localhost;Database=x" })
+            .Build();
+        var services = new ServiceCollection();
+        services.AddSingleton<IConfiguration>(configuration);
+        services.AddSingleton<IDatabaseProvider>(new FakeDatabaseProvider(DatabaseProviderNames.MySql));
+        services.AddThemiaPdfModuleEfCore();
+        using var provider = services.BuildServiceProvider();
+
+        // The provider-selection switch runs while EF builds the (cached) options, which happens when the
+        // factory is resolved — so the unsupported-provider guard surfaces across resolve + CreateDbContext.
+        Assert.Throws<NotSupportedException>(() =>
+            provider.GetRequiredService<IDbContextFactory<PdfDbContext>>().CreateDbContext());
     }
 
     [Fact]
@@ -77,6 +111,13 @@ public sealed class PdfModuleRegistrationTests
         {
             TenantContextAccessor.CurrentTenantId = previousTenant;
         }
+    }
+
+    private sealed class FakeDatabaseProvider(string providerName) : IDatabaseProvider
+    {
+        public string ProviderName { get; } = providerName;
+        public void Configure(DbContextOptionsBuilder optionsBuilder, IConfiguration configuration, IServiceProvider serviceProvider) { }
+        public void ConfigureServices(IServiceCollection services, IConfiguration configuration) { }
     }
 
     private sealed class TenantEchoStore(ITenantContext tenantContext) : IPdfTemplateStore
