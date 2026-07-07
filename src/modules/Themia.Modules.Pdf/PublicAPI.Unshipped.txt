@@ -1,0 +1,16 @@
+#nullable enable
+Themia.Modules.Pdf.PdfTemplate
+Themia.Modules.Pdf.PdfTemplate.PdfTemplate() -> void
+Themia.Modules.Pdf.PdfTemplate.TenantId.get -> Themia.Framework.Core.Abstractions.Tenancy.TenantId?
+Themia.Modules.Pdf.PdfTemplate.TenantId.set -> void
+Themia.Modules.Pdf.PdfTemplate.Key.get -> string!
+Themia.Modules.Pdf.PdfTemplate.Key.set -> void
+Themia.Modules.Pdf.PdfTemplate.Body.get -> string!
+Themia.Modules.Pdf.PdfTemplate.Body.set -> void
+Themia.Modules.Pdf.PdfTemplate.Name.get -> string?
+Themia.Modules.Pdf.PdfTemplate.Name.set -> void
+Themia.Modules.Pdf.PdfTemplate.Description.get -> string?
+Themia.Modules.Pdf.PdfTemplate.Description.set -> void
+Themia.Modules.Pdf.TemplateNotFoundException
+Themia.Modules.Pdf.TemplateNotFoundException.TemplateNotFoundException(string! key) -> void
+Themia.Modules.Pdf.TemplateNotFoundException.Key.get -> string!
