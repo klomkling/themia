@@ -1,11 +1,11 @@
 #nullable enable
 Themia.Modules.Pdf.Store.IPdfTemplateStore
-Themia.Modules.Pdf.Store.IPdfTemplateStore.CreateAsync(Themia.Modules.Pdf.PdfTemplate! template, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<Themia.Modules.Pdf.PdfTemplate!>!
-Themia.Modules.Pdf.Store.IPdfTemplateStore.DeleteAsync(System.Guid id, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
-Themia.Modules.Pdf.Store.IPdfTemplateStore.GetAsync(System.Guid id, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<Themia.Modules.Pdf.PdfTemplate?>!
-Themia.Modules.Pdf.Store.IPdfTemplateStore.ListAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Themia.Modules.Pdf.PdfTemplate!>!>!
-Themia.Modules.Pdf.Store.IPdfTemplateStore.ResolveAsync(string! key, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<Themia.Modules.Pdf.PdfTemplate!>!
-Themia.Modules.Pdf.Store.IPdfTemplateStore.UpdateAsync(Themia.Modules.Pdf.PdfTemplate! template, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<Themia.Modules.Pdf.PdfTemplate!>!
+Themia.Modules.Pdf.Store.IPdfTemplateStore.CreateAsync(Themia.Modules.Pdf.PdfTemplate! template, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Pdf.PdfTemplate!>!
+Themia.Modules.Pdf.Store.IPdfTemplateStore.DeleteAsync(System.Guid id, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Modules.Pdf.Store.IPdfTemplateStore.GetAsync(System.Guid id, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Pdf.PdfTemplate?>!
+Themia.Modules.Pdf.Store.IPdfTemplateStore.ListAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Themia.Modules.Pdf.PdfTemplate!>!>!
+Themia.Modules.Pdf.Store.IPdfTemplateStore.ResolveAsync(string! key, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Pdf.PdfTemplate!>!
+Themia.Modules.Pdf.Store.IPdfTemplateStore.UpdateAsync(Themia.Modules.Pdf.PdfTemplate! template, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Pdf.PdfTemplate!>!
 Themia.Modules.Pdf.PdfTemplate
 Themia.Modules.Pdf.PdfTemplate.PdfTemplate() -> void
 Themia.Modules.Pdf.PdfTemplate.TenantId.get -> Themia.Framework.Core.Abstractions.Tenancy.TenantId?
