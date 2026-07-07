@@ -10,4 +10,13 @@ public interface ITenantQueryFactory
 {
     /// <summary>Returns a tenant- and soft-delete-seeded query for <typeparamref name="T"/>.</summary>
     Query For<T>();
+
+    /// <summary>
+    /// Returns a tenant- and soft-delete-seeded query for <typeparamref name="T"/>, with a per-query
+    /// override of the global-records inclusion setting.
+    /// </summary>
+    /// <param name="includeGlobalRecords">
+    /// Whether to include records where <c>tenant_id IS NULL</c>. Overrides <see cref="DapperDataOptions.IncludeGlobalRecordsForTenants"/>.
+    /// </param>
+    Query For<T>(bool includeGlobalRecords);
 }
