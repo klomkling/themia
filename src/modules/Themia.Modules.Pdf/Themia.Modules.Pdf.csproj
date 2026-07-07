@@ -14,7 +14,10 @@
     <ProjectReference Include="../../neutral/Themia.Pdf/Themia.Pdf.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
     <PackageReference Include="FluentMigrator" />
     <PackageReference Include="Dapper" />
     <PackageReference Include="EFCore.NamingConventions" />

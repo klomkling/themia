@@ -26,3 +26,10 @@ Themia.Modules.Pdf.PdfDbContext.PdfDbContext(Microsoft.EntityFrameworkCore.DbCon
 Themia.Modules.Pdf.PdfDbContext.Templates.get -> Microsoft.EntityFrameworkCore.DbSet<Themia.Modules.Pdf.PdfTemplate!>!
 Themia.Modules.Pdf.Rendering.IPdfDocumentRenderer
 Themia.Modules.Pdf.Rendering.IPdfDocumentRenderer.RenderAsync(string! key, object! model, Themia.Pdf.PdfRenderOptions? options = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<byte[]!>!
+Themia.Modules.Pdf.PdfModuleOptions
+Themia.Modules.Pdf.PdfModuleOptions.PdfModuleOptions() -> void
+Themia.Modules.Pdf.PdfModuleOptions.ConnectionStringName.get -> string!
+Themia.Modules.Pdf.PdfModuleOptions.ConnectionStringName.set -> void
+Microsoft.Extensions.DependencyInjection.PdfModuleServiceCollectionExtensions
+static Microsoft.Extensions.DependencyInjection.PdfModuleServiceCollectionExtensions.AddThemiaPdfModuleDapper(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Themia.Modules.Pdf.PdfModuleOptions!>? configure = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static Microsoft.Extensions.DependencyInjection.PdfModuleServiceCollectionExtensions.AddThemiaPdfModuleEfCore(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Themia.Modules.Pdf.PdfModuleOptions!>? configure = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
