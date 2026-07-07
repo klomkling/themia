@@ -9,7 +9,7 @@ namespace Themia.Modules.Pdf.IntegrationTests;
 
 /// <summary>Peer-agnostic conformance facts exercised against a real database by each data-layer peer
 /// (EF Core, Dapper). A peer supplies its wiring via <see cref="ConfigurePeer"/> and a reset hook; the
-/// same seven facts run for both, verifying the migration, both stores, tenant/global resolution, and
+/// same eight facts run for both, verifying the migration, both stores, tenant/global resolution, and
 /// the tenant/global write-asymmetry on a real engine.</summary>
 public abstract class PdfStoreConformanceTests
 {
@@ -125,6 +125,11 @@ public abstract class PdfStoreConformanceTests
             var all = await system.Store.ListAsync();
             Assert.DoesNotContain(all, t => t.Key == "x" && t.TenantId == null);
         }
+        await using (var acme = NewScope(new TenantId("acme")))
+        {
+            var all = await acme.Store.ListAsync();
+            Assert.Contains(all, t => t.Key == "x" && t.TenantId is not null);
+        }
     }
 
     [Fact]
@@ -140,5 +145,19 @@ public abstract class PdfStoreConformanceTests
             await Assert.ThrowsAnyAsync<Exception>(
                 () => system.Store.CreateAsync(new PdfTemplate { Key = "dup", Body = "second", TenantId = null }));
         }
+    }
+
+    [Fact]
+    public async Task Recreate_key_after_soft_delete_succeeds()
+    {
+        await ResetAsync();
+        await using var acme = NewScope(new TenantId("acme"));
+        var created = await acme.Store.CreateAsync(new PdfTemplate { Key = "doc", Body = "v1" });
+        await acme.Store.DeleteAsync(created.Id);
+
+        await acme.Store.CreateAsync(new PdfTemplate { Key = "doc", Body = "v2" });
+
+        var resolved = await acme.Store.ResolveAsync("doc");
+        Assert.Equal("v2", resolved.Body);
     }
 }

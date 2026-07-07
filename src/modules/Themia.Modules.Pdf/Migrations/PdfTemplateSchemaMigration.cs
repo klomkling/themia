@@ -23,9 +23,10 @@ public sealed class PdfTemplateSchemaMigration : Migration
         IfDatabase("sqlserver").Delegate(() => CreateTable(c => c.AsDateTimeOffset()));
 
         // Filtered unique indexes are not expressible via the fluent API, so they are emitted as raw SQL
-        // with the reserved-word `key` column quoted per engine.
-        IfDatabase("postgresql").Delegate(() => CreateFilteredUniqueIndexes("\"key\""));
-        IfDatabase("sqlserver").Delegate(() => CreateFilteredUniqueIndexes("[key]"));
+        // with the reserved-word `key` column quoted per engine. The boolean literal differs per engine
+        // (PostgreSQL: false, SQL Server bit: 0).
+        IfDatabase("postgresql").Delegate(() => CreateFilteredUniqueIndexes("\"key\"", "false"));
+        IfDatabase("sqlserver").Delegate(() => CreateFilteredUniqueIndexes("[key]", "0"));
         IfDatabase("mysql").Delegate(CreateMySqlUniqueIndexes);
 
         IfDatabase(p =>
@@ -62,22 +63,25 @@ public sealed class PdfTemplateSchemaMigration : Migration
     }
 
     /// <summary>Emits the per-tenant and global filtered unique indexes on the resolution key for
-    /// engines with native partial-index support (PostgreSQL, SQL Server). <paramref name="keyColumn"/>
-    /// is the quoted <c>key</c> identifier (<c>"key"</c> on PostgreSQL, <c>[key]</c> on SQL Server —
-    /// <c>key</c> is a reserved word).</summary>
-    private void CreateFilteredUniqueIndexes(string keyColumn)
+    /// engines with native partial-index support (PostgreSQL, SQL Server), excluding soft-deleted rows
+    /// so a deleted key can be re-created. <paramref name="keyColumn"/> is the quoted <c>key</c>
+    /// identifier (<c>"key"</c> on PostgreSQL, <c>[key]</c> on SQL Server — <c>key</c> is a reserved
+    /// word). <paramref name="falseLiteral"/> is the engine's boolean-false literal (<c>false</c> on
+    /// PostgreSQL, <c>0</c> on SQL Server).</summary>
+    private void CreateFilteredUniqueIndexes(string keyColumn, string falseLiteral)
     {
-        Execute.Sql($"CREATE UNIQUE INDEX ux_pdf_templates_tenant_key ON pdf_templates (tenant_id, {keyColumn}) WHERE tenant_id IS NOT NULL;");
-        Execute.Sql($"CREATE UNIQUE INDEX ux_pdf_templates_global_key ON pdf_templates ({keyColumn}) WHERE tenant_id IS NULL;");
+        Execute.Sql($"CREATE UNIQUE INDEX ux_pdf_templates_tenant_key ON pdf_templates (tenant_id, {keyColumn}) WHERE tenant_id IS NOT NULL AND is_deleted = {falseLiteral};");
+        Execute.Sql($"CREATE UNIQUE INDEX ux_pdf_templates_global_key ON pdf_templates ({keyColumn}) WHERE tenant_id IS NULL AND is_deleted = {falseLiteral};");
     }
 
     /// <summary>MySQL lacks filtered/partial indexes, so the same per-tenant + global uniqueness is
     /// emulated with functional key parts that evaluate to <c>NULL</c> when the filter is false (MySQL
     /// treats each <c>NULL</c> as distinct in a unique index, so filtered-out rows do not collide).
+    /// Soft-deleted rows are folded into the "filtered out" case so a deleted key can be re-created.
     /// Finalized/verified when the MySQL increment lands; this branch is not exercised in the PG increment.</summary>
     private void CreateMySqlUniqueIndexes()
     {
-        Execute.Sql("CREATE UNIQUE INDEX ux_pdf_templates_tenant_key ON pdf_templates ((IF(tenant_id IS NULL, NULL, tenant_id)), (IF(tenant_id IS NULL, NULL, `key`)));");
-        Execute.Sql("CREATE UNIQUE INDEX ux_pdf_templates_global_key ON pdf_templates ((IF(tenant_id IS NULL, `key`, NULL)));");
+        Execute.Sql("CREATE UNIQUE INDEX ux_pdf_templates_tenant_key ON pdf_templates ((IF(tenant_id IS NULL OR is_deleted, NULL, tenant_id)), (IF(tenant_id IS NULL OR is_deleted, NULL, `key`)));");
+        Execute.Sql("CREATE UNIQUE INDEX ux_pdf_templates_global_key ON pdf_templates ((IF(tenant_id IS NULL AND NOT is_deleted, `key`, NULL)));");
     }
 }
