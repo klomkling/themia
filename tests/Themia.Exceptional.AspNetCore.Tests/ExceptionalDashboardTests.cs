@@ -202,6 +202,27 @@ public class ExceptionalDashboardTests
     }
 
     [Fact]
+    public async Task List_FlowsCustomStyleSheetAndFavicon()
+    {
+        // Guards the endpoint wiring: options -> DashboardHtml.List -> Page (a forgotten/typo'd forward would 404-green otherwise).
+        var client = await ServerAsync(new FakeExceptionStore(Sample()),
+            o => { o.Authorize = _ => Task.FromResult(true); o.CustomStyleSheet = "/app/theme.css"; o.CustomFavicon = "/app/fav.ico"; });
+        var body = await (await client.GetAsync("/exceptions")).Content.ReadAsStringAsync();
+        Assert.Contains("href=\"/app/theme.css\"", body);
+        Assert.Contains("href=\"/app/fav.ico\"", body);
+    }
+
+    [Fact]
+    public async Task Detail_FlowsCustomStyleSheetAndFavicon()
+    {
+        var client = await ServerAsync(new FakeExceptionStore(Sample()),
+            o => { o.Authorize = _ => Task.FromResult(true); o.CustomStyleSheet = "/app/theme.css"; o.CustomFavicon = "/app/fav.ico"; });
+        var body = await (await client.GetAsync($"/exceptions/{KnownGuid}")).Content.ReadAsStringAsync();
+        Assert.Contains("href=\"/app/theme.css\"", body);
+        Assert.Contains("href=\"/app/fav.ico\"", body);
+    }
+
+    [Fact]
     public async Task List_AuthorizeCancelled_DoesNotMaskAs404()
     {
         // OperationCanceledException is cancellation flow, not a denial — it must propagate, never 404.

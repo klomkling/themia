@@ -20,11 +20,12 @@ public sealed class ExceptionalDashboardOptions
 
     /// <summary>Optional URL to an extra stylesheet, injected into the dashboard <c>&lt;head&gt;</c> after
     /// the built-in CSS so its rules override the defaults — lets the dashboard match the host app.
-    /// Empty (the default) emits no extra link. Mirrors <c>ThemiaQuartzOptions.CustomStyleSheet</c>.</summary>
+    /// Empty (the default) emits no extra link. Parity feature for the jobs dashboard's
+    /// <c>ThemiaQuartzOptions.CustomStyleSheet</c> (which emits the link unconditionally; this one omits it when empty).</summary>
     public string CustomStyleSheet { get; set; } = "";
 
     /// <summary>Optional URL to a favicon for the dashboard page. Empty (the default) emits no icon link.
-    /// Mirrors <c>ThemiaQuartzOptions.CustomFavicon</c>.</summary>
+    /// Parity feature for the jobs dashboard's <c>ThemiaQuartzOptions.CustomFavicon</c>.</summary>
     public string CustomFavicon { get; set; } = "";
 
     /// <summary>Whether the detail view renders the captured request body. Default <c>true</c> (shown only
