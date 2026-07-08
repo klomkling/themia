@@ -17,7 +17,7 @@ public sealed class ListRenderTests
         };
         var filter = new ExceptionFilter { Page = 1, PageSize = 50 };
 
-        var html = DashboardHtml.List("Exceptions", "/exceptions", items, total: 200, filter, now);
+        var html = DashboardHtml.List(new DashboardChrome("Exceptions", "/exceptions", "", ""), items, total: 200, filter, now);
 
         Assert.Contains("200 errors", html);                       // summary header
         Assert.Contains("secs ago", html);                          // relative time

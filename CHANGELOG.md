@@ -27,6 +27,14 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-07-08
+
+### Added
+- **`Themia.Exceptional.AspNetCore`** — `ExceptionalDashboardOptions.CustomStyleSheet` and
+  `CustomFavicon`: inject an app stylesheet/favicon into the exceptions dashboard `<head>` (the custom
+  stylesheet is emitted after the built-in CSS so its rules win), letting the dashboard match the host
+  app — parity with the jobs dashboard's `ThemiaQuartzOptions.CustomStyleSheet`/`CustomFavicon`.
+
 ## [0.7.0] - 2026-07-07
 
 ### Added

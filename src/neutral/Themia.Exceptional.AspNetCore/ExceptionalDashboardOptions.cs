@@ -18,6 +18,19 @@ public sealed class ExceptionalDashboardOptions
     /// <summary>Page heading and document title. Default "Exceptions".</summary>
     public string Title { get; set; } = "Exceptions";
 
+    /// <summary>Optional URL to an extra stylesheet, injected into the dashboard <c>&lt;head&gt;</c> after
+    /// the built-in CSS so its rules override the defaults — lets the dashboard match the host app.
+    /// A relative URL is resolved against the dashboard mount path (so it loads on both the list and detail
+    /// routes); root-relative (<c>/css/…</c>) and absolute URLs are used as-is. Empty (the default) emits no
+    /// extra link. Parity feature for the jobs dashboard's <c>ThemiaQuartzOptions.CustomStyleSheet</c>
+    /// (which emits the link unconditionally; this one omits it when empty).</summary>
+    public string CustomStyleSheet { get; set; } = "";
+
+    /// <summary>Optional URL to a favicon for the dashboard page. Resolved like <see cref="CustomStyleSheet"/>
+    /// (relative → mount path; root-relative/absolute → as-is). Empty (the default) emits no icon link.
+    /// Parity feature for the jobs dashboard's <c>ThemiaQuartzOptions.CustomFavicon</c>.</summary>
+    public string CustomFavicon { get; set; } = "";
+
     /// <summary>Whether the detail view renders the captured request body. Default <c>true</c> (shown only
     /// behind <see cref="Authorize"/>). Request bodies can contain secrets/PII; prefer scrubbing them at
     /// capture time, and set this to <c>false</c> if even authorized viewers should not see them.</summary>
