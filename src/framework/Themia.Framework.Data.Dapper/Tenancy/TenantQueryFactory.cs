@@ -13,12 +13,17 @@ internal sealed class TenantQueryFactory(
 {
     public Query For<T>()
     {
+        return For<T>(options.IncludeGlobalRecordsForTenants);
+    }
+
+    public Query For<T>(bool includeGlobalRecords)
+    {
         var map = registry.For<T>();
         var query = new Query(map.Table);
         TenantPredicate.Apply<T>(
             query,
             tenantContext.CurrentTenantId,
-            options.IncludeGlobalRecordsForTenants,
+            includeGlobalRecords,
             filterScope.IsTenantFilterBypassed,
             filterScope.IsSoftDeleteFilterBypassed,
             map);

@@ -47,4 +47,5 @@ Themia.Framework.Data.Dapper.EntityMappingRegistryConfigurator.EntityMappingRegi
 Themia.Framework.Data.Dapper.EntityMappingRegistryConfigurator.Map<T>(Themia.Framework.Data.Dapper.Mapping.EntityMapping! mapping) -> Themia.Framework.Data.Dapper.EntityMappingRegistryConfigurator!
 Themia.Framework.Data.Dapper.Tenancy.ITenantQueryFactory
 Themia.Framework.Data.Dapper.Tenancy.ITenantQueryFactory.For<T>() -> SqlKata.Query!
+Themia.Framework.Data.Dapper.Tenancy.ITenantQueryFactory.For<T>(bool includeGlobalRecords) -> SqlKata.Query!
 static Themia.Framework.Data.Dapper.DependencyInjection.DapperDataServiceCollectionExtensions.AddThemiaDapperCore(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Themia.Framework.Data.Dapper.DapperDataOptions!>? configure = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!

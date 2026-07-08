@@ -27,6 +27,16 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-07-07
+
+### Added
+- **`Themia.Framework.Data.Dapper`** — `ITenantQueryFactory.For<T>(bool includeGlobalRecords)`
+  per-query global-inclusion override.
+- **`Themia.Modules.Pdf`** — tenant-aware HTML/PDF template store (`net10.0`) with global-default
+  fallback and a render-by-key service over the neutral `Themia.Pdf`. EF Core peer (SQL Server,
+  PostgreSQL) + Dapper peer (SQL Server, PostgreSQL, MySQL); one FluentMigrator schema owns
+  `pdf_templates` for both peers.
+
 ## [0.6.9] - 2026-06-29
 
 ### Added

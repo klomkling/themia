@@ -1,0 +1,44 @@
+#nullable enable
+override Themia.Modules.Pdf.Migrations.PdfTemplateSchemaMigration.Down() -> void
+override Themia.Modules.Pdf.Migrations.PdfTemplateSchemaMigration.Up() -> void
+Themia.Modules.Pdf.Migrations.PdfTemplateSchemaMigration
+Themia.Modules.Pdf.Migrations.PdfTemplateSchemaMigration.PdfTemplateSchemaMigration() -> void
+Themia.Modules.Pdf.Store.IPdfTemplateStore
+Themia.Modules.Pdf.Store.IPdfTemplateStore.CreateAsync(Themia.Modules.Pdf.PdfTemplate! template, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Pdf.PdfTemplate!>!
+Themia.Modules.Pdf.Store.IPdfTemplateStore.DeleteAsync(System.Guid id, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Modules.Pdf.Store.IPdfTemplateStore.GetAsync(System.Guid id, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Pdf.PdfTemplate?>!
+Themia.Modules.Pdf.Store.IPdfTemplateStore.ListAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Themia.Modules.Pdf.PdfTemplate!>!>!
+Themia.Modules.Pdf.Store.IPdfTemplateStore.ResolveAsync(string! key, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Pdf.PdfTemplate!>!
+Themia.Modules.Pdf.Store.IPdfTemplateStore.UpdateAsync(Themia.Modules.Pdf.PdfTemplate! template, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Pdf.PdfTemplate!>!
+Themia.Modules.Pdf.PdfTemplate
+Themia.Modules.Pdf.PdfTemplate.PdfTemplate() -> void
+Themia.Modules.Pdf.PdfTemplate.TenantId.get -> Themia.Framework.Core.Abstractions.Tenancy.TenantId?
+Themia.Modules.Pdf.PdfTemplate.TenantId.set -> void
+Themia.Modules.Pdf.PdfTemplate.Key.get -> string!
+Themia.Modules.Pdf.PdfTemplate.Key.set -> void
+Themia.Modules.Pdf.PdfTemplate.Body.get -> string!
+Themia.Modules.Pdf.PdfTemplate.Body.set -> void
+Themia.Modules.Pdf.PdfTemplate.Name.get -> string?
+Themia.Modules.Pdf.PdfTemplate.Name.set -> void
+Themia.Modules.Pdf.PdfTemplate.Description.get -> string?
+Themia.Modules.Pdf.PdfTemplate.Description.set -> void
+Themia.Modules.Pdf.TemplateNotFoundException
+Themia.Modules.Pdf.TemplateNotFoundException.TemplateNotFoundException(string! key) -> void
+Themia.Modules.Pdf.TemplateNotFoundException.Key.get -> string!
+Themia.Modules.Pdf.PdfDbContext
+Themia.Modules.Pdf.PdfDbContext.PdfDbContext(Microsoft.EntityFrameworkCore.DbContextOptions<Themia.Modules.Pdf.PdfDbContext!>! options, Themia.Framework.Core.Abstractions.Tenancy.ITenantContext? tenantContext = null) -> void
+Themia.Modules.Pdf.PdfDbContext.Templates.get -> Microsoft.EntityFrameworkCore.DbSet<Themia.Modules.Pdf.PdfTemplate!>!
+Themia.Modules.Pdf.Rendering.IPdfDocumentRenderer
+Themia.Modules.Pdf.Rendering.IPdfDocumentRenderer.RenderAsync(string! key, object! model, Themia.Pdf.PdfRenderOptions? options = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<byte[]!>!
+Themia.Modules.Pdf.PdfModuleOptions
+Themia.Modules.Pdf.PdfModuleOptions.PdfModuleOptions() -> void
+Themia.Modules.Pdf.PdfModuleOptions.ConnectionStringName.get -> string!
+Themia.Modules.Pdf.PdfModuleOptions.ConnectionStringName.set -> void
+Microsoft.Extensions.DependencyInjection.PdfModuleServiceCollectionExtensions
+static Microsoft.Extensions.DependencyInjection.PdfModuleServiceCollectionExtensions.AddThemiaPdfModuleDapper(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Themia.Modules.Pdf.PdfModuleOptions!>? configure = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static Microsoft.Extensions.DependencyInjection.PdfModuleServiceCollectionExtensions.AddThemiaPdfModuleEfCore(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Themia.Modules.Pdf.PdfModuleOptions!>? configure = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+Themia.Modules.Pdf.PdfModule
+Themia.Modules.Pdf.PdfModule.PdfModule(Themia.Data.Migrations.MigrationEngine engine) -> void
+Themia.Modules.Pdf.PdfModule.PdfModule(Themia.Data.Migrations.MigrationEngine engine, Themia.Modules.Pdf.PdfModuleOptions! options) -> void
+override Themia.Modules.Pdf.PdfModule.Descriptor.get -> Themia.Framework.Core.Modules.ModuleDescriptor!
+override Themia.Modules.Pdf.PdfModule.InitializeAsync(System.IServiceProvider! serviceProvider, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
