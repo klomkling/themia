@@ -65,11 +65,32 @@ public sealed class PdfModuleRegistrationTests
         services.AddSingleton<IDatabaseProvider>(new FakeDatabaseProvider(DatabaseProviderNames.MySql));
         services.AddThemiaPdfModuleEfCore();
         using var provider = services.BuildServiceProvider();
+        using var scope = provider.CreateScope();
 
-        // The provider-selection switch runs while EF builds the (cached) options, which happens when the
-        // factory is resolved — so the unsupported-provider guard surfaces across resolve + CreateDbContext.
+        // The provider-selection switch runs while EF builds the (scoped) options, which happens when the
+        // context is resolved from the scope — so the unsupported-provider guard surfaces on resolution.
         Assert.Throws<NotSupportedException>(() =>
-            provider.GetRequiredService<IDbContextFactory<PdfDbContext>>().CreateDbContext());
+            scope.ServiceProvider.GetRequiredService<PdfDbContext>());
+    }
+
+    [Fact]
+    public void EfCore_store_resolves_under_scope_validation_with_scoped_tenant_context()
+    {
+        var config = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?> { ["ConnectionStrings:Default"] = "Host=localhost;Database=x;Username=u;Password=p" })
+            .Build();
+        var services = new ServiceCollection();
+        services.AddSingleton<IConfiguration>(config);
+        services.AddSingleton<IDatabaseProvider>(new Themia.Framework.Data.EFCore.PostgreSql.PostgresDatabaseProvider());
+        services.AddScoped<ITenantContext>(_ => new TenantContext(new TenantId("acme")));
+        services.AddSingleton<Themia.Framework.Data.Abstractions.Exceptions.ISqlExceptionInterpreter>(new FakeSqlExceptionInterpreter());
+        services.AddThemiaPdfModuleEfCore();
+        using var provider = services.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true, ValidateOnBuild = false });
+        using var scope = provider.CreateScope();
+
+        var store = scope.ServiceProvider.GetRequiredService<IPdfTemplateStore>(); // must NOT throw
+
+        Assert.NotNull(store);
     }
 
     [Fact]
@@ -111,6 +132,11 @@ public sealed class PdfModuleRegistrationTests
         {
             TenantContextAccessor.CurrentTenantId = previousTenant;
         }
+    }
+
+    private sealed class FakeSqlExceptionInterpreter : Themia.Framework.Data.Abstractions.Exceptions.ISqlExceptionInterpreter
+    {
+        public bool IsUniqueConstraintViolation(Exception? exception) => false;
     }
 
     private sealed class FakeDatabaseProvider(string providerName) : IDatabaseProvider

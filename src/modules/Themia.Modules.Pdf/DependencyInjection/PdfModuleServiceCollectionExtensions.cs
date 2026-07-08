@@ -27,7 +27,7 @@ public static class PdfModuleServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(services);
         AddCommon(services, configure);
 
-        services.AddDbContextFactory<PdfDbContext>((sp, db) =>
+        services.AddDbContext<PdfDbContext>((sp, db) =>
         {
             var provider = sp.GetRequiredService<IDatabaseProvider>();
             var configuration = sp.GetRequiredService<IConfiguration>();
@@ -47,10 +47,7 @@ public static class PdfModuleServiceCollectionExtensions
                     throw new NotSupportedException(
                         $"Themia.Modules.Pdf on EF Core supports PostgreSQL and SQL Server; provider '{provider.ProviderName}' is not supported. Use the Dapper peer for MySQL.");
             }
-
-            db.UseSnakeCaseNamingConvention();
         });
-        services.TryAddScoped(sp => sp.GetRequiredService<IDbContextFactory<PdfDbContext>>().CreateDbContext());
         services.TryAddScoped<IPdfTemplateStore, EfPdfTemplateStore>();
         return services;
     }
