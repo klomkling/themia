@@ -22,18 +22,25 @@ internal static class DashboardHtml
           .Append("</title><link rel=\"stylesheet\" href=\"").Append(Enc(path)).Append("/dashboard.css\">");
         if (!string.IsNullOrEmpty(customFavicon))
         {
-            sb.Append("<link rel=\"icon\" href=\"").Append(Enc(customFavicon)).Append("\">");
+            sb.Append("<link rel=\"icon\" href=\"").Append(Enc(ResolveAsset(path, customFavicon))).Append("\">");
         }
 
         // Injected after the built-in stylesheet so an adopter's rules override the defaults.
         if (!string.IsNullOrEmpty(customStyleSheet))
         {
-            sb.Append("<link rel=\"stylesheet\" href=\"").Append(Enc(customStyleSheet)).Append("\" type=\"text/css\">");
+            sb.Append("<link rel=\"stylesheet\" href=\"").Append(Enc(ResolveAsset(path, customStyleSheet))).Append("\" type=\"text/css\">");
         }
 
         sb.Append("</head><body>").Append(body).Append("</body></html>");
         return sb.ToString();
     }
+
+    // A relative custom asset URL is resolved against the dashboard mount path (like the built-in
+    // dashboard.css) so it loads identically on the list (/mount) and detail (/mount/{guid}) routes —
+    // the page has no <base>, and page-relative URLs would otherwise resolve differently between the two.
+    // Root-relative ("/…"), protocol-relative ("//…") and absolute ("scheme://…") URLs are used verbatim.
+    private static string ResolveAsset(string path, string url) =>
+        url.StartsWith('/') || url.Contains("://", StringComparison.Ordinal) ? url : path + "/" + url;
 
     internal static string List(string title, string path, IReadOnlyList<ExceptionEntry> items, int total, ExceptionFilter filter, DateTime utcNow, string? csrfToken = null, string customStyleSheet = "", string customFavicon = "")
     {

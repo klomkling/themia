@@ -39,6 +39,28 @@ public sealed class DashboardCustomStyleTests
     }
 
     [Fact]
+    public void Page_ResolvesRelativeCustomUrls_AgainstMountPath()
+    {
+        // A page-relative URL would resolve differently on /exceptions vs /exceptions/{guid}; prefixing the
+        // mount path (like the built-in dashboard.css) makes it load on both.
+        var html = DashboardHtml.Page("Exceptions", "/exceptions", "<p>x</p>",
+            customStyleSheet: "theme.css", customFavicon: "fav.ico");
+
+        Assert.Contains("href=\"/exceptions/theme.css\"", html);
+        Assert.Contains("href=\"/exceptions/fav.ico\"", html);
+    }
+
+    [Fact]
+    public void Page_LeavesRootRelativeAndAbsoluteCustomUrls_Verbatim()
+    {
+        var html = DashboardHtml.Page("Exceptions", "/exceptions", "<p>x</p>",
+            customStyleSheet: "/css/theme.css", customFavicon: "https://cdn.example/fav.ico");
+
+        Assert.Contains("href=\"/css/theme.css\"", html);
+        Assert.Contains("href=\"https://cdn.example/fav.ico\"", html);
+    }
+
+    [Fact]
     public void Page_EncodesCustomHrefs()
     {
         var html = DashboardHtml.Page("Exceptions", "/exceptions", "<p>x</p>",

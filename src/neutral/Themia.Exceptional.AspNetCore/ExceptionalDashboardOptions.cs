@@ -20,11 +20,14 @@ public sealed class ExceptionalDashboardOptions
 
     /// <summary>Optional URL to an extra stylesheet, injected into the dashboard <c>&lt;head&gt;</c> after
     /// the built-in CSS so its rules override the defaults — lets the dashboard match the host app.
-    /// Empty (the default) emits no extra link. Parity feature for the jobs dashboard's
-    /// <c>ThemiaQuartzOptions.CustomStyleSheet</c> (which emits the link unconditionally; this one omits it when empty).</summary>
+    /// A relative URL is resolved against the dashboard mount path (so it loads on both the list and detail
+    /// routes); root-relative (<c>/css/…</c>) and absolute URLs are used as-is. Empty (the default) emits no
+    /// extra link. Parity feature for the jobs dashboard's <c>ThemiaQuartzOptions.CustomStyleSheet</c>
+    /// (which emits the link unconditionally; this one omits it when empty).</summary>
     public string CustomStyleSheet { get; set; } = "";
 
-    /// <summary>Optional URL to a favicon for the dashboard page. Empty (the default) emits no icon link.
+    /// <summary>Optional URL to a favicon for the dashboard page. Resolved like <see cref="CustomStyleSheet"/>
+    /// (relative → mount path; root-relative/absolute → as-is). Empty (the default) emits no icon link.
     /// Parity feature for the jobs dashboard's <c>ThemiaQuartzOptions.CustomFavicon</c>.</summary>
     public string CustomFavicon { get; set; } = "";
 
