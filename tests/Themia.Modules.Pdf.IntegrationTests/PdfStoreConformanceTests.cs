@@ -9,7 +9,7 @@ namespace Themia.Modules.Pdf.IntegrationTests;
 
 /// <summary>Peer-agnostic conformance facts exercised against a real database by each data-layer peer
 /// (EF Core, Dapper). A peer supplies its wiring via <see cref="ConfigurePeer"/> and a reset hook; the
-/// same twelve facts run for both, verifying the migration, both stores, tenant/global resolution, the
+/// same facts run for both, verifying the migration, both stores, tenant/global resolution, the
 /// tenant/global write-asymmetry, and owned-row scoping of writes on a real engine.</summary>
 public abstract class PdfStoreConformanceTests
 {

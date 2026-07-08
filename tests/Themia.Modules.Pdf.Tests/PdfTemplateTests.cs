@@ -1,5 +1,4 @@
 using Themia.Framework.Core.Abstractions.Tenancy;
-using Themia.Modules.Pdf;
 using Xunit;
 
 namespace Themia.Modules.Pdf.Tests;

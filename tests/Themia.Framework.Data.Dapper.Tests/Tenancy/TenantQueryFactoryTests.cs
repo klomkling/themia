@@ -1,4 +1,3 @@
-using SqlKata;
 using SqlKata.Compilers;
 using Themia.Framework.Core.Abstractions.Tenancy;
 using Themia.Framework.Data.Abstractions.Filtering;
