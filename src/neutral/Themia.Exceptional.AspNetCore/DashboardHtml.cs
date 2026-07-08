@@ -15,11 +15,27 @@ internal static class DashboardHtml
 {
     internal static string Enc(string? value) => WebUtility.HtmlEncode(value ?? string.Empty);
 
-    internal static string Page(string title, string path, string body) =>
-        "<!doctype html><html><head><meta charset=\"utf-8\"><title>" + Enc(title) +
-        "</title><link rel=\"stylesheet\" href=\"" + Enc(path) + "/dashboard.css\"></head><body>" + body + "</body></html>";
+    internal static string Page(string title, string path, string body, string customStyleSheet = "", string customFavicon = "")
+    {
+        var sb = new StringBuilder();
+        sb.Append("<!doctype html><html><head><meta charset=\"utf-8\"><title>").Append(Enc(title))
+          .Append("</title><link rel=\"stylesheet\" href=\"").Append(Enc(path)).Append("/dashboard.css\">");
+        if (!string.IsNullOrEmpty(customFavicon))
+        {
+            sb.Append("<link rel=\"icon\" href=\"").Append(Enc(customFavicon)).Append("\">");
+        }
 
-    internal static string List(string title, string path, IReadOnlyList<ExceptionEntry> items, int total, ExceptionFilter filter, DateTime utcNow, string? csrfToken = null)
+        // Injected after the built-in stylesheet so an adopter's rules override the defaults.
+        if (!string.IsNullOrEmpty(customStyleSheet))
+        {
+            sb.Append("<link rel=\"stylesheet\" href=\"").Append(Enc(customStyleSheet)).Append("\" type=\"text/css\">");
+        }
+
+        sb.Append("</head><body>").Append(body).Append("</body></html>");
+        return sb.ToString();
+    }
+
+    internal static string List(string title, string path, IReadOnlyList<ExceptionEntry> items, int total, ExceptionFilter filter, DateTime utcNow, string? csrfToken = null, string customStyleSheet = "", string customFavicon = "")
     {
         _ = csrfToken; // Accepted to keep List/Detail signatures aligned; per-row actions are a later addition.
         var sb = new StringBuilder();
@@ -66,7 +82,7 @@ internal static class DashboardHtml
         }
         sb.Append("</p>");
 
-        return Page(title, path, sb.ToString());
+        return Page(title, path, sb.ToString(), customStyleSheet, customFavicon);
     }
 
     private static string Relative(DateTime utc, DateTime now)
@@ -79,7 +95,7 @@ internal static class DashboardHtml
         return $"{(int)span.TotalDays} days ago";
     }
 
-    internal static string Detail(string title, string path, ExceptionEntry e, bool showRequestBody, bool showRequestContext, string? csrfToken = null)
+    internal static string Detail(string title, string path, ExceptionEntry e, bool showRequestBody, bool showRequestContext, string? csrfToken = null, string customStyleSheet = "", string customFavicon = "")
     {
         var sb = new StringBuilder();
         sb.Append("<p><a href=\"").Append(Enc(path)).Append("\">&larr; back</a></p>");
@@ -137,7 +153,7 @@ internal static class DashboardHtml
         if (showRequestContext && e.RequestContext is not null)
             AppendRequestContext(sb, e.RequestContext);
 
-        return Page(title, path, sb.ToString());
+        return Page(title, path, sb.ToString(), customStyleSheet, customFavicon);
     }
 
     private static (bool Parsed, string? StackTrace, string? Inner, string? Data) ParseDetail(string detail)

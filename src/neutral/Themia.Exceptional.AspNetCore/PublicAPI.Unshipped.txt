@@ -17,3 +17,7 @@ Themia.Exceptional.AspNetCore.ExceptionalDashboardOptions.ShowRequestContext.set
 Themia.Exceptional.AspNetCore.ExceptionalDashboardOptions.Title.get -> string!
 Themia.Exceptional.AspNetCore.ExceptionalDashboardOptions.Title.set -> void
 static Themia.Exceptional.AspNetCore.ExceptionalDashboardEndpoints.MapThemiaExceptional(this Microsoft.AspNetCore.Routing.IEndpointRouteBuilder! endpoints, string! path = "/exceptions", System.Action<Themia.Exceptional.AspNetCore.ExceptionalDashboardOptions!>? configure = null) -> Microsoft.AspNetCore.Routing.RouteGroupBuilder!
+Themia.Exceptional.AspNetCore.ExceptionalDashboardOptions.CustomStyleSheet.get -> string!
+Themia.Exceptional.AspNetCore.ExceptionalDashboardOptions.CustomStyleSheet.set -> void
+Themia.Exceptional.AspNetCore.ExceptionalDashboardOptions.CustomFavicon.get -> string!
+Themia.Exceptional.AspNetCore.ExceptionalDashboardOptions.CustomFavicon.set -> void

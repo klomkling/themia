@@ -71,7 +71,7 @@ public static class ExceptionalDashboardEndpoints
         var filter = BuildFilter(ctx.Request.Query, options);
         var result = await store.ListAsync(filter, ct).ConfigureAwait(false);
         // The list page renders no POST forms, so it needs no CSRF token (and must not set the cookie).
-        await WriteHtmlAsync(ctx, DashboardHtml.List(options.Title, path, result.Items, result.Total, filter, DateTime.UtcNow), ct).ConfigureAwait(false);
+        await WriteHtmlAsync(ctx, DashboardHtml.List(options.Title, path, result.Items, result.Total, filter, DateTime.UtcNow, customStyleSheet: options.CustomStyleSheet, customFavicon: options.CustomFavicon), ct).ConfigureAwait(false);
     }
 
     private static async Task HandleDetailAsync(HttpContext ctx, IExceptionStore store, ExceptionalDashboardOptions options, string path, Guid guid, CancellationToken ct)
@@ -82,7 +82,7 @@ public static class ExceptionalDashboardEndpoints
         if (entry is null) { ctx.Response.StatusCode = StatusCodes.Status404NotFound; return; }
 
         var token = options.EnableActions ? IssueCsrf(ctx) : null;
-        await WriteHtmlAsync(ctx, DashboardHtml.Detail(options.Title, path, entry, options.ShowRequestBody, options.ShowRequestContext, token), ct).ConfigureAwait(false);
+        await WriteHtmlAsync(ctx, DashboardHtml.Detail(options.Title, path, entry, options.ShowRequestBody, options.ShowRequestContext, token, customStyleSheet: options.CustomStyleSheet, customFavicon: options.CustomFavicon), ct).ConfigureAwait(false);
     }
 
     private const string CsrfCookie = "__themia_csrf";
