@@ -16,8 +16,7 @@ public sealed class DashboardCustomStyleTests
     [Fact]
     public void Page_InjectsCustomStyleSheet_AfterBuiltInCss()
     {
-        var html = DashboardHtml.Page("Exceptions", "/exceptions", "<p>x</p>",
-            customStyleSheet: "/app/theme.css", customFavicon: "/app/fav.ico");
+        var html = DashboardHtml.Page(new DashboardChrome("Exceptions", "/exceptions", "/app/theme.css", "/app/fav.ico"), "<p>x</p>");
 
         Assert.Contains("href=\"/app/theme.css\"", html);
         Assert.Contains("<link rel=\"icon\" href=\"/app/fav.ico\">", html);
@@ -31,7 +30,7 @@ public sealed class DashboardCustomStyleTests
     [Fact]
     public void Page_OmitsCustomLinks_WhenNotConfigured()
     {
-        var html = DashboardHtml.Page("Exceptions", "/exceptions", "<p>x</p>");
+        var html = DashboardHtml.Page(new DashboardChrome("Exceptions", "/exceptions", "", ""), "<p>x</p>");
 
         Assert.DoesNotContain("rel=\"icon\"", html);
         // Only the built-in stylesheet link is present.
@@ -43,8 +42,7 @@ public sealed class DashboardCustomStyleTests
     {
         // A page-relative URL would resolve differently on /exceptions vs /exceptions/{guid}; prefixing the
         // mount path (like the built-in dashboard.css) makes it load on both.
-        var html = DashboardHtml.Page("Exceptions", "/exceptions", "<p>x</p>",
-            customStyleSheet: "theme.css", customFavicon: "fav.ico");
+        var html = DashboardHtml.Page(new DashboardChrome("Exceptions", "/exceptions", "theme.css", "fav.ico"), "<p>x</p>");
 
         Assert.Contains("href=\"/exceptions/theme.css\"", html);
         Assert.Contains("href=\"/exceptions/fav.ico\"", html);
@@ -53,8 +51,7 @@ public sealed class DashboardCustomStyleTests
     [Fact]
     public void Page_LeavesRootRelativeAndAbsoluteCustomUrls_Verbatim()
     {
-        var html = DashboardHtml.Page("Exceptions", "/exceptions", "<p>x</p>",
-            customStyleSheet: "/css/theme.css", customFavicon: "https://cdn.example/fav.ico");
+        var html = DashboardHtml.Page(new DashboardChrome("Exceptions", "/exceptions", "/css/theme.css", "https://cdn.example/fav.ico"), "<p>x</p>");
 
         Assert.Contains("href=\"/css/theme.css\"", html);
         Assert.Contains("href=\"https://cdn.example/fav.ico\"", html);
@@ -63,8 +60,7 @@ public sealed class DashboardCustomStyleTests
     [Fact]
     public void Page_EncodesCustomHrefs()
     {
-        var html = DashboardHtml.Page("Exceptions", "/exceptions", "<p>x</p>",
-            customStyleSheet: "\"/x\"><script>alert(1)</script>", customFavicon: "\"/f\">");
+        var html = DashboardHtml.Page(new DashboardChrome("Exceptions", "/exceptions", "\"/x\"><script>alert(1)</script>", "\"/f\">"), "<p>x</p>");
 
         Assert.DoesNotContain("<script>alert(1)</script>", html);
         Assert.Contains("&lt;script&gt;", html);

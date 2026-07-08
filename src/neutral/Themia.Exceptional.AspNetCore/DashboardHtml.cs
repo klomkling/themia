@@ -6,6 +6,9 @@ using Themia.Exceptional;
 
 namespace Themia.Exceptional.AspNetCore;
 
+// Page-level chrome shared by every dashboard page (title, mount path, and the optional adopter assets).
+internal readonly record struct DashboardChrome(string Title, string Path, string CustomStyleSheet, string CustomFavicon);
+
 /// <summary>Pure, self-contained HTML rendering for the exceptions dashboard. Every <em>string</em>
 /// value is HTML-encoded via <see cref="Enc"/>; all attacker-influenceable fields (messages, request
 /// bodies, URLs, the mount path) are string-typed and pass through it. Non-string values (Guid, int,
@@ -15,20 +18,20 @@ internal static class DashboardHtml
 {
     internal static string Enc(string? value) => WebUtility.HtmlEncode(value ?? string.Empty);
 
-    internal static string Page(string title, string path, string body, string customStyleSheet = "", string customFavicon = "")
+    internal static string Page(DashboardChrome chrome, string body)
     {
         var sb = new StringBuilder();
-        sb.Append("<!doctype html><html><head><meta charset=\"utf-8\"><title>").Append(Enc(title))
-          .Append("</title><link rel=\"stylesheet\" href=\"").Append(Enc(path)).Append("/dashboard.css\">");
-        if (!string.IsNullOrEmpty(customFavicon))
+        sb.Append("<!doctype html><html><head><meta charset=\"utf-8\"><title>").Append(Enc(chrome.Title))
+          .Append("</title><link rel=\"stylesheet\" href=\"").Append(Enc(chrome.Path)).Append("/dashboard.css\">");
+        if (!string.IsNullOrEmpty(chrome.CustomFavicon))
         {
-            sb.Append("<link rel=\"icon\" href=\"").Append(Enc(ResolveAsset(path, customFavicon))).Append("\">");
+            sb.Append("<link rel=\"icon\" href=\"").Append(Enc(ResolveAsset(chrome.Path, chrome.CustomFavicon))).Append("\">");
         }
 
         // Injected after the built-in stylesheet so an adopter's rules override the defaults.
-        if (!string.IsNullOrEmpty(customStyleSheet))
+        if (!string.IsNullOrEmpty(chrome.CustomStyleSheet))
         {
-            sb.Append("<link rel=\"stylesheet\" href=\"").Append(Enc(ResolveAsset(path, customStyleSheet))).Append("\" type=\"text/css\">");
+            sb.Append("<link rel=\"stylesheet\" href=\"").Append(Enc(ResolveAsset(chrome.Path, chrome.CustomStyleSheet))).Append("\" type=\"text/css\">");
         }
 
         sb.Append("</head><body>").Append(body).Append("</body></html>");
@@ -42,16 +45,16 @@ internal static class DashboardHtml
     private static string ResolveAsset(string path, string url) =>
         url.StartsWith('/') || url.Contains("://", StringComparison.Ordinal) ? url : path + "/" + url;
 
-    internal static string List(string title, string path, IReadOnlyList<ExceptionEntry> items, int total, ExceptionFilter filter, DateTime utcNow, string? csrfToken = null, string customStyleSheet = "", string customFavicon = "")
+    internal static string List(DashboardChrome chrome, IReadOnlyList<ExceptionEntry> items, int total, ExceptionFilter filter, DateTime utcNow, string? csrfToken = null)
     {
         _ = csrfToken; // Accepted to keep List/Detail signatures aligned; per-row actions are a later addition.
         var sb = new StringBuilder();
-        sb.Append("<h1>").Append(Enc(title)).Append("</h1>");
+        sb.Append("<h1>").Append(Enc(chrome.Title)).Append("</h1>");
 
         var last = items.Count > 0 ? Relative(items[0].LastLogDate, utcNow) : "—";
         sb.Append("<p class=\"summary\"><strong>").Append(total).Append(" errors</strong> (last: ").Append(Enc(last)).Append(")</p>");
 
-        sb.Append("<form class=\"filter\" method=\"get\" action=\"").Append(Enc(path)).Append("\">")
+        sb.Append("<form class=\"filter\" method=\"get\" action=\"").Append(Enc(chrome.Path)).Append("\">")
           .Append("<input name=\"q\" value=\"").Append(Enc(filter.Search)).Append("\" placeholder=\"search\"> ")
           .Append("<input name=\"app\" value=\"").Append(Enc(filter.ApplicationName)).Append("\" placeholder=\"app\"> ")
           .Append("<input name=\"tenant\" value=\"").Append(Enc(filter.TenantId)).Append("\" placeholder=\"tenant\"> ")
@@ -64,7 +67,7 @@ internal static class DashboardHtml
               .Append("<td><time title=\"").Append(Enc(e.LastLogDate.ToString("u", CultureInfo.InvariantCulture))).Append("\">")
               .Append(Enc(Relative(e.LastLogDate, utcNow))).Append("</time></td>")
               .Append("<td>").Append(Enc(e.ApplicationName)).Append("</td>")
-              .Append("<td class=\"type type-err\"><a href=\"").Append(Enc(path)).Append('/').Append(e.Guid).Append("\">").Append(Enc(e.Type)).Append("</a></td>")
+              .Append("<td class=\"type type-err\"><a href=\"").Append(Enc(chrome.Path)).Append('/').Append(e.Guid).Append("\">").Append(Enc(e.Type)).Append("</a></td>")
               .Append("<td>").Append(Enc(e.Message)).Append("</td>")
               .Append("<td>").Append(Enc(e.StatusCode?.ToString(CultureInfo.InvariantCulture))).Append("</td>")
               .Append("<td>").Append(e.DuplicateCount).Append("</td>")
@@ -78,18 +81,18 @@ internal static class DashboardHtml
         sb.Append("<p>");
         if (hasPrev)
         {
-            sb.Append("<a href=\"").Append(Enc(path)).Append("?page=").Append(filter.Page - 1)
+            sb.Append("<a href=\"").Append(Enc(chrome.Path)).Append("?page=").Append(filter.Page - 1)
               .Append("&amp;pageSize=").Append(filter.PageSize).Append("\">Prev</a> ");
         }
         sb.Append("Page ").Append(filter.Page).Append(" (").Append(total).Append(" total) ");
         if (hasNext)
         {
-            sb.Append("<a href=\"").Append(Enc(path)).Append("?page=").Append(filter.Page + 1)
+            sb.Append("<a href=\"").Append(Enc(chrome.Path)).Append("?page=").Append(filter.Page + 1)
               .Append("&amp;pageSize=").Append(filter.PageSize).Append("\">Next</a>");
         }
         sb.Append("</p>");
 
-        return Page(title, path, sb.ToString(), customStyleSheet, customFavicon);
+        return Page(chrome, sb.ToString());
     }
 
     private static string Relative(DateTime utc, DateTime now)
@@ -102,10 +105,10 @@ internal static class DashboardHtml
         return $"{(int)span.TotalDays} days ago";
     }
 
-    internal static string Detail(string title, string path, ExceptionEntry e, bool showRequestBody, bool showRequestContext, string? csrfToken = null, string customStyleSheet = "", string customFavicon = "")
+    internal static string Detail(DashboardChrome chrome, ExceptionEntry e, bool showRequestBody, bool showRequestContext, string? csrfToken = null)
     {
         var sb = new StringBuilder();
-        sb.Append("<p><a href=\"").Append(Enc(path)).Append("\">&larr; back</a></p>");
+        sb.Append("<p><a href=\"").Append(Enc(chrome.Path)).Append("\">&larr; back</a></p>");
         sb.Append("<h1 class=\"type type-err\">").Append(Enc(e.Type)).Append("</h1>");
         sb.Append("<p>").Append(Enc(e.Message)).Append("</p>");
 
@@ -128,10 +131,10 @@ internal static class DashboardHtml
 
         if (csrfToken is not null)
         {
-            sb.Append("<form class=\"actions\" method=\"post\" action=\"").Append(Enc(path)).Append('/').Append(e.Guid).Append("/protect\">")
+            sb.Append("<form class=\"actions\" method=\"post\" action=\"").Append(Enc(chrome.Path)).Append('/').Append(e.Guid).Append("/protect\">")
               .Append("<input type=\"hidden\" name=\"__token\" value=\"").Append(Enc(csrfToken)).Append("\">")
               .Append("<button type=\"submit\">").Append(e.IsProtected ? "Protected" : "Protect").Append("</button></form> ");
-            sb.Append("<form class=\"actions\" method=\"post\" action=\"").Append(Enc(path)).Append('/').Append(e.Guid).Append("/delete\">")
+            sb.Append("<form class=\"actions\" method=\"post\" action=\"").Append(Enc(chrome.Path)).Append('/').Append(e.Guid).Append("/delete\">")
               .Append("<input type=\"hidden\" name=\"__token\" value=\"").Append(Enc(csrfToken)).Append("\">")
               .Append("<button type=\"submit\">Delete</button></form>");
         }
@@ -160,7 +163,7 @@ internal static class DashboardHtml
         if (showRequestContext && e.RequestContext is not null)
             AppendRequestContext(sb, e.RequestContext);
 
-        return Page(title, path, sb.ToString(), customStyleSheet, customFavicon);
+        return Page(chrome, sb.ToString());
     }
 
     private static (bool Parsed, string? StackTrace, string? Inner, string? Data) ParseDetail(string detail)
