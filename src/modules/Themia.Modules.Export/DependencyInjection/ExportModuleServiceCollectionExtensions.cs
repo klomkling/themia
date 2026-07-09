@@ -53,7 +53,11 @@ public static class ExportModuleServiceCollectionExtensions
         // the DbContext and storage. TryAdd lets a host's accessor-reading context (e.g. AspNetCore) win.
         services.TryAddScoped<ITenantContext, AmbientTenantContext>();
 
-        services.AddDbContextFactory<ExportDbContext>((sp, db) =>
+        // Register the context SCOPED (not through a singleton IDbContextFactory) so its scoped
+        // ITenantContext ctor dependency resolves from the request/job scope, not the root provider.
+        // Fixes #147: the singleton factory resolved ITenantContext from root — a ValidateScopes crash in
+        // Development and a wrong/absent tenant in production. Mirrors the fix in Themia.Modules.Pdf.
+        services.AddDbContext<ExportDbContext>((sp, db) =>
         {
             var provider = sp.GetRequiredService<IDatabaseProvider>();
             var configuration = sp.GetRequiredService<IConfiguration>();
@@ -77,9 +81,6 @@ public static class ExportModuleServiceCollectionExtensions
 
             db.UseSnakeCaseNamingConvention();
         });
-
-        services.TryAddScoped<ExportDbContext>(sp =>
-            sp.GetRequiredService<IDbContextFactory<ExportDbContext>>().CreateDbContext());
 
         services.TryAddSingleton<IExportDefinitionRegistry, ExportDefinitionRegistry>();
         services.TryAddScoped<IExportRunStore, ExportRunStore>();
