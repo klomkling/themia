@@ -27,6 +27,15 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.7.2] - 2026-07-09
+
+### Fixed
+- **`Themia.Modules.Export`** (#147) — the EF `ExportDbContext` was registered through a **singleton**
+  `IDbContextFactory` + a scoped bridge, so its scoped `ITenantContext` ctor dependency resolved from the
+  **root** provider (a `ValidateScopes` crash in Development; wrong/absent tenant in production). Now
+  registered scoped via `AddDbContext`, so tenancy resolves from the request/job scope. Same fix already
+  shipped for `Themia.Modules.Pdf` in 0.7.0.
+
 ## [0.7.1] - 2026-07-08
 
 ### Added
