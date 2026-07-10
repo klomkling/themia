@@ -64,16 +64,20 @@ New section in the root `README.md`:
 2. **Scenario matrix** — scenario → exact package(s) to add:
    - Identity (users/roles/JWT/external login) → `Themia.Modules.Identity.AspNetCore` (umbrella)
    - Scheduling → `Themia.Modules.Scheduling`
-   - Storage → `Themia.Modules.Storage` (+ `Themia.Storage.S3` for S3)
-   - Export → `Themia.Modules.Export` (+ `Themia.Export.Excel` for xlsx)
+   - Storage → `Themia.Modules.Storage` (S3 support included — it references `Themia.Storage.S3`)
+   - Export → `Themia.Modules.Export` (CSV + xlsx included; **heaviest umbrella** — also pulls
+     `Themia.Modules.Storage`, `.Scheduling`, `.Notifications`)
    - Pdf → `Themia.Modules.Pdf`
    - Exception logging/dashboard → `Themia.Exceptional` + one `Themia.Exceptional.{engine}` + `Themia.Exceptional.AspNetCore` (dashboard/middleware)
    - Notifications → `Themia.Modules.Notifications` + one `Themia.Modules.Notifications.{engine}`
 3. **Why so many packages** — one short paragraph: driver isolation + selectable peers; the
    metapackage never picks the data peer for you.
+4. **Caveat:** several modules (`Identity`, `Storage`, `Notifications`) currently reference both
+   the EF and Dapper peers (known peer-coupling follow-up,
+   `docs/2026-06-14-identity-followups.md`) — adding them drags both stacks regardless of the
+   peer chosen at the app level. State this so the metapackage's peer-neutrality isn't oversold.
 
-(Scenario entries are verified against actual csproj references during implementation, not
-copied from this spec.)
+(Scenario entries re-verified against actual csproj references during implementation.)
 
 ## Testing
 
@@ -81,8 +85,11 @@ copied from this spec.)
   exactly the 9 dependencies above and contains no `lib/` entries. Implemented in the existing
   test style (a unit test shelling `dotnet pack` is acceptable, or a CI assertion in the pack
   step if a test project is disproportionate).
-- Compile smoke: a test (or existing integration project) referencing only the metapackage +
-  one peer package builds — proves the bundle is sufficient for the quickstart claim.
+- Bootstrap smoke: a test referencing only the metapackage + one peer package that **builds and
+  runs the quickstart bootstrap** (host construction + Themia registration succeeds) — compile
+  alone does not prove the "running stack in two references" claim.
+- Implementation check: confirm `dotnet pack` of an assembly-less project behaves with the
+  repo-wide `SymbolPackageFormat=snupkg` (no symbols to package).
 
 ## Out of scope
 
