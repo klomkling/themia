@@ -27,6 +27,17 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-07-11
+
+### Added
+
+- `Themia.Framework` metapackage — assembly-less bundle of the framework core set (Core, Logging,
+  Caching, Services, MultiTenancy, Mediator, MultiTenancy.Mediator, Data.Abstractions,
+  Framework.AspNetCore). Deliberately excludes the data peer: adopters add exactly one
+  `Themia.Framework.Data.{EFCore|Dapper}.{provider}` package. Quickstart = two references.
+- README "Which packages do I reference?" section — quickstart + scenario matrix + peer-coupling
+  caveat.
+
 ## [0.7.2] - 2026-07-09
 
 ### Fixed
