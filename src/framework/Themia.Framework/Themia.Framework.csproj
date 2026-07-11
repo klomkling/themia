@@ -1,0 +1,43 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <PackageId>Themia.Framework</PackageId>
+    <Description>Themia framework metapackage — one reference for the framework core set (Core, Logging, Caching, Services, MultiTenancy, Mediator, MultiTenancy.Mediator, Data.Abstractions, AspNetCore integration). Deliberately excludes the data peer: add exactly one Themia.Framework.Data.EFCore.* or Themia.Framework.Data.Dapper.* package to complete the stack.</Description>
+    <PackageTags>themia;framework;metapackage;aspnetcore;multi-tenancy;mediator</PackageTags>
+    <!-- Assembly-less metapackage: ship dependencies only, no lib/ payload. -->
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <!-- No assembly -> no symbols; override the repo-wide IncludeSymbols=true (snupkg). -->
+    <IncludeSymbols>false</IncludeSymbols>
+    <!-- No compiled output per TFM is intentional for a metapackage. -->
+    <NoWarn>$(NoWarn);NU5128</NoWarn>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <!--
+      Repo-wide CentralPackageTransitivePinningEnabled=true (Directory.Packages.props)
+      promotes every transitive PackageReference of the referenced projects to a pinned
+      direct dependency, and pack emits those in the nuspec. For an assembly-less
+      metapackage that inflates the dependency list from the intended 9 siblings to the
+      whole flattened graph (Dapper, Serilog, Microsoft.Extensions.*, …). This project
+      has no PackageReferences of its own, so pinning has nothing legitimate to pin —
+      disable it here so the packed dependency list is exactly the 9 ProjectReferences.
+    -->
+    <CentralPackageTransitivePinningEnabled>false</CentralPackageTransitivePinningEnabled>
+  </PropertyGroup>
+  <ItemGroup>
+    <!--
+      The framework core set. Some entries are transitively implied (Mediator already
+      pulls Caching/Logging/Core) but are listed explicitly anyway — a metapackage's
+      dependency list is its documentation.
+      INVARIANT: no Themia.Framework.Data.EFCore*/Dapper* reference — the adopter picks
+      exactly one peer+provider package themselves (see the spec).
+    -->
+    <ProjectReference Include="../Themia.Framework.Core/Themia.Framework.Core.csproj" />
+    <ProjectReference Include="../Themia.Logging/Themia.Logging.csproj" />
+    <ProjectReference Include="../Themia.Caching/Themia.Caching.csproj" />
+    <ProjectReference Include="../Themia.Services/Themia.Services.csproj" />
+    <ProjectReference Include="../Themia.MultiTenancy/Themia.MultiTenancy.csproj" />
+    <ProjectReference Include="../Themia.Mediator/Themia.Mediator.csproj" />
+    <ProjectReference Include="../Themia.MultiTenancy.Mediator/Themia.MultiTenancy.Mediator.csproj" />
+    <ProjectReference Include="../Themia.Framework.Data.Abstractions/Themia.Framework.Data.Abstractions.csproj" />
+    <ProjectReference Include="../Themia.Framework.AspNetCore/Themia.Framework.AspNetCore.csproj" />
+  </ItemGroup>
+</Project>
