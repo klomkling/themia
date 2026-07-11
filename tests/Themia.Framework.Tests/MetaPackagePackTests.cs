@@ -57,7 +57,11 @@ public sealed class MetaPackagePackTests
         }
         finally
         {
-            Directory.Delete(outDir, recursive: true);
+            // Best-effort cleanup: a delete failure (file lock, AV scanner, partial pack
+            // output) must not mask a real pack assertion failure above.
+            try { Directory.Delete(outDir, recursive: true); }
+            catch (IOException) { }
+            catch (UnauthorizedAccessException) { }
         }
     }
 
@@ -83,9 +87,13 @@ public sealed class MetaPackagePackTests
         };
         using var process = Process.Start(psi)
             ?? throw new InvalidOperationException("Failed to start dotnet.");
-        var stdout = process.StandardOutput.ReadToEnd();
-        var stderr = process.StandardError.ReadToEnd();
+        // Drain both pipes concurrently before waiting: reading one stream to the end
+        // while the child fills the other's buffer would deadlock (dotnet pack is chatty).
+        var stdoutTask = process.StandardOutput.ReadToEndAsync();
+        var stderrTask = process.StandardError.ReadToEndAsync();
         process.WaitForExit();
+        var stdout = stdoutTask.GetAwaiter().GetResult();
+        var stderr = stderrTask.GetAwaiter().GetResult();
         Assert.True(process.ExitCode == 0, $"dotnet {arguments} failed ({process.ExitCode}):\n{stdout}\n{stderr}");
     }
 }
