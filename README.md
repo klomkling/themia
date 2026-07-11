@@ -51,6 +51,48 @@ owned by FluentMigrator (`Themia.Data.Migrations`) as the single authority for b
 Phase 1 targets **SQL Server, MySQL (incl. MariaDB), and PostgreSQL** via a dialect strategy and
 per-provider packages.
 
+## Which packages do I reference?
+
+Themia ships many small packages on purpose — native DB drivers (SqlClient/Npgsql/MySqlConnector),
+heavy optional dependencies (AWS SDK, ClosedXML), and the EF-vs-Dapper data-peer choice are kept in
+separate packages so your app only pulls what it actually uses. You never assemble them by hand:
+
+### Quickstart (multi-tenant web app)
+
+Two references:
+
+1. `Themia.Framework` — the framework core set (Core, Logging, Caching, Services, MultiTenancy,
+   Mediator, Data.Abstractions, ASP.NET Core integration) in one metapackage.
+2. Exactly one data peer+provider package — your conscious choice, never made for you:
+   - `Themia.Framework.Data.EFCore.SqlServer` or `Themia.Framework.Data.EFCore.PostgreSql`
+   - `Themia.Framework.Data.Dapper.SqlServer`, `Themia.Framework.Data.Dapper.PostgreSql`, or
+     `Themia.Framework.Data.Dapper.MySql`
+   - (No `EFCore.MySql` yet — there is no EF Core 10 MySQL provider.)
+
+Then bootstrap: `services.AddThemiaAspNetCore()` + `services.AddThemiaMultiTenancy(...)` +
+`app.UseThemia()` (see the smoke test in `tests/Themia.Framework.Tests/MetaPackageBootstrapTests.cs`
+for a minimal working host).
+
+Non-web apps (workers, consoles): skip the metapackage — it includes the ASP.NET Core integration —
+and reference the individual `Themia.*` packages you need instead.
+
+### Adding features
+
+| Scenario | Add |
+|---|---|
+| Identity (users/roles/JWT/external login) | `Themia.Modules.Identity.AspNetCore` (umbrella — pulls the Identity core, tokens, and external-auth packages) |
+| Scheduling (persistent Quartz) | `Themia.Modules.Scheduling` |
+| Storage (incl. S3) | `Themia.Modules.Storage` |
+| Async/scheduled export (CSV + xlsx) | `Themia.Modules.Export` — heaviest umbrella: also pulls the Storage, Scheduling, and Notifications modules |
+| PDF templates + rendering | `Themia.Modules.Pdf` |
+| Exception logging + dashboard | `Themia.Exceptional` + one `Themia.Exceptional.{SqlServer\|PostgreSql\|MySql}` + `Themia.Exceptional.AspNetCore` |
+| Notifications | `Themia.Modules.Notifications` + one `Themia.Modules.Notifications.{SqlServer\|PostgreSql\|MySql}` |
+
+> **Peer-coupling caveat:** some modules (`Identity`, `Storage`, `Notifications`, `Export`)
+> currently reference both the EF Core and Dapper data peers (tracked follow-up,
+> `docs/2026-06-14-identity-followups.md`), so adding them pulls both stacks regardless of the
+> peer you chose. The metapackage itself never does.
+
 ## Building
 
 Requires the .NET 10 SDK (with the .NET 8 runtime available for the multi-targeted packages).
