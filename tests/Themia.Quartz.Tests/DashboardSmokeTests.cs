@@ -155,6 +155,42 @@ public sealed class DashboardSmokeTests
         Assert.DoesNotContain("linear-gradient", body, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData(".stat-executed")]
+    [InlineData(".stat-failed")]
+    [InlineData(".stat-executing")]
+    [InlineData(".stat-activity")]
+    // The counts tile is the one rule that must OUT-WEIGH a selector already in this file:
+    // "#scheduler-dashboard .ui.statistic" (1,2,0) sets a box-shadow, and the inline style= this
+    // replaced used to beat it unconditionally. A bare "#scheduler-dashboard .stat-counts" (1,1,0)
+    // loses that cascade and the tile silently regains the shadow — assert the winning form.
+    [InlineData("#scheduler-dashboard .ui.statistic.stat-counts")]
+    public async Task SiteCss_DefinesRule_ForEachTileHook(string selector)
+    {
+        // Markup assertions alone cannot see a lost cascade: the classes can be present and correct
+        // while the rule that styles them never applies. Pin the selectors the tiles depend on.
+        await using var scope = await StartHostAsync(authorize: _ => Task.FromResult(true));
+
+        var css = await (await scope.CreateClient().GetAsync("/jobs/Content/Site.css")).Content.ReadAsStringAsync();
+
+        Assert.Contains(selector + " {", css, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task SiteCss_TileColourHooks_AreNotIdScoped()
+    {
+        // The point of moving the colours out of inline style= was to let an adopter's CustomStyleSheet
+        // rule (".stat-executed", specificity 0,1,0) win. An ID-scoped built-in rule (1,1,0) would beat
+        // it regardless of source order, forcing !important back on the adopter — the exact outcome the
+        // change exists to remove. Nothing in semantic.min.css styles a .statistic background, so these
+        // rules need no ID to land.
+        await using var scope = await StartHostAsync(authorize: _ => Task.FromResult(true));
+
+        var css = await (await scope.CreateClient().GetAsync("/jobs/Content/Site.css")).Content.ReadAsStringAsync();
+
+        Assert.DoesNotContain("#scheduler-dashboard .stat-", css, StringComparison.Ordinal);
+    }
+
     [Fact]
     public async Task EmbeddedContent_IsServed_WhenAuthorized()
     {
