@@ -20,6 +20,7 @@ internal static class DashboardCss
         input,button{font:14px inherit;padding:4px 8px;border:1px solid var(--line);border-radius:6px}
         button{background:#f6f8fa;cursor:pointer}
         .actions{display:inline}.actions button{color:var(--err)}
+        nav.pager{margin:1rem 0;color:var(--muted)}
         time{cursor:help}
         h2{font-size:1.05rem;margin:1.25rem 0 .25rem;border-bottom:1px solid var(--line);padding-bottom:.2rem}
         """;

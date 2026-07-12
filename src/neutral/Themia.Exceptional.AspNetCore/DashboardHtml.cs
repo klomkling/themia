@@ -6,14 +6,23 @@ using Themia.Exceptional;
 
 namespace Themia.Exceptional.AspNetCore;
 
-// Page-level chrome shared by every dashboard page (title, mount path, and the optional adopter assets).
-internal readonly record struct DashboardChrome(string Title, string Path, string CustomStyleSheet, string CustomFavicon);
+// Page-level chrome shared by every dashboard page (title, mount path, the optional adopter assets, and
+// the two raw-HTML injection slots).
+internal readonly record struct DashboardChrome(
+    string Title,
+    string Path,
+    string CustomStyleSheet,
+    string CustomFavicon,
+    string HeadHtml = "",
+    string BodyStartHtml = "");
 
 /// <summary>Pure, self-contained HTML rendering for the exceptions dashboard. Every <em>string</em>
 /// value is HTML-encoded via <see cref="Enc"/>; all attacker-influenceable fields (messages, request
 /// bodies, URLs, the mount path) are string-typed and pass through it. Non-string values (Guid, int,
 /// bool, formatted dates) are emitted raw — their <c>ToString()</c> cannot produce HTML metacharacters.
-/// When adding a new string value, route it through <see cref="Enc"/>.</summary>
+/// When adding a new string value, route it through <see cref="Enc"/>.
+/// The sole exceptions are <c>DashboardChrome.HeadHtml</c> and <c>DashboardChrome.BodyStartHtml</c>:
+/// they are trusted adopter-authored markup and are emitted verbatim by design.</summary>
 internal static class DashboardHtml
 {
     internal static string Enc(string? value) => WebUtility.HtmlEncode(value ?? string.Empty);
@@ -34,7 +43,10 @@ internal static class DashboardHtml
             sb.Append("<link rel=\"stylesheet\" href=\"").Append(Enc(ResolveAsset(chrome.Path, chrome.CustomStyleSheet))).Append("\" type=\"text/css\">");
         }
 
-        sb.Append("</head><body>").Append(body).Append("</body></html>");
+        // Trusted adopter markup, emitted verbatim (see the type doc) — last in <head> so it overrides
+        // everything above it, and first in <body> so the adopter's chrome frames the dashboard content.
+        sb.Append(chrome.HeadHtml).Append("</head><body>").Append(chrome.BodyStartHtml)
+          .Append(body).Append("</body></html>");
         return sb.ToString();
     }
 
@@ -60,7 +72,9 @@ internal static class DashboardHtml
           .Append("<input name=\"tenant\" value=\"").Append(Enc(filter.TenantId)).Append("\" placeholder=\"tenant\"> ")
           .Append("<button type=\"submit\">Filter</button></form>");
 
-        sb.Append("<table><tr><th>Last log</th><th>App</th><th>Type</th><th>Message</th><th>Status</th><th>Count</th><th>Tenant</th></tr>");
+        // Classed table/pager: the markup is a styling contract for adopter stylesheets, which would
+        // otherwise need positional selectors ("body > p:last-of-type") that break on any layout change.
+        sb.Append("<table class=\"errors\"><thead><tr><th>Last log</th><th>App</th><th>Type</th><th>Message</th><th>Status</th><th>Count</th><th>Tenant</th></tr></thead><tbody>");
         foreach (var e in items)
         {
             sb.Append("<tr>")
@@ -74,11 +88,11 @@ internal static class DashboardHtml
               .Append("<td>").Append(Enc(e.TenantId)).Append("</td>")
               .Append("</tr>");
         }
-        sb.Append("</table>");
+        sb.Append("</tbody></table>");
 
         var hasPrev = filter.Page > 1;
         var hasNext = (long)filter.Page * filter.PageSize < total;
-        sb.Append("<p>");
+        sb.Append("<nav class=\"pager\">");
         if (hasPrev)
         {
             sb.Append("<a href=\"").Append(Enc(chrome.Path)).Append("?page=").Append(filter.Page - 1)
@@ -90,7 +104,7 @@ internal static class DashboardHtml
             sb.Append("<a href=\"").Append(Enc(chrome.Path)).Append("?page=").Append(filter.Page + 1)
               .Append("&amp;pageSize=").Append(filter.PageSize).Append("\">Next</a>");
         }
-        sb.Append("</p>");
+        sb.Append("</nav>");
 
         return Page(chrome, sb.ToString());
     }

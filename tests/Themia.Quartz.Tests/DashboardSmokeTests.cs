@@ -34,7 +34,10 @@ public sealed class DashboardSmokeTests
     // Middleware order: UseThemiaQuartz (gate + static files + Services bridge) must run before
     // UseRouting so that the authorize gate and embedded content serving intercept requests before
     // the endpoint dispatcher. MapThemiaQuartz inside UseEndpoints registers the controller route.
-    private static async Task<TestHostScope> StartHostAsync(Func<HttpContext, Task<bool>>? authorize, int? deniedStatus = null)
+    private static async Task<TestHostScope> StartHostAsync(
+        Func<HttpContext, Task<bool>>? authorize,
+        int? deniedStatus = null,
+        Action<ThemiaQuartzOptions>? configure = null)
     {
         // Uniquely-named scheduler (not the process-global default) so concurrently-running test
         // classes don't share scheduler state.
@@ -60,6 +63,8 @@ public sealed class DashboardSmokeTests
                         {
                             o.DeniedStatusCode = ds;
                         }
+
+                        configure?.Invoke(o);
                     });
                     services.AddSingleton<IExecutionHistoryStore>(new InProcExecutionHistoryStore());
                 });
@@ -110,6 +115,44 @@ public sealed class DashboardSmokeTests
         var response = await scope.CreateClient().GetAsync("/jobs/Scheduler/Index");
         response.EnsureSuccessStatusCode();
         Assert.Contains("text/html", response.Content.Headers.ContentType!.ToString());
+    }
+
+    [Fact]
+    public async Task Layout_EmitsChromeSlots_Verbatim()
+    {
+        // The two raw-HTML slots are adopter-authored markup (back-link, dark-mode toggle): they must
+        // reach the page unencoded, HeadHtml inside <head> and BodyStartHtml right after <body> opens.
+        const string head = "<meta name=\"x-chrome\" content=\"1\">";
+        const string bodyStart = "<header id=\"app-chrome\"><a href=\"/admin\">Back</a></header>";
+        await using var scope = await StartHostAsync(
+            authorize: _ => Task.FromResult(true),
+            configure: o => { o.HeadHtml = head; o.BodyStartHtml = bodyStart; });
+
+        var body = await (await scope.CreateClient().GetAsync("/jobs/Scheduler/Index")).Content.ReadAsStringAsync();
+
+        Assert.Contains(head, body, StringComparison.Ordinal);
+        Assert.Contains(bodyStart, body, StringComparison.Ordinal);
+        Assert.True(
+            body.IndexOf(head, StringComparison.Ordinal) < body.IndexOf("</head>", StringComparison.Ordinal),
+            "HeadHtml must be emitted inside <head>");
+        Assert.True(
+            body.IndexOf(bodyStart, StringComparison.Ordinal) < body.IndexOf("id=\"top-menu\"", StringComparison.Ordinal),
+            "BodyStartHtml must be emitted before the dashboard's own chrome");
+    }
+
+    [Fact]
+    public async Task SchedulerIndex_StatusTiles_AreClassed_NotInlineStyled()
+    {
+        // Tile colours live in Content/Site.css so an adopter stylesheet can override them without
+        // !important (inline style= would outrank any adopter rule).
+        await using var scope = await StartHostAsync(authorize: _ => Task.FromResult(true));
+
+        var body = await (await scope.CreateClient().GetAsync("/jobs/Scheduler/Index")).Content.ReadAsStringAsync();
+
+        Assert.Contains("stat-executed", body, StringComparison.Ordinal);
+        Assert.Contains("stat-failed", body, StringComparison.Ordinal);
+        Assert.Contains("stat-executing", body, StringComparison.Ordinal);
+        Assert.DoesNotContain("linear-gradient", body, StringComparison.Ordinal);
     }
 
     [Fact]

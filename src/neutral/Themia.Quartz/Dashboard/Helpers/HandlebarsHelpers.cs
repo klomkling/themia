@@ -78,6 +78,8 @@ namespace Themia.Quartz.Dashboard.Helpers
             h.RegisterHelper(nameof(ProductName), ProductName);
             h.RegisterHelper(nameof(CustomStyleSheet), CustomStyleSheet);
             h.RegisterHelper(nameof(CustomFavicon), CustomFavicon);
+            h.RegisterHelper(nameof(HeadHtml), HeadHtml);
+            h.RegisterHelper(nameof(BodyStartHtml), BodyStartHtml);
         }
 
         static bool IsTrue(object value) => value?.ToString()?.Equals("true", StringComparison.OrdinalIgnoreCase) == true;
@@ -299,6 +301,18 @@ namespace Themia.Quartz.Dashboard.Helpers
         void CustomFavicon(EncodedTextWriter output, Context context, Arguments arguments)
         {
             output.Write(_services.Options.CustomFavicon);
+        }
+
+        // WriteSafeString, not Write: these two slots are trusted adopter-authored markup and must reach
+        // the page unencoded (see ThemiaQuartzOptions.HeadHtml/BodyStartHtml).
+        void HeadHtml(EncodedTextWriter output, Context context, Arguments arguments)
+        {
+            output.WriteSafeString(_services.Options.HeadHtml);
+        }
+
+        void BodyStartHtml(EncodedTextWriter output, Context context, Arguments arguments)
+        {
+            output.WriteSafeString(_services.Options.BodyStartHtml);
         }
     }
 }

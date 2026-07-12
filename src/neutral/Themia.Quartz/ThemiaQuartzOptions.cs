@@ -29,6 +29,18 @@ public sealed class ThemiaQuartzOptions
     /// <summary>Product name shown in the dashboard header and page title. Defaults to "Themia Scheduler".</summary>
     public string ProductName { get; set; } = "Themia Scheduler";
 
+    /// <summary>Raw HTML emitted verbatim at the end of the dashboard layout's <c>&lt;head&gt;</c> — after the
+    /// built-in CSS and <see cref="CustomStyleSheet"/>, so it can override both. Use it for chrome the
+    /// stylesheet hooks cannot express: an external script, extra links or meta tags. Empty (the default)
+    /// emits nothing. <strong>Not encoded</strong> — this is a trusted, adopter-authored slot; never build
+    /// it from user input.</summary>
+    public string HeadHtml { get; set; } = "";
+
+    /// <summary>Raw HTML emitted verbatim immediately after <c>&lt;body&gt;</c> opens, before the dashboard's
+    /// own navigation menu. Use it for a header bar, a back-link to the host app, or a theme toggle. Empty
+    /// (the default) emits nothing. <strong>Not encoded</strong> — same trust rules as <see cref="HeadHtml"/>.</summary>
+    public string BodyStartHtml { get; set; } = "";
+
     /// <summary>The virtual path the dashboard is mounted under. Defaults to <c>/jobs</c>.</summary>
     public string VirtualPathRoot { get; set; } = "/jobs";
 

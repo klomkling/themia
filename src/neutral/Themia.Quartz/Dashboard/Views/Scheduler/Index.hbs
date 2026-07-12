@@ -10,29 +10,29 @@
 
     <h3 class="ui dividing header" style="margin-top: 0px">Overview</h3>
 
-    <div class="ui inverted statistic" style="background-color: #0c5a0c; background-image: linear-gradient(#107c10, #0c5a0c);">
+    <div class="ui inverted statistic stat-executed">
         <div class="value"><i class="small check icon"></i> {{ExecutedJobs}}</div>
         <div class="label">Jobs executed</div>
     </div>
 
-    <div class="ui inverted statistic" style="background-color: #c42121; background-image: linear-gradient(#db2828, #c42121);">
+    <div class="ui inverted statistic stat-failed">
         <div class="value"><i class="small close icon"></i> {{FailedJobs}}</div>
         <div class="label">Jobs failed</div>
     </div>
 
-    <div class="ui inverted statistic" style="background-color: #1c70b0; background-image: linear-gradient(#2185d0, #1c70b0);">
+    <div class="ui inverted statistic stat-executing">
         <div class="value"><i class="small play icon"></i> {{ExecutingJobs}}</div>
         <div class="label">Jobs executing</div>
     </div>
 
-    <div class="ui statistic" style="background-color: #f0f0f0;">
+    <div class="ui statistic stat-activity">
         <div class="value">
             <div style="height: 50px" class="dashboard-histogram">{{>Histogram History}}</div>
         </div>
         <div class="label">Latest Activity</div>
     </div>
 
-    <div class="ui statistic" style="box-shadow: none">
+    <div class="ui statistic stat-counts">
         <div class="inline-stats">
             <span>{{JobsCount}}</span> jobs<br>
             <span>{{TriggerCount}}</span> triggers
