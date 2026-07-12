@@ -30,7 +30,11 @@ internal static class DashboardHtml
     internal static string Page(DashboardChrome chrome, string body)
     {
         var sb = new StringBuilder();
-        sb.Append("<!doctype html><html><head><meta charset=\"utf-8\"><title>").Append(Enc(chrome.Title))
+        // Without the viewport meta a mobile browser lays the page out at ~980px and zooms out to fit,
+        // making the dashboard unreadable on a phone. Emitted before HeadHtml so an adopter that wants a
+        // different viewport policy can still override it (for duplicate viewport metas, the last wins).
+        sb.Append("<!doctype html><html><head><meta charset=\"utf-8\">")
+          .Append("<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><title>").Append(Enc(chrome.Title))
           .Append("</title><link rel=\"stylesheet\" href=\"").Append(Enc(chrome.Path)).Append("/dashboard.css\">");
         if (!string.IsNullOrEmpty(chrome.CustomFavicon))
         {

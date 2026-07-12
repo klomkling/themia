@@ -18,6 +18,28 @@ public class DashboardHtmlTests
     };
 
     [Fact]
+    public void Page_EmitsViewportMeta_ByDefault()
+    {
+        // Without it a mobile browser renders the dashboard at ~980px and zooms out — unreadable on a
+        // phone. It is the same tag for every adopter, so it belongs in the default chrome, not in HeadHtml.
+        var html = DashboardHtml.Page(new DashboardChrome("Exceptions", "/exceptions", "", ""), "<p>x</p>");
+
+        Assert.Contains("<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Page_EmitsViewportMeta_BeforeHeadHtml_SoAdopterCanOverride()
+    {
+        const string custom = "<meta name=\"viewport\" content=\"width=1024\">";
+        var html = DashboardHtml.Page(new DashboardChrome("Exceptions", "/exceptions", "", "", custom, ""), "<p>x</p>");
+
+        // For duplicate viewport metas the last one wins, so the adopter's must come after the default.
+        Assert.True(
+            html.IndexOf("width=device-width", StringComparison.Ordinal) < html.IndexOf("width=1024", StringComparison.Ordinal),
+            "the built-in viewport meta must precede HeadHtml so an adopter's own viewport overrides it");
+    }
+
+    [Fact]
     public void List_EncodesMessage_NoRawScript()
     {
         var items = new List<ExceptionEntry> { Entry("<script>alert(1)</script>") };

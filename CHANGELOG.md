@@ -27,6 +27,16 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.8.2] - 2026-07-12
+
+### Fixed
+- **`Themia.Exceptional.AspNetCore`** — the dashboard now emits
+  `<meta name="viewport" content="width=device-width, initial-scale=1">`. Without it a mobile browser
+  laid the page out at ~980px and zoomed out to fit, leaving the dashboard unreadable on a phone (the
+  jobs dashboard has always emitted one). It is the same tag for every adopter, so it belongs in the
+  default chrome rather than in each adopter's `HeadHtml`; it is emitted *before* `HeadHtml`, so an
+  adopter wanting a different viewport policy can still override it.
+
 ## [0.8.1] - 2026-07-12
 
 ### Added

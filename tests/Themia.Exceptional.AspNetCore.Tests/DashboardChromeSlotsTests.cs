@@ -18,7 +18,10 @@ public sealed class DashboardChromeSlotsTests
     [Fact]
     public void Page_EmitsHeadHtmlVerbatim_AtEndOfHead()
     {
-        const string head = "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">";
+        // A marker that cannot collide with the page's own default chrome — asserting position by
+        // IndexOf against a tag the dashboard also emits itself (e.g. the viewport meta) would find the
+        // built-in occurrence and silently test nothing.
+        const string head = "<script src=\"/app/chrome.js\"></script>";
         var html = DashboardHtml.Page(
             new DashboardChrome("Exceptions", "/exceptions", "/app/theme.css", "", head, ""), "<p>x</p>");
 
