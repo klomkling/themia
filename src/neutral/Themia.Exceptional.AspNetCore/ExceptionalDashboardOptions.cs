@@ -15,8 +15,15 @@ public sealed class ExceptionalDashboardOptions
     /// <summary>Hard upper bound on rows per page (clamps the <c>pageSize</c> query param). Default 200.</summary>
     public int MaxPageSize { get; set; } = 200;
 
-    /// <summary>Page heading and document title. Default "Exceptions".</summary>
+    /// <summary>Document title (the browser tab). Also used as the list page's <c>&lt;h1&gt;</c> unless
+    /// <see cref="Heading"/> is set. Default "Exceptions".</summary>
     public string Title { get; set; } = "Exceptions";
+
+    /// <summary>The list page's <c>&lt;h1&gt;</c>. Empty (the default) falls back to <see cref="Title"/>.
+    /// Set it when an adopter's own header bar (injected via <see cref="BodyStartHtml"/>) already carries the
+    /// branding: <c>Title = "Contoso Exceptions"</c> keeps the browser tab unambiguous across apps while
+    /// <c>Heading = "Exceptions"</c> stops the page restating what the bar above it already says.</summary>
+    public string Heading { get; set; } = "";
 
     /// <summary>Optional URL to an extra stylesheet, injected into the dashboard <c>&lt;head&gt;</c> after
     /// the built-in CSS so its rules override the defaults — lets the dashboard match the host app.

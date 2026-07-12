@@ -362,6 +362,22 @@ tr.job-key a > span.group {
     box-shadow: none;
 }
 
+/* Footer appearance. Class-only, for the same reason as the status tiles above: an inline style= beats
+   any adopter rule, so a dark theme used to end the page in a light-grey strip unless the adopter
+   reached for !important. */
+.dashboard-footer {
+    text-align: center;
+    margin-top: 3em;
+    padding: .8em 0;
+    background-color: #f8f8f8;
+    font-size: 90%;
+    border-top: 1px solid rgba(34,36,38,.1);
+}
+
+.dashboard-footer a {
+    color: #909090;
+}
+
 .dashboard-histogram .histogram {
     height: 100%;
 }

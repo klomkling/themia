@@ -14,7 +14,12 @@ internal readonly record struct DashboardChrome(
     string CustomStyleSheet,
     string CustomFavicon,
     string HeadHtml = "",
-    string BodyStartHtml = "");
+    string BodyStartHtml = "",
+    string Heading = "")
+{
+    /// <summary>The list page's h1. Falls back to <see cref="Title"/>, which drives the document title.</summary>
+    internal string EffectiveHeading => string.IsNullOrEmpty(Heading) ? Title : Heading;
+}
 
 /// <summary>Pure, self-contained HTML rendering for the exceptions dashboard. Every <em>string</em>
 /// value is HTML-encoded via <see cref="Enc"/>; all attacker-influenceable fields (messages, request
@@ -65,7 +70,7 @@ internal static class DashboardHtml
     {
         _ = csrfToken; // Accepted to keep List/Detail signatures aligned; per-row actions are a later addition.
         var sb = new StringBuilder();
-        sb.Append("<h1>").Append(Enc(chrome.Title)).Append("</h1>");
+        sb.Append("<h1>").Append(Enc(chrome.EffectiveHeading)).Append("</h1>");
 
         var last = items.Count > 0 ? Relative(items[0].LastLogDate, utcNow) : "—";
         sb.Append("<p class=\"summary\"><strong>").Append(total).Append(" errors</strong> (last: ").Append(Enc(last)).Append(")</p>");
