@@ -223,6 +223,37 @@ public class ExceptionalDashboardTests
     }
 
     [Fact]
+    public async Task List_FlowsChromeSlots()
+    {
+        // Guards the endpoint wiring for the raw-HTML slots (options -> DashboardHtml.List -> Page).
+        var client = await ServerAsync(new FakeExceptionStore(Sample()),
+            o =>
+            {
+                o.Authorize = _ => Task.FromResult(true);
+                o.HeadHtml = "<meta name=\"viewport\" content=\"width=device-width\">";
+                o.BodyStartHtml = "<header id=\"app-chrome\"><a href=\"/admin\">Back</a></header>";
+            });
+        var body = await (await client.GetAsync("/exceptions")).Content.ReadAsStringAsync();
+        Assert.Contains("<meta name=\"viewport\" content=\"width=device-width\">", body, StringComparison.Ordinal);
+        Assert.Contains("<header id=\"app-chrome\"><a href=\"/admin\">Back</a></header>", body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Detail_FlowsChromeSlots()
+    {
+        var client = await ServerAsync(new FakeExceptionStore(Sample()),
+            o =>
+            {
+                o.Authorize = _ => Task.FromResult(true);
+                o.HeadHtml = "<meta name=\"viewport\" content=\"width=device-width\">";
+                o.BodyStartHtml = "<header id=\"app-chrome\"><a href=\"/admin\">Back</a></header>";
+            });
+        var body = await (await client.GetAsync($"/exceptions/{KnownGuid}")).Content.ReadAsStringAsync();
+        Assert.Contains("<meta name=\"viewport\" content=\"width=device-width\">", body, StringComparison.Ordinal);
+        Assert.Contains("<header id=\"app-chrome\"><a href=\"/admin\">Back</a></header>", body, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task List_AuthorizeCancelled_DoesNotMaskAs404()
     {
         // OperationCanceledException is cancellation flow, not a denial — it must propagate, never 404.

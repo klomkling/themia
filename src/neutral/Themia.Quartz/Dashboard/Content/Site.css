@@ -331,6 +331,37 @@ tr.job-key a > span.group {
     text-shadow: 1px 2px 4px rgba(0,0,0,0.25);
 }
 
+/* Status-tile appearance. Kept in a stylesheet (not inline style= attributes) so an adopter's
+   CustomStyleSheet can restyle the tiles without !important. Deliberately class-only (no
+   #scheduler-dashboard prefix): nothing in semantic.min.css styles a .statistic background, so
+   these need no extra weight to land — and staying at class specificity lets an adopter's own
+   .stat-* rule win on source order (CustomStyleSheet is linked after this file). */
+.stat-executed {
+    background-color: #0c5a0c;
+    background-image: linear-gradient(#107c10, #0c5a0c);
+}
+
+.stat-failed {
+    background-color: #c42121;
+    background-image: linear-gradient(#db2828, #c42121);
+}
+
+.stat-executing {
+    background-color: #1c70b0;
+    background-image: linear-gradient(#2185d0, #1c70b0);
+}
+
+.stat-activity {
+    background-color: #f0f0f0;
+}
+
+/* The one tile rule that must out-weigh a selector above rather than merely land: it suppresses the
+   shadow set by #scheduler-dashboard .ui.statistic (1,2,0), which the replaced inline
+   style="box-shadow: none" used to outrank unconditionally. */
+#scheduler-dashboard .ui.statistic.stat-counts {
+    box-shadow: none;
+}
+
 .dashboard-histogram .histogram {
     height: 100%;
 }

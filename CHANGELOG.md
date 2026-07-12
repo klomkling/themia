@@ -27,6 +27,26 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-07-12
+
+### Added
+- **`Themia.Quartz`** and **`Themia.Exceptional.AspNetCore`** — `HeadHtml` and `BodyStartHtml` on
+  `ThemiaQuartzOptions` / `ExceptionalDashboardOptions`: raw-HTML slots emitted verbatim at the end of
+  the dashboard `<head>` (after the built-in CSS and `CustomStyleSheet`, so they override both) and
+  immediately after `<body>` opens. They close the gaps CSS alone cannot — a back-link to the host app,
+  a theme toggle, a header bar on the exceptions page, a `<meta name="viewport">`. Both default to empty
+  and are **not encoded**: trusted, adopter-authored markup only, never built from user input.
+
+### Changed
+- **`Themia.Exceptional.AspNetCore`** — the list page now emits `<table class="errors">` with
+  `<thead>`/`<tbody>` and wraps pagination in `<nav class="pager">` (was a bare unclassed `<table>` and
+  `<p>`), so adopter stylesheets get stable hooks instead of positional selectors like
+  `body > p:last-of-type`.
+- **`Themia.Quartz`** — the scheduler dashboard's status tiles carry `stat-executed` / `stat-failed` /
+  `stat-executing` / `stat-activity` / `stat-counts` classes and their colours moved from inline
+  `style=` attributes into `Content/Site.css`, so an adopter stylesheet can restyle them without
+  `!important`.
+
 ## [0.8.0] - 2026-07-11
 
 ### Added

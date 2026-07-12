@@ -81,6 +81,10 @@ Themia.Quartz.ThemiaQuartzOptions.Authorize.get -> System.Func<Microsoft.AspNetC
 Themia.Quartz.ThemiaQuartzOptions.Authorize.set -> void
 Themia.Quartz.ThemiaQuartzOptions.BasePath.get -> string!
 Themia.Quartz.ThemiaQuartzOptions.BasePath.set -> void
+Themia.Quartz.ThemiaQuartzOptions.BodyStartHtml.get -> string!
+Themia.Quartz.ThemiaQuartzOptions.BodyStartHtml.set -> void
+Themia.Quartz.ThemiaQuartzOptions.HeadHtml.get -> string!
+Themia.Quartz.ThemiaQuartzOptions.HeadHtml.set -> void
 Themia.Quartz.ThemiaQuartzOptions.CronExpressionOptions.get -> CronExpressionDescriptor.Options!
 Themia.Quartz.ThemiaQuartzOptions.CronExpressionOptions.set -> void
 Themia.Quartz.ThemiaQuartzOptions.CustomFavicon.get -> string!

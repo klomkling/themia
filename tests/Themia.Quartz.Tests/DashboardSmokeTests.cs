@@ -34,7 +34,10 @@ public sealed class DashboardSmokeTests
     // Middleware order: UseThemiaQuartz (gate + static files + Services bridge) must run before
     // UseRouting so that the authorize gate and embedded content serving intercept requests before
     // the endpoint dispatcher. MapThemiaQuartz inside UseEndpoints registers the controller route.
-    private static async Task<TestHostScope> StartHostAsync(Func<HttpContext, Task<bool>>? authorize, int? deniedStatus = null)
+    private static async Task<TestHostScope> StartHostAsync(
+        Func<HttpContext, Task<bool>>? authorize,
+        int? deniedStatus = null,
+        Action<ThemiaQuartzOptions>? configure = null)
     {
         // Uniquely-named scheduler (not the process-global default) so concurrently-running test
         // classes don't share scheduler state.
@@ -60,6 +63,8 @@ public sealed class DashboardSmokeTests
                         {
                             o.DeniedStatusCode = ds;
                         }
+
+                        configure?.Invoke(o);
                     });
                     services.AddSingleton<IExecutionHistoryStore>(new InProcExecutionHistoryStore());
                 });
@@ -110,6 +115,80 @@ public sealed class DashboardSmokeTests
         var response = await scope.CreateClient().GetAsync("/jobs/Scheduler/Index");
         response.EnsureSuccessStatusCode();
         Assert.Contains("text/html", response.Content.Headers.ContentType!.ToString());
+    }
+
+    [Fact]
+    public async Task Layout_EmitsChromeSlots_Verbatim()
+    {
+        // The two raw-HTML slots are adopter-authored markup (back-link, dark-mode toggle): they must
+        // reach the page unencoded, HeadHtml inside <head> and BodyStartHtml right after <body> opens.
+        const string head = "<meta name=\"x-chrome\" content=\"1\">";
+        const string bodyStart = "<header id=\"app-chrome\"><a href=\"/admin\">Back</a></header>";
+        await using var scope = await StartHostAsync(
+            authorize: _ => Task.FromResult(true),
+            configure: o => { o.HeadHtml = head; o.BodyStartHtml = bodyStart; });
+
+        var body = await (await scope.CreateClient().GetAsync("/jobs/Scheduler/Index")).Content.ReadAsStringAsync();
+
+        Assert.Contains(head, body, StringComparison.Ordinal);
+        Assert.Contains(bodyStart, body, StringComparison.Ordinal);
+        Assert.True(
+            body.IndexOf(head, StringComparison.Ordinal) < body.IndexOf("</head>", StringComparison.Ordinal),
+            "HeadHtml must be emitted inside <head>");
+        Assert.True(
+            body.IndexOf(bodyStart, StringComparison.Ordinal) < body.IndexOf("id=\"top-menu\"", StringComparison.Ordinal),
+            "BodyStartHtml must be emitted before the dashboard's own chrome");
+    }
+
+    [Fact]
+    public async Task SchedulerIndex_StatusTiles_AreClassed_NotInlineStyled()
+    {
+        // Tile colours live in Content/Site.css so an adopter stylesheet can override them without
+        // !important (inline style= would outrank any adopter rule).
+        await using var scope = await StartHostAsync(authorize: _ => Task.FromResult(true));
+
+        var body = await (await scope.CreateClient().GetAsync("/jobs/Scheduler/Index")).Content.ReadAsStringAsync();
+
+        Assert.Contains("stat-executed", body, StringComparison.Ordinal);
+        Assert.Contains("stat-failed", body, StringComparison.Ordinal);
+        Assert.Contains("stat-executing", body, StringComparison.Ordinal);
+        Assert.DoesNotContain("linear-gradient", body, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(".stat-executed")]
+    [InlineData(".stat-failed")]
+    [InlineData(".stat-executing")]
+    [InlineData(".stat-activity")]
+    // The counts tile is the one rule that must OUT-WEIGH a selector already in this file:
+    // "#scheduler-dashboard .ui.statistic" (1,2,0) sets a box-shadow, and the inline style= this
+    // replaced used to beat it unconditionally. A bare "#scheduler-dashboard .stat-counts" (1,1,0)
+    // loses that cascade and the tile silently regains the shadow — assert the winning form.
+    [InlineData("#scheduler-dashboard .ui.statistic.stat-counts")]
+    public async Task SiteCss_DefinesRule_ForEachTileHook(string selector)
+    {
+        // Markup assertions alone cannot see a lost cascade: the classes can be present and correct
+        // while the rule that styles them never applies. Pin the selectors the tiles depend on.
+        await using var scope = await StartHostAsync(authorize: _ => Task.FromResult(true));
+
+        var css = await (await scope.CreateClient().GetAsync("/jobs/Content/Site.css")).Content.ReadAsStringAsync();
+
+        Assert.Contains(selector + " {", css, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task SiteCss_TileColourHooks_AreNotIdScoped()
+    {
+        // The point of moving the colours out of inline style= was to let an adopter's CustomStyleSheet
+        // rule (".stat-executed", specificity 0,1,0) win. An ID-scoped built-in rule (1,1,0) would beat
+        // it regardless of source order, forcing !important back on the adopter — the exact outcome the
+        // change exists to remove. Nothing in semantic.min.css styles a .statistic background, so these
+        // rules need no ID to land.
+        await using var scope = await StartHostAsync(authorize: _ => Task.FromResult(true));
+
+        var css = await (await scope.CreateClient().GetAsync("/jobs/Content/Site.css")).Content.ReadAsStringAsync();
+
+        Assert.DoesNotContain("#scheduler-dashboard .stat-", css, StringComparison.Ordinal);
     }
 
     [Fact]

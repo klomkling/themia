@@ -31,6 +31,26 @@ public sealed class ExceptionalDashboardOptions
     /// Parity feature for the jobs dashboard's <c>ThemiaQuartzOptions.CustomFavicon</c>.</summary>
     public string CustomFavicon { get; set; } = "";
 
+    /// <summary>Raw HTML emitted verbatim at the end of the dashboard <c>&lt;head&gt;</c> — after the built-in
+    /// CSS and <see cref="CustomStyleSheet"/>, so it can override both. Use it for chrome the stylesheet
+    /// hooks cannot express: a <c>&lt;meta name="viewport"&gt;</c>, an external script, extra links.
+    /// Empty (the default) emits nothing.
+    /// <para><strong>Not encoded</strong> — this is a trusted, adopter-authored slot; never build it from
+    /// user input.</para>
+    /// <para><strong>Use root-relative (<c>/app/x.js</c>) or absolute URLs.</strong> Unlike
+    /// <see cref="CustomStyleSheet"/>/<see cref="CustomFavicon"/>, the markup is emitted verbatim and its
+    /// URLs are not resolved against the mount path — and the page carries no <c>&lt;base&gt;</c>, so a
+    /// page-relative URL resolves differently on the list (<c>/mount</c>) and detail (<c>/mount/{guid}</c>)
+    /// routes. (The jobs dashboard's slots differ here: its layout has a <c>&lt;base&gt;</c>, which re-bases
+    /// relative URLs onto the dashboard root.)</para></summary>
+    public string HeadHtml { get; set; } = "";
+
+    /// <summary>Raw HTML emitted verbatim immediately after <c>&lt;body&gt;</c> opens, before the dashboard's
+    /// own content. Use it for a header bar, a back-link to the host app, or a theme toggle. Empty (the
+    /// default) emits nothing. <strong>Not encoded</strong>, and URLs are <strong>not</strong> resolved
+    /// against the mount path — same trust and URL rules as <see cref="HeadHtml"/>.</summary>
+    public string BodyStartHtml { get; set; } = "";
+
     /// <summary>Whether the detail view renders the captured request body. Default <c>true</c> (shown only
     /// behind <see cref="Authorize"/>). Request bodies can contain secrets/PII; prefer scrubbing them at
     /// capture time, and set this to <c>false</c> if even authorized viewers should not see them.</summary>
