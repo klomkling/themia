@@ -254,6 +254,19 @@ public class ExceptionalDashboardTests
     }
 
     [Fact]
+    public async Task List_FlowsHeading_SeparateFromTitle()
+    {
+        // Guards the endpoint wiring: Heading is a defaulted DashboardChrome param, so a forgotten forward
+        // compiles clean and silently falls back to Title.
+        var client = await ServerAsync(new FakeExceptionStore(Sample()),
+            o => { o.Authorize = _ => Task.FromResult(true); o.Title = "EzyAssets Exceptions"; o.Heading = "Exceptions"; });
+        var body = await (await client.GetAsync("/exceptions")).Content.ReadAsStringAsync();
+
+        Assert.Contains("<title>EzyAssets Exceptions</title>", body, StringComparison.Ordinal);
+        Assert.Contains("<h1>Exceptions</h1>", body, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task List_AuthorizeCancelled_DoesNotMaskAs404()
     {
         // OperationCanceledException is cancellation flow, not a denial — it must propagate, never 404.

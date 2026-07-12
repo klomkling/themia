@@ -27,6 +27,28 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.8.4] - 2026-07-12
+
+### Fixed
+- **`Themia.Quartz`** — the jobs dashboard no longer emits an empty `CustomFavicon`/`CustomStyleSheet`
+  `<link>`. Both were emitted unconditionally, so an adopter who left the option at its default (`""`)
+  shipped `href=""` — which the browser resolves to the page URL itself and fetches the dashboard HTML as
+  an icon/stylesheet. The favicon link is emitted **last**, so it won and displaced the seven bundled PNG
+  favicons for every adopter who never touched the option. Both links are now omitted when unset (parity
+  with `Themia.Exceptional.AspNetCore`, which already guarded this). The icon link also no longer hardcodes
+  `type="image/x-icon"`, which mis-declared the MIME type of an adopter's PNG.
+
+### Changed
+- **`Themia.Quartz`** — the dashboard `<footer>` and its link carry `dashboard-footer` classes with their
+  colours in `Content/Site.css`, instead of inline `style=` attributes. Completes the 0.8.1 reclassing: the
+  footer was the last place an adopter stylesheet still needed `!important`, and without it a dark theme
+  ended the page in a light-grey strip.
+- **`Themia.Exceptional.AspNetCore`** — new `ExceptionalDashboardOptions.Heading` drives the list page's
+  `<h1>`, falling back to `Title` when unset (so existing behaviour is unchanged). `Title` now drives only
+  the document title. Lets an adopter whose injected `BodyStartHtml` header bar already carries the branding
+  keep an unambiguous browser-tab title (`Title = "Contoso Exceptions"`) without the page restating it
+  (`Heading = "Exceptions"`).
+
 ## [0.8.3] - 2026-07-12
 
 ### Fixed

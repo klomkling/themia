@@ -70,7 +70,7 @@ public static class ExceptionalDashboardEndpoints
 
         var filter = BuildFilter(ctx.Request.Query, options);
         var result = await store.ListAsync(filter, ct).ConfigureAwait(false);
-        var chrome = new DashboardChrome(options.Title, path, options.CustomStyleSheet, options.CustomFavicon, options.HeadHtml, options.BodyStartHtml);
+        var chrome = new DashboardChrome(options.Title, path, options.CustomStyleSheet, options.CustomFavicon, options.HeadHtml, options.BodyStartHtml, options.Heading);
         // The list page renders no POST forms, so it needs no CSRF token (and must not set the cookie).
         await WriteHtmlAsync(ctx, DashboardHtml.List(chrome, result.Items, result.Total, filter, DateTime.UtcNow), ct).ConfigureAwait(false);
     }
@@ -83,7 +83,7 @@ public static class ExceptionalDashboardEndpoints
         if (entry is null) { ctx.Response.StatusCode = StatusCodes.Status404NotFound; return; }
 
         var token = options.EnableActions ? IssueCsrf(ctx) : null;
-        var chrome = new DashboardChrome(options.Title, path, options.CustomStyleSheet, options.CustomFavicon, options.HeadHtml, options.BodyStartHtml);
+        var chrome = new DashboardChrome(options.Title, path, options.CustomStyleSheet, options.CustomFavicon, options.HeadHtml, options.BodyStartHtml, options.Heading);
         await WriteHtmlAsync(ctx, DashboardHtml.Detail(chrome, entry, options.ShowRequestBody, options.ShowRequestContext, token), ct).ConfigureAwait(false);
     }
 

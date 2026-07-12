@@ -76,8 +76,8 @@ namespace Themia.Quartz.Dashboard.Helpers
             h.RegisterHelper(nameof(SilkierQuartzVersion), SilkierQuartzVersion);
             h.RegisterHelper(nameof(Logo), Logo);
             h.RegisterHelper(nameof(ProductName), ProductName);
-            h.RegisterHelper(nameof(CustomStyleSheet), CustomStyleSheet);
-            h.RegisterHelper(nameof(CustomFavicon), CustomFavicon);
+            h.RegisterHelper(nameof(CustomStyleSheetLink), CustomStyleSheetLink);
+            h.RegisterHelper(nameof(CustomFaviconLink), CustomFaviconLink);
             h.RegisterHelper(nameof(HeadHtml), HeadHtml);
             h.RegisterHelper(nameof(BodyStartHtml), BodyStartHtml);
         }
@@ -293,14 +293,31 @@ namespace Themia.Quartz.Dashboard.Helpers
             output.Write(_services.Options.ProductName);
         }
 
-        void CustomStyleSheet(EncodedTextWriter output, Context context, Arguments arguments)
+        // Emit the whole <link> (or nothing) rather than just the URL: an unset option used to render
+        // href="", which the browser resolves to the page URL itself — fetching the dashboard HTML as an
+        // icon/stylesheet. The favicon link is last, so it WON and displaced the bundled PNG favicons for
+        // every adopter who left the option alone. WriteSafeString emits the element, so the URL is
+        // encoded here. No hardcoded type on the icon: an adopter's PNG is not an image/x-icon.
+        void CustomStyleSheetLink(EncodedTextWriter output, Context context, Arguments arguments)
         {
-            output.Write(_services.Options.CustomStyleSheet);
+            var url = _services.Options.CustomStyleSheet;
+            if (string.IsNullOrEmpty(url))
+            {
+                return;
+            }
+
+            output.WriteSafeString($@"<link rel=""stylesheet"" href=""{HtmlEncode(url)}"" type=""text/css"" />");
         }
 
-        void CustomFavicon(EncodedTextWriter output, Context context, Arguments arguments)
+        void CustomFaviconLink(EncodedTextWriter output, Context context, Arguments arguments)
         {
-            output.Write(_services.Options.CustomFavicon);
+            var url = _services.Options.CustomFavicon;
+            if (string.IsNullOrEmpty(url))
+            {
+                return;
+            }
+
+            output.WriteSafeString($@"<link rel=""icon"" href=""{HtmlEncode(url)}"">");
         }
 
         // WriteSafeString, not Write: these two slots are trusted adopter-authored markup and must reach

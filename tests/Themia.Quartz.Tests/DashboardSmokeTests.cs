@@ -191,6 +191,78 @@ public sealed class DashboardSmokeTests
         Assert.DoesNotContain("#scheduler-dashboard .stat-", css, StringComparison.Ordinal);
     }
 
+    // An unset CustomFavicon/CustomStyleSheet used to emit href="" — which the browser resolves to the page
+    // URL itself, i.e. it fetches the dashboard HTML and treats it as an icon / stylesheet. The favicon link
+    // is emitted last, so it WON and displaced the seven bundled PNG favicons for every adopter who left the
+    // option alone. Both links must simply not be emitted when unset (parity with Themia.Exceptional).
+    [Fact]
+    public async Task Layout_OmitsCustomAssetLinks_WhenUnset()
+    {
+        await using var scope = await StartHostAsync(authorize: _ => Task.FromResult(true));
+
+        var body = await (await scope.CreateClient().GetAsync("/jobs/Scheduler/Index")).Content.ReadAsStringAsync();
+
+        Assert.DoesNotContain("href=\"\"", body, StringComparison.Ordinal);
+        // The bundled favicons must survive.
+        Assert.Contains("Content/Images/favicons/favicon-256.png", body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Layout_EmitsCustomFavicon_WhenSet_WithoutHardcodedMimeType()
+    {
+        // type="image/x-icon" was hardcoded, so an adopter pointing at a PNG declared a false MIME type.
+        await using var scope = await StartHostAsync(
+            authorize: _ => Task.FromResult(true),
+            configure: o => o.CustomFavicon = "/icon-192.png");
+
+        var body = await (await scope.CreateClient().GetAsync("/jobs/Scheduler/Index")).Content.ReadAsStringAsync();
+
+        Assert.Contains("<link rel=\"icon\" href=\"/icon-192.png\">", body, StringComparison.Ordinal);
+        Assert.DoesNotContain("image/x-icon", body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Layout_EmitsCustomStyleSheet_WhenSet()
+    {
+        await using var scope = await StartHostAsync(
+            authorize: _ => Task.FromResult(true),
+            configure: o => o.CustomStyleSheet = "/app/theme.css");
+
+        var body = await (await scope.CreateClient().GetAsync("/jobs/Scheduler/Index")).Content.ReadAsStringAsync();
+
+        Assert.Contains("href=\"/app/theme.css\"", body, StringComparison.Ordinal);
+        // Still after the built-in Site.css, so adopter rules win on source order.
+        Assert.True(
+            body.IndexOf("Content/Site.css", StringComparison.Ordinal) < body.IndexOf("/app/theme.css", StringComparison.Ordinal),
+            "the custom stylesheet must be linked after the built-in Site.css");
+    }
+
+    [Fact]
+    public async Task Layout_Footer_IsClassed_NotInlineStyled()
+    {
+        // Leftover from the tile reclassing: an inline style= on the footer beats any adopter rule, so a dark
+        // theme still ended the page in a light-grey strip unless the adopter reached for !important.
+        await using var scope = await StartHostAsync(authorize: _ => Task.FromResult(true));
+
+        var body = await (await scope.CreateClient().GetAsync("/jobs/Scheduler/Index")).Content.ReadAsStringAsync();
+
+        Assert.Contains("<footer class=\"dashboard-footer\">", body, StringComparison.Ordinal);
+        Assert.DoesNotContain("#f8f8f8", body, StringComparison.Ordinal);
+        Assert.DoesNotContain("#909090", body, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(".dashboard-footer")]
+    [InlineData(".dashboard-footer a")]
+    public async Task SiteCss_DefinesRule_ForEachFooterHook(string selector)
+    {
+        await using var scope = await StartHostAsync(authorize: _ => Task.FromResult(true));
+
+        var css = await (await scope.CreateClient().GetAsync("/jobs/Content/Site.css")).Content.ReadAsStringAsync();
+
+        Assert.Contains(selector + " {", css, StringComparison.Ordinal);
+    }
+
     [Fact]
     public async Task EmbeddedContent_IsServed_WhenAuthorized()
     {

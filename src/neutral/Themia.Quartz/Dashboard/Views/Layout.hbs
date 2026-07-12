@@ -16,13 +16,13 @@
     <link rel="icon" type="image/png" sizes="64x64" href="Content/Images/favicons/favicon-64.png">
     <link rel="icon" type="image/png" sizes="192x192" href="Content/Images/favicons/favicon-192.png">
     <link rel="icon" type="image/png" sizes="256x256" href="Content/Images/favicons/favicon-256.png">
-    <link rel="icon" type="image/x-icon" href="{{CustomFavicon}}">
+    {{CustomFaviconLink}}
 
     <link rel="stylesheet" href="Content/Lib/semanticui/semantic.min.css" type="text/css">
     <link rel="stylesheet" href="Content/Lib/semanticui/calendar.min.css" type="text/css" />
     <link rel="stylesheet" href="Content/Fonts/Lato.css" type="text/css" />
     <link rel="stylesheet" href="Content/Site.css" type="text/css" />
-    <link rel="stylesheet" href="{{CustomStyleSheet}}" type="text/css" />
+    {{CustomStyleSheetLink}}
 
     <script src="Content/Lib/jquery-3.3.1.min.js"></script>
     <script src="Content/Lib/moment.min.js"></script>
@@ -82,8 +82,8 @@
     </script>
 
     {{#footer}}
-    <footer style="text-align:center; margin-top: 3em; padding: .8em 0; background-color: #f8f8f8; font-size: 90%; border-top: 1px solid rgba(34,36,38,.1);">
-        <a href="https://github.com/maikebing/SilkierQuartz" target="_blank" style="color: #909090"><i class="github icon"></i> SilkierQuartz&nbsp;&nbsp;v{{SilkierQuartzVersion}}</a>
+    <footer class="dashboard-footer">
+        <a href="https://github.com/maikebing/SilkierQuartz" target="_blank"><i class="github icon"></i> SilkierQuartz&nbsp;&nbsp;v{{SilkierQuartzVersion}}</a>
     </footer>
     {{/footer}}
 </body>

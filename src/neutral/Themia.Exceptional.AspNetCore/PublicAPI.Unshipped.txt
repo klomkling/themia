@@ -25,3 +25,5 @@ Themia.Exceptional.AspNetCore.ExceptionalDashboardOptions.HeadHtml.get -> string
 Themia.Exceptional.AspNetCore.ExceptionalDashboardOptions.HeadHtml.set -> void
 Themia.Exceptional.AspNetCore.ExceptionalDashboardOptions.BodyStartHtml.get -> string!
 Themia.Exceptional.AspNetCore.ExceptionalDashboardOptions.BodyStartHtml.set -> void
+Themia.Exceptional.AspNetCore.ExceptionalDashboardOptions.Heading.get -> string!
+Themia.Exceptional.AspNetCore.ExceptionalDashboardOptions.Heading.set -> void
