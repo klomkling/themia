@@ -27,6 +27,19 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.8.3] - 2026-07-12
+
+### Fixed
+- **`Themia.Quartz`** — `AddThemiaQuartz` is now **additive**: every `configure` delegate is applied to the
+  same `ThemiaQuartzOptions` instance, in call order (last writer of a given property wins). It previously
+  built a fresh options object per call and registered it with `TryAddSingleton`, so the **first** call won
+  outright and every later call's settings were discarded silently — no exception, no warning. This made the
+  dashboard unconfigurable for anyone consuming it through `Themia.Modules.Scheduling`, which itself calls
+  `AddThemiaQuartz` to wire `VirtualPathRoot`/`Authorize`: an app that then called `AddThemiaQuartz` to set
+  `HeadHtml`/`CustomStyleSheet`/`ProductName` had those dropped, and an app that called it *first* instead
+  lost the module's routing and authorization wiring (dashboard mounted at the wrong path, left deny-all).
+  Apps calling `AddThemiaQuartz` exactly once are unaffected.
+
 ## [0.8.2] - 2026-07-12
 
 ### Fixed
