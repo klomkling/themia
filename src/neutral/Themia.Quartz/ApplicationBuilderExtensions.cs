@@ -148,9 +148,27 @@ public static class ThemiaQuartzApplicationBuilderExtensions
 
                 if (!allowed)
                 {
-                    context.Response.StatusCode = options.DeniedStatusCode;
+                    await DenyAsync(context, options).ConfigureAwait(false);
                     return;
                 }
+
+                // A gated page must not be cacheable: without no-store the browser can re-display the
+                // rendered dashboard after the session expires — the back/forward cache serves it from
+                // memory without ever contacting the server, so Authorize never runs. no-store also
+                // disables bfcache in Chrome/Firefox. Applied to the HTML only (checked once the response
+                // has a content type): the CSS/JS/icons under this path aren't sensitive, and no-storing
+                // them would re-download semantic.min.css on every navigation for no benefit.
+                context.Response.OnStarting(static state =>
+                {
+                    var response = (HttpResponse)state;
+                    if (response.ContentType?.StartsWith("text/html", StringComparison.OrdinalIgnoreCase) == true)
+                    {
+                        response.Headers.CacheControl = "no-store, no-cache, must-revalidate";
+                        response.Headers.Pragma = "no-cache";
+                    }
+
+                    return Task.CompletedTask;
+                }, context.Response);
             }
 
             await next().ConfigureAwait(false);
@@ -186,5 +204,29 @@ public static class ThemiaQuartzApplicationBuilderExtensions
         }
 
         return virtualPathRoot.EndsWith('/') ? virtualPathRoot : virtualPathRoot + "/";
+    }
+
+    // The single deny path. OnDenied owns the response when set (typically a redirect to the host's login);
+    // otherwise, and whenever it throws, the request fails closed with DeniedStatusCode — a broken hook must
+    // never be able to serve the dashboard.
+    private static async Task DenyAsync(HttpContext context, ThemiaQuartzOptions options)
+    {
+        if (options.OnDenied is not null)
+        {
+            try
+            {
+                await options.OnDenied(context).ConfigureAwait(false);
+                return;
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                context.RequestServices.GetService<ILoggerFactory>()?
+                    .CreateLogger("Themia.Quartz")
+                    .LogError(ex, "Themia.Quartz dashboard OnDenied hook threw; falling back to the deny status.");
+                context.Response.Clear();
+            }
+        }
+
+        context.Response.StatusCode = options.DeniedStatusCode;
     }
 }

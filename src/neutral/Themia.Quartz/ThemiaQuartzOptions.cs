@@ -110,6 +110,28 @@ public sealed class ThemiaQuartzOptions
     /// </summary>
     public int DeniedStatusCode { get; set; } = StatusCodes.Status404NotFound;
 
+    /// <summary>
+    /// Runs when <see cref="Authorize"/> denies a dashboard request, instead of returning the bare
+    /// <see cref="DeniedStatusCode"/>. Use it to bounce an expired session to the host app's login page —
+    /// otherwise a timed-out admin lands on a blank 404 with no explanation:
+    /// <code>
+    /// options.OnDenied = ctx =>
+    /// {
+    ///     ctx.Response.Redirect($"/login?returnUrl={UrlEncoder.Default.Encode(ctx.Request.Path)}");
+    ///     return Task.CompletedTask;
+    /// };
+    /// </code>
+    /// The hook owns the whole response. <see langword="null"/> (the default) keeps the
+    /// <see cref="DeniedStatusCode"/> behaviour, so this is strictly opt-in. If it throws, the request still
+    /// fails closed with that status — a broken hook can never serve the dashboard.
+    /// <para><strong>Careful:</strong> a redirect reveals that the route exists, which the default 404
+    /// deliberately hides. Usually the right trade for an admin dashboard, but it is your call.</para>
+    /// <para>It fires for <em>every</em> denied request under the dashboard path, including its CSS/JS and
+    /// icons. Redirecting an asset request is harmless (the browser is navigating away anyway), but don't
+    /// put expensive work in here.</para>
+    /// </summary>
+    public Func<HttpContext, Task>? OnDenied { get; set; }
+
     internal string? ContentRootDirectory => null;
 
     internal string? ViewsRootDirectory => null;

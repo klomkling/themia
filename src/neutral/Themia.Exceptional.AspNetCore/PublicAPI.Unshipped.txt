@@ -27,3 +27,5 @@ Themia.Exceptional.AspNetCore.ExceptionalDashboardOptions.BodyStartHtml.get -> s
 Themia.Exceptional.AspNetCore.ExceptionalDashboardOptions.BodyStartHtml.set -> void
 Themia.Exceptional.AspNetCore.ExceptionalDashboardOptions.Heading.get -> string!
 Themia.Exceptional.AspNetCore.ExceptionalDashboardOptions.Heading.set -> void
+Themia.Exceptional.AspNetCore.ExceptionalDashboardOptions.OnDenied.get -> System.Func<Microsoft.AspNetCore.Http.HttpContext!, System.Threading.Tasks.Task!>?
+Themia.Exceptional.AspNetCore.ExceptionalDashboardOptions.OnDenied.set -> void
