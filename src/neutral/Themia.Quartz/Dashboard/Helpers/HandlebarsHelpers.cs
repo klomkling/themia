@@ -77,7 +77,7 @@ namespace Themia.Quartz.Dashboard.Helpers
             h.RegisterHelper(nameof(Logo), Logo);
             h.RegisterHelper(nameof(ProductName), ProductName);
             h.RegisterHelper(nameof(CustomStyleSheetLink), CustomStyleSheetLink);
-            h.RegisterHelper(nameof(CustomFaviconLink), CustomFaviconLink);
+            h.RegisterHelper(nameof(FaviconLinks), FaviconLinks);
             h.RegisterHelper(nameof(HeadHtml), HeadHtml);
             h.RegisterHelper(nameof(BodyStartHtml), BodyStartHtml);
         }
@@ -309,15 +309,55 @@ namespace Themia.Quartz.Dashboard.Helpers
             output.WriteSafeString($@"<link rel=""stylesheet"" href=""{HtmlEncode(url)}"" type=""text/css"" />");
         }
 
-        void CustomFaviconLink(EncodedTextWriter output, Context context, Arguments arguments)
+        // Emits EITHER the adopter's icon OR the bundled set — never both. Emitting both let the browser
+        // choose, and it chose ours: the bundled links declare explicit sizes and an adopter's does not, so
+        // the size-preference algorithm picked a vendor PNG and setting CustomFavicon looked like a no-op.
+        // An adopter who supplies an icon has opted out of the vendor's, so replace rather than compete.
+        // Keeping both branches in one helper is deliberate: split across the template and a second helper,
+        // they drift apart and the "never both" invariant is not visible anywhere.
+        static readonly int[] BundledFaviconSizes = { 16, 24, 32, 48, 64, 192, 256 };
+
+        void FaviconLinks(EncodedTextWriter output, Context context, Arguments arguments)
         {
             var url = _services.Options.CustomFavicon;
-            if (string.IsNullOrEmpty(url))
+            if (!string.IsNullOrEmpty(url))
             {
+                var mimeType = FaviconMimeType(url);
+                var typeAttribute = mimeType is null ? "" : $@"type=""{mimeType}"" ";
+                output.WriteSafeString($@"<link rel=""icon"" {typeAttribute}href=""{HtmlEncode(url)}"">");
                 return;
             }
 
-            output.WriteSafeString($@"<link rel=""icon"" href=""{HtmlEncode(url)}"">");
+            var sb = new StringBuilder();
+            foreach (var size in BundledFaviconSizes)
+            {
+                sb.Append($@"<link rel=""icon"" type=""image/png"" sizes=""{size}x{size}"" href=""Content/Images/favicons/favicon-{size}.png"">");
+            }
+
+            output.WriteSafeString(sb.ToString());
+        }
+
+        // Derived from the extension, not hardcoded: the old type="image/x-icon" mis-declared an adopter's
+        // PNG or SVG. Unknown extension => omit the attribute rather than guess wrong.
+        static string? FaviconMimeType(string url)
+        {
+            var path = url.Split('?', '#')[0];
+            var dot = path.LastIndexOf('.');
+            if (dot < 0)
+            {
+                return null;
+            }
+
+            return path.Substring(dot + 1).ToLowerInvariant() switch
+            {
+                "svg" => "image/svg+xml",
+                "png" => "image/png",
+                "ico" => "image/x-icon",
+                "gif" => "image/gif",
+                "jpg" or "jpeg" => "image/jpeg",
+                "webp" => "image/webp",
+                _ => null,
+            };
         }
 
         // WriteSafeString, not Write: these two slots are trusted adopter-authored markup and must reach

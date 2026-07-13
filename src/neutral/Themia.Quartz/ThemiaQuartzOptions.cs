@@ -23,7 +23,12 @@ public sealed class ThemiaQuartzOptions
     /// <summary>Path to an additional stylesheet injected into the dashboard layout.</summary>
     public string CustomStyleSheet { get; set; } = "";
 
-    /// <summary>Path to a custom favicon used by the dashboard layout.</summary>
+    /// <summary>Path to a custom favicon for the dashboard. When set it <strong>replaces</strong> the seven
+    /// bundled PNG favicons rather than being added alongside them — an adopter who supplies an icon has
+    /// opted out of the built-in one, and emitting both let the browser's size-preference algorithm pick a
+    /// bundled icon instead (which made setting this look like a no-op). The link's <c>type</c> is derived
+    /// from the URL extension (<c>.svg</c>/<c>.png</c>/<c>.ico</c>/…), and omitted when the extension is
+    /// unrecognized. Empty (the default) emits the bundled favicons.</summary>
     public string CustomFavicon { get; set; } = "";
 
     /// <summary>Product name shown in the dashboard header and page title. Defaults to "Themia Scheduler".</summary>
