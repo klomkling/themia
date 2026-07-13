@@ -27,6 +27,20 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.8.5] - 2026-07-13
+
+### Fixed
+- **`Themia.Quartz`** — a configured `CustomFavicon` now actually wins the browser tab. It was emitted
+  *alongside* the seven bundled PNG favicons, which declare explicit `sizes` while the adopter's link
+  declared none — so the browser's size-preference algorithm picked a bundled icon and setting the option
+  looked like a no-op. A set `CustomFavicon` now **replaces** the bundled set instead of competing with it
+  (an adopter who supplies an icon has opted out of ours); when unset, the bundled favicons are emitted as
+  before. The link's `type` is also derived from the URL extension (`.svg` → `image/svg+xml`, `.png` →
+  `image/png`, `.ico` → `image/x-icon`, …) and omitted when unrecognized, rather than being absent (0.8.4)
+  or hardcoded to `image/x-icon` (≤ 0.8.3, which mis-declared a PNG or SVG). Completes the fix started in
+  0.8.4: guarding the empty `href` stopped a *broken* link from displacing the bundled icons, but left a
+  *working* one unable to displace them.
+
 ## [0.8.4] - 2026-07-12
 
 ### Fixed

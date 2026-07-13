@@ -1,5 +1,6 @@
 using System.Net;
 using System.Collections.Specialized;
+using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -207,18 +208,55 @@ public sealed class DashboardSmokeTests
         Assert.Contains("Content/Images/favicons/favicon-256.png", body, StringComparison.Ordinal);
     }
 
+    // A set CustomFavicon must WIN the browser tab. Emitting it alongside the seven bundled vendor icons
+    // did not achieve that: those declare explicit sizes and the adopter's did not, so the browser's
+    // size-preference algorithm picked a vendor PNG and the SilkierQuartz duck won anyway — setting the
+    // option looked like a no-op. Don't compete with the vendor icons; replace them. An adopter who
+    // supplies an icon has opted out of ours.
     [Fact]
-    public async Task Layout_EmitsCustomFavicon_WhenSet_WithoutHardcodedMimeType()
+    public async Task Layout_CustomFavicon_ReplacesBundledIcons_RatherThanCompetingWithThem()
     {
-        // type="image/x-icon" was hardcoded, so an adopter pointing at a PNG declared a false MIME type.
         await using var scope = await StartHostAsync(
             authorize: _ => Task.FromResult(true),
             configure: o => o.CustomFavicon = "/icon-192.png");
 
         var body = await (await scope.CreateClient().GetAsync("/jobs/Scheduler/Index")).Content.ReadAsStringAsync();
 
-        Assert.Contains("<link rel=\"icon\" href=\"/icon-192.png\">", body, StringComparison.Ordinal);
-        Assert.DoesNotContain("image/x-icon", body, StringComparison.Ordinal);
+        Assert.Contains("<link rel=\"icon\" type=\"image/png\" href=\"/icon-192.png\">", body, StringComparison.Ordinal);
+        // The vendor icons must be gone — otherwise they out-rank the adopter's on `sizes`.
+        Assert.DoesNotContain("Content/Images/favicons/", body, StringComparison.Ordinal);
+        Assert.Single(Regex.Matches(body, "rel=\"icon\""));
+    }
+
+    [Fact]
+    public async Task Layout_EmitsBundledIcons_WhenCustomFaviconUnset()
+    {
+        await using var scope = await StartHostAsync(authorize: _ => Task.FromResult(true));
+
+        var body = await (await scope.CreateClient().GetAsync("/jobs/Scheduler/Index")).Content.ReadAsStringAsync();
+
+        Assert.Contains("Content/Images/favicons/favicon-16.png", body, StringComparison.Ordinal);
+        Assert.Contains("Content/Images/favicons/favicon-256.png", body, StringComparison.Ordinal);
+        Assert.Equal(7, Regex.Matches(body, "rel=\"icon\"").Count);
+    }
+
+    [Theory]
+    [InlineData("/icon.svg", "type=\"image/svg+xml\" ")]
+    [InlineData("/icon-192.png", "type=\"image/png\" ")]
+    [InlineData("/favicon.ico", "type=\"image/x-icon\" ")]
+    [InlineData("/icon.png?v=2", "type=\"image/png\" ")]        // query string must not defeat the sniff
+    [InlineData("/icon", "")]                                    // unknown extension: omit type, don't guess
+    public async Task Layout_DerivesFaviconType_FromUrlExtension(string url, string expectedTypeAttr)
+    {
+        // Without a type the browser cannot tell what the icon is; hardcoding image/x-icon (the old
+        // behaviour) declared a false MIME type for an adopter's PNG or SVG.
+        await using var scope = await StartHostAsync(
+            authorize: _ => Task.FromResult(true),
+            configure: o => o.CustomFavicon = url);
+
+        var body = await (await scope.CreateClient().GetAsync("/jobs/Scheduler/Index")).Content.ReadAsStringAsync();
+
+        Assert.Contains($"<link rel=\"icon\" {expectedTypeAttr}href=\"{url}\">", body, StringComparison.Ordinal);
     }
 
     [Fact]
