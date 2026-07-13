@@ -103,6 +103,8 @@ Themia.Quartz.ThemiaQuartzOptions.EnableEdit.get -> bool
 Themia.Quartz.ThemiaQuartzOptions.EnableEdit.set -> void
 Themia.Quartz.ThemiaQuartzOptions.Logo.get -> string!
 Themia.Quartz.ThemiaQuartzOptions.Logo.set -> void
+Themia.Quartz.ThemiaQuartzOptions.OnDenied.get -> System.Func<Microsoft.AspNetCore.Http.HttpContext!, System.Threading.Tasks.Task!>?
+Themia.Quartz.ThemiaQuartzOptions.OnDenied.set -> void
 Themia.Quartz.ThemiaQuartzOptions.ProductName.get -> string!
 Themia.Quartz.ThemiaQuartzOptions.ProductName.set -> void
 Themia.Quartz.ThemiaQuartzOptions.Scheduler.get -> Quartz.IScheduler?

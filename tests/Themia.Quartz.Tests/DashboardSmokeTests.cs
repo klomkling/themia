@@ -302,6 +302,62 @@ public sealed class DashboardSmokeTests
     }
 
     [Fact]
+    public async Task SchedulerIndex_Authorized_IsNotCacheable()
+    {
+        // Without no-store the browser can re-display the rendered dashboard after the session times out —
+        // from the back/forward cache, without contacting the server, so Authorize never runs.
+        await using var scope = await StartHostAsync(authorize: _ => Task.FromResult(true));
+
+        var res = await scope.CreateClient().GetAsync("/jobs/Scheduler/Index");
+
+        Assert.True(res.Headers.CacheControl!.NoStore, "dashboard HTML must be Cache-Control: no-store");
+        Assert.True(res.Headers.CacheControl.NoCache);
+    }
+
+    [Fact]
+    public async Task EmbeddedContent_StaysCacheable()
+    {
+        // Only the HTML is sensitive. Blanket-no-storing the whole dashboard path would re-download
+        // semantic.min.css and the icons on every navigation for no security benefit.
+        await using var scope = await StartHostAsync(authorize: _ => Task.FromResult(true));
+
+        var res = await scope.CreateClient().GetAsync("/jobs/Content/Site.css");
+
+        Assert.NotEqual(true, res.Headers.CacheControl?.NoStore);
+    }
+
+    [Fact]
+    public async Task Denied_InvokesOnDenied_InsteadOfBareStatusCode()
+    {
+        await using var scope = await StartHostAsync(
+            authorize: _ => Task.FromResult(false),
+            configure: o => o.OnDenied = ctx =>
+            {
+                ctx.Response.StatusCode = StatusCodes.Status302Found;
+                ctx.Response.Headers.Location = "/login?returnUrl=/jobs";
+                return Task.CompletedTask;
+            });
+
+        var res = await scope.CreateClient().GetAsync("/jobs/Scheduler/Index");
+
+        Assert.Equal(HttpStatusCode.Redirect, res.StatusCode);
+        Assert.Equal("/login?returnUrl=/jobs", res.Headers.Location!.ToString());
+    }
+
+    [Fact]
+    public async Task Denied_WhenOnDeniedThrows_FailsClosed()
+    {
+        // A broken hook must fall back to the deny status, never surface a 500 or serve the page.
+        await using var scope = await StartHostAsync(
+            authorize: _ => Task.FromResult(false),
+            configure: o => o.OnDenied = _ => throw new InvalidOperationException("bad redirect target"));
+
+        var res = await scope.CreateClient().GetAsync("/jobs/Scheduler/Index");
+
+        Assert.Equal(HttpStatusCode.NotFound, res.StatusCode);
+    }
+
+    [Fact]
     public async Task EmbeddedContent_IsServed_WhenAuthorized()
     {
         await using var scope = await StartHostAsync(authorize: _ => Task.FromResult(true));

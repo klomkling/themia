@@ -66,7 +66,7 @@ public static class ExceptionalDashboardEndpoints
 
     private static async Task HandleListAsync(HttpContext ctx, IExceptionStore store, ExceptionalDashboardOptions options, string path, CancellationToken ct)
     {
-        if (!await AuthorizedAsync(ctx, options).ConfigureAwait(false)) { ctx.Response.StatusCode = StatusCodes.Status404NotFound; return; }
+        if (!await AuthorizedAsync(ctx, options).ConfigureAwait(false)) { await DenyAsync(ctx, options).ConfigureAwait(false); return; }
 
         var filter = BuildFilter(ctx.Request.Query, options);
         var result = await store.ListAsync(filter, ct).ConfigureAwait(false);
@@ -77,7 +77,7 @@ public static class ExceptionalDashboardEndpoints
 
     private static async Task HandleDetailAsync(HttpContext ctx, IExceptionStore store, ExceptionalDashboardOptions options, string path, Guid guid, CancellationToken ct)
     {
-        if (!await AuthorizedAsync(ctx, options).ConfigureAwait(false)) { ctx.Response.StatusCode = StatusCodes.Status404NotFound; return; }
+        if (!await AuthorizedAsync(ctx, options).ConfigureAwait(false)) { await DenyAsync(ctx, options).ConfigureAwait(false); return; }
 
         var entry = await store.GetAsync(guid, ct).ConfigureAwait(false);
         if (entry is null) { ctx.Response.StatusCode = StatusCodes.Status404NotFound; return; }
@@ -94,7 +94,7 @@ public static class ExceptionalDashboardEndpoints
         Func<Guid, CancellationToken, Task<bool>> action, CancellationToken ct)
     {
         // Auth gate runs FIRST: a denied request must 404 regardless of any token presented.
-        if (!await AuthorizedAsync(ctx, options).ConfigureAwait(false)) { ctx.Response.StatusCode = StatusCodes.Status404NotFound; return; }
+        if (!await AuthorizedAsync(ctx, options).ConfigureAwait(false)) { await DenyAsync(ctx, options).ConfigureAwait(false); return; }
         if (!await ValidCsrfAsync(ctx, ct).ConfigureAwait(false)) { ctx.Response.StatusCode = StatusCodes.Status400BadRequest; return; }
 
         await action(guid, ct).ConfigureAwait(false);
@@ -140,6 +140,39 @@ public static class ExceptionalDashboardEndpoints
             Path = "/",
         });
         return token;
+    }
+
+    // The single deny path. OnDenied owns the response when set (typically a redirect to the host's login);
+    // otherwise, and whenever it throws, the request fails closed with the route-hiding 404 — a broken hook
+    // must never be able to serve the dashboard.
+    private static async Task DenyAsync(HttpContext ctx, ExceptionalDashboardOptions options)
+    {
+        if (options.OnDenied is not null)
+        {
+            try
+            {
+                await options.OnDenied(ctx).ConfigureAwait(false);
+                return;
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                ctx.RequestServices.GetService<ILoggerFactory>()?
+                    .CreateLogger("Themia.Exceptional.AspNetCore")
+                    .LogError(ex, "Exceptions dashboard OnDenied hook threw; falling back to the deny status.");
+                ctx.Response.Clear();
+            }
+        }
+
+        ctx.Response.StatusCode = StatusCodes.Status404NotFound;
+    }
+
+    // A gated page must not be cacheable: without no-store the browser can re-display the rendered
+    // dashboard after the session expires (the back/forward cache serves it from memory without ever
+    // contacting the server, so Authorize never runs). no-store also disables bfcache in Chrome/Firefox.
+    private static void PreventCaching(HttpResponse response)
+    {
+        response.Headers.CacheControl = "no-store, no-cache, must-revalidate";
+        response.Headers.Pragma = "no-cache";
     }
 
     private static async Task<bool> AuthorizedAsync(HttpContext ctx, ExceptionalDashboardOptions options)
@@ -194,6 +227,7 @@ public static class ExceptionalDashboardEndpoints
     private static Task WriteHtmlAsync(HttpContext ctx, string html, CancellationToken ct)
     {
         ctx.Response.ContentType = "text/html; charset=utf-8";
+        PreventCaching(ctx.Response);
         return ctx.Response.WriteAsync(html, Encoding.UTF8, ct);
     }
 }

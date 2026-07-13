@@ -27,6 +27,26 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.8.6] - 2026-07-13
+
+### Security
+- **`Themia.Quartz`** and **`Themia.Exceptional.AspNetCore`** — dashboard HTML is now served with
+  `Cache-Control: no-store, no-cache, must-revalidate` (+ `Pragma: no-cache`). Neither dashboard set any
+  cache header, so a page behind the `Authorize` gate stayed in the browser's cache: after an admin session
+  timed out, the rendered dashboard could still be re-displayed from the **back/forward cache** — served
+  from memory **without contacting the server at all**, so `Authorize` never ran and the stale page looked
+  live. `no-store` also disables bfcache in Chrome/Firefox, which is the mechanism in play. The gate itself
+  was never bypassed: a request that reaches the server has always been denied correctly. Static dashboard
+  assets (CSS/JS/icons) stay cacheable — they are not sensitive.
+
+### Added
+- **`ThemiaQuartzOptions.OnDenied`** and **`ExceptionalDashboardOptions.OnDenied`** — optional hook run when
+  `Authorize` denies a request, instead of returning the bare deny status. Lets the host redirect an expired
+  session to its login page; previously a timed-out admin landed on a blank 404 with no explanation. Opt-in:
+  `null` (the default) keeps the existing route-hiding 404 / `DeniedStatusCode`. A hook that throws still
+  fails closed with that status — it can never serve the dashboard — and a genuine not-found (unknown
+  exception id) does not invoke it.
+
 ## [0.8.5] - 2026-07-13
 
 ### Fixed

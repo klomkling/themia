@@ -1,5 +1,6 @@
 using System.Net;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
@@ -264,6 +265,94 @@ public class ExceptionalDashboardTests
 
         Assert.Contains("<title>EzyAssets Exceptions</title>", body, StringComparison.Ordinal);
         Assert.Contains("<h1>Exceptions</h1>", body, StringComparison.Ordinal);
+    }
+
+    // A page behind an auth gate must not be cacheable. Without no-store the browser can re-display the
+    // rendered dashboard after the session times out — from the back/forward cache, without ever contacting
+    // the server, so Authorize never runs. That is what "the page still renders after logout" actually is.
+    [Fact]
+    public async Task List_Authorized_IsNotCacheable()
+    {
+        var client = await ServerAsync(new FakeExceptionStore(Sample()), o => o.Authorize = _ => Task.FromResult(true));
+        var res = await client.GetAsync("/exceptions");
+
+        var cacheControl = res.Headers.CacheControl!;
+        Assert.True(cacheControl.NoStore, "dashboard HTML must be Cache-Control: no-store (also disables bfcache)");
+        Assert.True(cacheControl.NoCache);
+    }
+
+    [Fact]
+    public async Task Detail_Authorized_IsNotCacheable()
+    {
+        var client = await ServerAsync(new FakeExceptionStore(Sample()), o => o.Authorize = _ => Task.FromResult(true));
+        var res = await client.GetAsync($"/exceptions/{KnownGuid}");
+
+        Assert.True(res.Headers.CacheControl!.NoStore);
+    }
+
+    [Fact]
+    public async Task Denied_InvokesOnDenied_InsteadOfBare404()
+    {
+        // Lets the host bounce an expired session to its login page instead of leaving the admin on a blank
+        // 404 with no explanation.
+        var client = await ServerAsync(new FakeExceptionStore(Sample()), o =>
+        {
+            o.Authorize = _ => Task.FromResult(false);
+            o.OnDenied = ctx =>
+            {
+                ctx.Response.StatusCode = StatusCodes.Status302Found;
+                ctx.Response.Headers.Location = "/login?returnUrl=/exceptions";
+                return Task.CompletedTask;
+            };
+        });
+
+        var res = await client.GetAsync("/exceptions");
+
+        Assert.Equal(HttpStatusCode.Found, res.StatusCode);
+        Assert.Equal("/login?returnUrl=/exceptions", res.Headers.Location!.ToString());
+    }
+
+    [Fact]
+    public async Task Denied_WithoutOnDenied_Still404s()
+    {
+        // Default stays fail-closed and route-hiding; the hook is strictly opt-in.
+        var client = await ServerAsync(new FakeExceptionStore(Sample()), o => o.Authorize = _ => Task.FromResult(false));
+        var res = await client.GetAsync("/exceptions");
+
+        Assert.Equal(HttpStatusCode.NotFound, res.StatusCode);
+    }
+
+    [Fact]
+    public async Task Denied_WhenOnDeniedThrows_FailsClosed()
+    {
+        // A broken hook must not turn a denial into a 500 (or, worse, a served page).
+        var client = await ServerAsync(new FakeExceptionStore(Sample()), o =>
+        {
+            o.Authorize = _ => Task.FromResult(false);
+            o.OnDenied = _ => throw new InvalidOperationException("redirect target misconfigured");
+        });
+
+        var res = await client.GetAsync("/exceptions");
+
+        Assert.Equal(HttpStatusCode.NotFound, res.StatusCode);
+    }
+
+    [Fact]
+    public async Task UnknownGuid_DoesNotInvokeOnDenied()
+    {
+        // A missing entry is a genuine 404, not an authorization denial — it must not bounce an authorized
+        // admin to the login page.
+        var denied = false;
+        var client = await ServerAsync(new FakeExceptionStore(Sample()), o =>
+        {
+            o.Authorize = _ => Task.FromResult(true);
+            o.OnDenied = _ => { denied = true; return Task.CompletedTask; };
+        });
+
+        var res = await client.GetAsync($"/exceptions/{Guid.NewGuid()}");
+
+        Assert.Equal(HttpStatusCode.NotFound, res.StatusCode);
+        Assert.False(denied, "a not-found entry must not be treated as an authorization denial");
     }
 
     [Fact]

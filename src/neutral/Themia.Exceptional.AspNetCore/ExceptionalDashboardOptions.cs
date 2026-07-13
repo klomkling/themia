@@ -9,6 +9,24 @@ public sealed class ExceptionalDashboardOptions
     /// (fail-closed) — the dashboard cannot be served without an explicit predicate.</summary>
     public Func<HttpContext, Task<bool>>? Authorize { get; set; }
 
+    /// <summary>Runs when <see cref="Authorize"/> denies a request, instead of returning the bare 404.
+    /// Use it to bounce an expired session to the host app's login page — otherwise a timed-out admin lands
+    /// on a blank 404 with no explanation:
+    /// <code>
+    /// options.OnDenied = ctx =>
+    /// {
+    ///     ctx.Response.Redirect($"/login?returnUrl={UrlEncoder.Default.Encode(ctx.Request.Path)}");
+    ///     return Task.CompletedTask;
+    /// };
+    /// </code>
+    /// The hook owns the whole response. <c>null</c> (the default) keeps the route-hiding 404, so this is
+    /// strictly opt-in. If it throws, the request still fails closed with the 404 — a broken hook can never
+    /// serve the dashboard. Not called for a genuine not-found (an unknown exception id), only for a denial.
+    /// <para><strong>Careful:</strong> a redirect reveals that the route exists, which the default 404
+    /// deliberately hides. That is usually the right trade for an admin-facing dashboard, but it is your
+    /// call to make.</para></summary>
+    public Func<HttpContext, Task>? OnDenied { get; set; }
+
     /// <summary>Rows per page when the request omits <c>pageSize</c>. Default 50.</summary>
     public int DefaultPageSize { get; set; } = 50;
 
