@@ -43,7 +43,14 @@ internal static class DashboardHtml
           .Append("</title><link rel=\"stylesheet\" href=\"").Append(Enc(chrome.Path)).Append("/dashboard.css\">");
         if (!string.IsNullOrEmpty(chrome.CustomFavicon))
         {
-            sb.Append("<link rel=\"icon\" href=\"").Append(Enc(ResolveAsset(chrome.Path, chrome.CustomFavicon))).Append("\">");
+            var mimeType = FaviconMimeType(chrome.CustomFavicon);
+            sb.Append("<link rel=\"icon\" ");
+            if (mimeType is not null)
+            {
+                sb.Append("type=\"").Append(mimeType).Append("\" ");
+            }
+
+            sb.Append("href=\"").Append(Enc(ResolveAsset(chrome.Path, chrome.CustomFavicon))).Append("\">");
         }
 
         // Injected after the built-in stylesheet so an adopter's rules override the defaults.
@@ -57,6 +64,32 @@ internal static class DashboardHtml
         sb.Append(chrome.HeadHtml).Append("</head><body>").Append(chrome.BodyStartHtml)
           .Append(body).Append("</body></html>");
         return sb.ToString();
+    }
+
+    // Derived from the extension, not hardcoded: a browser uses the type hint to decide it can render the
+    // icon at all, so an SVG served without image/svg+xml may be skipped and leave the page iconless.
+    // Unknown extension => omit the attribute rather than guess wrong (the browser then sniffs).
+    // Mirrors Themia.Quartz's FaviconMimeType; kept as a local copy because the two dashboards share no
+    // assembly and a shared package for one switch expression would not pay for itself.
+    private static string? FaviconMimeType(string url)
+    {
+        var path = url.Split('?', '#')[0];
+        var dot = path.LastIndexOf('.');
+        if (dot < 0)
+        {
+            return null;
+        }
+
+        return path[(dot + 1)..].ToLowerInvariant() switch
+        {
+            "svg" => "image/svg+xml",
+            "png" => "image/png",
+            "ico" => "image/x-icon",
+            "gif" => "image/gif",
+            "jpg" or "jpeg" => "image/jpeg",
+            "webp" => "image/webp",
+            _ => null,
+        };
     }
 
     // A relative custom asset URL is resolved against the dashboard mount path (like the built-in
