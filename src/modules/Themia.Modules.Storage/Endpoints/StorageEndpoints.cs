@@ -15,11 +15,24 @@ public static class StorageEndpoints
     /// <summary>Maps the storage endpoints onto <paramref name="endpoints"/> under <paramref name="prefix"/>.</summary>
     /// <param name="endpoints">The endpoint route builder.</param>
     /// <param name="prefix">The route prefix (default <c>/storage</c>).</param>
-    /// <returns>The route group builder for further configuration (e.g. <c>.RequireAuthorization()</c>).</returns>
+    /// <returns>The route group builder for the <em>broker</em> endpoints, for further configuration
+    /// (e.g. <c>.RequireAuthorization()</c>). The Local presigned-transfer routes are deliberately NOT in
+    /// this group — see <c>transfer</c> below.</returns>
     public static RouteGroupBuilder MapThemiaStorageEndpoints(this IEndpointRouteBuilder endpoints, string prefix = "/storage")
     {
         ArgumentNullException.ThrowIfNull(endpoints);
+
+        // The broker endpoints (mint URLs, confirm uploads, delete). Returned to the host, which is
+        // expected to gate them with RequireAuthorization().
         var group = endpoints.MapGroup(prefix);
+
+        // The Local presigned-transfer routes live in a SEPARATE group that is never returned, so the
+        // host's RequireAuthorization() on the group above cannot reach them. A presigned URL is
+        // self-authorizing — the HMAC token IS the credential, exactly as an S3/R2 presigned URL is —
+        // and it is handed to a browser (an <img> src, a direct upload) that carries no app session.
+        // Gating them behind app auth would 401 a valid signed URL and make Local silently behave
+        // differently from S3/R2, whose presigned URLs never touch this app at all.
+        var transfer = endpoints.MapGroup(prefix);
 
         // Request a presigned upload URL. The provider returns an absolute URL for S3/R2 and a relative
         // _local URL for the Local backend; resolve both to an absolute URL the client can use. The
@@ -56,7 +69,7 @@ public static class StorageEndpoints
 
         // Serve a Local presigned download (the token authorizes exactly this physical key).
         // Returns 404 when the backend is not Local (the signer is only registered for UseLocal).
-        group.MapGet("/_local/get", async (
+        transfer.MapGet("/_local/get", async (
             [FromQuery] string key,
             [FromQuery] string token,
             [FromServices] LocalUrlSigner? signer,
@@ -80,7 +93,7 @@ public static class StorageEndpoints
         // Accept a Local presigned upload (the token authorizes exactly this physical key).
         // Returns 404 when the backend is not Local (the signer is only registered for UseLocal).
         // Enforces the configured size cap before writing (413 when exceeded) to bound memory/DoS.
-        group.MapPut("/_local/put", async (
+        transfer.MapPut("/_local/put", async (
             [FromQuery] string key,
             [FromQuery] string token,
             HttpRequest request,

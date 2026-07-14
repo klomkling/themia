@@ -27,6 +27,18 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.8.8] - 2026-07-14
+
+### Fixed
+- **`Themia.Modules.Storage`** — the Local presigned-transfer routes (`_local/get`, `_local/put`) no longer
+  sit in the route group returned by `MapThemiaStorageEndpoints`, so an adopter calling the documented
+  `.RequireAuthorization()` on that group no longer gates them. A presigned URL is **self-authorizing** —
+  the HMAC token *is* the credential, exactly as an S3/R2 presigned URL is — and it is handed to a browser
+  (an `<img>` src, a direct upload) that carries no app session. Gating it behind app auth returned 401 for
+  a *valid* signed URL, and made Local silently behave differently from S3/R2, whose presigned URLs never
+  reach the app at all. The broker endpoints (mint URL, complete, download-url, delete) stay in the returned
+  group and are still gated by `.RequireAuthorization()` — a test now pins both halves.
+
 ## [0.8.7] - 2026-07-14
 
 ### Fixed
