@@ -64,7 +64,7 @@
     <PackageVersion Include="StackExchange.Redis" Version="3.0.0" />
     <PackageVersion Include="MessagePack" Version="3.1.7" />
     <!-- Logging (Serilog) -->
-    <PackageVersion Include="Serilog" Version="4.3.1" />
+    <PackageVersion Include="Serilog" Version="4.4.0" />
     <PackageVersion Include="Serilog.Extensions.Logging" Version="10.0.0" />
     <PackageVersion Include="Serilog.Sinks.Console" Version="6.1.1" />
     <PackageVersion Include="Serilog.Sinks.File" Version="7.0.0" />
