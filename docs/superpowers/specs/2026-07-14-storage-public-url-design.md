@@ -1,8 +1,8 @@
 # Themia.Storage — permanent public URLs (coord #0022)
 
-**Date:** 2026-07-14
+**Date:** 2026-07-14 (rev 2, 2026-07-15 — visibility made immutable; `MoveAsync` deleted)
 **Status:** approved, ready for an implementation plan
-**Target version:** 0.8.8 — **(breaking)** for direct implementors of `IStorageProvider`
+**Target version:** 0.9.0 — **(breaking)** for direct implementors of `IStorageProvider`
 **Request:** coord #0022, from `propertiezy`
 
 ## Why
@@ -101,16 +101,52 @@ content type); `CompleteUploadAsync` likewise. A consumer **cannot** persist a r
 because it never receives one. The URL exists only at read time, resolved from current config — which
 makes a CDN swap or domain change a **config edit instead of a data migration**.
 
-### 5. Visibility is mutable, via a real move
+### 5. Visibility is chosen at write time and is **immutable**
 
-Flipping visibility physically moves bytes between containers. `SetVisibilityAsync` is ordered
-**copy → update row → delete source**:
+The first draft of this spec supported flipping visibility after write, via a `MoveAsync`
+(copy → update row → delete source) with an orphan-blob failure mode and a reconcile sweep. **That
+mechanism is deleted.** Every expensive part of the two-container design existed *only* to support the
+flip — it was the move machinery that was costly, not the two containers.
 
-- crash between copy and row-update → object still readable at its **old** key;
-- crash between row-update and delete → an **orphan** in the old container, collected by the reconcile
-  sweep the module already anticipates (`TenantStorage.cs:188`).
+Interrogating whether the flip ever legitimately happens, it does not:
 
-**No ordering loses bytes.** A no-op flip (already that visibility) returns without touching the backend.
+- **Private → public** is unnecessary. A photo on a draft listing does not need to be private: keys are
+  unguessable GUIDs, which is what every CMS does (WordPress uploads, Notion). The residual "leak" is that
+  someone who *guesses a GUID* sees a photo that becomes public within days anyway — not a threat worth
+  paying a distributed copy-with-orphans mechanism to prevent.
+- **Public → private** is pointless after the fact. Once a listing photo has been crawled by Google Images
+  and cached at a CDN edge, making the origin 403 changes nothing real.
+
+So: **each mechanism is used where it is actually right, and nothing ever converts between them.** Public
+objects are born in the public container and served **direct from the bucket**. Private objects (invoices,
+receipts, ID documents — genuinely different data) live in the private container and are **route-served**
+through the authenticated endpoint, at low volume.
+
+**Consequence:** a re-put of an existing key with a *different* `Visibility` **throws**. It does not
+silently orphan the old blob, and it does not silently ignore the caller's argument. There is exactly one
+way bytes enter a container, and no way to move them between containers.
+
+Adding a move later is purely **additive and non-breaking**, so nothing is foreclosed by leaving it out.
+
+### 6. Why public bytes are served direct-from-bucket, not through a route
+
+The tempting simplification is to route-serve public bytes too (a CDN in front of the app origin), which
+would collapse visibility into a plain DB column and delete the second container entirely. It is rejected
+for a reason that is **not** the egress bill:
+
+Costed at Propertiezy's scale — ~10k listings × ~20 photos ≈ 200k objects ≈ 60 GB stored, ~400 GB/month
+delivered, and immutable GUID-keyed images hitting 90–95% at the CDN → only ~20–40 GB/month of origin
+egress — the bill is a rounding error, and route-serving would be fine.
+
+The problem is **topology**. `ezy-assets`' API runs on a **homelab behind residential upload bandwidth**
+(Coolify, `api.asetix.com`), and Propertiezy's deployment target may land somewhere similar. Pushing a
+public marketplace's image traffic — plus Google Images crawls, plus an OG-scraper fetch on every
+LINE/Facebook share — through the app origin is an **availability risk, not a cost one**: a crawl burst or
+a cold cache after a purge saturates home upload and takes down the same API that serves ingest and the
+agent app. That is a self-inflicted DoS surface, and **CDN hit ratio is precisely what you cannot rely on
+during the bursts that hurt.**
+
+Direct-from-bucket keeps the app out of the byte path entirely, which is the whole point.
 
 ## Design
 
@@ -126,17 +162,18 @@ public readonly record struct StoragePutOptions(
     bool Overwrite = true,
     StorageVisibility Visibility = StorageVisibility.Private);
 
-// IStorageProvider gains exactly two members; everything else is untouched:
+// IStorageProvider gains exactly ONE member; everything else is untouched:
 Uri GetPublicUrl(string key);   // sync — pure config + key composition, no I/O
-Task MoveAsync(string sourceKey, string destinationKey, CancellationToken ct = default);
 ```
 
 `GetPublicUrl` throws `InvalidOperationException` when the key is not in the public space, or when no
 public container is configured. **It never returns a URL that would 403 at render time** — a URL that
 looks right and fails in the browser is the worst of the available outcomes.
 
-`MoveAsync`: server-side `CopyObject` + `DeleteObject` for S3/R2 (bytes never transit the API); a file
-move for Local.
+There is **no `MoveAsync`** (see decision 5). A general-purpose move on the neutral provider would also
+have been a tenant-isolation footgun: it takes two arbitrary physical keys at a layer with no tenant
+awareness, so it could move a blob from one tenant's prefix into another's, and the isolation analyzer
+does not cover it. Not adding it is the safer surface as well as the smaller one.
 
 Provider options gain a public container and an absolute base URL:
 
@@ -163,12 +200,16 @@ Reading it is **free**: every module read and delete already fetches the row bef
 
 ```csharp
 Task<Uri> GetPublicUrlAsync(string key, CancellationToken ct = default);
-Task SetVisibilityAsync(string key, StorageVisibility visibility, CancellationToken ct = default);
 ```
 
 `GetPublicUrlAsync` looks up the row and **throws `StorageNotPublicException` for a private object**, so
 the failure lands at the call site rather than in a browser. A missing object throws too: asking for the
 public URL of a nonexistent key is a caller bug.
+
+There is no `SetVisibilityAsync` (decision 5). `PutAsync` on an **existing** key whose stored visibility
+differs from `options.Visibility` **throws** — the alternatives are both silent failures: writing at the
+new visibility orphans the old blob, and writing at the old one ignores the caller's argument, leaving the
+app believing it published a photo that is still private.
 
 `GetUploadUrlAsync` gains a `StorageVisibility` parameter (default `Private`) so a presigned upload lands
 **directly in the right container** — otherwise every large video upload would need a move immediately
@@ -195,9 +236,19 @@ GET {mount}/public/{**key}   →  no auth, no token, streams from PublicRootPath
                                 {key} is the stripped key, e.g. t1/listings/42/hero.jpg
 ```
 
+**It is mapped in the ungated `transfer` group, never the returned broker group.** 0.8.8 established this
+seam: the group returned by `MapThemiaStorageEndpoints` is what adopters gate with
+`.RequireAuthorization()`, so a public route mapped inside it would **401 in an `<img>` tag** — a public
+URL that fails at render time, the worst of the available failure modes because it *looks* right. A test
+must pin it: map the group, call `.RequireAuthorization()`, assert the public route still serves 200.
+
 For Local, `PublicBaseUrl` is therefore the app's absolute origin **plus this mount path** (e.g.
-`https://api.example.com/storage/public`). The mirror of the existing `_local/get` route, minus the
-signature — a public object is public by definition, so there is no token to verify. Content type comes from the sidecar via `provider.GetAsync`
+`https://api.example.com/storage/public`). Startup validation asserts it is absolute **and** that it ends
+with the mount path — an otherwise-valid base URL missing the mount segment passes an "is it absolute?"
+check and then 404s on every image.
+
+The route is the mirror of the existing `_local/get`, minus the signature — a public object is public by
+definition, so there is no token to verify. Content type comes from the sidecar via `provider.GetAsync`
 (Local stores content types under `{root}/content-types`). Keys pass through
 `StorageKey.NormalizeAndValidate` and resolve strictly under `PublicRootPath`, so traversal cannot escape
 into the private root. It emits `Cache-Control: public, max-age=…` (configurable, default one day) — the
@@ -214,9 +265,13 @@ Local-serving is **production-supported**, not dev-only: `ezy-assets`' base `app
 | `GetPublicUrl` with no public container configured | `InvalidOperationException` |
 | `GetPublicUrlAsync` on a private object (module) | `StorageNotPublicException` |
 | `GetPublicUrlAsync` on a missing object | throws — caller bug |
-| `PublicBaseUrl` not absolute | throws at **startup** in `Validate()` |
+| `PutAsync` on an existing key with a different `Visibility` | throws — visibility is immutable |
+| `PublicBaseUrl` not absolute, or missing the mount path (Local) | throws at **startup** in `Validate()` |
 | Tenant id `public` | rejected in `StorageScope`, as `_platform` is today |
-| Crash mid-`SetVisibilityAsync` | object readable at one key or the other; worst case an orphan blob |
+
+Note what is **absent**: there is no partial-failure state anywhere in this design. Because visibility is
+immutable, no operation ever spans two containers, so there is no half-moved object, no orphan blob and
+no reconcile sweep to write. That is the whole dividend of decision 5.
 
 ## Testing
 
@@ -224,10 +279,12 @@ Local-serving is **production-supported**, not dev-only: `ezy-assets`' base `app
   back-compat proof — existing blobs must not move); tenant id `public` is rejected.
 - **`GetPublicUrlAsync`:** throws for a private object; returns an absolute URL for a public one; the URL
   changes with config alone, with no data change.
-- **`SetVisibilityAsync`:** moves both directions; updates the row; leaves the old key empty; a simulated
-  failure of the final delete still leaves the object readable at the new key.
-- **Local public route:** serves without auth; emits the sidecar content type and `Cache-Control`; rejects
-  traversal; **cannot reach a private key**.
+- **Immutability:** a re-put of an existing key with a different `Visibility` throws (and writes nothing).
+- **Local public route:** serves **while the broker group has `.RequireAuthorization()` applied** — the
+  0.8.8 lesson, and the test that would have caught it; emits the sidecar content type and `Cache-Control`;
+  rejects traversal; **cannot reach a private key**. Plus the other half: the broker routes still 401, so a
+  later change cannot ungate everything to make the public test pass.
+- **Startup validation:** a relative `PublicBaseUrl`, and (for Local) one missing the mount path, both throw.
 - **Migration:** existing rows default to `Private`.
 
 ## Out of scope
@@ -240,6 +297,8 @@ Each is real; none is this request.
 - **Transcoding** — a genuinely separate problem. The assumption is "store raw, serve raw", which holds
   only while the size cap is real.
 - **Per-object ACLs** — impossible on R2/S3, as established above.
+- **Changing an object's visibility after write** (`MoveAsync` / `SetVisibilityAsync`) — deleted in
+  decision 5. Purely additive to add later if a consumer ever genuinely needs it.
 - **Already exists, not rebuilt:** the content-type- and size-restricted presigned PUT
   (`ITenantStorage.GetUploadUrlAsync` + `CompleteUploadAsync`, with quota reservation,
   `StorageModuleOptions.MaxObjectSizeBytes` default 100 MiB, and `AllowedContentTypes` enforced by
@@ -247,13 +306,21 @@ Each is real; none is this request.
 
 ## Known caveat
 
-**Making a public object private does not make it instantly unreachable.** A CDN keeps serving its cached
-copy until the TTL expires, and crawlers may already hold copies. `SetVisibilityAsync` moves the origin
-bytes; it cannot un-publish the internet. If "unpublish must be immediate", the answer is a shorter CDN
-TTL or explicit cache invalidation — an app-side concern, not a storage-layer one.
+**A public object cannot be un-published.** Deleting it removes the origin bytes, but a CDN keeps serving
+its cached copy until the TTL expires, and crawlers may already hold their own copies. This is *why*
+visibility is immutable rather than a limitation of it: a public→private flip would have offered the
+*illusion* of un-publishing while changing nothing real. If "unpublish must be immediate", the honest
+answers are a shorter CDN TTL or explicit cache invalidation — app-side concerns, not storage-layer ones.
 
-## Open thread
+## Resolved (was an open thread)
 
-`ezy-assets`' production `Storage__Provider` is set in Coolify and is **unverified**. If it is `Local`,
-its existing photos carry relative URLs frozen at upload time and media re-hosting becomes a V1
-prerequisite rather than a P2 nicety.
+`ezy-assets`' production `Storage:Provider` **is `Local`** — but its uploads are **already public and
+unauthenticated**: `app.UseStaticFiles(…)` (`Program.cs:589`) is registered *before*
+`UseRouting`/`UseAuthentication`/`UseAuthorization` (615/618/625), so it short-circuits before any auth
+runs, and the anonymous public web-proposal page already renders those images. Hot-linking works today, so
+**this request does not go critical** — media re-hosting stays deferred, and Propertiezy V1 hot-links
+ezy-assets' photos without touching `Themia.Storage` at all. **V1 volume through this package is zero**,
+which is the honest reason there is no urgency here.
+
+The residual gap is app-side and owned by them: `LocalFileStorage` emits a *relative* `/uploads/…` path, so
+their snapshot builder needs a `ValidateOnStart` `Marketplace:PublicMediaBaseUrl` key to absolutize it.
