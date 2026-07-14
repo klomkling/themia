@@ -27,6 +27,16 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.8.7] - 2026-07-14
+
+### Fixed
+- **`Themia.Exceptional.AspNetCore`** — the exceptions dashboard now derives the `CustomFavicon` link's
+  `type` from the URL extension (`.svg` → `image/svg+xml`, `.png` → `image/png`, `.ico` → `image/x-icon`, …),
+  omitting it when unrecognized. 0.8.5 added this to `Themia.Quartz` only, so the two dashboards disagreed:
+  the exceptions one still emitted a bare `<link rel="icon" href="…">`. Not cosmetic for an SVG icon — the
+  `type` hint is how a browser decides it can use an SVG at all, so an adopter pointing `CustomFavicon` at
+  `/favicon.svg` got their icon on the jobs dashboard and none on the exceptions dashboard.
+
 ## [0.8.6] - 2026-07-13
 
 ### Security

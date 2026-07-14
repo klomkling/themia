@@ -19,7 +19,7 @@ public sealed class DashboardCustomStyleTests
         var html = DashboardHtml.Page(new DashboardChrome("Exceptions", "/exceptions", "/app/theme.css", "/app/fav.ico"), "<p>x</p>");
 
         Assert.Contains("href=\"/app/theme.css\"", html);
-        Assert.Contains("<link rel=\"icon\" href=\"/app/fav.ico\">", html);
+        Assert.Contains("<link rel=\"icon\" type=\"image/x-icon\" href=\"/app/fav.ico\">", html);
         // The custom stylesheet must come AFTER the built-in dashboard.css so its rules override.
         Assert.True(
             html.IndexOf("/dashboard.css", System.StringComparison.Ordinal)
@@ -55,6 +55,32 @@ public sealed class DashboardCustomStyleTests
 
         Assert.Contains("href=\"/css/theme.css\"", html);
         Assert.Contains("href=\"https://cdn.example/fav.ico\"", html);
+    }
+
+    [Theory]
+    [InlineData("/app/fav.svg", "image/svg+xml")]
+    [InlineData("/app/fav.png", "image/png")]
+    [InlineData("/app/fav.ico", "image/x-icon")]
+    [InlineData("/app/fav.gif", "image/gif")]
+    [InlineData("/app/fav.jpg", "image/jpeg")]
+    [InlineData("/app/fav.webp", "image/webp")]
+    [InlineData("/app/fav.SVG?v=2#h", "image/svg+xml")]
+    public void Page_DerivesFaviconType_FromUrlExtension(string favicon, string expectedType)
+    {
+        // A browser uses the type hint to decide it can render the icon at all — an SVG favicon served
+        // without type="image/svg+xml" may be skipped entirely, leaving the dashboard with no icon.
+        var html = DashboardHtml.Page(new DashboardChrome("Exceptions", "/exceptions", "", favicon), "<p>x</p>");
+
+        Assert.Contains($"<link rel=\"icon\" type=\"{expectedType}\" href=\"", html);
+    }
+
+    [Fact]
+    public void Page_OmitsFaviconType_WhenExtensionIsUnrecognized()
+    {
+        // Guessing a wrong type is worse than omitting it — the browser sniffs when there is no hint.
+        var html = DashboardHtml.Page(new DashboardChrome("Exceptions", "/exceptions", "", "/app/icon"), "<p>x</p>");
+
+        Assert.Contains("<link rel=\"icon\" href=\"/app/icon\">", html);
     }
 
     [Fact]
