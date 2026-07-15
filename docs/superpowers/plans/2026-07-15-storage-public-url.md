@@ -470,12 +470,27 @@ public sealed class S3PublicContainerTests
     [Fact]
     public void Validate_rejects_a_relative_PublicBaseUrl()
     {
+        // Uri.TryCreate(..., Absolute) parses "/media" as file:///media on Unix — Validate must still reject it.
         var options = new S3StorageOptions
         {
             BucketName = "private-bucket",
             PublicBucketName = "public-bucket",
             PublicBaseUrl = "/media",
         };
+        Assert.Throws<ArgumentException>(options.Validate);
+    }
+
+    [Fact]
+    public void Validate_rejects_a_public_bucket_without_a_base_url()
+    {
+        var options = new S3StorageOptions { BucketName = "private-bucket", PublicBucketName = "public-bucket" };
+        Assert.Throws<ArgumentException>(options.Validate);
+    }
+
+    [Fact]
+    public void Validate_rejects_a_base_url_without_a_public_bucket()
+    {
+        var options = new S3StorageOptions { BucketName = "private-bucket", PublicBaseUrl = "https://cdn.example.com" };
         Assert.Throws<ArgumentException>(options.Validate);
     }
 }
@@ -505,22 +520,39 @@ Add to `src/neutral/Themia.Storage.S3/S3StorageOptions.cs`, inside the class:
     public string PublicBaseUrl { get; set; } = string.Empty;
 
     /// <summary>Validates the public-container options, failing fast at composition time.</summary>
-    /// <exception cref="ArgumentException">A public bucket is configured without an absolute
-    /// <see cref="PublicBaseUrl"/>, or the public bucket equals the private one.</exception>
+    /// <exception cref="ArgumentException">Only one of <see cref="PublicBucketName"/> /
+    /// <see cref="PublicBaseUrl"/> is set, the base URL is not an absolute http(s) URL, or the public
+    /// bucket equals the private one.</exception>
     public void Validate()
     {
-        if (string.IsNullOrWhiteSpace(PublicBucketName))
+        var hasBucket = !string.IsNullOrWhiteSpace(PublicBucketName);
+        var hasBaseUrl = !string.IsNullOrWhiteSpace(PublicBaseUrl);
+
+        if (!hasBucket && !hasBaseUrl)
         {
-            return;
+            return; // public container disabled
         }
 
-        if (!Uri.TryCreate(PublicBaseUrl, UriKind.Absolute, out _))
+        // Both-or-neither: a base URL with no bucket (or vice versa) is a half-configured broken state.
+        if (hasBucket != hasBaseUrl)
         {
             throw new ArgumentException(
-                "PublicBaseUrl must be set to an ABSOLUTE url (e.g. https://cdn.example.com) when PublicBucketName is set.",
+                "PublicBucketName and PublicBaseUrl must be set together (a public container needs both a bucket and an absolute base URL), or both left empty.",
+                nameof(PublicBucketName));
+        }
+
+        // Uri.TryCreate(..., UriKind.Absolute, ...) alone is not enough: on Unix it parses a rooted path
+        // like "/media" as file:///media, so require an http/https scheme — the ezy-assets relative-URL bug.
+        if (!Uri.TryCreate(PublicBaseUrl, UriKind.Absolute, out var baseUri) ||
+            (baseUri.Scheme != Uri.UriSchemeHttp && baseUri.Scheme != Uri.UriSchemeHttps))
+        {
+            throw new ArgumentException(
+                "PublicBaseUrl must be an ABSOLUTE http(s) url (e.g. https://cdn.example.com) when PublicBucketName is set.",
                 nameof(PublicBaseUrl));
         }
 
+        // Bucket names are case-sensitive AWS identifiers, so Ordinal is correct here (unlike filesystem
+        // paths). A public and private object sharing a bucket would break the isolation this exists for.
         if (string.Equals(BucketName, PublicBucketName, StringComparison.Ordinal))
         {
             throw new ArgumentException("PublicBucketName must differ from BucketName; public and private objects cannot share a container.", nameof(PublicBucketName));
