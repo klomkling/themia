@@ -22,16 +22,32 @@ public sealed class LocalStorageOptions
 
     /// <summary>Validates that required options are set, failing fast at composition time.</summary>
     /// <exception cref="ArgumentException">Thrown when <see cref="RootPath"/> or <see cref="SigningKey"/> is
-    /// null or whitespace, when a public container is configured without an absolute
-    /// <see cref="PublicBaseUrl"/>, or when the public root equals the private root.</exception>
+    /// null or whitespace, when only one of <see cref="PublicRootPath"/>/<see cref="PublicBaseUrl"/> is set,
+    /// when the configured <see cref="PublicBaseUrl"/> is not an absolute http/https url, or when the public
+    /// root resolves to the same directory as the private root.</exception>
     public void Validate()
     {
         if (string.IsNullOrWhiteSpace(RootPath)) throw new ArgumentException("RootPath must be set.", nameof(RootPath));
         if (string.IsNullOrWhiteSpace(SigningKey)) throw new ArgumentException("SigningKey must be set (required to issue/verify Local presigned download/upload URLs).", nameof(SigningKey));
 
-        if (string.IsNullOrWhiteSpace(PublicRootPath))
+        var hasRoot = !string.IsNullOrWhiteSpace(PublicRootPath);
+        var hasBaseUrl = !string.IsNullOrWhiteSpace(PublicBaseUrl);
+
+        // The public container is both-or-neither: a half-configured state (one set, the other empty) is a
+        // silent trap where writes or URL composition break at runtime, so fail fast naming the missing half.
+        if (!hasRoot && !hasBaseUrl)
         {
             return;
+        }
+
+        if (!hasRoot)
+        {
+            throw new ArgumentException("PublicRootPath must be set when PublicBaseUrl is set (the public container is both-or-neither).", nameof(PublicRootPath));
+        }
+
+        if (!hasBaseUrl)
+        {
+            throw new ArgumentException("PublicBaseUrl must be set when PublicRootPath is set (the public container is both-or-neither).", nameof(PublicBaseUrl));
         }
 
         // A relative base URL is the ezy-assets bug in a bottle: it cannot be hot-linked cross-origin, and
@@ -46,7 +62,11 @@ public sealed class LocalStorageOptions
                 nameof(PublicBaseUrl));
         }
 
-        if (string.Equals(Path.GetFullPath(RootPath), Path.GetFullPath(PublicRootPath), StringComparison.Ordinal))
+        // Case-insensitive on Windows (NTFS) and macOS (APFS): there "/data/Store" and "/data/store" are the
+        // SAME directory, so an ordinal-only compare would wave through a shared container and let a public
+        // and private key with the same tail collide — the exact failure this two-container split prevents.
+        var cmp = OperatingSystem.IsWindows() || OperatingSystem.IsMacOS() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+        if (string.Equals(Path.GetFullPath(RootPath), Path.GetFullPath(PublicRootPath), cmp))
         {
             throw new ArgumentException("PublicRootPath must differ from RootPath; public and private objects cannot share a container.", nameof(PublicRootPath));
         }

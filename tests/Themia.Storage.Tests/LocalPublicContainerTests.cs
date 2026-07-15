@@ -93,4 +93,38 @@ public sealed class LocalPublicContainerTests : IDisposable
         };
         Assert.Throws<ArgumentException>(options.Validate);
     }
+
+    [Fact]
+    public void Validate_rejects_a_base_url_without_a_public_root()
+    {
+        // Mirror of the above: the public container is both-or-neither, so a base URL with no root is broken.
+        var options = new LocalStorageOptions
+        {
+            RootPath = root,
+            SigningKey = "test-signing-key-at-least-32-characters-long",
+            PublicBaseUrl = "https://cdn.example.com/media",
+        };
+        Assert.Throws<ArgumentException>(options.Validate);
+    }
+
+    [Fact]
+    public void Validate_rejects_a_public_root_differing_only_in_case_on_case_insensitive_filesystems()
+    {
+        // On Windows (NTFS) and macOS (APFS) "/data/Store" and "/data/store" are the SAME directory, so a
+        // case-only difference must be rejected there or public and private objects would share a container.
+        // On a case-sensitive FS they are legitimately different directories, so only assert on Win/macOS.
+        if (!OperatingSystem.IsWindows() && !OperatingSystem.IsMacOS())
+        {
+            return;
+        }
+
+        var options = new LocalStorageOptions
+        {
+            RootPath = root,
+            SigningKey = "test-signing-key-at-least-32-characters-long",
+            PublicRootPath = root.ToUpperInvariant(),
+            PublicBaseUrl = "https://cdn.example.com/media",
+        };
+        Assert.Throws<ArgumentException>(options.Validate);
+    }
 }

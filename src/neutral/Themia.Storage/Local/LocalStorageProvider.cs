@@ -180,7 +180,14 @@ public sealed class LocalStorageProvider : IStorageProvider
         }
     }
 
-    /// <inheritdoc />
+    /// <summary>Returns the permanent, absolute public URL for an object in the public container. The URL is
+    /// composed at read time from <see cref="LocalStorageOptions.PublicBaseUrl"/> and the key with its
+    /// visibility prefix stripped, so it survives a base-URL/domain change and is never persisted.</summary>
+    /// <param name="key">A public-container object key (one carrying the public visibility prefix).</param>
+    /// <returns>The absolute public URL the object is served from.</returns>
+    /// <exception cref="System.InvalidOperationException">Thrown when <paramref name="key"/> is not a
+    /// public-container key, or when no public container is configured
+    /// (<see cref="LocalStorageOptions.PublicBaseUrl"/> unset).</exception>
     public Uri GetPublicUrl(string key)
     {
         if (!StorageKey.IsPublic(key))
