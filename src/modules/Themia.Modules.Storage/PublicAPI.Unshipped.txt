@@ -22,9 +22,15 @@ Themia.Modules.Storage.Entities.StorageObject.SizeBytes.set -> void
 Themia.Modules.Storage.Entities.StorageObject.StorageObject() -> void
 Themia.Modules.Storage.Entities.StorageObject.TenantId.get -> Themia.Framework.Core.Abstractions.Tenancy.TenantId?
 Themia.Modules.Storage.Entities.StorageObject.TenantId.set -> void
+Themia.Modules.Storage.Entities.StorageObject.Visibility.get -> Themia.Storage.StorageVisibility
+Themia.Modules.Storage.Entities.StorageObject.Visibility.set -> void
 Themia.Modules.Storage.Mapping.StorageDapperMappings
 Themia.Modules.Storage.Migrations.StorageSchemaMigration
 Themia.Modules.Storage.Migrations.StorageSchemaMigration.StorageSchemaMigration() -> void
+Themia.Modules.Storage.Migrations.StorageVisibilityMigration
+Themia.Modules.Storage.Migrations.StorageVisibilityMigration.StorageVisibilityMigration() -> void
+override Themia.Modules.Storage.Migrations.StorageVisibilityMigration.Down() -> void
+override Themia.Modules.Storage.Migrations.StorageVisibilityMigration.Up() -> void
 Themia.Modules.Storage.StorageScope
 Themia.Modules.Storage.StorageModuleOptions
 Themia.Modules.Storage.StorageModuleOptions.StorageModuleOptions() -> void

@@ -23,4 +23,10 @@
   <ItemGroup>
     <ProjectReference Include="../../src/neutral/Themia.Data.Migrations/Themia.Data.Migrations.csproj" />
   </ItemGroup>
+  <!-- Themia.Modules.Storage is a net10.0-only framework module (see Directory.Build.props policy), so it
+       is only referenceable from the net10.0 leg of this net8.0;net10.0 test project. StorageMigrationOrderTests
+       is guarded with #if NET10_0 to match. -->
+  <ItemGroup Condition="'$(TargetFramework)' == 'net10.0'">
+    <ProjectReference Include="../../src/modules/Themia.Modules.Storage/Themia.Modules.Storage.csproj" />
+  </ItemGroup>
 </Project>
