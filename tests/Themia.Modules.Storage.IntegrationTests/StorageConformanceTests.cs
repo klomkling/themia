@@ -46,6 +46,8 @@ file sealed class ThrowingStorageProvider(IStorageProvider inner, int throwOnPut
 
     public Task<Uri> GetPresignedUrlAsync(string key, PresignedUrlRequest request, CancellationToken cancellationToken = default) =>
         inner.GetPresignedUrlAsync(key, request, cancellationToken);
+
+    public Uri GetPublicUrl(string key) => inner.GetPublicUrl(key);
 }
 
 /// <summary>An <see cref="IFileScanner"/> that always reports the content as a threat.</summary>
