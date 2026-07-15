@@ -5,6 +5,7 @@ override Themia.Modules.Storage.Migrations.StorageSchemaMigration.Down() -> void
 override Themia.Modules.Storage.Migrations.StorageSchemaMigration.Up() -> void
 static Themia.Modules.Storage.Mapping.StorageDapperMappings.Apply(Themia.Framework.Data.Dapper.Mapping.EntityMappingRegistry! registry) -> void
 static Themia.Modules.Storage.StorageScope.PhysicalKey(Themia.Framework.Core.Abstractions.Tenancy.TenantId? tenantId, string! logicalKey) -> string!
+static Themia.Modules.Storage.StorageScope.PhysicalKey(Themia.Framework.Core.Abstractions.Tenancy.TenantId? tenantId, string! logicalKey, Themia.Storage.StorageVisibility visibility) -> string!
 Themia.Modules.Storage.EntityConfiguration.StorageModelBuilderExtensions
 Themia.Modules.Storage.Entities.StorageObject
 Themia.Modules.Storage.Entities.StorageObject.ContentType.get -> string!
