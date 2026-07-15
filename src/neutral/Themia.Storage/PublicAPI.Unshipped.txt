@@ -57,7 +57,15 @@ Themia.Storage.StoragePutOptions.Metadata.init -> void
 Themia.Storage.StoragePutOptions.Overwrite.get -> bool
 Themia.Storage.StoragePutOptions.Overwrite.init -> void
 Themia.Storage.StoragePutOptions.StoragePutOptions() -> void
-Themia.Storage.StoragePutOptions.StoragePutOptions(string! ContentType, System.Collections.Generic.IReadOnlyDictionary<string!, string!>? Metadata = null, bool Overwrite = true) -> void
+Themia.Storage.StoragePutOptions.StoragePutOptions(string! ContentType, System.Collections.Generic.IReadOnlyDictionary<string!, string!>? Metadata = null, bool Overwrite = true, Themia.Storage.StorageVisibility Visibility = Themia.Storage.StorageVisibility.Private) -> void
+Themia.Storage.StoragePutOptions.Visibility.get -> Themia.Storage.StorageVisibility
+Themia.Storage.StoragePutOptions.Visibility.init -> void
+Themia.Storage.StorageVisibility
+Themia.Storage.StorageVisibility.Private = 0 -> Themia.Storage.StorageVisibility
+Themia.Storage.StorageVisibility.Public = 1 -> Themia.Storage.StorageVisibility
+const Themia.Storage.StorageKey.PublicPrefix = "public/" -> string!
+static Themia.Storage.StorageKey.IsPublic(string! key) -> bool
+static Themia.Storage.StorageKey.StripVisibilityPrefix(string! key) -> string!
 Themia.Storage.StorageReadResult
 Themia.Storage.StorageReadResult.Content.get -> System.IO.Stream!
 Themia.Storage.StorageReadResult.Content.init -> void

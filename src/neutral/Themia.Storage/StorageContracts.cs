@@ -14,10 +14,13 @@ public enum PresignedUrlOperation
 /// <param name="ContentType">The MIME content type to store and serve.</param>
 /// <param name="Metadata">Optional provider metadata (small string pairs); may be empty.</param>
 /// <param name="Overwrite">Whether to overwrite an existing object at the key (default true).</param>
+/// <param name="Visibility">Which container the object is written to. Defaults to
+/// <see cref="StorageVisibility.Private"/> and is <b>immutable</b> once written.</param>
 public readonly record struct StoragePutOptions(
     string ContentType,
     IReadOnlyDictionary<string, string>? Metadata = null,
-    bool Overwrite = true);
+    bool Overwrite = true,
+    StorageVisibility Visibility = StorageVisibility.Private);
 
 /// <summary>The result of reading an object: an open content stream plus its metadata.</summary>
 /// <param name="Content">The object content stream; the caller disposes it.</param>
