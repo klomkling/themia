@@ -74,3 +74,8 @@ Themia.Storage.StorageReadResult.ContentType.init -> void
 Themia.Storage.StorageReadResult.Length.get -> long
 Themia.Storage.StorageReadResult.Length.init -> void
 Themia.Storage.StorageReadResult.StorageReadResult(System.IO.Stream! Content, string! ContentType, long Length) -> void
+Themia.Storage.Local.LocalStorageOptions.PublicRootPath.get -> string!
+Themia.Storage.Local.LocalStorageOptions.PublicRootPath.set -> void
+Themia.Storage.Local.LocalStorageOptions.PublicBaseUrl.get -> string!
+Themia.Storage.Local.LocalStorageOptions.PublicBaseUrl.set -> void
+Themia.Storage.Local.LocalStorageProvider.GetPublicUrl(string! key) -> System.Uri!

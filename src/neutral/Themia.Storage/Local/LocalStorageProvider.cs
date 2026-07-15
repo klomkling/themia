@@ -180,6 +180,24 @@ public sealed class LocalStorageProvider : IStorageProvider
         }
     }
 
+    /// <inheritdoc />
+    public Uri GetPublicUrl(string key)
+    {
+        if (!StorageKey.IsPublic(key))
+        {
+            throw new InvalidOperationException(
+                $"Object '{key}' is not in the public container; only a public object has a public URL. " +
+                "Public visibility is chosen at write time and cannot be changed.");
+        }
+
+        if (string.IsNullOrWhiteSpace(options.PublicBaseUrl))
+        {
+            throw new InvalidOperationException("No public container is configured; set LocalStorageOptions.PublicRootPath and PublicBaseUrl.");
+        }
+
+        return new Uri($"{options.PublicBaseUrl.TrimEnd('/')}/{StorageKey.StripVisibilityPrefix(key)}");
+    }
+
     // Maps a key to an absolute blob path under {root}/blobs.
     private string ResolveBlobPath(string key) => ResolveUnder(BlobsDir, key);
 
@@ -187,12 +205,21 @@ public sealed class LocalStorageProvider : IStorageProvider
     private string ResolveContentTypePath(string key) => ResolveUnder(ContentTypesDir, key);
 
     // Maps a key to an absolute path UNDER {root}/{subdir}, rejecting traversal/absolute keys by verifying
-    // the resolved full path stays within that subtree.
+    // the resolved full path stays within that subtree. The key's own prefix selects the root: a public key
+    // resolves under PublicRootPath with the prefix stripped, so a public and a private key with the same
+    // tail are different objects in different containers and can never collide.
     private string ResolveUnder(string subdir, string key)
     {
-        var normalized = StorageKey.NormalizeAndValidate(key);
+        var isPublic = StorageKey.IsPublic(key);
+        if (isPublic && string.IsNullOrWhiteSpace(options.PublicRootPath))
+        {
+            throw new InvalidOperationException("No public container is configured; set LocalStorageOptions.PublicRootPath and PublicBaseUrl.");
+        }
 
-        var subRoot = Path.GetFullPath(Path.Combine(options.RootPath, subdir));
+        var root = isPublic ? options.PublicRootPath : options.RootPath;
+        var normalized = StorageKey.NormalizeAndValidate(StorageKey.StripVisibilityPrefix(key));
+
+        var subRoot = Path.GetFullPath(Path.Combine(root, subdir));
         var full = Path.GetFullPath(Path.Combine(subRoot, normalized));
         if (!full.StartsWith(subRoot + Path.DirectorySeparatorChar, StringComparison.Ordinal) &&
             !full.Equals(subRoot, StringComparison.Ordinal))
