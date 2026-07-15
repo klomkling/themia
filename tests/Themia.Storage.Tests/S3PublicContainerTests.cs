@@ -26,6 +26,18 @@ public sealed class S3PublicContainerTests
     }
 
     [Fact]
+    public void GetPublicUrl_percent_encodes_reserved_characters_in_the_key()
+    {
+        // AbsoluteUri is the canonical fully-escaped form; Uri.ToString() would un-escape %20 back to a
+        // space for display, masking that the key was escaped. The '#' MUST be encoded either way, else it
+        // would silently become a fragment delimiter and truncate the path.
+        var url = Create().GetPublicUrl("public/t1/my report#2.jpg").AbsoluteUri;
+        Assert.Contains("my%20report%232.jpg", url);
+        Assert.DoesNotContain('#', url);
+        Assert.DoesNotContain(' ', url);
+    }
+
+    [Fact]
     public void GetPublicUrl_throws_when_no_public_bucket_is_configured()
     {
         var provider = new S3StorageProvider(new S3StorageOptions { BucketName = "private-bucket", Region = "us-east-1" });

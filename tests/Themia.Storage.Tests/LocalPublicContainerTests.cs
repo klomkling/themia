@@ -62,6 +62,18 @@ public sealed class LocalPublicContainerTests : IDisposable
     }
 
     [Fact]
+    public void GetPublicUrl_percent_encodes_reserved_characters_in_the_key()
+    {
+        // AbsoluteUri is the canonical fully-escaped form; Uri.ToString() would un-escape %20 back to a
+        // space for display, masking that the key was escaped. The '#' MUST be encoded either way, else it
+        // would silently become a fragment delimiter and truncate the path.
+        var url = Create().GetPublicUrl("public/t1/my report#2.txt").AbsoluteUri;
+        Assert.Contains("my%20report%232.txt", url);
+        Assert.DoesNotContain('#', url);
+        Assert.DoesNotContain(' ', url);
+    }
+
+    [Fact]
     public void GetPublicUrl_throws_when_no_public_container_is_configured()
     {
         var provider = new LocalStorageProvider(new LocalStorageOptions { RootPath = root, SigningKey = "k" });

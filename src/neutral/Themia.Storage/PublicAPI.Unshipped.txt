@@ -66,6 +66,7 @@ Themia.Storage.StorageVisibility.Public = 1 -> Themia.Storage.StorageVisibility
 const Themia.Storage.StorageKey.PublicPrefix = "public/" -> string!
 static Themia.Storage.StorageKey.IsPublic(string! key) -> bool
 static Themia.Storage.StorageKey.StripVisibilityPrefix(string! key) -> string!
+static Themia.Storage.StorageKey.ToUrlPath(string! key) -> string!
 Themia.Storage.StorageReadResult
 Themia.Storage.StorageReadResult.Content.get -> System.IO.Stream!
 Themia.Storage.StorageReadResult.Content.init -> void

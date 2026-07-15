@@ -202,7 +202,7 @@ public sealed class LocalStorageProvider : IStorageProvider
             throw new InvalidOperationException("No public container is configured; set LocalStorageOptions.PublicRootPath and PublicBaseUrl.");
         }
 
-        return new Uri($"{options.PublicBaseUrl.TrimEnd('/')}/{StorageKey.StripVisibilityPrefix(key)}");
+        return new Uri($"{options.PublicBaseUrl.TrimEnd('/')}/{StorageKey.ToUrlPath(StorageKey.StripVisibilityPrefix(key))}");
     }
 
     // Maps a key to an absolute blob path under {root}/blobs.

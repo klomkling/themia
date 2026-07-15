@@ -1,3 +1,5 @@
+using System.Linq;
+
 namespace Themia.Storage;
 
 /// <summary>Shared syntactic validation for object keys, used by both the neutral provider and the
@@ -38,4 +40,12 @@ public static class StorageKey
     /// <returns>The key without its <see cref="PublicPrefix"/>; an unprefixed key is returned unchanged.</returns>
     public static string StripVisibilityPrefix(string key) =>
         IsPublic(key) ? key[PublicPrefix.Length..] : key;
+
+    /// <summary>Escapes an object key into a URL path: each '/'-separated segment is percent-encoded via
+    /// <see cref="System.Uri.EscapeDataString(string)"/>, the separators preserved. Used to compose a public
+    /// URL from a key that may contain reserved URI characters (spaces, '#', '?', '%').</summary>
+    /// <param name="key">The object key (already stripped of any visibility prefix).</param>
+    /// <returns>The key as a safe URL path.</returns>
+    public static string ToUrlPath(string key) =>
+        string.Join('/', key.Split('/').Select(System.Uri.EscapeDataString));
 }

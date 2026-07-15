@@ -129,7 +129,15 @@ public sealed class S3StorageProvider : IStorageProvider, IDisposable
         return new Uri(url);
     }
 
-    /// <inheritdoc />
+    /// <summary>Returns the permanent, absolute public URL for an object in the public container. The URL is
+    /// composed at read time from <see cref="S3StorageOptions.PublicBaseUrl"/> and the key with its
+    /// visibility prefix stripped and each path segment percent-encoded, so it survives a base-URL/CDN change
+    /// and is never persisted.</summary>
+    /// <param name="key">A public-container object key (one carrying the public visibility prefix).</param>
+    /// <returns>The absolute public URL the object is served from.</returns>
+    /// <exception cref="System.InvalidOperationException">Thrown when <paramref name="key"/> is not a
+    /// public-container key, or when no public container is configured
+    /// (<see cref="S3StorageOptions.PublicBucketName"/> / <see cref="S3StorageOptions.PublicBaseUrl"/> unset).</exception>
     public Uri GetPublicUrl(string key)
     {
         if (!Themia.Storage.StorageKey.IsPublic(key))
@@ -144,7 +152,7 @@ public sealed class S3StorageProvider : IStorageProvider, IDisposable
             throw new InvalidOperationException("No public container is configured; set S3StorageOptions.PublicBucketName and PublicBaseUrl.");
         }
 
-        return new Uri($"{publicBaseUrl.TrimEnd('/')}/{Themia.Storage.StorageKey.StripVisibilityPrefix(key)}");
+        return new Uri($"{publicBaseUrl.TrimEnd('/')}/{Themia.Storage.StorageKey.ToUrlPath(Themia.Storage.StorageKey.StripVisibilityPrefix(key))}");
     }
 
     // The key addresses its own container: a "public/" prefix selects the public bucket and is stripped,

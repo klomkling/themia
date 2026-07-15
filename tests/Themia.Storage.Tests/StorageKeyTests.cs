@@ -26,4 +26,16 @@ public sealed class StorageKeyTests
     {
         Assert.Equal(StorageVisibility.Private, new StoragePutOptions("image/png").Visibility);
     }
+
+    [Fact]
+    public void ToUrlPath_percent_encodes_each_segment_and_preserves_separators()
+    {
+        Assert.Equal("t1/my%20report%232.jpg", StorageKey.ToUrlPath("t1/my report#2.jpg"));
+    }
+
+    [Fact]
+    public void ToUrlPath_leaves_a_safe_key_unchanged()
+    {
+        Assert.Equal("t1/a.jpg", StorageKey.ToUrlPath("t1/a.jpg"));
+    }
 }
