@@ -11,6 +11,8 @@ public sealed class S3StorageProvider : IStorageProvider, IDisposable
 {
     private readonly IAmazonS3 client;
     private readonly string bucket;
+    private readonly string publicBucket;
+    private readonly string publicBaseUrl;
     private readonly bool ownsClient;
 
     /// <summary>Creates the provider, building the S3 client from <paramref name="options"/>.</summary>
@@ -20,6 +22,9 @@ public sealed class S3StorageProvider : IStorageProvider, IDisposable
         ArgumentNullException.ThrowIfNull(options);
         ArgumentException.ThrowIfNullOrWhiteSpace(options.BucketName);
         bucket = options.BucketName;
+        options.Validate();
+        publicBucket = options.PublicBucketName;
+        publicBaseUrl = options.PublicBaseUrl;
         client = BuildClient(options);
         ownsClient = true;
     }
@@ -33,6 +38,8 @@ public sealed class S3StorageProvider : IStorageProvider, IDisposable
         ArgumentException.ThrowIfNullOrWhiteSpace(bucketName);
         this.client = client;
         bucket = bucketName;
+        publicBucket = string.Empty;
+        publicBaseUrl = string.Empty;
         ownsClient = false;
     }
 
@@ -40,11 +47,12 @@ public sealed class S3StorageProvider : IStorageProvider, IDisposable
     public async Task<StorageObjectInfo> PutAsync(string key, Stream content, StoragePutOptions options, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(content);
+        var (resolvedBucket, resolvedKey) = Resolve(key);
         var contentType = string.IsNullOrEmpty(options.ContentType) ? "application/octet-stream" : options.ContentType;
         var response = await client.PutObjectAsync(new PutObjectRequest
         {
-            BucketName = bucket,
-            Key = key,
+            BucketName = resolvedBucket,
+            Key = resolvedKey,
             InputStream = content,
             ContentType = contentType,
             AutoCloseStream = false,
@@ -59,7 +67,8 @@ public sealed class S3StorageProvider : IStorageProvider, IDisposable
     {
         try
         {
-            var response = await client.GetObjectAsync(bucket, key, cancellationToken).ConfigureAwait(false);
+            var (resolvedBucket, resolvedKey) = Resolve(key);
+            var response = await client.GetObjectAsync(resolvedBucket, resolvedKey, cancellationToken).ConfigureAwait(false);
             return new StorageReadResult(response.ResponseStream, response.Headers.ContentType ?? "application/octet-stream", response.ContentLength);
         }
         catch (AmazonS3Exception ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
@@ -73,7 +82,8 @@ public sealed class S3StorageProvider : IStorageProvider, IDisposable
     {
         try
         {
-            await client.GetObjectMetadataAsync(bucket, key, cancellationToken).ConfigureAwait(false);
+            var (resolvedBucket, resolvedKey) = Resolve(key);
+            await client.GetObjectMetadataAsync(resolvedBucket, resolvedKey, cancellationToken).ConfigureAwait(false);
             return true;
         }
         catch (AmazonS3Exception ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
@@ -87,7 +97,8 @@ public sealed class S3StorageProvider : IStorageProvider, IDisposable
     {
         try
         {
-            var response = await client.GetObjectMetadataAsync(bucket, key, cancellationToken).ConfigureAwait(false);
+            var (resolvedBucket, resolvedKey) = Resolve(key);
+            var response = await client.GetObjectMetadataAsync(resolvedBucket, resolvedKey, cancellationToken).ConfigureAwait(false);
             return new StorageObjectInfo(key, response.ContentLength, response.Headers.ContentType ?? "application/octet-stream", response.ETag);
         }
         catch (AmazonS3Exception ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
@@ -97,21 +108,60 @@ public sealed class S3StorageProvider : IStorageProvider, IDisposable
     }
 
     /// <inheritdoc />
-    public Task DeleteAsync(string key, CancellationToken cancellationToken = default) =>
-        client.DeleteObjectAsync(bucket, key, cancellationToken);
+    public Task DeleteAsync(string key, CancellationToken cancellationToken = default)
+    {
+        var (resolvedBucket, resolvedKey) = Resolve(key);
+        return client.DeleteObjectAsync(resolvedBucket, resolvedKey, cancellationToken);
+    }
 
     /// <inheritdoc />
     public async Task<Uri> GetPresignedUrlAsync(string key, PresignedUrlRequest request, CancellationToken cancellationToken = default)
     {
+        var (resolvedBucket, resolvedKey) = Resolve(key);
         var url = await client.GetPreSignedURLAsync(new GetPreSignedUrlRequest
         {
-            BucketName = bucket,
-            Key = key,
+            BucketName = resolvedBucket,
+            Key = resolvedKey,
             Verb = request.Operation == PresignedUrlOperation.Put ? HttpVerb.PUT : HttpVerb.GET,
             Expires = DateTime.UtcNow.Add(request.Expiry),
             ContentType = request.Operation == PresignedUrlOperation.Put ? request.ContentType : null,
         }).ConfigureAwait(false);
         return new Uri(url);
+    }
+
+    /// <inheritdoc />
+    public Uri GetPublicUrl(string key)
+    {
+        if (!Themia.Storage.StorageKey.IsPublic(key))
+        {
+            throw new InvalidOperationException(
+                $"Object '{key}' is not in the public container; only a public object has a public URL. " +
+                "Public visibility is chosen at write time and cannot be changed.");
+        }
+
+        if (string.IsNullOrWhiteSpace(publicBaseUrl))
+        {
+            throw new InvalidOperationException("No public container is configured; set S3StorageOptions.PublicBucketName and PublicBaseUrl.");
+        }
+
+        return new Uri($"{publicBaseUrl.TrimEnd('/')}/{Themia.Storage.StorageKey.StripVisibilityPrefix(key)}");
+    }
+
+    // The key addresses its own container: a "public/" prefix selects the public bucket and is stripped,
+    // so the object is stored under the same tail in a different bucket. Every S3 call routes through here.
+    private (string Bucket, string Key) Resolve(string key)
+    {
+        if (!Themia.Storage.StorageKey.IsPublic(key))
+        {
+            return (bucket, key);
+        }
+
+        if (string.IsNullOrWhiteSpace(publicBucket))
+        {
+            throw new InvalidOperationException("No public container is configured; set S3StorageOptions.PublicBucketName and PublicBaseUrl.");
+        }
+
+        return (publicBucket, Themia.Storage.StorageKey.StripVisibilityPrefix(key));
     }
 
     /// <inheritdoc />
