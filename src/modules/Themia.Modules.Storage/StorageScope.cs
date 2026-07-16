@@ -13,7 +13,7 @@ public static class StorageScope
     public const string PlatformPrefix = "_platform";
 
     /// <summary>The reserved tenant id that would collide with the public namespace.</summary>
-    private const string PublicReservedTenantId = "public";
+    private static readonly string PublicReservedTenantId = StorageKey.PublicPrefix.TrimEnd('/');
 
     /// <summary>Builds the physical key for a <see cref="StorageVisibility.Private"/> object.</summary>
     /// <param name="tenantId">The owning tenant, or <see langword="null"/> for a platform object.</param>

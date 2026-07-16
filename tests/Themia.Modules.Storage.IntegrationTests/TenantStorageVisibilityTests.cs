@@ -130,4 +130,19 @@ public sealed class TenantStorageVisibilityTests(PostgresStorageFixture fixture)
             s.Storage.PutAsync("hero.jpg", Bytes("y"), new StoragePutOptions("image/jpeg", Visibility: StorageVisibility.Private)));
         Assert.Contains("immutable", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
+
+    [Fact]
+    public async Task GetUploadUrl_at_a_different_visibility_than_an_existing_object_throws()
+    {
+        await fixture.ResetAsync();
+        await using var s = NewScope();
+
+        await s.Storage.PutAsync("hero.jpg", Bytes("x"), new StoragePutOptions("image/jpeg"));
+
+        // Same immutability rule as PutAsync, but on the presigned-upload path: minting a PUT into the
+        // other container would orphan the new bytes and leave CompleteUploadAsync statting the wrong one.
+        var ex = await Assert.ThrowsAsync<StorageValidationException>(() =>
+            s.Storage.GetUploadUrlAsync("hero.jpg", "image/jpeg", 10, TimeSpan.FromMinutes(5), StorageVisibility.Public));
+        Assert.Contains("immutable", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
 }

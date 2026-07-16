@@ -149,6 +149,11 @@ public static class StorageEndpoints
         // gate with RequireAuthorization(), and a public URL that 401s in an <img> tag is a URL that looks
         // right and fails at render time. Local only: with S3/R2 the bytes are served straight from the
         // public bucket's custom domain and never reach this app.
+        // SECURITY INVARIANT: this literal-segment route must win over the broker group's catch-all
+        // "/{*key}" for a "/public/..." path (ASP.NET routing: a literal segment outranks a catch-all).
+        // If that precedence ever changed, public GETs would fall through to the auth-gated broker route
+        // and 401. The AuthorizedGroupRouteTests + PublicRouteTests together pin this (public GET returns
+        // 200 under RequireAuthorization; broker routes 401).
         transfer.MapGet("/public/{**key}", async (
             string key,
             [FromServices] IStorageProvider provider,

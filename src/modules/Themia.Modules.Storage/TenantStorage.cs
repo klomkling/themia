@@ -231,6 +231,17 @@ public sealed class TenantStorage : ITenantStorage
             throw new StorageValidationException(validation.Error ?? "Upload failed validation.");
         }
 
+        // Visibility is immutable (same rule as PutAsync): a presigned upload at a different visibility than
+        // an existing object would mint a PUT into the other container, orphaning bytes and leaving the row
+        // pointing at the wrong one. Reject it here rather than let CompleteUploadAsync silently diverge.
+        var existing = await objects.FirstOrDefaultAsync(new StorageObjectByKeySpec(key, tenantContext.CurrentTenantId, committedOnly: false), cancellationToken).ConfigureAwait(false);
+        if (existing is not null && InScope(existing) && existing.Visibility != visibility)
+        {
+            throw new StorageValidationException(
+                $"Object '{key}' already exists with visibility {existing.Visibility}; visibility is immutable. " +
+                "Delete the object and re-upload it to change where it lives.");
+        }
+
         // Reserve a quota-counted but PENDING metadata row up front (declared size is authoritative for
         // the reservation; CommittedAt stays null so the row is invisible to reads until CompleteUploadAsync
         // confirms it). The bytes are written by the subsequent presigned PUT; nothing here writes a blob.
