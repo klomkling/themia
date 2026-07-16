@@ -180,6 +180,13 @@ public static class StorageEndpoints
             }
 
             response.Headers.CacheControl = $"public, max-age={(int)options.PublicCacheMaxAge.TotalSeconds}";
+
+            // Defense-in-depth for a same-origin (Local) public route serving user-uploaded bytes: neutralize
+            // active content (HTML/SVG script) so a public object with an executable Content-Type cannot run in
+            // the app's origin. Harmless to images/video/audio. AllowedContentTypes (an adopter allowlist) is the
+            // upload-time control; these headers are the serve-time backstop when it is unset.
+            response.Headers["X-Content-Type-Options"] = "nosniff";
+            response.Headers["Content-Security-Policy"] = "sandbox; default-src 'none'";
             return Results.Stream(read.Content, read.ContentType);
         });
 

@@ -102,6 +102,23 @@ public sealed class PublicRouteTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Public_route_sets_anti_xss_headers()
+    {
+        // A public object with an executable Content-Type (text/html, image/svg+xml) served same-origin
+        // (Local) is stored XSS unless active content is neutralized at serve time. These headers do that
+        // without affecting images/video/audio.
+        await provider.PutAsync("public/t1/payload.html", new MemoryStream(Encoding.UTF8.GetBytes("<script>alert(1)</script>")),
+            new StoragePutOptions("text/html", Visibility: StorageVisibility.Public));
+
+        var response = await client.GetAsync("/storage/public/t1/payload.html");
+
+        Assert.True(response.Headers.TryGetValues("X-Content-Type-Options", out var nosniff));
+        Assert.Equal("nosniff", Assert.Single(nosniff));
+        Assert.True(response.Headers.TryGetValues("Content-Security-Policy", out var csp));
+        Assert.Equal("sandbox; default-src 'none'", Assert.Single(csp));
+    }
+
+    [Fact]
     public async Task Public_route_cannot_reach_a_private_object()
     {
         // Same tail, private container. The public route must not serve it under any key shape.
