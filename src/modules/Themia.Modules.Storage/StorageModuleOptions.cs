@@ -15,6 +15,10 @@ public sealed class StorageModuleOptions
     /// <summary>An allowlist of accepted content types. <see langword="null"/> or empty allows any type.</summary>
     public IReadOnlyList<string>? AllowedContentTypes { get; set; }
 
+    /// <summary>How long a public object may be cached by browsers and CDNs (default 1 day). Public media
+    /// is not sensitive — the deliberate opposite of the dashboards' <c>no-store</c>.</summary>
+    public TimeSpan PublicCacheMaxAge { get; set; } = TimeSpan.FromDays(1);
+
     /// <summary>Validates the options; throws when a value is out of range.</summary>
     /// <exception cref="ArgumentException">The connection-string name is null or whitespace.</exception>
     /// <exception cref="System.ArgumentOutOfRangeException">A numeric option is less than 1.</exception>

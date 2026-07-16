@@ -42,6 +42,8 @@ Themia.Modules.Storage.StorageModuleOptions.DefaultTenantQuotaBytes.get -> long
 Themia.Modules.Storage.StorageModuleOptions.DefaultTenantQuotaBytes.set -> void
 Themia.Modules.Storage.StorageModuleOptions.AllowedContentTypes.get -> System.Collections.Generic.IReadOnlyList<string!>?
 Themia.Modules.Storage.StorageModuleOptions.AllowedContentTypes.set -> void
+Themia.Modules.Storage.StorageModuleOptions.PublicCacheMaxAge.get -> System.TimeSpan
+Themia.Modules.Storage.StorageModuleOptions.PublicCacheMaxAge.set -> void
 Themia.Modules.Storage.StorageModuleOptions.Validate() -> void
 Themia.Modules.Storage.StorageValidationException
 Themia.Modules.Storage.StorageValidationException.StorageValidationException(string! message) -> void
