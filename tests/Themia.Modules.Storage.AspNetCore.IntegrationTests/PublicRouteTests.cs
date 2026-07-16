@@ -153,3 +153,62 @@ public sealed class PublicRouteTests : IAsyncLifetime
         public string? UserId => "tester";
     }
 }
+
+/// <summary>The startup guard in <c>MapThemiaStorageEndpoints</c> is the exact mechanism that stops every
+/// public URL from silently 404ing in production: a Local <c>PublicBaseUrl</c> that is absolute (so it
+/// passes <c>UseLocal</c>'s own validation) but does not end with the route mount <c>{prefix}/public</c>
+/// must fail fast at mapping time, not at render time.</summary>
+public sealed class PublicMountPathGuardTests
+{
+    private const string SigningKey = "test-signing-key-at-least-32-characters-long";
+
+    [Fact]
+    public void Mapping_throws_when_PublicBaseUrl_does_not_end_with_the_route_mount()
+    {
+        var app = BuildApp("http://127.0.0.1/wrong-path");
+        try
+        {
+            // Absolute http, so UseLocal's own Validate() already passed; the only remaining thrower is the
+            // mount-path guard. Assert on its message so a future UseLocal change can't mask this test.
+            var ex = Assert.Throws<InvalidOperationException>(() => app.MapThemiaStorageEndpoints());
+            Assert.Contains("must end with the public route mount", ex.Message, StringComparison.Ordinal);
+        }
+        finally
+        {
+            ((IDisposable)app).Dispose();
+        }
+    }
+
+    [Fact]
+    public void Mapping_does_not_throw_when_PublicBaseUrl_ends_with_the_route_mount()
+    {
+        var app = BuildApp("http://127.0.0.1/storage/public");
+        try
+        {
+            app.MapThemiaStorageEndpoints(); // does not throw
+        }
+        finally
+        {
+            ((IDisposable)app).Dispose();
+        }
+    }
+
+    private static WebApplication BuildApp(string publicBaseUrl)
+    {
+        var root = Path.Combine(Path.GetTempPath(), "themia-storage-guard", Guid.NewGuid().ToString("N"));
+        var publicRoot = Path.Combine(Path.GetTempPath(), "themia-storage-guard-pub", Guid.NewGuid().ToString("N"));
+
+        var builder = WebApplication.CreateBuilder();
+        builder.Services
+            .AddThemiaStorage(o => o.DefaultTenantQuotaBytes = 1024L * 1024 * 1024)
+            .UseLocal(o =>
+            {
+                o.RootPath = root;
+                o.PublicRootPath = publicRoot;
+                o.PublicBaseUrl = publicBaseUrl;
+                o.SigningKey = SigningKey;
+            });
+
+        return builder.Build();
+    }
+}

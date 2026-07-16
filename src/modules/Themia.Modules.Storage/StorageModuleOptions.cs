@@ -28,6 +28,8 @@ public sealed class StorageModuleOptions
             throw new ArgumentOutOfRangeException(nameof(MaxObjectSizeBytes), MaxObjectSizeBytes, "Must be at least 1 byte.");
         if (DefaultTenantQuotaBytes < 1)
             throw new ArgumentOutOfRangeException(nameof(DefaultTenantQuotaBytes), DefaultTenantQuotaBytes, "Must be at least 1 byte.");
+        if (PublicCacheMaxAge < TimeSpan.Zero)
+            throw new ArgumentOutOfRangeException(nameof(PublicCacheMaxAge), PublicCacheMaxAge, "Must not be negative.");
         if (string.IsNullOrWhiteSpace(ConnectionStringName))
             throw new ArgumentException("Must not be null or whitespace.", nameof(ConnectionStringName));
     }
