@@ -23,3 +23,13 @@ public sealed class StorageQuotaExceededException : Exception
     /// <param name="message">The quota details.</param>
     public StorageQuotaExceededException(string message) : base(message) { }
 }
+
+/// <summary>Thrown when a public URL is requested for an object that is not in the public container (or
+/// does not exist). Deliberately an exception rather than a null/placeholder URL: a URL that looks right
+/// and 403s at render time is the worst of the available failure modes.</summary>
+public sealed class StorageNotPublicException : Exception
+{
+    /// <summary>Creates the exception.</summary>
+    /// <param name="message">The reason no public URL exists.</param>
+    public StorageNotPublicException(string message) : base(message) { }
+}

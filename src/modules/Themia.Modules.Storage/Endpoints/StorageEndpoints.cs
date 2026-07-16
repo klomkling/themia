@@ -47,7 +47,7 @@ public static class StorageEndpoints
                 });
             }
 
-            var url = await storage.GetUploadUrlAsync(request.Key, request.ContentType, request.SizeBytes, TimeSpan.FromMinutes(15), ct);
+            var url = await storage.GetUploadUrlAsync(request.Key, request.ContentType, request.SizeBytes, TimeSpan.FromMinutes(15), cancellationToken: ct);
             return Results.Ok(new { uploadUrl = ToAbsolute(httpRequest, prefix, url) });
         });
 
