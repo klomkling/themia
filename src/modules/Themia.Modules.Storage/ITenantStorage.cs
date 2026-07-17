@@ -47,9 +47,17 @@ public interface ITenantStorage
     /// <param name="contentType">The content type the upload must declare.</param>
     /// <param name="sizeBytes">The declared object size in bytes (reserved against quota up front).</param>
     /// <param name="expiry">How long the URL stays valid.</param>
+    /// <param name="visibility">Which container the uploaded object lands in. Immutable once written.</param>
     /// <param name="cancellationToken">A cancellation token.</param>
     /// <returns>A time-limited upload URL.</returns>
-    Task<Uri> GetUploadUrlAsync(string key, string contentType, long sizeBytes, TimeSpan expiry, CancellationToken cancellationToken = default);
+    Task<Uri> GetUploadUrlAsync(string key, string contentType, long sizeBytes, TimeSpan expiry, StorageVisibility visibility = StorageVisibility.Private, CancellationToken cancellationToken = default);
+
+    /// <summary>The permanent, unsigned, absolute URL of a public object.</summary>
+    /// <param name="key">The logical key.</param>
+    /// <param name="cancellationToken">A cancellation token.</param>
+    /// <returns>The absolute public URL.</returns>
+    /// <exception cref="StorageNotPublicException">The object is private or does not exist.</exception>
+    Task<Uri> GetPublicUrlAsync(string key, CancellationToken cancellationToken = default);
 
     /// <summary>Confirms a presigned upload: stats the actually-stored bytes, validates and re-checks the
     /// per-tenant quota against the <em>actual</em> size, then commits the pending reservation (recording

@@ -76,6 +76,8 @@ public sealed class StorageBuilder
         var local = new LocalStorageOptions();
         configure(local);
         local.Validate();
+        // Register the options so MapThemiaStorageEndpoints can validate the public mount path at startup.
+        services.TryAddSingleton(local);
         // Register the signer so the module's _local routes can verify presigned tokens.
         if (!string.IsNullOrWhiteSpace(local.SigningKey))
         {

@@ -11,5 +11,6 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/neutral/Themia.Storage/Themia.Storage.csproj" />
+    <ProjectReference Include="../../src/neutral/Themia.Storage.S3/Themia.Storage.S3.csproj" />
   </ItemGroup>
 </Project>

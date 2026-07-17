@@ -10,6 +10,27 @@ with the *why* and concrete upgrade steps.
 - Each entry states: **What changed**, **Why**, and **How to upgrade** (before → after).
 - Non-breaking changes are *not* listed here — see the CHANGELOG.
 
+## 0.8.x → 0.9.0
+
+**Breaking: `IStorageProvider.GetPublicUrl(string key)`.** Only affects code that implements
+`IStorageProvider` directly — the built-in Local and S3/R2 providers already do. Consumers of
+`ITenantStorage` need no change.
+
+If you implement `IStorageProvider`, add:
+
+```csharp
+public Uri GetPublicUrl(string key) =>
+    throw new InvalidOperationException("This backend has no public container.");
+```
+
+**Optional:** to serve public media, configure a public container —
+`PublicRootPath` + `PublicBaseUrl` (Local) or `PublicBucketName` + `PublicBaseUrl` (S3/R2) — and write with
+`new StoragePutOptions(contentType, Visibility: StorageVisibility.Public)`. A relative `PublicBaseUrl` throws
+at startup. **Visibility cannot be changed after a write**; delete and re-upload to move an object.
+
+**Schema:** `storage_objects.visibility` is added by `StorageVisibilityMigration` (FluentMigrator, applied on
+boot). Every existing row defaults to `Private`, which is correct: private keys are unchanged and no blob moves.
+
 ## 0.6.7
 
 ### `OidcExternalAuthProvider` and `ExternalAuthenticationFlow` are now `internal`

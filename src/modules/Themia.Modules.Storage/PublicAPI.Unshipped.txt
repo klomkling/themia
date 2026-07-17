@@ -5,6 +5,7 @@ override Themia.Modules.Storage.Migrations.StorageSchemaMigration.Down() -> void
 override Themia.Modules.Storage.Migrations.StorageSchemaMigration.Up() -> void
 static Themia.Modules.Storage.Mapping.StorageDapperMappings.Apply(Themia.Framework.Data.Dapper.Mapping.EntityMappingRegistry! registry) -> void
 static Themia.Modules.Storage.StorageScope.PhysicalKey(Themia.Framework.Core.Abstractions.Tenancy.TenantId? tenantId, string! logicalKey) -> string!
+static Themia.Modules.Storage.StorageScope.PhysicalKey(Themia.Framework.Core.Abstractions.Tenancy.TenantId? tenantId, string! logicalKey, Themia.Storage.StorageVisibility visibility) -> string!
 Themia.Modules.Storage.EntityConfiguration.StorageModelBuilderExtensions
 Themia.Modules.Storage.Entities.StorageObject
 Themia.Modules.Storage.Entities.StorageObject.ContentType.get -> string!
@@ -21,9 +22,15 @@ Themia.Modules.Storage.Entities.StorageObject.SizeBytes.set -> void
 Themia.Modules.Storage.Entities.StorageObject.StorageObject() -> void
 Themia.Modules.Storage.Entities.StorageObject.TenantId.get -> Themia.Framework.Core.Abstractions.Tenancy.TenantId?
 Themia.Modules.Storage.Entities.StorageObject.TenantId.set -> void
+Themia.Modules.Storage.Entities.StorageObject.Visibility.get -> Themia.Storage.StorageVisibility
+Themia.Modules.Storage.Entities.StorageObject.Visibility.set -> void
 Themia.Modules.Storage.Mapping.StorageDapperMappings
 Themia.Modules.Storage.Migrations.StorageSchemaMigration
 Themia.Modules.Storage.Migrations.StorageSchemaMigration.StorageSchemaMigration() -> void
+Themia.Modules.Storage.Migrations.StorageVisibilityMigration
+Themia.Modules.Storage.Migrations.StorageVisibilityMigration.StorageVisibilityMigration() -> void
+override Themia.Modules.Storage.Migrations.StorageVisibilityMigration.Down() -> void
+override Themia.Modules.Storage.Migrations.StorageVisibilityMigration.Up() -> void
 Themia.Modules.Storage.StorageScope
 Themia.Modules.Storage.StorageModuleOptions
 Themia.Modules.Storage.StorageModuleOptions.StorageModuleOptions() -> void
@@ -35,6 +42,8 @@ Themia.Modules.Storage.StorageModuleOptions.DefaultTenantQuotaBytes.get -> long
 Themia.Modules.Storage.StorageModuleOptions.DefaultTenantQuotaBytes.set -> void
 Themia.Modules.Storage.StorageModuleOptions.AllowedContentTypes.get -> System.Collections.Generic.IReadOnlyList<string!>?
 Themia.Modules.Storage.StorageModuleOptions.AllowedContentTypes.set -> void
+Themia.Modules.Storage.StorageModuleOptions.PublicCacheMaxAge.get -> System.TimeSpan
+Themia.Modules.Storage.StorageModuleOptions.PublicCacheMaxAge.set -> void
 Themia.Modules.Storage.StorageModuleOptions.Validate() -> void
 Themia.Modules.Storage.StorageValidationException
 Themia.Modules.Storage.StorageValidationException.StorageValidationException(string! message) -> void
@@ -42,6 +51,8 @@ Themia.Modules.Storage.StorageScanException
 Themia.Modules.Storage.StorageScanException.StorageScanException(string! message) -> void
 Themia.Modules.Storage.StorageQuotaExceededException
 Themia.Modules.Storage.StorageQuotaExceededException.StorageQuotaExceededException(string! message) -> void
+Themia.Modules.Storage.StorageNotPublicException
+Themia.Modules.Storage.StorageNotPublicException.StorageNotPublicException(string! message) -> void
 Themia.Modules.Storage.Validation.FileValidationResult
 Themia.Modules.Storage.Validation.FileValidationResult.FileValidationResult() -> void
 Themia.Modules.Storage.Validation.FileValidationResult.FileValidationResult(bool IsValid, string? Error) -> void
@@ -85,7 +96,8 @@ Themia.Modules.Storage.ITenantStorage.GetAsync(string! key, System.Threading.Can
 Themia.Modules.Storage.ITenantStorage.ExistsAsync(string! key, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!
 Themia.Modules.Storage.ITenantStorage.DeleteAsync(string! key, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
 Themia.Modules.Storage.ITenantStorage.GetDownloadUrlAsync(string! key, System.TimeSpan expiry, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Uri!>!
-Themia.Modules.Storage.ITenantStorage.GetUploadUrlAsync(string! key, string! contentType, long sizeBytes, System.TimeSpan expiry, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Uri!>!
+Themia.Modules.Storage.ITenantStorage.GetUploadUrlAsync(string! key, string! contentType, long sizeBytes, System.TimeSpan expiry, Themia.Storage.StorageVisibility visibility = Themia.Storage.StorageVisibility.Private, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Uri!>!
+Themia.Modules.Storage.ITenantStorage.GetPublicUrlAsync(string! key, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Uri!>!
 Themia.Modules.Storage.ITenantStorage.CompleteUploadAsync(string! key, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Storage.StoredObject!>!
 Themia.Modules.Storage.TenantStorage
 Themia.Modules.Storage.TenantStorage.TenantStorage(Themia.Storage.IStorageProvider! provider, Themia.Framework.Data.Abstractions.Repositories.IRepository<Themia.Modules.Storage.Entities.StorageObject!, System.Guid>! objects, Themia.Framework.Data.Abstractions.UnitOfWork.IUnitOfWork! unitOfWork, Themia.Framework.Core.Abstractions.Tenancy.ITenantContext! tenantContext, Themia.Modules.Storage.Validation.IFileValidator! validator, Themia.Modules.Storage.Scanning.IFileScanner! scanner, Themia.Modules.Storage.StorageModuleOptions! options, System.TimeProvider! timeProvider, Microsoft.Extensions.Logging.ILogger<Themia.Modules.Storage.TenantStorage!>! logger) -> void
@@ -94,7 +106,8 @@ Themia.Modules.Storage.TenantStorage.GetAsync(string! key, System.Threading.Canc
 Themia.Modules.Storage.TenantStorage.ExistsAsync(string! key, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!
 Themia.Modules.Storage.TenantStorage.DeleteAsync(string! key, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
 Themia.Modules.Storage.TenantStorage.GetDownloadUrlAsync(string! key, System.TimeSpan expiry, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Uri!>!
-Themia.Modules.Storage.TenantStorage.GetUploadUrlAsync(string! key, string! contentType, long sizeBytes, System.TimeSpan expiry, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Uri!>!
+Themia.Modules.Storage.TenantStorage.GetUploadUrlAsync(string! key, string! contentType, long sizeBytes, System.TimeSpan expiry, Themia.Storage.StorageVisibility visibility = Themia.Storage.StorageVisibility.Private, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Uri!>!
+Themia.Modules.Storage.TenantStorage.GetPublicUrlAsync(string! key, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Uri!>!
 Themia.Modules.Storage.TenantStorage.CompleteUploadAsync(string! key, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Storage.StoredObject!>!
 Themia.Modules.Storage.DependencyInjection.R2StorageOptions
 Themia.Modules.Storage.DependencyInjection.R2StorageOptions.AccessKey.get -> string?

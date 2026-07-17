@@ -1,5 +1,6 @@
 using Themia.Framework.Core.Abstractions.Entities;
 using Themia.Framework.Core.Abstractions.Tenancy;
+using Themia.Storage;
 
 namespace Themia.Modules.Storage.Entities;
 
@@ -25,6 +26,10 @@ public sealed class StorageObject : SoftDeletableEntity<Guid>, ITenantEntity
 
     /// <summary>When the object's upload was confirmed; null while a presigned reservation is pending (invisible to reads).</summary>
     public DateTimeOffset? CommittedAt { get; set; }
+
+    /// <summary>Which container the blob lives in. Set when the object is written and <b>immutable</b>:
+    /// changing it would require physically moving bytes between containers, which no operation does.</summary>
+    public StorageVisibility Visibility { get; set; } = StorageVisibility.Private;
 
     /// <summary>Assigns the identifier for a new (transient) object.</summary>
     /// <param name="id">A client-generated identifier.</param>

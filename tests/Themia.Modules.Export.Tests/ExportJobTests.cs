@@ -320,7 +320,10 @@ internal sealed class FakeTenantStorage : ITenantStorage
     public Task<bool> ExistsAsync(string key, CancellationToken cancellationToken = default)
         => Task.FromResult(false);
 
-    public Task<Uri> GetUploadUrlAsync(string key, string contentType, long sizeBytes, TimeSpan expiry, CancellationToken cancellationToken = default)
+    public Task<Uri> GetUploadUrlAsync(string key, string contentType, long sizeBytes, TimeSpan expiry, StorageVisibility visibility = StorageVisibility.Private, CancellationToken cancellationToken = default)
+        => throw new NotImplementedException();
+
+    public Task<Uri> GetPublicUrlAsync(string key, CancellationToken cancellationToken = default)
         => throw new NotImplementedException();
 
     public Task<StoredObject> CompleteUploadAsync(string key, CancellationToken cancellationToken = default)

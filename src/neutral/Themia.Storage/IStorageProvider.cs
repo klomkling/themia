@@ -46,4 +46,15 @@ public interface IStorageProvider
     /// <param name="cancellationToken">A cancellation token.</param>
     /// <returns>A time-limited URL.</returns>
     Task<Uri> GetPresignedUrlAsync(string key, PresignedUrlRequest request, CancellationToken cancellationToken = default);
+
+    /// <summary>The permanent, unsigned, absolute URL of a <see cref="StorageVisibility.Public"/> object.
+    /// Pure composition of configuration and the key — it performs no I/O and does not check existence.
+    /// Synchronous by design, and deliberately <b>not</b> derived from the incoming request: a permanent URL
+    /// must survive a background job (which has no <c>HttpContext</c>) and a proxy/CDN (whose internal
+    /// origin is not the public one).</summary>
+    /// <param name="key">The physical object key (must address the public container).</param>
+    /// <returns>The absolute public URL.</returns>
+    /// <exception cref="InvalidOperationException">The key is not in the public container, or no public
+    /// container is configured. It never returns a URL that would 403 at render time.</exception>
+    Uri GetPublicUrl(string key);
 }

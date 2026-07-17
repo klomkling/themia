@@ -31,6 +31,8 @@ public static class StorageModelBuilderExtensions
             b.Property(o => o.SizeBytes).HasColumnName("size_bytes");
             b.Property(o => o.ETag).HasColumnName("etag").HasMaxLength(256);
             b.Property(o => o.CommittedAt).HasColumnName("committed_at");
+            // Stored as int so the enum's numeric contract is explicit and stable across engines.
+            b.Property(o => o.Visibility).HasColumnName("visibility").HasConversion<int>();
         }
     }
 }

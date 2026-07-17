@@ -27,6 +27,42 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-07-16
+
+### Added
+- **`Themia.Storage` / `Themia.Storage.S3` / `Themia.Modules.Storage`** — permanent, unsigned, **absolute**
+  public URLs for world-readable media (coord #0022). `StoragePutOptions.Visibility` selects a container at
+  write time; `ITenantStorage.GetPublicUrlAsync(key)` returns the URL, resolved at *read* time from a
+  configured absolute `PublicBaseUrl`. A presigned URL is a *time-boxed capability* and is not a substitute:
+  an expiring URL breaks OG/Twitter previews on a shared listing (the share is permanent, the URL is not),
+  403s a crawler that re-fetches later, and defeats CDN caching because every render mints a fresh cache key.
+  Visibility is a property of the **container**, not the object, because R2 has no per-object ACL and S3
+  Object Ownership defaults to *bucket owner enforced*, which disables object ACLs entirely — so a per-object
+  flag would silently no-op on both real backends. Configure `PublicRootPath` + `PublicBaseUrl` (Local) or
+  `PublicBucketName` + `PublicBaseUrl` (S3/R2); a relative `PublicBaseUrl` now throws at **startup**.
+  Public objects on Local are served from a new **ungated** `GET {mount}/public/{**key}` route with
+  `Cache-Control: public` — deliberately the opposite of the dashboards' `no-store`, because these bytes are
+  not sensitive. On S3/R2 they are served straight from the public bucket and never reach the app.
+
+### Changed
+- **(breaking)** **`IStorageProvider` gains `Uri GetPublicUrl(string key)`.** Affects only code that
+  *implements* the interface directly; every consumer of `ITenantStorage` is unaffected. See `MIGRATION.md`.
+- **`ITenantStorage.GetUploadUrlAsync`** takes a `StorageVisibility` (defaulting to `Private`), so a presigned
+  upload lands directly in the right container.
+- **Visibility is immutable once written.** There is deliberately no move/flip operation: private→public is
+  unnecessary (keys are unguessable GUIDs), and public→private is an illusion (a CDN and Google's cache keep
+  serving the copy they already have). Because no operation spans two containers, the design has **no
+  partial-failure state** — no half-moved object, no orphaned blob, no reconcile sweep. Re-putting an existing
+  key with a different `Visibility` throws rather than silently orphaning the old blob or ignoring the caller.
+- Private physical keys are **unchanged**, so **no existing blob moves** and no data migration is required.
+
+### Security
+- **`Themia.Modules.Storage`** — the public serving route sets `X-Content-Type-Options: nosniff` and
+  `Content-Security-Policy: sandbox; default-src 'none'` so a public object stored with an executable content
+  type (`text/html`, `image/svg+xml`) cannot execute script in the app's origin when served same-origin (the
+  Local backend). Adopters serving user-uploaded media publicly should also restrict `AllowedContentTypes` to
+  a media allowlist.
+
 ## [0.8.8] - 2026-07-14
 
 ### Fixed

@@ -34,6 +34,18 @@ public static class StorageEndpoints
         // differently from S3/R2, whose presigned URLs never touch this app at all.
         var transfer = endpoints.MapGroup(prefix);
 
+        // A PublicBaseUrl that is absolute but does not end with this mount (e.g. https://api.example.com
+        // instead of https://api.example.com/storage/public) passes the "is it absolute?" check and then
+        // 404s on every single image. Fail at startup instead.
+        var localOptions = endpoints.ServiceProvider.GetService<LocalStorageOptions>();
+        if (localOptions is not null && !string.IsNullOrWhiteSpace(localOptions.PublicBaseUrl) &&
+            !localOptions.PublicBaseUrl.TrimEnd('/').EndsWith($"{prefix}/public", StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                $"LocalStorageOptions.PublicBaseUrl ('{localOptions.PublicBaseUrl}') must end with the public route mount " +
+                $"('{prefix}/public') — e.g. https://api.example.com{prefix}/public. Otherwise every public URL 404s.");
+        }
+
         // Request a presigned upload URL. The provider returns an absolute URL for S3/R2 and a relative
         // _local URL for the Local backend; resolve both to an absolute URL the client can use. The
         // reservation is pending (invisible) until the client uploads the bytes and POSTs /complete.
@@ -47,7 +59,7 @@ public static class StorageEndpoints
                 });
             }
 
-            var url = await storage.GetUploadUrlAsync(request.Key, request.ContentType, request.SizeBytes, TimeSpan.FromMinutes(15), ct);
+            var url = await storage.GetUploadUrlAsync(request.Key, request.ContentType, request.SizeBytes, TimeSpan.FromMinutes(15), cancellationToken: ct);
             return Results.Ok(new { uploadUrl = ToAbsolute(httpRequest, prefix, url) });
         });
 
@@ -130,6 +142,57 @@ public static class StorageEndpoints
             buffer.Position = 0;
             await provider.PutAsync(key, buffer, new StoragePutOptions(request.ContentType ?? "application/octet-stream"), ct);
             return Results.NoContent();
+        });
+
+        // Serve a public object. No auth, no token: a public object is public by definition. It is mapped
+        // in the ungated `transfer` group ON PURPOSE — the group returned to the host is the one adopters
+        // gate with RequireAuthorization(), and a public URL that 401s in an <img> tag is a URL that looks
+        // right and fails at render time. Local only: with S3/R2 the bytes are served straight from the
+        // public bucket's custom domain and never reach this app.
+        // SECURITY INVARIANT: this literal-segment route must win over the broker group's catch-all
+        // "/{*key}" for a "/public/..." path (ASP.NET routing: a literal segment outranks a catch-all).
+        // If that precedence ever changed, public GETs would fall through to the auth-gated broker route
+        // and 401. The AuthorizedGroupRouteTests + PublicRouteTests together pin this (public GET returns
+        // 200 under RequireAuthorization; broker routes 401).
+        transfer.MapGet("/public/{**key}", async (
+            string key,
+            [FromServices] IStorageProvider provider,
+            [FromServices] StorageModuleOptions options,
+            HttpResponse response,
+            CancellationToken ct) =>
+        {
+            // Address the public container explicitly. A private object is unreachable through this route
+            // no matter what key is supplied, because the prefix — not the caller — selects the container.
+            var physicalKey = StorageKey.PublicPrefix + key;
+
+            StorageReadResult? read;
+            try
+            {
+                read = await provider.GetAsync(physicalKey, ct);
+            }
+            catch (ArgumentException)
+            {
+                return Results.NotFound(); // traversal / malformed key
+            }
+            catch (InvalidOperationException)
+            {
+                return Results.NotFound(); // no public container configured on this backend
+            }
+
+            if (read is null)
+            {
+                return Results.NotFound();
+            }
+
+            response.Headers.CacheControl = $"public, max-age={(int)options.PublicCacheMaxAge.TotalSeconds}";
+
+            // Defense-in-depth for a same-origin (Local) public route serving user-uploaded bytes: neutralize
+            // active content (HTML/SVG script) so a public object with an executable Content-Type cannot run in
+            // the app's origin. Harmless to images/video/audio. AllowedContentTypes (an adopter allowlist) is the
+            // upload-time control; these headers are the serve-time backstop when it is unset.
+            response.Headers["X-Content-Type-Options"] = "nosniff";
+            response.Headers["Content-Security-Policy"] = "sandbox; default-src 'none'";
+            return Results.Stream(read.Content, read.ContentType);
         });
 
         // Request a presigned download URL (404 when absent).

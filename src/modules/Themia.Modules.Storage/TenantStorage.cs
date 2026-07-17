@@ -70,7 +70,19 @@ public sealed class TenantStorage : ITenantStorage
     public async Task<StoredObject> PutAsync(string key, Stream content, StoragePutOptions putOptions, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(content);
-        var physicalKey = StorageScope.PhysicalKey(tenantContext.CurrentTenantId, key);
+
+        // Visibility is immutable: it selects the container, and no operation moves bytes between
+        // containers. Re-putting at a different visibility would either orphan the old blob (write to the
+        // new container) or silently ignore the caller (write to the old one). Reject it instead.
+        var existing = await objects.FirstOrDefaultAsync(new StorageObjectByKeySpec(key, tenantContext.CurrentTenantId, committedOnly: false), cancellationToken).ConfigureAwait(false);
+        if (existing is not null && InScope(existing) && existing.Visibility != putOptions.Visibility)
+        {
+            throw new StorageValidationException(
+                $"Object '{key}' already exists with visibility {existing.Visibility}; visibility is immutable. " +
+                "Delete the object and re-upload it to change where it lives.");
+        }
+
+        var physicalKey = StorageScope.PhysicalKey(tenantContext.CurrentTenantId, key, putOptions.Visibility);
 
         // Buffer + measure with a hard cap so the size limit holds even for a non-seekable stream
         // (server-proxied uploads are for small files; large uploads use a presigned PUT).
@@ -97,7 +109,7 @@ public sealed class TenantStorage : ITenantStorage
         // Metadata-first: reserve the row (quota-checked) in a transaction, then write the blob. Server-
         // proxied uploads commit inline (the bytes are written in this call), so the row is visible at once.
         var (row, rowWasCreated, priorContentType, priorSize, priorETag) =
-            await ReserveAsync(key, putOptions.ContentType, size, commit: true, cancellationToken).ConfigureAwait(false);
+            await ReserveAsync(key, putOptions.ContentType, size, commit: true, putOptions.Visibility, cancellationToken).ConfigureAwait(false);
 
         try
         {
@@ -160,7 +172,7 @@ public sealed class TenantStorage : ITenantStorage
             return null;
         }
 
-        return await provider.GetAsync(StorageScope.PhysicalKey(tenantContext.CurrentTenantId, key), cancellationToken).ConfigureAwait(false);
+        return await provider.GetAsync(StorageScope.PhysicalKey(tenantContext.CurrentTenantId, key, row.Visibility), cancellationToken).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -186,7 +198,7 @@ public sealed class TenantStorage : ITenantStorage
 
         // Best-effort blob delete; a backend failure must not fail the already-committed logical
         // delete. An orphaned blob is swept by a future reconcile sweep.
-        var physicalKey = StorageScope.PhysicalKey(tenantContext.CurrentTenantId, key);
+        var physicalKey = StorageScope.PhysicalKey(tenantContext.CurrentTenantId, key, row.Visibility);
         try
         {
             await provider.DeleteAsync(physicalKey, cancellationToken).ConfigureAwait(false);
@@ -198,14 +210,19 @@ public sealed class TenantStorage : ITenantStorage
     }
 
     /// <inheritdoc />
-    public Task<Uri> GetDownloadUrlAsync(string key, TimeSpan expiry, CancellationToken cancellationToken = default) =>
-        provider.GetPresignedUrlAsync(
-            StorageScope.PhysicalKey(tenantContext.CurrentTenantId, key),
+    public async Task<Uri> GetDownloadUrlAsync(string key, TimeSpan expiry, CancellationToken cancellationToken = default)
+    {
+        var row = await objects.FirstOrDefaultAsync(new StorageObjectByKeySpec(key, tenantContext.CurrentTenantId, committedOnly: true), cancellationToken).ConfigureAwait(false);
+        var visibility = row is not null && InScope(row) ? row.Visibility : StorageVisibility.Private;
+
+        return await provider.GetPresignedUrlAsync(
+            StorageScope.PhysicalKey(tenantContext.CurrentTenantId, key, visibility),
             new PresignedUrlRequest(PresignedUrlOperation.Get, expiry),
-            cancellationToken);
+            cancellationToken).ConfigureAwait(false);
+    }
 
     /// <inheritdoc />
-    public async Task<Uri> GetUploadUrlAsync(string key, string contentType, long sizeBytes, TimeSpan expiry, CancellationToken cancellationToken = default)
+    public async Task<Uri> GetUploadUrlAsync(string key, string contentType, long sizeBytes, TimeSpan expiry, StorageVisibility visibility = StorageVisibility.Private, CancellationToken cancellationToken = default)
     {
         // Presigned upload: only the declared metadata is known here, no bytes to sniff.
         var validation = validator.Validate(key, contentType, sizeBytes, content: null);
@@ -214,21 +231,55 @@ public sealed class TenantStorage : ITenantStorage
             throw new StorageValidationException(validation.Error ?? "Upload failed validation.");
         }
 
+        // Visibility is immutable (same rule as PutAsync): a presigned upload at a different visibility than
+        // an existing object would mint a PUT into the other container, orphaning bytes and leaving the row
+        // pointing at the wrong one. Reject it here rather than let CompleteUploadAsync silently diverge.
+        var existing = await objects.FirstOrDefaultAsync(new StorageObjectByKeySpec(key, tenantContext.CurrentTenantId, committedOnly: false), cancellationToken).ConfigureAwait(false);
+        if (existing is not null && InScope(existing) && existing.Visibility != visibility)
+        {
+            throw new StorageValidationException(
+                $"Object '{key}' already exists with visibility {existing.Visibility}; visibility is immutable. " +
+                "Delete the object and re-upload it to change where it lives.");
+        }
+
         // Reserve a quota-counted but PENDING metadata row up front (declared size is authoritative for
         // the reservation; CommittedAt stays null so the row is invisible to reads until CompleteUploadAsync
         // confirms it). The bytes are written by the subsequent presigned PUT; nothing here writes a blob.
-        await ReserveAsync(key, contentType, sizeBytes, commit: false, cancellationToken).ConfigureAwait(false);
+        await ReserveAsync(key, contentType, sizeBytes, commit: false, visibility, cancellationToken).ConfigureAwait(false);
 
         return await provider.GetPresignedUrlAsync(
-            StorageScope.PhysicalKey(tenantContext.CurrentTenantId, key),
+            StorageScope.PhysicalKey(tenantContext.CurrentTenantId, key, visibility),
             new PresignedUrlRequest(PresignedUrlOperation.Put, expiry, contentType),
             cancellationToken).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
+    public async Task<Uri> GetPublicUrlAsync(string key, CancellationToken cancellationToken = default)
+    {
+        var row = await objects.FirstOrDefaultAsync(new StorageObjectByKeySpec(key, tenantContext.CurrentTenantId, committedOnly: true), cancellationToken).ConfigureAwait(false);
+        if (row is null || !InScope(row))
+        {
+            throw new StorageNotPublicException($"Object '{key}' does not exist; asking for the public URL of a missing object is a caller bug.");
+        }
+
+        if (row.Visibility != StorageVisibility.Public)
+        {
+            throw new StorageNotPublicException($"Object '{key}' is private and has no public URL. Visibility is chosen at write time and is immutable.");
+        }
+
+        return provider.GetPublicUrl(StorageScope.PhysicalKey(tenantContext.CurrentTenantId, key, StorageVisibility.Public));
+    }
+
+    /// <inheritdoc />
     public async Task<StoredObject> CompleteUploadAsync(string key, CancellationToken cancellationToken = default)
     {
-        var physicalKey = StorageScope.PhysicalKey(tenantContext.CurrentTenantId, key);
+        var pending = await objects.FirstOrDefaultAsync(new StorageObjectByKeySpec(key, tenantContext.CurrentTenantId, committedOnly: false), cancellationToken).ConfigureAwait(false);
+        if (pending is null || !InScope(pending))
+        {
+            throw new StorageValidationException($"No reservation to complete for key '{key}'.");
+        }
+
+        var physicalKey = StorageScope.PhysicalKey(tenantContext.CurrentTenantId, key, pending.Visibility);
 
         // Stat the actually-stored bytes; absent means the client never uploaded (nothing to complete).
         var stat = await provider.StatAsync(physicalKey, cancellationToken).ConfigureAwait(false);
@@ -299,7 +350,7 @@ public sealed class TenantStorage : ITenantStorage
     // writing a blob afterwards can compensate (restore an overwrite / remove a new reservation) if that
     // write fails.
     private async Task<(StorageObject Row, bool WasCreated, string PriorContentType, long PriorSize, string? PriorETag)> ReserveAsync(
-        string key, string contentType, long size, bool commit, CancellationToken cancellationToken)
+        string key, string contentType, long size, bool commit, StorageVisibility visibility, CancellationToken cancellationToken)
     {
         StorageObject row = null!;
         var rowWasCreated = false;
@@ -334,6 +385,7 @@ public sealed class TenantStorage : ITenantStorage
                     ContentType = contentType,
                     SizeBytes = size,
                     CommittedAt = commit ? timeProvider.GetUtcNow() : null,
+                    Visibility = visibility,
                 };
                 row.SetId(Guid.CreateVersion7());
                 await objects.AddAsync(row, ct).ConfigureAwait(false);
