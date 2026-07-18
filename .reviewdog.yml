@@ -1,0 +1,12 @@
+# .reviewdog.yml — turns .NET compiler + Roslyn analyzer diagnostics (CS*, CA*,
+# SYSLIB*) into inline PR review comments, the same way jetabot does. No AI.
+# Add more runners (eslint, svelte-check, ...) here as coverage grows.
+runner:
+  dotnet:
+    # bare `dotnet build` auto-detects this repo's single solution.
+    # --no-restore: the workflow restores first, so the build just compiles + emits diagnostics.
+    cmd: dotnet build --no-restore -clp:NoSummary -nologo -v q
+    errorformat:
+      - '%f(%l\,%c): %tarning %m'
+      - '%f(%l\,%c): %trror %m'
+    level: warning
