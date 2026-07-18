@@ -1,0 +1,43 @@
+name: idevs-review
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write   # post inline review comments
+  checks: write          # fallback for findings outside the diff
+
+concurrency:
+  group: idevs-review-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    name: reviewdog
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0   # reviewdog needs base history to compute the diff
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Setup reviewdog
+        uses: reviewdog/action-setup@v1
+        with:
+          reviewdog_version: latest
+
+      # Runs every runner in .reviewdog.yml, posts each diagnostic as an inline
+      # comment on lines touched by the PR. -fail-on-error=false keeps findings
+      # advisory (they comment, they don't fail the check).
+      - name: Run reviewdog
+        env:
+          REVIEWDOG_GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: reviewdog -reporter=github-pr-review -filter-mode=diff_context -level=warning -fail-on-error=false
