@@ -5,6 +5,12 @@ using Xunit;
 
 namespace Themia.Framework.Tests;
 
+// Integration-tagged so it runs in the nightly integration lane, NOT the fast PR test shards: it
+// shells out to a full `dotnet pack` (tens of seconds), and a nested `dotnet` invocation deadlocks on
+// MSBuild build-server contention when the parent `dotnet test` is itself building (as the PR shards
+// are). Per-PR packaging is still exercised by the analyzer-flow job. RunDotnet also disables build
+// servers in the child as belt-and-suspenders.
+[Trait("Category", "Integration")]
 public sealed class MetaPackagePackTests
 {
     private static readonly string[] ExpectedDependencyIds =
@@ -29,7 +35,9 @@ public sealed class MetaPackagePackTests
         Directory.CreateDirectory(outDir);
         try
         {
-            RunDotnet($"pack \"{project}\" --output \"{outDir}\"", repoRoot);
+            // --disable-build-servers: run the child pack with no MSBuild/VBCSCompiler/Razor server so it
+            // cannot deadlock against a build server the parent `dotnet test` process is holding.
+            RunDotnet($"pack \"{project}\" --output \"{outDir}\" --disable-build-servers", repoRoot);
 
             // Assembly-less: exactly one .nupkg, and no symbols package (IncludeSymbols
             // is overridden to false — there is no assembly to produce symbols for).
@@ -85,6 +93,10 @@ public sealed class MetaPackagePackTests
             RedirectStandardOutput = true,
             RedirectStandardError = true,
         };
+        // Belt-and-suspenders with --disable-build-servers: never reuse or start an MSBuild node, so a
+        // nested dotnet invocation cannot deadlock against a build server the test host is using.
+        psi.Environment["DOTNET_CLI_USE_MSBUILD_SERVER"] = "0";
+        psi.Environment["MSBUILDDISABLENODEREUSE"] = "1";
         using var process = Process.Start(psi)
             ?? throw new InvalidOperationException("Failed to start dotnet.");
         // Drain both pipes concurrently before waiting: reading one stream to the end

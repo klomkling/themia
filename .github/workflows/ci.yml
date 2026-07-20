@@ -134,7 +134,9 @@ jobs:
         # Same filter as the pre-shard single run — Integration (Testcontainers) tests are excluded
         # (their fixtures never init, so no Docker is needed here) and are covered nightly by
         # integration.yml. `dotnet test` restores + builds only this shard's slice.
-        run: dotnet test shard.slnf --configuration Release --verbosity normal --filter "Category!=Integration"
+        # --blame-hang-timeout turns a hung test host into a fast, named failure instead of a ~16-min
+        # wait (unit tests here complete in ms, so 5m of inactivity is unambiguously a hang).
+        run: dotnet test shard.slnf --configuration Release --verbosity normal --filter "Category!=Integration" --blame-hang-timeout 5m
 
   analyzer-flow:
     name: Analyzer flow (adopter smoke test)
