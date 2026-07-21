@@ -13,12 +13,19 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+# themia is a PUBLIC repo — GitHub-hosted minutes are free and unlimited, so the optimisation target
+# is PR WALL-CLOCK, not minutes. That inverts the usual advice: redundant parallel work is free, and
+# the only thing worth cutting is the critical path (the slowest single job a PR waits on). So the
+# build gate and the test shards run in parallel (each rebuilds — fine), and the tests are sharded to
+# cut the tail. Integration (Testcontainers) tests run nightly in integration.yml, not here.
 jobs:
-  build-test:
-    name: Build & Test
+  build:
+    name: Build & inline review
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0   # reviewdog needs base history to compute the PR diff
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v6
@@ -37,15 +44,118 @@ jobs:
       - name: Restore
         run: dotnet restore
 
-      - name: Build
-        run: dotnet build --configuration Release --no-restore
+      - name: Setup reviewdog
+        uses: reviewdog/action-setup@v1
+        with:
+          reviewdog_version: latest
 
-      - name: Test
-        # Skip integration tests on GitHub-hosted runners — they need
-        # Testcontainers + DB image pulls (mcr.microsoft.com) that
-        # intermittently 403 through Microsoft's WAF on shared runner IPs.
-        # Integration coverage runs in integration.yml + locally before merge.
-        run: dotnet test --configuration Release --no-build --verbosity normal --filter "Category!=Integration"
+      - name: Build (compile gate + inline diagnostics on the PR)
+        env:
+          REVIEWDOG_GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # The definitive "does the whole solution compile" gate — covers projects no test references —
+        # AND the reviewdog inline-diagnostics pass, as ONE job that runs in PARALLEL with the test
+        # shards (so reviewdog is off their critical path). Under TreatWarningsAsErrors any diagnostic
+        # is emitted as `error` and fails the build; `set -o pipefail` + reviewdog's -fail-on-error=true
+        # keep the fail-on-any-diagnostic gate while posting each diagnostic inline on the PR's lines.
+        run: |
+          set -o pipefail
+          dotnet build --configuration Release --no-restore 2>&1 \
+            | reviewdog \
+                -efm='%f(%l\,%c): warning %m' \
+                -efm='%f(%l\,%c): error %m' \
+                -name=dotnet \
+                -reporter=github-pr-review \
+                -filter-mode=diff_context \
+                -level=warning \
+                -fail-on-error=true
+
+  test:
+    name: Test (shard ${{ matrix.shard }}/3)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false          # one shard failing must not cancel the others (see all failures at once)
+      matrix:
+        shard: [1, 2, 3]
+    env:
+      SHARDS: "3"
+      SHARD: ${{ matrix.shard }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v6
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', '**/Directory.Packages.props') }}
+          restore-keys: ${{ runner.os }}-nuget-
+
+      - name: Compose this shard's solution filter
+        # Deterministic round-robin over the sorted test-project list: project i goes to shard
+        # (i % SHARDS). Every project lands in exactly ONE shard, so the three shards together run the
+        # exact same set the old single `dotnet test <solution>` did — this only PARTITIONS the test
+        # set, it does not change which tests run. Fail loudly on an empty slice (a partition bug)
+        # rather than pass vacuously.
+        run: |
+          set -euo pipefail
+          mapfile -t ALL < <(find tests -name '*Tests.csproj' | sort)
+          if [ ${#ALL[@]} -eq 0 ]; then
+            echo "::error::Found 0 test projects — refusing a vacuous pass."
+            exit 1
+          fi
+          SLICE=()
+          for i in "${!ALL[@]}"; do
+            if [ $(( i % SHARDS )) -eq $(( SHARD - 1 )) ]; then
+              SLICE+=("${ALL[$i]}")
+            fi
+          done
+          if [ ${#SLICE[@]} -eq 0 ]; then
+            echo "::error::Shard ${SHARD}/${SHARDS} resolved 0 test projects — partition bug; refusing a vacuous pass."
+            exit 1
+          fi
+          echo "Shard ${SHARD}/${SHARDS} → ${#SLICE[@]} of ${#ALL[@]} test projects:"
+          printf '  %s\n' "${SLICE[@]}"
+          {
+            echo '{ "solution": { "path": "Themia.sln", "projects": ['
+            for j in "${!SLICE[@]}"; do
+              sep=,; [ "$j" -eq $(( ${#SLICE[@]} - 1 )) ] && sep=
+              printf '    "%s"%s\n' "${SLICE[$j]}" "$sep"
+            done
+            echo '] } }'
+          } > shard.slnf
+
+      - name: Test shard
+        # Same filter as the pre-shard single run — Integration (Testcontainers) tests are excluded
+        # (their fixtures never init, so no Docker is needed here) and are covered nightly by
+        # integration.yml. `dotnet test` restores + builds only this shard's slice.
+        # --blame-hang-timeout turns a hung test host into a fast, named failure instead of a ~16-min
+        # wait (unit tests here complete in ms, so 5m of inactivity is unambiguously a hang).
+        run: dotnet test shard.slnf --configuration Release --verbosity normal --filter "Category!=Integration" --blame-hang-timeout 5m
+
+  # Aggregate gate. The branch ruleset requires a status check named "Build & Test". Splitting the old
+  # single build-test job into `build` + a sharded `test` matrix renamed those checks, which would leave
+  # the required "Build & Test" check forever pending and block every merge. This stable-named job stands
+  # in for it: it runs always and passes ONLY when the build gate AND all test shards succeeded — so a
+  # failing shard still blocks merge, and future job renames won't silently re-break the required check.
+  build-test:
+    name: Build & Test
+    needs: [build, test]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require build + all test shards to have succeeded
+        run: |
+          echo "build=${{ needs.build.result }}  test=${{ needs.test.result }}"
+          if [ "${{ needs.build.result }}" != "success" ] || [ "${{ needs.test.result }}" != "success" ]; then
+            echo "::error::Build & Test gate not satisfied (build=${{ needs.build.result }}, test=${{ needs.test.result }})."
+            exit 1
+          fi
 
   analyzer-flow:
     name: Analyzer flow (adopter smoke test)
