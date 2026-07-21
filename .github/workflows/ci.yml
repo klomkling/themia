@@ -138,6 +138,25 @@ jobs:
         # wait (unit tests here complete in ms, so 5m of inactivity is unambiguously a hang).
         run: dotnet test shard.slnf --configuration Release --verbosity normal --filter "Category!=Integration" --blame-hang-timeout 5m
 
+  # Aggregate gate. The branch ruleset requires a status check named "Build & Test". Splitting the old
+  # single build-test job into `build` + a sharded `test` matrix renamed those checks, which would leave
+  # the required "Build & Test" check forever pending and block every merge. This stable-named job stands
+  # in for it: it runs always and passes ONLY when the build gate AND all test shards succeeded — so a
+  # failing shard still blocks merge, and future job renames won't silently re-break the required check.
+  build-test:
+    name: Build & Test
+    needs: [build, test]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require build + all test shards to have succeeded
+        run: |
+          echo "build=${{ needs.build.result }}  test=${{ needs.test.result }}"
+          if [ "${{ needs.build.result }}" != "success" ] || [ "${{ needs.test.result }}" != "success" ]; then
+            echo "::error::Build & Test gate not satisfied (build=${{ needs.build.result }}, test=${{ needs.test.result }})."
+            exit 1
+          fi
+
   analyzer-flow:
     name: Analyzer flow (adopter smoke test)
     runs-on: ubuntu-latest
