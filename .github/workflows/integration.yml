@@ -8,17 +8,22 @@ name: Integration Tests
 #      by Microsoft's WAF on shared GitHub-hosted runner IPs from time to time.
 #   2. Integration tests are ~5-10x slower (image pull + container startup).
 #
-# Triggered on push to main (catch regressions soon after merge) and manually.
-# Until integration-tagged tests exist, the filter matches nothing and the job
-# is a fast no-op.
+# Runs NIGHTLY (not on every push to main) and on manual dispatch. The suite spins up real DB
+# containers across every module and takes ~15-20 min; running it on every merge — including docs and
+# chore merges — was noise for little marginal signal. Nightly still catches a regression within a day;
+# the pre-merge gate is ci.yml (unit, sharded) + a full local `dotnet test`. On a nightly failure the
+# job opens (or comments on) a single tracking issue so a red night is not silently missed, and
+# auto-closes it once a later run goes green.
+# (themia is a PUBLIC repo, so these minutes are free — this is a signal/noise change, not a cost one.)
 
 on:
-  push:
-    branches: [main]
+  schedule:
+    - cron: "17 19 * * *"   # 02:17 ICT (19:17 UTC) daily — off the hour to avoid runner contention
   workflow_dispatch:
 
 permissions:
   contents: read
+  issues: write             # open/close the nightly-failure tracking issue
 
 concurrency:
   group: integration-${{ github.ref }}
@@ -55,3 +60,39 @@ jobs:
         # Inverse of ci.yml: Category=Integration only. Re-runnable from the
         # Actions tab if a DB image pull fails at fixture init.
         run: dotnet test --configuration Release --no-build --verbosity normal --filter "Category=Integration"
+
+      # The two steps below only track state in an issue — they are best-effort and must never
+      # flip the job's result (only the test step decides that), so gh errors are swallowed.
+      - name: Open or update the nightly-failure issue
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # All trusted GitHub-provided context (no user input) — still passed via env and quoted.
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          TITLE="Nightly integration tests are failing"
+          BODY="Nightly integration run failed: ${RUN_URL} (commit ${COMMIT_SHA})."
+          # Match by exact title (no label dependency). Reuse an open issue so a multi-night
+          # outage accumulates comments on one thread instead of spawning a new issue nightly.
+          EXISTING=$(gh issue list --state open --search "in:title \"${TITLE}\"" --json number,title \
+            --jq ".[] | select(.title == \"${TITLE}\") | .number" | head -1 || true)
+          if [ -n "${EXISTING}" ]; then
+            gh issue comment "${EXISTING}" --body "${BODY}" || true
+          else
+            gh issue create --title "${TITLE}" --body "${BODY}" || true
+          fi
+
+      - name: Close the nightly-failure issue on a green run
+        if: success()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          TITLE="Nightly integration tests are failing"
+          EXISTING=$(gh issue list --state open --search "in:title \"${TITLE}\"" --json number,title \
+            --jq ".[] | select(.title == \"${TITLE}\") | .number" | head -1 || true)
+          if [ -n "${EXISTING}" ]; then
+            gh issue comment "${EXISTING}" --body "Integration tests are green again: ${RUN_URL}. Closing." || true
+            gh issue close "${EXISTING}" || true
+          fi
