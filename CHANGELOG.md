@@ -27,6 +27,8 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.9.1] - 2026-07-26
+
 ### Fixed
 - **`Themia.Data.Migrations`** — `ThemiaMigrations.Run` now serializes migrate-on-boot across
   simultaneously-starting instances (coord #0041). FluentMigrator skips migrations already recorded in
