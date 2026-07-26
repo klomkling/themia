@@ -27,6 +27,43 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-07-26
+
+### Added
+- **`Themia.AspNetCore.DataProtection`** (+ `.PostgreSql` / `.MySql` / `.SqlServer`) — a shared Data Protection
+  key store for multi-instance applications (coord #0042). ASP.NET Core ships EF Core and Redis key
+  repositories but no Dapper one, so on the Themia Dapper stack the default is per-container filesystem keys:
+  the moment a second instance starts the key rings diverge, and auth cookies, antiforgery tokens, and anything
+  else wrapped by a `DataProtector` stop round-tripping across instances. This is an ASP.NET *provider* gap, not
+  a new persistence layer — distinct from the rejected coord #0039.
+
+  Registered as an `IDataProtectionBuilder` extension, mirroring the built-in `PersistKeysToDbContext`:
+  `services.AddDataProtection().SetApplicationName("app").PersistKeysToThemiaPostgres(cs)`. Calling it twice is
+  last-wins, as with the built-in `PersistKeysTo*`. Follows the `Themia.Exceptional` shape — a neutral core
+  with an `IDataProtectionKeyDialect` seam plus one package per engine — over **one** `data_protection_keys`
+  schema owned by FluentMigrator. Keys are per *application*, not per tenant, so the package takes no
+  multi-tenancy dependency. `created_at` comes from the server clock, never the application's, since a fleet's
+  clocks disagree. On .NET 10 the repository also implements `IDeletableXmlRepository`, so
+  `IKeyManager.DeleteKeys` works and revoked key material can be removed; .NET 8 has no such framework API, so
+  that leg's public surface differs by design.
+
+  **Two applications must not share one table.** Everything using this repository shares the whole key ring —
+  each holds the raw key material able to decrypt the other's payloads, and a revocation or expiry in one
+  applies to the other. `SetApplicationName` only sets the discriminator folded into the purpose chain; it is
+  **not** an isolation boundary. Give separate applications separate tables or databases.
+
+  A row that will not parse **fails the read** rather than being skipped. Skipping is unsafe in two
+  directions: the row may be a `<revocation>` rather than a `<key>`, so dropping it silently reinstates key
+  material an operator revoked after a compromise; and if the whole table is unreadable (a charset change, a
+  mangled restore) the survivors are an *empty* ring, which Data Protection cannot distinguish from a fresh
+  deployment — it mints a new key and signs out every user while the application reports healthy. The built-in
+  filesystem and registry repositories fail closed for the same reason.
+
+  **The stored key material is not encrypted at rest.** Anything that can read the table can decrypt that
+  application's cookies. ASP.NET Core's own EF Core and Redis providers behave the same way, but a database
+  spreads the material further than a per-instance filesystem does — into backups, replicas, and any DBA's
+  reach. Treat the table as a secret, and add `ProtectKeysWith*` where the deployment requires encryption at rest.
+
 ## [0.9.1] - 2026-07-26
 
 ### Fixed
