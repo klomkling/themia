@@ -3,6 +3,7 @@ Themia.AspNetCore.DataProtection.PostgreSql.DataProtectionBuilderExtensions
 Themia.AspNetCore.DataProtection.PostgreSql.PostgresDataProtectionKeyDialect
 Themia.AspNetCore.DataProtection.PostgreSql.PostgresDataProtectionKeyDialect.PostgresDataProtectionKeyDialect(string! connectionString) -> void
 Themia.AspNetCore.DataProtection.PostgreSql.PostgresDataProtectionKeyDialect.CreateConnection() -> System.Data.Common.DbConnection!
+Themia.AspNetCore.DataProtection.PostgreSql.PostgresDataProtectionKeyDialect.DeleteSql.get -> string!
 Themia.AspNetCore.DataProtection.PostgreSql.PostgresDataProtectionKeyDialect.InsertSql.get -> string!
-Themia.AspNetCore.DataProtection.PostgreSql.PostgresDataProtectionKeyDialect.SelectAllXmlSql.get -> string!
-static Themia.AspNetCore.DataProtection.PostgreSql.DataProtectionBuilderExtensions.PersistKeysToThemiaPostgres(this Microsoft.AspNetCore.DataProtection.IDataProtectionBuilder! builder, string! connectionString, bool runMigration = true) -> Microsoft.AspNetCore.DataProtection.IDataProtectionBuilder!
+Themia.AspNetCore.DataProtection.PostgreSql.PostgresDataProtectionKeyDialect.SelectAllSql.get -> string!
+static Themia.AspNetCore.DataProtection.PostgreSql.DataProtectionBuilderExtensions.PersistKeysToThemiaPostgres(this Microsoft.AspNetCore.DataProtection.IDataProtectionBuilder! builder, string! connectionString, bool runMigration = true, Themia.Data.Migrations.ThemiaMigrationOptions? migrationOptions = null) -> Microsoft.AspNetCore.DataProtection.IDataProtectionBuilder!

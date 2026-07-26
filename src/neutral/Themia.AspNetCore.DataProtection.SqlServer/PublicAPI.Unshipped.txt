@@ -3,6 +3,7 @@ Themia.AspNetCore.DataProtection.SqlServer.DataProtectionBuilderExtensions
 Themia.AspNetCore.DataProtection.SqlServer.SqlServerDataProtectionKeyDialect
 Themia.AspNetCore.DataProtection.SqlServer.SqlServerDataProtectionKeyDialect.SqlServerDataProtectionKeyDialect(string! connectionString) -> void
 Themia.AspNetCore.DataProtection.SqlServer.SqlServerDataProtectionKeyDialect.CreateConnection() -> System.Data.Common.DbConnection!
+Themia.AspNetCore.DataProtection.SqlServer.SqlServerDataProtectionKeyDialect.DeleteSql.get -> string!
 Themia.AspNetCore.DataProtection.SqlServer.SqlServerDataProtectionKeyDialect.InsertSql.get -> string!
-Themia.AspNetCore.DataProtection.SqlServer.SqlServerDataProtectionKeyDialect.SelectAllXmlSql.get -> string!
-static Themia.AspNetCore.DataProtection.SqlServer.DataProtectionBuilderExtensions.PersistKeysToThemiaSqlServer(this Microsoft.AspNetCore.DataProtection.IDataProtectionBuilder! builder, string! connectionString, bool runMigration = true) -> Microsoft.AspNetCore.DataProtection.IDataProtectionBuilder!
+Themia.AspNetCore.DataProtection.SqlServer.SqlServerDataProtectionKeyDialect.SelectAllSql.get -> string!
+static Themia.AspNetCore.DataProtection.SqlServer.DataProtectionBuilderExtensions.PersistKeysToThemiaSqlServer(this Microsoft.AspNetCore.DataProtection.IDataProtectionBuilder! builder, string! connectionString, bool runMigration = true, Themia.Data.Migrations.ThemiaMigrationOptions? migrationOptions = null) -> Microsoft.AspNetCore.DataProtection.IDataProtectionBuilder!

@@ -1,5 +1,10 @@
 namespace Themia.AspNetCore.DataProtection;
 
+/// <summary>One stored key-ring element, with the identity needed to delete it.</summary>
+/// <param name="Id">Primary key of the row.</param>
+/// <param name="Xml">The raw stored XML.</param>
+public sealed record DataProtectionKeyRecord(long Id, string? Xml);
+
 /// <summary>
 /// Persistence for the Data Protection key ring, kept separate from the
 /// <see cref="Microsoft.AspNetCore.DataProtection.Repositories.IXmlRepository"/> adapter so swapping the
@@ -11,9 +16,14 @@ namespace Themia.AspNetCore.DataProtection;
 /// </remarks>
 public interface IDataProtectionKeyStore
 {
-    /// <summary>Every stored key element, as raw XML strings.</summary>
-    IReadOnlyList<string> GetAllXml();
+    /// <summary>Every stored element, oldest first.</summary>
+    IReadOnlyList<DataProtectionKeyRecord> GetAll();
 
-    /// <summary>Appends one key element.</summary>
+    /// <summary>Appends one element.</summary>
     void StoreXml(string? friendlyName, string xml);
+
+    /// <summary>
+    /// Deletes one row. Returns whether a row was actually removed.
+    /// </summary>
+    bool Delete(long id);
 }

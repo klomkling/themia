@@ -11,21 +11,29 @@ public static class DataProtectionBuilderExtensions
     /// <c>data_protection_keys</c> table exists.
     /// </summary>
     /// <remarks>
-    /// Chain after <c>SetApplicationName</c> so the application keeps control of the discriminator that stops
-    /// two applications sharing one table from reading each other's keys:
     /// <code>
     /// services.AddDataProtection()
     ///         .SetApplicationName("my-app")
     ///         .PersistKeysToThemiaPostgres(connectionString);
     /// </code>
-    /// The stored key material is <strong>not encrypted at rest</strong> — see
-    /// <see cref="Themia.AspNetCore.DataProtection.DataProtectionBuilderExtensions.PersistKeysToThemia"/>.
+    /// <para><strong>Two applications must not share one table</strong>, and the keys are stored
+    /// <strong>unencrypted</strong> — see
+    /// <see cref="Themia.AspNetCore.DataProtection.DataProtectionBuilderExtensions.PersistKeysToThemia"/> for
+    /// both, including why <c>SetApplicationName</c> is not an isolation boundary.</para>
     /// </remarks>
     /// <param name="builder">The Data Protection builder.</param>
     /// <param name="connectionString">PostgreSQL connection string.</param>
     /// <param name="runMigration">Whether to apply the schema migration during registration. Defaults to true.</param>
+    /// <param name="migrationOptions">
+    /// Migration-lock settings. Supply a <see cref="ThemiaMigrationOptions.Logger"/> whenever more than one
+    /// instance can boot at once — the migration runs during service registration, before the host has built
+    /// any logging provider.
+    /// </param>
     public static IDataProtectionBuilder PersistKeysToThemiaPostgres(
-        this IDataProtectionBuilder builder, string connectionString, bool runMigration = true)
+        this IDataProtectionBuilder builder,
+        string connectionString,
+        bool runMigration = true,
+        ThemiaMigrationOptions? migrationOptions = null)
     {
         ArgumentNullException.ThrowIfNull(builder);
         ArgumentException.ThrowIfNullOrWhiteSpace(connectionString);
@@ -34,6 +42,7 @@ public static class DataProtectionBuilderExtensions
             new PostgresDataProtectionKeyDialect(connectionString),
             MigrationEngine.Postgres,
             connectionString,
-            runMigration);
+            runMigration,
+            migrationOptions);
     }
 }

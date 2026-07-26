@@ -19,11 +19,14 @@ public sealed class SqlServerDataProtectionKeyDialect : IDataProtectionKeyDialec
     public DbConnection CreateConnection() => new SqlConnection(connectionString);
 
     /// <inheritdoc />
-    public string SelectAllXmlSql => """SELECT [xml] FROM [data_protection_keys] ORDER BY [id];""";
+    public string SelectAllSql => """SELECT [id] AS Id, [xml] AS Xml FROM [data_protection_keys] ORDER BY [id];""";
 
     /// <inheritdoc />
     public string InsertSql => """
         INSERT INTO [data_protection_keys] ([friendly_name], [xml], [created_at])
         VALUES (@FriendlyName, @Xml, SYSUTCDATETIME());
         """;
+
+    /// <inheritdoc />
+    public string DeleteSql => """DELETE FROM [data_protection_keys] WHERE [id] = @Id;""";
 }
