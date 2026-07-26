@@ -45,4 +45,28 @@ public class MigrationLockKeyTests
         // MySQL rejects GET_LOCK names longer than 64 characters.
         Assert.True(MigrationLock.TextKey("themia:data:migrations:" + new string('d', 200)).Length <= 64);
     }
+
+    [Theory]
+    [InlineData("propertiezy")]
+    [InlineData("Propertiezy")]
+    [InlineData("PROPERTIEZY")]
+    [InlineData("  propertiezy  ")]
+    public void NormalizeScope_ShouldFoldCaseAndWhitespace(string database)
+    {
+        // connection.Database echoes the connection string rather than a server-normalised name, so
+        // "Database=App" and "Database=app" — the same database on a case-insensitive engine — must not hash
+        // to two unrelated keys and quietly stop contending.
+        Assert.Equal(PropertiezyScope, MigrationLock.NormalizeScope(database));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void NormalizeScope_ShouldFallBackToAServerWideScope_WhenNoDatabaseIsReported(string? database)
+    {
+        // No database name means the lock cannot be scoped to one database. Sharing a server-wide lock only
+        // over-serialises; inventing a per-instance scope would silently stop the lock working.
+        Assert.Equal("themia:data:migrations:", MigrationLock.NormalizeScope(database));
+    }
 }

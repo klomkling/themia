@@ -12,6 +12,7 @@
     <PackageReference Include="FluentMigrator.Runner.MySql" />
     <PackageReference Include="FluentMigrator.Runner.SqlServer" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
     <!-- Drivers for the boot lock's dedicated connection. Referenced explicitly rather than relied on
          transitively through the FluentMigrator.Runner.* packages above. -->
     <PackageReference Include="Npgsql" />

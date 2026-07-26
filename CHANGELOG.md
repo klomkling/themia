@@ -43,8 +43,27 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
   SHA-256 digest of the scope rather than `string.GetHashCode()`, which is randomized per process on .NET
   and would have every instance contend on a *different* key — a lock that silently protects nothing.
 
-  Waits are unbounded by design: a booting instance cannot meaningfully continue until the one ahead of it
-  has finished migrating. Applies to all three engines Themia ships a processor for.
+  Waits are **bounded** (default 15 min, see `ThemiaMigrationOptions.LockTimeout`) rather than infinite. An
+  infinite wait sounds right — a booting instance genuinely cannot continue until the one ahead finishes — but
+  it blocks a thread that cannot observe a `CancellationToken` and emits nothing, so a replica waiting on a
+  wedged holder is killed by its orchestrator's startup probe and crash-loops with no diagnostic. Since a probe
+  budget is typically far shorter than any sane timeout, the timeout alone is not enough: pass
+  `ThemiaMigrationOptions.Logger` to get one message naming the lock before the wait begins. New overload
+  `Run(engine, connectionString, options, assemblies)` carries both; the existing three-argument overload is
+  unchanged and keeps the defaults.
+
+  MySQL sends a **positive** `GET_LOCK` timeout: a negative timeout means "wait forever" on MySQL 8 but is not
+  portable to MariaDB, which this engine also covers — there is now a MariaDB container leg proving it.
+  SQL Server's `sp_getapplock` guard **fails closed** (anything that is not an explicit non-negative status is
+  treated as *not* granted, so `MigrateUp` can never run believing it holds a lock it does not). The release
+  result is now read rather than discarded: "you did not hold this lock" means the lock session was reaped
+  mid-migration and mutual exclusion was not actually in force, which is logged as a warning naming the scope.
+  The lock connection is **unpooled**, so it no longer occupies a pool slot for the whole migration — which
+  would otherwise deadlock a deployment configured with a maximum pool size of one. A failing release can no
+  longer mask the migration exception, and lock failures are reported separately from DDL failures instead of
+  telling operators to audit DDL grants for a migration that never started.
+
+  Applies to all three engines Themia ships a processor for.
 
 ## [0.9.0] - 2026-07-16
 

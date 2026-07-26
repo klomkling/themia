@@ -3,5 +3,13 @@ Themia.Data.Migrations.MigrationEngine
 Themia.Data.Migrations.MigrationEngine.MySql = 1 -> Themia.Data.Migrations.MigrationEngine
 Themia.Data.Migrations.MigrationEngine.Postgres = 0 -> Themia.Data.Migrations.MigrationEngine
 Themia.Data.Migrations.MigrationEngine.SqlServer = 2 -> Themia.Data.Migrations.MigrationEngine
+Themia.Data.Migrations.ThemiaMigrationOptions
+Themia.Data.Migrations.ThemiaMigrationOptions.LockTimeout.get -> System.TimeSpan
+Themia.Data.Migrations.ThemiaMigrationOptions.LockTimeout.init -> void
+Themia.Data.Migrations.ThemiaMigrationOptions.Logger.get -> Microsoft.Extensions.Logging.ILogger?
+Themia.Data.Migrations.ThemiaMigrationOptions.Logger.init -> void
+Themia.Data.Migrations.ThemiaMigrationOptions.ThemiaMigrationOptions() -> void
 Themia.Data.Migrations.ThemiaMigrations
+static Themia.Data.Migrations.ThemiaMigrationOptions.DefaultLockTimeout.get -> System.TimeSpan
+static Themia.Data.Migrations.ThemiaMigrations.Run(Themia.Data.Migrations.MigrationEngine engine, string! connectionString, Themia.Data.Migrations.ThemiaMigrationOptions? options, System.Reflection.Assembly![]! migrationAssemblies) -> void
 static Themia.Data.Migrations.ThemiaMigrations.Run(Themia.Data.Migrations.MigrationEngine engine, string! connectionString, params System.Reflection.Assembly![]! migrationAssemblies) -> void

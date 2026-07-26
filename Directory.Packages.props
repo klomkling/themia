@@ -96,6 +96,9 @@
     <PackageVersion Include="MySqlConnector" Version="2.6.0" />
     <PackageVersion Include="Microsoft.Data.SqlClient" Version="6.1.5" />
     <PackageVersion Include="Testcontainers.MySql" Version="4.13.0" />
+    <!-- MariaDB needs its own container type: MySqlBuilder's readiness probe shells out to mysqladmin, which
+         MariaDB 11 no longer ships (it is mariadb-admin), so the container never reports ready. -->
+    <PackageVersion Include="Testcontainers.MariaDb" Version="4.13.0" />
     <PackageVersion Include="Testcontainers.MsSql" Version="4.13.0" />
     <!-- Storage (Themia.Modules.Storage.S3): AWS S3 SDK (also drives Cloudflare R2 via a configured ServiceUrl) -->
     <PackageVersion Include="AWSSDK.S3" Version="4.0.100" />
