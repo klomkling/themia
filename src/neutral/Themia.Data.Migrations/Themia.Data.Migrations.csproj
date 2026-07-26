@@ -12,6 +12,15 @@
     <PackageReference Include="FluentMigrator.Runner.MySql" />
     <PackageReference Include="FluentMigrator.Runner.SqlServer" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+    <!-- Drivers for the boot lock's dedicated connection. Referenced explicitly rather than relied on
+         transitively through the FluentMigrator.Runner.* packages above. -->
+    <PackageReference Include="Npgsql" />
+    <PackageReference Include="MySqlConnector" />
+    <PackageReference Include="Microsoft.Data.SqlClient" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Themia.Data.Migrations.Tests" />
+    <InternalsVisibleTo Include="Themia.Data.Migrations.IntegrationTests" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers">

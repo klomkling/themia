@@ -27,6 +27,25 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+### Fixed
+- **`Themia.Data.Migrations`** — `ThemiaMigrations.Run` now serializes migrate-on-boot across
+  simultaneously-starting instances (coord #0041). FluentMigrator skips migrations already recorded in
+  `VersionInfo`, so re-running is a no-op *once applied*; the unsafe window is N instances booting at once,
+  all reading `VersionInfo`, all seeing the same migration pending, and all applying it concurrently —
+  check-then-apply is not atomic across connections, so they collide on DDL and insert duplicate version
+  rows. `Run` now holds the engine's session-level advisory lock over `MigrateUp` on a dedicated connection
+  (`pg_advisory_lock` / `GET_LOCK` / `sp_getapplock`), so the first instance applies and the rest wait, then
+  find the work done. No separate migration job is needed and no consumer code changes.
+
+  The lock key is derived from the **database name**, not a fixed constant: PostgreSQL advisory locks and
+  MySQL's `GET_LOCK` are keyed *server-wide* rather than per database, so a fixed key would make two
+  unrelated Themia applications sharing one server queue behind each other's migrations. The key is a
+  SHA-256 digest of the scope rather than `string.GetHashCode()`, which is randomized per process on .NET
+  and would have every instance contend on a *different* key — a lock that silently protects nothing.
+
+  Waits are unbounded by design: a booting instance cannot meaningfully continue until the one ahead of it
+  has finished migrating. Applies to all three engines Themia ships a processor for.
+
 ## [0.9.0] - 2026-07-16
 
 ### Added

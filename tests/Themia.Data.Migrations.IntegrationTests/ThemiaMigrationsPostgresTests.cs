@@ -35,6 +35,23 @@ public class ThemiaMigrationsPostgresTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Run_AppliesEachMigrationOnce_WhenInstancesBootSimultaneously()
+    {
+        // The scenario the boot lock exists for: several instances start together, all see the same
+        // migration pending, and all call Run. Without serialization they collide on the DDL and duplicate
+        // the VersionInfo row; with it, one applies and the rest find the work already done.
+        const int Instances = 6;
+
+        var boots = Enumerable.Range(0, Instances).Select(_ => Task.Run(
+            () => ThemiaMigrations.Run(MigrationEngine.Postgres, ConnString, typeof(ProbeMigration).Assembly)));
+
+        await Task.WhenAll(boots);
+
+        Assert.True(await TableExistsAsync("migrations_probe"));
+        Assert.Equal(1, await CountAsync("SELECT COUNT(*) FROM \"VersionInfo\""));
+    }
+
+    [Fact]
     public void Run_WrapsFailure_NamingTheEngine()
     {
         const string badConn = "Host=127.0.0.1;Port=1;Username=x;Password=y;Database=z;Timeout=2;Command Timeout=2";
@@ -43,6 +60,14 @@ public class ThemiaMigrationsPostgresTests : IAsyncLifetime
             () => ThemiaMigrations.Run(MigrationEngine.Postgres, badConn, typeof(ProbeMigration).Assembly));
 
         Assert.Contains("PostgreSQL", ex.Message);
+    }
+
+    private async Task<long> CountAsync(string sql)
+    {
+        await using var conn = new NpgsqlConnection(ConnString);
+        await conn.OpenAsync();
+        await using var cmd = new NpgsqlCommand(sql, conn);
+        return Convert.ToInt64(await cmd.ExecuteScalarAsync());
     }
 
     private async Task<bool> TableExistsAsync(string table)

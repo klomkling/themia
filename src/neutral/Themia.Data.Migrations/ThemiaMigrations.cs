@@ -19,6 +19,13 @@ public static class ThemiaMigrations
     /// against <paramref name="connectionString"/> using the <paramref name="engine"/>'s processor.
     /// Runs synchronously (<c>MigrateUp</c>).
     /// </summary>
+    /// <remarks>
+    /// Safe to call from every instance of a horizontally-scaled application. The run is serialized behind
+    /// the engine's session-level advisory lock, scoped to the target database, so instances booting
+    /// simultaneously apply pending migrations one at a time instead of racing on the same DDL. An instance
+    /// that finds the lock held waits for it — there is no timeout, because a booting instance cannot
+    /// meaningfully continue until the one ahead of it has finished migrating.
+    /// </remarks>
     /// <param name="engine">The target database engine.</param>
     /// <param name="connectionString">Connection string for the migration runner. Required.</param>
     /// <param name="migrationAssemblies">
@@ -81,9 +88,13 @@ public static class ThemiaMigrations
                 "The supplied assemblies contain no FluentMigrator [Migration] types; nothing would be applied.",
                 nameof(migrationAssemblies));
 
+        var runner = serviceProvider.GetRequiredService<IMigrationRunner>();
+
         try
         {
-            serviceProvider.GetRequiredService<IMigrationRunner>().MigrateUp();
+            // Serialized across instances: N of them booting at once would otherwise all see the same
+            // migration pending and apply it concurrently (see MigrationLock).
+            MigrationLock.RunExclusive(engine, connectionString, runner.MigrateUp);
         }
         catch (Exception ex)
         {
