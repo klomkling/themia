@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -360,7 +361,7 @@ public sealed class SqlServerCaseSensitiveCollationTests : IAsyncLifetime
         var p1 = BuildServices();
         try
         {
-            await RunWithMigrationDeadlockRetry(() =>
+            await RunWithMigrationContentionRetry(() =>
                 new SchedulingModule(new SchedulingModuleOptions { SchedulerName = "cs-test" }).InitializeAsync(p1));
             LogContext.SetCurrentLogProvider(p1.GetRequiredService<ILoggerFactory>());
             // Build the scheduler (this runs AdoJobStore ValidateSchema against the uppercase qrtz_* tables —
@@ -390,14 +391,18 @@ public sealed class SqlServerCaseSensitiveCollationTests : IAsyncLifetime
         var p2 = BuildServices();
         try
         {
-            await using (var scope = p2.CreateAsyncScope())
+            // Retried like the migrations either side of it: this DELETE races process 1's teardown for a lock
+            // on VersionInfo (the AdoJobStore check-in connection above is not released synchronously), so
+            // under parallel CI load it can sit until the command timeout expires.
+            await RunWithMigrationContentionRetry(async () =>
             {
+                await using var scope = p2.CreateAsyncScope();
                 await scope.ServiceProvider.GetRequiredService<SchedulingDbContext>()
                     .Database.ExecuteSqlRawAsync("DELETE FROM [dbo].[VersionInfo]");
-            }
+            });
 
             LogContext.SetCurrentLogProvider(p2.GetRequiredService<ILoggerFactory>());
-            await RunWithMigrationDeadlockRetry(() =>
+            await RunWithMigrationContentionRetry(() =>
                 new SchedulingModule(new SchedulingModuleOptions { SchedulerName = "cs-test" }).InitializeAsync(p2));
 
             // The durable job survived the replay and is readable through the rebuilt scheduler.
@@ -440,26 +445,39 @@ public sealed class SqlServerCaseSensitiveCollationTests : IAsyncLifetime
     // victim transaction rolls back cleanly and MigrateUp is idempotent, so a bounded retry rides out the
     // transient deadlock. (#82 cut the main trigger by not Start()ing scheduler1; this clears the residual
     // flake at the source — both process 1 and process 2 apply migrations and either can be the victim.)
-    private static async Task RunWithMigrationDeadlockRetry(Func<ValueTask> migrate, int maxAttempts = 4)
+    /// <summary>
+    /// Retries an operation that lost a race for a lock against the other "process" in this test.
+    /// </summary>
+    /// <remarks>
+    /// Covers being chosen as a deadlock victim <em>and</em> simply waiting too long, because under parallel CI
+    /// load the common outcome is the latter: the statement blocks on process 1's lingering AdoJobStore
+    /// connection and expires. SQL Server never picks a victim in that case, so the word "deadlock" never
+    /// appears — matching on it (as this helper originally did) misses the failure that actually happens.
+    /// Matching numeric error codes rather than message text also keeps this working on a non-English server.
+    /// </remarks>
+    private static async Task RunWithMigrationContentionRetry(Func<ValueTask> operation, int maxAttempts = 4)
     {
         for (var attempt = 1; ; attempt++)
         {
             try
             {
-                await migrate();
+                await operation();
                 return;
             }
-            catch (Exception ex) when (attempt < maxAttempts && IsDeadlock(ex))
+            catch (Exception ex) when (attempt < maxAttempts && IsLockContention(ex))
             {
                 await Task.Delay(TimeSpan.FromMilliseconds(250 * attempt));
             }
         }
 
-        static bool IsDeadlock(Exception ex)
+        static bool IsLockContention(Exception ex)
         {
             for (var e = ex; e is not null; e = e.InnerException)
             {
-                if (e.Message.Contains("deadlock", StringComparison.OrdinalIgnoreCase))
+                if (e is SqlException sql && sql.Number is
+                        -2      // client command timeout — "Execution Timeout Expired"
+                        or 1205 // chosen as the deadlock victim
+                        or 1222) // server-side lock request timeout
                 {
                     return true;
                 }
