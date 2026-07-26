@@ -1,0 +1,8 @@
+#nullable enable
+Themia.AspNetCore.DataProtection.MySql.DataProtectionBuilderExtensions
+Themia.AspNetCore.DataProtection.MySql.MySqlDataProtectionKeyDialect
+Themia.AspNetCore.DataProtection.MySql.MySqlDataProtectionKeyDialect.MySqlDataProtectionKeyDialect(string! connectionString) -> void
+Themia.AspNetCore.DataProtection.MySql.MySqlDataProtectionKeyDialect.CreateConnection() -> System.Data.Common.DbConnection!
+Themia.AspNetCore.DataProtection.MySql.MySqlDataProtectionKeyDialect.InsertSql.get -> string!
+Themia.AspNetCore.DataProtection.MySql.MySqlDataProtectionKeyDialect.SelectAllXmlSql.get -> string!
+static Themia.AspNetCore.DataProtection.MySql.DataProtectionBuilderExtensions.PersistKeysToThemiaMySql(this Microsoft.AspNetCore.DataProtection.IDataProtectionBuilder! builder, string! connectionString, bool runMigration = true) -> Microsoft.AspNetCore.DataProtection.IDataProtectionBuilder!

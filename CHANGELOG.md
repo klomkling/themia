@@ -27,6 +27,28 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+### Added
+- **`Themia.AspNetCore.DataProtection`** (+ `.PostgreSql` / `.MySql` / `.SqlServer`) — a shared Data Protection
+  key store for multi-instance applications (coord #0042). ASP.NET Core ships EF Core and Redis key
+  repositories but no Dapper one, so on the Themia Dapper stack the default is per-container filesystem keys:
+  the moment a second instance starts the key rings diverge, and auth cookies, antiforgery tokens, and anything
+  else wrapped by a `DataProtector` stop round-tripping across instances. This is an ASP.NET *provider* gap, not
+  a new persistence layer — distinct from the rejected coord #0039.
+
+  Registered as an `IDataProtectionBuilder` extension so the application keeps `SetApplicationName`, which is
+  the discriminator that stops two applications sharing one table from reading each other's keys:
+  `services.AddDataProtection().SetApplicationName("app").PersistKeysToThemiaPostgres(cs)`. Follows the
+  `Themia.Exceptional` shape — a neutral core with an `IDataProtectionKeyDialect` seam plus one package per
+  engine — over **one** `data_protection_keys` schema owned by FluentMigrator. Keys are per *application*, not
+  per tenant, so the package takes no multi-tenancy dependency. `created_at` comes from the server clock, never
+  the application's, since a fleet's clocks disagree. A single unparseable row is skipped rather than failing
+  the whole key ring: returning nothing would break every unprotect operation in the application.
+
+  **The stored key material is not encrypted at rest.** Anything that can read the table can decrypt that
+  application's cookies. ASP.NET Core's own EF Core and Redis providers behave the same way, but a database
+  spreads the material further than a per-instance filesystem does — into backups, replicas, and any DBA's
+  reach. Treat the table as a secret, and add `ProtectKeysWith*` where the deployment requires encryption at rest.
+
 ## [0.9.1] - 2026-07-26
 
 ### Fixed
