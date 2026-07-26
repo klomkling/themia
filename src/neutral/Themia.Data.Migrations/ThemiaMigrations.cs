@@ -19,6 +19,16 @@ public static class ThemiaMigrations
     /// against <paramref name="connectionString"/> using the <paramref name="engine"/>'s processor.
     /// Runs synchronously (<c>MigrateUp</c>).
     /// </summary>
+    /// <remarks>
+    /// Safe to call from every instance of a horizontally-scaled application. The run is serialized behind
+    /// the engine's session-level advisory lock, scoped to the target database, so instances booting
+    /// simultaneously apply pending migrations one at a time instead of racing on the same DDL. An instance
+    /// that finds the lock held waits for it, up to
+    /// <see cref="ThemiaMigrationOptions.DefaultLockTimeout"/>. Supply a
+    /// <see cref="ThemiaMigrationOptions.Logger"/> via the other overload to make a contended wait visible in
+    /// the boot log — an orchestrator's startup probe will usually kill a waiting instance long before the
+    /// timeout expires, and without a logger that leaves no trace.
+    /// </remarks>
     /// <param name="engine">The target database engine.</param>
     /// <param name="connectionString">Connection string for the migration runner. Required.</param>
     /// <param name="migrationAssemblies">
@@ -30,7 +40,31 @@ public static class ThemiaMigrations
     /// <exception cref="ArgumentNullException"><paramref name="migrationAssemblies"/> is null.</exception>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="engine"/> is not a known engine.</exception>
     /// <exception cref="InvalidOperationException">The migrations could not be loaded (e.g. duplicate version numbers) or failed to apply; the message names the engine.</exception>
-    public static void Run(MigrationEngine engine, string connectionString, params Assembly[] migrationAssemblies)
+    public static void Run(MigrationEngine engine, string connectionString, params Assembly[] migrationAssemblies) =>
+        Run(engine, connectionString, options: null, migrationAssemblies);
+
+    /// <inheritdoc cref="Run(MigrationEngine, string, Assembly[])"/>
+    /// <param name="engine">The target database engine.</param>
+    /// <param name="connectionString">Connection string for the migration runner. Required.</param>
+    /// <param name="options">
+    /// Migration-lock settings (wait timeout and a logger for lock diagnostics). Pass <see langword="null"/>
+    /// for the defaults.
+    /// </param>
+    /// <param name="migrationAssemblies">
+    /// One or more assemblies scanned for <c>[Migration]</c> types. At least one is required, and the
+    /// supplied set must contain at least one migration — passing assemblies with no <c>[Migration]</c>
+    /// types is rejected rather than silently applying nothing.
+    /// </param>
+    /// <remarks>
+    /// Deliberately not <c>params</c>: with it, a three-argument call whose last argument is <c>null</c> would
+    /// be ambiguous between this overload and the <c>params</c> one. Pass a collection expression —
+    /// <c>Run(engine, cs, options, [typeof(X).Assembly])</c>.
+    /// </remarks>
+    public static void Run(
+        MigrationEngine engine,
+        string connectionString,
+        ThemiaMigrationOptions? options,
+        Assembly[] migrationAssemblies)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(connectionString);
         ArgumentNullException.ThrowIfNull(migrationAssemblies);
@@ -81,9 +115,21 @@ public static class ThemiaMigrations
                 "The supplied assemblies contain no FluentMigrator [Migration] types; nothing would be applied.",
                 nameof(migrationAssemblies));
 
+        var runner = serviceProvider.GetRequiredService<IMigrationRunner>();
+
         try
         {
-            serviceProvider.GetRequiredService<IMigrationRunner>().MigrateUp();
+            // Serialized across instances: N of them booting at once would otherwise all see the same
+            // migration pending and apply it concurrently (see MigrationLock).
+            MigrationLock.RunExclusive(engine, connectionString, options ?? new ThemiaMigrationOptions(), runner.MigrateUp);
+        }
+        catch (MigrationLockException ex)
+        {
+            // Kept separate from the DDL wrap below: a lock failure never reached a migration, so pointing the
+            // operator at DDL permissions would send them auditing grants for an outage that has another cause.
+            throw new InvalidOperationException(
+                $"Themia.Data.Migrations: could not take the migration lock for {displayName}, so no " +
+                "migrations were applied. See the inner exception for the lock failure.", ex);
         }
         catch (Exception ex)
         {
