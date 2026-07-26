@@ -27,6 +27,8 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-07-26
+
 ### Added
 - **`Themia.AspNetCore.DataProtection`** (+ `.PostgreSql` / `.MySql` / `.SqlServer`) — a shared Data Protection
   key store for multi-instance applications (coord #0042). ASP.NET Core ships EF Core and Redis key
