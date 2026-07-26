@@ -7,6 +7,29 @@ namespace Themia.Pdf.Tests;
 
 public sealed class PuppeteerPdfRendererTests
 {
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void Ctor_MaxConcurrencyBelowOne_Throws(int maxConcurrency)
+    {
+        // A semaphore's capacity is fixed at construction, so an invalid bound has to fail here rather than
+        // at the first render — and zero would deadlock every caller forever rather than erroring.
+        var options = new ThemiaPdfOptions { MaxConcurrency = maxConcurrency };
+
+        var ex = Assert.Throws<ArgumentOutOfRangeException>(
+            () => new PuppeteerPdfRenderer(options, NullLogger<PuppeteerPdfRenderer>.Instance));
+
+        Assert.Contains(nameof(ThemiaPdfOptions.MaxConcurrency), ex.Message);
+    }
+
+    [Fact]
+    public void MaxConcurrency_DefaultsToASmallBound()
+    {
+        // Deliberately not "unbounded". Every concurrent render opens its own Chromium page, so an
+        // unbounded default makes worst-case memory a function of inbound traffic.
+        Assert.Equal(2, new ThemiaPdfOptions().MaxConcurrency);
+    }
+
     [Fact]
     public async Task RenderHtmlAsync_AutoDownloadDisabledWithoutExecutablePath_Throws()
     {

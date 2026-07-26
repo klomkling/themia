@@ -27,6 +27,27 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+### Added
+- **`Themia.Pdf`** — `ThemiaPdfOptions.MaxConcurrency` bounds how many renders run at once (coord #0046).
+
+### Fixed
+- **(breaking-ish) `Themia.Pdf`** — concurrent renders were **completely ungated**. The `SemaphoreSlim(1,1)` in
+  `PuppeteerPdfRenderer` guards *browser launch* only (so concurrent first-callers don't start two Chromiums);
+  `RenderHtmlAsync` then went straight to `browser.NewPageAsync()` with no limit, so every caller opened its own
+  Chromium page and worst-case memory was a function of inbound traffic. On a small or shared host that
+  surfaces as Chromium OOM-killing a *neighbouring* process, not as a failed render. Unchanged since 0.6.0, so
+  every version up to 0.10.0 is affected.
+
+  Renders are now bounded by `MaxConcurrency`, **default 2** — deliberately a small bound rather than
+  "preserve current behaviour", since the previous behaviour is the defect. Callers beyond the limit queue and
+  honour their `CancellationToken`. Raise it once you have measured a page's real cost on your host; PDF
+  rendering is normally low-rate and bursty, so a low ceiling costs little latency for a predictable memory
+  envelope. If you already cap concurrency yourself, set it to match rather than stacking two gates.
+
+  The class doc also claimed the browser was "guarded by a semaphore", which reads as though renders were
+  guarded — that wording is what led an adopter to assume a bound existed. Both gates are now named and
+  distinguished explicitly.
+
 ## [0.10.0] - 2026-07-26
 
 ### Added
