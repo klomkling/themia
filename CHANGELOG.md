@@ -44,6 +44,13 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
   rendering is normally low-rate and bursty, so a low ceiling costs little latency for a predictable memory
   envelope. If you already cap concurrency yourself, set it to match rather than stacking two gates.
 
+  **The bound is per process.** It is a `SemaphoreSlim`, so behind a load balancer — or with several
+  applications sharing a host — the real ceiling is `instances × MaxConcurrency`, and since the renderer is a
+  singleton per process each instance runs its *own* Chromium too. A host's worst case is
+  `instances × (browser baseline + MaxConcurrency × page cost)`. For a hard guarantee that rendering cannot
+  starve a *neighbouring* process, set a container memory limit as well; no in-process bound can protect a
+  process it does not live in.
+
   The class doc also claimed the browser was "guarded by a semaphore", which reads as though renders were
   guarded — that wording is what led an adopter to assume a bound existed. Both gates are now named and
   distinguished explicitly.

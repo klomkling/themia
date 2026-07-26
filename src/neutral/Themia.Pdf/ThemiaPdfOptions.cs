@@ -44,6 +44,17 @@ public sealed class ThemiaPdfOptions
     /// <para>The default is deliberately small rather than "whatever the caller happens to send". PDF
     /// rendering is normally low-rate and bursty, so a low ceiling costs little latency in exchange for a
     /// predictable memory envelope; raise it once you have measured a page's real cost on your host.</para>
+    ///
+    /// <para><strong>This bound is per process, not per host or per cluster.</strong> It is a
+    /// <see cref="System.Threading.SemaphoreSlim"/>, so it knows nothing about other instances. Behind a load
+    /// balancer, or when several applications share a host, the real ceiling is
+    /// <c>instances × MaxConcurrency</c> — and because the renderer is a singleton per process, each instance
+    /// also runs its <em>own</em> Chromium, so a host's worst case is
+    /// <c>instances × (browser baseline + MaxConcurrency × page cost)</c>. Size accordingly.</para>
+    ///
+    /// <para>If the goal is "never let this starve a neighbouring process", set a container memory limit as
+    /// well. No in-process bound can protect a process it does not live in. A cluster-wide render budget
+    /// would need a distributed lease rather than this option.</para>
     /// </remarks>
     public int MaxConcurrency { get; set; } = 2;
 
