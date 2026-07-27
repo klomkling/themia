@@ -27,6 +27,8 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.10.1] - 2026-07-27
+
 ### Added
 - **`Themia.Pdf`** — `ThemiaPdfOptions.MaxConcurrency` bounds how many renders run at once (coord #0046).
 
