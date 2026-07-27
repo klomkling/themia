@@ -29,6 +29,8 @@ Themia.Pdf.ThemiaPdfOptions.ExecutablePath.get -> string?
 Themia.Pdf.ThemiaPdfOptions.ExecutablePath.set -> void
 Themia.Pdf.ThemiaPdfOptions.Headless.get -> bool
 Themia.Pdf.ThemiaPdfOptions.Headless.set -> void
+Themia.Pdf.ThemiaPdfOptions.MaxConcurrency.get -> int
+Themia.Pdf.ThemiaPdfOptions.MaxConcurrency.set -> void
 Themia.Pdf.ThemiaPdfOptions.LaunchArgs.get -> string![]!
 Themia.Pdf.ThemiaPdfOptions.LaunchArgs.set -> void
 Themia.Pdf.IHtmlTemplateRenderer

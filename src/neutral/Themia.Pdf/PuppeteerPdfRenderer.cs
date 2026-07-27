@@ -5,10 +5,16 @@ using PuppeteerSharp.Media;
 namespace Themia.Pdf;
 
 /// <summary>
-/// PuppeteerSharp-backed <see cref="IPdfRenderer"/>. Lazily launches a single headless Chromium
-/// browser (guarded by a semaphore), reuses it across renders, and disposes it on
-/// <see cref="DisposeAsync"/> (or <see cref="Dispose"/> for non-async teardown).
+/// PuppeteerSharp-backed <see cref="IPdfRenderer"/>. Lazily launches a single headless Chromium browser,
+/// reuses it across renders, and disposes it on <see cref="DisposeAsync"/> (or <see cref="Dispose"/> for
+/// non-async teardown).
 /// </summary>
+/// <remarks>
+/// Two distinct gates, previously easy to confuse: <c>_browserLock</c> guards <em>launching</em> the browser
+/// (so concurrent first-callers don't start two Chromiums), while <c>_renderLock</c> bounds how many renders
+/// run at once (<see cref="ThemiaPdfOptions.MaxConcurrency"/>). Only the second one limits memory — each
+/// concurrent render opens its own page in the shared browser process.
+/// </remarks>
 internal sealed class PuppeteerPdfRenderer : IPdfRenderer, IAsyncDisposable, IDisposable
 {
     private readonly ThemiaPdfOptions _options;
@@ -17,6 +23,9 @@ internal sealed class PuppeteerPdfRenderer : IPdfRenderer, IAsyncDisposable, IDi
     private readonly string[] _launchArgs;
     private readonly ILogger<PuppeteerPdfRenderer> _logger;
     private readonly SemaphoreSlim _browserLock = new(1, 1);
+    private readonly SemaphoreSlim _renderLock;
+    private int _inFlight;
+    private int _peakInFlight;
     // volatile: the outer fast-path read in EnsureBrowserAsync runs outside the lock, so the
     // canonical double-checked-locking form requires a fresh read of the published reference.
     private volatile IBrowser? _browser;
@@ -27,7 +36,22 @@ internal sealed class PuppeteerPdfRenderer : IPdfRenderer, IAsyncDisposable, IDi
         _options = options ?? throw new ArgumentNullException(nameof(options));
         _launchArgs = options.LaunchArgs.ToArray();
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+
+        // Snapshot like _launchArgs above: the options object is mutable, and a semaphore's capacity is
+        // fixed at construction, so a later mutation must not silently disagree with the real bound.
+        if (options.MaxConcurrency < 1)
+            throw new ArgumentOutOfRangeException(
+                nameof(options), options.MaxConcurrency,
+                $"{nameof(ThemiaPdfOptions)}.{nameof(ThemiaPdfOptions.MaxConcurrency)} must be at least 1.");
+
+        _renderLock = new SemaphoreSlim(options.MaxConcurrency, options.MaxConcurrency);
     }
+
+    /// <summary>
+    /// Highest number of renders seen in flight at once. Exposed for tests that assert the concurrency bound
+    /// actually holds — a timing-based assertion could not tell a working gate from a slow machine.
+    /// </summary>
+    internal int PeakInFlight => Volatile.Read(ref _peakInFlight);
 
     public async Task<byte[]> RenderHtmlAsync(string html, PdfRenderOptions? options = null, CancellationToken ct = default)
     {
@@ -35,16 +59,45 @@ internal sealed class PuppeteerPdfRenderer : IPdfRenderer, IAsyncDisposable, IDi
         ct.ThrowIfCancellationRequested();
         var opts = options ?? new PdfRenderOptions();
 
-        var browser = await EnsureBrowserAsync(ct).ConfigureAwait(false);
+        // Bound concurrent renders before touching the browser. Each render opens its own page, and a page
+        // holds the rendered document, so this is what keeps worst-case memory finite — without it the only
+        // limit is how many callers arrive at once, and Chromium OOM-kills whatever shares the host.
+        // Queuing honours ct, so a caller that gives up while waiting is not charged a slot.
+        await _renderLock.WaitAsync(ct).ConfigureAwait(false);
+        TrackEntry();
+        try
+        {
+            var browser = await EnsureBrowserAsync(ct).ConfigureAwait(false);
 
-        // PuppeteerSharp's page methods don't take a CancellationToken, so honor ct between
-        // stages — combined with the WaitAsync(ct) in EnsureBrowserAsync this is the available
-        // granularity (a SetContent/PdfData call already in flight runs to completion). Render
-        // failures propagate untouched to the top-level handler (THEMIA101: no log-and-rethrow).
-        await using var page = await browser.NewPageAsync().ConfigureAwait(false);
-        await page.SetContentAsync(html).ConfigureAwait(false);
-        ct.ThrowIfCancellationRequested();
-        return await page.PdfDataAsync(ToPdfOptions(opts)).ConfigureAwait(false);
+            // PuppeteerSharp's page methods don't take a CancellationToken, so honor ct between
+            // stages — combined with the WaitAsync(ct) in EnsureBrowserAsync this is the available
+            // granularity (a SetContent/PdfData call already in flight runs to completion). Render
+            // failures propagate untouched to the top-level handler (THEMIA101: no log-and-rethrow).
+            await using var page = await browser.NewPageAsync().ConfigureAwait(false);
+            await page.SetContentAsync(html).ConfigureAwait(false);
+            ct.ThrowIfCancellationRequested();
+            return await page.PdfDataAsync(ToPdfOptions(opts)).ConfigureAwait(false);
+        }
+        finally
+        {
+            Interlocked.Decrement(ref _inFlight);
+            _renderLock.Release();
+        }
+    }
+
+    private void TrackEntry()
+    {
+        var current = Interlocked.Increment(ref _inFlight);
+
+        // CAS the peak upward; plain Max would lose races between concurrent renders.
+        var peak = Volatile.Read(ref _peakInFlight);
+        while (current > peak)
+        {
+            var seen = Interlocked.CompareExchange(ref _peakInFlight, current, peak);
+            if (seen == peak)
+                break;
+            peak = seen;
+        }
     }
 
     private async Task<IBrowser> EnsureBrowserAsync(CancellationToken ct)

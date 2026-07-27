@@ -21,6 +21,30 @@ public sealed class PdfRenderingIntegrationTests
         Assert.Equal(new byte[] { 0x25, 0x50, 0x44, 0x46, 0x2D }, bytes[..5]);
     }
 
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    public async Task RenderHtmlAsync_NeverExceedsMaxConcurrency(int maxConcurrency)
+    {
+        // Asserted on an observed peak rather than on elapsed time: a timing assertion cannot tell a working
+        // gate from a slow machine, and would pass on a fast one even with the gate removed.
+        await using var renderer = new PuppeteerPdfRenderer(
+            new ThemiaPdfOptions { MaxConcurrency = maxConcurrency },
+            NullLogger<PuppeteerPdfRenderer>.Instance);
+
+        var results = await Task.WhenAll(
+            Enumerable.Range(0, 6).Select(i => renderer.RenderHtmlAsync($"<p>{i}</p>")));
+
+        Assert.All(results, b => Assert.True(b.Length > 0));
+        Assert.True(
+            renderer.PeakInFlight <= maxConcurrency,
+            $"peak in-flight renders was {renderer.PeakInFlight}, expected at most {maxConcurrency}");
+
+        // The gate must actually have been contended, otherwise the assertion above is satisfied trivially
+        // by renders that happened to run one at a time.
+        Assert.Equal(maxConcurrency, renderer.PeakInFlight);
+    }
+
     [Fact]
     public async Task RenderHtmlAsync_ConcurrentRenders_ReuseSingleBrowser()
     {
