@@ -83,9 +83,10 @@ namespace TestNamespace
         Assert.Empty(result.Diagnostics);
         Assert.True(result.GeneratedTrees.Length > 0);
 
-        var handlerFileGenerated = result.GeneratedTrees.Any(t =>
+        var handlerTree = result.GeneratedTrees.FirstOrDefault(t =>
             t.FilePath.Contains("Handler") && t.FilePath.Contains("CreateOrderHandler"));
-        Assert.True(handlerFileGenerated, "Handler file should be generated");
+        Assert.NotNull(handlerTree);
+        Assert.Contains("#pragma warning disable CS8631", handlerTree!.ToString());
 
         var registrationGenerated = result.GeneratedTrees.Any(t => t.FilePath.Contains("Registration"));
         Assert.True(registrationGenerated, "Registration file should be generated");
