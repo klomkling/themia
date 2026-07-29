@@ -27,6 +27,11 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.10.2] - 2026-07-29
+
+### Fixed
+- **`Themia.SourceGenerator`** — Emit `#pragma warning disable CS8631` in generated mediator handler, registration, and dispatcher files to prevent Roslyn `CS8631` nullability constraint warnings in consumer projects (coord #0049).
+
 ## [0.10.1] - 2026-07-27
 
 ### Added
