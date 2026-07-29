@@ -43,3 +43,9 @@ Thumbs.db
 # Local secrets / env
 *.env
 appsettings.*.local.json
+
+# --- Graphify Knowledge Graph ---
+graphify-out/*
+!graphify-out/GRAPH_REPORT.md
+
+
