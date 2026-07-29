@@ -1,11 +1,11 @@
 # Graph Report - themia  (2026-07-29)
 
 ## Corpus Check
-- 1164 files · ~745,277 words
+- 1162 files · ~745,275 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 12237 nodes · 18903 edges · 1002 communities (789 shown, 213 thin omitted)
+- 12235 nodes · 18903 edges · 1001 communities (787 shown, 214 thin omitted)
 - Extraction: 100% EXTRACTED · 0% INFERRED · 0% AMBIGUOUS · INFERRED: 67 edges (avg confidence: 0.8)
 - Token cost: 0 input · 0 output
 
@@ -971,6 +971,7 @@
 - [[_COMMUNITY_Community 955|Community 955]]
 - [[_COMMUNITY_Community 956|Community 956]]
 - [[_COMMUNITY_Community 957|Community 957]]
+- [[_COMMUNITY_Community 958|Community 958]]
 
 ## God Nodes (most connected - your core abstractions)
 1. `_()` - 76 edges
@@ -999,15 +1000,15 @@
 ## Import Cycles
 - None detected.
 
-## Communities (1002 total, 213 thin omitted)
+## Communities (1001 total, 214 thin omitted)
 
 ### Community 0 - "Community 0"
 Cohesion: 0.09
 Nodes (25): IUserService, Action, CancellationToken, Fact, Func, Guid, IConfiguration, int (+17 more)
 
 ### Community 1 - "Community 1"
-Cohesion: 0.03
-Nodes (72): Microsoft.EntityFrameworkCore.Sqlite, net10.0, Microsoft.CodeAnalysis.PublicApiAnalyzers, Microsoft.Extensions.Configuration.Abstractions, Microsoft.Extensions.DependencyInjection.Abstractions, Npgsql.EntityFrameworkCore.PostgreSQL, Microsoft.NET.Sdk, net10.0 (+64 more)
+Cohesion: 0.04
+Nodes (49): net10.0, Microsoft.CodeAnalysis.PublicApiAnalyzers, Microsoft.EntityFrameworkCore.SqlServer, Microsoft.Extensions.Configuration.Abstractions, Microsoft.Extensions.DependencyInjection.Abstractions, Microsoft.NET.Sdk, net10.0, coverlet.collector (+41 more)
 
 ### Community 2 - "Community 2"
 Cohesion: 0.06
@@ -1023,7 +1024,7 @@ Nodes (64): FluentValidation, Microsoft.CodeAnalysis.CSharp.Analyzer.Testing.XUn
 
 ### Community 5 - "Community 5"
 Cohesion: 0.04
-Nodes (44): $(), a(), be(), C(), ce(), Ee(), et(), ft() (+36 more)
+Nodes (50): $(), a(), ae(), be(), C(), ce(), ct(), Ee() (+42 more)
 
 ### Community 6 - "Community 6"
 Cohesion: 0.03
@@ -1070,8 +1071,8 @@ Cohesion: 0.05
 Nodes (37): AuditableProduct, InventoryItem, ConstraintProduct, QueryCategory, QueryOrder, TestQueryDbContext, AuditableEntity, ConcurrencyAwareEntity (+29 more)
 
 ### Community 17 - "Community 17"
-Cohesion: 0.10
-Nodes (45): _(), a(), at(), b(), c(), cn(), d(), dt() (+37 more)
+Cohesion: 0.11
+Nodes (42): _(), a(), Ae(), at(), b(), c(), ct(), dt() (+34 more)
 
 ### Community 18 - "Community 18"
 Cohesion: 0.04
@@ -1178,8 +1179,8 @@ Cohesion: 0.10
 Nodes (13): MariaDbContainer, Action, Fact, MsSqlContainer, MySqlContainer, PostgreSqlContainer, Task, TimeSpan (+5 more)
 
 ### Community 44 - "Community 44"
-Cohesion: 0.06
-Nodes (32): net10.0, Microsoft.CodeAnalysis.PublicApiAnalyzers, Microsoft.Data.SqlClient, Microsoft.Extensions.Configuration.Abstractions, Microsoft.Extensions.DependencyInjection.Abstractions, SqlKata, Microsoft.NET.Sdk, net10.0 (+24 more)
+Cohesion: 0.07
+Nodes (26): net10.0, Microsoft.CodeAnalysis.PublicApiAnalyzers, Microsoft.Data.SqlClient, Microsoft.Extensions.Configuration.Abstractions, Microsoft.Extensions.DependencyInjection.Abstractions, SqlKata, Microsoft.NET.Sdk, net10.0 (+18 more)
 
 ### Community 45 - "Community 45"
 Cohesion: 0.15
@@ -1222,8 +1223,8 @@ Cohesion: 0.10
 Nodes (17): AuthenticationBuilder, DashboardChrome, IdentityAspNetCoreServiceCollectionExtensions, Inner, Parsed, Action, IServiceCollection, JwtOptions (+9 more)
 
 ### Community 55 - "Community 55"
-Cohesion: 0.06
-Nodes (23): IClassFixture, Fact, MySqlContainerFixture, Task, Fact, PostgresContainerFixture, Task, Fact (+15 more)
+Cohesion: 0.08
+Nodes (18): IClassFixture, Fact, MySqlContainerFixture, Task, Fact, PostgresContainerFixture, Task, Fact (+10 more)
 
 ### Community 56 - "Community 56"
 Cohesion: 0.07
@@ -1282,8 +1283,8 @@ Cohesion: 0.07
 Nodes (25): net10.0, Microsoft.CodeAnalysis.PublicApiAnalyzers, Microsoft.EntityFrameworkCore, Microsoft.EntityFrameworkCore.Relational, Microsoft.Extensions.Configuration.Abstractions, Microsoft.Extensions.DependencyInjection.Abstractions, Microsoft.NET.Sdk, net10.0 (+17 more)
 
 ### Community 70 - "Community 70"
-Cohesion: 0.15
-Nodes (14): CancellationToken, ExportContext, ExportResult, NotificationRequest, StoragePutOptions, StorageReadResult, StorageVisibility, StoredObject (+6 more)
+Cohesion: 0.18
+Nodes (12): CancellationToken, ExportContext, ExportResult, StoragePutOptions, StorageReadResult, StorageVisibility, StoredObject, Stream (+4 more)
 
 ### Community 71 - "Community 71"
 Cohesion: 0.33
@@ -1730,8 +1731,8 @@ Cohesion: 0.16
 Nodes (12): EntityExtensions, Persisted, CancellationToken, Entity, Guid, ICollection, IDomainEventDispatcher, IEnumerable (+4 more)
 
 ### Community 183 - "Community 183"
-Cohesion: 0.16
-Nodes (12): FakeAccessTokenService, FakeClaimsPrincipalFactory, FakeRefreshTokenService, IRefreshTokenService, AccessToken, CancellationToken, ClaimsPrincipal, Guid (+4 more)
+Cohesion: 0.15
+Nodes (13): FakeAccessTokenService, FakeClaimsPrincipalFactory, FakeRefreshTokenService, IAccessTokenService, IRefreshTokenService, AccessToken, CancellationToken, ClaimsPrincipal (+5 more)
 
 ### Community 184 - "Community 184"
 Cohesion: 0.11
@@ -2239,7 +2240,7 @@ Nodes (11): DiagnosticInfo, Enumerator, EquatableArray, Create(), Equals(), GetE
 
 ### Community 312 - "Community 312"
 Cohesion: 0.15
-Nodes (9): INotificationDispatcher, NotificationDispatcher, CancellationToken, NotificationRequest, Task, CancellationToken, NotificationRequest, Task (+1 more)
+Nodes (13): INotificationDispatcher, IExportDefinition, CancellationToken, NotificationRequest, Task, NotificationRequest, CancellingDefinition, CancelThenThrowDefinition (+5 more)
 
 ### Community 313 - "Community 313"
 Cohesion: 0.15
@@ -2257,17 +2258,13 @@ Nodes (8): PreferenceResolver, CancellationToken, Func, IReadOnlyList, Notificat
 Cohesion: 0.28
 Nodes (6): TestIdTokens, RsaKeyMaterial, SecurityTokenDescriptor, DateTimeOffset, IDictionary, SigningCredentials
 
-### Community 317 - "Community 317"
-Cohesion: 0.21
-Nodes (8): IExportDefinition, IJobExecutionContext, CancellingDefinition, CancelThenThrowDefinition, FakeJobContext, SoftDeleteAssertingDefinition, StubDefinition, ThrowingDefinition
-
 ### Community 318 - "Community 318"
 Cohesion: 0.42
 Nodes (3): HandlebarsJsonHelperTests, Fact, Services
 
 ### Community 319 - "Community 319"
-Cohesion: 0.23
-Nodes (13): be(), ce(), de(), fe(), ke(), n(), Ne(), Pe() (+5 more)
+Cohesion: 0.18
+Nodes (17): be(), ce(), cn(), d(), de(), fe(), fn(), ke() (+9 more)
 
 ### Community 320 - "Community 320"
 Cohesion: 0.17
@@ -2766,8 +2763,8 @@ Cohesion: 0.20
 Nodes (9): File Structure, Notes for the executor, Scheduling EF→FluentMigrator (Postgres + SQL Server) Implementation Plan, Task 1: Framework — register the active `IDatabaseProvider` in DI, Task 2: Add references and author the FluentMigrator migration, Task 3: Provider-agnostic registration + run the FM migration in InitializeAsync, Task 4: Delete the EF-migration artifacts, Task 5: Multi-engine integration tests (Postgres + SQL Server) (+1 more)
 
 ### Community 448 - "Community 448"
-Cohesion: 0.20
-Nodes (8): ClaimsPrincipalFactory, CancellationToken, ClaimsPrincipal, IClaimService, IRepository, ITenantContext, Task, User
+Cohesion: 0.12
+Nodes (13): IClaimsPrincipalFactory, ClaimsPrincipalFactory, CancellationToken, ClaimsPrincipal, IClaimService, IRepository, ITenantContext, Task (+5 more)
 
 ### Community 449 - "Community 449"
 Cohesion: 0.33
@@ -3098,8 +3095,8 @@ Cohesion: 0.39
 Nodes (3): HandlebarsNotificationRenderer, Fact, HandlebarsNotificationRendererTests
 
 ### Community 537 - "Community 537"
-Cohesion: 0.25
-Nodes (6): IAccessTokenService, IClaimsPrincipalFactory, AccessToken, ClaimsPrincipal, FakeAccessTokenService, FakeClaimsPrincipalFactory
+Cohesion: 0.06
+Nodes (29): Microsoft.EntityFrameworkCore.Sqlite, net10.0, Microsoft.CodeAnalysis.PublicApiAnalyzers, Microsoft.Extensions.Configuration.Abstractions, Microsoft.Extensions.DependencyInjection.Abstractions, Npgsql.EntityFrameworkCore.PostgreSQL, Microsoft.NET.Sdk, net10.0 (+21 more)
 
 ### Community 538 - "Community 538"
 Cohesion: 0.29
@@ -3375,7 +3372,7 @@ Nodes (6): 1. MySQL support is deferred (the plan intended it; there is no EF Co
 
 ### Community 611 - "Community 611"
 Cohesion: 0.38
-Nodes (5): ExternalLoginLinkConfiguration, RoleConfiguration, EntityTypeBuilder, ExternalLoginLink, Role
+Nodes (5): RefreshTokenConfiguration, RoleConfiguration, EntityTypeBuilder, RefreshToken, Role
 
 ### Community 612 - "Community 612"
 Cohesion: 0.38
@@ -3442,8 +3439,8 @@ Cohesion: 0.33
 Nodes (4): BackgroundTenantScope, Restore, IDisposable, TenantId
 
 ### Community 628 - "Community 628"
-Cohesion: 0.62
-Nodes (7): Ae(), ct(), Ee(), Ge(), Ie(), tn(), Ve()
+Cohesion: 0.25
+Nodes (5): IConfiguration, IServiceCollection, PdfSqlServerFixture, Task, DapperSqlServerPdfStoreTests
 
 ### Community 629 - "Community 629"
 Cohesion: 0.33
@@ -3622,8 +3619,8 @@ Cohesion: 0.40
 Nodes (4): JavaScriptEncoder, DashboardJsonOptions, Themia.Quartz.Dashboard.Json, JsonSerializerOptions
 
 ### Community 688 - "Community 688"
-Cohesion: 0.40
-Nodes (6): ae(), ct(), fe(), lt(), ue(), S()
+Cohesion: 0.33
+Nodes (4): NotificationDispatcher, CancellationToken, NotificationRequest, Task
 
 ### Community 689 - "Community 689"
 Cohesion: 0.33
@@ -3692,10 +3689,6 @@ Nodes (4): Action, IServiceCollection, ThemiaPdfOptions, ThemiaPdfServiceCollect
 ### Community 715 - "Community 715"
 Cohesion: 0.47
 Nodes (3): Fact, Task, ExportModuleTests
-
-### Community 718 - "Community 718"
-Cohesion: 0.33
-Nodes (3): TypeHandlerBase, Themia.Quartz.Dashboard.TypeHandlers, UnsupportedTypeHandler
 
 ### Community 719 - "Community 719"
 Cohesion: 0.40
@@ -3849,6 +3842,10 @@ Nodes (3): IDataProtectionBuilder, ThemiaMigrationOptions, DataProtectionBuilder
 Cohesion: 0.40
 Nodes (3): KeyValuePair, OptionSetHandler, Themia.Quartz.Dashboard.TypeHandlers
 
+### Community 766 - "Community 766"
+Cohesion: 0.33
+Nodes (3): TypeHandlerBase, StringHandler, Themia.Quartz.Dashboard.TypeHandlers
+
 ### Community 768 - "Community 768"
 Cohesion: 0.40
 Nodes (3): Fact, Task, UseThemiaProblemDetailsTests
@@ -3883,7 +3880,7 @@ Nodes (4): [0.9.0] - 2026-07-16, Added, Changed, Security
 
 ### Community 792 - "Community 792"
 Cohesion: 0.67
-Nodes (3): RefreshTokenConfiguration, IEntityTypeConfiguration, RefreshToken
+Nodes (3): ExternalLoginLinkConfiguration, IEntityTypeConfiguration, ExternalLoginLink
 
 ### Community 797 - "Community 797"
 Cohesion: 0.50
@@ -3973,10 +3970,14 @@ Nodes (3): [0.8.4] - 2026-07-12, Changed, Fixed
 Cohesion: 0.67
 Nodes (3): [0.8.6] - 2026-07-13, Added, Security
 
+### Community 958 - "Community 958"
+Cohesion: 0.40
+Nodes (6): en(), Ft(), gn(), I(), u(), vn()
+
 ## Knowledge Gaps
 - **4338 isolated node(s):** `verify-analyzer-flow.sh script`, `IServiceCollection`, `IConfiguration`, `CacheEntryOptions`, `CacheEntryOptions` (+4333 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **213 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **214 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
@@ -3994,4 +3995,4 @@ _Questions this graph is uniquely positioned to answer:_
 - **Should `Community 0` be split into smaller, more focused modules?**
   _Cohesion score 0.09355742296918768 - nodes in this community are weakly interconnected._
 - **Should `Community 1` be split into smaller, more focused modules?**
-  _Cohesion score 0.025925925925925925 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.037037037037037035 - nodes in this community are weakly interconnected._
