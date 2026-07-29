@@ -135,3 +135,14 @@ design/doc work done without ExitPlanMode/TodoWrite. Do it before the session en
 3. Keep it tight: **what changed + why** (the decision/rationale), not a transcript.
 
 Always read `/Users/sarawut/Obsidian/ai-brains/CLAUDE.md` first and obey it when writing there.
+
+## graphify
+
+This project has a knowledge graph at `graphify-out/` with god nodes, community structure, and cross-file relationships.
+
+Rules:
+- For codebase questions, first query the graph in `graphify-out/graph.json` when it exists. Use `graphify path "<A>" "<B>"` for relationships and `graphify explain "<concept>"` for focused concepts.
+- If `graphify-out/wiki/index.md` exists, use it for broad navigation instead of raw source browsing.
+- Read `graphify-out/GRAPH_REPORT.md` for broad architecture review.
+- After modifying code, run `graphify update .` to keep the graph current (AST-only, fast & free).
+
