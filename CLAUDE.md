@@ -115,6 +115,9 @@ This Themia effort is tracked in the **ai-brains vault** (`/Users/sarawut/Obsidi
 - Design / decision note: `03-Resources/Quartz.NET Dashboards & Porting SilkierQuartz.md`
 - Timeline log: `Note Timeline Hub.md`
 
+> [!TIP]
+> `ai-brains` and `coord` are accessible directly via **MCP Server tools** (`read_note`, `search_notes`, `list_folder`, `read_moc`, `append_timeline`, `write_session_log`, `upsert_design_note` / `list_requests`, `show_request`, `new_request`, `set_status`, `next_request`, `sync`) connected centrally to Homelab over Tailscale (`http://100.97.42.23:3001/sse` and `3002/sse`). Changes auto-commit and sync via Git (`klomkling/ai-brains.git`).
+
 **What the vault hooks auto-capture** (global `~/.claude/settings.json`) — and *where*:
 
 - `vault-plan-logger` — fires on the **ExitPlanMode** and **TodoWrite** tools → appends to
@@ -125,7 +128,7 @@ These trigger on **those tools/events only — not on "using a superpowers skill
 `writing-plans` / `brainstorming` run that merely `Write`s a doc (no TodoWrite, no Plan Mode) is
 **not** captured. And the hooks log to `AI/logs/`, **not** the curated `03-Resources/` note.
 
-**So manually capture to the curated note + timeline** for any substantive decision, design change,
+**So manually capture to the curated note + timeline** (via `upsert_design_note` and `append_timeline` MCP tools or file edit) for any substantive decision, design change,
 or chunk of work that the hook triggers above did **not** record — i.e. ad-hoc reasoning, or
 design/doc work done without ExitPlanMode/TodoWrite. Do it before the session ends:
 
