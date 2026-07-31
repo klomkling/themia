@@ -10,11 +10,20 @@ public sealed class HmacOptions
     /// <param name="configure">Configures the peer's keys, header prefix and routes.</param>
     /// <exception cref="ArgumentException"><paramref name="name"/> is null or empty.</exception>
     /// <exception cref="ArgumentNullException"><paramref name="configure"/> is null.</exception>
-    /// <exception cref="InvalidOperationException">The configured peer failed validation; see <see cref="MessagingPeerBuilder"/>.</exception>
+    /// <exception cref="InvalidOperationException">
+    /// The configured peer failed validation (see <see cref="MessagingPeerBuilder"/>), or
+    /// <paramref name="name"/> was already registered — last-write-wins would silently discard one
+    /// side's keys, turning a configuration mistake into intermittent 401s instead of a startup error.
+    /// </exception>
     public void AddPeer(string name, Action<MessagingPeerBuilder> configure)
     {
         ArgumentException.ThrowIfNullOrEmpty(name);
         ArgumentNullException.ThrowIfNull(configure);
+
+        if (_peers.ContainsKey(name))
+        {
+            throw new InvalidOperationException($"A peer named '{name}' is already registered.");
+        }
 
         var builder = new MessagingPeerBuilder();
         configure(builder);
