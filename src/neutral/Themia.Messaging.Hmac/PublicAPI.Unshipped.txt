@@ -1,7 +1,76 @@
 #nullable enable
+Themia.Messaging.Hmac.DependencyInjection.HmacServiceCollectionExtensions
 Themia.Messaging.Hmac.ThemiaHmacV1
 const Themia.Messaging.Hmac.ThemiaHmacV1.SchemeName = "themia-hmac-v1" -> string!
 static Themia.Messaging.Hmac.ThemiaHmacV1.Canonicalize(string! timestamp, string! method, string! pathAndQuery, string! body) -> string!
 static Themia.Messaging.Hmac.ThemiaHmacV1.FormatTimestamp(System.DateTimeOffset value) -> string!
 static Themia.Messaging.Hmac.ThemiaHmacV1.Sign(string! canonical, string! secret) -> string!
 static Themia.Messaging.Hmac.ThemiaHmacV1.TryParseTimestamp(string? value, out System.DateTimeOffset result) -> bool
+Themia.Messaging.Hmac.HmacHeaderNames
+const Themia.Messaging.Hmac.HmacHeaderNames.DefaultPrefix = "X-Themia-" -> string!
+Themia.Messaging.Hmac.HmacHeaderNames.HmacHeaderNames(string! Prefix) -> void
+Themia.Messaging.Hmac.HmacHeaderNames.KeyId.get -> string!
+Themia.Messaging.Hmac.HmacHeaderNames.Origin.get -> string!
+Themia.Messaging.Hmac.HmacHeaderNames.Prefix.get -> string!
+Themia.Messaging.Hmac.HmacHeaderNames.Prefix.init -> void
+Themia.Messaging.Hmac.HmacHeaderNames.Scheme.get -> string!
+Themia.Messaging.Hmac.HmacHeaderNames.Signature.get -> string!
+Themia.Messaging.Hmac.HmacHeaderNames.Timestamp.get -> string!
+Themia.Messaging.Hmac.HmacOptions
+Themia.Messaging.Hmac.HmacOptions.AddPeer(string! name, System.Action<Themia.Messaging.Hmac.MessagingPeerBuilder!>! configure) -> void
+Themia.Messaging.Hmac.HmacOptions.HmacOptions() -> void
+Themia.Messaging.Hmac.HmacOptions.TryGetPeer(string! name, out Themia.Messaging.Hmac.MessagingPeer? peer) -> bool
+Themia.Messaging.Hmac.HmacVerdict
+Themia.Messaging.Hmac.HmacVerdict.MalformedTimestamp = 2 -> Themia.Messaging.Hmac.HmacVerdict
+Themia.Messaging.Hmac.HmacVerdict.SignatureMismatch = 4 -> Themia.Messaging.Hmac.HmacVerdict
+Themia.Messaging.Hmac.HmacVerdict.StaleTimestamp = 1 -> Themia.Messaging.Hmac.HmacVerdict
+Themia.Messaging.Hmac.HmacVerdict.UnknownKeyId = 3 -> Themia.Messaging.Hmac.HmacVerdict
+Themia.Messaging.Hmac.HmacVerdict.UnknownPeer = 6 -> Themia.Messaging.Hmac.HmacVerdict
+Themia.Messaging.Hmac.HmacVerdict.UnknownScheme = 5 -> Themia.Messaging.Hmac.HmacVerdict
+Themia.Messaging.Hmac.HmacVerdict.Verified = 0 -> Themia.Messaging.Hmac.HmacVerdict
+Themia.Messaging.Hmac.HmacVerificationResult
+Themia.Messaging.Hmac.HmacVerificationResult.HmacVerificationResult() -> void
+Themia.Messaging.Hmac.HmacVerificationResult.HmacVerificationResult(Themia.Messaging.Hmac.HmacVerdict Verdict, string? MatchedKeyId = null, System.TimeSpan? Skew = null) -> void
+Themia.Messaging.Hmac.HmacVerificationResult.MatchedKeyId.get -> string?
+Themia.Messaging.Hmac.HmacVerificationResult.MatchedKeyId.init -> void
+Themia.Messaging.Hmac.HmacVerificationResult.Skew.get -> System.TimeSpan?
+Themia.Messaging.Hmac.HmacVerificationResult.Skew.init -> void
+Themia.Messaging.Hmac.HmacVerificationResult.Verdict.get -> Themia.Messaging.Hmac.HmacVerdict
+Themia.Messaging.Hmac.HmacVerificationResult.Verdict.init -> void
+Themia.Messaging.Hmac.HmacVerifier
+Themia.Messaging.Hmac.HmacVerifier.HmacVerifier() -> void
+Themia.Messaging.Hmac.HmacVerifier.Verify(Themia.Messaging.Hmac.MessagingPeer! peer, System.Collections.Generic.IReadOnlyDictionary<string!, string?>! headers, string! method, string! pathAndQuery, string! body, System.DateTimeOffset now) -> Themia.Messaging.Hmac.HmacVerificationResult
+Themia.Messaging.Hmac.IHmacVerifier
+Themia.Messaging.Hmac.IHmacVerifier.Verify(Themia.Messaging.Hmac.MessagingPeer! peer, System.Collections.Generic.IReadOnlyDictionary<string!, string?>! headers, string! method, string! pathAndQuery, string! body, System.DateTimeOffset now) -> Themia.Messaging.Hmac.HmacVerificationResult
+Themia.Messaging.Hmac.MessagingPeer
+Themia.Messaging.Hmac.MessagingPeer.BaseAddress.get -> System.Uri?
+Themia.Messaging.Hmac.MessagingPeer.ClockSkewTolerance.get -> System.TimeSpan
+Themia.Messaging.Hmac.MessagingPeer.HeaderNames.get -> Themia.Messaging.Hmac.HmacHeaderNames!
+Themia.Messaging.Hmac.MessagingPeer.HeaderPrefix.get -> string!
+Themia.Messaging.Hmac.MessagingPeer.InboundKeys.get -> System.Collections.Generic.IReadOnlyDictionary<string!, string!>!
+Themia.Messaging.Hmac.MessagingPeer.MaxBodyBytes.get -> long
+Themia.Messaging.Hmac.MessagingPeer.Name.get -> string!
+Themia.Messaging.Hmac.MessagingPeer.OutboundKeyId.get -> string!
+Themia.Messaging.Hmac.MessagingPeer.OutboundSecret.get -> string!
+Themia.Messaging.Hmac.MessagingPeer.Routes.get -> System.Collections.Generic.IReadOnlyDictionary<string!, string!>!
+Themia.Messaging.Hmac.MessagingPeerBuilder
+Themia.Messaging.Hmac.MessagingPeerBuilder.Accept(string! keyId, string! secret) -> void
+Themia.Messaging.Hmac.MessagingPeerBuilder.BaseAddress.get -> System.Uri?
+Themia.Messaging.Hmac.MessagingPeerBuilder.BaseAddress.set -> void
+Themia.Messaging.Hmac.MessagingPeerBuilder.ClockSkewTolerance.get -> System.TimeSpan
+Themia.Messaging.Hmac.MessagingPeerBuilder.ClockSkewTolerance.set -> void
+Themia.Messaging.Hmac.MessagingPeerBuilder.HeaderPrefix.get -> string!
+Themia.Messaging.Hmac.MessagingPeerBuilder.HeaderPrefix.set -> void
+Themia.Messaging.Hmac.MessagingPeerBuilder.MaxBodyBytes.get -> long
+Themia.Messaging.Hmac.MessagingPeerBuilder.MaxBodyBytes.set -> void
+Themia.Messaging.Hmac.MessagingPeerBuilder.MessagingPeerBuilder() -> void
+Themia.Messaging.Hmac.MessagingPeerBuilder.Route(string! type, string! path) -> void
+Themia.Messaging.Hmac.MessagingPeerBuilder.SignWith(string! keyId, string! secret) -> void
+static Themia.Messaging.Hmac.DependencyInjection.HmacServiceCollectionExtensions.AddThemiaMessagingHmac(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Themia.Messaging.Hmac.HmacOptions!>! configure) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static Themia.Messaging.Hmac.HmacVerificationResult.MalformedTimestamp() -> Themia.Messaging.Hmac.HmacVerificationResult
+static Themia.Messaging.Hmac.HmacVerificationResult.SignatureMismatch() -> Themia.Messaging.Hmac.HmacVerificationResult
+static Themia.Messaging.Hmac.HmacVerificationResult.StaleTimestamp(System.TimeSpan skew) -> Themia.Messaging.Hmac.HmacVerificationResult
+static Themia.Messaging.Hmac.HmacVerificationResult.UnknownKeyId() -> Themia.Messaging.Hmac.HmacVerificationResult
+static Themia.Messaging.Hmac.HmacVerificationResult.UnknownPeer() -> Themia.Messaging.Hmac.HmacVerificationResult
+static Themia.Messaging.Hmac.HmacVerificationResult.UnknownScheme() -> Themia.Messaging.Hmac.HmacVerificationResult
+static Themia.Messaging.Hmac.HmacVerificationResult.Verified(string! matchedKeyId) -> Themia.Messaging.Hmac.HmacVerificationResult
