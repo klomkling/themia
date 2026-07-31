@@ -1,0 +1,46 @@
+#nullable enable
+Themia.Messaging.Outbox.BackoffPolicy
+Themia.Messaging.Outbox.DispatchOutcome
+Themia.Messaging.Outbox.DispatchOutcome.Delivered = 0 -> Themia.Messaging.Outbox.DispatchOutcome
+Themia.Messaging.Outbox.DispatchOutcome.Permanent = 2 -> Themia.Messaging.Outbox.DispatchOutcome
+Themia.Messaging.Outbox.DispatchOutcome.Transient = 1 -> Themia.Messaging.Outbox.DispatchOutcome
+Themia.Messaging.Outbox.DispatchResult
+Themia.Messaging.Outbox.DispatchResult.DispatchResult() -> void
+Themia.Messaging.Outbox.DispatchResult.DispatchResult(Themia.Messaging.Outbox.DispatchOutcome Outcome, string? Error) -> void
+Themia.Messaging.Outbox.DispatchResult.Error.get -> string?
+Themia.Messaging.Outbox.DispatchResult.Error.init -> void
+Themia.Messaging.Outbox.DispatchResult.Outcome.get -> Themia.Messaging.Outbox.DispatchOutcome
+Themia.Messaging.Outbox.DispatchResult.Outcome.init -> void
+Themia.Messaging.Outbox.DrainSignal
+Themia.Messaging.Outbox.DrainSignal.DrainSignal() -> void
+Themia.Messaging.Outbox.DrainSignal.Signal() -> void
+Themia.Messaging.Outbox.DrainSignal.WaitAsync(System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!
+Themia.Messaging.Outbox.IClaimedRow
+Themia.Messaging.Outbox.IClaimedRow.Attempts.get -> int
+Themia.Messaging.Outbox.IClaimedRow.Id.get -> System.Guid
+Themia.Messaging.Outbox.IOutboxDialect<TRow>
+Themia.Messaging.Outbox.IOutboxDialect<TRow>.ClaimAsync(System.Data.Common.DbConnection! connection, string! leaseOwner, System.DateTimeOffset now, System.DateTimeOffset leaseExpiresAt, int batchSize, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<TRow>!>!
+Themia.Messaging.Outbox.IOutboxDialect<TRow>.CompleteAsync(System.Data.Common.DbConnection! connection, System.Guid id, System.DateTimeOffset completedAt, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!
+Themia.Messaging.Outbox.IOutboxDialect<TRow>.CreateConnection() -> System.Data.Common.DbConnection!
+Themia.Messaging.Outbox.IOutboxDialect<TRow>.FailAsync(System.Data.Common.DbConnection! connection, System.Guid id, int attempts, System.DateTimeOffset nextAttemptAt, bool dead, string! error, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!
+Themia.Messaging.Outbox.IOutboxDispatcher<TRow>
+Themia.Messaging.Outbox.IOutboxDispatcher<TRow>.DispatchAsync(System.IServiceProvider! scopedServices, TRow row, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<Themia.Messaging.Outbox.DispatchResult>!
+Themia.Messaging.Outbox.OutboxDrainer<TRow>
+Themia.Messaging.Outbox.OutboxDrainer<TRow>.DrainOnceAsync(System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<int>!
+Themia.Messaging.Outbox.OutboxDrainer<TRow>.OutboxDrainer(Themia.Messaging.Outbox.IOutboxDialect<TRow>! dialect, Themia.Messaging.Outbox.IOutboxDispatcher<TRow>! dispatcher, Themia.Messaging.Outbox.DrainSignal! signal, Microsoft.Extensions.DependencyInjection.IServiceScopeFactory! scopeFactory, Themia.Messaging.Outbox.OutboxDrainerOptions<TRow>! options, System.TimeProvider! time, Microsoft.Extensions.Logging.ILogger<Themia.Messaging.Outbox.OutboxDrainer<TRow>!>! logger) -> void
+Themia.Messaging.Outbox.OutboxDrainerOptions<TRow>
+Themia.Messaging.Outbox.OutboxDrainerOptions<TRow>.DrainIntervalSeconds.get -> int
+Themia.Messaging.Outbox.OutboxDrainerOptions<TRow>.DrainIntervalSeconds.set -> void
+Themia.Messaging.Outbox.OutboxDrainerOptions<TRow>.LeaseSeconds.get -> int
+Themia.Messaging.Outbox.OutboxDrainerOptions<TRow>.LeaseSeconds.set -> void
+Themia.Messaging.Outbox.OutboxDrainerOptions<TRow>.MaxAttempts.get -> int
+Themia.Messaging.Outbox.OutboxDrainerOptions<TRow>.MaxAttempts.set -> void
+Themia.Messaging.Outbox.OutboxDrainerOptions<TRow>.MaxBatchSize.get -> int
+Themia.Messaging.Outbox.OutboxDrainerOptions<TRow>.MaxBatchSize.set -> void
+Themia.Messaging.Outbox.OutboxDrainerOptions<TRow>.OutboxDrainerOptions() -> void
+static Themia.Messaging.Outbox.BackoffPolicy.IsDead(int attempts, int maxAttempts) -> bool
+static readonly Themia.Messaging.Outbox.BackoffPolicy.MaxDelay -> System.TimeSpan
+static Themia.Messaging.Outbox.BackoffPolicy.NextAttemptAt(System.DateTimeOffset now, int attempts) -> System.DateTimeOffset
+static Themia.Messaging.Outbox.DispatchResult.Delivered() -> Themia.Messaging.Outbox.DispatchResult
+static Themia.Messaging.Outbox.DispatchResult.Permanent(string! error) -> Themia.Messaging.Outbox.DispatchResult
+static Themia.Messaging.Outbox.DispatchResult.Transient(string! error) -> Themia.Messaging.Outbox.DispatchResult

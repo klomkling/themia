@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Themia.Framework.Data.Dapper.Mapping;
+using Themia.Messaging.Outbox;
 using Themia.Modules.Notifications.Config;
 using Themia.Modules.Notifications.Dispatch;
 using Themia.Modules.Notifications.Mapping;
@@ -40,6 +41,18 @@ public static class NotificationsServiceCollectionExtensions
 
         services.TryAddSingleton<DrainSignal>();
 
+        // The drain loop itself is the shared one from Themia.Messaging; map the module's options onto it
+        // so adopters keep configuring drain behaviour through NotificationsModuleOptions.
+        services.TryAddSingleton(new OutboxDrainerOptions<ClaimedOutboxRow>
+        {
+            DrainIntervalSeconds = options.DrainIntervalSeconds,
+            MaxBatchSize = options.MaxBatchSize,
+            MaxAttempts = options.MaxAttempts,
+            LeaseSeconds = options.LeaseSeconds,
+        });
+        services.TryAddSingleton<IOutboxDispatcher<ClaimedOutboxRow>, NotificationOutboxDispatcher>();
+        services.TryAddSingleton<IOutboxDialect<ClaimedOutboxRow>>(sp => sp.GetRequiredService<INotificationsSqlDialect>());
+
         services.TryAddScoped<IOutboxStore, OutboxStore>();
         services.TryAddScoped<IInAppNotificationStore, InAppNotificationStore>();
         services.TryAddScoped<INotificationPreferenceStore, NotificationPreferenceStore>();
@@ -49,7 +62,7 @@ public static class NotificationsServiceCollectionExtensions
         services.TryAddScoped<INotificationDispatcher, NotificationDispatcher>();
 
         ContributeDapperMappings(services);
-        services.AddHostedService<OutboxDrainer>();
+        services.AddHostedService<OutboxDrainer<ClaimedOutboxRow>>();
 
         return services;
     }

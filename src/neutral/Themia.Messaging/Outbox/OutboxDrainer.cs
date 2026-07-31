@@ -4,27 +4,36 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
-using Themia.Notifications;
-
-namespace Themia.Modules.Notifications.Outbox;
+namespace Themia.Messaging.Outbox;
 
 /// <summary>
-/// Background service that drains the transactional outbox: it claims due rows under a lease,
-/// dispatches each to the registered channel sender, and marks the row sent or failed (with
-/// backoff). It owns the delivery outcome — failures are recorded on the row, not rethrown.
+/// Background service that drains a transactional outbox: it claims due rows under a lease, hands each
+/// to the <see cref="IOutboxDispatcher{TRow}"/>, and marks the row complete or failed (with backoff).
+/// It owns the delivery outcome — failures are recorded on the row, not rethrown.
 /// </summary>
-internal sealed class OutboxDrainer(
-    INotificationsSqlDialect dialect,
+/// <typeparam name="TRow">The claimed-row shape this drainer serves.</typeparam>
+/// <param name="dialect">Engine-specific claim/complete/fail SQL for this outbox.</param>
+/// <param name="dispatcher">Delivers a claimed row and classifies failures.</param>
+/// <param name="signal">In-process wake kicked after an enqueuing transaction commits.</param>
+/// <param name="scopeFactory">Creates the per-batch scope delivery dependencies resolve from.</param>
+/// <param name="options">Drain-loop settings.</param>
+/// <param name="time">Clock used for lease, completion and backoff timestamps.</param>
+/// <param name="logger">Logger for cycle and delivery failures.</param>
+public sealed class OutboxDrainer<TRow>(
+    IOutboxDialect<TRow> dialect,
+    IOutboxDispatcher<TRow> dispatcher,
     DrainSignal signal,
     IServiceScopeFactory scopeFactory,
-    NotificationsModuleOptions options,
+    OutboxDrainerOptions<TRow> options,
     TimeProvider time,
-    ILogger<OutboxDrainer> logger) : BackgroundService
+    ILogger<OutboxDrainer<TRow>> logger) : BackgroundService
+    where TRow : IClaimedRow
 {
     private const int MaxErrorLength = 1000;
 
     private readonly string leaseOwner = $"{Environment.MachineName}:{Environment.ProcessId}";
 
+    /// <inheritdoc />
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         while (!stoppingToken.IsCancellationRequested)
@@ -70,7 +79,9 @@ internal sealed class OutboxDrainer(
     }
 
     /// <summary>Claims and dispatches one batch. Returns the number of rows claimed.</summary>
-    internal async Task<int> DrainOnceAsync(CancellationToken ct)
+    /// <param name="ct">A token to cancel the cycle.</param>
+    /// <returns>The number of rows claimed in this cycle.</returns>
+    public async Task<int> DrainOnceAsync(CancellationToken ct)
     {
         var now = time.GetUtcNow();
         var leaseExpires = now.AddSeconds(options.LeaseSeconds);
@@ -107,73 +118,51 @@ internal sealed class OutboxDrainer(
         return claimed.Count;
     }
 
-    private async Task DeliverAsync(IServiceProvider sp, DbConnection connection, ClaimedOutboxRow row, CancellationToken ct)
+    private async Task DeliverAsync(IServiceProvider sp, DbConnection connection, TRow row, CancellationToken ct)
     {
+        DispatchResult result;
         try
         {
-            var message = new NotificationMessage
-            {
-                Channel = row.Channel,
-                Recipient = row.Recipient,
-                Subject = row.Subject,
-                Body = row.Body, // already rendered at enqueue
-            };
-
-            // forward-note: per-tenant sender/provider-config resolution is deferred — v1 resolves the global
-            // sender here. WHEN a tenant-aware sender is wired, the drainer must set the ambient tenant for the
-            // row (row.TenantId) BEFORE resolving config, else IProviderConfigResolver resolves with a null
-            // tenant and silently falls back to the global config.
-            var result = await SendAsync(sp, message, ct).ConfigureAwait(false);
-            if (!result.Succeeded)
-            {
-                throw new InvalidOperationException(result.Error ?? "Sender reported failure.");
-            }
-
-            await dialect.CompleteAsync(connection, row.Id, time.GetUtcNow(), ct).ConfigureAwait(false);
+            result = await dispatcher.DispatchAsync(sp, row, ct).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
             throw; // host stop — let the cycle observe cancellation, do not record as a failure.
         }
-        catch (Exception ex) when (ex is FormatException or NotSupportedException)
-        {
-            // A malformed address/body (FormatException) or an undeliverable channel routed to the outbox
-            // (NotSupportedException) is permanent — retrying cannot help, so dead-letter immediately.
-            await FailRowAsync(connection, row, permanent: true, ex, ct).ConfigureAwait(false);
-        }
         catch (Exception ex)
         {
-            await FailRowAsync(connection, row, permanent: false, ex, ct).ConfigureAwait(false);
+            // A dispatcher that throws instead of reporting is treated as retryable: the drainer
+            // cannot know whether the fault is permanent, and retrying a transient fault is
+            // recoverable whereas dead-lettering a retryable one is not.
+            result = DispatchResult.Transient(ex.Message);
         }
+
+        if (result.Outcome == DispatchOutcome.Delivered)
+        {
+            await dialect.CompleteAsync(connection, row.Id, time.GetUtcNow(), ct).ConfigureAwait(false);
+            return;
+        }
+
+        await FailRowAsync(connection, row, result, ct).ConfigureAwait(false);
     }
 
-    // Direct switch: await the right sender inline. (No SenderAdapter indirection — the plan prefers this.)
-    private static async Task<NotificationResult> SendAsync(IServiceProvider sp, NotificationMessage message, CancellationToken ct) =>
-        message.Channel switch
-        {
-            NotificationChannel.Email => await sp.GetRequiredService<IEmailSender>().SendAsync(message, ct).ConfigureAwait(false),
-            NotificationChannel.Sms => await sp.GetRequiredService<ISmsSender>().SendAsync(message, ct).ConfigureAwait(false),
-            NotificationChannel.Push => await sp.GetRequiredService<IPushSender>().SendAsync(message, ct).ConfigureAwait(false),
-            _ => throw new NotSupportedException($"Channel {message.Channel} is not deliverable via the outbox."),
-        };
-
-    private async Task FailRowAsync(DbConnection connection, ClaimedOutboxRow row, bool permanent, Exception ex, CancellationToken ct)
+    private async Task FailRowAsync(DbConnection connection, TRow row, DispatchResult result, CancellationToken ct)
     {
         var attempts = row.Attempts + 1;
-        var dead = permanent || BackoffPolicy.IsDead(attempts, options.MaxAttempts);
+        var dead = result.Outcome == DispatchOutcome.Permanent || BackoffPolicy.IsDead(attempts, options.MaxAttempts);
         var next = BackoffPolicy.NextAttemptAt(time.GetUtcNow(), attempts);
+        var error = result.Error ?? "Dispatcher reported failure.";
 
         // Log once, with safe context only (no recipient PII, no credentials). The drainer owns the
         // outcome (THEMIA101: no log-and-rethrow) — record it on the row instead of propagating.
         logger.LogWarning(
-            ex,
-            "Notification {Id} on {Channel} failed (attempt {Attempts}); {Outcome}.",
+            "Outbox row {Id} failed (attempt {Attempts}): {Error}; {Outcome}.",
             row.Id,
-            row.Channel,
             attempts,
+            error,
             dead ? "dead-lettered" : "will retry");
 
-        await dialect.FailAsync(connection, row.Id, attempts, next, dead, Truncate(ex.Message, MaxErrorLength), ct).ConfigureAwait(false);
+        await dialect.FailAsync(connection, row.Id, attempts, next, dead, Truncate(error, MaxErrorLength), ct).ConfigureAwait(false);
     }
 
     private static string Truncate(string s, int max) => s.Length <= max ? s : s[..max];

@@ -1,3 +1,4 @@
+using Themia.Messaging.Outbox;
 using Themia.Modules.Notifications.Outbox;
 using Xunit;
 

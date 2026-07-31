@@ -11,6 +11,7 @@ using Themia.Framework.Core.Abstractions.Tenancy;
 using Themia.Framework.Data.Abstractions.UnitOfWork;
 using Themia.Framework.Data.EFCore.Extensions;
 using Themia.Framework.Data.EFCore.PostgreSql;
+using Themia.Messaging.Outbox;
 using Themia.Modules.Notifications.Entities;
 using Themia.Modules.Notifications.Migrations;
 using Themia.Modules.Notifications.Outbox;
@@ -134,24 +135,25 @@ public sealed class OutboxRoundTripTests : IAsyncLifetime
         return services.BuildServiceProvider();
     }
 
-    private OutboxDrainer CreateDrainer(ServiceProvider provider)
+    private OutboxDrainer<ClaimedOutboxRow> CreateDrainer(ServiceProvider provider)
     {
         var dialect = provider.GetRequiredService<INotificationsSqlDialect>();
-        var options = new NotificationsModuleOptions { MaxAttempts = MaxAttempts, MaxBatchSize = 10 };
-        return new OutboxDrainer(
+        var options = new OutboxDrainerOptions<ClaimedOutboxRow> { MaxAttempts = MaxAttempts, MaxBatchSize = 10 };
+        return new OutboxDrainer<ClaimedOutboxRow>(
             dialect,
+            new NotificationOutboxDispatcher(),
             new DrainSignal(),
             provider.GetRequiredService<IServiceScopeFactory>(),
             options,
             TimeProvider.System,
-            NullLogger<OutboxDrainer>.Instance);
+            NullLogger<OutboxDrainer<ClaimedOutboxRow>>.Instance);
     }
 
-    private static async Task<int> DrainAsync(OutboxDrainer drainer) =>
+    private static async Task<int> DrainAsync(OutboxDrainer<ClaimedOutboxRow> drainer) =>
         await drainer.DrainOnceAsync(CancellationToken.None);
 
     // After a failure the row's next_attempt_at sits in the future; reset it to now so the next claim is due.
-    private async Task ForceClaimAndDrainAsync(Guid id, OutboxDrainer drainer)
+    private async Task ForceClaimAndDrainAsync(Guid id, OutboxDrainer<ClaimedOutboxRow> drainer)
     {
         await SetDueNowAsync(id);
         await DrainAsync(drainer);

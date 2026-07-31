@@ -1,6 +1,6 @@
 using System.Threading.Channels;
 
-namespace Themia.Modules.Notifications.Outbox;
+namespace Themia.Messaging.Outbox;
 
 /// <summary>
 /// In-process wake for the drainer, kicked after an enqueuing transaction commits. Coalescing:

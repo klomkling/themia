@@ -5,6 +5,7 @@ using Microsoft.Extensions.Hosting;
 using Themia.Modules.Notifications;
 using Themia.Modules.Notifications.Config;
 using Themia.Modules.Notifications.DependencyInjection;
+using Themia.Messaging.Outbox;
 using Themia.Modules.Notifications.Dispatch;
 using Themia.Modules.Notifications.Outbox;
 using Themia.Modules.Notifications.Stores;
@@ -54,8 +55,8 @@ public class AddThemiaNotificationsModuleTests
         Assert.Contains(
             services,
             d => d.ServiceType == typeof(IHostedService)
-                && (d.ImplementationType == typeof(OutboxDrainer)
-                    || d.ImplementationType?.Name == nameof(OutboxDrainer)));
+                && (d.ImplementationType == typeof(OutboxDrainer<ClaimedOutboxRow>)
+                    || d.ImplementationType?.Name == typeof(OutboxDrainer<ClaimedOutboxRow>).Name));
     }
 
     [Fact]
