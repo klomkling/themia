@@ -44,3 +44,58 @@ static Themia.Messaging.Outbox.BackoffPolicy.NextAttemptAt(System.DateTimeOffset
 static Themia.Messaging.Outbox.DispatchResult.Delivered() -> Themia.Messaging.Outbox.DispatchResult
 static Themia.Messaging.Outbox.DispatchResult.Permanent(string! error) -> Themia.Messaging.Outbox.DispatchResult
 static Themia.Messaging.Outbox.DispatchResult.Transient(string! error) -> Themia.Messaging.Outbox.DispatchResult
+Themia.Messaging.Inbox.IInboxStore
+Themia.Messaging.Inbox.IInboxStore.TryAdmitAsync(string! origin, System.Guid messageId, string? entityKey, long? version, System.DateTimeOffset receivedAt, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<Themia.Messaging.Inbox.InboxAdmission>!
+Themia.Messaging.Inbox.InboxAdmission
+Themia.Messaging.Inbox.InboxAdmission.Accepted = 0 -> Themia.Messaging.Inbox.InboxAdmission
+Themia.Messaging.Inbox.InboxAdmission.Duplicate = 1 -> Themia.Messaging.Inbox.InboxAdmission
+Themia.Messaging.Inbox.InboxAdmission.Stale = 2 -> Themia.Messaging.Inbox.InboxAdmission
+Themia.Messaging.Messages.MessageEnvelope
+Themia.Messaging.Messages.MessageEnvelope.CreatedAt.get -> System.DateTimeOffset
+Themia.Messaging.Messages.MessageEnvelope.CreatedAt.set -> void
+Themia.Messaging.Messages.MessageEnvelope.Destination.get -> string!
+Themia.Messaging.Messages.MessageEnvelope.Destination.set -> void
+Themia.Messaging.Messages.MessageEnvelope.EntityKey.get -> string?
+Themia.Messaging.Messages.MessageEnvelope.EntityKey.set -> void
+Themia.Messaging.Messages.MessageEnvelope.Headers.get -> System.Collections.Generic.IDictionary<string!, string!>?
+Themia.Messaging.Messages.MessageEnvelope.Headers.set -> void
+Themia.Messaging.Messages.MessageEnvelope.MessageEnvelope() -> void
+Themia.Messaging.Messages.MessageEnvelope.MessageId.get -> System.Guid
+Themia.Messaging.Messages.MessageEnvelope.MessageId.set -> void
+Themia.Messaging.Messages.MessageEnvelope.Origin.get -> string!
+Themia.Messaging.Messages.MessageEnvelope.Origin.set -> void
+Themia.Messaging.Messages.MessageEnvelope.Payload.get -> string!
+Themia.Messaging.Messages.MessageEnvelope.Payload.set -> void
+Themia.Messaging.Messages.MessageEnvelope.ScheduledFor.get -> System.DateTimeOffset?
+Themia.Messaging.Messages.MessageEnvelope.ScheduledFor.set -> void
+Themia.Messaging.Messages.MessageEnvelope.TenantId.get -> string?
+Themia.Messaging.Messages.MessageEnvelope.TenantId.set -> void
+Themia.Messaging.Messages.MessageEnvelope.Type.get -> string!
+Themia.Messaging.Messages.MessageEnvelope.Type.set -> void
+Themia.Messaging.Messages.MessageEnvelope.Validate() -> void
+Themia.Messaging.Messages.MessageEnvelope.Version.get -> long?
+Themia.Messaging.Messages.MessageEnvelope.Version.set -> void
+Themia.Messaging.Outbox.ClaimedMessageRow
+Themia.Messaging.Outbox.ClaimedMessageRow.ClaimedMessageRow(System.Guid Id, System.Guid MessageId, string? TenantId, string! Type, string! Payload, string! Destination, string! Origin, string? EntityKey, long? Version, int Attempts) -> void
+Themia.Messaging.Outbox.ClaimedMessageRow.Attempts.get -> int
+Themia.Messaging.Outbox.ClaimedMessageRow.Attempts.init -> void
+Themia.Messaging.Outbox.ClaimedMessageRow.Destination.get -> string!
+Themia.Messaging.Outbox.ClaimedMessageRow.Destination.init -> void
+Themia.Messaging.Outbox.ClaimedMessageRow.EntityKey.get -> string?
+Themia.Messaging.Outbox.ClaimedMessageRow.EntityKey.init -> void
+Themia.Messaging.Outbox.ClaimedMessageRow.Id.get -> System.Guid
+Themia.Messaging.Outbox.ClaimedMessageRow.Id.init -> void
+Themia.Messaging.Outbox.ClaimedMessageRow.MessageId.get -> System.Guid
+Themia.Messaging.Outbox.ClaimedMessageRow.MessageId.init -> void
+Themia.Messaging.Outbox.ClaimedMessageRow.Origin.get -> string!
+Themia.Messaging.Outbox.ClaimedMessageRow.Origin.init -> void
+Themia.Messaging.Outbox.ClaimedMessageRow.Payload.get -> string!
+Themia.Messaging.Outbox.ClaimedMessageRow.Payload.init -> void
+Themia.Messaging.Outbox.ClaimedMessageRow.TenantId.get -> string?
+Themia.Messaging.Outbox.ClaimedMessageRow.TenantId.init -> void
+Themia.Messaging.Outbox.ClaimedMessageRow.Type.get -> string!
+Themia.Messaging.Outbox.ClaimedMessageRow.Type.init -> void
+Themia.Messaging.Outbox.ClaimedMessageRow.Version.get -> long?
+Themia.Messaging.Outbox.ClaimedMessageRow.Version.init -> void
+Themia.Messaging.Outbox.IMessageOutboxStore
+Themia.Messaging.Outbox.IMessageOutboxStore.EnqueueAsync(Themia.Messaging.Messages.MessageEnvelope! message, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
