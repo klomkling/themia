@@ -7,9 +7,11 @@ namespace Themia.Modules.Messaging.Tests;
 public class MessagingModuleOptionsTests
 {
     [Fact]
-    public void Validate_ShouldSucceed_WithDefaults()
+    public void Validate_ShouldSucceed_WithDefaults_WhenOriginIsSet()
     {
-        var exception = Record.Exception(() => new MessagingModuleOptions().Validate());
+        var options = new MessagingModuleOptions { Origin = "svc-orders" };
+
+        var exception = Record.Exception(options.Validate);
 
         Assert.Null(exception);
     }
@@ -20,7 +22,7 @@ public class MessagingModuleOptionsTests
     [InlineData("   ")]
     public void Validate_ShouldThrow_WhenConnectionStringNameIsMissing(string? name)
     {
-        var options = new MessagingModuleOptions { ConnectionStringName = name! };
+        var options = new MessagingModuleOptions { ConnectionStringName = name!, Origin = "svc-orders" };
 
         Assert.Throws<ArgumentException>(options.Validate);
     }
@@ -30,7 +32,7 @@ public class MessagingModuleOptionsTests
     [InlineData(-1)]
     public void Validate_ShouldThrow_WhenMaxBatchSizeIsNotPositive(int value)
     {
-        var options = new MessagingModuleOptions { MaxBatchSize = value };
+        var options = new MessagingModuleOptions { MaxBatchSize = value, Origin = "svc-orders" };
 
         Assert.Throws<ArgumentOutOfRangeException>(options.Validate);
     }
@@ -53,7 +55,7 @@ public class MessagingModuleOptionsTests
     [Fact]
     public void Validate_ShouldThrow_WhenInboxRetentionIsShorterThanDeadRetention()
     {
-        var options = new MessagingModuleOptions { InboxRetentionDays = 5, DeadRetentionDays = 90 };
+        var options = new MessagingModuleOptions { InboxRetentionDays = 5, DeadRetentionDays = 90, Origin = "svc-orders" };
 
         Assert.Throws<ArgumentOutOfRangeException>(options.Validate);
     }

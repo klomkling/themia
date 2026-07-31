@@ -8,11 +8,9 @@ public sealed class MessagingModuleOptions
 
     /// <summary>
     /// This service's identity, stamped on every published message as its origin and used by the receiver
-    /// to drop messages that arrive back where they started. Defaults to <c>"Default"</c> so bare defaults
-    /// validate; every deployment with more than one service MUST override this to a value unique among
-    /// its peers, or the loop-guard cannot tell services apart.
+    /// to drop messages that arrive back where they started.
     /// </summary>
-    public string Origin { get; set; } = "Default";
+    public string Origin { get; set; } = string.Empty;
 
     /// <summary>How often the drainer polls when no in-process signal arrives. Default 5s.</summary>
     public int DrainIntervalSeconds { get; set; } = 5;
