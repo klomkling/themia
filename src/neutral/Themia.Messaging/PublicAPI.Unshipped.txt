@@ -45,11 +45,10 @@ static Themia.Messaging.Outbox.DispatchResult.Delivered() -> Themia.Messaging.Ou
 static Themia.Messaging.Outbox.DispatchResult.Permanent(string! error) -> Themia.Messaging.Outbox.DispatchResult
 static Themia.Messaging.Outbox.DispatchResult.Transient(string! error) -> Themia.Messaging.Outbox.DispatchResult
 Themia.Messaging.Inbox.IInboxStore
-Themia.Messaging.Inbox.IInboxStore.TryAdmitAsync(string! origin, System.Guid messageId, string? entityKey, long? version, System.DateTimeOffset receivedAt, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<Themia.Messaging.Inbox.InboxAdmission>!
+Themia.Messaging.Inbox.IInboxStore.TryAdmitAsync(string! origin, System.Guid messageId, string! type, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<Themia.Messaging.Inbox.InboxAdmission>!
 Themia.Messaging.Inbox.InboxAdmission
 Themia.Messaging.Inbox.InboxAdmission.Accepted = 0 -> Themia.Messaging.Inbox.InboxAdmission
 Themia.Messaging.Inbox.InboxAdmission.Duplicate = 1 -> Themia.Messaging.Inbox.InboxAdmission
-Themia.Messaging.Inbox.InboxAdmission.Stale = 2 -> Themia.Messaging.Inbox.InboxAdmission
 Themia.Messaging.Messages.MessageEnvelope
 Themia.Messaging.Messages.MessageEnvelope.CreatedAt.get -> System.DateTimeOffset
 Themia.Messaging.Messages.MessageEnvelope.CreatedAt.set -> void
