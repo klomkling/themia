@@ -27,7 +27,7 @@ Themia.Messaging.Outbox.IOutboxDispatcher<TRow>
 Themia.Messaging.Outbox.IOutboxDispatcher<TRow>.DispatchAsync(System.IServiceProvider! scopedServices, TRow row, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<Themia.Messaging.Outbox.DispatchResult>!
 Themia.Messaging.Outbox.OutboxDrainer<TRow>
 Themia.Messaging.Outbox.OutboxDrainer<TRow>.DrainOnceAsync(System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<int>!
-Themia.Messaging.Outbox.OutboxDrainer<TRow>.OutboxDrainer(Themia.Messaging.Outbox.IOutboxDialect<TRow>! dialect, Themia.Messaging.Outbox.IOutboxDispatcher<TRow>! dispatcher, Themia.Messaging.Outbox.DrainSignal! signal, Microsoft.Extensions.DependencyInjection.IServiceScopeFactory! scopeFactory, Themia.Messaging.Outbox.OutboxDrainerOptions<TRow>! options, System.TimeProvider! time, Microsoft.Extensions.Logging.ILogger<Themia.Messaging.Outbox.OutboxDrainer<TRow>!>! logger) -> void
+Themia.Messaging.Outbox.OutboxDrainer<TRow>.OutboxDrainer(Themia.Messaging.Outbox.IOutboxDialect<TRow>! dialect, Themia.Messaging.Outbox.IOutboxDispatcher<TRow>! dispatcher, Themia.Messaging.Outbox.DrainSignal! signal, Microsoft.Extensions.DependencyInjection.IServiceScopeFactory! scopeFactory, Themia.Messaging.Outbox.OutboxDrainerOptions<TRow>! options, System.TimeProvider! time, Microsoft.Extensions.Logging.ILogger<Themia.Messaging.Outbox.OutboxDrainer<TRow>!>! logger, Themia.Messaging.Outbox.IOutboxPurgeDialect<TRow>? purgeDialect = null) -> void
 Themia.Messaging.Outbox.OutboxDrainerOptions<TRow>
 Themia.Messaging.Outbox.OutboxDrainerOptions<TRow>.DrainIntervalSeconds.get -> int
 Themia.Messaging.Outbox.OutboxDrainerOptions<TRow>.DrainIntervalSeconds.set -> void
@@ -98,3 +98,18 @@ Themia.Messaging.Outbox.ClaimedMessageRow.Version.get -> long?
 Themia.Messaging.Outbox.ClaimedMessageRow.Version.init -> void
 Themia.Messaging.Outbox.IMessageOutboxStore
 Themia.Messaging.Outbox.IMessageOutboxStore.EnqueueAsync(Themia.Messaging.Messages.MessageEnvelope! message, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Messaging.Inbox.IInboxPurgeDialect
+Themia.Messaging.Inbox.IInboxPurgeDialect.PurgeAdmittedAsync(System.Data.Common.DbConnection! connection, System.DateTimeOffset olderThan, int batchSize, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<int>!
+Themia.Messaging.Outbox.IOutboxPurgeDialect<TRow>
+Themia.Messaging.Outbox.IOutboxPurgeDialect<TRow>.PurgeDeadAsync(System.Data.Common.DbConnection! connection, System.DateTimeOffset olderThan, int batchSize, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<int>!
+Themia.Messaging.Outbox.IOutboxPurgeDialect<TRow>.PurgeSentAsync(System.Data.Common.DbConnection! connection, System.DateTimeOffset olderThan, int batchSize, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<int>!
+Themia.Messaging.Outbox.OutboxDrainerOptions<TRow>.DeadRetentionDays.get -> int
+Themia.Messaging.Outbox.OutboxDrainerOptions<TRow>.DeadRetentionDays.set -> void
+Themia.Messaging.Outbox.OutboxDrainerOptions<TRow>.PurgeBatchSize.get -> int
+Themia.Messaging.Outbox.OutboxDrainerOptions<TRow>.PurgeBatchSize.set -> void
+Themia.Messaging.Outbox.OutboxDrainerOptions<TRow>.PurgeEnabled.get -> bool
+Themia.Messaging.Outbox.OutboxDrainerOptions<TRow>.PurgeEnabled.set -> void
+Themia.Messaging.Outbox.OutboxDrainerOptions<TRow>.PurgeIntervalHours.get -> int
+Themia.Messaging.Outbox.OutboxDrainerOptions<TRow>.PurgeIntervalHours.set -> void
+Themia.Messaging.Outbox.OutboxDrainerOptions<TRow>.SentRetentionDays.get -> int
+Themia.Messaging.Outbox.OutboxDrainerOptions<TRow>.SentRetentionDays.set -> void

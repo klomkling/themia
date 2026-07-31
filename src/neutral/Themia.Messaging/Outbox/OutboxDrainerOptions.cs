@@ -20,4 +20,23 @@ public sealed class OutboxDrainerOptions<TRow>
 
     /// <summary>How long a claimed row's lease is held before it is reclaimable. Default 120s.</summary>
     public int LeaseSeconds { get; set; } = 120;
+
+    /// <summary>
+    /// Whether the drain loop also purges terminal rows. Defaults to <see langword="false"/> so that
+    /// enabling retention is always a deliberate act: switching it on for an existing deployment deletes
+    /// history on the first run, which must never arrive as a side effect of a version bump.
+    /// </summary>
+    public bool PurgeEnabled { get; set; }
+
+    /// <summary>How long successfully-sent rows are kept. Default 7 days.</summary>
+    public int SentRetentionDays { get; set; } = 7;
+
+    /// <summary>How long dead-lettered rows are kept. Default 90 days — each one is an unresolved failure.</summary>
+    public int DeadRetentionDays { get; set; } = 90;
+
+    /// <summary>Minimum interval between purge passes. Default 24 hours.</summary>
+    public int PurgeIntervalHours { get; set; } = 24;
+
+    /// <summary>Rows deleted per statement. Default 1000, keeping each delete's lock hold short.</summary>
+    public int PurgeBatchSize { get; set; } = 1000;
 }

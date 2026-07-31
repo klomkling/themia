@@ -19,6 +19,7 @@ namespace Themia.Messaging.Outbox;
 /// <param name="options">Drain-loop settings.</param>
 /// <param name="time">Clock used for lease, completion and backoff timestamps.</param>
 /// <param name="logger">Logger for cycle and delivery failures.</param>
+/// <param name="purgeDialect">Optional retention purge; when absent, no purge runs regardless of options.</param>
 public sealed class OutboxDrainer<TRow>(
     IOutboxDialect<TRow> dialect,
     IOutboxDispatcher<TRow> dispatcher,
@@ -26,12 +27,14 @@ public sealed class OutboxDrainer<TRow>(
     IServiceScopeFactory scopeFactory,
     OutboxDrainerOptions<TRow> options,
     TimeProvider time,
-    ILogger<OutboxDrainer<TRow>> logger) : BackgroundService
+    ILogger<OutboxDrainer<TRow>> logger,
+    IOutboxPurgeDialect<TRow>? purgeDialect = null) : BackgroundService
     where TRow : IClaimedRow
 {
     private const int MaxErrorLength = 1000;
 
     private readonly string leaseOwner = $"{Environment.MachineName}:{Environment.ProcessId}";
+    private DateTimeOffset lastPurgeAt = DateTimeOffset.MinValue;
 
     /// <inheritdoc />
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -94,6 +97,7 @@ public sealed class OutboxDrainer<TRow>(
         var claimed = await dialect.ClaimAsync(connection, leaseOwner, now, leaseExpires, options.MaxBatchSize, ct).ConfigureAwait(false);
         if (claimed.Count == 0)
         {
+            await PurgeIfDueAsync(connection, now, ct).ConfigureAwait(false);
             return 0;
         }
 
@@ -115,7 +119,58 @@ public sealed class OutboxDrainer<TRow>(
             }
         }
 
+        await PurgeIfDueAsync(connection, now, ct).ConfigureAwait(false);
         return claimed.Count;
+    }
+
+    // Retention runs on the drain loop's own connection and cadence: a dedicated scheduler would force a
+    // new package dependency on every adopter purely to delete rows on a timer.
+    private async Task PurgeIfDueAsync(DbConnection connection, DateTimeOffset now, CancellationToken ct)
+    {
+        if (!options.PurgeEnabled || purgeDialect is null)
+        {
+            return;
+        }
+
+        if (now - lastPurgeAt < TimeSpan.FromHours(options.PurgeIntervalHours))
+        {
+            return;
+        }
+
+        lastPurgeAt = now;
+
+        var sentDeleted = await PurgeAllAsync(
+            (c, cutoff, batch, token) => purgeDialect.PurgeSentAsync(c, cutoff, batch, token),
+            connection, now.AddDays(-options.SentRetentionDays), ct).ConfigureAwait(false);
+
+        var deadDeleted = await PurgeAllAsync(
+            (c, cutoff, batch, token) => purgeDialect.PurgeDeadAsync(c, cutoff, batch, token),
+            connection, now.AddDays(-options.DeadRetentionDays), ct).ConfigureAwait(false);
+
+        if (sentDeleted + deadDeleted > 0)
+        {
+            logger.LogInformation(
+                "Outbox purge removed {SentDeleted} sent and {DeadDeleted} dead rows.", sentDeleted, deadDeleted);
+        }
+    }
+
+    private async Task<int> PurgeAllAsync(
+        Func<DbConnection, DateTimeOffset, int, CancellationToken, Task<int>> purge,
+        DbConnection connection,
+        DateTimeOffset cutoff,
+        CancellationToken ct)
+    {
+        var total = 0;
+        int deleted;
+        do
+        {
+            ct.ThrowIfCancellationRequested();
+            deleted = await purge(connection, cutoff, options.PurgeBatchSize, ct).ConfigureAwait(false);
+            total += deleted;
+        }
+        while (deleted == options.PurgeBatchSize);
+
+        return total;
     }
 
     private async Task DeliverAsync(IServiceProvider sp, DbConnection connection, TRow row, CancellationToken ct)
