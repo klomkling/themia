@@ -36,6 +36,36 @@ This is not negotiable and not configurable. Canonicalization is where signature
 an adopter-swappable canonical string would reintroduce exactly the protocol drift #0050 exists to
 prevent.
 
+### The rejection statuses are part of the scheme, not an implementation choice
+
+A conformant `themia-hmac-v1` verifier — in any language, in or out of this repo — **must** answer:
+
+| Condition | Status | Why this one |
+|---|---|---|
+| Timestamp outside the freshness window | **408** | A clock problem is infrastructure and self-heals; it must be retryable. |
+| Timestamp missing or unparseable | **401** | Malformed input never becomes valid by retrying. |
+| Signature mismatch, or `Key-Id` present but unknown | **401** | Retrying identical bytes fails identically. |
+| Scheme header present but unrecognised | **400** | Protocol mismatch, not a credential failure. |
+| Body over the size limit | **413** | Rejected before hashing; see *Body size limit*. |
+
+This sits in the scheme definition rather than under *Receiving* because it is an **interop guarantee,
+not a local preference**. A verifier that answers 401 for skew is a silent data-loss bug in any adopter
+whose producer dead-letters 4xx — and that is the common case, because retrying a rejected signature
+really is futile, so treating 4xx as permanent is the *correct* default for a producer. The two failures
+are only separable if the verifier distinguishes them, and the only place that can be guaranteed is the
+scheme both ends implement.
+
+This was not designed in the abstract. Both live implementations shipped 401-for-skew, neither noticed,
+and the resulting bug destroyed production data on one channel — see *Freshness window*. ezy-assets, on
+fixing their half, asked for exactly this:
+
+> *themia-hmac-v1 should pin this status split, not just the canonical string. A verifier that answers
+> 401 for skew is a data-loss bug in any adopter whose producer dead-letters 4xx, and the framework is
+> the right place to make that impossible to get wrong.*
+
+Two independent implementations converged on this split after being bitten by its absence. It is
+therefore normative, pinned by conformance tests, and not configurable.
+
 ## Packages
 
 | Package | Holds | Depends on |
@@ -269,6 +299,27 @@ dead-letters just the same.
 They explicitly declined the offered fallback of classifying 401 as transient for these peers, on the
 grounds that it would weaken the one classification deliberately made strict. **Do not build it.**
 
+**ezy-assets have since shipped both halves of their side** (PR #169): their delivery producer now
+classifies 408 and 429 as transient alongside 5xx, and their own lead verifier — which had the same
+defect, collapsing missing headers, unparseable timestamps, stale timestamps and signature mismatches
+all into 401 — now answers 408 for staleness and retains 401 for the rest. They reproduced the
+dead-lettering with a failing test before changing anything.
+
+Two things from their reply that bear on this spec:
+
+**The blast radius was one channel, not two.** propertiezy's original report said entitlement pushes
+were destroyed alongside listing snapshots. They were not: `EntitlementSyncJob` has no terminal-failure
+state — a non-2xx increments a counter and leaves the tenant due, so it retries on the next fire
+regardless of status. Reassert-based sync, not an outbox. Recorded so the corrected version is what
+survives.
+
+**Their reason for declining 401-as-transient does not transfer to Themia adopters.** They held 401
+strict because their outbox has no alert when a row retries forever — their spec promises one and the
+code never implemented it — so retrying 401 indefinitely would trade a silent destroy for a silent
+stall. Themia's outbox has no such gap: `MaxAttempts` bounds retries and the row dead-letters, so a
+transient classification here cannot stall indefinitely. Their constraint is real and specific to their
+system; it is not an argument against this design.
+
 ## Testing
 
 The four supplied vectors are committed as a JSON fixture read at runtime, exercised in **both
@@ -322,16 +373,22 @@ only the two it knows.
 
 **Freshness window:** enforced today at ±300 seconds, matching this default. Do not default it off.
 
-**Stale-timestamp status:** their half is shipped (408); ezy-assets' half is coord **#0051**.
+**Stale-timestamp status:** both halves shipped — propertiezy PR #36, ezy-assets PR #169 (coord #0051).
+Both live implementations now match the normative split above.
 
 ## Open questions
 
-**ezy-assets has answered none of this.** Q1–Q3 apply to the ingest side they own, and three earlier
-items are still outstanding: whether they reference `DrainSignal`/`BackoffPolicy`, the blocking
-`CREATE INDEX` on their notifications outbox at upgrade, and whether they filter notification logs on
-the `{Channel}` facet.
+**ezy-assets has not answered on #0050.** They replied fully on #0051, but the questions addressed to
+them here are still open: Q1–Q3 for the ingest side they own, plus whether they reference
+`DrainSignal`/`BackoffPolicy`, the blocking `CREATE INDEX` on their notifications outbox at upgrade, and
+whether they filter notification logs on the `{Channel}` facet.
 
-**#0051 gates the staleness fix.** Until ezy-assets classifies 408 as transient, propertiezy's shipped
-408 changes nothing on the ezy-assets → propertiezy channel — an unrecognised 4xx treated as permanent
-dead-letters exactly as the 401 did. This is not a Themia dependency; it is recorded here because it
-determines whether that channel is safe to cut over.
+The `DrainSignal` answer is the one that gates a release: it is a source break for any 0.10.x consumer,
+propertiezy confirmed they do not touch it, and ezy-assets is the only remaining unknown. If they do not
+use it either, the generic reshape is free.
+
+**Their verifier does not log skew or tolerance on rejection** — `LeadsController` has no logger
+injected, so if their clock drifts, the *sending* side sees 408s and retries correctly while their own
+operator sees nothing locally. Not a Themia concern, but the framework verifier should log both values
+on a 408 so an adopter can separate "clock problem" from "attack" in one line, which is what
+propertiezy's fix does and theirs does not.
