@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Themia.Messaging.Hmac</RootNamespace>
+    <PackageId>Themia.Messaging.Hmac</PackageId>
+    <Description>Themia messaging HMAC scheme — the themia-hmac-v1 canonicalizer, signer and verifier, plus per-peer key registration. No HTTP or ASP.NET dependency; shared by the sending dispatcher and the receiving filter so both ends compute identical bytes.</Description>
+    <PackageTags>themia;messaging;hmac;security;integration</PackageTags>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+  <ItemGroup>
+    <AdditionalFiles Include="PublicAPI.Shipped.txt" />
+    <AdditionalFiles Include="PublicAPI.Unshipped.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Themia.Messaging.Hmac.Tests" />
+  </ItemGroup>
+</Project>

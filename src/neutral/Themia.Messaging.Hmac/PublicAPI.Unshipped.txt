@@ -1,0 +1,7 @@
+#nullable enable
+Themia.Messaging.Hmac.ThemiaHmacV1
+const Themia.Messaging.Hmac.ThemiaHmacV1.SchemeName = "themia-hmac-v1" -> string!
+static Themia.Messaging.Hmac.ThemiaHmacV1.Canonicalize(string! timestamp, string! method, string! pathAndQuery, string! body) -> string!
+static Themia.Messaging.Hmac.ThemiaHmacV1.FormatTimestamp(System.DateTimeOffset value) -> string!
+static Themia.Messaging.Hmac.ThemiaHmacV1.Sign(string! canonical, string! secret) -> string!
+static Themia.Messaging.Hmac.ThemiaHmacV1.TryParseTimestamp(string? value, out System.DateTimeOffset result) -> bool
