@@ -54,13 +54,13 @@ isolation and reusable by a future non-HTTP transport.
 
 Signed content is the canonical string only. Everything below rides as an **unsigned selector header**:
 
-| Header | Purpose |
-|---|---|
-| `{prefix}Timestamp` | The signed timestamp, byte-identical to the canonical string's first segment. |
-| `{prefix}Signature` | Lowercase hex. |
-| `{prefix}Key-Id` | Selects which key verifies. |
-| `{prefix}Scheme` | e.g. `themia-hmac-v1`. |
-| `{prefix}Origin` | The originating system, for the loop guard. |
+| Header | Required | Purpose |
+|---|---|---|
+| `{prefix}Timestamp` | **yes** | The signed timestamp, byte-identical to the canonical string's first segment. |
+| `{prefix}Signature` | **yes** | Lowercase hex. |
+| `{prefix}Key-Id` | no | Selects which key verifies. |
+| `{prefix}Scheme` | no | e.g. `themia-hmac-v1`. |
+| `{prefix}Origin` | no | The originating system, for the loop guard. |
 
 `{prefix}` defaults to `X-Themia-` and is **configurable per peer**.
 
@@ -75,6 +75,51 @@ that cutover.
 An unsigned `Key-Id` is not a weakness: it only selects which key to verify against, and an attacker who
 changes it merely causes verification to fail, since they still cannot forge a signature under the other
 key.
+
+### Only two headers are mandatory, and that is not a default — it is the live wire format
+
+propertiezy confirmed from source that the existing link sends **exactly two** headers on every channel
+and both directions — `X-Propertiezy-Timestamp` and `X-Propertiezy-Signature` — defined once as
+constants (`Propertiezy.Contracts.Security.HmacSigner.TimestampHeader` / `.SignatureHeader`) that both
+the inbound filter and the outbound job reference. There is **no key-id header, no scheme header and no
+origin header** anywhere in the live integration.
+
+So the framework verifier must treat the other three as optional, with defined behaviour when absent:
+
+| Absent header | Verifier behaviour |
+|---|---|
+| `Key-Id` | Try every inbound key configured for the peer, in registration order. Verification is constant-time per key, so this leaks nothing beyond "one of them matched". |
+| `Scheme` | Assume `themia-hmac-v1`. A future v2 must be *explicitly* tagged; absence can never mean "the newest scheme", or adding v2 would silently reinterpret legacy traffic. |
+| `Origin` | The loop guard **cannot run** — see below. |
+
+A verifier that *required* `Key-Id` would reject the entire live link on the first request, which is the
+same class of failure as the prefix mismatch: correct signature, rejected before it is ever checked.
+
+Outbound signing always emits all five. propertiezy confirmed their filter reads only the two it knows
+and ignores the rest, so emitting `Key-Id`/`Scheme`/`Origin` to a legacy endpoint is inert today and
+becomes meaningful the moment that endpoint moves to the framework verifier. That is the migration path:
+senders start emitting first, receivers start reading later, and no flag day is needed.
+
+### Consequence: the loop guard is unavailable on legacy channels
+
+The loop guard compares an `Origin` header that the live link neither sends nor reads. Until **both**
+ends of a channel run the framework verifier, loop protection on that channel is not degraded — it is
+**absent**.
+
+This matters because #0050's stated goal includes bi-directional master-data sync, which is exactly the
+topology a loop guard exists for. Enabling bi-directional flow on a channel where one end is still the
+legacy verifier means a message that returns to its origin is accepted and re-processed rather than
+dropped.
+
+Two things follow, and both belong in the adoption checklist rather than in code:
+
+1. `AddThemiaMessagingHmac` logs a **startup warning** naming any peer configured for bi-directional
+   flow whose `Origin` header is not being read, so the gap is visible at boot rather than inferred from
+   a cycling message.
+2. Bi-directional sync must not be switched on for a channel until both ends verify with the framework.
+   The inbox's `(origin, message_id)` deduplication limits the blast radius — a looped message is
+   admitted once and dropped thereafter — but that is a backstop, not the guard, and it only helps for
+   messages that go through the inbox.
 
 ## Keys and rotation
 
@@ -147,12 +192,15 @@ An endpoint filter, in strict order:
 
 1. Reject a body larger than `MaxBodyBytes` with **413**, before reading or hashing anything.
 2. `EnableBuffering(bufferThreshold, bufferLimit)`, read the body as a string.
-3. Unknown or missing scheme version → **400**. This is a protocol mismatch, not a bad credential.
+3. Scheme header **present and unrecognised** → **400**. This is a protocol mismatch, not a bad
+   credential. Scheme header **absent** → assume `themia-hmac-v1` and continue.
 4. Timestamp missing or unparseable → **401**. Timestamp outside the freshness window → **408**
    (see *Freshness window* below — this status is load-bearing, not cosmetic).
-5. Unknown `kid` for this peer → **401**.
-6. Recompute the canonical string and compare with `CryptographicOperations.FixedTimeEquals`.
-7. **Then** the loop guard.
+5. `Key-Id` present but unknown for this peer → **401**. `Key-Id` absent → carry every inbound key
+   configured for the peer into step 6.
+6. Recompute the canonical string and compare with `CryptographicOperations.FixedTimeEquals` against
+   each candidate key; no match → **401**.
+7. **Then** the loop guard, if an `Origin` header is present. Absent → the guard cannot run.
 
 ### Body size limit
 
@@ -201,8 +249,25 @@ deliver themselves once the clock is right, with no operator action and no data 
 reserved for genuine signature and `kid` failures, where retrying really is futile and immediate
 dead-lettering is the correct, visible outcome.
 
-Both apps must be asked what they enforce today before a live channel cuts over — if they enforce no
-window at all, adopting the framework could reject traffic that works today.
+**propertiezy confirmed they already enforce ±300 seconds** (`HmacAuthFilter.cs:40-53`,
+`IngestAuthOptions.ToleranceSeconds`, range-constrained `[30, 3600]`) — identical to this default. So
+there is no adoption surprise on those channels and the window must **not** be defaulted off for them:
+the framework verifier would enforce exactly what they enforce today.
+
+**The 401-for-staleness trap was real and already live in production, before any framework adoption.**
+propertiezy's verifier answered 401 for an out-of-window timestamp, and ezy-assets' producer treats any
+4xx as permanent — so a clock drift on the ezy-assets host silently dead-lettered every listing snapshot,
+presenting to the operator as a compromised secret. That is the exact failure this section designs
+against, reached without Themia being involved at all.
+
+propertiezy has shipped their half (408 for staleness, 401 retained for genuine signature failure,
+unparseable timestamps deliberately still 401 since retrying cannot make them valid) and filed **coord
+#0051** asking ezy-assets to classify 408 as transient — without which the fix changes nothing, because
+408 is not in ezy-assets' documented status list and an unrecognised 4xx treated as permanent
+dead-letters just the same.
+
+They explicitly declined the offered fallback of classifying 401 as transient for these peers, on the
+grounds that it would weaken the one classification deliberately made strict. **Do not build it.**
 
 ## Testing
 
@@ -215,6 +280,13 @@ and an oversized body rejected with 413 before any hashing. Expired and future t
 to answer **408, not 401** — that status is what keeps a clock-skew outage retryable instead of
 dead-lettering the queue, so it is pinned by a test rather than left to a reviewer to notice.
 
+**Legacy two-header requests are a first-class test case, not an edge case** — they are what the live
+link actually sends. A request carrying only `{prefix}Timestamp` and `{prefix}Signature`, with no
+`Key-Id`, `Scheme` or `Origin`, must verify successfully against a peer with one inbound key, and must
+still verify against a peer with several. A test also pins that an absent `Scheme` is treated as v1
+rather than as "newest", since that is what stops a future v2 from silently reinterpreting legacy
+traffic.
+
 Comparison uses `CryptographicOperations.FixedTimeEquals`. That is asserted by reading the call, not by
 timing: a timing-based test is flaky and proves almost nothing at this granularity, so claiming one
 would be worse than claiming nothing.
@@ -225,6 +297,9 @@ sides, and it is not academic: `LeadForward.JsonOptions` uses `JavaScriptEncoder
 so Thai visitor names travel as raw UTF-8 rather than `\uXXXX` escapes. Both apps verify it against
 their implementations before it is promoted.
 
+Use **Thai script** for the non-ASCII content, at propertiezy's suggestion — a visitor name in Thai is
+the actual traffic on the lead channel, so the vector pins the real case rather than a synthetic one.
+
 ## Deliberate trade-offs
 
 **Routing lives in the sender's config.** The `type → path` map is per-peer configuration, so a peer
@@ -234,15 +309,29 @@ publisher determine what gets signed, and a message sitting in an outbox for an 
 that may no longer exist. Routing is a deployment concern, not a message property.
 
 **`Retry-After` is ignored.** See *Response classification*. Deferred to its own request because
-honouring it changes `DispatchResult`, which is already merged.
+honouring it changes `DispatchResult`, which is already merged. propertiezy confirmed their ingest
+endpoints are not rate-limited, so no live channel is affected today; their rate-limited
+`POST /api/v1/leads` is first-party BFF traffic, not an inter-service channel.
+
+## Settled by propertiezy (coord #0050)
+
+**Headers:** `X-Propertiezy-Timestamp` and `X-Propertiezy-Signature`, identical on both channels and
+both directions, no key-id, no origin. Set the per-peer prefix to `X-Propertiezy-` for both legacy
+channels. Adding `Key-Id`/`Scheme`/`Origin` outbound is inert against their current filter, which reads
+only the two it knows.
+
+**Freshness window:** enforced today at ±300 seconds, matching this default. Do not default it off.
+
+**Stale-timestamp status:** their half is shipped (408); ezy-assets' half is coord **#0051**.
 
 ## Open questions
 
-**Header prefix migration.** Neither consumer has mentioned that their current headers are
-`X-Propertiezy-*`. They must confirm the prefix per channel before cutover.
+**ezy-assets has answered none of this.** Q1–Q3 apply to the ingest side they own, and three earlier
+items are still outstanding: whether they reference `DrainSignal`/`BackoffPolicy`, the blocking
+`CREATE INDEX` on their notifications outbox at upgrade, and whether they filter notification logs on
+the `{Channel}` facet.
 
-**Freshness window today.** Neither has said whether their existing verifier enforces one. If they
-enforce none and Themia defaults to 5 minutes, adopting the framework could reject traffic that works
-today — and if *their* verifier answers 401 rather than 408 for staleness, a Themia sender talking to
-their existing endpoint inherits the dead-letter-the-queue failure this spec designs against. Worth
-asking explicitly, since it is their code that would produce the status.
+**#0051 gates the staleness fix.** Until ezy-assets classifies 408 as transient, propertiezy's shipped
+408 changes nothing on the ezy-assets → propertiezy channel — an unrecognised 4xx treated as permanent
+dead-letters exactly as the 401 did. This is not a Themia dependency; it is recorded here because it
+determines whether that channel is safe to cut over.
