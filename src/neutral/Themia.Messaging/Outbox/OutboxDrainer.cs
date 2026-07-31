@@ -137,8 +137,6 @@ public sealed class OutboxDrainer<TRow>(
             return;
         }
 
-        lastPurgeAt = now;
-
         var sentDeleted = await PurgeAllAsync(
             (c, cutoff, batch, token) => purgeDialect.PurgeSentAsync(c, cutoff, batch, token),
             connection, now.AddDays(-options.SentRetentionDays), ct).ConfigureAwait(false);
@@ -146,6 +144,10 @@ public sealed class OutboxDrainer<TRow>(
         var deadDeleted = await PurgeAllAsync(
             (c, cutoff, batch, token) => purgeDialect.PurgeDeadAsync(c, cutoff, batch, token),
             connection, now.AddDays(-options.DeadRetentionDays), ct).ConfigureAwait(false);
+
+        // Only advance the gate once both passes complete without throwing — a transient failure
+        // (timeout, lock conflict) must not suppress the next attempt for a full PurgeIntervalHours.
+        lastPurgeAt = now;
 
         if (sentDeleted + deadDeleted > 0)
         {
@@ -168,7 +170,9 @@ public sealed class OutboxDrainer<TRow>(
             deleted = await purge(connection, cutoff, options.PurgeBatchSize, ct).ConfigureAwait(false);
             total += deleted;
         }
-        while (deleted == options.PurgeBatchSize);
+        // A non-positive batch size can never be "filled", so this stops after one call instead of
+        // spinning forever on a dialect that (validly) returns 0 for a 0-row request.
+        while (options.PurgeBatchSize > 0 && deleted == options.PurgeBatchSize);
 
         return total;
     }

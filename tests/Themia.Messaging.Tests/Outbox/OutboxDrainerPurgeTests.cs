@@ -36,6 +36,7 @@ public class OutboxDrainerPurgeTests
         public int SentCalls { get; private set; }
         public int DeadCalls { get; private set; }
         public DateTimeOffset LastSentOlderThan { get; private set; }
+        public DateTimeOffset LastDeadOlderThan { get; private set; }
 
         public Task<int> PurgeSentAsync(DbConnection c, DateTimeOffset olderThan, int batchSize, CancellationToken ct)
         {
@@ -47,8 +48,41 @@ public class OutboxDrainerPurgeTests
         public Task<int> PurgeDeadAsync(DbConnection c, DateTimeOffset olderThan, int batchSize, CancellationToken ct)
         {
             DeadCalls++;
+            LastDeadOlderThan = olderThan;
             return Task.FromResult(0);
         }
+    }
+
+    // Always throws from PurgeSentAsync, simulating a transient DB failure (timeout, lock conflict).
+    // Used to pin that a failed purge pass does not advance the interval gate.
+    private sealed class ThrowingSentPurgeDialect : IOutboxPurgeDialect<Row>
+    {
+        public int SentCalls { get; private set; }
+
+        public Task<int> PurgeSentAsync(DbConnection c, DateTimeOffset olderThan, int batchSize, CancellationToken ct)
+        {
+            SentCalls++;
+            throw new InvalidOperationException("Simulated transient purge failure.");
+        }
+
+        public Task<int> PurgeDeadAsync(DbConnection c, DateTimeOffset olderThan, int batchSize, CancellationToken ct)
+            => Task.FromResult(0);
+    }
+
+    // Returns a full batch on the first call and an empty one on the second, so the caller must loop
+    // twice to drain it — pins that PurgeAllAsync's "loop until a short batch comes back" behavior exists.
+    private sealed class BatchingPurgeDialect(int batchSize) : IOutboxPurgeDialect<Row>
+    {
+        public int SentCalls { get; private set; }
+
+        public Task<int> PurgeSentAsync(DbConnection c, DateTimeOffset olderThan, int requestedBatchSize, CancellationToken ct)
+        {
+            SentCalls++;
+            return Task.FromResult(SentCalls == 1 ? batchSize : 0);
+        }
+
+        public Task<int> PurgeDeadAsync(DbConnection c, DateTimeOffset olderThan, int batchSize, CancellationToken ct)
+            => Task.FromResult(0);
     }
 
     private sealed class NoopDispatcher : IOutboxDispatcher<Row>
@@ -124,17 +158,57 @@ public class OutboxDrainerPurgeTests
     }
 
     // Retention is expressed in days and must be subtracted from the drainer's clock, not DateTime.UtcNow.
+    // Sent and dead use deliberately different values so a copy-paste swap of the two retention
+    // settings in PurgeIfDueAsync would fail this test instead of passing unnoticed.
     [Fact]
-    public async Task DrainOnce_ShouldComputeSentCutoff_FromRetentionDays()
+    public async Task DrainOnce_ShouldComputeCutoffs_FromRetentionDays()
     {
         var now = new DateTimeOffset(2026, 7, 31, 12, 0, 0, TimeSpan.Zero);
         var purge = new RecordingPurgeDialect();
-        var options = new OutboxDrainerOptions<Row> { PurgeEnabled = true, SentRetentionDays = 7 };
+        var options = new OutboxDrainerOptions<Row>
+        {
+            PurgeEnabled = true,
+            SentRetentionDays = 7,
+            DeadRetentionDays = 90,
+        };
 
         var drainer = Build(options, purge, new FixedTimeProvider(now));
         await drainer.DrainOnceAsync(CancellationToken.None);
 
         Assert.Equal(now.AddDays(-7), purge.LastSentOlderThan);
+        Assert.Equal(now.AddDays(-90), purge.LastDeadOlderThan);
+    }
+
+    // A purge pass that throws (transient DB timeout, lock conflict) must not suppress the next
+    // attempt for a full PurgeIntervalHours — the interval gate may only advance after both purges
+    // complete successfully.
+    [Fact]
+    public async Task DrainOnce_ShouldRetryPurge_OnNextCycle_WhenPurgeFails()
+    {
+        var purge = new ThrowingSentPurgeDialect();
+        var options = new OutboxDrainerOptions<Row> { PurgeEnabled = true, PurgeIntervalHours = 24 };
+
+        var drainer = Build(options, purge, TimeProvider.System);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => drainer.DrainOnceAsync(CancellationToken.None));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => drainer.DrainOnceAsync(CancellationToken.None));
+
+        Assert.Equal(2, purge.SentCalls);
+    }
+
+    // PurgeAllAsync must keep calling the dialect until a batch comes back short of the requested
+    // size — an unbounded single DELETE is the exact failure mode retention batching exists to avoid.
+    [Fact]
+    public async Task DrainOnce_ShouldKeepPurging_UntilABatchComesBackShort()
+    {
+        const int batchSize = 3;
+        var purge = new BatchingPurgeDialect(batchSize);
+        var options = new OutboxDrainerOptions<Row> { PurgeEnabled = true, PurgeBatchSize = batchSize };
+
+        var drainer = Build(options, purge, TimeProvider.System);
+        await drainer.DrainOnceAsync(CancellationToken.None);
+
+        Assert.Equal(2, purge.SentCalls);
     }
 
     private sealed class FixedTimeProvider(DateTimeOffset now) : TimeProvider
