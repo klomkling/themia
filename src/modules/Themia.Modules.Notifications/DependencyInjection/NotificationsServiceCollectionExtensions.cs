@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Themia.Framework.Data.Dapper.Mapping;
+using Themia.Messaging.Outbox;
 using Themia.Modules.Notifications.Config;
 using Themia.Modules.Notifications.Dispatch;
 using Themia.Modules.Notifications.Mapping;
@@ -14,7 +15,7 @@ public static class NotificationsServiceCollectionExtensions
 {
     /// <summary>
     /// Adds the Notifications module's own services: the peer-agnostic stores, outbox store, preference and
-    /// provider-config resolvers, the dispatcher, the <see cref="DrainSignal"/>, and the background
+    /// provider-config resolvers, the dispatcher, the <see cref="DrainSignal{TRow}"/>, and the background
     /// <c>OutboxDrainer</c> hosted service. The adopter must ALSO register: (1) a provider dialect via
     /// <c>AddThemiaNotifications{PostgreSql|MySql|SqlServer}(...)</c> (the drainer needs <c>INotificationsSqlDialect</c>);
     /// (2) the neutral senders via <c>AddThemiaNotifications(...)</c> (the drainer needs <c>IEmailSender</c> etc.);
@@ -38,7 +39,22 @@ public static class NotificationsServiceCollectionExtensions
         services.TryAddSingleton(TimeProvider.System);
         services.AddLogging();
 
-        services.TryAddSingleton<DrainSignal>();
+        services.TryAddSingleton<DrainSignal<ClaimedOutboxRow>>();
+
+        // The drain loop itself is the shared one from Themia.Messaging; map the module's options onto it
+        // so adopters keep configuring drain behaviour through NotificationsModuleOptions.
+        services.TryAddSingleton(new OutboxDrainerOptions<ClaimedOutboxRow>
+        {
+            DrainIntervalSeconds = options.DrainIntervalSeconds,
+            MaxBatchSize = options.MaxBatchSize,
+            MaxAttempts = options.MaxAttempts,
+            LeaseSeconds = options.LeaseSeconds,
+            PurgeEnabled = options.PurgeEnabled,
+            SentRetentionDays = options.SentRetentionDays,
+            DeadRetentionDays = options.DeadRetentionDays,
+        });
+        services.TryAddSingleton<IOutboxDispatcher<ClaimedOutboxRow>, NotificationOutboxDispatcher>();
+        services.TryAddSingleton<IOutboxDialect<ClaimedOutboxRow>>(sp => sp.GetRequiredService<INotificationsSqlDialect>());
 
         services.TryAddScoped<IOutboxStore, OutboxStore>();
         services.TryAddScoped<IInAppNotificationStore, InAppNotificationStore>();
@@ -49,7 +65,7 @@ public static class NotificationsServiceCollectionExtensions
         services.TryAddScoped<INotificationDispatcher, NotificationDispatcher>();
 
         ContributeDapperMappings(services);
-        services.AddHostedService<OutboxDrainer>();
+        services.AddHostedService<OutboxDrainer<ClaimedOutboxRow>>();
 
         return services;
     }

@@ -1,0 +1,3 @@
+#nullable enable
+Themia.Messaging.SqlServer.ServiceCollectionExtensions
+static Themia.Messaging.SqlServer.ServiceCollectionExtensions.AddThemiaMessagingSqlServer(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, string! connectionStringName = "Default") -> Microsoft.Extensions.DependencyInjection.IServiceCollection!

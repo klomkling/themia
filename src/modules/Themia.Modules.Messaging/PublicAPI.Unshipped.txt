@@ -1,0 +1,84 @@
+#nullable enable
+Themia.Modules.Messaging.Mapping.MessagingDapperMappings
+static Themia.Modules.Messaging.Mapping.MessagingDapperMappings.Apply(Themia.Framework.Data.Dapper.Mapping.EntityMappingRegistry! registry) -> void
+Themia.Modules.Messaging.EntityConfiguration.ThemiaMessagingModelBuilderExtensions
+static Themia.Modules.Messaging.EntityConfiguration.ThemiaMessagingModelBuilderExtensions.ApplyThemiaMessaging(this Microsoft.EntityFrameworkCore.ModelBuilder! modelBuilder) -> Microsoft.EntityFrameworkCore.ModelBuilder!
+Themia.Modules.Messaging.MessagingModule
+Themia.Modules.Messaging.MessagingModule.MessagingModule(Themia.Data.Migrations.MigrationEngine engine, Themia.Modules.Messaging.MessagingModuleOptions! options) -> void
+Themia.Modules.Messaging.DependencyInjection.MessagingServiceCollectionExtensions
+static Themia.Modules.Messaging.DependencyInjection.MessagingServiceCollectionExtensions.AddThemiaMessagingModule(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Themia.Modules.Messaging.MessagingModuleOptions!>? configure = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static Themia.Modules.Messaging.DependencyInjection.MessagingServiceCollectionExtensions.AddThemiaMessagingInbox(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+override Themia.Modules.Messaging.MessagingModule.Descriptor.get -> Themia.Framework.Core.Modules.ModuleDescriptor!
+override Themia.Modules.Messaging.MessagingModule.InitializeAsync(System.IServiceProvider! serviceProvider, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+Themia.Modules.Messaging.Migrations.MessagingSchemaMigration
+Themia.Modules.Messaging.Migrations.MessagingSchemaMigration.MessagingSchemaMigration() -> void
+override Themia.Modules.Messaging.Migrations.MessagingSchemaMigration.Up() -> void
+override Themia.Modules.Messaging.Migrations.MessagingSchemaMigration.Down() -> void
+Themia.Modules.Messaging.MessagingModuleOptions
+Themia.Modules.Messaging.MessagingModuleOptions.MessagingModuleOptions() -> void
+Themia.Modules.Messaging.MessagingModuleOptions.ConnectionStringName.get -> string!
+Themia.Modules.Messaging.MessagingModuleOptions.ConnectionStringName.set -> void
+Themia.Modules.Messaging.MessagingModuleOptions.Origin.get -> string!
+Themia.Modules.Messaging.MessagingModuleOptions.Origin.set -> void
+Themia.Modules.Messaging.MessagingModuleOptions.DrainIntervalSeconds.get -> int
+Themia.Modules.Messaging.MessagingModuleOptions.DrainIntervalSeconds.set -> void
+Themia.Modules.Messaging.MessagingModuleOptions.MaxBatchSize.get -> int
+Themia.Modules.Messaging.MessagingModuleOptions.MaxBatchSize.set -> void
+Themia.Modules.Messaging.MessagingModuleOptions.MaxAttempts.get -> int
+Themia.Modules.Messaging.MessagingModuleOptions.MaxAttempts.set -> void
+Themia.Modules.Messaging.MessagingModuleOptions.LeaseSeconds.get -> int
+Themia.Modules.Messaging.MessagingModuleOptions.LeaseSeconds.set -> void
+Themia.Modules.Messaging.MessagingModuleOptions.PurgeEnabled.get -> bool
+Themia.Modules.Messaging.MessagingModuleOptions.PurgeEnabled.set -> void
+Themia.Modules.Messaging.MessagingModuleOptions.SentRetentionDays.get -> int
+Themia.Modules.Messaging.MessagingModuleOptions.SentRetentionDays.set -> void
+Themia.Modules.Messaging.MessagingModuleOptions.DeadRetentionDays.get -> int
+Themia.Modules.Messaging.MessagingModuleOptions.DeadRetentionDays.set -> void
+Themia.Modules.Messaging.MessagingModuleOptions.InboxRetentionDays.get -> int
+Themia.Modules.Messaging.MessagingModuleOptions.InboxRetentionDays.set -> void
+Themia.Modules.Messaging.MessagingModuleOptions.Validate() -> void
+Themia.Modules.Messaging.Entities.OutboxStatus
+Themia.Modules.Messaging.Entities.OutboxStatus.Pending = 0 -> Themia.Modules.Messaging.Entities.OutboxStatus
+Themia.Modules.Messaging.Entities.OutboxStatus.Sending = 1 -> Themia.Modules.Messaging.Entities.OutboxStatus
+Themia.Modules.Messaging.Entities.OutboxStatus.Sent = 2 -> Themia.Modules.Messaging.Entities.OutboxStatus
+Themia.Modules.Messaging.Entities.OutboxStatus.Failed = 3 -> Themia.Modules.Messaging.Entities.OutboxStatus
+Themia.Modules.Messaging.Entities.OutboxStatus.Dead = 4 -> Themia.Modules.Messaging.Entities.OutboxStatus
+Themia.Modules.Messaging.Entities.MessageOutboxEntry
+Themia.Modules.Messaging.Entities.MessageOutboxEntry.MessageOutboxEntry() -> void
+Themia.Modules.Messaging.Entities.MessageOutboxEntry.TenantId.get -> Themia.Framework.Core.Abstractions.Tenancy.TenantId?
+Themia.Modules.Messaging.Entities.MessageOutboxEntry.TenantId.set -> void
+Themia.Modules.Messaging.Entities.MessageOutboxEntry.MessageId.get -> System.Guid
+Themia.Modules.Messaging.Entities.MessageOutboxEntry.MessageId.set -> void
+Themia.Modules.Messaging.Entities.MessageOutboxEntry.Type.get -> string!
+Themia.Modules.Messaging.Entities.MessageOutboxEntry.Type.set -> void
+Themia.Modules.Messaging.Entities.MessageOutboxEntry.Payload.get -> string!
+Themia.Modules.Messaging.Entities.MessageOutboxEntry.Payload.set -> void
+Themia.Modules.Messaging.Entities.MessageOutboxEntry.Destination.get -> string!
+Themia.Modules.Messaging.Entities.MessageOutboxEntry.Destination.set -> void
+Themia.Modules.Messaging.Entities.MessageOutboxEntry.Origin.get -> string!
+Themia.Modules.Messaging.Entities.MessageOutboxEntry.Origin.set -> void
+Themia.Modules.Messaging.Entities.MessageOutboxEntry.EntityKey.get -> string?
+Themia.Modules.Messaging.Entities.MessageOutboxEntry.EntityKey.set -> void
+Themia.Modules.Messaging.Entities.MessageOutboxEntry.Version.get -> long?
+Themia.Modules.Messaging.Entities.MessageOutboxEntry.Version.set -> void
+Themia.Modules.Messaging.Entities.MessageOutboxEntry.Headers.get -> string?
+Themia.Modules.Messaging.Entities.MessageOutboxEntry.Headers.set -> void
+Themia.Modules.Messaging.Entities.MessageOutboxEntry.Status.get -> Themia.Modules.Messaging.Entities.OutboxStatus
+Themia.Modules.Messaging.Entities.MessageOutboxEntry.Status.set -> void
+Themia.Modules.Messaging.Entities.MessageOutboxEntry.Attempts.get -> int
+Themia.Modules.Messaging.Entities.MessageOutboxEntry.Attempts.set -> void
+Themia.Modules.Messaging.Entities.MessageOutboxEntry.NextAttemptAt.get -> System.DateTimeOffset
+Themia.Modules.Messaging.Entities.MessageOutboxEntry.NextAttemptAt.set -> void
+Themia.Modules.Messaging.Entities.MessageOutboxEntry.ScheduledFor.get -> System.DateTimeOffset?
+Themia.Modules.Messaging.Entities.MessageOutboxEntry.ScheduledFor.set -> void
+Themia.Modules.Messaging.Entities.MessageOutboxEntry.LeaseOwner.get -> string?
+Themia.Modules.Messaging.Entities.MessageOutboxEntry.LeaseOwner.set -> void
+Themia.Modules.Messaging.Entities.MessageOutboxEntry.LeaseExpiresAt.get -> System.DateTimeOffset?
+Themia.Modules.Messaging.Entities.MessageOutboxEntry.LeaseExpiresAt.set -> void
+Themia.Modules.Messaging.Entities.MessageOutboxEntry.CreatedAt.get -> System.DateTimeOffset
+Themia.Modules.Messaging.Entities.MessageOutboxEntry.CreatedAt.set -> void
+Themia.Modules.Messaging.Entities.MessageOutboxEntry.SentAt.get -> System.DateTimeOffset?
+Themia.Modules.Messaging.Entities.MessageOutboxEntry.SentAt.set -> void
+Themia.Modules.Messaging.Entities.MessageOutboxEntry.LastError.get -> string?
+Themia.Modules.Messaging.Entities.MessageOutboxEntry.LastError.set -> void
+Themia.Modules.Messaging.Entities.MessageOutboxEntry.SetId(System.Guid id) -> void

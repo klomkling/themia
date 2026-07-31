@@ -18,6 +18,19 @@ public sealed class NotificationsModuleOptions
     /// <summary>How long a claimed (sending) row's lease is held before it is reclaimable. Default 120s.</summary>
     public int LeaseSeconds { get; set; } = 120;
 
+    /// <summary>
+    /// Whether the drainer also purges terminal outbox rows. Defaults to <see langword="false"/>: this
+    /// module has shipped without a purge since 0.6.x, so enabling it by default would silently delete
+    /// every historical sent row on the first run after an upgrade. Opt in deliberately.
+    /// </summary>
+    public bool PurgeEnabled { get; set; }
+
+    /// <summary>How long delivered rows are kept once <see cref="PurgeEnabled"/> is set. Default 7 days.</summary>
+    public int SentRetentionDays { get; set; } = 7;
+
+    /// <summary>How long dead-lettered rows are kept once <see cref="PurgeEnabled"/> is set. Default 90 days.</summary>
+    public int DeadRetentionDays { get; set; } = 90;
+
     /// <summary>Validates the options, throwing if any value is out of range.</summary>
     public void Validate()
     {
@@ -31,5 +44,9 @@ public sealed class NotificationsModuleOptions
             throw new ArgumentOutOfRangeException(nameof(MaxAttempts), MaxAttempts, "Must be at least 1.");
         if (LeaseSeconds < 1)
             throw new ArgumentOutOfRangeException(nameof(LeaseSeconds), LeaseSeconds, "Must be at least 1 second.");
+        if (SentRetentionDays < 1)
+            throw new ArgumentOutOfRangeException(nameof(SentRetentionDays), SentRetentionDays, "Must be at least 1 day.");
+        if (DeadRetentionDays < 1)
+            throw new ArgumentOutOfRangeException(nameof(DeadRetentionDays), DeadRetentionDays, "Must be at least 1 day.");
     }
 }

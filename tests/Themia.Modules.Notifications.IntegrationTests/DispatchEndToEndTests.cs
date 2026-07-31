@@ -11,6 +11,7 @@ using Themia.Framework.Core.Abstractions.Tenancy;
 using Themia.Framework.Data.Abstractions.UnitOfWork;
 using Themia.Framework.Data.EFCore.Extensions;
 using Themia.Framework.Data.EFCore.PostgreSql;
+using Themia.Messaging.Outbox;
 using Themia.Modules.Notifications.DependencyInjection;
 using Themia.Modules.Notifications.Dispatch;
 using Themia.Modules.Notifications.Entities;
@@ -76,7 +77,7 @@ public sealed class DispatchEndToEndTests : IAsyncLifetime
         }
 
         // Kick the drainer's wake signal, then drive one drain cycle (deterministic, no timing race).
-        provider.GetRequiredService<DrainSignal>().Signal();
+        provider.GetRequiredService<DrainSignal<ClaimedOutboxRow>>().Signal();
         var drained = await DriveDrainAsync(provider);
 
         Assert.Equal(1, drained);
@@ -173,13 +174,14 @@ public sealed class DispatchEndToEndTests : IAsyncLifetime
     // Drives a single drain cycle through the module's registered drainer dependencies.
     private static async Task<int> DriveDrainAsync(ServiceProvider provider)
     {
-        var drainer = new OutboxDrainer(
+        var drainer = new OutboxDrainer<ClaimedOutboxRow>(
             provider.GetRequiredService<INotificationsSqlDialect>(),
-            provider.GetRequiredService<DrainSignal>(),
+            new NotificationOutboxDispatcher(),
+            provider.GetRequiredService<DrainSignal<ClaimedOutboxRow>>(),
             provider.GetRequiredService<IServiceScopeFactory>(),
-            new NotificationsModuleOptions { MaxAttempts = MaxAttempts, MaxBatchSize = 10 },
+            new OutboxDrainerOptions<ClaimedOutboxRow> { MaxAttempts = MaxAttempts, MaxBatchSize = 10 },
             TimeProvider.System,
-            NullLogger<OutboxDrainer>.Instance);
+            NullLogger<OutboxDrainer<ClaimedOutboxRow>>.Instance);
 
         return await drainer.DrainOnceAsync(CancellationToken.None);
     }

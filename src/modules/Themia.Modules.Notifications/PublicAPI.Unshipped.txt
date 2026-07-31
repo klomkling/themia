@@ -11,11 +11,13 @@ Themia.Modules.Notifications.NotificationsModuleOptions.MaxAttempts.get -> int
 Themia.Modules.Notifications.NotificationsModuleOptions.MaxAttempts.set -> void
 Themia.Modules.Notifications.NotificationsModuleOptions.LeaseSeconds.get -> int
 Themia.Modules.Notifications.NotificationsModuleOptions.LeaseSeconds.set -> void
+Themia.Modules.Notifications.NotificationsModuleOptions.PurgeEnabled.get -> bool
+Themia.Modules.Notifications.NotificationsModuleOptions.PurgeEnabled.set -> void
+Themia.Modules.Notifications.NotificationsModuleOptions.SentRetentionDays.get -> int
+Themia.Modules.Notifications.NotificationsModuleOptions.SentRetentionDays.set -> void
+Themia.Modules.Notifications.NotificationsModuleOptions.DeadRetentionDays.get -> int
+Themia.Modules.Notifications.NotificationsModuleOptions.DeadRetentionDays.set -> void
 Themia.Modules.Notifications.NotificationsModuleOptions.Validate() -> void
-Themia.Modules.Notifications.Outbox.DrainSignal
-Themia.Modules.Notifications.Outbox.DrainSignal.DrainSignal() -> void
-Themia.Modules.Notifications.Outbox.DrainSignal.Signal() -> void
-Themia.Modules.Notifications.Outbox.DrainSignal.WaitAsync(System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!
 Themia.Modules.Notifications.Entities.OutboxStatus
 Themia.Modules.Notifications.Entities.OutboxStatus.Pending = 0 -> Themia.Modules.Notifications.Entities.OutboxStatus
 Themia.Modules.Notifications.Entities.OutboxStatus.Sending = 1 -> Themia.Modules.Notifications.Entities.OutboxStatus
@@ -104,6 +106,10 @@ Themia.Modules.Notifications.Migrations.NotificationsSchemaMigration
 Themia.Modules.Notifications.Migrations.NotificationsSchemaMigration.NotificationsSchemaMigration() -> void
 override Themia.Modules.Notifications.Migrations.NotificationsSchemaMigration.Up() -> void
 override Themia.Modules.Notifications.Migrations.NotificationsSchemaMigration.Down() -> void
+Themia.Modules.Notifications.Migrations.NotificationsPurgeIndexMigration
+Themia.Modules.Notifications.Migrations.NotificationsPurgeIndexMigration.NotificationsPurgeIndexMigration() -> void
+override Themia.Modules.Notifications.Migrations.NotificationsPurgeIndexMigration.Up() -> void
+override Themia.Modules.Notifications.Migrations.NotificationsPurgeIndexMigration.Down() -> void
 Themia.Modules.Notifications.EntityConfiguration.ThemiaNotificationsModelBuilderExtensions
 static Themia.Modules.Notifications.EntityConfiguration.ThemiaNotificationsModelBuilderExtensions.ApplyThemiaNotifications(this Microsoft.EntityFrameworkCore.ModelBuilder! modelBuilder) -> Microsoft.EntityFrameworkCore.ModelBuilder!
 Themia.Modules.Notifications.Mapping.NotificationsDapperMappings
@@ -137,10 +143,6 @@ Themia.Modules.Notifications.Outbox.ClaimedOutboxRow.Subject.init -> void
 Themia.Modules.Notifications.Outbox.ClaimedOutboxRow.TenantId.get -> string?
 Themia.Modules.Notifications.Outbox.ClaimedOutboxRow.TenantId.init -> void
 Themia.Modules.Notifications.Outbox.INotificationsSqlDialect
-Themia.Modules.Notifications.Outbox.INotificationsSqlDialect.ClaimAsync(System.Data.Common.DbConnection! connection, string! leaseOwner, System.DateTimeOffset now, System.DateTimeOffset leaseExpiresAt, int batchSize, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Themia.Modules.Notifications.Outbox.ClaimedOutboxRow!>!>!
-Themia.Modules.Notifications.Outbox.INotificationsSqlDialect.CompleteAsync(System.Data.Common.DbConnection! connection, System.Guid id, System.DateTimeOffset sentAt, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!
-Themia.Modules.Notifications.Outbox.INotificationsSqlDialect.CreateConnection() -> System.Data.Common.DbConnection!
-Themia.Modules.Notifications.Outbox.INotificationsSqlDialect.FailAsync(System.Data.Common.DbConnection! connection, System.Guid id, int attempts, System.DateTimeOffset nextAttemptAt, bool dead, string! error, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!
 Themia.Modules.Notifications.Dispatch.IPreferenceResolver
 Themia.Modules.Notifications.Dispatch.IPreferenceResolver.ResolveAsync(string! userId, System.Collections.Generic.IReadOnlyList<Themia.Notifications.NotificationChannel>! requested, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Notifications.Dispatch.ResolvedPreferences!>!
 Themia.Modules.Notifications.Dispatch.ResolvedPreferences

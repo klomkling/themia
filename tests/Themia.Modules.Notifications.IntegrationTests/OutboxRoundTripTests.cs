@@ -11,6 +11,7 @@ using Themia.Framework.Core.Abstractions.Tenancy;
 using Themia.Framework.Data.Abstractions.UnitOfWork;
 using Themia.Framework.Data.EFCore.Extensions;
 using Themia.Framework.Data.EFCore.PostgreSql;
+using Themia.Messaging.Outbox;
 using Themia.Modules.Notifications.Entities;
 using Themia.Modules.Notifications.Migrations;
 using Themia.Modules.Notifications.Outbox;
@@ -114,6 +115,37 @@ public sealed class OutboxRoundTripTests : IAsyncLifetime
         Assert.Equal(1, attempts);
     }
 
+    [Fact]
+    public async Task Purge_does_nothing_when_disabled_and_deletes_old_sent_rows_when_enabled()
+    {
+        var recorder = new RecordingEmailSender(succeed: true);
+        await using var provider = BuildProvider(recorder);
+
+        var oldId = await EnqueueEmailAsync(provider, "old@example.com", "Hi", "Body");
+        var recentId = await EnqueueEmailAsync(provider, "recent@example.com", "Hi", "Body");
+
+        // Drain both to `sent`, then backdate one row's sent_at so retention can distinguish them.
+        var sendDrainer = CreateDrainer(provider);
+        await DrainAsync(sendDrainer);
+
+        await SetSentAtAsync(oldId, DateTimeOffset.UtcNow.AddDays(-30));
+        await SetSentAtAsync(recentId, DateTimeOffset.UtcNow.AddHours(-1));
+
+        var purgeDialect = provider.GetRequiredService<IOutboxPurgeDialect<ClaimedOutboxRow>>();
+
+        var disabledDrainer = CreateDrainerWithPurge(provider, purgeDialect, purgeEnabled: false, sentRetentionDays: 7);
+        await DrainAsync(disabledDrainer);
+
+        Assert.True(await RowExistsAsync(oldId), "purge disabled must not delete rows");
+        Assert.True(await RowExistsAsync(recentId), "purge disabled must not delete rows");
+
+        var enabledDrainer = CreateDrainerWithPurge(provider, purgeDialect, purgeEnabled: true, sentRetentionDays: 7);
+        await DrainAsync(enabledDrainer);
+
+        Assert.False(await RowExistsAsync(oldId), "old sent row should be purged once enabled");
+        Assert.True(await RowExistsAsync(recentId), "recent sent row is within the retention window");
+    }
+
     private const int MaxAttempts = 3;
 
     private ServiceProvider BuildProvider(IEmailSender emailSender)
@@ -134,24 +166,50 @@ public sealed class OutboxRoundTripTests : IAsyncLifetime
         return services.BuildServiceProvider();
     }
 
-    private OutboxDrainer CreateDrainer(ServiceProvider provider)
+    private OutboxDrainer<ClaimedOutboxRow> CreateDrainer(ServiceProvider provider)
     {
         var dialect = provider.GetRequiredService<INotificationsSqlDialect>();
-        var options = new NotificationsModuleOptions { MaxAttempts = MaxAttempts, MaxBatchSize = 10 };
-        return new OutboxDrainer(
+        var options = new OutboxDrainerOptions<ClaimedOutboxRow> { MaxAttempts = MaxAttempts, MaxBatchSize = 10 };
+        return new OutboxDrainer<ClaimedOutboxRow>(
             dialect,
-            new DrainSignal(),
+            new NotificationOutboxDispatcher(),
+            new DrainSignal<ClaimedOutboxRow>(),
             provider.GetRequiredService<IServiceScopeFactory>(),
             options,
             TimeProvider.System,
-            NullLogger<OutboxDrainer>.Instance);
+            NullLogger<OutboxDrainer<ClaimedOutboxRow>>.Instance);
     }
 
-    private static async Task<int> DrainAsync(OutboxDrainer drainer) =>
+    private OutboxDrainer<ClaimedOutboxRow> CreateDrainerWithPurge(
+        ServiceProvider provider,
+        IOutboxPurgeDialect<ClaimedOutboxRow> purgeDialect,
+        bool purgeEnabled,
+        int sentRetentionDays)
+    {
+        var dialect = provider.GetRequiredService<INotificationsSqlDialect>();
+        var options = new OutboxDrainerOptions<ClaimedOutboxRow>
+        {
+            MaxAttempts = MaxAttempts,
+            MaxBatchSize = 10,
+            PurgeEnabled = purgeEnabled,
+            SentRetentionDays = sentRetentionDays,
+        };
+        return new OutboxDrainer<ClaimedOutboxRow>(
+            dialect,
+            new NotificationOutboxDispatcher(),
+            new DrainSignal<ClaimedOutboxRow>(),
+            provider.GetRequiredService<IServiceScopeFactory>(),
+            options,
+            TimeProvider.System,
+            NullLogger<OutboxDrainer<ClaimedOutboxRow>>.Instance,
+            purgeDialect);
+    }
+
+    private static async Task<int> DrainAsync(OutboxDrainer<ClaimedOutboxRow> drainer) =>
         await drainer.DrainOnceAsync(CancellationToken.None);
 
     // After a failure the row's next_attempt_at sits in the future; reset it to now so the next claim is due.
-    private async Task ForceClaimAndDrainAsync(Guid id, OutboxDrainer drainer)
+    private async Task ForceClaimAndDrainAsync(Guid id, OutboxDrainer<ClaimedOutboxRow> drainer)
     {
         await SetDueNowAsync(id);
         await DrainAsync(drainer);
@@ -191,6 +249,30 @@ public sealed class OutboxRoundTripTests : IAsyncLifetime
         command.Parameters.AddWithValue("now", DateTimeOffset.UtcNow);
         command.Parameters.AddWithValue("id", id);
         await command.ExecuteNonQueryAsync(CancellationToken.None);
+    }
+
+    private async Task SetSentAtAsync(Guid id, DateTimeOffset sentAt)
+    {
+        await using var connection = new NpgsqlConnection(ConnString);
+        await connection.OpenAsync(CancellationToken.None);
+        await using var command = new NpgsqlCommand(
+            "UPDATE notifications.outbox_messages SET sent_at = @sentAt WHERE id = @id",
+            connection);
+        command.Parameters.AddWithValue("sentAt", sentAt);
+        command.Parameters.AddWithValue("id", id);
+        await command.ExecuteNonQueryAsync(CancellationToken.None);
+    }
+
+    private async Task<bool> RowExistsAsync(Guid id)
+    {
+        await using var connection = new NpgsqlConnection(ConnString);
+        await connection.OpenAsync(CancellationToken.None);
+        await using var command = new NpgsqlCommand(
+            "SELECT COUNT(*) FROM notifications.outbox_messages WHERE id = @id",
+            connection);
+        command.Parameters.AddWithValue("id", id);
+        var count = (long)(await command.ExecuteScalarAsync(CancellationToken.None))!;
+        return count > 0;
     }
 
     private async Task<(int Status, int Attempts, DateTimeOffset NextAttemptAt)> ReadRowAsync(Guid id)

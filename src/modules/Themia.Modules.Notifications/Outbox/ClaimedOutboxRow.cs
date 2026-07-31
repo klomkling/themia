@@ -1,3 +1,4 @@
+using Themia.Messaging.Outbox;
 using Themia.Notifications;
 
 namespace Themia.Modules.Notifications.Outbox;
@@ -18,4 +19,4 @@ public sealed record ClaimedOutboxRow(
     string Recipient,
     string? Subject,
     string Body,
-    int Attempts);
+    int Attempts) : IClaimedRow;

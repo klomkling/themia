@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Themia.Messaging.Outbox;
 using Themia.Modules.Notifications.Outbox;
 
 namespace Themia.Modules.Notifications.PostgreSql;
@@ -34,6 +35,8 @@ public static class ServiceCollectionExtensions
                     $"Connection string '{connectionStringName}' was not found.");
             return new PostgresNotificationsDialect(connectionString);
         });
+
+        services.TryAddSingleton<IOutboxPurgeDialect<ClaimedOutboxRow>, PostgresNotificationsPurgeDialect>();
 
         return services;
     }

@@ -5,6 +5,7 @@ using Microsoft.Extensions.Hosting;
 using Themia.Modules.Notifications;
 using Themia.Modules.Notifications.Config;
 using Themia.Modules.Notifications.DependencyInjection;
+using Themia.Messaging.Outbox;
 using Themia.Modules.Notifications.Dispatch;
 using Themia.Modules.Notifications.Outbox;
 using Themia.Modules.Notifications.Stores;
@@ -29,7 +30,7 @@ public class AddThemiaNotificationsModuleTests
     [InlineData(typeof(ITenantProviderConfigStore))]
     [InlineData(typeof(IPreferenceResolver))]
     [InlineData(typeof(IProviderConfigResolver))]
-    [InlineData(typeof(DrainSignal))]
+    [InlineData(typeof(DrainSignal<ClaimedOutboxRow>))]
     public void AddThemiaNotificationsModule_ShouldRegister_ModuleService(Type serviceType)
     {
         var services = BuildServices();
@@ -42,7 +43,7 @@ public class AddThemiaNotificationsModuleTests
     {
         var services = BuildServices();
 
-        var descriptor = Assert.Single(services, d => d.ServiceType == typeof(DrainSignal));
+        var descriptor = Assert.Single(services, d => d.ServiceType == typeof(DrainSignal<ClaimedOutboxRow>));
         Assert.Equal(ServiceLifetime.Singleton, descriptor.Lifetime);
     }
 
@@ -54,8 +55,8 @@ public class AddThemiaNotificationsModuleTests
         Assert.Contains(
             services,
             d => d.ServiceType == typeof(IHostedService)
-                && (d.ImplementationType == typeof(OutboxDrainer)
-                    || d.ImplementationType?.Name == nameof(OutboxDrainer)));
+                && (d.ImplementationType == typeof(OutboxDrainer<ClaimedOutboxRow>)
+                    || d.ImplementationType?.Name == typeof(OutboxDrainer<ClaimedOutboxRow>).Name));
     }
 
     [Fact]
@@ -82,5 +83,38 @@ public class AddThemiaNotificationsModuleTests
         var options = new NotificationsModuleOptions { ConnectionStringName = " " };
 
         Assert.Throws<ArgumentException>(options.Validate);
+    }
+
+    // Purge must be OFF unless the adopter asks for it: enabling retention on an existing deployment
+    // deletes historical sent rows on the first run, which must never arrive via a version bump.
+    [Fact]
+    public void AddThemiaNotificationsModule_ShouldDefault_PurgeDisabled()
+    {
+        var services = BuildServices();
+        var provider = services.BuildServiceProvider();
+
+        var options = provider.GetRequiredService<OutboxDrainerOptions<ClaimedOutboxRow>>();
+
+        Assert.False(options.PurgeEnabled);
+    }
+
+    [Fact]
+    public void AddThemiaNotificationsModule_ShouldPropagate_PurgeSettings_WhenEnabled()
+    {
+        var services = new ServiceCollection();
+        services.AddThemiaNotificationsModule(o =>
+        {
+            o.ConnectionStringName = "X";
+            o.PurgeEnabled = true;
+            o.SentRetentionDays = 3;
+            o.DeadRetentionDays = 45;
+        });
+        var provider = services.BuildServiceProvider();
+
+        var options = provider.GetRequiredService<OutboxDrainerOptions<ClaimedOutboxRow>>();
+
+        Assert.True(options.PurgeEnabled);
+        Assert.Equal(3, options.SentRetentionDays);
+        Assert.Equal(45, options.DeadRetentionDays);
     }
 }

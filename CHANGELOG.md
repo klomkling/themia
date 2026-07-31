@@ -27,6 +27,26 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+### Added
+- **`Themia.Messaging`** (+ `.PostgreSql` / `.MySql` / `.SqlServer`) — neutral transactional-outbox and
+  deduplicating-inbox core shared by inter-service messaging: `IOutboxDialect<TRow>`, the generic
+  `OutboxDrainer<TRow>` background service, `IInboxStore` / `IInboxAdmissionDialect`, and per-engine
+  claim/complete/fail/purge/admission dialects (coord #0050).
+- **`Themia.Modules.Messaging`** — tenant-aware messaging module over `Themia.Messaging`:
+  `IMessageOutboxStore` / `MessageEnvelope`, the Dapper-peer deduplicating inbox
+  (`AddThemiaMessagingInbox`), a FluentMigrator schema (`messaging_outbox_messages` /
+  `messaging_inbox_messages`, PostgreSQL + MySQL + SQL Server), and an `AddThemiaMessagingModule` DI
+  extension (coord #0050).
+
+### Changed
+- **(breaking) `Themia.Modules.Notifications`** — the outbox drainer's shared plumbing moved into the new
+  `Themia.Messaging` core so both modules reuse one drain loop instead of forking it: `DrainSignal` moved
+  from `Themia.Modules.Notifications.Outbox.DrainSignal` to the generic
+  `Themia.Messaging.Outbox.DrainSignal<TRow>`, and four `INotificationsSqlDialect` members
+  (`ClaimAsync`/`CompleteAsync`/`CreateConnection`/`FailAsync`) moved onto the shared
+  `Themia.Messaging.Outbox.IOutboxDialect<TRow>` base interface it now extends. Source- and
+  binary-breaking only for code that references either type directly; see [MIGRATION.md](MIGRATION.md).
+
 ## [0.10.2] - 2026-07-29
 
 ### Fixed
