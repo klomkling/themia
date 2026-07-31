@@ -77,6 +77,27 @@ public sealed class InboxAdmissionTests : IAsyncLifetime
         Assert.Equal(InboxAdmission.Accepted, fromPeerB);
     }
 
+    // This pins a KNOWN LIMITATION, not a desired behaviour: dedup is keyed on (origin, message_id) with
+    // no tenant component (see IInboxStore's remarks and MessageEnvelope.MessageId's doc). If a peer ever
+    // produces a MessageId that is not globally unique across tenants — e.g. derived from a per-tenant
+    // sequence instead of a random GUID — the second tenant's message is silently dropped as a false
+    // duplicate. Widening the key to include tenant_id was considered and rejected: tenant_id is nullable,
+    // no engine allows NULL in a primary key, and the surrogate-key-plus-unique-index workaround enforces
+    // nothing on PostgreSQL/MySQL. This test exists so that if anyone ever widens the dedup key, it fails
+    // and forces a deliberate decision rather than silently changing behaviour.
+    [Fact]
+    public async Task Same_message_id_from_the_same_origin_is_duplicate_even_across_tenants()
+    {
+        await using var provider = BuildDapperProvider();
+        var messageId = Guid.CreateVersion7();
+
+        var forTenantA = await AdmitAsync(provider, "peer-a", messageId, "tenant-a");
+        var forTenantB = await AdmitAsync(provider, "peer-a", messageId, "tenant-b");
+
+        Assert.Equal(InboxAdmission.Accepted, forTenantA);
+        Assert.Equal(InboxAdmission.Duplicate, forTenantB);
+    }
+
     [Fact]
     public async Task Concurrent_admissions_of_the_same_message_admit_exactly_once()
     {
@@ -157,7 +178,10 @@ public sealed class InboxAdmissionTests : IAsyncLifetime
 
         var services = new ServiceCollection();
         services.AddSingleton<IConfiguration>(configuration);
-        services.AddScoped<ITenantContext>(_ => new TenantContext(new TenantId("acme")));
+        // Resolved from TenantContextAccessor (an AsyncLocal) so AdmitAsync can vary the tenant per call
+        // without rebuilding the provider; falls back to "acme" when no test has set an ambient tenant.
+        services.AddScoped<ITenantContext>(
+            _ => new TenantContext(TenantContextAccessor.CurrentTenantId ?? new TenantId("acme")));
         services.AddThemiaMessagingModule(o => o.Origin = "test-origin");
         services.AddThemiaDapperCore();
         services.AddThemiaDapperPostgres(configuration);
@@ -167,8 +191,14 @@ public sealed class InboxAdmissionTests : IAsyncLifetime
         return services.BuildServiceProvider();
     }
 
-    private static async Task<InboxAdmission> AdmitAsync(ServiceProvider provider, string origin, Guid messageId)
+    private static async Task<InboxAdmission> AdmitAsync(
+        ServiceProvider provider, string origin, Guid messageId, string? tenant = null)
     {
+        // AsyncLocal semantics scope this to the call: it does not leak back to the caller once this
+        // async method returns, so sequential calls with different tenants (see the cross-tenant test)
+        // do not interfere with each other.
+        TenantContextAccessor.CurrentTenantId = tenant is null ? null : new TenantId(tenant);
+
         await using var scope = provider.CreateAsyncScope();
         var store = scope.ServiceProvider.GetRequiredService<IInboxStore>();
         return await store.TryAdmitAsync(origin, messageId, TestType, CancellationToken.None);

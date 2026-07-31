@@ -7,7 +7,10 @@ namespace Themia.Messaging.Inbox;
 /// <remarks>
 /// <para>
 /// Deduplication is keyed on (origin, message id) rather than message id alone, so two peers can never
-/// collide on an identifier either of them generated independently.
+/// collide on an identifier either of them generated independently. There is deliberately no tenant
+/// component in this key: <see cref="Messages.MessageEnvelope.MessageId"/> MUST be globally unique across
+/// tenants (a random GUID, never derived from tenant-scoped data), or a collision across two tenants is
+/// silently dropped as a false-positive duplicate.
 /// </para>
 /// <para>
 /// This store deduplicates and nothing else. It does NOT decide whether an arriving payload is older

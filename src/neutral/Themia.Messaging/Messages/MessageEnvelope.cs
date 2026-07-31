@@ -12,6 +12,15 @@ public sealed class MessageEnvelope
     /// This is the key the receiver deduplicates on, so a redelivery must carry the SAME id — a new id
     /// per attempt would defeat the inbox entirely.
     /// </summary>
+    /// <remarks>
+    /// MUST be globally unique across every tenant and every peer — generate it with
+    /// <see cref="Guid.CreateVersion7()"/> (or an equivalent random GUID), never derive it deterministically
+    /// from tenant-scoped data (e.g. a per-tenant sequence). The receiving inbox dedups on
+    /// <c>(origin, message_id)</c> with no tenant component in the key, so a deterministically-derived id
+    /// that collides across two tenants is silently treated as a redelivery of the first tenant's message
+    /// and dropped for the second — the same permanent message loss the inbox exists to prevent, just
+    /// crossing a tenant boundary instead of a crash window.
+    /// </remarks>
     public Guid MessageId { get; set; }
 
     /// <summary>The owning tenant, or <see langword="null"/> for a single-org or host-level message.</summary>
