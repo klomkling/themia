@@ -46,7 +46,7 @@ internal sealed class NotificationOutboxDispatcher : IOutboxDispatcher<ClaimedOu
         {
             // A malformed address/body (FormatException) or an undeliverable channel routed to the outbox
             // (NotSupportedException) is permanent — retrying cannot help, so dead-letter immediately.
-            return DispatchResult.Permanent(ex.Message);
+            return DispatchResult.Permanent(ex.Message, ex);
         }
     }
 

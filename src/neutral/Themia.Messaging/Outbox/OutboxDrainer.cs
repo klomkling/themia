@@ -34,7 +34,7 @@ public sealed class OutboxDrainer<TRow>(
     private const int MaxErrorLength = 1000;
 
     private readonly string leaseOwner = $"{Environment.MachineName}:{Environment.ProcessId}";
-    private DateTimeOffset lastPurgeAt = DateTimeOffset.MinValue;
+    private DateTimeOffset nextPurgeAt = DateTimeOffset.MinValue;
 
     /// <inheritdoc />
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -125,6 +125,12 @@ public sealed class OutboxDrainer<TRow>(
 
     // Retention runs on the drain loop's own connection and cadence: a dedicated scheduler would force a
     // new package dependency on every adopter purely to delete rows on a timer.
+    //
+    // Retention must never stop delivery: delivery is the drainer's job, purge is housekeeping. A purge
+    // failure (a lock-wait timeout on a large table, say) is therefore caught and logged here rather than
+    // left to propagate out of DrainOnceAsync — otherwise a single broken purge would abort every delivery
+    // cycle forever, since lastPurgeAt/nextPurgeAt never advances on failure and the next cycle would hit
+    // the same exception immediately.
     private async Task PurgeIfDueAsync(DbConnection connection, DateTimeOffset now, CancellationToken ct)
     {
         if (!options.PurgeEnabled || purgeDialect is null)
@@ -132,27 +138,40 @@ public sealed class OutboxDrainer<TRow>(
             return;
         }
 
-        if (now - lastPurgeAt < TimeSpan.FromHours(options.PurgeIntervalHours))
+        if (now < nextPurgeAt)
         {
             return;
         }
 
-        var sentDeleted = await PurgeAllAsync(
-            (c, cutoff, batch, token) => purgeDialect.PurgeSentAsync(c, cutoff, batch, token),
-            connection, now.AddDays(-options.SentRetentionDays), ct).ConfigureAwait(false);
-
-        var deadDeleted = await PurgeAllAsync(
-            (c, cutoff, batch, token) => purgeDialect.PurgeDeadAsync(c, cutoff, batch, token),
-            connection, now.AddDays(-options.DeadRetentionDays), ct).ConfigureAwait(false);
-
-        // Only advance the gate once both passes complete without throwing — a transient failure
-        // (timeout, lock conflict) must not suppress the next attempt for a full PurgeIntervalHours.
-        lastPurgeAt = now;
-
-        if (sentDeleted + deadDeleted > 0)
+        try
         {
-            logger.LogInformation(
-                "Outbox purge removed {SentDeleted} sent and {DeadDeleted} dead rows.", sentDeleted, deadDeleted);
+            var sentDeleted = await PurgeAllAsync(
+                (c, cutoff, batch, token) => purgeDialect.PurgeSentAsync(c, cutoff, batch, token),
+                connection, now.AddDays(-options.SentRetentionDays), ct).ConfigureAwait(false);
+
+            var deadDeleted = await PurgeAllAsync(
+                (c, cutoff, batch, token) => purgeDialect.PurgeDeadAsync(c, cutoff, batch, token),
+                connection, now.AddDays(-options.DeadRetentionDays), ct).ConfigureAwait(false);
+
+            nextPurgeAt = now.AddHours(options.PurgeIntervalHours);
+
+            if (sentDeleted + deadDeleted > 0)
+            {
+                logger.LogInformation(
+                    "Outbox purge removed {SentDeleted} sent and {DeadDeleted} dead rows.", sentDeleted, deadDeleted);
+            }
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw; // host stop — let the cycle observe cancellation, same as everywhere else in this file.
+        }
+        catch (Exception ex)
+        {
+            // A transient failure (timeout, lock conflict) must not suppress the next attempt for a full
+            // PurgeIntervalHours, but must also not hammer every drain cycle — retry on a slow, fixed
+            // cadence instead.
+            nextPurgeAt = now.AddHours(1);
+            logger.LogWarning(ex, "Outbox retention purge failed; will retry in 1 hour. Delivery is unaffected.");
         }
     }
 
@@ -193,7 +212,7 @@ public sealed class OutboxDrainer<TRow>(
             // A dispatcher that throws instead of reporting is treated as retryable: the drainer
             // cannot know whether the fault is permanent, and retrying a transient fault is
             // recoverable whereas dead-lettering a retryable one is not.
-            result = DispatchResult.Transient(ex.Message);
+            result = DispatchResult.Transient(ex.Message, ex);
         }
 
         if (result.Outcome == DispatchOutcome.Delivered)
@@ -213,8 +232,11 @@ public sealed class OutboxDrainer<TRow>(
         var error = result.Error ?? "Dispatcher reported failure.";
 
         // Log once, with safe context only (no recipient PII, no credentials). The drainer owns the
-        // outcome (THEMIA101: no log-and-rethrow) — record it on the row instead of propagating.
+        // outcome (THEMIA101: no log-and-rethrow) — record it on the row instead of propagating. The
+        // exception (when the dispatcher caught one) is logged for diagnosability but never persisted —
+        // last_error keeps storing just the message.
         logger.LogWarning(
+            result.Exception,
             "Outbox row {Id} failed (attempt {Attempts}): {Error}; {Outcome}.",
             row.Id,
             attempts,

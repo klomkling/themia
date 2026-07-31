@@ -8,7 +8,7 @@ internal sealed class MessageOutboxEntryConfiguration : IEntityTypeConfiguration
 {
     public void Configure(EntityTypeBuilder<MessageOutboxEntry> b)
     {
-        b.ToTable("outbox_messages", "messaging");
+        b.ToTable("messaging_outbox_messages");
         b.HasKey(x => x.Id);
         b.Property(x => x.Id).HasColumnName("id");
         b.Property(x => x.MessageId).HasColumnName("message_id");

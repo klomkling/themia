@@ -22,7 +22,7 @@ internal sealed class SqlServerMessagingDialect : IOutboxDialect<ClaimedMessageR
         WITH due AS (
             SELECT TOP (@batch) id, message_id, tenant_id, type, payload, destination, origin, entity_key,
                    version, headers, attempts, status, lease_owner, lease_expires_at
-            FROM [messaging].[outbox_messages] WITH (READPAST, UPDLOCK, ROWLOCK)
+            FROM [messaging_outbox_messages] WITH (READPAST, UPDLOCK, ROWLOCK)
             WHERE next_attempt_at <= @now
               AND (scheduled_for IS NULL OR scheduled_for <= @now)
               AND ( status IN (0, 3) OR (status = 1 AND lease_expires_at < @now) )
@@ -36,13 +36,13 @@ internal sealed class SqlServerMessagingDialect : IOutboxDialect<ClaimedMessageR
         """;
 
     private const string CompleteSql = """
-        UPDATE [messaging].[outbox_messages]
+        UPDATE [messaging_outbox_messages]
         SET status = 2, sent_at = @sentAt, lease_owner = NULL, lease_expires_at = NULL
         WHERE id = @id
         """;
 
     private const string FailSql = """
-        UPDATE [messaging].[outbox_messages]
+        UPDATE [messaging_outbox_messages]
         SET status = @status, attempts = @attempts, next_attempt_at = @next,
             last_error = @error, lease_owner = NULL, lease_expires_at = NULL
         WHERE id = @id

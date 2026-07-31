@@ -334,6 +334,22 @@ public abstract class MessagingDialectTests
         Assert.True(readmitted);
     }
 
+    // F10: origin is VARCHAR(100)/NVARCHAR(100). MySQL's old INSERT IGNORE downgraded every error class —
+    // including a truncation error — to a warning, so an over-length origin was silently truncated to fit
+    // instead of rejected, which can collapse two distinct peers sharing a 100-char prefix into one dedup
+    // key. All three engines must reject it outright rather than truncate.
+    [Fact]
+    public async Task Admission_rejects_an_over_length_origin_rather_than_silently_truncating_it()
+    {
+        await using var conn = Dialect.CreateConnection();
+        await conn.OpenAsync();
+        var messageId = Guid.CreateVersion7();
+        var overLengthOrigin = new string('x', 101);
+
+        await Assert.ThrowsAnyAsync<DbException>(
+            () => AdmissionDialect.TryAdmitAsync(conn, null, overLengthOrigin, messageId, null, TestType, default));
+    }
+
     // ---- Helpers ----
 
     private async Task ResetClaimedToPendingAsync(DateTimeOffset now)
@@ -486,8 +502,8 @@ public sealed class PostgresMessagingDialectTests : MessagingDialectTests, IAsyn
     protected override IOutboxPurgeDialect<ClaimedMessageRow> PurgeDialect => purgeDialect;
     protected override IInboxPurgeDialect InboxPurgeDialect => inboxPurgeDialect;
     protected override IInboxAdmissionDialect AdmissionDialect => admissionDialect;
-    protected override string OutboxTable => "messaging.outbox_messages";
-    protected override string InboxTable => "messaging.inbox_messages";
+    protected override string OutboxTable => "messaging_outbox_messages";
+    protected override string InboxTable => "messaging_inbox_messages";
 
     public async Task InitializeAsync()
     {
@@ -525,8 +541,8 @@ public sealed class SqlServerMessagingDialectTests : MessagingDialectTests, IAsy
     protected override IOutboxPurgeDialect<ClaimedMessageRow> PurgeDialect => purgeDialect;
     protected override IInboxPurgeDialect InboxPurgeDialect => inboxPurgeDialect;
     protected override IInboxAdmissionDialect AdmissionDialect => admissionDialect;
-    protected override string OutboxTable => "[messaging].[outbox_messages]";
-    protected override string InboxTable => "[messaging].[inbox_messages]";
+    protected override string OutboxTable => "[messaging_outbox_messages]";
+    protected override string InboxTable => "[messaging_inbox_messages]";
 
     public async Task InitializeAsync()
     {
@@ -563,8 +579,8 @@ public sealed class MySqlMessagingDialectTests : MessagingDialectTests, IAsyncLi
     protected override IOutboxPurgeDialect<ClaimedMessageRow> PurgeDialect => purgeDialect;
     protected override IInboxPurgeDialect InboxPurgeDialect => inboxPurgeDialect;
     protected override IInboxAdmissionDialect AdmissionDialect => admissionDialect;
-    protected override string OutboxTable => "outbox_messages";
-    protected override string InboxTable => "inbox_messages";
+    protected override string OutboxTable => "messaging_outbox_messages";
+    protected override string InboxTable => "messaging_inbox_messages";
 
     public async Task InitializeAsync()
     {

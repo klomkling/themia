@@ -160,26 +160,13 @@ public class MessageOutboxStoreTests
             () => new MessageOutboxStore(new RecordingRepository(), TimeProvider.System, Options())
                 .EnqueueAsync(null!, CancellationToken.None));
 
-    // F1: an explicit envelope TenantId must be carried onto the entry so it lands under that tenant
-    // instead of the ambient one the repository would otherwise stamp.
+    // F4: MessageEnvelope carries no tenant field at all — the store must never set entry.TenantId, so the
+    // repository's ambient-tenant stamping (only applied when the entity's TenantId is still null) is the
+    // ONLY way a row gets a tenant. Before this fix a caller-supplied tenant on an inserted row bypassed
+    // ThemiaDbContext.ValidateTenantWritesAsync (which only validates Modified/Deleted entries), letting a
+    // request authenticated as tenant A publish a message stamped tenant B.
     [Fact]
-    public async Task EnqueueAsync_ShouldCarryExplicitTenantId_OntoTheEntry()
-    {
-        var repository = new RecordingRepository();
-        var store = new MessageOutboxStore(repository, TimeProvider.System, Options());
-        var envelope = Valid();
-        envelope.TenantId = "tenant-x";
-
-        await store.EnqueueAsync(envelope, CancellationToken.None);
-
-        var entry = Assert.Single(repository.Added);
-        Assert.Equal("tenant-x", entry.TenantId?.Value);
-    }
-
-    // F1: a null/blank envelope TenantId must leave the entry's TenantId null so the repository's
-    // ambient-tenant stamping (only applied when the entity's TenantId is still null) still applies.
-    [Fact]
-    public async Task EnqueueAsync_ShouldLeaveTenantIdNull_WhenEnvelopeTenantIdNotSet()
+    public async Task EnqueueAsync_ShouldLeaveTenantIdNull_SoTheAmbientStampOwnsIt()
     {
         var repository = new RecordingRepository();
         var store = new MessageOutboxStore(repository, TimeProvider.System, Options());

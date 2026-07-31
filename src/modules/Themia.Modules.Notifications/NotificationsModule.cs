@@ -35,7 +35,11 @@ public sealed class NotificationsModule : ThemiaModuleBase
         name: "Themia.Notifications",
         displayName: "Notifications",
         description: "Tenant-aware notifications: transactional outbox, background drainer, multi-channel dispatcher.",
-        version: new Version(0, 6, 3, 0));
+        // Bumped for the breaking DrainSignal/INotificationsSqlDialect move into Themia.Messaging — see
+        // MIGRATION.md "Unreleased". 0.11.0 tracks the next planned release: this PR also adds the new
+        // Themia.Messaging/Themia.Modules.Messaging module, which is a MINOR bump per the versioning
+        // policy in CHANGELOG.md regardless of this breaking change on its own.
+        version: new Version(0, 11, 0, 0));
 
     /// <inheritdoc />
     public override ValueTask InitializeAsync(IServiceProvider serviceProvider, CancellationToken cancellationToken = default)

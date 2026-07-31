@@ -31,6 +31,35 @@ public class OutboxDrainerPurgeTests
             bool dead, string error, CancellationToken ct) => Task.CompletedTask;
     }
 
+    // Claims a fixed batch of rows exactly once (then nothing), so a test can assert on the delivered
+    // count returned by DrainOnceAsync while the purge that follows delivery misbehaves.
+    private sealed class ClaimingDialect(int rowCount) : IOutboxDialect<Row>
+    {
+        private bool claimed;
+
+        public DbConnection CreateConnection() => new FakeConnection();
+
+        public Task<IReadOnlyList<Row>> ClaimAsync(
+            DbConnection connection, string leaseOwner, DateTimeOffset now,
+            DateTimeOffset leaseExpiresAt, int batchSize, CancellationToken ct)
+        {
+            if (claimed)
+            {
+                return Task.FromResult<IReadOnlyList<Row>>([]);
+            }
+
+            claimed = true;
+            IReadOnlyList<Row> rows = Enumerable.Range(0, rowCount).Select(_ => new Row(Guid.NewGuid(), 0)).ToArray();
+            return Task.FromResult(rows);
+        }
+
+        public Task CompleteAsync(DbConnection c, Guid id, DateTimeOffset at, CancellationToken ct)
+            => Task.CompletedTask;
+
+        public Task FailAsync(DbConnection c, Guid id, int attempts, DateTimeOffset next,
+            bool dead, string error, CancellationToken ct) => Task.CompletedTask;
+    }
+
     private sealed class RecordingPurgeDialect : IOutboxPurgeDialect<Row>
     {
         public int SentCalls { get; private set; }
@@ -179,20 +208,68 @@ public class OutboxDrainerPurgeTests
         Assert.Equal(now.AddDays(-90), purge.LastDeadOlderThan);
     }
 
-    // A purge pass that throws (transient DB timeout, lock conflict) must not suppress the next
-    // attempt for a full PurgeIntervalHours — the interval gate may only advance after both purges
-    // complete successfully.
+    // F8: a purge failure must never propagate out of DrainOnceAsync — retention is housekeeping, and
+    // delivery is the drainer's job. Before this fix, a purge exception killed the whole delivery cycle,
+    // and because the interval gate never advanced on failure, the very next cycle threw again too,
+    // stalling delivery indefinitely.
     [Fact]
-    public async Task DrainOnce_ShouldRetryPurge_OnNextCycle_WhenPurgeFails()
+    public async Task DrainOnce_ShouldNotPropagate_WhenPurgeFails()
     {
         var purge = new ThrowingSentPurgeDialect();
-        var options = new OutboxDrainerOptions<Row> { PurgeEnabled = true, PurgeIntervalHours = 24 };
+        var options = new OutboxDrainerOptions<Row> { PurgeEnabled = true };
 
         var drainer = Build(options, purge, TimeProvider.System);
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => drainer.DrainOnceAsync(CancellationToken.None));
-        await Assert.ThrowsAsync<InvalidOperationException>(() => drainer.DrainOnceAsync(CancellationToken.None));
+        var exception = await Record.ExceptionAsync(() => drainer.DrainOnceAsync(CancellationToken.None));
 
+        Assert.Null(exception);
+        Assert.Equal(1, purge.SentCalls);
+    }
+
+    // F8: rows claimed and delivered before the purge runs must still be reported/completed even though
+    // the purge that follows throws — the drain cycle's return value (rows drained) must stay intact.
+    [Fact]
+    public async Task DrainOnce_ShouldReturnClaimedCount_WhenPurgeFailsAfterDelivery()
+    {
+        const int rowCount = 3;
+        var scopeFactory = new ServiceCollection().BuildServiceProvider().GetRequiredService<IServiceScopeFactory>();
+        var drainer = new OutboxDrainer<Row>(
+            new ClaimingDialect(rowCount),
+            new NoopDispatcher(),
+            new DrainSignal<Row>(),
+            scopeFactory,
+            new OutboxDrainerOptions<Row> { PurgeEnabled = true, MaxBatchSize = 10 },
+            TimeProvider.System,
+            NullLogger<OutboxDrainer<Row>>.Instance,
+            new ThrowingSentPurgeDialect());
+
+        var drained = await drainer.DrainOnceAsync(CancellationToken.None);
+
+        Assert.Equal(rowCount, drained);
+    }
+
+    // F8: a failed purge must retry on a slow, fixed cadence (1 hour) rather than either hammering every
+    // drain cycle or being suppressed for a full PurgeIntervalHours. Two cycles moments apart must not
+    // re-attempt the purge; advancing the clock past the 1-hour backoff must.
+    [Fact]
+    public async Task DrainOnce_ShouldRetryPurge_OneHourAfterFailure_NotOnTheImmediateNextCycle()
+    {
+        var purge = new ThrowingSentPurgeDialect();
+        var time = new MutableTimeProvider(new DateTimeOffset(2026, 7, 31, 12, 0, 0, TimeSpan.Zero));
+        var options = new OutboxDrainerOptions<Row> { PurgeEnabled = true, PurgeIntervalHours = 24 };
+
+        var drainer = Build(options, purge, time);
+
+        await drainer.DrainOnceAsync(CancellationToken.None);
+        Assert.Equal(1, purge.SentCalls);
+
+        // Same instant (no time passed): still within the 1-hour failure backoff — must not retry yet.
+        await drainer.DrainOnceAsync(CancellationToken.None);
+        Assert.Equal(1, purge.SentCalls);
+
+        // Past the 1-hour backoff: must retry.
+        time.Advance(TimeSpan.FromHours(1));
+        await drainer.DrainOnceAsync(CancellationToken.None);
         Assert.Equal(2, purge.SentCalls);
     }
 
@@ -214,6 +291,17 @@ public class OutboxDrainerPurgeTests
     private sealed class FixedTimeProvider(DateTimeOffset now) : TimeProvider
     {
         public override DateTimeOffset GetUtcNow() => now;
+    }
+
+    // Like FixedTimeProvider, but the instant can be moved forward mid-test — needed to prove the
+    // purge-failure retry backoff is time-gated rather than just "not immediately".
+    private sealed class MutableTimeProvider(DateTimeOffset now) : TimeProvider
+    {
+        private DateTimeOffset current = now;
+
+        public override DateTimeOffset GetUtcNow() => current;
+
+        public void Advance(TimeSpan by) => current += by;
     }
 
     // Minimal DbConnection stand-in: the drainer opens it but the fake dialects never use it.

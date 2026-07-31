@@ -6,9 +6,11 @@ Themia.Messaging.Outbox.DispatchOutcome.Permanent = 2 -> Themia.Messaging.Outbox
 Themia.Messaging.Outbox.DispatchOutcome.Transient = 1 -> Themia.Messaging.Outbox.DispatchOutcome
 Themia.Messaging.Outbox.DispatchResult
 Themia.Messaging.Outbox.DispatchResult.DispatchResult() -> void
-Themia.Messaging.Outbox.DispatchResult.DispatchResult(Themia.Messaging.Outbox.DispatchOutcome Outcome, string? Error) -> void
+Themia.Messaging.Outbox.DispatchResult.DispatchResult(Themia.Messaging.Outbox.DispatchOutcome Outcome, string? Error, System.Exception? Exception = null) -> void
 Themia.Messaging.Outbox.DispatchResult.Error.get -> string?
 Themia.Messaging.Outbox.DispatchResult.Error.init -> void
+Themia.Messaging.Outbox.DispatchResult.Exception.get -> System.Exception?
+Themia.Messaging.Outbox.DispatchResult.Exception.init -> void
 Themia.Messaging.Outbox.DispatchResult.Outcome.get -> Themia.Messaging.Outbox.DispatchOutcome
 Themia.Messaging.Outbox.DispatchResult.Outcome.init -> void
 Themia.Messaging.Outbox.DrainSignal<TRow>
@@ -43,7 +45,9 @@ static readonly Themia.Messaging.Outbox.BackoffPolicy.MaxDelay -> System.TimeSpa
 static Themia.Messaging.Outbox.BackoffPolicy.NextAttemptAt(System.DateTimeOffset now, int attempts) -> System.DateTimeOffset
 static Themia.Messaging.Outbox.DispatchResult.Delivered() -> Themia.Messaging.Outbox.DispatchResult
 static Themia.Messaging.Outbox.DispatchResult.Permanent(string! error) -> Themia.Messaging.Outbox.DispatchResult
+static Themia.Messaging.Outbox.DispatchResult.Permanent(string! error, System.Exception! exception) -> Themia.Messaging.Outbox.DispatchResult
 static Themia.Messaging.Outbox.DispatchResult.Transient(string! error) -> Themia.Messaging.Outbox.DispatchResult
+static Themia.Messaging.Outbox.DispatchResult.Transient(string! error, System.Exception! exception) -> Themia.Messaging.Outbox.DispatchResult
 Themia.Messaging.Inbox.IInboxStore
 Themia.Messaging.Inbox.IInboxStore.TryAdmitAsync(string! origin, System.Guid messageId, string! type, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<Themia.Messaging.Inbox.InboxAdmission>!
 Themia.Messaging.Inbox.InboxAdmission
@@ -67,8 +71,6 @@ Themia.Messaging.Messages.MessageEnvelope.Payload.get -> string!
 Themia.Messaging.Messages.MessageEnvelope.Payload.set -> void
 Themia.Messaging.Messages.MessageEnvelope.ScheduledFor.get -> System.DateTimeOffset?
 Themia.Messaging.Messages.MessageEnvelope.ScheduledFor.set -> void
-Themia.Messaging.Messages.MessageEnvelope.TenantId.get -> string?
-Themia.Messaging.Messages.MessageEnvelope.TenantId.set -> void
 Themia.Messaging.Messages.MessageEnvelope.Type.get -> string!
 Themia.Messaging.Messages.MessageEnvelope.Type.set -> void
 Themia.Messaging.Messages.MessageEnvelope.Validate() -> void

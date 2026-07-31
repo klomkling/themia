@@ -267,7 +267,7 @@ public sealed class OutboxRoundTripTests : IAsyncLifetime
         await using var connection = new NpgsqlConnection(ConnString);
         await connection.OpenAsync();
         await connection.ExecuteAsync(
-            "UPDATE messaging.outbox_messages SET next_attempt_at = @now, lease_owner = NULL, lease_expires_at = NULL WHERE message_id = @messageId",
+            "UPDATE messaging_outbox_messages SET next_attempt_at = @now, lease_owner = NULL, lease_expires_at = NULL WHERE message_id = @messageId",
             new { now = DateTimeOffset.UtcNow, messageId });
     }
 
@@ -276,7 +276,7 @@ public sealed class OutboxRoundTripTests : IAsyncLifetime
         await using var connection = new NpgsqlConnection(ConnString);
         await connection.OpenAsync();
         var row = await connection.QuerySingleAsync<(int Status, int Attempts, DateTimeOffset NextAttemptAt)>(
-            "SELECT status, attempts, next_attempt_at FROM messaging.outbox_messages WHERE message_id = @messageId",
+            "SELECT status, attempts, next_attempt_at FROM messaging_outbox_messages WHERE message_id = @messageId",
             new { messageId });
         return row;
     }
@@ -288,7 +288,7 @@ public sealed class OutboxRoundTripTests : IAsyncLifetime
         await using var connection = new NpgsqlConnection(ConnString);
         await connection.OpenAsync();
         await connection.ExecuteAsync("""
-            INSERT INTO messaging.outbox_messages
+            INSERT INTO messaging_outbox_messages
             (id, message_id, tenant_id, type, payload, destination, origin, entity_key, version, headers,
              status, attempts, next_attempt_at, scheduled_for, lease_owner, lease_expires_at, created_at, sent_at, last_error)
             VALUES
@@ -302,7 +302,7 @@ public sealed class OutboxRoundTripTests : IAsyncLifetime
         await using var connection = new NpgsqlConnection(ConnString);
         await connection.OpenAsync();
         var count = await connection.ExecuteScalarAsync<int>(
-            "SELECT COUNT(*) FROM messaging.outbox_messages WHERE id = @id", new { id });
+            "SELECT COUNT(*) FROM messaging_outbox_messages WHERE id = @id", new { id });
         return count > 0;
     }
 
@@ -310,7 +310,7 @@ public sealed class OutboxRoundTripTests : IAsyncLifetime
     {
         await using var connection = new NpgsqlConnection(ConnString);
         await connection.OpenAsync();
-        return await connection.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM messaging.outbox_messages");
+        return await connection.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM messaging_outbox_messages");
     }
 
     private async Task<int> CountByMessageIdAsync(Guid messageId)
@@ -318,7 +318,7 @@ public sealed class OutboxRoundTripTests : IAsyncLifetime
         await using var connection = new NpgsqlConnection(ConnString);
         await connection.OpenAsync();
         return await connection.ExecuteScalarAsync<int>(
-            "SELECT COUNT(*) FROM messaging.outbox_messages WHERE message_id = @messageId", new { messageId });
+            "SELECT COUNT(*) FROM messaging_outbox_messages WHERE message_id = @messageId", new { messageId });
     }
 
     private sealed class RecordingDispatcher : IOutboxDispatcher<ClaimedMessageRow>

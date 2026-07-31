@@ -14,9 +14,9 @@ internal sealed class PostgresMessagingPurgeDialect
     : IOutboxPurgeDialect<ClaimedMessageRow>, IInboxPurgeDialect
 {
     private const string PurgeSentSql = """
-        DELETE FROM messaging.outbox_messages
+        DELETE FROM messaging_outbox_messages
         WHERE ctid IN (
-            SELECT ctid FROM messaging.outbox_messages
+            SELECT ctid FROM messaging_outbox_messages
             WHERE status = 2 AND sent_at < @olderThan
             LIMIT @batch
         )
@@ -24,18 +24,18 @@ internal sealed class PostgresMessagingPurgeDialect
 
     // next_attempt_at is a deliberate proxy for time-of-death: the schema has no dedicated "died at" column.
     private const string PurgeDeadSql = """
-        DELETE FROM messaging.outbox_messages
+        DELETE FROM messaging_outbox_messages
         WHERE ctid IN (
-            SELECT ctid FROM messaging.outbox_messages
+            SELECT ctid FROM messaging_outbox_messages
             WHERE status = 4 AND next_attempt_at < @olderThan
             LIMIT @batch
         )
         """;
 
     private const string PurgeInboxSql = """
-        DELETE FROM messaging.inbox_messages
+        DELETE FROM messaging_inbox_messages
         WHERE ctid IN (
-            SELECT ctid FROM messaging.inbox_messages
+            SELECT ctid FROM messaging_inbox_messages
             WHERE received_at < @olderThan
             LIMIT @batch
         )

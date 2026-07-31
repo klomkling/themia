@@ -1,6 +1,5 @@
 using System.Text.Json;
 
-using Themia.Framework.Core.Abstractions.Tenancy;
 using Themia.Framework.Data.Abstractions.Repositories;
 using Themia.Messaging.Messages;
 using Themia.Messaging.Outbox;
@@ -27,9 +26,11 @@ internal sealed class MessageOutboxStore(
         var now = time.GetUtcNow();
         var entry = new MessageOutboxEntry
         {
-            // Only stamp when the caller left it unset — an explicit envelope value must win, and this
-            // repository only ambient-stamps the tenant when the entity's TenantId is still null.
-            TenantId = TenantId.From(message.TenantId),
+            // TenantId is deliberately left unset here: MessageEnvelope carries no tenant field (a
+            // caller-supplied tenant on an INSERT bypasses ThemiaDbContext.ValidateTenantWritesAsync, which
+            // only validates Modified/Deleted entries — an explicit value here would let a request
+            // authenticated as tenant A stamp a row as tenant B). The repository stamps the ambient tenant
+            // on insert whenever the entity's TenantId is still null, which is the only source of truth.
             MessageId = message.MessageId,
             Type = message.Type,
             Payload = message.Payload,

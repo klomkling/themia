@@ -18,10 +18,10 @@ namespace Themia.Messaging.SqlServer;
 internal sealed class SqlServerInboxAdmission : IInboxAdmissionDialect
 {
     private const string AdmitSql = """
-        INSERT INTO [messaging].[inbox_messages] (origin, message_id, tenant_id, type, received_at)
+        INSERT INTO [messaging_inbox_messages] (origin, message_id, tenant_id, type, received_at)
         SELECT @origin, @messageId, @tenantId, @type, SYSDATETIMEOFFSET()
         WHERE NOT EXISTS (
-            SELECT 1 FROM [messaging].[inbox_messages] WITH (UPDLOCK, HOLDLOCK)
+            SELECT 1 FROM [messaging_inbox_messages] WITH (UPDLOCK, HOLDLOCK)
             WHERE origin = @origin AND message_id = @messageId
         )
         """;

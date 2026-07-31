@@ -12,7 +12,7 @@ namespace Themia.Messaging.PostgreSql;
 internal sealed class PostgresInboxAdmission : IInboxAdmissionDialect
 {
     private const string AdmitSql = """
-        INSERT INTO messaging.inbox_messages (origin, message_id, tenant_id, type, received_at)
+        INSERT INTO messaging_inbox_messages (origin, message_id, tenant_id, type, received_at)
         VALUES (@origin, @messageId, @tenantId, @type, now())
         ON CONFLICT (origin, message_id) DO NOTHING
         """;

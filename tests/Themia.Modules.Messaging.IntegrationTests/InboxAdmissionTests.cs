@@ -182,9 +182,11 @@ public sealed class InboxAdmissionTests : IAsyncLifetime
         // without rebuilding the provider; falls back to "acme" when no test has set an ambient tenant.
         services.AddScoped<ITenantContext>(
             _ => new TenantContext(TenantContextAccessor.CurrentTenantId ?? new TenantId("acme")));
-        services.AddThemiaMessagingModule(o => o.Origin = "test-origin");
+        // F6: AddThemiaDapperCore() (Dapper's EntityMappingRegistry) must be registered BEFORE
+        // AddThemiaMessagingModule() so the Messaging entity mapping is actually contributed to it.
         services.AddThemiaDapperCore();
         services.AddThemiaDapperPostgres(configuration);
+        services.AddThemiaMessagingModule(o => o.Origin = "test-origin");
         services.AddThemiaMessagingPostgreSql();
         services.AddThemiaMessagingInbox();
 
@@ -200,8 +202,15 @@ public sealed class InboxAdmissionTests : IAsyncLifetime
         TenantContextAccessor.CurrentTenantId = tenant is null ? null : new TenantId(tenant);
 
         await using var scope = provider.CreateAsyncScope();
+        var uow = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
         var store = scope.ServiceProvider.GetRequiredService<IInboxStore>();
-        return await store.TryAdmitAsync(origin, messageId, TestType, CancellationToken.None);
+
+        // F1: admission now requires an ambient transaction — the caller must begin one before calling
+        // TryAdmitAsync, exactly as production code (a real state-change handler) is expected to.
+        await using var tx = await uow.BeginTransactionAsync(CancellationToken.None);
+        var admission = await store.TryAdmitAsync(origin, messageId, TestType, CancellationToken.None);
+        await tx.CommitAsync(CancellationToken.None);
+        return admission;
     }
 
     private async Task<bool> RowExistsAsync(string origin, Guid messageId)
@@ -209,7 +218,7 @@ public sealed class InboxAdmissionTests : IAsyncLifetime
         await using var connection = new NpgsqlConnection(ConnString);
         await connection.OpenAsync();
         var count = await connection.ExecuteScalarAsync<int>(
-            "SELECT COUNT(*) FROM messaging.inbox_messages WHERE origin = @origin AND message_id = @messageId",
+            "SELECT COUNT(*) FROM messaging_inbox_messages WHERE origin = @origin AND message_id = @messageId",
             new { origin, messageId });
         return count > 0;
     }
@@ -219,7 +228,7 @@ public sealed class InboxAdmissionTests : IAsyncLifetime
         await using var connection = new NpgsqlConnection(ConnString);
         await connection.OpenAsync();
         var receivedAt = await connection.ExecuteScalarAsync<DateTime>(
-            "SELECT received_at FROM messaging.inbox_messages WHERE origin = @origin AND message_id = @messageId",
+            "SELECT received_at FROM messaging_inbox_messages WHERE origin = @origin AND message_id = @messageId",
             new { origin, messageId });
         return new DateTimeOffset(DateTime.SpecifyKind(receivedAt, DateTimeKind.Utc));
     }

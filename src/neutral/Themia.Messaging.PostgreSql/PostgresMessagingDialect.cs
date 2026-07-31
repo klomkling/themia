@@ -13,7 +13,7 @@ internal sealed class PostgresMessagingDialect(string connectionString) : IOutbo
 {
     // status: 0 pending, 1 sending, 2 sent, 3 failed, 4 dead (matches OutboxStatus).
     private const string SelectDueSql = """
-        SELECT id FROM messaging.outbox_messages
+        SELECT id FROM messaging_outbox_messages
         WHERE next_attempt_at <= @now
           AND (scheduled_for IS NULL OR scheduled_for <= @now)
           AND ( status IN (0, 3) OR (status = 1 AND lease_expires_at < @now) )
@@ -23,20 +23,20 @@ internal sealed class PostgresMessagingDialect(string connectionString) : IOutbo
         """;
 
     private const string ClaimSql = """
-        UPDATE messaging.outbox_messages
+        UPDATE messaging_outbox_messages
         SET status = 1, lease_owner = @owner, lease_expires_at = @exp
         WHERE id = ANY(@ids)
         RETURNING id, message_id, tenant_id, type, payload, destination, origin, entity_key, version, headers, attempts
         """;
 
     private const string CompleteSql = """
-        UPDATE messaging.outbox_messages
+        UPDATE messaging_outbox_messages
         SET status = 2, sent_at = @sentAt, lease_owner = NULL, lease_expires_at = NULL
         WHERE id = @id
         """;
 
     private const string FailSql = """
-        UPDATE messaging.outbox_messages
+        UPDATE messaging_outbox_messages
         SET status = @status, attempts = @attempts, next_attempt_at = @next,
             last_error = @error, lease_owner = NULL, lease_expires_at = NULL
         WHERE id = @id

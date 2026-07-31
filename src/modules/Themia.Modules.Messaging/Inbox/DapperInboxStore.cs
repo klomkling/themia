@@ -25,6 +25,16 @@ internal sealed class DapperInboxStore(
         ArgumentException.ThrowIfNullOrWhiteSpace(origin);
         ArgumentException.ThrowIfNullOrWhiteSpace(type);
 
+        if (connectionContext.CurrentTransaction is null)
+        {
+            throw new InvalidOperationException(
+                "Inbox admission requires an ambient transaction: TryAdmitAsync must commit together with the "
+                + "caller's state change, or a crash between the two can drop a message permanently while "
+                + "looking like correct deduplication. Begin a unit-of-work transaction (IUnitOfWork."
+                + "BeginTransactionAsync) before calling TryAdmitAsync, and commit it after applying the "
+                + "message's effect.");
+        }
+
 #pragma warning disable THEMIA103 // Deliberate bypass: inbox admission is keyed on (origin, message id), not
         // tenant, by design — TryAdmitAsync passes tenantId through as an explicit, recorded column rather than
         // a query-level tenant filter, and IInboxAdmissionDialect.TryAdmitAsync is the one sanctioned insert

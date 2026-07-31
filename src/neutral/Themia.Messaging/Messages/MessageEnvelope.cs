@@ -23,9 +23,6 @@ public sealed class MessageEnvelope
     /// </remarks>
     public Guid MessageId { get; set; }
 
-    /// <summary>The owning tenant, or <see langword="null"/> for a single-org or host-level message.</summary>
-    public string? TenantId { get; set; }
-
     /// <summary>
     /// The logical message type the receiver routes on, e.g. <c>listing.snapshot.v1</c>. Versioning the
     /// type is the adopter's business; the framework only carries the string.

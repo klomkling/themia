@@ -10,6 +10,38 @@ with the *why* and concrete upgrade steps.
 - Each entry states: **What changed**, **Why**, and **How to upgrade** (before → after).
 - Non-breaking changes are *not* listed here — see the CHANGELOG.
 
+## Unreleased
+
+### `Themia.Modules.Notifications`: outbox drain plumbing moved into `Themia.Messaging`
+
+**What changed:** two breaking changes landed together as the shared outbox/inbox core
+(`Themia.Messaging`) was extracted so `Themia.Modules.Messaging` could reuse it:
+
+1. `DrainSignal` moved from `Themia.Modules.Notifications.Outbox.DrainSignal` (non-generic) to
+   `Themia.Messaging.Outbox.DrainSignal<TRow>` (generic). Both the namespace and the generic parameter
+   changed, so no `TypeForwardedTo` can bridge the two.
+2. Four `INotificationsSqlDialect` members — `ClaimAsync`, `CompleteAsync`, `CreateConnection`,
+   `FailAsync` — moved off `INotificationsSqlDialect` itself onto the shared
+   `Themia.Messaging.Outbox.IOutboxDialect<TRow>` base interface it now extends.
+
+**Why:** `Themia.Modules.Messaging`'s outbox needed the identical claim/lease/backoff drain loop
+Notifications already had; extracting it into a neutral, row-shape-generic `Themia.Messaging` core lets
+both modules share one implementation instead of forking it.
+
+**How to upgrade:**
+
+- **No action** if you only consume Notifications through `AddThemiaNotificationsModule(...)` and its
+  documented services (`IOutboxStore`, `INotificationDispatcher`, etc.) — the drain loop's behavior is
+  unchanged; only its internal plumbing moved.
+- **If you referenced `Themia.Modules.Notifications.Outbox.DrainSignal` directly** (e.g. to call
+  `Signal()` after your own write): change the type to
+  `Themia.Messaging.Outbox.DrainSignal<Themia.Modules.Notifications.Outbox.ClaimedOutboxRow>` and update
+  the `using`.
+- **If you implemented `INotificationsSqlDialect` directly** (a custom engine dialect): the four moved
+  members now satisfy `IOutboxDialect<ClaimedOutboxRow>` instead of being declared directly on
+  `INotificationsSqlDialect` — method signatures are unchanged, only where they're declared, so no
+  implementation code changes.
+
 ## 0.8.x → 0.9.0
 
 **Breaking: `IStorageProvider.GetPublicUrl(string key)`.** Only affects code that implements

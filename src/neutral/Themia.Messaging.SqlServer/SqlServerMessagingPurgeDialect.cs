@@ -15,18 +15,18 @@ internal sealed class SqlServerMessagingPurgeDialect
     : IOutboxPurgeDialect<ClaimedMessageRow>, IInboxPurgeDialect
 {
     private const string PurgeSentSql = """
-        DELETE TOP (@batch) FROM [messaging].[outbox_messages]
+        DELETE TOP (@batch) FROM [messaging_outbox_messages]
         WHERE status = 2 AND sent_at < @olderThan
         """;
 
     // next_attempt_at is a deliberate proxy for time-of-death: the schema has no dedicated "died at" column.
     private const string PurgeDeadSql = """
-        DELETE TOP (@batch) FROM [messaging].[outbox_messages]
+        DELETE TOP (@batch) FROM [messaging_outbox_messages]
         WHERE status = 4 AND next_attempt_at < @olderThan
         """;
 
     private const string PurgeInboxSql = """
-        DELETE TOP (@batch) FROM [messaging].[inbox_messages]
+        DELETE TOP (@batch) FROM [messaging_inbox_messages]
         WHERE received_at < @olderThan
         """;
 
