@@ -90,4 +90,45 @@ public class GoldenVectorTests
 
         Assert.Equal("2026-07-14T09:30:00.0000000Z", formatted);
     }
+
+    // Guards the fix that formats via DateTimeOffset.UtcDateTime: a non-zero source offset must still
+    // convert to UTC and render a trailing Z, not the offset itself. Prevents a future "simplification"
+    // back to formatting the DateTimeOffset directly (which renders +00:00, never Z).
+    [Fact]
+    public void FormatTimestamp_ShouldConvertANonZeroOffsetToUtc_AndStillRenderZ()
+    {
+        var formatted = ThemiaHmacV1.FormatTimestamp(
+            new DateTimeOffset(2026, 7, 14, 16, 30, 0, TimeSpan.FromHours(7)));
+
+        Assert.Equal("2026-07-14T09:30:00.0000000Z", formatted);
+    }
+
+    [Fact]
+    public void TryParseTimestamp_ShouldRoundTrip_AValidTimestamp()
+    {
+        var succeeded = ThemiaHmacV1.TryParseTimestamp("2026-07-14T09:30:00.0000000Z", out var result);
+
+        Assert.True(succeeded);
+        Assert.Equal(new DateTimeOffset(2026, 7, 14, 9, 30, 0, TimeSpan.Zero), result);
+    }
+
+    [Fact]
+    public void TryParseTimestamp_ShouldReturnFalse_ForAMalformedValue()
+    {
+        var succeeded = ThemiaHmacV1.TryParseTimestamp("not-a-timestamp", out var result);
+
+        Assert.False(succeeded);
+        Assert.Equal(default, result);
+    }
+
+    // The verifier (next task) depends on this: a peer-supplied timestamp with a non-UTC offset must
+    // still resolve to the correct instant, not be rejected or silently truncated.
+    [Fact]
+    public void TryParseTimestamp_ShouldResolveTheCorrectInstant_ForANonUtcOffset()
+    {
+        var succeeded = ThemiaHmacV1.TryParseTimestamp("2026-07-14T16:30:00.0000000+07:00", out var result);
+
+        Assert.True(succeeded);
+        Assert.Equal(new DateTimeOffset(2026, 7, 14, 9, 30, 0, TimeSpan.Zero), result);
+    }
 }
