@@ -21,7 +21,7 @@ internal sealed class SqlServerMessagingDialect : IOutboxDialect<ClaimedMessageR
     private const string ClaimSql = """
         WITH due AS (
             SELECT TOP (@batch) id, message_id, tenant_id, type, payload, destination, origin, entity_key,
-                   version, attempts, status, lease_owner, lease_expires_at
+                   version, headers, attempts, status, lease_owner, lease_expires_at
             FROM [messaging].[outbox_messages] WITH (READPAST, UPDLOCK, ROWLOCK)
             WHERE next_attempt_at <= @now
               AND (scheduled_for IS NULL OR scheduled_for <= @now)
@@ -31,7 +31,8 @@ internal sealed class SqlServerMessagingDialect : IOutboxDialect<ClaimedMessageR
         UPDATE due
         SET status = 1, lease_owner = @owner, lease_expires_at = @exp
         OUTPUT inserted.id, inserted.message_id, inserted.tenant_id, inserted.type, inserted.payload,
-               inserted.destination, inserted.origin, inserted.entity_key, inserted.version, inserted.attempts
+               inserted.destination, inserted.origin, inserted.entity_key, inserted.version, inserted.headers,
+               inserted.attempts
         """;
 
     private const string CompleteSql = """

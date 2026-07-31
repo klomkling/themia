@@ -26,7 +26,7 @@ internal sealed class PostgresMessagingDialect(string connectionString) : IOutbo
         UPDATE messaging.outbox_messages
         SET status = 1, lease_owner = @owner, lease_expires_at = @exp
         WHERE id = ANY(@ids)
-        RETURNING id, message_id, tenant_id, type, payload, destination, origin, entity_key, version, attempts
+        RETURNING id, message_id, tenant_id, type, payload, destination, origin, entity_key, version, headers, attempts
         """;
 
     private const string CompleteSql = """

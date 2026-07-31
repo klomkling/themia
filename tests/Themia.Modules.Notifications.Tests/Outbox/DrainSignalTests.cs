@@ -11,7 +11,7 @@ public class DrainSignalTests
     public async Task WaitAsync_completes_after_Signal()
     {
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-        var signal = new DrainSignal();
+        var signal = new DrainSignal<ClaimedOutboxRow>();
         var wait = signal.WaitAsync(cts.Token);
         signal.Signal();
         await wait; // does not hang
@@ -21,7 +21,7 @@ public class DrainSignalTests
     public async Task WaitAsync_completes_when_already_signaled()
     {
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-        var signal = new DrainSignal();
+        var signal = new DrainSignal<ClaimedOutboxRow>();
         signal.Signal();
         await signal.WaitAsync(cts.Token);
     }

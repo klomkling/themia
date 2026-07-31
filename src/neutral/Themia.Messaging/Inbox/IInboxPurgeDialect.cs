@@ -11,7 +11,8 @@ public interface IInboxPurgeDialect
 {
     /// <summary>
     /// Deletes up to <paramref name="batchSize"/> admission records received before
-    /// <paramref name="olderThan"/>. Batched; the caller loops until this returns 0.
+    /// <paramref name="olderThan"/>. Batched; the caller loops until a batch comes back short of
+    /// <paramref name="batchSize"/>.
     /// </summary>
     /// <remarks>
     /// Forgetting an admission record means a redelivery older than the window is processed as new. The
@@ -21,6 +22,6 @@ public interface IInboxPurgeDialect
     /// <param name="olderThan">Records received before this instant are eligible.</param>
     /// <param name="batchSize">The maximum number of rows to delete in one statement.</param>
     /// <param name="ct">A token to cancel the operation.</param>
-    /// <returns>The number of rows deleted; 0 means nothing is left.</returns>
+    /// <returns>The number of rows deleted; fewer than <paramref name="batchSize"/> means nothing is left.</returns>
     Task<int> PurgeAdmittedAsync(DbConnection connection, DateTimeOffset olderThan, int batchSize, CancellationToken ct);
 }

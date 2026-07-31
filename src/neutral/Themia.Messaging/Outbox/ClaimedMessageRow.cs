@@ -11,6 +11,7 @@ namespace Themia.Messaging.Outbox;
 /// <param name="Origin">The system that originated the message (not the last hop).</param>
 /// <param name="EntityKey">The key a staleness fence applies within, or <see langword="null"/>.</param>
 /// <param name="Version">The monotonic version for <paramref name="EntityKey"/>, or <see langword="null"/>.</param>
+/// <param name="Headers">Extra transport metadata sent alongside the payload, as JSON, or <see langword="null"/>.</param>
 /// <param name="Attempts">The number of delivery attempts already made before this claim.</param>
 public sealed record ClaimedMessageRow(
     Guid Id,
@@ -22,4 +23,5 @@ public sealed record ClaimedMessageRow(
     string Origin,
     string? EntityKey,
     long? Version,
+    string? Headers,
     int Attempts) : IClaimedRow;

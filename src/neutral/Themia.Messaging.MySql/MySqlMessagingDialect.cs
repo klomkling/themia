@@ -42,7 +42,7 @@ internal sealed class MySqlMessagingDialect : IOutboxDialect<ClaimedMessageRow>
         """;
 
     private const string SelectClaimedSql = """
-        SELECT id, message_id, tenant_id, type, payload, destination, origin, entity_key, version, attempts
+        SELECT id, message_id, tenant_id, type, payload, destination, origin, entity_key, version, headers, attempts
         FROM outbox_messages
         WHERE id IN @ids
         """;

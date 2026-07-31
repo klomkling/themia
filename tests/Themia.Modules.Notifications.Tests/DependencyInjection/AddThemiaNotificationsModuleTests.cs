@@ -30,7 +30,7 @@ public class AddThemiaNotificationsModuleTests
     [InlineData(typeof(ITenantProviderConfigStore))]
     [InlineData(typeof(IPreferenceResolver))]
     [InlineData(typeof(IProviderConfigResolver))]
-    [InlineData(typeof(DrainSignal))]
+    [InlineData(typeof(DrainSignal<ClaimedOutboxRow>))]
     public void AddThemiaNotificationsModule_ShouldRegister_ModuleService(Type serviceType)
     {
         var services = BuildServices();
@@ -43,7 +43,7 @@ public class AddThemiaNotificationsModuleTests
     {
         var services = BuildServices();
 
-        var descriptor = Assert.Single(services, d => d.ServiceType == typeof(DrainSignal));
+        var descriptor = Assert.Single(services, d => d.ServiceType == typeof(DrainSignal<ClaimedOutboxRow>));
         Assert.Equal(ServiceLifetime.Singleton, descriptor.Lifetime);
     }
 

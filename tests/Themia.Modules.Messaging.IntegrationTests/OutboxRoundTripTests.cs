@@ -17,6 +17,7 @@ using Themia.Framework.Data.EFCore.PostgreSql;
 using Themia.Messaging.Messages;
 using Themia.Messaging.Outbox;
 using Themia.Messaging.PostgreSql;
+using Themia.Modules.Messaging;
 using Themia.Modules.Messaging.Entities;
 using Themia.Modules.Messaging.Migrations;
 using Themia.Modules.Messaging.Stores;
@@ -213,6 +214,7 @@ public sealed class OutboxRoundTripTests : IAsyncLifetime
         services.AddScoped<ITenantContext>(_ => new TenantContext(new TenantId("acme")));
         services.AddThemiaPostgres<TestMessagingDbContext>(configuration);
         services.AddThemiaDataRepositories<TestMessagingDbContext>();
+        services.AddSingleton(new MessagingModuleOptions { ConnectionStringName = "Default", Origin = TestOrigin });
         services.AddScoped<IMessageOutboxStore, MessageOutboxStore>();
         services.AddThemiaMessagingPostgreSql();
 
@@ -230,7 +232,7 @@ public sealed class OutboxRoundTripTests : IAsyncLifetime
         return new OutboxDrainer<ClaimedMessageRow>(
             dialect,
             dispatcher,
-            new DrainSignal(),
+            new DrainSignal<ClaimedMessageRow>(),
             provider.GetRequiredService<IServiceScopeFactory>(),
             options,
             TimeProvider.System,

@@ -173,7 +173,7 @@ public sealed class OutboxRoundTripTests : IAsyncLifetime
         return new OutboxDrainer<ClaimedOutboxRow>(
             dialect,
             new NotificationOutboxDispatcher(),
-            new DrainSignal(),
+            new DrainSignal<ClaimedOutboxRow>(),
             provider.GetRequiredService<IServiceScopeFactory>(),
             options,
             TimeProvider.System,
@@ -197,7 +197,7 @@ public sealed class OutboxRoundTripTests : IAsyncLifetime
         return new OutboxDrainer<ClaimedOutboxRow>(
             dialect,
             new NotificationOutboxDispatcher(),
-            new DrainSignal(),
+            new DrainSignal<ClaimedOutboxRow>(),
             provider.GetRequiredService<IServiceScopeFactory>(),
             options,
             TimeProvider.System,

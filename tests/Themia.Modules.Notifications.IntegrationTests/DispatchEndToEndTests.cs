@@ -77,7 +77,7 @@ public sealed class DispatchEndToEndTests : IAsyncLifetime
         }
 
         // Kick the drainer's wake signal, then drive one drain cycle (deterministic, no timing race).
-        provider.GetRequiredService<DrainSignal>().Signal();
+        provider.GetRequiredService<DrainSignal<ClaimedOutboxRow>>().Signal();
         var drained = await DriveDrainAsync(provider);
 
         Assert.Equal(1, drained);
@@ -177,7 +177,7 @@ public sealed class DispatchEndToEndTests : IAsyncLifetime
         var drainer = new OutboxDrainer<ClaimedOutboxRow>(
             provider.GetRequiredService<INotificationsSqlDialect>(),
             new NotificationOutboxDispatcher(),
-            provider.GetRequiredService<DrainSignal>(),
+            provider.GetRequiredService<DrainSignal<ClaimedOutboxRow>>(),
             provider.GetRequiredService<IServiceScopeFactory>(),
             new OutboxDrainerOptions<ClaimedOutboxRow> { MaxAttempts = MaxAttempts, MaxBatchSize = 10 },
             TimeProvider.System,

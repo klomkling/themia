@@ -15,7 +15,7 @@ public static class NotificationsServiceCollectionExtensions
 {
     /// <summary>
     /// Adds the Notifications module's own services: the peer-agnostic stores, outbox store, preference and
-    /// provider-config resolvers, the dispatcher, the <see cref="DrainSignal"/>, and the background
+    /// provider-config resolvers, the dispatcher, the <see cref="DrainSignal{TRow}"/>, and the background
     /// <c>OutboxDrainer</c> hosted service. The adopter must ALSO register: (1) a provider dialect via
     /// <c>AddThemiaNotifications{PostgreSql|MySql|SqlServer}(...)</c> (the drainer needs <c>INotificationsSqlDialect</c>);
     /// (2) the neutral senders via <c>AddThemiaNotifications(...)</c> (the drainer needs <c>IEmailSender</c> etc.);
@@ -39,7 +39,7 @@ public static class NotificationsServiceCollectionExtensions
         services.TryAddSingleton(TimeProvider.System);
         services.AddLogging();
 
-        services.TryAddSingleton<DrainSignal>();
+        services.TryAddSingleton<DrainSignal<ClaimedOutboxRow>>();
 
         // The drain loop itself is the shared one from Themia.Messaging; map the module's options onto it
         // so adopters keep configuring drain behaviour through NotificationsModuleOptions.

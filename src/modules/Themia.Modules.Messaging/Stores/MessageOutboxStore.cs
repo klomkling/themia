@@ -1,5 +1,6 @@
 using System.Text.Json;
 
+using Themia.Framework.Core.Abstractions.Tenancy;
 using Themia.Framework.Data.Abstractions.Repositories;
 using Themia.Messaging.Messages;
 using Themia.Messaging.Outbox;
@@ -12,7 +13,8 @@ namespace Themia.Modules.Messaging.Stores;
 /// work commits, so a published message can never survive a rolled-back transaction.</summary>
 internal sealed class MessageOutboxStore(
     IRepository<MessageOutboxEntry, Guid> repository,
-    TimeProvider time) : IMessageOutboxStore
+    TimeProvider time,
+    MessagingModuleOptions options) : IMessageOutboxStore
 {
     /// <inheritdoc />
     public Task EnqueueAsync(MessageEnvelope message, CancellationToken ct = default)
@@ -25,11 +27,16 @@ internal sealed class MessageOutboxStore(
         var now = time.GetUtcNow();
         var entry = new MessageOutboxEntry
         {
+            // Only stamp when the caller left it unset — an explicit envelope value must win, and this
+            // repository only ambient-stamps the tenant when the entity's TenantId is still null.
+            TenantId = TenantId.From(message.TenantId),
             MessageId = message.MessageId,
             Type = message.Type,
             Payload = message.Payload,
             Destination = message.Destination,
-            Origin = message.Origin,
+            // The envelope's Origin wins when set; otherwise fall back to the module's configured
+            // identity. MessagingModuleOptions.Validate() already guarantees options.Origin is non-blank.
+            Origin = string.IsNullOrWhiteSpace(message.Origin) ? options.Origin : message.Origin,
             EntityKey = message.EntityKey,
             Version = message.Version,
             Headers = message.Headers is null ? null : JsonSerializer.Serialize(message.Headers),

@@ -18,7 +18,7 @@ public static class MessagingServiceCollectionExtensions
 {
     /// <summary>
     /// Adds the Messaging module's own services: the peer-agnostic outbox store, the
-    /// <see cref="DrainSignal"/>, and the shared <c>OutboxDrainer</c> hosted service. The adopter must ALSO
+    /// <see cref="DrainSignal{TRow}"/>, and the shared <c>OutboxDrainer</c> hosted service. The adopter must ALSO
     /// register a provider dialect via <c>AddThemiaMessaging{PostgreSql|MySql|SqlServer}(...)</c>, an
     /// <see cref="IOutboxDispatcher{TRow}"/> that delivers messages, and a framework data peer (EF with
     /// <c>modelBuilder.ApplyThemiaMessaging()</c>, or Dapper); then run
@@ -41,7 +41,7 @@ public static class MessagingServiceCollectionExtensions
         services.TryAddSingleton(TimeProvider.System);
         services.AddLogging();
 
-        services.TryAddSingleton<DrainSignal>();
+        services.TryAddSingleton<DrainSignal<ClaimedMessageRow>>();
 
         services.TryAddSingleton(new OutboxDrainerOptions<ClaimedMessageRow>
         {

@@ -21,6 +21,7 @@ internal sealed class MySqlMessagingPurgeDialect
         LIMIT @batch
         """;
 
+    // next_attempt_at is a deliberate proxy for time-of-death: the schema has no dedicated "died at" column.
     private const string PurgeDeadSql = """
         DELETE FROM outbox_messages
         WHERE status = 4 AND next_attempt_at < @olderThan

@@ -57,18 +57,21 @@ public class MessageEnvelopeTests
         Assert.Throws<ArgumentException>(() => envelope.Validate());
     }
 
-    // Origin is what the loop guard drops on, so an unset origin would make a forwarded message
-    // un-droppable and let a bi-directional topology cycle.
+    // F2: Origin is no longer required on the envelope itself — a caller may leave it unset and let the
+    // module's configured MessagingModuleOptions.Origin fill in at enqueue time (MessageOutboxStore).
+    // Validate() has no access to that configuration, so it must not reject a blank Origin.
     [Theory]
     [InlineData(null)]
     [InlineData("")]
     [InlineData("   ")]
-    public void Validate_ShouldThrow_WhenOriginIsMissing(string? origin)
+    public void Validate_ShouldSucceed_WhenOriginIsMissing(string? origin)
     {
         var envelope = Valid();
         envelope.Origin = origin!;
 
-        Assert.Throws<ArgumentException>(() => envelope.Validate());
+        var exception = Record.Exception(() => envelope.Validate());
+
+        Assert.Null(exception);
     }
 
     // A version with no entity key scopes to nothing, so it would fence nothing while looking like it does.

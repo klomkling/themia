@@ -14,13 +14,14 @@ public interface IOutboxPurgeDialect<TRow>
     /// <summary>
     /// Deletes up to <paramref name="batchSize"/> successfully-sent rows older than
     /// <paramref name="olderThan"/>. Batched deliberately: an unbounded DELETE on a large outbox holds
-    /// long locks and bloats the table, so the caller loops until this returns 0.
+    /// long locks and bloats the table, so the caller loops until a batch comes back short of
+    /// <paramref name="batchSize"/>.
     /// </summary>
     /// <param name="connection">An open connection.</param>
     /// <param name="olderThan">Rows sent before this instant are eligible.</param>
     /// <param name="batchSize">The maximum number of rows to delete in one statement.</param>
     /// <param name="ct">A token to cancel the operation.</param>
-    /// <returns>The number of rows deleted; 0 means nothing is left.</returns>
+    /// <returns>The number of rows deleted; fewer than <paramref name="batchSize"/> means nothing is left.</returns>
     Task<int> PurgeSentAsync(DbConnection connection, DateTimeOffset olderThan, int batchSize, CancellationToken ct);
 
     /// <summary>
@@ -31,6 +32,6 @@ public interface IOutboxPurgeDialect<TRow>
     /// <param name="olderThan">Rows that died before this instant are eligible.</param>
     /// <param name="batchSize">The maximum number of rows to delete in one statement.</param>
     /// <param name="ct">A token to cancel the operation.</param>
-    /// <returns>The number of rows deleted; 0 means nothing is left.</returns>
+    /// <returns>The number of rows deleted; fewer than <paramref name="batchSize"/> means nothing is left.</returns>
     Task<int> PurgeDeadAsync(DbConnection connection, DateTimeOffset olderThan, int batchSize, CancellationToken ct);
 }

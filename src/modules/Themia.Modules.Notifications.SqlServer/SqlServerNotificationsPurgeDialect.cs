@@ -18,6 +18,7 @@ internal sealed class SqlServerNotificationsPurgeDialect : IOutboxPurgeDialect<C
         WHERE status = 2 AND sent_at < @olderThan
         """;
 
+    // next_attempt_at is a deliberate proxy for time-of-death: the schema has no dedicated "died at" column.
     private const string PurgeDeadSql = """
         DELETE TOP (@batch) FROM [notifications].[outbox_messages]
         WHERE status = 4 AND next_attempt_at < @olderThan

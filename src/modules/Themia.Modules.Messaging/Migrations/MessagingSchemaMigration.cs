@@ -19,8 +19,6 @@ public sealed class MessagingSchemaMigration : Migration
     /// <inheritdoc />
     public override void Up()
     {
-        Create.Schema(SchemaName);
-
         IfDatabase("postgresql").Delegate(() => CreateTables(c => c.AsDateTimeOffset()));
         IfDatabase("mysql").Delegate(() => CreateTables(c => c.AsCustom("DATETIME(6)")));
         IfDatabase("sqlserver").Delegate(() => CreateTables(c => c.AsDateTimeOffset()));
@@ -40,6 +38,14 @@ public sealed class MessagingSchemaMigration : Migration
 
     private void CreateTables(DateTimeType dt)
     {
+        // Guarded so the unsupported-provider branch below (which the earlier IfDatabase() delegates never
+        // reach for provider) can never observe a half-created schema: create it only once we know the
+        // provider is one CreateTables actually handles.
+        if (!Schema.Schema(SchemaName).Exists())
+        {
+            Create.Schema(SchemaName);
+        }
+
         // Operational outbox row — not soft-deletable (purged, not tombstoned; the purge is implemented).
         var outbox = Create.Table("outbox_messages").InSchema(SchemaName)
             .WithColumn("id").AsGuid().NotNullable().PrimaryKey()

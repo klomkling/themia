@@ -20,6 +20,7 @@ internal sealed class PostgresNotificationsPurgeDialect : IOutboxPurgeDialect<Cl
         )
         """;
 
+    // next_attempt_at is a deliberate proxy for time-of-death: the schema has no dedicated "died at" column.
     private const string PurgeDeadSql = """
         DELETE FROM notifications.outbox_messages
         WHERE ctid IN (

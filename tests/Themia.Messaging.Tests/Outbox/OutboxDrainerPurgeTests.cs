@@ -98,7 +98,7 @@ public class OutboxDrainerPurgeTests
         return new OutboxDrainer<Row>(
             new EmptyDialect(),
             new NoopDispatcher(),
-            new DrainSignal(),
+            new DrainSignal<Row>(),
             services.GetRequiredService<IServiceScopeFactory>(),
             options,
             time,

@@ -139,7 +139,7 @@ public abstract class MessagingDialectTests
         await InsertPendingRowAsync(
             id, messageId, nextAttemptAt: now, scheduledFor: null,
             tenantId: "tenant-x", type: "type-x", payload: "{\"x\":1}", destination: "dest-x",
-            entityKey: "entity-x", version: 7);
+            entityKey: "entity-x", version: 7, headers: """{"x-trace":"abc"}""");
 
         await using var conn = Dialect.CreateConnection();
         await conn.OpenAsync();
@@ -154,6 +154,8 @@ public abstract class MessagingDialectTests
         Assert.Equal(TestOrigin, row.Origin);
         Assert.Equal("entity-x", row.EntityKey);
         Assert.Equal(7, row.Version);
+        // F3: headers are selected by the claim query, not just stored — a round-tripped row must carry them.
+        Assert.Equal("""{"x-trace":"abc"}""", row.Headers);
         Assert.Equal(0, row.Attempts);
     }
 
@@ -302,6 +304,36 @@ public abstract class MessagingDialectTests
         Assert.True(receivedAt >= before.AddMinutes(-1) && receivedAt <= DateTimeOffset.UtcNow.AddMinutes(1));
     }
 
+    // F5: every other admission test above passes transaction: null (autocommit). The production path
+    // admits inside the CALLER's ambient transaction — on SQL Server that means the WITH (UPDLOCK,
+    // HOLDLOCK) existence-check lock is held until the outer commit/rollback, not released immediately.
+    // A rolled-back admission must not leave the message admitted, and the row must become admittable
+    // again afterwards — otherwise a genuine redelivery would be silently dropped as a duplicate forever.
+    [Fact]
+    public async Task Admission_rolled_back_in_the_callers_transaction_can_be_admitted_again()
+    {
+        await using var conn = Dialect.CreateConnection();
+        await conn.OpenAsync();
+        var messageId = Guid.CreateVersion7();
+
+        await using (var tx = await conn.BeginTransactionAsync())
+        {
+            var admitted = await AdmissionDialect.TryAdmitAsync(conn, tx, "peer-a", messageId, null, TestType, default);
+            Assert.True(admitted);
+
+            await tx.RollbackAsync();
+        }
+
+        // The rollback must have undone the insert entirely — a fresh, unrelated connection sees nothing.
+        await using var verifyConn = Dialect.CreateConnection();
+        await verifyConn.OpenAsync();
+        Assert.False(await InboxRowExistsAsync(verifyConn, "peer-a", messageId));
+
+        // And the message must be admittable again, exactly as if it had never been attempted.
+        var readmitted = await AdmissionDialect.TryAdmitAsync(conn, null, "peer-a", messageId, null, TestType, default);
+        Assert.True(readmitted);
+    }
+
     // ---- Helpers ----
 
     private async Task ResetClaimedToPendingAsync(DateTimeOffset now)
@@ -325,32 +357,32 @@ public abstract class MessagingDialectTests
     private async Task InsertPendingRowAsync(
         Guid id, Guid messageId, DateTimeOffset nextAttemptAt, DateTimeOffset? scheduledFor,
         string? tenantId = null, string type = TestType, string payload = "{}", string destination = "peer-a",
-        string? entityKey = null, long? version = null)
+        string? entityKey = null, long? version = null, string? headers = null)
         => await InsertOutboxRowAsync(
-            id, messageId, tenantId, type, payload, destination, entityKey, version,
+            id, messageId, tenantId, type, payload, destination, entityKey, version, headers,
             status: 0, attempts: 0, nextAttemptAt, scheduledFor, leaseOwner: null, leaseExpiresAt: null, sentAt: null);
 
     private async Task InsertSendingRowAsync(Guid id, Guid messageId, string leaseOwner, DateTimeOffset leaseExpiresAt)
         => await InsertOutboxRowAsync(
-            id, messageId, null, TestType, "{}", "peer-a", null, null,
+            id, messageId, null, TestType, "{}", "peer-a", null, null, null,
             status: 1, attempts: 0, nextAttemptAt: DateTimeOffset.UtcNow.AddMinutes(-5), scheduledFor: null,
             leaseOwner, leaseExpiresAt, sentAt: null);
 
     private async Task InsertSentRowAsync(Guid id, Guid messageId, DateTimeOffset sentAt)
         => await InsertOutboxRowAsync(
-            id, messageId, null, TestType, "{}", "peer-a", null, null,
+            id, messageId, null, TestType, "{}", "peer-a", null, null, null,
             status: 2, attempts: 1, nextAttemptAt: sentAt, scheduledFor: null,
             leaseOwner: null, leaseExpiresAt: null, sentAt);
 
     private async Task InsertDeadRowAsync(Guid id, Guid messageId, DateTimeOffset nextAttemptAt)
         => await InsertOutboxRowAsync(
-            id, messageId, null, TestType, "{}", "peer-a", null, null,
+            id, messageId, null, TestType, "{}", "peer-a", null, null, null,
             status: 4, attempts: 5, nextAttemptAt, scheduledFor: null,
             leaseOwner: null, leaseExpiresAt: null, sentAt: null);
 
     private async Task InsertOutboxRowAsync(
         Guid id, Guid messageId, string? tenantId, string type, string payload, string destination,
-        string? entityKey, long? version, int status, int attempts, DateTimeOffset nextAttemptAt,
+        string? entityKey, long? version, string? headers, int status, int attempts, DateTimeOffset nextAttemptAt,
         DateTimeOffset? scheduledFor, string? leaseOwner, DateTimeOffset? leaseExpiresAt, DateTimeOffset? sentAt)
     {
         await using var conn = Dialect.CreateConnection();
@@ -360,7 +392,7 @@ public abstract class MessagingDialectTests
             (id, message_id, tenant_id, type, payload, destination, origin, entity_key, version, headers,
              status, attempts, next_attempt_at, scheduled_for, lease_owner, lease_expires_at, created_at, sent_at, last_error)
             VALUES
-            (@id, @messageId, @tenantId, @type, @payload, @destination, @origin, @entityKey, @version, NULL,
+            (@id, @messageId, @tenantId, @type, @payload, @destination, @origin, @entityKey, @version, @headers,
              @status, @attempts, @nextAttemptAt, @scheduledFor, @leaseOwner, @leaseExpiresAt, @nextAttemptAt, @sentAt, NULL)
             """, new
         {
@@ -373,6 +405,7 @@ public abstract class MessagingDialectTests
             origin = TestOrigin,
             entityKey,
             version,
+            headers,
             status,
             attempts,
             nextAttemptAt,

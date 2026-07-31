@@ -23,7 +23,7 @@ namespace Themia.Messaging.Outbox;
 public sealed class OutboxDrainer<TRow>(
     IOutboxDialect<TRow> dialect,
     IOutboxDispatcher<TRow> dispatcher,
-    DrainSignal signal,
+    DrainSignal<TRow> signal,
     IServiceScopeFactory scopeFactory,
     OutboxDrainerOptions<TRow> options,
     TimeProvider time,
