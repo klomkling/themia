@@ -25,5 +25,6 @@
     <ProjectReference Include="../../src/modules/Themia.Modules.Messaging/Themia.Modules.Messaging.csproj" />
     <ProjectReference Include="../../src/neutral/Themia.Messaging.PostgreSql/Themia.Messaging.PostgreSql.csproj" />
     <ProjectReference Include="../../src/framework/Themia.Framework.Data.EFCore.PostgreSql/Themia.Framework.Data.EFCore.PostgreSql.csproj" />
+    <ProjectReference Include="../../src/framework/Themia.Framework.Data.Dapper.PostgreSql/Themia.Framework.Data.Dapper.PostgreSql.csproj" />
   </ItemGroup>
 </Project>

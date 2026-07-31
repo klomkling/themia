@@ -113,3 +113,5 @@ Themia.Messaging.Outbox.OutboxDrainerOptions<TRow>.PurgeIntervalHours.get -> int
 Themia.Messaging.Outbox.OutboxDrainerOptions<TRow>.PurgeIntervalHours.set -> void
 Themia.Messaging.Outbox.OutboxDrainerOptions<TRow>.SentRetentionDays.get -> int
 Themia.Messaging.Outbox.OutboxDrainerOptions<TRow>.SentRetentionDays.set -> void
+Themia.Messaging.Inbox.IInboxAdmissionDialect
+Themia.Messaging.Inbox.IInboxAdmissionDialect.TryAdmitAsync(System.Data.Common.DbConnection! connection, System.Data.Common.DbTransaction? transaction, string! origin, System.Guid messageId, string? tenantId, string! type, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<bool>!

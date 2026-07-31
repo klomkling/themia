@@ -41,6 +41,7 @@ public static class ServiceCollectionExtensions
             sp => sp.GetRequiredService<PostgresMessagingPurgeDialect>());
         services.TryAddSingleton<IInboxPurgeDialect>(
             sp => sp.GetRequiredService<PostgresMessagingPurgeDialect>());
+        services.TryAddSingleton<IInboxAdmissionDialect, PostgresInboxAdmission>();
 
         return services;
     }

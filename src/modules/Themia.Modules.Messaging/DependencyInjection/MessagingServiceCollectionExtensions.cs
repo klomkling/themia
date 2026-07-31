@@ -1,8 +1,13 @@
+using System.Linq;
+
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
+using Themia.Framework.Data.Dapper.Connection;
 using Themia.Framework.Data.Dapper.Mapping;
+using Themia.Messaging.Inbox;
 using Themia.Messaging.Outbox;
+using Themia.Modules.Messaging.Inbox;
 using Themia.Modules.Messaging.Mapping;
 using Themia.Modules.Messaging.Stores;
 
@@ -53,6 +58,39 @@ public static class MessagingServiceCollectionExtensions
 
         ContributeDapperMappings(services);
         services.AddHostedService<OutboxDrainer<ClaimedMessageRow>>();
+
+        return services;
+    }
+
+    /// <summary>
+    /// Adds the deduplicating inbox. REQUIRES the Dapper data peer: admission must commit inside the
+    /// caller's transaction, and only the Dapper peer exposes an ambient connection. Throws at startup on
+    /// an EF-only host rather than degrading to a non-transactional admission that could lose messages.
+    /// </summary>
+    /// <remarks>
+    /// <b>Registration order matters.</b> Call <c>AddThemiaDapper{Postgres|MySql|SqlServer}(...)</c>
+    /// (and the provider's messaging dialect, e.g. <c>AddThemiaMessagingPostgreSql(...)</c>) BEFORE this
+    /// method. The Dapper-peer check below scans the collection built so far, so calling this method first
+    /// throws even on a host that registers the Dapper peer later.
+    /// </remarks>
+    /// <param name="services">The service collection.</param>
+    /// <returns>The same <see cref="IServiceCollection"/> for chaining.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="services"/> is null.</exception>
+    /// <exception cref="InvalidOperationException">No Dapper data peer is registered yet.</exception>
+    public static IServiceCollection AddThemiaMessagingInbox(this IServiceCollection services)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+
+        if (services.All(d => d.ServiceType != typeof(IDapperConnectionContext)))
+        {
+            throw new InvalidOperationException(
+                "AddThemiaMessagingInbox requires the Dapper data peer: register AddThemiaDapper{Postgres|MySql|SqlServer}(...) "
+                + "BEFORE calling AddThemiaMessagingInbox. The inbox is not supported on the EF peer because admission must "
+                + "commit inside the caller's transaction, and Themia.Framework.Data.EFCore exposes no ambient connection.");
+        }
+
+        services.TryAddScoped<IInboxStore, DapperInboxStore>();
+        services.AddHostedService<InboxPurgeService>();
 
         return services;
     }
