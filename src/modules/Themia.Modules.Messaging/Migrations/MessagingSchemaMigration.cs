@@ -28,6 +28,14 @@ public sealed class MessagingSchemaMigration : Migration
         IfDatabase("postgresql").Delegate(() => CreateIndexes("\"messaging\".\"outbox_messages\""));
         IfDatabase("sqlserver").Delegate(() => CreateIndexes("[messaging].[outbox_messages]"));
         IfDatabase("mysql").Delegate(() => CreateIndexes("outbox_messages"));
+
+        IfDatabase(p =>
+                !p.StartsWith("Postgres", StringComparison.OrdinalIgnoreCase) &&
+                !p.StartsWith("MySql", StringComparison.OrdinalIgnoreCase) &&
+                !p.StartsWith("SqlServer", StringComparison.OrdinalIgnoreCase))
+            .Delegate(() => throw new NotSupportedException(
+                "Themia.Modules.Messaging supports only PostgreSQL, MySQL, and SQL Server. The active " +
+                "database provider is not supported; add a migration branch for it."));
     }
 
     private void CreateTables(DateTimeType dt)
