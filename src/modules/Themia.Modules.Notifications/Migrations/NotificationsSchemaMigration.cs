@@ -49,7 +49,8 @@ public sealed class NotificationsSchemaMigration : Migration
             Create.Schema(SchemaName);
         }
 
-        // Operational outbox row — not soft-deletable (purged, not tombstoned).
+        // Operational outbox row — not soft-deletable. Terminal rows are deleted by the retention purge,
+        // which is OPT-IN via NotificationsModuleOptions.PurgeEnabled; without it this table grows forever.
         var outbox = Create.Table("outbox_messages").InSchema(SchemaName)
             .WithColumn("id").AsGuid().NotNullable().PrimaryKey()
             .WithColumn("tenant_id").AsString(100).Nullable()

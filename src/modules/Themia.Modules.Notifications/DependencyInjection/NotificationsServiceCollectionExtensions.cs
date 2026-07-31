@@ -49,6 +49,9 @@ public static class NotificationsServiceCollectionExtensions
             MaxBatchSize = options.MaxBatchSize,
             MaxAttempts = options.MaxAttempts,
             LeaseSeconds = options.LeaseSeconds,
+            PurgeEnabled = options.PurgeEnabled,
+            SentRetentionDays = options.SentRetentionDays,
+            DeadRetentionDays = options.DeadRetentionDays,
         });
         services.TryAddSingleton<IOutboxDispatcher<ClaimedOutboxRow>, NotificationOutboxDispatcher>();
         services.TryAddSingleton<IOutboxDialect<ClaimedOutboxRow>>(sp => sp.GetRequiredService<INotificationsSqlDialect>());

@@ -84,4 +84,37 @@ public class AddThemiaNotificationsModuleTests
 
         Assert.Throws<ArgumentException>(options.Validate);
     }
+
+    // Purge must be OFF unless the adopter asks for it: enabling retention on an existing deployment
+    // deletes historical sent rows on the first run, which must never arrive via a version bump.
+    [Fact]
+    public void AddThemiaNotificationsModule_ShouldDefault_PurgeDisabled()
+    {
+        var services = BuildServices();
+        var provider = services.BuildServiceProvider();
+
+        var options = provider.GetRequiredService<OutboxDrainerOptions<ClaimedOutboxRow>>();
+
+        Assert.False(options.PurgeEnabled);
+    }
+
+    [Fact]
+    public void AddThemiaNotificationsModule_ShouldPropagate_PurgeSettings_WhenEnabled()
+    {
+        var services = new ServiceCollection();
+        services.AddThemiaNotificationsModule(o =>
+        {
+            o.ConnectionStringName = "X";
+            o.PurgeEnabled = true;
+            o.SentRetentionDays = 3;
+            o.DeadRetentionDays = 45;
+        });
+        var provider = services.BuildServiceProvider();
+
+        var options = provider.GetRequiredService<OutboxDrainerOptions<ClaimedOutboxRow>>();
+
+        Assert.True(options.PurgeEnabled);
+        Assert.Equal(3, options.SentRetentionDays);
+        Assert.Equal(45, options.DeadRetentionDays);
+    }
 }

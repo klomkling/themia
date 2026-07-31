@@ -11,6 +11,12 @@ Themia.Modules.Notifications.NotificationsModuleOptions.MaxAttempts.get -> int
 Themia.Modules.Notifications.NotificationsModuleOptions.MaxAttempts.set -> void
 Themia.Modules.Notifications.NotificationsModuleOptions.LeaseSeconds.get -> int
 Themia.Modules.Notifications.NotificationsModuleOptions.LeaseSeconds.set -> void
+Themia.Modules.Notifications.NotificationsModuleOptions.PurgeEnabled.get -> bool
+Themia.Modules.Notifications.NotificationsModuleOptions.PurgeEnabled.set -> void
+Themia.Modules.Notifications.NotificationsModuleOptions.SentRetentionDays.get -> int
+Themia.Modules.Notifications.NotificationsModuleOptions.SentRetentionDays.set -> void
+Themia.Modules.Notifications.NotificationsModuleOptions.DeadRetentionDays.get -> int
+Themia.Modules.Notifications.NotificationsModuleOptions.DeadRetentionDays.set -> void
 Themia.Modules.Notifications.NotificationsModuleOptions.Validate() -> void
 Themia.Modules.Notifications.Entities.OutboxStatus
 Themia.Modules.Notifications.Entities.OutboxStatus.Pending = 0 -> Themia.Modules.Notifications.Entities.OutboxStatus
@@ -100,6 +106,10 @@ Themia.Modules.Notifications.Migrations.NotificationsSchemaMigration
 Themia.Modules.Notifications.Migrations.NotificationsSchemaMigration.NotificationsSchemaMigration() -> void
 override Themia.Modules.Notifications.Migrations.NotificationsSchemaMigration.Up() -> void
 override Themia.Modules.Notifications.Migrations.NotificationsSchemaMigration.Down() -> void
+Themia.Modules.Notifications.Migrations.NotificationsPurgeIndexMigration
+Themia.Modules.Notifications.Migrations.NotificationsPurgeIndexMigration.NotificationsPurgeIndexMigration() -> void
+override Themia.Modules.Notifications.Migrations.NotificationsPurgeIndexMigration.Up() -> void
+override Themia.Modules.Notifications.Migrations.NotificationsPurgeIndexMigration.Down() -> void
 Themia.Modules.Notifications.EntityConfiguration.ThemiaNotificationsModelBuilderExtensions
 static Themia.Modules.Notifications.EntityConfiguration.ThemiaNotificationsModelBuilderExtensions.ApplyThemiaNotifications(this Microsoft.EntityFrameworkCore.ModelBuilder! modelBuilder) -> Microsoft.EntityFrameworkCore.ModelBuilder!
 Themia.Modules.Notifications.Mapping.NotificationsDapperMappings
