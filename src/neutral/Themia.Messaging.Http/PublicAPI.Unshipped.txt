@@ -1,0 +1,8 @@
+#nullable enable
+Themia.Messaging.Http.DependencyInjection.HttpServiceCollectionExtensions
+Themia.Messaging.Http.HttpMessageDispatcher
+Themia.Messaging.Http.HttpMessageDispatcher.DispatchAsync(System.IServiceProvider! scopedServices, Themia.Messaging.Outbox.ClaimedMessageRow! row, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<Themia.Messaging.Outbox.DispatchResult>!
+Themia.Messaging.Http.HttpMessageDispatcher.HttpMessageDispatcher(System.Net.Http.IHttpClientFactory! httpClientFactory, Themia.Messaging.Hmac.HmacOptions! hmacOptions, Microsoft.Extensions.Logging.ILogger<Themia.Messaging.Http.HttpMessageDispatcher!>! logger) -> void
+Themia.Messaging.Http.HttpStatusClassifier
+static Themia.Messaging.Http.DependencyInjection.HttpServiceCollectionExtensions.AddThemiaMessagingHttp(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static Themia.Messaging.Http.HttpStatusClassifier.Classify(int status) -> Themia.Messaging.Outbox.DispatchOutcome
