@@ -15,10 +15,6 @@ public sealed class MessagingModule : ThemiaModuleBase
     private readonly MigrationEngine engine;
     private readonly MessagingModuleOptions options;
 
-    /// <summary>Creates the module with default options.</summary>
-    /// <param name="engine">The migration engine for the schema.</param>
-    public MessagingModule(MigrationEngine engine) : this(engine, new MessagingModuleOptions()) { }
-
     /// <summary>Creates the module with explicit options.</summary>
     /// <param name="engine">The migration engine for the schema.</param>
     /// <param name="options">The module options.</param>

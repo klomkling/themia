@@ -1,8 +1,9 @@
 #nullable enable
 Themia.Modules.Messaging.Mapping.MessagingDapperMappings
 static Themia.Modules.Messaging.Mapping.MessagingDapperMappings.Apply(Themia.Framework.Data.Dapper.Mapping.EntityMappingRegistry! registry) -> void
+Themia.Modules.Messaging.EntityConfiguration.ThemiaMessagingModelBuilderExtensions
+static Themia.Modules.Messaging.EntityConfiguration.ThemiaMessagingModelBuilderExtensions.ApplyThemiaMessaging(this Microsoft.EntityFrameworkCore.ModelBuilder! modelBuilder) -> Microsoft.EntityFrameworkCore.ModelBuilder!
 Themia.Modules.Messaging.MessagingModule
-Themia.Modules.Messaging.MessagingModule.MessagingModule(Themia.Data.Migrations.MigrationEngine engine) -> void
 Themia.Modules.Messaging.MessagingModule.MessagingModule(Themia.Data.Migrations.MigrationEngine engine, Themia.Modules.Messaging.MessagingModuleOptions! options) -> void
 Themia.Modules.Messaging.DependencyInjection.MessagingServiceCollectionExtensions
 static Themia.Modules.Messaging.DependencyInjection.MessagingServiceCollectionExtensions.AddThemiaMessagingModule(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Themia.Modules.Messaging.MessagingModuleOptions!>? configure = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
