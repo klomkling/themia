@@ -17,6 +17,8 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
     <PackageReference Include="Testcontainers.PostgreSql" />
+    <PackageReference Include="Testcontainers.MsSql" />
+    <PackageReference Include="Testcontainers.MySql" />
     <PackageReference Include="Npgsql" />
     <PackageReference Include="Microsoft.Extensions.Configuration" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
@@ -24,6 +26,8 @@
   <ItemGroup>
     <ProjectReference Include="../../src/modules/Themia.Modules.Messaging/Themia.Modules.Messaging.csproj" />
     <ProjectReference Include="../../src/neutral/Themia.Messaging.PostgreSql/Themia.Messaging.PostgreSql.csproj" />
+    <ProjectReference Include="../../src/neutral/Themia.Messaging.MySql/Themia.Messaging.MySql.csproj" />
+    <ProjectReference Include="../../src/neutral/Themia.Messaging.SqlServer/Themia.Messaging.SqlServer.csproj" />
     <ProjectReference Include="../../src/framework/Themia.Framework.Data.EFCore.PostgreSql/Themia.Framework.Data.EFCore.PostgreSql.csproj" />
     <ProjectReference Include="../../src/framework/Themia.Framework.Data.Dapper.PostgreSql/Themia.Framework.Data.Dapper.PostgreSql.csproj" />
   </ItemGroup>

@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Themia.Messaging.Outbox;
 using Themia.Modules.Notifications.Outbox;
 
 namespace Themia.Modules.Notifications.SqlServer;
@@ -34,6 +35,8 @@ public static class ServiceCollectionExtensions
                     $"Connection string '{connectionStringName}' was not found.");
             return new SqlServerNotificationsDialect(connectionString);
         });
+
+        services.TryAddSingleton<IOutboxPurgeDialect<ClaimedOutboxRow>, SqlServerNotificationsPurgeDialect>();
 
         return services;
     }
