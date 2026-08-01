@@ -11,10 +11,24 @@ public static class HmacServiceCollectionExtensions
     /// <param name="configure">Registers peers via <see cref="HmacOptions.AddPeer"/>.</param>
     /// <returns>The same <paramref name="services"/> for chaining.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="services"/> or <paramref name="configure"/> is null.</exception>
+    /// <exception cref="InvalidOperationException">
+    /// <see cref="HmacOptions"/> is already registered. <c>TryAddSingleton</c> would silently discard the
+    /// second call's <paramref name="configure"/> — and every peer it registered — because the type is
+    /// already present; in a modular host where two modules each call this method, the second module's
+    /// peers would vanish and surface later as 401s on receive or Permanent dead-letters on send.
+    /// </exception>
     public static IServiceCollection AddThemiaMessagingHmac(this IServiceCollection services, Action<HmacOptions> configure)
     {
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(configure);
+
+        if (services.Any(d => d.ServiceType == typeof(HmacOptions)))
+        {
+            throw new InvalidOperationException(
+                "AddThemiaMessagingHmac has already been called: HmacOptions is already registered. Calling "
+                + "it again would silently discard this call's peers instead of adding to the existing "
+                + "registry. Register all peers in a single AddThemiaMessagingHmac(...) call.");
+        }
 
         var options = new HmacOptions();
         configure(options);

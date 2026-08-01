@@ -228,6 +228,35 @@ public class HttpMessageDispatcherTests
         Assert.NotEqual("forged-signature-attempt", signatures!.Single());
     }
 
+    // F9 (final whole-branch review): envelope header values go out via TryAddWithoutValidation, which
+    // skips .NET's normal header-value validation. A control character in an adopter-supplied value could
+    // throw at send time from outside the two existing catch clauses, escaping DispatchAsync unhandled.
+    // A value containing CR or LF must be skipped, not sent and not allowed to blow up delivery of an
+    // otherwise valid, signed row.
+    [Fact]
+    public async Task DispatchAsync_ShouldSkipEnvelopeHeaderValues_ContainingCarriageReturnOrLineFeed()
+    {
+        var options = BuildOptions();
+        var handler = new StubHandler(HttpStatusCode.OK);
+        var dispatcher = BuildDispatcher(options, handler);
+        var envelopeHeaders = JsonSerializer.Serialize(new Dictionary<string, string>
+        {
+            ["X-Injected"] = "value\r\nX-Smuggled: evil",
+            ["X-Also-Bad"] = "line1\nline2",
+            ["X-Fine"] = "a normal value",
+        });
+        var row = BuildRow(headers: envelopeHeaders);
+
+        var result = await dispatcher.DispatchAsync(new NullServiceProvider(), row, CancellationToken.None);
+
+        Assert.Equal(DispatchOutcome.Delivered, result.Outcome);
+        var request = handler.LastRequest!;
+        Assert.False(request.Headers.Contains("X-Injected"));
+        Assert.False(request.Headers.Contains("X-Also-Bad"));
+        Assert.True(request.Headers.TryGetValues("X-Fine", out var fine));
+        Assert.Equal("a normal value", fine!.Single());
+    }
+
     [Fact]
     public async Task DispatchAsync_ShouldStillDeliver_WhenEnvelopeHeadersJsonIsMalformed()
     {

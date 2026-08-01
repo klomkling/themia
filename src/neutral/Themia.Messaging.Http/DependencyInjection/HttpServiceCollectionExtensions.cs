@@ -39,6 +39,17 @@ public static class HttpServiceCollectionExtensions
         }
 
         services.AddHttpClient();
+
+        // Peer clients are named dynamically (the peer's name, unknown at registration time), so the
+        // default cannot be set via a named AddHttpClient(...) builder — ConfigureHttpClientDefaults
+        // applies to every client the factory produces, named or not. A redirect must never be followed
+        // automatically: a 301/302/303 silently converts the signed POST to a GET and drops the body
+        // (the receiver 401s and the channel dead-letters looking like a key problem), while a 307/308
+        // would replay the signed payload, verbatim and validly signed, to whatever host Location names.
+        // HttpStatusClassifier already treats 3xx as Permanent — this just lets it see the 3xx at all.
+        services.ConfigureHttpClientDefaults(builder =>
+            builder.ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { AllowAutoRedirect = false }));
+
         services.TryAddSingleton<IOutboxDispatcher<ClaimedMessageRow>, HttpMessageDispatcher>();
         return services;
     }

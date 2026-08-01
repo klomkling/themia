@@ -119,11 +119,11 @@ public sealed class HttpMessageDispatcher : IOutboxDispatcher<ClaimedMessageRow>
         var timestamp = ThemiaHmacV1.FormatTimestamp(DateTimeOffset.UtcNow);
         var pathAndQuery = request.RequestUri!.PathAndQuery;
         var canonical = ThemiaHmacV1.Canonicalize(timestamp, HttpPostMethod, pathAndQuery, row.Payload);
-        var signature = ThemiaHmacV1.Sign(canonical, peer.OutboundSecret);
+        var (keyId, signature) = peer.SignOutbound(canonical);
 
         request.Headers.TryAddWithoutValidation(names.Timestamp, timestamp);
         request.Headers.TryAddWithoutValidation(names.Signature, signature);
-        request.Headers.TryAddWithoutValidation(names.KeyId, peer.OutboundKeyId);
+        request.Headers.TryAddWithoutValidation(names.KeyId, keyId);
         request.Headers.TryAddWithoutValidation(names.Scheme, ThemiaHmacV1.SchemeName);
         request.Headers.TryAddWithoutValidation(names.Origin, row.Origin);
     }
@@ -160,6 +160,17 @@ public sealed class HttpMessageDispatcher : IOutboxDispatcher<ClaimedMessageRow>
         foreach (var (key, value) in envelopeHeaders)
         {
             if (value is null || reserved.Any(r => string.Equals(r, key, StringComparison.OrdinalIgnoreCase)))
+            {
+                continue;
+            }
+
+            // TryAddWithoutValidation skips .NET's normal header-value validation (names are token-checked
+            // by the public API, but values are not). A control character in an adopter-supplied value can
+            // throw at send time from outside the two catch clauses above, escaping DispatchAsync
+            // unhandled — so a malformed envelope value is skipped here instead of ever reaching the
+            // request, the same "must not block delivery of an otherwise valid, signed row" rule the
+            // malformed-JSON case above already follows.
+            if (value.Contains('\r') || value.Contains('\n'))
             {
                 continue;
             }

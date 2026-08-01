@@ -91,9 +91,15 @@ public sealed class HmacVerificationFilter : IEndpointFilter
                 request.Body, Encoding.UTF8, detectEncodingFromByteOrderMarks: false, bufferSize: 1024, leaveOpen: true);
             body = await reader.ReadToEndAsync(httpContext.RequestAborted).ConfigureAwait(false);
         }
-        catch (IOException)
+        catch (IOException ex)
         {
-            // The bufferLimit backstop tripped — the chunked-request case Content-Length can't catch.
+            // Two distinct causes both surface as IOException here: the bufferLimit backstop tripping
+            // (the chunked-request case Content-Length can't catch) or the connection being interrupted
+            // mid-read. Both are reported 413 today, but without this log line an operator sees every
+            // mid-read connection reset reported as "payload too large" with no diagnostic trail. The
+            // exception (message/InnerException) is what lets the two be told apart after the fact.
+            logger.LogWarning(
+                ex, "Rejected inbound request from peer '{Peer}': failed reading the buffered body.", peer.Name);
             return Results.StatusCode(StatusCodes.Status413PayloadTooLarge);
         }
 
@@ -141,7 +147,6 @@ public sealed class HmacVerificationFilter : IEndpointFilter
             case HmacVerdict.MalformedTimestamp:
             case HmacVerdict.UnknownKeyId:
             case HmacVerdict.SignatureMismatch:
-            case HmacVerdict.UnknownPeer:
             default:
                 return StatusCodes.Status401Unauthorized;
         }

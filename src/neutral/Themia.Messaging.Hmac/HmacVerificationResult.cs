@@ -26,9 +26,6 @@ public enum HmacVerdict
 
     /// <summary>The scheme header named a scheme this verifier does not recognise. Maps to HTTP 400.</summary>
     UnknownScheme = 5,
-
-    /// <summary>No peer was configured under the requested name.</summary>
-    UnknownPeer = 6,
 }
 
 /// <summary>The outcome of <see cref="IHmacVerifier.Verify"/>.</summary>
@@ -62,8 +59,4 @@ public readonly record struct HmacVerificationResult(HmacVerdict Verdict, string
     /// <summary>The scheme header named a scheme this verifier does not recognise.</summary>
     /// <returns>A <see cref="HmacVerdict.UnknownScheme"/> result.</returns>
     public static HmacVerificationResult UnknownScheme() => new(HmacVerdict.UnknownScheme);
-
-    /// <summary>No peer was configured under the requested name.</summary>
-    /// <returns>A <see cref="HmacVerdict.UnknownPeer"/> result.</returns>
-    public static HmacVerificationResult UnknownPeer() => new(HmacVerdict.UnknownPeer);
 }

@@ -131,4 +131,20 @@ public class GoldenVectorTests
         Assert.True(succeeded);
         Assert.Equal(new DateTimeOffset(2026, 7, 14, 9, 30, 0, TimeSpan.Zero), result);
     }
+
+    // F8 (final whole-branch review): RoundtripKind alone reads a timestamp with NO offset designator in
+    // server-LOCAL time. These services run on UTC+7 hosts, so a naive timestamp from a peer would be off
+    // by ~7 hours, fail the clock-skew window, and dead-letter looking exactly like clock drift. This
+    // assertion is offset-based (TimeSpan.Zero), not host-timezone-dependent, so it is meaningful in CI
+    // regardless of the runner's local timezone: if the naive value were still read as local time, this
+    // would resolve to a DateTimeOffset carrying the runner's local offset instead of zero.
+    [Fact]
+    public void TryParseTimestamp_ShouldTreatANaiveTimestamp_AsUtc_NotServerLocal()
+    {
+        var succeeded = ThemiaHmacV1.TryParseTimestamp("2026-07-14T09:30:00.0000000", out var result);
+
+        Assert.True(succeeded);
+        Assert.Equal(TimeSpan.Zero, result.Offset);
+        Assert.Equal(new DateTimeOffset(2026, 7, 14, 9, 30, 0, TimeSpan.Zero), result);
+    }
 }

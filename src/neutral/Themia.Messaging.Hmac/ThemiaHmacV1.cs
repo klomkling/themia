@@ -67,10 +67,22 @@ public static class ThemiaHmacV1
         => value.UtcDateTime.ToString(TimestampFormat, CultureInfo.InvariantCulture);
 
     /// <summary>Parses a timestamp in the scheme's format.</summary>
+    /// <remarks>
+    /// <see cref="DateTimeStyles.AssumeUniversal"/> (with <see cref="DateTimeStyles.AdjustToUniversal"/>)
+    /// is combined with <see cref="DateTimeStyles.RoundtripKind"/> so a value with NO offset designator is
+    /// treated as UTC rather than server-local time. These services run on UTC+7 hosts: a naive timestamp
+    /// read in local time would land ~7 hours off, fail the clock-skew window, and produce a permanent 408
+    /// loop that looks exactly like clock drift — in a transport whose entire design is about
+    /// distinguishing clock problems from credential problems. This changes nothing for offset-bearing
+    /// values (every golden vector carries a trailing <c>Z</c>) and fails safe for naive ones.
+    /// </remarks>
     /// <param name="value">The header value.</param>
     /// <param name="result">The parsed instant when parsing succeeds.</param>
     /// <returns><see langword="true"/> when <paramref name="value"/> is a well-formed timestamp.</returns>
     public static bool TryParseTimestamp(string? value, out DateTimeOffset result)
         => DateTimeOffset.TryParse(
-            value, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out result);
+            value,
+            CultureInfo.InvariantCulture,
+            DateTimeStyles.RoundtripKind | DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal,
+            out result);
 }

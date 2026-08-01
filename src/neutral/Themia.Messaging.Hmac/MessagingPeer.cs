@@ -3,6 +3,11 @@ namespace Themia.Messaging.Hmac;
 /// <summary>A configured messaging peer: its header prefix, signing keys, clock tolerance and routes.</summary>
 public sealed class MessagingPeer
 {
+    // Kept out of any public property: a single logger.LogInformation("{@Peer}", peer), a diagnostics
+    // endpoint, or an adopter serialising this object must not be able to leak it. Themia.Messaging.Http
+    // never sees this value — it asks SignOutbound to produce a signature instead.
+    private readonly string outboundSecret;
+
     internal MessagingPeer(
         string name,
         string headerPrefix,
@@ -20,7 +25,7 @@ public sealed class MessagingPeer
         ClockSkewTolerance = clockSkewTolerance;
         MaxBodyBytes = maxBodyBytes;
         OutboundKeyId = outboundKeyId;
-        OutboundSecret = outboundSecret;
+        this.outboundSecret = outboundSecret;
         InboundKeys = inboundKeys;
         Routes = routes;
         HeaderNames = new HmacHeaderNames(headerPrefix);
@@ -44,17 +49,32 @@ public sealed class MessagingPeer
     /// <summary>The key id this side signs outbound requests with.</summary>
     public string OutboundKeyId { get; }
 
-    /// <summary>The secret this side signs outbound requests with.</summary>
-    public string OutboundSecret { get; }
-
-    /// <summary>The inbound keys this side accepts, keyed by key id — supports rotation without a shared cutover.</summary>
-    public IReadOnlyDictionary<string, string> InboundKeys { get; }
+    /// <summary>
+    /// The inbound keys this side accepts, keyed by key id — supports rotation without a shared cutover.
+    /// Internal: only <see cref="HmacVerifier"/>, in the same assembly, needs to read the raw secrets to
+    /// verify a signature.
+    /// </summary>
+    internal IReadOnlyDictionary<string, string> InboundKeys { get; }
 
     /// <summary>Outbound route path templates keyed by message type name.</summary>
     public IReadOnlyDictionary<string, string> Routes { get; }
 
     /// <summary>The wire header names derived from <see cref="HeaderPrefix"/>.</summary>
     public HmacHeaderNames HeaderNames { get; }
+
+    /// <summary>
+    /// Signs <paramref name="canonical"/> with this peer's outbound key and returns the key id and
+    /// signature together, so a caller (e.g. <c>Themia.Messaging.Http</c>'s dispatcher) never needs to
+    /// hold, log, or otherwise handle the outbound secret itself.
+    /// </summary>
+    /// <param name="canonical">The canonical string from <see cref="ThemiaHmacV1.Canonicalize"/>.</param>
+    /// <returns>The outbound key id and the lowercase-hex signature.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="canonical"/> is <see langword="null"/>.</exception>
+    public (string KeyId, string Signature) SignOutbound(string canonical)
+    {
+        ArgumentNullException.ThrowIfNull(canonical);
+        return (OutboundKeyId, ThemiaHmacV1.Sign(canonical, outboundSecret));
+    }
 }
 
 /// <summary>Configures a <see cref="MessagingPeer"/> via <see cref="HmacOptions.AddPeer"/>.</summary>
@@ -91,20 +111,40 @@ public sealed class MessagingPeerBuilder
     /// <summary>Registers an inbound key this side accepts, keyed by key id. Call once per active or rotating key.</summary>
     /// <param name="keyId">The inbound key id.</param>
     /// <param name="secret">The inbound shared secret.</param>
+    /// <exception cref="InvalidOperationException">
+    /// <paramref name="keyId"/> was already registered — last-write-wins would silently discard the
+    /// first secret, the same class of configuration mistake <see cref="HmacOptions.AddPeer"/> already
+    /// refuses to allow for duplicate peer names.
+    /// </exception>
     public void Accept(string keyId, string secret)
     {
         ArgumentException.ThrowIfNullOrEmpty(keyId);
         ArgumentException.ThrowIfNullOrEmpty(secret);
-        _inboundKeys[keyId] = secret;
+
+        if (!_inboundKeys.TryAdd(keyId, secret))
+        {
+            throw new InvalidOperationException($"An inbound key id '{keyId}' is already registered.");
+        }
     }
 
     /// <summary>Registers an outbound route path template for a message type.</summary>
     /// <param name="type">The message type name.</param>
     /// <param name="path">The route path template.</param>
+    /// <exception cref="InvalidOperationException">
+    /// <paramref name="type"/> was already routed — last-write-wins would silently discard the first
+    /// path, the same class of configuration mistake <see cref="HmacOptions.AddPeer"/> already refuses
+    /// to allow for duplicate peer names.
+    /// </exception>
     public void Route(string type, string path)
     {
         ArgumentException.ThrowIfNullOrEmpty(type);
         ArgumentException.ThrowIfNullOrEmpty(path);
+
+        if (_routes.ContainsKey(type))
+        {
+            throw new InvalidOperationException($"A route for message type '{type}' is already registered.");
+        }
+
         _routes[type] = path;
     }
 

@@ -13,18 +13,23 @@ public sealed record HmacHeaderNames(string Prefix)
     /// <summary>The default prefix used when a peer does not override it.</summary>
     public const string DefaultPrefix = "X-Themia-";
 
+    // Computed from Prefix rather than captured once in field initializers: the latter let
+    // `names with { Prefix = "X-Foo-" }` compile and produce a record with a new Prefix sitting beside
+    // the OLD derived names — internally inconsistent state a `with` expression should never be able to
+    // produce. Computed properties keep `with` coherent by construction.
+
     /// <summary>Header carrying the signed timestamp. Required.</summary>
-    public string Timestamp { get; } = Prefix + "Timestamp";
+    public string Timestamp => Prefix + "Timestamp";
 
     /// <summary>Header carrying the lowercase-hex signature. Required.</summary>
-    public string Signature { get; } = Prefix + "Signature";
+    public string Signature => Prefix + "Signature";
 
     /// <summary>Header selecting which inbound key verifies. Optional.</summary>
-    public string KeyId { get; } = Prefix + "Key-Id";
+    public string KeyId => Prefix + "Key-Id";
 
     /// <summary>Header naming the signing scheme. Optional; absence means <c>themia-hmac-v1</c>.</summary>
-    public string Scheme { get; } = Prefix + "Scheme";
+    public string Scheme => Prefix + "Scheme";
 
     /// <summary>Header naming the originating system, for the loop guard. Optional.</summary>
-    public string Origin { get; } = Prefix + "Origin";
+    public string Origin => Prefix + "Origin";
 }

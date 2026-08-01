@@ -77,6 +77,32 @@ public class HmacVerificationFilterTests
         Assert.Equal(StatusCodes.Status413PayloadTooLarge, status);
     }
 
+    // F10 (final whole-branch review): the filter used to catch (IOException) around the buffered read
+    // and return 413 with no log at all — a mid-read connection reset would then report to the operator
+    // as "payload too large" with no diagnostic trail, indistinguishable from a client that actually sent
+    // too much data. A warning naming the peer, carrying the exception, is now logged either way.
+    [Fact]
+    public async Task InvokeAsync_ShouldLogAWarning_WhenTheBufferLimitBackstopTrips()
+    {
+        var (options, peer) = BuildPeer(maxBodyBytes: 5);
+        var body = new string('a', 200);
+        var headers = SignedHeaders(peer, Now, body, Secret);
+        var httpContext = BuildContext(peer, headers, body, declareContentLength: false, nonSeekableBody: true);
+        var logger = new RecordingLogger<HmacVerificationFilter>();
+
+        var (status, nextCalled) = await InvokeFilterAsync(BuildFilter(options, logger: logger), httpContext);
+
+        Assert.False(nextCalled);
+        Assert.Equal(StatusCodes.Status413PayloadTooLarge, status);
+        Assert.Contains(logger.Entries, e =>
+            e.Level == LogLevel.Warning && e.Message.Contains(peer.Name, StringComparison.Ordinal));
+        // Still never leaks the body itself.
+        foreach (var (_, message) in logger.Entries)
+        {
+            Assert.DoesNotContain(body, message, StringComparison.Ordinal);
+        }
+    }
+
     // --- Table: scheme -----------------------------------------------------------------------------
 
     [Fact]

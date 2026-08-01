@@ -11,6 +11,31 @@ namespace Themia.Messaging.AspNetCore.Tests;
 
 public class AddThemiaMessagingVerificationTests
 {
+    // F2 (final whole-branch review): AddThemiaMessagingHttp already scans for HmacOptions and throws a
+    // clear message when it is missing; this side only documented the requirement. An adopter who calls
+    // AddThemiaMessagingVerification + RequireThemiaHmac("peer") without AddThemiaMessagingHmac used to
+    // get an opaque activation failure at first request instead of a clear message at registration time.
+    [Fact]
+    public void AddThemiaMessagingVerification_ShouldThrow_WhenAddThemiaMessagingHmacWasNotCalled()
+    {
+        var services = new ServiceCollection();
+
+        var ex = Assert.Throws<InvalidOperationException>(() => services.AddThemiaMessagingVerification());
+
+        Assert.Contains("AddThemiaMessagingHmac", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AddThemiaMessagingVerification_ShouldNotThrow_WhenHmacOptionsIsAlreadyRegistered()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton(new Themia.Messaging.Hmac.HmacOptions());
+
+        var exception = Record.Exception(() => services.AddThemiaMessagingVerification());
+
+        Assert.Null(exception);
+    }
+
     [Fact]
     public async Task AddThemiaMessagingVerification_ShouldWarnAtStartup_ForABiDirectionalPeerWithNoOriginHeader()
     {
