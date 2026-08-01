@@ -30,7 +30,8 @@ public static class HttpServiceCollectionExtensions
     {
         ArgumentNullException.ThrowIfNull(services);
 
-        if (services.All(d => d.ServiceType != typeof(HmacOptions)))
+        var hmacOptions = FindRegisteredHmacOptions(services);
+        if (hmacOptions is null)
         {
             throw new InvalidOperationException(
                 "AddThemiaMessagingHttp requires AddThemiaMessagingHmac(...) to already be registered: "
@@ -40,17 +41,42 @@ public static class HttpServiceCollectionExtensions
 
         services.AddHttpClient();
 
-        // Peer clients are named dynamically (the peer's name, unknown at registration time), so the
-        // default cannot be set via a named AddHttpClient(...) builder — ConfigureHttpClientDefaults
-        // applies to every client the factory produces, named or not. A redirect must never be followed
-        // automatically: a 301/302/303 silently converts the signed POST to a GET and drops the body
-        // (the receiver 401s and the channel dead-letters looking like a key problem), while a 307/308
-        // would replay the signed payload, verbatim and validly signed, to whatever host Location names.
-        // HttpStatusClassifier already treats 3xx as Permanent — this just lets it see the 3xx at all.
-        services.ConfigureHttpClientDefaults(builder =>
-            builder.ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { AllowAutoRedirect = false }));
+        // A redirect must never be followed automatically on a peer's client: a 301/302/303 silently
+        // converts the signed POST to a GET and drops the body (the receiver 401s and the channel
+        // dead-letters looking like a key problem), while a 307/308 would replay the signed payload,
+        // verbatim and validly signed, to whatever host Location names. HttpStatusClassifier already
+        // treats 3xx as Permanent — this just lets it see the 3xx at all.
+        //
+        // This is configured per PEER NAME (via AddHttpClient(peerName), read off the HmacOptions instance
+        // already registered by AddThemiaMessagingHmac) rather than via ConfigureHttpClientDefaults, which
+        // would apply to EVERY HttpClient the factory produces for the whole host — including OIDC
+        // discovery/authorization in Themia.Modules.Identity.ExternalAuth.AspNetCore, which depends on
+        // following redirects, plus any other IHttpClientFactory consumer (SMS providers, integration
+        // services) that never opted into this module at all.
+        foreach (var peerName in hmacOptions.PeerNames)
+        {
+            services.AddHttpClient(peerName)
+                .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { AllowAutoRedirect = false });
+        }
 
         services.TryAddSingleton<IOutboxDispatcher<ClaimedMessageRow>, HttpMessageDispatcher>();
         return services;
+    }
+
+    // Mirrors Themia.Modules.Messaging.DependencyInjection.MessagingServiceCollectionExtensions'
+    // ContributeDapperMappings: reads a registered singleton instance out of the collection at
+    // registration time, without building a provider (a provider can't be built mid-registration, and
+    // building one just to read one value would be wasteful besides).
+    private static HmacOptions? FindRegisteredHmacOptions(IServiceCollection services)
+    {
+        for (var i = services.Count - 1; i >= 0; i--)
+        {
+            if (services[i].ServiceType == typeof(HmacOptions) && services[i].ImplementationInstance is HmacOptions options)
+            {
+                return options;
+            }
+        }
+
+        return null;
     }
 }

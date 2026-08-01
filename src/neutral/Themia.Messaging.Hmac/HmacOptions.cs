@@ -36,4 +36,11 @@ public sealed class HmacOptions
     /// <returns><see langword="true"/> when a peer with <paramref name="name"/> was configured.</returns>
     public bool TryGetPeer(string name, out MessagingPeer? peer)
         => _peers.TryGetValue(name, out peer);
+
+    /// <summary>
+    /// The names of every peer registered so far. Lets a DI extension that needs to act per peer (e.g.
+    /// configuring each peer's named <c>HttpClient</c>) enumerate them without a broader read/write
+    /// surface onto the registry than that.
+    /// </summary>
+    public IReadOnlyCollection<string> PeerNames => _peers.Keys;
 }

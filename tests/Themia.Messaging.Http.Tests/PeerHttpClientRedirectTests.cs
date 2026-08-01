@@ -18,6 +18,13 @@ namespace Themia.Messaging.Http.Tests;
 // just never used to see the 3xx because HttpClient followed it first. This suite proves the real DI
 // registration (AddThemiaMessagingHmac + AddThemiaMessagingHttp), not a hand-built dispatcher, refuses to
 // follow the redirect.
+//
+// A first version of this fix used ConfigureHttpClientDefaults, which applies to EVERY HttpClient the
+// factory produces for the whole host — not just messaging peer clients. That would have silently broken
+// OIDC redirect-following in Themia.Modules.Identity.ExternalAuth.AspNetCore (and any other
+// IHttpClientFactory consumer never opted into this module) the moment a host registered both. The fix is
+// now scoped per peer name, and NonPeerClient_ShouldStillFollowRedirects... below is the regression test
+// that would have caught the broader version.
 public class PeerHttpClientRedirectTests
 {
     private const string PeerName = "peer";
@@ -64,6 +71,44 @@ public class PeerHttpClientRedirectTests
         // listener answers 200 OK) — asserting exactly one request proves the redirect was never chased,
         // not merely that the eventual outcome happens to match.
         Assert.Equal(1, listener.RequestCount);
+    }
+
+    // The regression test for the coordinator-flagged issue: a module that never opted into messaging's
+    // "peer clients refuse redirects" rule (e.g. Themia.Modules.Identity.ExternalAuth.AspNetCore's OIDC
+    // client, which DEPENDS on following redirects for discovery/authorization) must be completely
+    // unaffected by AddThemiaMessagingHttp being registered in the same host. Without this test, nothing
+    // stops a future change from reinstating ConfigureHttpClientDefaults (or an equivalent host-wide
+    // default) and silently reintroducing the auth outage this fix exists to prevent.
+    [Fact]
+    public async Task NonPeerClient_ShouldStillFollowRedirects_WhenRegisteredAlongsideMessagingHttp()
+    {
+        using var listener = new RedirectingListener(RoutePath);
+        listener.Start();
+
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddThemiaMessagingHmac(o => o.AddPeer(PeerName, p =>
+        {
+            p.BaseAddress = listener.BaseAddress;
+            p.SignWith("out-1", "secret");
+            p.Accept("in-1", "secret");
+            p.Route(MessageType, RoutePath);
+        }));
+        services.AddThemiaMessagingHttp();
+        // Stands in for a module (e.g. OIDC external auth) that registers its own named client and never
+        // asked for messaging's redirect-refusal behaviour.
+        services.AddHttpClient("some-other-client");
+
+        using var provider = services.BuildServiceProvider();
+        var factory = provider.GetRequiredService<IHttpClientFactory>();
+        var otherClient = factory.CreateClient("some-other-client");
+
+        using var response = await otherClient.GetAsync(new Uri(listener.BaseAddress, RoutePath));
+
+        // The redirect WAS followed: the client landed on 200 from the redirect target, and the listener
+        // saw two requests (the original GET to /ingest, then the followed GET to /redirected).
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(2, listener.RequestCount);
     }
 
     /// <summary>A minimal loopback HTTP server that always answers the configured route with a 302 to a second path that would succeed if followed.</summary>

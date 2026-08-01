@@ -19,6 +19,7 @@ Themia.Messaging.Hmac.HmacHeaderNames.Timestamp.get -> string!
 Themia.Messaging.Hmac.HmacOptions
 Themia.Messaging.Hmac.HmacOptions.AddPeer(string! name, System.Action<Themia.Messaging.Hmac.MessagingPeerBuilder!>! configure) -> void
 Themia.Messaging.Hmac.HmacOptions.HmacOptions() -> void
+Themia.Messaging.Hmac.HmacOptions.PeerNames.get -> System.Collections.Generic.IReadOnlyCollection<string!>!
 Themia.Messaging.Hmac.HmacOptions.TryGetPeer(string! name, out Themia.Messaging.Hmac.MessagingPeer? peer) -> bool
 Themia.Messaging.Hmac.HmacVerdict
 Themia.Messaging.Hmac.HmacVerdict.MalformedTimestamp = 2 -> Themia.Messaging.Hmac.HmacVerdict
