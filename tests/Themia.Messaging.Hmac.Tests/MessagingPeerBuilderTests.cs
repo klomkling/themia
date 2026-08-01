@@ -60,6 +60,37 @@ public class MessagingPeerBuilderTests
     }
 
     [Fact]
+    public void AddPeer_ShouldThrow_WhenRouteIsConfigured_ButBaseAddressIsNotSet()
+    {
+        var options = new HmacOptions();
+
+        var ex = Assert.Throws<InvalidOperationException>(() =>
+            options.AddPeer("peer", p =>
+            {
+                p.SignWith("out-1", "secret");
+                p.Accept("in-1", "secret");
+                p.Route("ListingCreated", "/api/v1/listings");
+            }));
+
+        Assert.Contains("BaseAddress", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AddPeer_ShouldBuild_WhenInboundOnlyPeerHasNoRoutesOrBaseAddress()
+    {
+        var options = new HmacOptions();
+
+        options.AddPeer("inbound-peer", p =>
+        {
+            p.SignWith("out-1", "secret");
+            p.Accept("in-1", "secret");
+        });
+
+        Assert.True(options.TryGetPeer("inbound-peer", out var peer));
+        Assert.Null(peer!.BaseAddress);
+    }
+
+    [Fact]
     public void AddPeer_ShouldBuildAndExposeConfiguredValues_WhenValid()
     {
         var options = new HmacOptions();

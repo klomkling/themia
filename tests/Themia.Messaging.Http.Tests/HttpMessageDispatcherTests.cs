@@ -1,4 +1,5 @@
 using System.Net;
+using System.Reflection;
 using System.Text;
 using System.Text.Json;
 
@@ -113,6 +114,27 @@ public class HttpMessageDispatcherTests
         Assert.False(handler.WasCalled);
     }
 
+    [Fact]
+    public async Task DispatchAsync_ShouldReturnPermanent_WhenPeerHasNoBaseAddress_WithoutSending()
+    {
+        // MessagingPeerBuilder.Build now refuses to construct a peer that has routes but no
+        // BaseAddress (see Themia.Messaging.Hmac/MessagingPeer.cs), so this state can no longer arise
+        // through the public API — the dispatcher's guard below is defensive, not reachable, code.
+        // This test reaches it anyway, via reflection into the internal MessagingPeer constructor and
+        // HmacOptions' peer registry, so the guard is proven correct rather than merely present.
+        var options = new HmacOptions();
+        var peer = CreatePeerWithoutBaseAddress();
+        InjectPeer(options, peer);
+        var handler = new StubHandler(HttpStatusCode.OK);
+        var dispatcher = BuildDispatcher(options, handler);
+        var row = BuildRow(destination: peer.Name);
+
+        var result = await dispatcher.DispatchAsync(new NullServiceProvider(), row, CancellationToken.None);
+
+        Assert.Equal(DispatchOutcome.Permanent, result.Outcome);
+        Assert.False(handler.WasCalled);
+    }
+
     [Theory]
     [InlineData(HttpStatusCode.OK, DispatchOutcome.Delivered)]
     [InlineData(HttpStatusCode.RequestTimeout, DispatchOutcome.Transient)] // 408 — the scheme's stale-timestamp status
@@ -207,6 +229,20 @@ public class HttpMessageDispatcherTests
     }
 
     [Fact]
+    public async Task DispatchAsync_ShouldStillDeliver_WhenEnvelopeHeadersJsonIsMalformed()
+    {
+        var options = BuildOptions();
+        var handler = new StubHandler(HttpStatusCode.OK);
+        var dispatcher = BuildDispatcher(options, handler);
+        var row = BuildRow(headers: "{not valid json");
+
+        var result = await dispatcher.DispatchAsync(new NullServiceProvider(), row, CancellationToken.None);
+
+        Assert.Equal(DispatchOutcome.Delivered, result.Outcome);
+        Assert.True(handler.WasCalled);
+    }
+
+    [Fact]
     public async Task DispatchAsync_ShouldNeverLogTheSecretOrTheSignature()
     {
         var options = BuildOptions();
@@ -264,6 +300,48 @@ public class HttpMessageDispatcherTests
             Version: null,
             Headers: headers,
             Attempts: 0);
+
+    // MessagingPeerBuilder.Build validates that a peer with routes has a BaseAddress, so this
+    // otherwise-invalid state can no longer be reached through HmacOptions.AddPeer. Bypasses that
+    // builder via reflection into MessagingPeer's internal constructor, purely to exercise the
+    // dispatcher's own defensive check against the same invariant.
+    private static MessagingPeer CreatePeerWithoutBaseAddress()
+    {
+        var ctor = typeof(MessagingPeer).GetConstructor(
+            BindingFlags.NonPublic | BindingFlags.Instance,
+            binder: null,
+            types:
+            [
+                typeof(string), typeof(string), typeof(Uri), typeof(TimeSpan), typeof(long),
+                typeof(string), typeof(string),
+                typeof(IReadOnlyDictionary<string, string>), typeof(IReadOnlyDictionary<string, string>),
+            ],
+            modifiers: null)
+            ?? throw new InvalidOperationException("MessagingPeer's internal constructor shape changed; update this test helper.");
+
+        return (MessagingPeer)ctor.Invoke(
+        [
+            "no-base-address-peer",
+            HmacHeaderNames.DefaultPrefix,
+            null, // BaseAddress — the invalid state Build() now rejects
+            TimeSpan.FromMinutes(5),
+            4L * 1024 * 1024,
+            OutboundKeyId,
+            OutboundSecret,
+            new Dictionary<string, string> { ["in-1"] = "in-secret" },
+            new Dictionary<string, string> { [MessageType] = RoutePath },
+        ]);
+    }
+
+    // HmacOptions only exposes peers through AddPeer (which runs the builder's validation), so
+    // reaching the dispatcher's defensive branch also requires bypassing that registry directly.
+    private static void InjectPeer(HmacOptions options, MessagingPeer peer)
+    {
+        var field = typeof(HmacOptions).GetField("_peers", BindingFlags.NonPublic | BindingFlags.Instance)
+            ?? throw new InvalidOperationException("HmacOptions' internal peer field changed; update this test helper.");
+        var peers = (Dictionary<string, MessagingPeer>)field.GetValue(options)!;
+        peers[peer.Name] = peer;
+    }
 }
 
 /// <summary>An <see cref="IHttpClientFactory"/> that always hands back a client wrapping <paramref name="handler"/>.</summary>

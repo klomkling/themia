@@ -111,8 +111,9 @@ public sealed class MessagingPeerBuilder
     /// <summary>Validates the configured values and builds the immutable <see cref="MessagingPeer"/>.</summary>
     /// <param name="name">The peer's name.</param>
     /// <exception cref="InvalidOperationException">
-    /// <paramref name="name"/> is blank, no outbound key was set, no inbound key was accepted, or
-    /// <see cref="ClockSkewTolerance"/> is not positive.
+    /// <paramref name="name"/> is blank, no outbound key was set, no inbound key was accepted,
+    /// <see cref="ClockSkewTolerance"/> is not positive, or a route was configured with no
+    /// <see cref="BaseAddress"/> set.
     /// </exception>
     internal MessagingPeer Build(string name)
     {
@@ -134,6 +135,16 @@ public sealed class MessagingPeerBuilder
         if (ClockSkewTolerance <= TimeSpan.Zero)
         {
             throw new InvalidOperationException($"Peer '{name}' must have a positive ClockSkewTolerance.");
+        }
+
+        // A route with nowhere to send it is a contradiction, not a valid inbound-only configuration:
+        // it would build cleanly and then dead-letter every message at dispatch time, looking like a
+        // transport failure instead of the configuration mistake it is.
+        if (_routes.Count > 0 && BaseAddress is null)
+        {
+            throw new InvalidOperationException(
+                $"Peer '{name}' has {_routes.Count} route(s) configured but no BaseAddress: outbound dispatch "
+                + "would have nowhere to send. Set BaseAddress, or remove the Route(...) calls if this peer is inbound-only.");
         }
 
         return new MessagingPeer(
