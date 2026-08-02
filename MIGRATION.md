@@ -10,6 +10,89 @@ with the *why* and concrete upgrade steps.
 - Each entry states: **What changed**, **Why**, and **How to upgrade** (before → after).
 - Non-breaking changes are *not* listed here — see the CHANGELOG.
 
+## Unreleased
+
+### `Themia.Notifications`: the logger stubs no longer report success
+
+**What changed:** `LoggerEmailSender` and `LoggerSmsSender` returned `NotificationResult.Success()`
+without sending anything. They now return `NotificationResult.NoProviderConfigured(reason)` and log at
+`Warning` instead of `Information`.
+
+`NotificationResult` gained a `NotificationOutcome Outcome` property with three states — `Sent`,
+`Failed`, `NotConfigured`. `Succeeded` is now computed (`Outcome == Sent`) and `NotConfigured` is a
+convenience for `Outcome == NotConfigured`. Existing `if (result.Succeeded)` code keeps compiling and
+keeps meaning the same thing.
+
+**Why:** `AddThemiaNotifications()` registers those stubs with `TryAdd` so the DI graph always resolves.
+That is deliberate and stays. But combined with a success result it meant a host that never configured a
+real provider saw every send succeed while nothing was delivered, with no signal anywhere — and a
+caller's retry or audit logic recorded deliveries that never happened. "I deliberately did not send
+this" and "I sent this" must not be the same value.
+
+**Who is affected:** any host that runs on the stub for a channel — which includes running deliberately
+without SMTP, a supported and normal state. Both known consumers do this: ezy-assets falls back to the
+stub when `Email:Smtp:Host` is unset, and propertiezy documents an unset `Smtp:Host` as "a normal,
+supported state".
+
+**How to upgrade.** Anywhere you treat a non-success result as a failure, separate "not configured"
+from "the provider rejected it":
+
+```csharp
+// before — an unconfigured channel looked like a successful send
+var result = await emailSender.SendAsync(message, ct);
+if (!result.Succeeded)
+{
+    logger.LogError("Email delivery failed: {Error}", result.Error);
+    return Problem("Could not send the email.");
+}
+
+// after — an intentionally-disabled channel is not an error
+var result = await emailSender.SendAsync(message, ct);
+if (result.NotConfigured)
+{
+    // Nothing was sent, and that was the configuration's intent.
+    // Fall back to whatever you did before (log the invite link, skip the notification, ...).
+    logger.LogInformation("Email delivery is not configured; skipping.");
+}
+else if (!result.Succeeded)
+{
+    logger.LogError("Email delivery failed: {Error}", result.Error);
+    return Problem("Could not send the email.");
+}
+```
+
+If you previously relied on `Succeeded == true` from the stub to mean "did I finish handling this",
+the control-flow equivalent is `result.Succeeded || result.NotConfigured`.
+
+> **Do not apply that substitution to anything that records or reports delivery.** Writing
+> `if (result.Succeeded || result.NotConfigured) await audit.RecordDeliveredAsync(...)` produces a
+> "delivered" audit row for a message that was never sent — which is the exact defect this change
+> removes, restored under a new spelling. The equivalence is safe for "have I finished with this
+> message", and wrong for "was this message delivered".
+
+**If you use `Themia.Modules.Notifications` instead of calling a sender directly, you have nothing to
+change — but read this.** `INotificationDispatcher.DispatchAsync` enqueues an outbox row and never hands
+you a `NotificationResult`; the result is interpreted inside `NotificationOutboxDispatcher`, which is
+framework code. That mapping is updated in this release: a `NotConfigured` result now dead-letters the
+row on its **first** attempt rather than being treated as a retryable failure.
+
+That matters because the naive mapping was genuinely wrong. `NotConfigured` reached
+`DispatchResult.Transient`, so on a host with no configured provider every notification was retried to
+the attempt cap (5 by default) and *then* dead-lettered — messages that previously completed as `Sent`
+were lost, ten `Warning` lines were written per message, and with `PurgeEnabled` defaulting to `false`
+the dead rows accumulated indefinitely.
+
+Retrying cannot help here: configuration does not change between backoff attempts. Failing on the first
+attempt puts the reason in `last_error` immediately, where an operator can see it. **If you run a host
+deliberately without a provider and do not want dead rows, either disable the outbox for that channel or
+configure a sender** — a `Dead` row is now the honest record of a message that was never sent.
+
+**If you would rather fail fast at startup:** the framework does not currently expose a way to detect a
+stub registration (`LoggerEmailSender` and `LoggerSmsSender` are `internal`). The supported approach is
+to assert your own configuration — check that `Smtp:Host` (or your provider's equivalent) is set in the
+environments where delivery is required, and fail startup yourself. If you want the framework to refuse
+a stub outside `Development`, say so on coord #0057 and it can be added.
+
 ## 0.11.0
 
 ### `Themia.Modules.Notifications`: outbox drain plumbing moved into `Themia.Messaging`

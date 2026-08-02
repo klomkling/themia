@@ -20,5 +20,6 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/neutral/Themia.Messaging.Http/Themia.Messaging.Http.csproj" />
+    <ProjectReference Include="..\Themia.TestSupport\Themia.TestSupport.csproj" />
   </ItemGroup>
 </Project>
