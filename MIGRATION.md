@@ -10,7 +10,7 @@ with the *why* and concrete upgrade steps.
 - Each entry states: **What changed**, **Why**, and **How to upgrade** (before → after).
 - Non-breaking changes are *not* listed here — see the CHANGELOG.
 
-## Unreleased
+## 0.11.0
 
 ### `Themia.Modules.Notifications`: outbox drain plumbing moved into `Themia.Messaging`
 
