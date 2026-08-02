@@ -1,6 +1,7 @@
 using System.Text.Json;
 
 using Themia.Framework.Data.Abstractions.Repositories;
+using Themia.Messaging;
 using Themia.Messaging.Messages;
 using Themia.Messaging.Outbox;
 using Themia.Modules.Messaging.Entities;
@@ -13,7 +14,7 @@ namespace Themia.Modules.Messaging.Stores;
 internal sealed class MessageOutboxStore(
     IRepository<MessageOutboxEntry, Guid> repository,
     TimeProvider time,
-    MessagingModuleOptions options) : IMessageOutboxStore
+    MessagingIdentity identity) : IMessageOutboxStore
 {
     /// <inheritdoc />
     public Task EnqueueAsync(MessageEnvelope message, CancellationToken ct = default)
@@ -35,9 +36,9 @@ internal sealed class MessageOutboxStore(
             Type = message.Type,
             Payload = message.Payload,
             Destination = message.Destination,
-            // The envelope's Origin wins when set; otherwise fall back to the module's configured
-            // identity. MessagingModuleOptions.Validate() already guarantees options.Origin is non-blank.
-            Origin = string.IsNullOrWhiteSpace(message.Origin) ? options.Origin : message.Origin,
+            // The envelope's Origin wins when set; otherwise fall back to this service's identity.
+            // MessagingIdentity's constructor already guarantees Origin is non-blank.
+            Origin = string.IsNullOrWhiteSpace(message.Origin) ? identity.Origin : message.Origin,
             EntityKey = message.EntityKey,
             Version = message.Version,
             Headers = message.Headers is null ? null : JsonSerializer.Serialize(message.Headers),

@@ -3,6 +3,7 @@ using System.Data.Common;
 using Microsoft.Extensions.DependencyInjection;
 
 using Themia.Framework.Data.Dapper.Connection;
+using Themia.Messaging.DependencyInjection;
 using Themia.Modules.Messaging.DependencyInjection;
 
 using Xunit;
@@ -33,9 +34,10 @@ public class MessagingRegistrationOrderingTests
     {
         var services = new ServiceCollection();
         services.AddScoped<IDapperConnectionContext, StubDapperConnectionContext>();
+        services.AddThemiaMessagingIdentity("test-origin");
 
         var ex = Assert.Throws<InvalidOperationException>(
-            () => services.AddThemiaMessagingModule(o => o.Origin = "test-origin"));
+            () => services.AddThemiaMessagingModule());
 
         Assert.Contains("AddThemiaDapperCore", ex.Message, StringComparison.Ordinal);
     }
@@ -44,10 +46,21 @@ public class MessagingRegistrationOrderingTests
     public void AddThemiaMessagingModule_ShouldNotThrow_OnTheEFOnlyPath()
     {
         var services = new ServiceCollection();
+        services.AddThemiaMessagingIdentity("test-origin");
 
-        var exception = Record.Exception(() => services.AddThemiaMessagingModule(o => o.Origin = "test-origin"));
+        var exception = Record.Exception(() => services.AddThemiaMessagingModule());
 
         Assert.Null(exception);
+    }
+
+    [Fact]
+    public void AddThemiaMessagingModule_ShouldThrow_WhenNoMessagingIdentityIsRegistered()
+    {
+        var services = new ServiceCollection();
+
+        var ex = Assert.Throws<InvalidOperationException>(() => services.AddThemiaMessagingModule());
+
+        Assert.Contains("AddThemiaMessagingIdentity", ex.Message, StringComparison.Ordinal);
     }
 
     [Fact]

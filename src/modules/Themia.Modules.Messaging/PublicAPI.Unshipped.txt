@@ -18,8 +18,6 @@ Themia.Modules.Messaging.MessagingModuleOptions
 Themia.Modules.Messaging.MessagingModuleOptions.MessagingModuleOptions() -> void
 Themia.Modules.Messaging.MessagingModuleOptions.ConnectionStringName.get -> string!
 Themia.Modules.Messaging.MessagingModuleOptions.ConnectionStringName.set -> void
-Themia.Modules.Messaging.MessagingModuleOptions.Origin.get -> string!
-Themia.Modules.Messaging.MessagingModuleOptions.Origin.set -> void
 Themia.Modules.Messaging.MessagingModuleOptions.DrainIntervalSeconds.get -> int
 Themia.Modules.Messaging.MessagingModuleOptions.DrainIntervalSeconds.set -> void
 Themia.Modules.Messaging.MessagingModuleOptions.MaxBatchSize.get -> int

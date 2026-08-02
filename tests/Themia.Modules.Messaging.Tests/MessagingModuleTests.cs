@@ -7,21 +7,22 @@ namespace Themia.Modules.Messaging.Tests;
 public class MessagingModuleTests
 {
     [Fact]
-    public void Constructor_ShouldSucceed_WhenOriginIsSet()
+    public void Constructor_ShouldSucceed_WithValidOptions()
     {
-        var module = new MessagingModule(MigrationEngine.Postgres, new MessagingModuleOptions { Origin = "ezy-assets" });
+        var module = new MessagingModule(MigrationEngine.Postgres, new MessagingModuleOptions());
 
         Assert.Equal("Themia.Messaging", module.Descriptor.Name);
     }
 
-    // MessagingModuleOptions.Origin has no safe default (task 2 decision): a module built from
-    // default-constructed options would carry a blank Origin, which Validate() must reject at
-    // construction rather than let through to fail confusingly later during InitializeAsync.
+    // MessagingModuleOptions.ConnectionStringName is the last required string (task 2 decision: Origin
+    // moved to MessagingIdentity, validated by its own constructor instead). A module built with a blank
+    // ConnectionStringName must be rejected at construction rather than fail confusingly later during
+    // InitializeAsync.
     [Fact]
-    public void Constructor_ShouldThrow_WhenOriginIsBlank()
+    public void Constructor_ShouldThrow_WhenConnectionStringNameIsBlank()
     {
         var ex = Assert.Throws<ArgumentException>(
-            () => new MessagingModule(MigrationEngine.Postgres, new MessagingModuleOptions()));
-        Assert.Equal("Origin", ex.ParamName);
+            () => new MessagingModule(MigrationEngine.Postgres, new MessagingModuleOptions { ConnectionStringName = "" }));
+        Assert.Equal("ConnectionStringName", ex.ParamName);
     }
 }

@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 
 using Themia.Framework.Data.Dapper.Connection;
 using Themia.Framework.Data.Dapper.Mapping;
+using Themia.Messaging;
 using Themia.Messaging.Inbox;
 using Themia.Messaging.Outbox;
 using Themia.Modules.Messaging.Inbox;
@@ -18,11 +19,12 @@ public static class MessagingServiceCollectionExtensions
 {
     /// <summary>
     /// Adds the Messaging module's own services: the peer-agnostic outbox store, the
-    /// <see cref="DrainSignal{TRow}"/>, and the shared <c>OutboxDrainer</c> hosted service. The adopter must ALSO
-    /// register a provider dialect via <c>AddThemiaMessaging{PostgreSql|MySql|SqlServer}(...)</c>, an
-    /// <see cref="IOutboxDispatcher{TRow}"/> that delivers messages, and a framework data peer (EF with
-    /// <c>modelBuilder.ApplyThemiaMessaging()</c>, or Dapper); then run
-    /// <c>MessagingModule.InitializeAsync</c> to apply the schema migration.
+    /// <see cref="DrainSignal{TRow}"/>, and the shared <c>OutboxDrainer</c> hosted service. Requires
+    /// <c>AddThemiaMessagingIdentity(...)</c> to already be registered: <c>MessageOutboxStore</c> stamps that
+    /// identity on every message it originates. The adopter must ALSO register a provider dialect via
+    /// <c>AddThemiaMessaging{PostgreSql|MySql|SqlServer}(...)</c>, an <see cref="IOutboxDispatcher{TRow}"/>
+    /// that delivers messages, and a framework data peer (EF with <c>modelBuilder.ApplyThemiaMessaging()</c>,
+    /// or Dapper); then run <c>MessagingModule.InitializeAsync</c> to apply the schema migration.
     /// </summary>
     /// <remarks>
     /// <b>If the host uses the Dapper peer, registration order matters here too.</b> Call
@@ -36,14 +38,23 @@ public static class MessagingServiceCollectionExtensions
     /// <param name="configure">Optional callback to configure <see cref="MessagingModuleOptions"/>.</param>
     /// <returns>The same <see cref="IServiceCollection"/> for chaining.</returns>
     /// <exception cref="InvalidOperationException">
-    /// A Dapper data peer is registered but its <c>EntityMappingRegistry</c> is not — call
-    /// <c>AddThemiaDapperCore()</c> before this method.
+    /// No <see cref="MessagingIdentity"/> is registered yet — call <c>AddThemiaMessagingIdentity(...)</c>
+    /// before this method. Or: a Dapper data peer is registered but its <c>EntityMappingRegistry</c> is not
+    /// — call <c>AddThemiaDapperCore()</c> before this method.
     /// </exception>
     public static IServiceCollection AddThemiaMessagingModule(
         this IServiceCollection services,
         Action<MessagingModuleOptions>? configure = null)
     {
         ArgumentNullException.ThrowIfNull(services);
+
+        if (services.All(d => d.ServiceType != typeof(MessagingIdentity)))
+        {
+            throw new InvalidOperationException(
+                "AddThemiaMessagingModule requires AddThemiaMessagingIdentity(...) to already be registered: "
+                + "MessageOutboxStore stamps this service's identity on every message it originates. Call "
+                + "AddThemiaMessagingIdentity(...) BEFORE calling AddThemiaMessagingModule.");
+        }
 
         var options = new MessagingModuleOptions();
         configure?.Invoke(options);

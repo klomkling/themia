@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
+using Themia.Messaging.DependencyInjection;
 using Themia.Messaging.Outbox;
 using Themia.Modules.Messaging.DependencyInjection;
 using Themia.Modules.Messaging.Stores;
@@ -18,7 +19,8 @@ public class AddThemiaMessagingModuleTests
     private static ServiceCollection BuildServices()
     {
         var services = new ServiceCollection();
-        services.AddThemiaMessagingModule(o => o.Origin = "test-origin");
+        services.AddThemiaMessagingIdentity("test-origin");
+        services.AddThemiaMessagingModule();
         return services;
     }
 
@@ -57,8 +59,9 @@ public class AddThemiaMessagingModuleTests
     public void AddThemiaMessagingModule_ShouldReturn_SameServiceCollection()
     {
         var services = new ServiceCollection();
+        services.AddThemiaMessagingIdentity("test-origin");
 
-        var result = services.AddThemiaMessagingModule(o => o.Origin = "test-origin");
+        var result = services.AddThemiaMessagingModule();
 
         Assert.Same(services, result);
     }
@@ -81,9 +84,9 @@ public class AddThemiaMessagingModuleTests
     public void AddThemiaMessagingModule_ShouldPropagate_DrainAndRetentionSettings()
     {
         var services = new ServiceCollection();
+        services.AddThemiaMessagingIdentity("test-origin");
         services.AddThemiaMessagingModule(o =>
         {
-            o.Origin = "test-origin";
             o.DrainIntervalSeconds = 9;
             o.MaxBatchSize = 17;
             o.MaxAttempts = 4;
