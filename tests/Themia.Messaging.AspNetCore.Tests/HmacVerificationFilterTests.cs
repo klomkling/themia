@@ -281,6 +281,65 @@ public class HmacVerificationFilterTests
         }
     }
 
+    // The level is chosen from the declared topology. On a peer marked bi-directional, stopping a loop is
+    // the guard working as designed and happens per message — Warning there would page an operator on
+    // healthy traffic and bury the real warnings from this same filter.
+    [Fact]
+    public async Task InvokeAsync_ShouldLogAtInformation_WhenTheLoopingPeerIsDeclaredBiDirectional()
+    {
+        var (options, peer) = BuildPeer();
+        var body = "{}";
+        var headers = SignedHeaders(peer, Now, body, Secret, origin: "self");
+        var httpContext = BuildContext(peer, headers, body);
+        var verification = new VerificationOptions();
+        verification.MarkBiDirectional(peer.Name);
+        var logger = new RecordingLogger<HmacVerificationFilter>();
+
+        var (status, nextCalled) = await InvokeFilterAsync(
+            BuildFilter(options, new MessagingIdentity("self"), logger: logger, verification: verification), httpContext);
+
+        Assert.False(nextCalled);
+        Assert.Equal(StatusCodes.Status200OK, status);
+        Assert.Contains(logger.Entries, e => e.Level == LogLevel.Information);
+        Assert.DoesNotContain(logger.Entries, e => e.Level == LogLevel.Warning);
+    }
+
+    // The echo topology: a peer that replies by returning the inbound envelope with Origin preserved.
+    // Those replies legitimately carry the receiver's own origin, and with the guard on they are dropped
+    // with a 200 that the sender records as Delivered — lost silently on both sides.
+    [Fact]
+    public async Task InvokeAsync_ShouldRunEndpoint_WhenOriginMatchesButTheLoopGuardIsDisabled()
+    {
+        var (options, peer) = BuildPeer();
+        var body = "{}";
+        var headers = SignedHeaders(peer, Now, body, Secret, origin: "self");
+        var httpContext = BuildContext(peer, headers, body);
+        var verification = new VerificationOptions { DisableLoopGuard = true };
+
+        var (status, nextCalled) = await InvokeFilterAsync(
+            BuildFilter(options, new MessagingIdentity("self"), verification: verification), httpContext);
+
+        Assert.True(nextCalled);
+        Assert.Equal(StatusCodes.Status200OK, status);
+    }
+
+    // A padded origin must still match. HTTP strips optional whitespace around a header value in transit,
+    // so an untrimmed identity would compare "svc-a " against an inbound "svc-a" and never fire.
+    [Fact]
+    public async Task InvokeAsync_ShouldStillDetectTheLoop_WhenTheConfiguredOriginWasPadded()
+    {
+        var (options, peer) = BuildPeer();
+        var body = "{}";
+        var headers = SignedHeaders(peer, Now, body, Secret, origin: "self");
+        var httpContext = BuildContext(peer, headers, body);
+
+        var (status, nextCalled) = await InvokeFilterAsync(
+            BuildFilter(options, new MessagingIdentity("  self  ")), httpContext);
+
+        Assert.False(nextCalled);
+        Assert.Equal(StatusCodes.Status200OK, status);
+    }
+
     [Fact]
     public async Task InvokeAsync_ShouldRunEndpoint_WhenOriginDiffersFromOwnOrigin()
     {
@@ -476,8 +535,9 @@ public class HmacVerificationFilterTests
 
     private static HmacVerificationFilter BuildFilter(
         HmacOptions options, MessagingIdentity? identity = null, TimeProvider? time = null,
-        RecordingLogger<HmacVerificationFilter>? logger = null)
-        => new(options, new HmacVerifier(), identity ?? new MessagingIdentity("unused-default-origin"), time ?? new FakeTimeProvider(Now),
+        RecordingLogger<HmacVerificationFilter>? logger = null, VerificationOptions? verification = null)
+        => new(options, new HmacVerifier(), identity ?? new MessagingIdentity("unused-default-origin"),
+            verification ?? new VerificationOptions(), time ?? new FakeTimeProvider(Now),
             logger ?? new RecordingLogger<HmacVerificationFilter>());
 
     private static async Task<(int Status, bool NextCalled)> InvokeFilterAsync(HmacVerificationFilter filter, DefaultHttpContext httpContext)

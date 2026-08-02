@@ -1,6 +1,8 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
+using Themia.Messaging.DependencyInjection;
+
 namespace Themia.Messaging.Hmac.DependencyInjection;
 
 /// <summary>DI entry point for the <c>themia-hmac-v1</c> peer registry and verifier.</summary>
@@ -22,13 +24,11 @@ public static class HmacServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(configure);
 
-        if (services.Any(d => d.ServiceType == typeof(HmacOptions)))
-        {
-            throw new InvalidOperationException(
-                "AddThemiaMessagingHmac has already been called: HmacOptions is already registered. Calling "
-                + "it again would silently discard this call's peers instead of adding to the existing "
-                + "registry. Register all peers in a single AddThemiaMessagingHmac(...) call.");
-        }
+        MessagingRegistrationGuards.ThrowIfAlreadyRegistered<HmacOptions>(
+            services,
+            "AddThemiaMessagingHmac has already been called: HmacOptions is already registered. Calling "
+            + "it again would silently discard this call's peers instead of adding to the existing "
+            + "registry. Register all peers in a single AddThemiaMessagingHmac(...) call.");
 
         var options = new HmacOptions();
         configure(options);

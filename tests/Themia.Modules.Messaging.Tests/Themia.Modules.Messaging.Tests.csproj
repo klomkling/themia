@@ -22,5 +22,9 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/modules/Themia.Modules.Messaging/Themia.Modules.Messaging.csproj" />
+    <!-- For OriginRoundTripTests: the stamp lives in this module, the comparison lives in the verifier,
+         and the whole point of MessagingIdentity is that they read one registration. Pinning that needs
+         both halves in one test assembly. -->
+    <ProjectReference Include="../../src/neutral/Themia.Messaging.AspNetCore/Themia.Messaging.AspNetCore.csproj" />
   </ItemGroup>
 </Project>

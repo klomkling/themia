@@ -1,13 +1,22 @@
 #nullable enable
-Themia.Messaging.Hmac.DependencyInjection.HmacServiceCollectionExtensions
-Themia.Messaging.Hmac.ThemiaHmacV1
+const Themia.Messaging.Hmac.HmacHeaderNames.DefaultPrefix = "X-Themia-" -> string!
 const Themia.Messaging.Hmac.ThemiaHmacV1.SchemeName = "themia-hmac-v1" -> string!
+const Themia.Messaging.MessagingIdentity.MaxOriginLength = 100 -> int
+static Themia.Messaging.DependencyInjection.MessagingIdentityServiceCollectionExtensions.AddThemiaMessagingIdentity(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, string! origin) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static Themia.Messaging.Hmac.DependencyInjection.HmacServiceCollectionExtensions.AddThemiaMessagingHmac(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Themia.Messaging.Hmac.HmacOptions!>! configure) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static Themia.Messaging.Hmac.HmacVerificationResult.MalformedTimestamp() -> Themia.Messaging.Hmac.HmacVerificationResult
+static Themia.Messaging.Hmac.HmacVerificationResult.SignatureMismatch() -> Themia.Messaging.Hmac.HmacVerificationResult
+static Themia.Messaging.Hmac.HmacVerificationResult.StaleTimestamp(System.TimeSpan skew) -> Themia.Messaging.Hmac.HmacVerificationResult
+static Themia.Messaging.Hmac.HmacVerificationResult.UnknownKeyId() -> Themia.Messaging.Hmac.HmacVerificationResult
+static Themia.Messaging.Hmac.HmacVerificationResult.UnknownScheme() -> Themia.Messaging.Hmac.HmacVerificationResult
+static Themia.Messaging.Hmac.HmacVerificationResult.Verified(string! matchedKeyId) -> Themia.Messaging.Hmac.HmacVerificationResult
 static Themia.Messaging.Hmac.ThemiaHmacV1.Canonicalize(string! timestamp, string! method, string! pathAndQuery, string! body) -> string!
 static Themia.Messaging.Hmac.ThemiaHmacV1.FormatTimestamp(System.DateTimeOffset value) -> string!
 static Themia.Messaging.Hmac.ThemiaHmacV1.Sign(string! canonical, string! secret) -> string!
 static Themia.Messaging.Hmac.ThemiaHmacV1.TryParseTimestamp(string? value, out System.DateTimeOffset result) -> bool
+Themia.Messaging.DependencyInjection.MessagingIdentityServiceCollectionExtensions
+Themia.Messaging.Hmac.DependencyInjection.HmacServiceCollectionExtensions
 Themia.Messaging.Hmac.HmacHeaderNames
-const Themia.Messaging.Hmac.HmacHeaderNames.DefaultPrefix = "X-Themia-" -> string!
 Themia.Messaging.Hmac.HmacHeaderNames.HmacHeaderNames(string! Prefix) -> void
 Themia.Messaging.Hmac.HmacHeaderNames.KeyId.get -> string!
 Themia.Messaging.Hmac.HmacHeaderNames.Origin.get -> string!
@@ -65,10 +74,7 @@ Themia.Messaging.Hmac.MessagingPeerBuilder.MaxBodyBytes.set -> void
 Themia.Messaging.Hmac.MessagingPeerBuilder.MessagingPeerBuilder() -> void
 Themia.Messaging.Hmac.MessagingPeerBuilder.Route(string! type, string! path) -> void
 Themia.Messaging.Hmac.MessagingPeerBuilder.SignWith(string! keyId, string! secret) -> void
-static Themia.Messaging.Hmac.DependencyInjection.HmacServiceCollectionExtensions.AddThemiaMessagingHmac(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Themia.Messaging.Hmac.HmacOptions!>! configure) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
-static Themia.Messaging.Hmac.HmacVerificationResult.MalformedTimestamp() -> Themia.Messaging.Hmac.HmacVerificationResult
-static Themia.Messaging.Hmac.HmacVerificationResult.SignatureMismatch() -> Themia.Messaging.Hmac.HmacVerificationResult
-static Themia.Messaging.Hmac.HmacVerificationResult.StaleTimestamp(System.TimeSpan skew) -> Themia.Messaging.Hmac.HmacVerificationResult
-static Themia.Messaging.Hmac.HmacVerificationResult.UnknownKeyId() -> Themia.Messaging.Hmac.HmacVerificationResult
-static Themia.Messaging.Hmac.HmacVerificationResult.UnknownScheme() -> Themia.Messaging.Hmac.HmacVerificationResult
-static Themia.Messaging.Hmac.HmacVerificationResult.Verified(string! matchedKeyId) -> Themia.Messaging.Hmac.HmacVerificationResult
+Themia.Messaging.Hmac.ThemiaHmacV1
+Themia.Messaging.MessagingIdentity
+Themia.Messaging.MessagingIdentity.MessagingIdentity(string! origin) -> void
+Themia.Messaging.MessagingIdentity.Origin.get -> string!

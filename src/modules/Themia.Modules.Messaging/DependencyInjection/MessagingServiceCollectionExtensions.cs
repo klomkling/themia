@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 
 using Themia.Framework.Data.Dapper.Connection;
 using Themia.Framework.Data.Dapper.Mapping;
+using Themia.Messaging.DependencyInjection;
 using Themia.Messaging;
 using Themia.Messaging.Inbox;
 using Themia.Messaging.Outbox;
@@ -48,13 +49,11 @@ public static class MessagingServiceCollectionExtensions
     {
         ArgumentNullException.ThrowIfNull(services);
 
-        if (services.All(d => d.ServiceType != typeof(MessagingIdentity)))
-        {
-            throw new InvalidOperationException(
-                "AddThemiaMessagingModule requires AddThemiaMessagingIdentity(...) to already be registered: "
-                + "MessageOutboxStore stamps this service's identity on every message it originates. Call "
-                + "AddThemiaMessagingIdentity(...) BEFORE calling AddThemiaMessagingModule.");
-        }
+        MessagingRegistrationGuards.RequireRegistered<MessagingIdentity>(
+            services,
+            "AddThemiaMessagingModule requires AddThemiaMessagingIdentity(...) to already be registered: "
+            + "MessageOutboxStore stamps this service's identity on every message it originates. Call "
+            + "AddThemiaMessagingIdentity(...) BEFORE calling AddThemiaMessagingModule.");
 
         var options = new MessagingModuleOptions();
         configure?.Invoke(options);
@@ -113,22 +112,18 @@ public static class MessagingServiceCollectionExtensions
     {
         ArgumentNullException.ThrowIfNull(services);
 
-        if (services.All(d => d.ServiceType != typeof(IDapperConnectionContext)))
-        {
-            throw new InvalidOperationException(
-                "AddThemiaMessagingInbox requires the Dapper data peer: register AddThemiaDapper{Postgres|MySql|SqlServer}(...) "
-                + "BEFORE calling AddThemiaMessagingInbox. The inbox is not supported on the EF peer because admission must "
-                + "commit inside the caller's transaction, and Themia.Framework.Data.EFCore exposes no ambient connection.");
-        }
+        MessagingRegistrationGuards.RequireRegistered<IDapperConnectionContext>(
+            services,
+            "AddThemiaMessagingInbox requires the Dapper data peer: register AddThemiaDapper{Postgres|MySql|SqlServer}(...) "
+            + "BEFORE calling AddThemiaMessagingInbox. The inbox is not supported on the EF peer because admission must "
+            + "commit inside the caller's transaction, and Themia.Framework.Data.EFCore exposes no ambient connection.");
 
-        if (services.All(d => d.ServiceType != typeof(MessagingModuleOptions)))
-        {
-            throw new InvalidOperationException(
-                "AddThemiaMessagingInbox requires AddThemiaMessagingModule(...) to already be registered: "
-                + "InboxPurgeService needs the MessagingModuleOptions and outbox dialect that only "
-                + "AddThemiaMessagingModule registers. Call AddThemiaMessagingModule(...) BEFORE calling "
-                + "AddThemiaMessagingInbox.");
-        }
+        MessagingRegistrationGuards.RequireRegistered<MessagingModuleOptions>(
+            services,
+            "AddThemiaMessagingInbox requires AddThemiaMessagingModule(...) to already be registered: "
+            + "InboxPurgeService needs the MessagingModuleOptions and outbox dialect that only "
+            + "AddThemiaMessagingModule registers. Call AddThemiaMessagingModule(...) BEFORE calling "
+            + "AddThemiaMessagingInbox.");
 
         services.TryAddScoped<IInboxStore, DapperInboxStore>();
         services.AddHostedService<InboxPurgeService>();

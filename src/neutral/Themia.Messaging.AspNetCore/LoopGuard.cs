@@ -19,21 +19,19 @@ public static class LoopGuard
     /// <param name="headers">The verified request's headers.</param>
     /// <param name="headerNames">The peer's header names, used to locate the <c>Origin</c> header.</param>
     /// <param name="ownOrigin">
-    /// This service's own configured origin (<see cref="Themia.Messaging.MessagingIdentity.Origin"/>). The
-    /// guard is inactive — always returns <see langword="false"/> — when this is <see langword="null"/> or
-    /// empty.
+    /// This service's own origin (<see cref="Themia.Messaging.MessagingIdentity.Origin"/>), which is
+    /// always non-blank — <see cref="Themia.Messaging.MessagingIdentity"/> rejects a blank origin at
+    /// construction. To turn the guard off, set <see cref="VerificationOptions.DisableLoopGuard"/>; that
+    /// is checked by the caller, not here.
     /// </param>
     /// <returns><see langword="true"/> when the request has looped back to its own origin.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="headers"/> or <paramref name="headerNames"/> is null.</exception>
-    public static bool IsLoopback(IReadOnlyDictionary<string, string?> headers, HmacHeaderNames headerNames, string? ownOrigin)
+    /// <exception cref="ArgumentException"><paramref name="ownOrigin"/> is empty.</exception>
+    public static bool IsLoopback(IReadOnlyDictionary<string, string?> headers, HmacHeaderNames headerNames, string ownOrigin)
     {
         ArgumentNullException.ThrowIfNull(headers);
         ArgumentNullException.ThrowIfNull(headerNames);
-
-        if (string.IsNullOrEmpty(ownOrigin))
-        {
-            return false;
-        }
+        ArgumentException.ThrowIfNullOrEmpty(ownOrigin);
 
         return headers.TryGetValue(headerNames.Origin, out var origin)
             && !string.IsNullOrEmpty(origin)

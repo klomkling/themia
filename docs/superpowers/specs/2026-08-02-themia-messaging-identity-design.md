@@ -58,6 +58,23 @@ services.AddThemiaMessagingIdentity("propertiezy");
 There is then exactly one place in a host where the origin string is written. Drift is not "caught" —
 it is unrepresentable, on every wiring path, without a new package.
 
+### Revision 2 — where the type actually lives
+
+The sections below describe placing `MessagingIdentity` in `Themia.Messaging`. **It ships in
+`Themia.Messaging.Hmac` instead**, under the same `Themia.Messaging` namespace (the type is not an HMAC
+concept; only its assembly changed). A review caught that referencing `Themia.Messaging` from
+`Themia.Messaging.AspNetCore` drags the outbox drainer, dialects, inbox admission and
+`Microsoft.Extensions.Hosting.Abstractions` into receive-only hosts that never publish anything.
+`Themia.Messaging.Hmac` is the one package both halves already reference and has no project
+dependencies of its own, so it carries the type for free. `Themia.Modules.Messaging` gains a reference
+to it; `Themia.Messaging.AspNetCore` keeps only its existing Hmac reference.
+
+Revision 2 also hardened the type itself: the origin is **trimmed** (HTTP strips optional whitespace
+around a header value in transit per RFC 9110 §5.5, so an untrimmed padded origin would be stamped
+padded, arrive trimmed, and never match — silently disabling the guard), and is rejected above
+`MaxOriginLength` = 100 to match the `origin` column width in both schemas, which nothing else was
+checking after `MessagingModuleOptions.Validate()` lost its `Origin` clause.
+
 ### Why the neutral core can hold it
 
 Read from the csproj files:
@@ -96,18 +113,20 @@ sequence — nothing here blocks it.
 | 9 | `Themia.Messaging.AspNetCore.csproj` | add `ProjectReference` to `Themia.Messaging` |
 | 10 | three `PublicAPI.Unshipped.txt` files | add `MessagingIdentity`; remove both `Origin` members |
 
-### `LoopGuard` is not touched
+### `LoopGuard` — reversed in revision 2
 
-An earlier draft of this spec changed `IsLoopback`'s `ownOrigin` to non-nullable and dropped its
-empty-origin early return. Both were unnecessary: that branch is **redundant, not dead**. With it
-removed, `LoopGuard.cs:37-39` still returns `false` for a null or empty `ownOrigin`, because
-`!string.IsNullOrEmpty(origin)` already excludes an empty header and `string.Equals("self", null)`
-and `string.Equals("self", "")` are both false. `LoopGuardTests.cs:35-43` asserts exactly that and
-keeps passing either way.
+An earlier draft changed `IsLoopback`'s `ownOrigin` to non-nullable; the first scrutiny pass reverted
+that, on the grounds that the empty-origin branch is redundant rather than dead, so removing it changes
+no behaviour. That reasoning was correct and still is — but it answered the wrong question. A later
+review pointed out what it missed: the **shipped XML doc still advertised "the guard is inactive when
+this is null or empty"**, which became a lie the moment `MessagingIdentity` was made mandatory. An
+adopter reading the public API would believe loop protection was opt-out and build a host on it.
 
-So `LoopGuard.cs` and `LoopGuardTests.cs` are left alone. The filter will pass an origin that is
-never empty; a loose nullable annotation on a public static helper does not justify a breaking
-signature edit inside this change.
+Revision 2 therefore does make `ownOrigin` non-nullable and drops the branch — not to remove dead code,
+but because the doc had to stop claiming an escape hatch that no longer existed there. The escape hatch
+itself moved to `VerificationOptions.DisableLoopGuard` (below). `LoopGuardTests`' blank-origin theory is
+**retargeted, not deleted**: it now asserts the method throws on a blank origin, which is the new
+contract.
 
 ### `VerificationOptions` survives
 
@@ -143,17 +162,24 @@ one package over, which has its own regression test
 four that already exist — scan the collection, throw at registration time with a message naming what
 to call first, rather than failing later with an opaque DI activation error.
 
-### Behaviour change: the loop guard can no longer be disabled
+### Behaviour change: the off-switch moves — revised in revision 2
 
 `VerificationOptions.Origin` documented "leave unset (the default) to disable the loop guard — every
-verified request then reaches the endpoint." That off-switch disappears: the identity is always
-present, so the guard always runs.
+verified request then reaches the endpoint." Deleting that property deleted the off-switch with it.
 
-This is deliberate. The guard fires only when a message arrives carrying **its own origin**, which
-means it has returned to the service that created it. There is no configuration in which accepting
-your own looped message is correct — the off-switch only ever made the loop bug reachable. A
-uni-directional receiver is unaffected: inbound messages carry the *sender's* origin, so the
-comparison never matches and every request reaches the endpoint exactly as before.
+**The first version of this spec argued that was safe, and that argument was wrong.** It reasoned that
+the guard fires only when a message carries its own origin, meaning it returned to its creator, so
+there is no configuration where accepting it is correct. A later review produced the counter-example:
+an **echo topology**, where a peer replies by returning the inbound envelope with `Origin` preserved so
+the originator can correlate the reply. Those replies legitimately carry the receiver's own origin.
+With the guard unconditional they are dropped with a 200 — which `HttpStatusClassifier` maps to
+`Delivered`, so the sender marks the row Sent and never retries. The reply is lost silently on both
+sides, which is the same class of invisible failure this whole change was written to remove.
+
+Revision 2 restores the capability as an explicit `VerificationOptions.DisableLoopGuard` (default
+`false`) rather than by reviving a nullable `Origin`. The origin keeps exactly one source; only the
+"should the guard run at all" decision is configurable, and it is now stated rather than inferred from
+whether someone remembered to set a string.
 
 ## Testing
 

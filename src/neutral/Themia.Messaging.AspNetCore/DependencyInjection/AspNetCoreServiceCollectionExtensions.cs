@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
 using Themia.Messaging;
+using Themia.Messaging.DependencyInjection;
 using Themia.Messaging.Hmac;
 
 namespace Themia.Messaging.AspNetCore.DependencyInjection;
@@ -37,22 +38,18 @@ public static class AspNetCoreServiceCollectionExtensions
     {
         ArgumentNullException.ThrowIfNull(services);
 
-        if (services.All(d => d.ServiceType != typeof(HmacOptions)))
-        {
-            throw new InvalidOperationException(
-                "AddThemiaMessagingVerification requires AddThemiaMessagingHmac(...) to already be "
-                + "registered: HmacVerificationFilter resolves HmacOptions to find the peer a route was "
-                + "protected with. Call AddThemiaMessagingHmac(...) BEFORE calling AddThemiaMessagingVerification.");
-        }
+        MessagingRegistrationGuards.RequireRegistered<HmacOptions>(
+            services,
+            "AddThemiaMessagingVerification requires AddThemiaMessagingHmac(...) to already be "
+            + "registered: HmacVerificationFilter resolves HmacOptions to find the peer a route was "
+            + "protected with. Call AddThemiaMessagingHmac(...) BEFORE calling AddThemiaMessagingVerification.");
 
-        if (services.All(d => d.ServiceType != typeof(MessagingIdentity)))
-        {
-            throw new InvalidOperationException(
-                "AddThemiaMessagingVerification requires AddThemiaMessagingIdentity(...) to already be "
-                + "registered: HmacVerificationFilter compares this service's identity against the inbound "
-                + "Origin header to detect a message that has looped back. Call AddThemiaMessagingIdentity(...) "
-                + "BEFORE calling AddThemiaMessagingVerification.");
-        }
+        MessagingRegistrationGuards.RequireRegistered<MessagingIdentity>(
+            services,
+            "AddThemiaMessagingVerification requires AddThemiaMessagingIdentity(...) to already be "
+            + "registered: HmacVerificationFilter compares this service's identity against the inbound "
+            + "Origin header to detect a message that has looped back. Call AddThemiaMessagingIdentity(...) "
+            + "BEFORE calling AddThemiaMessagingVerification.");
 
         var options = new VerificationOptions();
         configure?.Invoke(options);
