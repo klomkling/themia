@@ -116,7 +116,9 @@ This Themia effort is tracked in the **ai-brains vault** (`/Users/sarawut/Obsidi
 - Timeline log: `Note Timeline Hub.md`
 
 > [!TIP]
-> `ai-brains` and `coord` are accessible directly via **MCP Server tools** (`read_note`, `search_notes`, `list_folder`, `read_moc`, `append_timeline`, `write_session_log`, `upsert_design_note` / `list_requests`, `show_request`, `new_request`, `set_status`, `next_request`, `sync`) connected centrally to Homelab over Tailscale (`http://100.97.42.23:3001/sse` and `3002/sse`). Changes auto-commit and sync via Git (`klomkling/ai-brains.git`).
+> `ai-brains` and `coord` are accessible directly via **MCP Server tools** (`read_note`, `search_notes`, `list_folder`, `read_moc`, `append_timeline`, `write_session_log`, `upsert_design_note` / `list_requests`, `show_request`, `get_note`, `new_request`, `set_status`, `next_request`, `sync`) connected centrally to Homelab over Tailscale (coord = `http://100.97.42.23:3001/sse`, ai-brains = `:3002/sse`). Changes auto-commit and sync via Git (`klomkling/ai-brains.git`).
+>
+> **Reading long coord threads:** a well-discussed request's full JSON exceeds the context window. Call `show_request(id, history: "index")` first — one preview line per history entry — then `get_note(id, index)` for any single entry in full. Only use the default `history: "full"` on short threads. Read the WHOLE index before re-asking anything: on #0050 an already-posted answer was missed and re-asked because the thread was grepped narrowly instead of read. Writes (`set_status`, `new_request`) return compact confirmations that include per-field character counts — check them (a malformed filing shows up as `proposed_api=0 chars` with everything crammed into `intent`) instead of re-reading the request.
 
 **What the vault hooks auto-capture** (global `~/.claude/settings.json`) — and *where*:
 
