@@ -1,4 +1,6 @@
 #nullable enable
+Themia.Messaging.DependencyInjection.MessagingIdentityServiceCollectionExtensions
+static Themia.Messaging.DependencyInjection.MessagingIdentityServiceCollectionExtensions.AddThemiaMessagingIdentity(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, string! origin) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
 Themia.Messaging.Outbox.BackoffPolicy
 Themia.Messaging.Outbox.DispatchOutcome
 Themia.Messaging.Outbox.DispatchOutcome.Delivered = 0 -> Themia.Messaging.Outbox.DispatchOutcome
@@ -76,6 +78,9 @@ Themia.Messaging.Messages.MessageEnvelope.Type.set -> void
 Themia.Messaging.Messages.MessageEnvelope.Validate() -> void
 Themia.Messaging.Messages.MessageEnvelope.Version.get -> long?
 Themia.Messaging.Messages.MessageEnvelope.Version.set -> void
+Themia.Messaging.MessagingIdentity
+Themia.Messaging.MessagingIdentity.MessagingIdentity(string! origin) -> void
+Themia.Messaging.MessagingIdentity.Origin.get -> string!
 Themia.Messaging.Outbox.ClaimedMessageRow
 Themia.Messaging.Outbox.ClaimedMessageRow.ClaimedMessageRow(System.Guid Id, System.Guid MessageId, string? TenantId, string! Type, string! Payload, string! Destination, string! Origin, string? EntityKey, long? Version, string? Headers, int Attempts) -> void
 Themia.Messaging.Outbox.ClaimedMessageRow.Attempts.get -> int
