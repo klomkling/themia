@@ -10,6 +10,60 @@ with the *why* and concrete upgrade steps.
 - Each entry states: **What changed**, **Why**, and **How to upgrade** (before → after).
 - Non-breaking changes are *not* listed here — see the CHANGELOG.
 
+## Unreleased
+
+### `Themia.Notifications`: the logger stubs no longer report success
+
+**What changed:** `LoggerEmailSender` and `LoggerSmsSender` returned `NotificationResult.Success()`
+without sending anything. They now return `NotificationResult.NoProviderConfigured(reason)` —
+`Succeeded == false`, and the new `NotificationResult.NotConfigured == true` — and log at `Warning`
+instead of `Information`.
+
+**Why:** `AddThemiaNotifications()` registers those stubs with `TryAdd` so the DI graph always resolves.
+That is deliberate and stays. But combined with a success result it meant a host that never configured a
+real provider saw every send succeed while nothing was delivered, with no signal anywhere — and a
+caller's retry or audit logic recorded deliveries that never happened. "I deliberately did not send
+this" and "I sent this" must not be the same value.
+
+**Who is affected:** any host that runs on the stub for a channel — which includes running deliberately
+without SMTP, a supported and normal state. Both known consumers do this: ezy-assets falls back to the
+stub when `Email:Smtp:Host` is unset, and propertiezy documents an unset `Smtp:Host` as "a normal,
+supported state".
+
+**How to upgrade.** Anywhere you treat a non-success result as a failure, separate "not configured"
+from "the provider rejected it":
+
+```csharp
+// before — an unconfigured channel looked like a successful send
+var result = await emailSender.SendAsync(message, ct);
+if (!result.Succeeded)
+{
+    logger.LogError("Email delivery failed: {Error}", result.Error);
+    return Problem("Could not send the email.");
+}
+
+// after — an intentionally-disabled channel is not an error
+var result = await emailSender.SendAsync(message, ct);
+if (result.NotConfigured)
+{
+    // Nothing was sent, and that was the configuration's intent.
+    // Fall back to whatever you did before (log the invite link, skip the notification, ...).
+    logger.LogInformation("Email delivery is not configured; skipping.");
+}
+else if (!result.Succeeded)
+{
+    logger.LogError("Email delivery failed: {Error}", result.Error);
+    return Problem("Could not send the email.");
+}
+```
+
+If you previously relied on `Succeeded == true` from the stub to mean "handled", the equivalent check is
+now `result.Succeeded || result.NotConfigured`.
+
+**If you would rather fail fast instead:** treat `NotConfigured` as a startup error in environments
+where delivery is required. The framework does not decide this for you — it only stops claiming the
+message was delivered.
+
 ## 0.11.0
 
 ### `Themia.Modules.Notifications`: outbox drain plumbing moved into `Themia.Messaging`

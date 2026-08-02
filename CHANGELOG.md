@@ -25,6 +25,26 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
   moved out to `docs/changelog/changelog-YYYY.md` and replaced here by a one-line link under
   [Older releases](#older-releases). The current (and most recent) year stays inline.
 
+## [Unreleased]
+
+### Fixed
+- **(breaking) `Themia.Notifications`** — `LoggerEmailSender` and `LoggerSmsSender` reported
+  `NotificationResult.Success()` having sent nothing, and `AddThemiaNotifications()` registers them via
+  `TryAdd` so the DI graph always resolves. A host that never configured a real provider — or configured
+  one whose settings were incomplete — therefore saw **every send succeed while no message was ever
+  delivered**, with nothing in the result or the logs to distinguish that from working. The caller's own
+  retry and audit logic recorded deliveries that never happened.
+
+  Both stubs now return the new `NotificationResult.NoProviderConfigured(reason)` — `Succeeded` is
+  `false`, the new `NotificationResult.NotConfigured` is `true` — and log at **Warning** rather than
+  Information, so the condition survives the Information-level filtering common in production.
+
+  Running without a provider stays a fully supported state. What changes is that it is no longer
+  indistinguishable from delivery. Callers that treat any non-success as a failure need to separate the
+  two — see [MIGRATION.md](MIGRATION.md). Found while scoping `Themia.Otp` (coord #0056), where the same
+  path would have turned a missing SMS provider into an authentication outage with no signal
+  (coord #0057).
+
 ## [0.11.0] - 2026-08-02
 
 ### Added
