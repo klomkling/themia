@@ -92,22 +92,49 @@ sequence — nothing here blocks it.
 | 5 | `Themia.Modules.Messaging/.../MessagingServiceCollectionExtensions.cs` | `AddThemiaMessagingModule` throws when no identity is registered |
 | 6 | `Themia.Messaging.AspNetCore/VerificationOptions.cs` | remove `Origin`; `MarkBiDirectional` is all that remains |
 | 7 | `Themia.Messaging.AspNetCore/HmacVerificationFilter.cs` | inject `MessagingIdentity`; pass `identity.Origin` to the guard |
-| 8 | `Themia.Messaging.AspNetCore/LoopGuard.cs` | `ownOrigin` becomes non-nullable; drop the now-dead inactive branch |
-| 9 | `Themia.Messaging.AspNetCore/.../AspNetCoreServiceCollectionExtensions.cs` | `AddThemiaMessagingVerification` throws when no identity is registered |
-| 10 | `Themia.Messaging.AspNetCore.csproj` | add `ProjectReference` to `Themia.Messaging` |
-| 11 | three `PublicAPI.Unshipped.txt` files | add `MessagingIdentity`; remove both `Origin` members; amend the `IsLoopback` signature |
+| 8 | `Themia.Messaging.AspNetCore/.../AspNetCoreServiceCollectionExtensions.cs` | `AddThemiaMessagingVerification` throws when no identity is registered |
+| 9 | `Themia.Messaging.AspNetCore.csproj` | add `ProjectReference` to `Themia.Messaging` |
+| 10 | three `PublicAPI.Unshipped.txt` files | add `MessagingIdentity`; remove both `Origin` members |
+
+### `LoopGuard` is not touched
+
+An earlier draft of this spec changed `IsLoopback`'s `ownOrigin` to non-nullable and dropped its
+empty-origin early return. Both were unnecessary: that branch is **redundant, not dead**. With it
+removed, `LoopGuard.cs:37-39` still returns `false` for a null or empty `ownOrigin`, because
+`!string.IsNullOrEmpty(origin)` already excludes an empty header and `string.Equals("self", null)`
+and `string.Equals("self", "")` are both false. `LoopGuardTests.cs:35-43` asserts exactly that and
+keeps passing either way.
+
+So `LoopGuard.cs` and `LoopGuardTests.cs` are left alone. The filter will pass an origin that is
+never empty; a loose nullable annotation on a public static helper does not justify a breaking
+signature edit inside this change.
+
+### `VerificationOptions` survives
+
+With `Origin` gone it retains only `MarkBiDirectional` and `BiDirectionalPeers`, which
+`LoopGuardStartupWarnings.cs:17` enumerates to warn about channels with no loop protection. A
+one-method options class still earns its place — do not simplify it away.
 
 ### `AddThemiaMessagingIdentity` semantics
 
-Scans the collection for an already-registered `MessagingIdentity` instance:
+Mirrors `AddThemiaMessagingHmac` exactly (`HmacServiceCollectionExtensions.cs:25`): if any descriptor
+with `ServiceType == typeof(MessagingIdentity)` is already present, **throw** — whatever shape that
+registration took. Otherwise register the singleton.
 
-- **absent** → registers it;
-- **present with the same origin** → no-op, so a modular host wiring two Themia modules that each
-  declare the same identity works;
-- **present with a different origin** → throws, naming both values. Two different identities in one
-  process is the drift this spec removes, arriving by another door.
+Two weaker rules were considered and rejected:
 
-`TryAddSingleton` alone is wrong here: it would silently discard the second, differing value.
+- **`TryAddSingleton` alone** silently discards a second, differing value.
+- **Scan for the registered instance, no-op when the origin matches, throw when it differs.** This
+  leaves the drift representable: `services.AddSingleton(sp => new MessagingIdentity("wrong"))`
+  registers a descriptor whose `ImplementationInstance` is `null`, so an instance-scan misses it, a
+  second descriptor is appended, and DI resolves the *last* one. Two identities coexist and the later
+  silently wins — the exact failure this spec exists to remove. The "modular host where two modules
+  each declare the same identity" case that motivated the no-op is speculative: no Themia module
+  registers an identity, the adopter does.
+
+Checking `ServiceType` rather than the instance closes the hole and matches the pattern already used
+one package over, which has its own regression test
+(`AddThemiaMessagingHmac_ShouldThrow_WhenHmacOptionsWasAlreadyRegisteredDirectly`).
 
 ### Registration order
 
@@ -133,20 +160,19 @@ comparison never matches and every request reaches the endpoint exactly as befor
 New:
 
 - `MessagingIdentity` rejects null, empty, and whitespace origins.
-- `AddThemiaMessagingIdentity` twice with the same origin is a no-op.
-- `AddThemiaMessagingIdentity` twice with different origins throws, message contains both values.
+- `AddThemiaMessagingIdentity` called twice throws.
+- `AddThemiaMessagingIdentity` throws when `MessagingIdentity` was registered directly, including via
+  a factory — the case an instance-scan would miss.
 - `AddThemiaMessagingModule` without an identity throws, message names `AddThemiaMessagingIdentity`.
 - `AddThemiaMessagingVerification` without an identity throws, same shape.
 - `MessageOutboxStore` stamps `identity.Origin` when the envelope's `Origin` is unset.
 
 Updated (behaviour preserved, source of the origin changed): `MessagingModuleOptionsTests`,
 `AddThemiaMessagingModuleTests`, `MessagingRegistrationOrderingTests`, `MessageOutboxStoreTests`,
-`AddThemiaMessagingVerificationTests`, `HmacVerificationFilterTests`, `LoopGuardTests`,
-`OutboxRoundTripTests`, `InboxAdmissionTests`.
+`AddThemiaMessagingVerificationTests`, `HmacVerificationFilterTests`, `OutboxRoundTripTests`,
+`InboxAdmissionTests`.
 
-Deleted: the `LoopGuardTests` case asserting the guard is inactive when `ownOrigin` is empty. That
-behaviour is removed by decision, not broken by accident — the test is retired with the feature
-rather than adjusted to keep passing.
+**No test is deleted.** `LoopGuardTests` is untouched — see "`LoopGuard` is not touched" above.
 
 **`RoundTripTests` is the load-bearing one.** It drives the real dispatcher against the real filter
 over a `TestServer` with nothing stubbed, and is the only test proving both halves agree on the wire.
