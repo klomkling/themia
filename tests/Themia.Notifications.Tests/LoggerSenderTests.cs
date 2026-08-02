@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Themia.Notifications.Providers;
+using Themia.TestSupport;
 using Xunit;
 
 namespace Themia.Notifications.Tests;
@@ -76,22 +77,33 @@ public sealed class LoggerSenderTests
         }
     }
 
+    // The subject is not logged either. It used to be, until raising this line to Warning made it survive
+    // the production filtering that had been hiding it — and subjects routinely carry PII or account
+    // context ("Password reset for jane.doe@acme.com", "Invoice INV-2214 for Acme Ltd").
+    [Fact]
+    public async Task LoggerEmail_NeverLogsTheSubject()
+    {
+        const string subject = "Password reset for jane.doe@acme.com";
+        var logger = new RecordingLogger<LoggerEmailSender>();
+
+        await new LoggerEmailSender(logger).SendAsync(new NotificationMessage
+        {
+            Channel = NotificationChannel.Email,
+            Recipient = "jane.doe@acme.com",
+            Subject = subject,
+            Body = "hi",
+        });
+
+        foreach (var (_, message) in logger.Entries)
+        {
+            Assert.DoesNotContain(subject, message, StringComparison.Ordinal);
+        }
+    }
+
     [Fact]
     public async Task LoggerEmail_NullMessage_Throws()
     {
         var sut = new LoggerEmailSender(NullLogger<LoggerEmailSender>.Instance);
         await Assert.ThrowsAsync<ArgumentNullException>(() => sut.SendAsync(null!));
-    }
-
-    private sealed class RecordingLogger<T> : ILogger<T>
-    {
-        public List<(LogLevel Level, string Message)> Entries { get; } = [];
-
-        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
-
-        public bool IsEnabled(LogLevel logLevel) => true;
-
-        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
-            => Entries.Add((logLevel, formatter(state, exception)));
     }
 }

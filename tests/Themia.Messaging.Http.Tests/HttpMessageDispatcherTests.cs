@@ -1,3 +1,4 @@
+using Themia.TestSupport;
 using System.Net;
 using System.Reflection;
 using System.Text;
@@ -416,22 +417,6 @@ internal sealed class StubHandler : HttpMessageHandler
 
         return new HttpResponseMessage(status!.Value);
     }
-}
-
-/// <summary>An <see cref="ILogger{TCategoryName}"/> that records every formatted message for assertion.</summary>
-internal sealed class RecordingLogger<T> : ILogger<T>
-{
-    public List<string> Messages { get; } = [];
-
-    public IDisposable? BeginScope<TState>(TState state)
-        where TState : notnull
-        => null;
-
-    public bool IsEnabled(LogLevel logLevel) => true;
-
-    public void Log<TState>(
-        LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
-        => Messages.Add(formatter(state, exception));
 }
 
 /// <summary>An <see cref="IServiceProvider"/> with nothing registered, for dispatchers that don't need scoped services in tests.</summary>

@@ -36,9 +36,14 @@ Themia.Notifications.NotificationMessage.Subject.get -> string?
 Themia.Notifications.NotificationMessage.Subject.init -> void
 Themia.Notifications.NotificationMessage.Template.get -> string?
 Themia.Notifications.NotificationMessage.Template.init -> void
+Themia.Notifications.NotificationOutcome
+Themia.Notifications.NotificationOutcome.Failed = 1 -> Themia.Notifications.NotificationOutcome
+Themia.Notifications.NotificationOutcome.NotConfigured = 2 -> Themia.Notifications.NotificationOutcome
+Themia.Notifications.NotificationOutcome.Sent = 0 -> Themia.Notifications.NotificationOutcome
 Themia.Notifications.NotificationResult
 Themia.Notifications.NotificationResult.Error.get -> string?
 Themia.Notifications.NotificationResult.NotConfigured.get -> bool
+Themia.Notifications.NotificationResult.Outcome.get -> Themia.Notifications.NotificationOutcome
 Themia.Notifications.NotificationResult.ProviderMessageId.get -> string?
 Themia.Notifications.NotificationResult.Succeeded.get -> bool
 Themia.Notifications.Providers.HttpSmsSenderBase

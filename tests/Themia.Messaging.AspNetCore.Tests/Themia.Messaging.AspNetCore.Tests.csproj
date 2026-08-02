@@ -24,5 +24,6 @@
     <ProjectReference Include="../../src/neutral/Themia.Messaging.AspNetCore/Themia.Messaging.AspNetCore.csproj" />
     <ProjectReference Include="../../src/neutral/Themia.Messaging.Hmac/Themia.Messaging.Hmac.csproj" />
     <ProjectReference Include="../../src/neutral/Themia.Messaging.Http/Themia.Messaging.Http.csproj" />
+    <ProjectReference Include="..\Themia.TestSupport\Themia.TestSupport.csproj" />
   </ItemGroup>
 </Project>

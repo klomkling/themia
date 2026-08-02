@@ -34,9 +34,26 @@ internal sealed class NotificationOutboxDispatcher : IOutboxDispatcher<ClaimedOu
             // tenant and silently falls back to the global config.
             var result = await SendAsync(scopedServices, message, ct).ConfigureAwait(false);
 
-            return result.Succeeded
-                ? DispatchResult.Delivered()
-                : DispatchResult.Transient(result.Error ?? "Sender reported failure.");
+            // Exhaustive over NotificationOutcome deliberately: a new outcome must break this build rather
+            // than fall into a default and be silently mishandled. That is exactly how NotConfigured was
+            // once treated as Transient, which retried every notification to the attempt cap and then
+            // dead-lettered it on any host running without a configured provider.
+            return result.Outcome switch
+            {
+                NotificationOutcome.Sent => DispatchResult.Delivered(),
+
+                // Permanent, not Transient: "no provider is configured" is a deployment-level state, not a
+                // property of this message. Configuration cannot change between backoff attempts, so
+                // retrying burns the attempt cap to reach the same dead-letter with five times the log
+                // noise. Failing on the first attempt puts the reason in last_error immediately, where an
+                // operator can see it.
+                NotificationOutcome.NotConfigured => DispatchResult.Permanent(
+                    result.Error ?? "No provider is configured for this channel; nothing was sent."),
+
+                NotificationOutcome.Failed => DispatchResult.Transient(result.Error ?? "Sender reported failure."),
+
+                _ => throw new NotSupportedException($"Unhandled notification outcome {result.Outcome}."),
+            };
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {

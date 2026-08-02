@@ -15,9 +15,13 @@ with the *why* and concrete upgrade steps.
 ### `Themia.Notifications`: the logger stubs no longer report success
 
 **What changed:** `LoggerEmailSender` and `LoggerSmsSender` returned `NotificationResult.Success()`
-without sending anything. They now return `NotificationResult.NoProviderConfigured(reason)` —
-`Succeeded == false`, and the new `NotificationResult.NotConfigured == true` — and log at `Warning`
-instead of `Information`.
+without sending anything. They now return `NotificationResult.NoProviderConfigured(reason)` and log at
+`Warning` instead of `Information`.
+
+`NotificationResult` gained a `NotificationOutcome Outcome` property with three states — `Sent`,
+`Failed`, `NotConfigured`. `Succeeded` is now computed (`Outcome == Sent`) and `NotConfigured` is a
+convenience for `Outcome == NotConfigured`. Existing `if (result.Succeeded)` code keeps compiling and
+keeps meaning the same thing.
 
 **Why:** `AddThemiaNotifications()` registers those stubs with `TryAdd` so the DI graph always resolves.
 That is deliberate and stays. But combined with a success result it meant a host that never configured a
@@ -57,12 +61,37 @@ else if (!result.Succeeded)
 }
 ```
 
-If you previously relied on `Succeeded == true` from the stub to mean "handled", the equivalent check is
-now `result.Succeeded || result.NotConfigured`.
+If you previously relied on `Succeeded == true` from the stub to mean "did I finish handling this",
+the control-flow equivalent is `result.Succeeded || result.NotConfigured`.
 
-**If you would rather fail fast instead:** treat `NotConfigured` as a startup error in environments
-where delivery is required. The framework does not decide this for you — it only stops claiming the
-message was delivered.
+> **Do not apply that substitution to anything that records or reports delivery.** Writing
+> `if (result.Succeeded || result.NotConfigured) await audit.RecordDeliveredAsync(...)` produces a
+> "delivered" audit row for a message that was never sent — which is the exact defect this change
+> removes, restored under a new spelling. The equivalence is safe for "have I finished with this
+> message", and wrong for "was this message delivered".
+
+**If you use `Themia.Modules.Notifications` instead of calling a sender directly, you have nothing to
+change — but read this.** `INotificationDispatcher.DispatchAsync` enqueues an outbox row and never hands
+you a `NotificationResult`; the result is interpreted inside `NotificationOutboxDispatcher`, which is
+framework code. That mapping is updated in this release: a `NotConfigured` result now dead-letters the
+row on its **first** attempt rather than being treated as a retryable failure.
+
+That matters because the naive mapping was genuinely wrong. `NotConfigured` reached
+`DispatchResult.Transient`, so on a host with no configured provider every notification was retried to
+the attempt cap (5 by default) and *then* dead-lettered — messages that previously completed as `Sent`
+were lost, ten `Warning` lines were written per message, and with `PurgeEnabled` defaulting to `false`
+the dead rows accumulated indefinitely.
+
+Retrying cannot help here: configuration does not change between backoff attempts. Failing on the first
+attempt puts the reason in `last_error` immediately, where an operator can see it. **If you run a host
+deliberately without a provider and do not want dead rows, either disable the outbox for that channel or
+configure a sender** — a `Dead` row is now the honest record of a message that was never sent.
+
+**If you would rather fail fast at startup:** the framework does not currently expose a way to detect a
+stub registration (`LoggerEmailSender` and `LoggerSmsSender` are `internal`). The supported approach is
+to assert your own configuration — check that `Smtp:Host` (or your provider's equivalent) is set in the
+environments where delivery is required, and fail startup yourself. If you want the framework to refuse
+a stub outside `Development`, say so on coord #0057 and it can be added.
 
 ## 0.11.0
 

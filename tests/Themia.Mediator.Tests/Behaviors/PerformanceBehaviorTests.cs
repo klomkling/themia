@@ -1,3 +1,4 @@
+using Themia.TestSupport;
 using Microsoft.Extensions.Logging;
 using Themia.Mediator.Abstractions;
 using Themia.Mediator.Behaviors;
@@ -15,7 +16,7 @@ public sealed class PerformanceBehaviorTests
     public async Task HandleAsync_logs_warning_when_handler_exceeds_threshold()
     {
         // Arrange
-        var logger = new RecordingTestLogger<PerformanceBehavior<SlowRequest, string>>();
+        var logger = new RecordingLogger<PerformanceBehavior<SlowRequest, string>>();
         var behavior = new PerformanceBehavior<SlowRequest, string>(logger, TimeSpan.FromMilliseconds(1));
 
         RequestHandlerContinuation<string> next = async ct =>
@@ -38,7 +39,7 @@ public sealed class PerformanceBehaviorTests
     public async Task HandleAsync_does_not_log_warning_when_handler_is_fast()
     {
         // Arrange — use a very large threshold so the handler is always "fast"
-        var logger = new RecordingTestLogger<PerformanceBehavior<FastRequest, string>>();
+        var logger = new RecordingLogger<PerformanceBehavior<FastRequest, string>>();
         var behavior = new PerformanceBehavior<FastRequest, string>(logger, TimeSpan.FromHours(1));
 
         RequestHandlerContinuation<string> next = _ => Task.FromResult("quick");

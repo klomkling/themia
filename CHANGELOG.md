@@ -35,15 +35,34 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
   delivered**, with nothing in the result or the logs to distinguish that from working. The caller's own
   retry and audit logic recorded deliveries that never happened.
 
-  Both stubs now return the new `NotificationResult.NoProviderConfigured(reason)` — `Succeeded` is
-  `false`, the new `NotificationResult.NotConfigured` is `true` — and log at **Warning** rather than
-  Information, so the condition survives the Information-level filtering common in production.
+  Both stubs now return the new `NotificationResult.NoProviderConfigured(reason)` and log at **Warning**
+  rather than Information, so the condition survives the Information-level filtering common in
+  production. The email stub no longer logs the subject at all — raising the line to Warning would
+  otherwise have pushed subjects, which routinely carry PII, into production log aggregators.
+
+  `NotificationResult` now carries a three-state `NotificationOutcome Outcome` (`Sent`, `Failed`,
+  `NotConfigured`) with `Succeeded` computed from it. **This is deliberately an enum rather than a second
+  bool:** a bool compiles cleanly at every existing `if (result.Succeeded)` site, so nothing forces a
+  consumer to revisit its mapping — which is precisely how the first attempt at this change shipped with
+  `NotificationOutboxDispatcher` unrevised.
+
+  **`Themia.Modules.Notifications` outbox mapping changed with it.** A `NotConfigured` result is now
+  `DispatchResult.Permanent`, so the row dead-letters on its first attempt. Under the naive mapping it
+  was `Transient`: on a host with no configured provider, every notification was retried to the attempt
+  cap and then dead-lettered anyway — losing messages that previously completed as `Sent`, writing ten
+  Warning lines per message, and accumulating dead rows indefinitely since `PurgeEnabled` defaults to
+  `false`. Retrying cannot help, because configuration does not change between backoff attempts.
 
   Running without a provider stays a fully supported state. What changes is that it is no longer
-  indistinguishable from delivery. Callers that treat any non-success as a failure need to separate the
-  two — see [MIGRATION.md](MIGRATION.md). Found while scoping `Themia.Otp` (coord #0056), where the same
-  path would have turned a missing SMS provider into an authentication outage with no signal
-  (coord #0057).
+  indistinguishable from delivery. See [MIGRATION.md](MIGRATION.md) — including a warning about the one
+  substitution that would restore the original defect. Found while scoping `Themia.Otp` (coord #0056),
+  where the same path would have turned a missing SMS provider into an authentication outage with no
+  signal (coord #0057).
+
+### Changed
+- **`tests`** — one shared `Themia.TestSupport` project now owns `RecordingLogger<T>` and
+  `RecordingLoggerProvider`, which had been hand-copied member-for-member into four test projects. Test
+  infrastructure only; nothing shipped changes.
 
 ## [0.11.0] - 2026-08-02
 
