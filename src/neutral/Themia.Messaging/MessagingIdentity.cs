@@ -10,6 +10,13 @@ namespace Themia.Messaging;
 /// the two agree by construction: when the stamp and the comparison came from separate configuration
 /// values, drift between them silently disabled loop protection, with no exception and no log.
 /// </remarks>
+/// <remarks>
+/// The outbox stamps each row's <c>Origin</c> at enqueue time, not at delivery time, so renaming this
+/// value is a fabric-wide operation, not a per-instance config change: rows already enqueued under the
+/// old origin are delivered and compared against the new one after a redeploy, and the inbox's
+/// <c>(origin, message_id)</c> dedup key resets across the rename too. Drain the outbox (and let the
+/// inbox's dedup window pass) before rolling out an origin change.
+/// </remarks>
 public sealed class MessagingIdentity
 {
     /// <summary>Creates the identity.</summary>

@@ -252,6 +252,35 @@ public class HmacVerificationFilterTests
         Assert.Equal(StatusCodes.Status200OK, status);
     }
 
+    // F: the loop guard used to drop the message with no log at all. If two services are accidentally
+    // configured with the same origin, every message between them was discarded 200-OK with zero
+    // telemetry on either side. A Warning line naming the peer and the matched origin is now the only
+    // way that misconfiguration is diagnosable.
+    [Fact]
+    public async Task InvokeAsync_ShouldLogAWarning_NamingThePeerAndOrigin_WhenOriginMatchesOwnOrigin()
+    {
+        var (options, peer) = BuildPeer();
+        var body = "{}";
+        var headers = SignedHeaders(peer, Now, body, Secret, origin: "self");
+        var httpContext = BuildContext(peer, headers, body);
+        var identity = new MessagingIdentity("self");
+        var logger = new RecordingLogger<HmacVerificationFilter>();
+
+        var (status, nextCalled) = await InvokeFilterAsync(BuildFilter(options, identity, logger: logger), httpContext);
+
+        Assert.False(nextCalled);
+        Assert.Equal(StatusCodes.Status200OK, status);
+        Assert.Contains(logger.Entries, e =>
+            e.Level == LogLevel.Warning
+            && e.Message.Contains(peer.Name, StringComparison.Ordinal)
+            && e.Message.Contains("self", StringComparison.Ordinal));
+        // Still never leaks the body itself.
+        foreach (var (_, message) in logger.Entries)
+        {
+            Assert.DoesNotContain(body, message, StringComparison.Ordinal);
+        }
+    }
+
     [Fact]
     public async Task InvokeAsync_ShouldRunEndpoint_WhenOriginDiffersFromOwnOrigin()
     {

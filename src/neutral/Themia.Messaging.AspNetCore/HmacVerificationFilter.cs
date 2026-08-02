@@ -120,6 +120,14 @@ public sealed class HmacVerificationFilter : IEndpointFilter
         // Step 7: loop guard, last — Origin is attacker-controlled until verification has passed.
         if (LoopGuard.IsLoopback(headers, peer.HeaderNames, identity.Origin))
         {
+            // Stopping a real loop is normal on a healthy bi-directional channel, but the same line is
+            // also the only signal that two services were accidentally configured with the same origin —
+            // in which case every message between them is silently discarded. Logged at Warning, like the
+            // stale-timestamp path, so it survives the Information-level filtering many production
+            // pipelines apply and the misconfiguration doesn't vanish along with the message.
+            logger.LogWarning(
+                "Rejected inbound request from peer '{Peer}' as a loop: inbound Origin matched this service's own origin '{Origin}'.",
+                peer.Name, identity.Origin);
             return Results.StatusCode(StatusCodes.Status200OK);
         }
 
