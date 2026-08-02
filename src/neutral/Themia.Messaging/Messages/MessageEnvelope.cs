@@ -38,7 +38,7 @@ public sealed class MessageEnvelope
     /// <summary>
     /// The system that ORIGINATED the message — not the last hop. Preserved across forwarding so a
     /// bi-directional topology can drop anything that arrives back at its own origin. Optional: when left
-    /// unset, the module's configured <c>MessagingModuleOptions.Origin</c> is used instead.
+    /// unset, the service's configured <c>MessagingIdentity.Origin</c> is used instead.
     /// </summary>
     public string Origin { get; set; } = string.Empty;
 
@@ -74,8 +74,8 @@ public sealed class MessageEnvelope
         if (string.IsNullOrWhiteSpace(Destination))
             throw new ArgumentException("Must not be null or whitespace.", nameof(Destination));
 
-        // Origin is optional here: an unset value falls back to the module's configured Origin at
-        // enqueue time (see MessagingModuleOptions.Origin), which Validate() has no access to.
+        // Origin is optional here: an unset value falls back to the service's configured Origin at
+        // enqueue time (see MessagingIdentity.Origin), which Validate() has no access to.
 
         // A version with nothing to scope it to cannot be compared against anything, so it would fence
         // nothing while looking like it does — reject it rather than silently ignore it.

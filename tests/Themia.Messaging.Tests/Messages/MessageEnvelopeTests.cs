@@ -58,7 +58,7 @@ public class MessageEnvelopeTests
     }
 
     // F2: Origin is no longer required on the envelope itself — a caller may leave it unset and let the
-    // module's configured MessagingModuleOptions.Origin fill in at enqueue time (MessageOutboxStore).
+    // service's configured MessagingIdentity.Origin fill in at enqueue time (MessageOutboxStore).
     // Validate() has no access to that configuration, so it must not reject a blank Origin.
     [Theory]
     [InlineData(null)]

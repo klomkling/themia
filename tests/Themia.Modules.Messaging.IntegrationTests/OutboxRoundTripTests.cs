@@ -215,7 +215,6 @@ public sealed class OutboxRoundTripTests : IAsyncLifetime
         services.AddScoped<ITenantContext>(_ => new TenantContext(new TenantId("acme")));
         services.AddThemiaPostgres<TestMessagingDbContext>(configuration);
         services.AddThemiaDataRepositories<TestMessagingDbContext>();
-        services.AddSingleton(new MessagingModuleOptions { ConnectionStringName = "Default" });
         services.AddSingleton(new MessagingIdentity(TestOrigin));
         services.AddScoped<IMessageOutboxStore, MessageOutboxStore>();
         services.AddThemiaMessagingPostgreSql();
