@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Extensions;
 using Microsoft.Extensions.Logging;
 
+using Themia.Messaging;
 using Themia.Messaging.AspNetCore.DependencyInjection;
 using Themia.Messaging.Hmac;
 
@@ -25,33 +26,33 @@ public sealed class HmacVerificationFilter : IEndpointFilter
 {
     private readonly HmacOptions hmacOptions;
     private readonly IHmacVerifier verifier;
-    private readonly VerificationOptions verificationOptions;
+    private readonly MessagingIdentity identity;
     private readonly TimeProvider time;
     private readonly ILogger<HmacVerificationFilter> logger;
 
     /// <summary>Creates the filter.</summary>
     /// <param name="hmacOptions">The registered peers, resolved by the name attached via <c>RequireThemiaHmac</c>.</param>
     /// <param name="verifier">Verifies the request's signature; comparison stays inside this dependency.</param>
-    /// <param name="verificationOptions">This service's own origin and loop-guard configuration.</param>
+    /// <param name="identity">This service's own identity, compared against the inbound Origin header by the loop guard.</param>
     /// <param name="time">Clock used to evaluate the signed timestamp's freshness.</param>
     /// <param name="logger">Logger for rejections. Never receives the secret, the signature or the body.</param>
     /// <exception cref="ArgumentNullException">Any parameter is <see langword="null"/>.</exception>
     public HmacVerificationFilter(
         HmacOptions hmacOptions,
         IHmacVerifier verifier,
-        VerificationOptions verificationOptions,
+        MessagingIdentity identity,
         TimeProvider time,
         ILogger<HmacVerificationFilter> logger)
     {
         ArgumentNullException.ThrowIfNull(hmacOptions);
         ArgumentNullException.ThrowIfNull(verifier);
-        ArgumentNullException.ThrowIfNull(verificationOptions);
+        ArgumentNullException.ThrowIfNull(identity);
         ArgumentNullException.ThrowIfNull(time);
         ArgumentNullException.ThrowIfNull(logger);
 
         this.hmacOptions = hmacOptions;
         this.verifier = verifier;
-        this.verificationOptions = verificationOptions;
+        this.identity = identity;
         this.time = time;
         this.logger = logger;
     }
@@ -117,7 +118,7 @@ public sealed class HmacVerificationFilter : IEndpointFilter
         }
 
         // Step 7: loop guard, last — Origin is attacker-controlled until verification has passed.
-        if (LoopGuard.IsLoopback(headers, peer.HeaderNames, verificationOptions.Origin))
+        if (LoopGuard.IsLoopback(headers, peer.HeaderNames, identity.Origin))
         {
             return Results.StatusCode(StatusCodes.Status200OK);
         }

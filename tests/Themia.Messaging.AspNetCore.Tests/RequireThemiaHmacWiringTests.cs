@@ -9,6 +9,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
 using Themia.Messaging.AspNetCore.DependencyInjection;
+using Themia.Messaging.DependencyInjection;
 using Themia.Messaging.Hmac;
 using Themia.Messaging.Hmac.DependencyInjection;
 
@@ -85,6 +86,7 @@ public class RequireThemiaHmacWiringTests
                         p.SignWith("out-1", Secret);
                         p.Accept("in-1", Secret);
                     }));
+                    services.AddThemiaMessagingIdentity("wiring-origin");
                     services.AddThemiaMessagingVerification();
                 })
                 .Configure(app =>

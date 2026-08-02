@@ -9,6 +9,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Time.Testing;
 
 using Themia.Messaging.AspNetCore.DependencyInjection;
+using Themia.Messaging.DependencyInjection;
 using Themia.Messaging.Hmac;
 using Themia.Messaging.Hmac.DependencyInjection;
 using Themia.Messaging.Http;
@@ -197,13 +198,8 @@ public class RoundTripTests
                             p.SignWith("receiver-unused-out-key", "receiver-unused-out-secret");
                             p.Accept(inboundKeyId, inboundSecret);
                         }));
-                        services.AddThemiaMessagingVerification(o =>
-                        {
-                            if (ownOrigin is not null)
-                            {
-                                o.Origin = ownOrigin;
-                            }
-                        });
+                        services.AddThemiaMessagingIdentity(ownOrigin ?? "receiver-default-origin");
+                        services.AddThemiaMessagingVerification();
                     })
                     .Configure(app =>
                     {

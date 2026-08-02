@@ -19,8 +19,9 @@ public static class LoopGuard
     /// <param name="headers">The verified request's headers.</param>
     /// <param name="headerNames">The peer's header names, used to locate the <c>Origin</c> header.</param>
     /// <param name="ownOrigin">
-    /// This service's own configured origin (<see cref="VerificationOptions.Origin"/>). The guard is
-    /// inactive — always returns <see langword="false"/> — when this is <see langword="null"/> or empty.
+    /// This service's own configured origin (<see cref="Themia.Messaging.MessagingIdentity.Origin"/>). The
+    /// guard is inactive — always returns <see langword="false"/> — when this is <see langword="null"/> or
+    /// empty.
     /// </param>
     /// <returns><see langword="true"/> when the request has looped back to its own origin.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="headers"/> or <paramref name="headerNames"/> is null.</exception>

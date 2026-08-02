@@ -20,6 +20,7 @@
     <AdditionalFiles Include="PublicAPI.Unshipped.txt" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\Themia.Messaging\Themia.Messaging.csproj" />
     <ProjectReference Include="..\Themia.Messaging.Hmac\Themia.Messaging.Hmac.csproj" />
   </ItemGroup>
   <ItemGroup>

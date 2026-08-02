@@ -2,13 +2,11 @@
 Themia.Messaging.AspNetCore.DependencyInjection.AspNetCoreServiceCollectionExtensions
 Themia.Messaging.AspNetCore.DependencyInjection.RouteHandlerBuilderExtensions
 Themia.Messaging.AspNetCore.HmacVerificationFilter
-Themia.Messaging.AspNetCore.HmacVerificationFilter.HmacVerificationFilter(Themia.Messaging.Hmac.HmacOptions! hmacOptions, Themia.Messaging.Hmac.IHmacVerifier! verifier, Themia.Messaging.AspNetCore.VerificationOptions! verificationOptions, System.TimeProvider! time, Microsoft.Extensions.Logging.ILogger<Themia.Messaging.AspNetCore.HmacVerificationFilter!>! logger) -> void
+Themia.Messaging.AspNetCore.HmacVerificationFilter.HmacVerificationFilter(Themia.Messaging.Hmac.HmacOptions! hmacOptions, Themia.Messaging.Hmac.IHmacVerifier! verifier, Themia.Messaging.MessagingIdentity! identity, System.TimeProvider! time, Microsoft.Extensions.Logging.ILogger<Themia.Messaging.AspNetCore.HmacVerificationFilter!>! logger) -> void
 Themia.Messaging.AspNetCore.HmacVerificationFilter.InvokeAsync(Microsoft.AspNetCore.Http.EndpointFilterInvocationContext! context, Microsoft.AspNetCore.Http.EndpointFilterDelegate! next) -> System.Threading.Tasks.ValueTask<object?>
 Themia.Messaging.AspNetCore.LoopGuard
 Themia.Messaging.AspNetCore.VerificationOptions
 Themia.Messaging.AspNetCore.VerificationOptions.MarkBiDirectional(string! peerName, bool sendsOriginHeader = true) -> void
-Themia.Messaging.AspNetCore.VerificationOptions.Origin.get -> string?
-Themia.Messaging.AspNetCore.VerificationOptions.Origin.set -> void
 Themia.Messaging.AspNetCore.VerificationOptions.VerificationOptions() -> void
 static Themia.Messaging.AspNetCore.DependencyInjection.AspNetCoreServiceCollectionExtensions.AddThemiaMessagingVerification(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Themia.Messaging.AspNetCore.VerificationOptions!>? configure = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
 static Themia.Messaging.AspNetCore.DependencyInjection.RouteHandlerBuilderExtensions.RequireThemiaHmac(this Microsoft.AspNetCore.Builder.RouteHandlerBuilder! builder, string! peerName) -> Microsoft.AspNetCore.Builder.RouteHandlerBuilder!

@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Time.Testing;
 
+using Themia.Messaging;
 using Themia.Messaging.AspNetCore.DependencyInjection;
 using Themia.Messaging.Hmac;
 
@@ -243,9 +244,9 @@ public class HmacVerificationFilterTests
         var body = "{}";
         var headers = SignedHeaders(peer, Now, body, Secret, origin: "self");
         var httpContext = BuildContext(peer, headers, body);
-        var verification = new VerificationOptions { Origin = "self" };
+        var identity = new MessagingIdentity("self");
 
-        var (status, nextCalled) = await InvokeFilterAsync(BuildFilter(options, verification), httpContext);
+        var (status, nextCalled) = await InvokeFilterAsync(BuildFilter(options, identity), httpContext);
 
         Assert.False(nextCalled);
         Assert.Equal(StatusCodes.Status200OK, status);
@@ -258,9 +259,9 @@ public class HmacVerificationFilterTests
         var body = "{}";
         var headers = SignedHeaders(peer, Now, body, Secret, origin: "someone-else");
         var httpContext = BuildContext(peer, headers, body);
-        var verification = new VerificationOptions { Origin = "self" };
+        var identity = new MessagingIdentity("self");
 
-        var (status, nextCalled) = await InvokeFilterAsync(BuildFilter(options, verification), httpContext);
+        var (status, nextCalled) = await InvokeFilterAsync(BuildFilter(options, identity), httpContext);
 
         Assert.True(nextCalled);
         Assert.Equal(StatusCodes.Status200OK, status);
@@ -273,9 +274,9 @@ public class HmacVerificationFilterTests
         var body = "{}";
         var headers = SignedHeaders(peer, Now, body, Secret, origin: null);
         var httpContext = BuildContext(peer, headers, body);
-        var verification = new VerificationOptions { Origin = "self" };
+        var identity = new MessagingIdentity("self");
 
-        var (status, nextCalled) = await InvokeFilterAsync(BuildFilter(options, verification), httpContext);
+        var (status, nextCalled) = await InvokeFilterAsync(BuildFilter(options, identity), httpContext);
 
         Assert.True(nextCalled);
         Assert.Equal(StatusCodes.Status200OK, status);
@@ -291,9 +292,9 @@ public class HmacVerificationFilterTests
         var body = "{}";
         var headers = SignedHeaders(peer, Now, body, WrongSecret, origin: "self");
         var httpContext = BuildContext(peer, headers, body);
-        var verification = new VerificationOptions { Origin = "self" };
+        var identity = new MessagingIdentity("self");
 
-        var (status, nextCalled) = await InvokeFilterAsync(BuildFilter(options, verification), httpContext);
+        var (status, nextCalled) = await InvokeFilterAsync(BuildFilter(options, identity), httpContext);
 
         Assert.False(nextCalled);
         Assert.Equal(StatusCodes.Status401Unauthorized, status);
@@ -445,9 +446,9 @@ public class HmacVerificationFilterTests
     }
 
     private static HmacVerificationFilter BuildFilter(
-        HmacOptions options, VerificationOptions? verification = null, TimeProvider? time = null,
+        HmacOptions options, MessagingIdentity? identity = null, TimeProvider? time = null,
         RecordingLogger<HmacVerificationFilter>? logger = null)
-        => new(options, new HmacVerifier(), verification ?? new VerificationOptions(), time ?? new FakeTimeProvider(Now),
+        => new(options, new HmacVerifier(), identity ?? new MessagingIdentity("unused-default-origin"), time ?? new FakeTimeProvider(Now),
             logger ?? new RecordingLogger<HmacVerificationFilter>());
 
     private static async Task<(int Status, bool NextCalled)> InvokeFilterAsync(HmacVerificationFilter filter, DefaultHttpContext httpContext)

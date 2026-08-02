@@ -1,20 +1,11 @@
 namespace Themia.Messaging.AspNetCore;
 
 /// <summary>
-/// Configures the inbound HMAC verification filter: this service's own identity for the loop guard, and
-/// which peers are known to lack loop protection.
+/// Configures the inbound HMAC verification filter: which peers are known to lack loop protection.
 /// </summary>
 public sealed class VerificationOptions
 {
     private readonly Dictionary<string, bool> biDirectionalPeers = new(StringComparer.Ordinal);
-
-    /// <summary>
-    /// This service's own origin identifier. The loop guard compares it against the inbound
-    /// <c>{prefix}Origin</c> header once a request has verified: a match means the message has come back
-    /// to its own sender, so the filter answers 200 without invoking the endpoint. Leave unset (the
-    /// default) to disable the loop guard — every verified request then reaches the endpoint.
-    /// </summary>
-    public string? Origin { get; set; }
 
     /// <summary>
     /// Declares <paramref name="peerName"/> as a channel used for bi-directional messaging (this service
