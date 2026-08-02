@@ -1,6 +1,7 @@
 using Themia.Framework.Data.Abstractions.Paging;
 using Themia.Framework.Data.Abstractions.Repositories;
 using Themia.Framework.Data.Abstractions.Specifications;
+using Themia.Messaging;
 using Themia.Messaging.Messages;
 using Themia.Modules.Messaging;
 using Themia.Modules.Messaging.Entities;
@@ -12,8 +13,9 @@ namespace Themia.Modules.Messaging.Tests.Stores;
 
 public class MessageOutboxStoreTests
 {
-    private static MessagingModuleOptions Options(string origin = "configured-origin") =>
-        new() { ConnectionStringName = "Default", Origin = origin };
+    // MessageOutboxStore no longer reads MessagingModuleOptions (Origin moved to MessagingIdentity, and
+    // nothing else in the store reads options), so tests construct the identity directly.
+    private static MessagingIdentity Identity(string origin = "configured-origin") => new(origin);
 
     private sealed class RecordingRepository : IRepository<MessageOutboxEntry, Guid>
     {
@@ -58,7 +60,7 @@ public class MessageOutboxStoreTests
     public async Task EnqueueAsync_ShouldStageOneRow_WithPendingStatusAndZeroAttempts()
     {
         var repository = new RecordingRepository();
-        var store = new MessageOutboxStore(repository, TimeProvider.System, Options());
+        var store = new MessageOutboxStore(repository, TimeProvider.System, Identity());
 
         await store.EnqueueAsync(Valid(), CancellationToken.None);
 
@@ -71,7 +73,7 @@ public class MessageOutboxStoreTests
     public async Task EnqueueAsync_ShouldCarryEnvelopeFieldsVerbatim()
     {
         var repository = new RecordingRepository();
-        var store = new MessageOutboxStore(repository, TimeProvider.System, Options());
+        var store = new MessageOutboxStore(repository, TimeProvider.System, Identity());
         var envelope = Valid();
 
         await store.EnqueueAsync(envelope, CancellationToken.None);
@@ -90,7 +92,7 @@ public class MessageOutboxStoreTests
     {
         var now = new DateTimeOffset(2026, 7, 31, 9, 0, 0, TimeSpan.Zero);
         var repository = new RecordingRepository();
-        var store = new MessageOutboxStore(repository, new FixedTimeProvider(now), Options());
+        var store = new MessageOutboxStore(repository, new FixedTimeProvider(now), Identity());
 
         await store.EnqueueAsync(Valid(), CancellationToken.None);
 
@@ -103,7 +105,7 @@ public class MessageOutboxStoreTests
     public async Task EnqueueAsync_ShouldSerializeHeaders_AsJson()
     {
         var repository = new RecordingRepository();
-        var store = new MessageOutboxStore(repository, TimeProvider.System, Options());
+        var store = new MessageOutboxStore(repository, TimeProvider.System, Identity());
         var envelope = Valid();
         envelope.Headers = new Dictionary<string, string> { ["x-trace"] = "abc" };
 
@@ -117,7 +119,7 @@ public class MessageOutboxStoreTests
     public async Task EnqueueAsync_ShouldLeaveHeadersNull_WhenNoneSupplied()
     {
         var repository = new RecordingRepository();
-        var store = new MessageOutboxStore(repository, TimeProvider.System, Options());
+        var store = new MessageOutboxStore(repository, TimeProvider.System, Identity());
 
         await store.EnqueueAsync(Valid(), CancellationToken.None);
 
@@ -130,7 +132,7 @@ public class MessageOutboxStoreTests
     public async Task EnqueueAsync_ShouldThrow_WhenEnvelopeIsInvalid()
     {
         var repository = new RecordingRepository();
-        var store = new MessageOutboxStore(repository, TimeProvider.System, Options());
+        var store = new MessageOutboxStore(repository, TimeProvider.System, Identity());
         var envelope = Valid();
         envelope.Type = string.Empty;
 
@@ -145,7 +147,7 @@ public class MessageOutboxStoreTests
     public async Task EnqueueAsync_ShouldNotThrow_WhenEnvelopeOriginIsBlank()
     {
         var repository = new RecordingRepository();
-        var store = new MessageOutboxStore(repository, TimeProvider.System, Options());
+        var store = new MessageOutboxStore(repository, TimeProvider.System, Identity());
         var envelope = Valid();
         envelope.Origin = string.Empty;
 
@@ -157,7 +159,7 @@ public class MessageOutboxStoreTests
     [Fact]
     public async Task EnqueueAsync_ShouldThrow_WhenEnvelopeIsNull()
         => await Assert.ThrowsAsync<ArgumentNullException>(
-            () => new MessageOutboxStore(new RecordingRepository(), TimeProvider.System, Options())
+            () => new MessageOutboxStore(new RecordingRepository(), TimeProvider.System, Identity())
                 .EnqueueAsync(null!, CancellationToken.None));
 
     // F4: MessageEnvelope carries no tenant field at all — the store must never set entry.TenantId, so the
@@ -169,7 +171,7 @@ public class MessageOutboxStoreTests
     public async Task EnqueueAsync_ShouldLeaveTenantIdNull_SoTheAmbientStampOwnsIt()
     {
         var repository = new RecordingRepository();
-        var store = new MessageOutboxStore(repository, TimeProvider.System, Options());
+        var store = new MessageOutboxStore(repository, TimeProvider.System, Identity());
 
         await store.EnqueueAsync(Valid(), CancellationToken.None);
 
@@ -182,7 +184,7 @@ public class MessageOutboxStoreTests
     public async Task EnqueueAsync_ShouldUseConfiguredOrigin_WhenEnvelopeOriginNotSet()
     {
         var repository = new RecordingRepository();
-        var store = new MessageOutboxStore(repository, TimeProvider.System, Options("configured-origin"));
+        var store = new MessageOutboxStore(repository, TimeProvider.System, Identity("configured-origin"));
         var envelope = Valid();
         envelope.Origin = string.Empty;
 
@@ -196,7 +198,7 @@ public class MessageOutboxStoreTests
     public async Task EnqueueAsync_ShouldPreferEnvelopeOrigin_OverConfiguredOrigin()
     {
         var repository = new RecordingRepository();
-        var store = new MessageOutboxStore(repository, TimeProvider.System, Options("configured-origin"));
+        var store = new MessageOutboxStore(repository, TimeProvider.System, Identity("configured-origin"));
         var envelope = Valid();
         envelope.Origin = "envelope-origin";
 

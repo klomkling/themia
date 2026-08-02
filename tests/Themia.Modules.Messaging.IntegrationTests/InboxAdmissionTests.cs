@@ -13,6 +13,7 @@ using Themia.Framework.Data.Abstractions.UnitOfWork;
 using Themia.Framework.Data.Dapper.DependencyInjection;
 using Themia.Framework.Data.Dapper.PostgreSql.DependencyInjection;
 using Themia.Framework.Data.EFCore.PostgreSql;
+using Themia.Messaging.DependencyInjection;
 using Themia.Messaging.Inbox;
 using Themia.Messaging.PostgreSql;
 using Themia.Modules.Messaging.DependencyInjection;
@@ -163,7 +164,8 @@ public sealed class InboxAdmissionTests : IAsyncLifetime
         var services = new ServiceCollection();
         services.AddSingleton<IConfiguration>(configuration);
         services.AddScoped<ITenantContext>(_ => new TenantContext(new TenantId("acme")));
-        services.AddThemiaMessagingModule(o => o.Origin = "test-origin");
+        services.AddThemiaMessagingIdentity("test-origin");
+        services.AddThemiaMessagingModule();
         services.AddThemiaPostgres<TestMessagingDbContext>(configuration);
 
         var ex = Assert.Throws<InvalidOperationException>(() => services.AddThemiaMessagingInbox());
@@ -186,7 +188,8 @@ public sealed class InboxAdmissionTests : IAsyncLifetime
         // AddThemiaMessagingModule() so the Messaging entity mapping is actually contributed to it.
         services.AddThemiaDapperCore();
         services.AddThemiaDapperPostgres(configuration);
-        services.AddThemiaMessagingModule(o => o.Origin = "test-origin");
+        services.AddThemiaMessagingIdentity("test-origin");
+        services.AddThemiaMessagingModule();
         services.AddThemiaMessagingPostgreSql();
         services.AddThemiaMessagingInbox();
 

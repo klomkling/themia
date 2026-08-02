@@ -32,13 +32,18 @@ public class LoopGuardTests
         Assert.False(LoopGuard.IsLoopback(headers, Names, "self"));
     }
 
+    // Retargeted, not retired. This used to assert the guard went INACTIVE on a blank ownOrigin — the
+    // documented "leave Origin unset to disable the loop guard" escape hatch. That hatch moved to
+    // VerificationOptions.DisableLoopGuard, which the filter checks before calling here, so a blank
+    // origin reaching this method is now a programming error rather than a configuration choice, and
+    // silently returning false would hide it.
     [Theory]
     [InlineData(null)]
     [InlineData("")]
-    public void IsLoopback_ShouldReturnFalse_WhenOwnOriginIsNotConfigured(string? ownOrigin)
+    public void IsLoopback_ShouldThrow_WhenOwnOriginIsBlank(string? ownOrigin)
     {
         var headers = new Dictionary<string, string?> { [Names.Origin] = "self" };
 
-        Assert.False(LoopGuard.IsLoopback(headers, Names, ownOrigin));
+        Assert.ThrowsAny<ArgumentException>(() => LoopGuard.IsLoopback(headers, Names, ownOrigin!));
     }
 }

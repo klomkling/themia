@@ -6,12 +6,6 @@ public sealed class MessagingModuleOptions
     /// <summary>Name of the connection string (in <c>ConnectionStrings</c>) the module migrates and drains.</summary>
     public string ConnectionStringName { get; set; } = "Default";
 
-    /// <summary>
-    /// This service's identity, stamped on every published message as its origin and used by the receiver
-    /// to drop messages that arrive back where they started.
-    /// </summary>
-    public string Origin { get; set; } = string.Empty;
-
     /// <summary>How often the drainer polls when no in-process signal arrives. Default 5s.</summary>
     public int DrainIntervalSeconds { get; set; } = 5;
 
@@ -45,8 +39,6 @@ public sealed class MessagingModuleOptions
     {
         if (string.IsNullOrWhiteSpace(ConnectionStringName))
             throw new ArgumentException("Must not be null or whitespace.", nameof(ConnectionStringName));
-        if (string.IsNullOrWhiteSpace(Origin))
-            throw new ArgumentException("Must not be null or whitespace.", nameof(Origin));
         if (DrainIntervalSeconds < 1)
             throw new ArgumentOutOfRangeException(nameof(DrainIntervalSeconds), DrainIntervalSeconds, "Must be at least 1 second.");
         if (MaxBatchSize < 1)

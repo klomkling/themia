@@ -14,6 +14,7 @@ using Themia.Framework.Data.Abstractions.Exceptions;
 using Themia.Framework.Data.Abstractions.UnitOfWork;
 using Themia.Framework.Data.EFCore.Extensions;
 using Themia.Framework.Data.EFCore.PostgreSql;
+using Themia.Messaging;
 using Themia.Messaging.Messages;
 using Themia.Messaging.Outbox;
 using Themia.Messaging.PostgreSql;
@@ -214,7 +215,7 @@ public sealed class OutboxRoundTripTests : IAsyncLifetime
         services.AddScoped<ITenantContext>(_ => new TenantContext(new TenantId("acme")));
         services.AddThemiaPostgres<TestMessagingDbContext>(configuration);
         services.AddThemiaDataRepositories<TestMessagingDbContext>();
-        services.AddSingleton(new MessagingModuleOptions { ConnectionStringName = "Default", Origin = TestOrigin });
+        services.AddSingleton(new MessagingIdentity(TestOrigin));
         services.AddScoped<IMessageOutboxStore, MessageOutboxStore>();
         services.AddThemiaMessagingPostgreSql();
 

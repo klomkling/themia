@@ -3,6 +3,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 using Themia.Messaging.AspNetCore.DependencyInjection;
+using Themia.Messaging.DependencyInjection;
 using Themia.Messaging.Hmac.DependencyInjection;
 
 using Xunit;
@@ -30,10 +31,26 @@ public class AddThemiaMessagingVerificationTests
     {
         var services = new ServiceCollection();
         services.AddSingleton(new Themia.Messaging.Hmac.HmacOptions());
+        services.AddThemiaMessagingIdentity("test-origin");
 
         var exception = Record.Exception(() => services.AddThemiaMessagingVerification());
 
         Assert.Null(exception);
+    }
+
+    [Fact]
+    public void AddThemiaMessagingVerification_ShouldThrow_WhenNoMessagingIdentityIsRegistered()
+    {
+        var services = new ServiceCollection();
+        services.AddThemiaMessagingHmac(o => o.AddPeer("peer", p =>
+        {
+            p.SignWith("k", "s");
+            p.Accept("k", "s");
+        }));
+
+        var ex = Assert.Throws<InvalidOperationException>(() => services.AddThemiaMessagingVerification());
+
+        Assert.Contains("AddThemiaMessagingIdentity", ex.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -50,6 +67,7 @@ public class AddThemiaMessagingVerificationTests
                     p.SignWith("out-1", "secret");
                     p.Accept("in-1", "secret");
                 }));
+                services.AddThemiaMessagingIdentity("test-origin");
                 services.AddThemiaMessagingVerification(o => o.MarkBiDirectional("propertiezy", sendsOriginHeader: false));
             })
             .Build();
@@ -75,6 +93,7 @@ public class AddThemiaMessagingVerificationTests
                     p.SignWith("out-1", "secret");
                     p.Accept("in-1", "secret");
                 }));
+                services.AddThemiaMessagingIdentity("test-origin");
                 // sendsOriginHeader defaults to true: this peer DOES send Origin, so no gap to warn about.
                 services.AddThemiaMessagingVerification(o => o.MarkBiDirectional("propertiezy"));
             })
@@ -100,6 +119,7 @@ public class AddThemiaMessagingVerificationTests
                     p.SignWith("out-1", "secret");
                     p.Accept("in-1", "secret");
                 }));
+                services.AddThemiaMessagingIdentity("test-origin");
                 services.AddThemiaMessagingVerification();
             })
             .Build();

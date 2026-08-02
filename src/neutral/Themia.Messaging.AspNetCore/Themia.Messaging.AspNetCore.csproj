@@ -20,6 +20,8 @@
     <AdditionalFiles Include="PublicAPI.Unshipped.txt" />
   </ItemGroup>
   <ItemGroup>
+    <!-- Hmac only, deliberately: a receive-only host must not take a dependency on the outbox core
+         (drainer, dialects, inbox admission) just to reach MessagingIdentity, which lives in Hmac. -->
     <ProjectReference Include="..\Themia.Messaging.Hmac\Themia.Messaging.Hmac.csproj" />
   </ItemGroup>
   <ItemGroup>

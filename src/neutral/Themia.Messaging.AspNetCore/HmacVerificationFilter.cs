@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Extensions;
 using Microsoft.Extensions.Logging;
 
+using Themia.Messaging;
 using Themia.Messaging.AspNetCore.DependencyInjection;
 using Themia.Messaging.Hmac;
 
@@ -25,6 +26,7 @@ public sealed class HmacVerificationFilter : IEndpointFilter
 {
     private readonly HmacOptions hmacOptions;
     private readonly IHmacVerifier verifier;
+    private readonly MessagingIdentity identity;
     private readonly VerificationOptions verificationOptions;
     private readonly TimeProvider time;
     private readonly ILogger<HmacVerificationFilter> logger;
@@ -32,25 +34,29 @@ public sealed class HmacVerificationFilter : IEndpointFilter
     /// <summary>Creates the filter.</summary>
     /// <param name="hmacOptions">The registered peers, resolved by the name attached via <c>RequireThemiaHmac</c>.</param>
     /// <param name="verifier">Verifies the request's signature; comparison stays inside this dependency.</param>
-    /// <param name="verificationOptions">This service's own origin and loop-guard configuration.</param>
+    /// <param name="identity">This service's own identity, compared against the inbound Origin header by the loop guard.</param>
+    /// <param name="verificationOptions">Whether the loop guard runs, and which peers are declared bi-directional.</param>
     /// <param name="time">Clock used to evaluate the signed timestamp's freshness.</param>
     /// <param name="logger">Logger for rejections. Never receives the secret, the signature or the body.</param>
     /// <exception cref="ArgumentNullException">Any parameter is <see langword="null"/>.</exception>
     public HmacVerificationFilter(
         HmacOptions hmacOptions,
         IHmacVerifier verifier,
+        MessagingIdentity identity,
         VerificationOptions verificationOptions,
         TimeProvider time,
         ILogger<HmacVerificationFilter> logger)
     {
         ArgumentNullException.ThrowIfNull(hmacOptions);
         ArgumentNullException.ThrowIfNull(verifier);
+        ArgumentNullException.ThrowIfNull(identity);
         ArgumentNullException.ThrowIfNull(verificationOptions);
         ArgumentNullException.ThrowIfNull(time);
         ArgumentNullException.ThrowIfNull(logger);
 
         this.hmacOptions = hmacOptions;
         this.verifier = verifier;
+        this.identity = identity;
         this.verificationOptions = verificationOptions;
         this.time = time;
         this.logger = logger;
@@ -117,8 +123,21 @@ public sealed class HmacVerificationFilter : IEndpointFilter
         }
 
         // Step 7: loop guard, last — Origin is attacker-controlled until verification has passed.
-        if (LoopGuard.IsLoopback(headers, peer.HeaderNames, verificationOptions.Origin))
+        if (!verificationOptions.DisableLoopGuard && LoopGuard.IsLoopback(headers, peer.HeaderNames, identity.Origin))
         {
+            // The level is chosen from a signal the host already gave us. On a peer declared
+            // bi-directional via MarkBiDirectional, stopping a loop is the guard working as designed and
+            // happens per message — logging that at Warning would page an operator continuously on healthy
+            // traffic and bury the genuinely actionable warnings from this same filter (stale timestamp,
+            // body-read failure). On any OTHER peer, a message arriving with our own origin is not
+            // explainable by the declared topology, and the likeliest cause is two services accidentally
+            // sharing an origin — which silently discards every message between them, so that one is worth
+            // surviving Information-level filtering.
+            var expectedLoop = verificationOptions.BiDirectionalPeers.ContainsKey(peer.Name);
+            logger.Log(
+                expectedLoop ? LogLevel.Information : LogLevel.Warning,
+                "Rejected inbound request from peer '{Peer}' as a loop: inbound Origin matched this service's own origin '{Origin}'.",
+                peer.Name, identity.Origin);
             return Results.StatusCode(StatusCodes.Status200OK);
         }
 

@@ -21,5 +21,10 @@
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="Themia.Messaging.Hmac.Tests" />
+    <!-- MessagingRegistrationGuards is shared plumbing, not adopter surface: the messaging Add* methods
+         across these packages use it instead of each re-deriving the same scan-and-throw. -->
+    <InternalsVisibleTo Include="Themia.Messaging.AspNetCore" />
+    <InternalsVisibleTo Include="Themia.Messaging.Http" />
+    <InternalsVisibleTo Include="Themia.Modules.Messaging" />
   </ItemGroup>
 </Project>

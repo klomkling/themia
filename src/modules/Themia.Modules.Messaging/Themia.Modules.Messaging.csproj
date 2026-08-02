@@ -7,6 +7,8 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../../neutral/Themia.Messaging/Themia.Messaging.csproj" />
+    <!-- For MessagingIdentity, which the outbox store stamps from. Hmac has no project dependencies. -->
+    <ProjectReference Include="../../neutral/Themia.Messaging.Hmac/Themia.Messaging.Hmac.csproj" />
     <ProjectReference Include="../../framework/Themia.Framework.Core/Themia.Framework.Core.csproj" />
     <ProjectReference Include="../../framework/Themia.Framework.Data.Abstractions/Themia.Framework.Data.Abstractions.csproj" />
     <ProjectReference Include="../../framework/Themia.Framework.Data.EFCore/Themia.Framework.Data.EFCore.csproj" />
