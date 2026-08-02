@@ -25,9 +25,25 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
   moved out to `docs/changelog/changelog-YYYY.md` and replaced here by a one-line link under
   [Older releases](#older-releases). The current (and most recent) year stays inline.
 
-## [Unreleased]
+## [0.11.0] - 2026-08-02
 
 ### Added
+- **`Themia.Messaging.Hmac`** — the `themia-hmac-v1` signing scheme shared by both ends of a channel, so
+  the sender and the receiver compute identical bytes: `ThemiaHmacV1` (canonicalizer, signer, timestamp
+  format), per-peer key registration with rotation support (`HmacOptions.AddPeer`, multiple accepted
+  inbound key ids), and `IHmacVerifier`. The canonical string is fixed and not configurable. Conformance
+  is pinned by golden vectors shared across repos rather than by each side's own tests (coord #0050).
+  Also carries `MessagingIdentity` — this service's one origin, read by both the outbox stamp and the
+  receiving loop guard.
+- **`Themia.Messaging.Http`** — the HTTP outbox dispatcher: signs and delivers a claimed row to a peer,
+  and classifies the response into `Delivered` / `Transient` / `Permanent`. Redirects are **not**
+  followed on peer clients — a 301/302/303 drops the signed body and a 307/308 would replay a validly
+  signed payload to whatever host `Location` names (coord #0050).
+- **`Themia.Messaging.AspNetCore`** — the receiving half: a minimal-API endpoint filter
+  (`RequireThemiaHmac`) that verifies inbound requests, plus the loop guard that answers 200 without
+  invoking the endpoint when a message has come back to its own origin. **408 (not 401) for a stale
+  timestamp**, so a clock-drifted sender retries instead of dead-lettering every message — a live
+  production bug on both consumers before this shipped (coord #0050, #0051).
 - **`Themia.Messaging`** (+ `.PostgreSql` / `.MySql` / `.SqlServer`) — neutral transactional-outbox and
   deduplicating-inbox core shared by inter-service messaging: `IOutboxDialect<TRow>`, the generic
   `OutboxDrainer<TRow>` background service, `IInboxStore` / `IInboxAdmissionDialect`, and per-engine
@@ -46,6 +62,25 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
   (`ClaimAsync`/`CompleteAsync`/`CreateConnection`/`FailAsync`) moved onto the shared
   `Themia.Messaging.Outbox.IOutboxDialect<TRow>` base interface it now extends. Source- and
   binary-breaking only for code that references either type directly; see [MIGRATION.md](MIGRATION.md).
+
+  Both consumers confirmed by grep that they reference neither type, so this breaks nobody in practice.
+
+### Fixed
+- **`Themia.Messaging.Hmac` / `.AspNetCore`** — a service's identity used to be configured **twice**, in
+  two packages, with nothing linking the two values: `MessagingModuleOptions.Origin` (stamped on every
+  message the outbox originates) and `VerificationOptions.Origin` (what the loop guard compares the
+  inbound `Origin` header against). When they drifted, a looped message matched nothing, passed the
+  guard, and was reprocessed as new — no exception, no log, no failing test, and on a bi-directional
+  channel an unbounded forwarding loop. Both properties are gone; one `MessagingIdentity`, registered
+  once via `AddThemiaMessagingIdentity(origin)`, now feeds both halves.
+
+  The origin is **trimmed** (HTTP strips whitespace around a header value in transit, so a padded origin
+  would be stamped padded, arrive trimmed, and never match) and bounded at 100 characters to match the
+  `origin` column, which nothing was checking. The loop guard logs when it drops a message —
+  `Information` on a peer declared bi-directional, where stopping a loop is the design working, and
+  `Warning` on any other peer, where the likeliest cause is two services sharing an origin and silently
+  destroying every message between them. Turning the guard off is now an explicit
+  `VerificationOptions.DisableLoopGuard` rather than a side effect of leaving a string unset.
 
 ## [0.10.2] - 2026-07-29
 
