@@ -1,9 +1,9 @@
 # Themia.Challenges — one-time secrets, one core
 
 **Date:** 2026-08-04
-**Status:** approved
+**Status:** approved (rev 2 — rev 1 reworked after scrutiny; see "What rev 1 got wrong")
 **Tracks:** coord #0056 (filed as `Themia.Otp`), and item (2) of coord #0054
-**Renames:** the package accepted on #0056 as `Themia.Otp` ships as **`Themia.Challenges`** — see "Why not Themia.Otp".
+**Renames:** the package accepted on #0056 as `Themia.Otp` ships as **`Themia.Challenges`**.
 
 ## Problem
 
@@ -29,26 +29,89 @@ Themia.Challenges.EFCore       persistent store over the EF peer
 
 ### Why not `Themia.Otp`
 
-#0056 accepted the package as `Themia.Otp`. The name is wrong for what the thing does, and renaming is
-free right now because no code exists.
-
 The generic operation is *"issue a secret bound to a key, verify it once, within a TTL, under a rate
-limit."* That is the same mechanism for **phone OTP**, **email OTP**, **magic links**, **email
-verification**, **password reset**, and **2FA enrolment**. Calling it `Otp` would have made four of those
-six read as a misuse of an SMS-shaped package.
+limit."* Same mechanism for **phone OTP**, **email OTP**, **magic links**, **email verification**,
+**password reset**, **2FA enrolment**. `Otp` would make four of those six read as a misuse of an
+SMS-shaped package. Renaming is free now — no code exists.
 
-The key is an **opaque string** — a phone number, an email address, a user id. The core never parses it,
-never validates its shape, and never decides what it means.
+The key is an **opaque string**. The core never parses it, never validates its shape, never decides what
+it means. Email OTP is therefore the same core with a different key and a different sender — the adopter
+passes the secret to `IEmailSender` instead of `ISmsSender` (both already ship in `Themia.Notifications`).
 
-### Email OTP costs nothing
+## What rev 1 got wrong
 
-It is the same core with a different key and a different sender. The adopter passes the code to
-`IEmailSender` instead of `ISmsSender` (both already ship in `Themia.Notifications`). No new API, no
-configuration switch, no branch in the core.
+Recorded because both errors were the kind that get re-introduced by someone reading only the final text.
 
-## Two challenge shapes, one core
+1. **The API could not express a magic link**, while the spec claimed the core supported them. `Verify`
+   took the key as its first argument, but a user clicking a link presents only a token — the system has
+   no key. The two ways out were to put the key in the URL (leaking an email or phone into browser
+   history and referrers, the very threat the spec listed) or to ask the user to retype their email
+   (at which point it is not a magic link). Fixed by `VerifyByTokenAsync`, below.
+2. **Multi-tenancy was cut as "speculative" on a false premise** — that keys are globally unique in
+   practice. `Themia.Modules.Identity.Abstractions/Entities/User.cs:10` declares
+   `User : SoftDeletableEntity<Guid>, ITenantEntity` with a nullable `TenantId`, and its own doc says
+   "Tenant-scoped when `ITenantEntity.TenantId` is set". Two tenants holding the same phone number is
+   the design, not an edge case. Without tenant in the challenge identity, tenant B could verify a code
+   issued to tenant A — cross-tenant account takeover — and either tenant could rate-limit the other out
+   of logging in. Fixed by making tenant part of `ChallengeScope`.
 
-`Themia.Challenges` supports two secret formats, because their threat models genuinely differ:
+## Public API
+
+```csharp
+namespace Themia.Challenges;
+
+/// Identity of a challenge. Tenant is part of it: two tenants may hold the same phone number.
+public sealed record ChallengeScope(string Key, string Purpose, string? TenantId = null);
+
+public interface IChallengeService
+{
+    // Rate-limited (see below). The returned secret is the only time the plaintext exists.
+    Task<ChallengeIssueResult> IssueAsync(ChallengeScope scope, CancellationToken ct = default);
+
+    // For user-typed secrets (numeric codes): the caller knows the key, so the row is found by scope
+    // and the code is then compared in constant time.
+    Task<ChallengeVerifyResult> VerifyAsync(ChallengeScope scope, string code, CancellationToken ct = default);
+
+    // For opaque tokens (magic links): the caller has ONLY the token. Safe to look up by the token's
+    // hash precisely because the token carries 256 bits — a numeric code must never use this path.
+    Task<ChallengeVerifyResult> VerifyByTokenAsync(
+        string token, string purpose, string? tenantId = null, CancellationToken ct = default);
+}
+
+public enum ChallengeIssueOutcome { Issued, RateLimited }
+public enum ChallengeVerifyOutcome { Verified, Incorrect, Expired, Consumed, AttemptsExhausted, NotFound }
+```
+
+Both results are **enums with computed booleans**, never bare bools — a caller must not collapse
+`RateLimited` or `AttemptsExhausted` into "not verified" and treat them the same. (`Themia` already
+models outcomes this way: `DispatchOutcome`, `LoginOutcome`, `NotificationOutcome`.)
+
+`ChallengeVerifyResult` carries the verified `ChallengeScope` on success, so a `VerifyByTokenAsync`
+caller learns which key the token belonged to — that is how a magic-link endpoint knows who just logged
+in without the key ever travelling in the URL.
+
+### Purpose is the configuration unit
+
+```csharp
+services.AddThemiaChallenges(o =>
+{
+    o.ConfigurePurpose("login", p =>
+    {
+        p.Format = ChallengeFormat.Numeric(6);
+        p.Ttl = TimeSpan.FromMinutes(5);
+        p.MaxAttempts = 5;
+        p.PerScopeWindow = (Limit: 3, Window: TimeSpan.FromMinutes(15));
+    });
+});
+```
+
+`purpose` scopes a challenge so a code issued for `"login"` cannot be replayed against `"change-phone"`,
+**and** it is where TTL, attempt cap, format and limits are set. This is what makes "email OTP costs
+nothing" true at the policy level and not just the mechanism level: email is slower to arrive than SMS
+(queueing, greylisting) and costs almost nothing to send, so it wants a longer TTL and a looser limit
+than an SMS purpose. Same core, different purpose config.
+
+## Two challenge shapes
 
 | | Numeric code (OTP) | Opaque token (magic link) |
 |---|---|---|
@@ -56,75 +119,59 @@ configuration switch, no branch in the core.
 | Entropy | ~20 bits (6 digits) | 256 bits |
 | Brute-forceable | **yes** — attempt cap is load-bearing | no |
 | Forwardable | hard (short TTL, needs the code) | **trivially — forwarding the email grants login** |
-| Appears in | the user's screen | URL, browser history, referrer, server logs |
+| Verify path | `VerifyAsync(scope, code)` | `VerifyByTokenAsync(token, ...)` |
 
-Supporting both from the start costs almost nothing at design time and is expensive to retrofit: the
-token generator becomes a strategy, and the attempt cap becomes per-challenge configuration. Both are
-decisions that are hard to add once a schema and an API have shipped.
-
-**v1 ships the numeric generator only.** The opaque-token generator and the magic-link guidance below are
-specified so the shape is right, but are not built until an adopter asks. Nobody has.
+**v1 ships the numeric format and `VerifyAsync` only.** `ChallengeFormat.OpaqueToken` and
+`VerifyByTokenAsync` are specified and present in the API from the start — they cost almost nothing at
+design time and are expensive to retrofit — but the token generator is not implemented until an adopter
+asks. Nobody has.
 
 ### The prefetch trap, recorded now rather than discovered later
 
-The single most common way magic links fail in production: **email scanners follow the link before the
-user does.** Outlook Safe Links, corporate antivirus, and Slack unfurling all issue a `GET` on every URL
-in a message. With a naive single-use `GET`, the token is consumed by a scanner and the real user sees
-"link expired" every time — a support problem that is very hard to trace back to its cause.
+The most common way magic links fail in production: **email scanners follow the link before the user
+does.** Outlook Safe Links, corporate antivirus and Slack unfurling all issue a `GET` on every URL in a
+message. With a naive single-use `GET`, a scanner consumes the token and the real user sees "link
+expired" every time — a support problem that is very hard to trace to its cause.
 
 **The rule, when magic links ship:** a `GET` on the link must be idempotent and must NOT consume the
 challenge — it renders a confirmation page. The `POST` behind the user's click consumes it. Scanners do
-not POST.
-
-This is guidance for the adopter's endpoint, not something the core can enforce — but it belongs in the
-core's documentation, because the core is where someone will look.
-
-## Public API (indicative)
-
-```csharp
-namespace Themia.Challenges;
-
-public interface IChallengeService
-{
-    // Rate-limited per key. The returned secret is the ONLY time the plaintext exists —
-    // the store keeps a hash.
-    Task<ChallengeIssueResult> IssueAsync(string key, string purpose, CancellationToken ct = default);
-
-    // Constant-time comparison, single-use, atomic consume.
-    Task<ChallengeVerifyResult> VerifyAsync(string key, string purpose, string secret, CancellationToken ct = default);
-}
-
-public enum ChallengeIssueOutcome { Issued, RateLimited }
-public enum ChallengeVerifyOutcome { Verified, Incorrect, Expired, Consumed, AttemptsExhausted, NotFound }
-```
-
-Both results are **enums with computed booleans**, never bare bools — a caller must not be able to
-collapse `RateLimited` or `AttemptsExhausted` into "not verified" and treat the two the same. (`Themia`
-already models outcomes this way: `DispatchOutcome`, `LoginOutcome`, `NotificationOutcome`.)
-
-`purpose` scopes a challenge so a code issued for `"login"` cannot be replayed against
-`"change-phone"`. Same key, different purpose, independent challenges and independent rate limits.
+not POST. The core cannot enforce this (it never sees the HTTP verb), but this is where someone will
+look for it.
 
 ## Security requirements — non-negotiable
 
-These are the reasons the package exists. None of them is optional or configurable off.
-
 1. **Store a hash, never the secret.** `IssueAsync` returns the plaintext once; the row keeps a salted
-   hash. A leaked database backup must not hand over live login codes. This matters for numeric codes
-   too, not just tokens.
-2. **Rate limit per KEY, not per IP.** An unthrottled issue endpoint is an SMS-cost amplification attack
-   against whoever pays the gateway bill. Per-IP limiting does not stop it — the attacker rotates IPs and
-   the victim is the account owner's phone number and your invoice.
-3. **Attempt cap per challenge.** A 6-digit code with unlimited guesses is not a second factor. Exceeding
-   the cap burns the challenge.
-4. **Single use, atomically.** Verification and consumption are one database operation, not read-then-write.
-   Two concurrent verifications must not both succeed.
-5. **Invalidate on re-issue.** Requesting a new code for the same `(key, purpose)` invalidates the
-   outstanding one, so an intercepted older code cannot be used later.
-6. **Constant-time comparison.** `CryptographicOperations.FixedTimeEquals` over the hashes.
-7. **Short TTL.** Default 5 minutes for numeric codes.
+   hash.
+   **What this does and does not buy, stated precisely** so nobody later relaxes the TTL on the strength
+   of it: hashing prevents casual disclosure — a support engineer reading the table, a code appearing in
+   a query log, a screenshot of a DB browser. It does **not** protect a numeric code against an attacker
+   who has the backup: 10⁶ candidates fall to a GPU instantly regardless of salt. What makes a leaked
+   row worthless is the **short TTL and single-use** — the hash is defence in depth, not the defence.
+2. **Rate limit in two layers, both required.**
+   - *Per scope* (`tenant + key + purpose`) — the UX limit: "you asked for a login code three times in
+     fifteen minutes".
+   - *Per key across all purposes* (`tenant + key`) — the **cost ceiling**. Without this layer an
+     attacker cycles `login` → `reset` → `verify` → `enroll` and multiplies their SMS volume by the
+     number of purposes the system defines, never touching a per-purpose limit. The per-purpose layer
+     protects the user's experience; only this layer protects the invoice.
+   - Per IP is deliberately NOT the mechanism: the attacker rotates IPs, and the victim is the account
+     owner's phone number and your SMS bill.
+3. **Attempt cap per challenge.** A 6-digit code with unlimited guesses is not a second factor.
+   Exceeding the cap burns the challenge.
+4. **Single use, atomically.** Verification and consumption are one database operation, never
+   read-then-write. Two concurrent verifications must not both succeed.
+5. **Invalidate on re-issue.** A new secret for the same scope invalidates the outstanding one.
+6. **Constant-time comparison** (`CryptographicOperations.FixedTimeEquals`) on the numeric path.
+7. **Short TTL**, default 5 minutes for numeric.
 8. **The rate limiter and attempt cap cannot be disabled.** Values are tunable; the mechanism is not
    removable. An off switch is how it ships disabled by accident.
+
+### Why not `System.Threading.RateLimiting`
+
+.NET 8+ ships it and it is not used here: it is **in-process and in-memory**. Behind a load balancer,
+each instance would hold its own counter, so the real ceiling becomes `instances × limit` and an attacker
+simply spreads requests across instances. The limit that protects an SMS bill has to be as durable and as
+shared as the challenge store itself, so it lives in the same table.
 
 ## Store: no silent in-memory default
 
@@ -134,30 +181,49 @@ convenience. Registering the core without a store **throws at registration time*
 
 A host that adopts this package specifically to get persistence, and silently receives an in-memory store
 instead, is worse off than before — it believes the restart-drops-challenges problem is fixed when it is
-not.
-
-If an in-memory store ships at all it is an explicitly named opt-in (`AddThemiaChallengesInMemoryStore()`)
-whose documentation states it is single-instance and non-durable. Never a default, never a fallback.
+not. An in-memory store, if it ships at all, is an explicitly named opt-in
+(`AddThemiaChallengesInMemoryStore()`) documented as single-instance and non-durable. Never a default.
 
 Schema is owned by FluentMigrator, one migration with `IfDatabase(...)` per engine, following
 `MessagingSchemaMigration` — including its lesson: **a single literal table name on every engine**
-(`challenges`), not a schema-qualified one, because FluentMigrator drops `InSchema(...)` on MySQL.
+(`challenges`), never schema-qualified, because FluentMigrator drops `InSchema(...)` on MySQL.
+
+Unique index on `(tenant_id, key, purpose)` for the live challenge; separate index on the token hash for
+`VerifyByTokenAsync`.
+
+### ⚠️ ezy-assets cannot adopt v1, and that is a known gap
+
+ezy-assets takes **no Themia data peer at all** — not Dapper, not EF (`Directory.Packages.props:43`,
+deliberate, confirmed by them on coord #0050). Both v1 stores require a peer, so
+`AddThemiaChallenges()` will throw on their host.
+
+This is the same wall the Messaging inbox hit, recorded here rather than discovered by them at build
+time. #0054 states plainly that ezy-assets will need this feature. Options, none chosen yet and none
+blocking v1:
+
+- they adopt a data peer (their call, not ours);
+- a store that takes a `DbConnection` directly, with no peer dependency;
+- a Redis-backed store, which suits short-TTL challenges well.
+
+The decision belongs on #0056 with ezy-assets in the thread — not in this spec.
 
 ## Boundaries — what this package does NOT do
 
-- **Delivery.** `Themia.Notifications` already ships `ISmsSender` and `IEmailSender` with
-  `HttpSmsSenderBase` for wiring a provider. `Themia.Challenges` hands the caller a secret and never
-  sends anything. It defines no competing abstraction.
+- **Delivery.** `Themia.Notifications` already ships `ISmsSender` / `IEmailSender`. This core hands the
+  caller a secret and never sends anything; it defines no competing abstraction.
   - **⚠️ Adopters must check `NotificationResult.NotConfigured`** before treating a send as done. The
-    logger stubs report `NotConfigured` (not success) when no provider is wired — see coord #0057. An OTP
+    logger stubs report `NotConfigured` (not success) when no provider is wired — coord #0057. An OTP
     "sent" through an unconfigured stub is an authentication outage with no signal.
 - **Users.** The core does not know what a user is. `FindByPhoneAsync` and identifier resolution are
   coord #0054 item (1), in `Themia.Modules.Identity`.
-- **Token issuance.** "Verified challenge → access + refresh tokens" is an Identity concern. See below.
-- **Whether an unknown key should appear to succeed.** The core cannot decide this: it does not know what
-  "registered" means. It will issue a challenge for any key, so an adopter can implement
-  always-appear-to-succeed without the framework fighting them. Decided at the endpoint. Propertiezy
-  raised this question on #0054 and it is still theirs to answer.
+- **Token issuance.** "Verified challenge → access + refresh tokens" is an Identity concern; see below.
+- **Whether an unknown key should appear to succeed.** The core cannot decide this — it does not know
+  what "registered" means. It issues a challenge for any key, so an adopter can implement
+  always-appear-to-succeed without the framework fighting them. Propertiezy raised this on #0054 and it
+  is still theirs to answer.
+- **Tenant resolution.** The caller passes `TenantId` explicitly rather than the core reading an ambient
+  tenant — a neutral core must not depend on `Themia.MultiTenancy`. Hosts that have an ambient tenant
+  pass it in one line.
 
 ## Identity integration — separate spec, boundary recorded here
 
@@ -165,30 +231,32 @@ Propertiezy asked for `LoginWithOtpAsync(phone, code) -> LoginResult`. That retu
 `LoginResult` and mints Identity's `AuthTokens`, so it cannot live in a package that does not know what a
 user is.
 
-**Proposed shape, to be specced separately:** `Themia.Modules.Identity` takes a reference to
-`Themia.Challenges` (neutral, no project dependencies of its own) and adds the flow that composes
-`IChallengeService` + `FindByPhoneAsync` + its existing token issuance. The core stays neutral; Identity
-is merely a caller.
+**Proposed shape, to be specced separately:** `Themia.Modules.Identity` references `Themia.Challenges`
+(neutral, no project dependencies of its own) and adds the flow composing `IChallengeService` +
+`FindByPhoneAsync` + its existing token issuance. The core stays neutral; Identity is merely a caller.
 
-Recorded here because the alternative — the adopter writing that glue — would require Identity to expose
-enough of its token pipeline publicly that every consumer re-derives the security-critical part. That is
-the same objection propertiezy made about identifier resolution on #0054.
+The alternative — the adopter writing that glue — would require Identity to expose enough of its token
+pipeline publicly that every consumer re-derives the security-critical part. That is the same objection
+propertiezy made about identifier resolution on #0054.
 
 ## Testing
 
 - Every security requirement above gets a test that fails if the requirement is removed. A rate limiter
   with no test asserting the *second* request is refused is decorative.
-- **Concurrency:** two simultaneous `VerifyAsync` calls with the correct secret — exactly one wins. This
-  is the requirement most likely to be quietly broken by a later refactor to read-then-write.
-- **Hashing:** a test asserting the plaintext secret does not appear in the persisted row.
+- **Both rate-limit layers tested separately**, including the purpose-cycling bypass: N requests across N
+  distinct purposes must hit the per-key ceiling even though no per-purpose limit was reached.
+- **Cross-tenant isolation:** a code issued for `(tenant A, +66…, login)` must NOT verify under tenant B,
+  and tenant A exhausting its limit must not affect tenant B.
+- **Concurrency:** two simultaneous `VerifyAsync` calls with the correct secret — exactly one wins. The
+  requirement most likely to be quietly broken by a later refactor to read-then-write.
+- **Hashing:** the plaintext secret does not appear in the persisted row.
 - **Integration tests against real PostgreSQL / MySQL / SQL Server** via Testcontainers, matching the
-  Messaging module. The atomic-consume guarantee is engine-specific and cannot be verified in memory.
+  Messaging module. Atomic consume is engine-specific and cannot be verified in memory.
 - **No test may log a secret.** Codes and tokens are credentials.
 
 ## Out of scope for v1
 
-- The opaque-token generator and magic-link flow (designed above, not built — no adopter asked).
+- The opaque-token generator (API present, generator unimplemented — no adopter asked).
 - Any SMS or email provider implementation.
 - The Identity integration flow (separate spec).
-- Multi-tenancy on the challenge table. Keys are already globally unique in practice (a phone number, an
-  email); adding a tenant column before anyone needs it is speculative.
+- A peer-free store for ezy-assets (see the gap above — decision belongs on #0056).
