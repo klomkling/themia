@@ -255,7 +255,7 @@ public abstract class ConcurrencyTests
                 });
 
                 // First call seeds the bucket (count 0) then updates it to 1.
-                await connection.ExecuteAsync(sqlServerFixture.Dialect.IncrementWindowSql, new
+                await connection.ExecuteAsync(sqlServerFixture.Dialect.IncrementWindowSql(RateWindowBucket.TenantAllPurposes), new
                 {
                     Id = Guid.NewGuid(),
                     TenantId = tenantId,
@@ -267,7 +267,7 @@ public abstract class ConcurrencyTests
                 // Second call, identical bucket, same session: the seed INSERT collides with the row this
                 // same transaction just inserted — exactly the scenario the XACT_ABORT OFF/restore dance
                 // exists for. Must not throw and must not doom the ambient transaction.
-                var collision = await Record.ExceptionAsync(() => connection.ExecuteAsync(sqlServerFixture.Dialect.IncrementWindowSql, new
+                var collision = await Record.ExceptionAsync(() => connection.ExecuteAsync(sqlServerFixture.Dialect.IncrementWindowSql(RateWindowBucket.TenantAllPurposes), new
                 {
                     Id = Guid.NewGuid(),
                     TenantId = tenantId,

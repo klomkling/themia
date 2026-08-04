@@ -27,6 +27,8 @@ Themia.Challenges.ChallengeOptions.PerKeyWindow.set -> void
 Themia.Challenges.ChallengeOptions.PurgeEnabled.get -> bool
 Themia.Challenges.ChallengeOptions.PurgeEnabled.set -> void
 Themia.Challenges.ChallengeOptions.Validate() -> void
+Themia.Challenges.ChallengeOptions.VerifyWindow.get -> (int Limit, System.TimeSpan Window)
+Themia.Challenges.ChallengeOptions.VerifyWindow.set -> void
 Themia.Challenges.ChallengeScope
 Themia.Challenges.ChallengeScope.ChallengeScope(string! Key, string! Purpose, string? TenantId = null) -> void
 Themia.Challenges.ChallengeScope.Key.get -> string!
@@ -35,12 +37,16 @@ Themia.Challenges.ChallengeScope.Purpose.get -> string!
 Themia.Challenges.ChallengeScope.Purpose.init -> void
 Themia.Challenges.ChallengeScope.TenantId.get -> string?
 Themia.Challenges.ChallengeScope.TenantId.init -> void
+Themia.Challenges.ChallengeTenancy
+Themia.Challenges.ChallengeTenancy.Platform = 1 -> Themia.Challenges.ChallengeTenancy
+Themia.Challenges.ChallengeTenancy.Tenant = 0 -> Themia.Challenges.ChallengeTenancy
 Themia.Challenges.ChallengeVerifyOutcome
 Themia.Challenges.ChallengeVerifyOutcome.AttemptsExhausted = 4 -> Themia.Challenges.ChallengeVerifyOutcome
 Themia.Challenges.ChallengeVerifyOutcome.Consumed = 3 -> Themia.Challenges.ChallengeVerifyOutcome
 Themia.Challenges.ChallengeVerifyOutcome.Expired = 2 -> Themia.Challenges.ChallengeVerifyOutcome
 Themia.Challenges.ChallengeVerifyOutcome.Incorrect = 1 -> Themia.Challenges.ChallengeVerifyOutcome
 Themia.Challenges.ChallengeVerifyOutcome.NotFound = 5 -> Themia.Challenges.ChallengeVerifyOutcome
+Themia.Challenges.ChallengeVerifyOutcome.RateLimited = 6 -> Themia.Challenges.ChallengeVerifyOutcome
 Themia.Challenges.ChallengeVerifyOutcome.Verified = 0 -> Themia.Challenges.ChallengeVerifyOutcome
 Themia.Challenges.ChallengeVerifyResult
 Themia.Challenges.ChallengeVerifyResult.Outcome.get -> Themia.Challenges.ChallengeVerifyOutcome
@@ -50,18 +56,18 @@ Themia.Challenges.DependencyInjection.ChallengeServiceCollectionExtensions
 Themia.Challenges.IChallengeDialect
 Themia.Challenges.IChallengeDialect.ConsumeSql.get -> string!
 Themia.Challenges.IChallengeDialect.CreateConnection() -> System.Data.Common.DbConnection!
-Themia.Challenges.IChallengeDialect.DecrementWindowSql.get -> string!
-Themia.Challenges.IChallengeDialect.IncrementWindowSql.get -> string!
+Themia.Challenges.IChallengeDialect.DecrementWindowSql(Themia.Challenges.RateWindowBucket bucket) -> string!
+Themia.Challenges.IChallengeDialect.IncrementWindowSql(Themia.Challenges.RateWindowBucket bucket) -> string!
 Themia.Challenges.IChallengeDialect.InsertSql.get -> string!
-Themia.Challenges.IChallengeDialect.InvalidateLiveForScopeSql.get -> string!
+Themia.Challenges.IChallengeDialect.InvalidateLiveForScopeSql(Themia.Challenges.ChallengeTenancy tenancy) -> string!
 Themia.Challenges.IChallengeDialect.MarkRefundedSql.get -> string!
 Themia.Challenges.IChallengeDialect.PurgeElapsedWindowsSql.get -> string!
 Themia.Challenges.IChallengeDialect.PurgeExpiredSql.get -> string!
 Themia.Challenges.IChallengeDialect.RecordAttemptSql.get -> string!
 Themia.Challenges.IChallengeDialect.SelectByIdSql.get -> string!
-Themia.Challenges.IChallengeDialect.SelectLiveByScopeSql.get -> string!
+Themia.Challenges.IChallengeDialect.SelectLiveByScopeSql(Themia.Challenges.ChallengeTenancy tenancy) -> string!
 Themia.Challenges.IChallengeDialect.SelectLiveByTokenHashSql.get -> string!
-Themia.Challenges.IChallengeDialect.SelectMostRecentByScopeSql.get -> string!
+Themia.Challenges.IChallengeDialect.SelectMostRecentByScopeSql(Themia.Challenges.ChallengeTenancy tenancy) -> string!
 Themia.Challenges.IChallengeService
 Themia.Challenges.IChallengeService.IssueAsync(Themia.Challenges.ChallengeScope! scope, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Challenges.ChallengeIssueResult!>!
 Themia.Challenges.IChallengeService.RefundAsync(System.Guid challengeId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!
@@ -81,7 +87,13 @@ Themia.Challenges.PurposeOptions.PerScopeWindow.set -> void
 Themia.Challenges.PurposeOptions.PurposeOptions() -> void
 Themia.Challenges.PurposeOptions.Ttl.get -> System.TimeSpan
 Themia.Challenges.PurposeOptions.Ttl.set -> void
+Themia.Challenges.RateWindowBucket
+Themia.Challenges.RateWindowBucket.PlatformAllPurposes = 3 -> Themia.Challenges.RateWindowBucket
+Themia.Challenges.RateWindowBucket.PlatformAndPurpose = 2 -> Themia.Challenges.RateWindowBucket
+Themia.Challenges.RateWindowBucket.TenantAllPurposes = 1 -> Themia.Challenges.RateWindowBucket
+Themia.Challenges.RateWindowBucket.TenantAndPurpose = 0 -> Themia.Challenges.RateWindowBucket
 const Themia.Challenges.ChallengeOptions.GlobalKeyBucketPurpose = "__themia_global_key__" -> string!
+const Themia.Challenges.ChallengeOptions.VerifyBucketPurpose = "__themia_verify__" -> string!
 const Themia.Challenges.ChallengeScope.MaxKeyLength = 450 -> int
 const Themia.Challenges.ChallengeScope.MaxPurposeLength = 100 -> int
 const Themia.Challenges.ChallengeScope.MaxTenantIdLength = 100 -> int
@@ -97,5 +109,6 @@ static Themia.Challenges.ChallengeVerifyResult.Consumed(Themia.Challenges.Challe
 static Themia.Challenges.ChallengeVerifyResult.Expired(Themia.Challenges.ChallengeScope! scope) -> Themia.Challenges.ChallengeVerifyResult!
 static Themia.Challenges.ChallengeVerifyResult.Incorrect(Themia.Challenges.ChallengeScope! scope) -> Themia.Challenges.ChallengeVerifyResult!
 static Themia.Challenges.ChallengeVerifyResult.NotFound(Themia.Challenges.ChallengeScope! scope) -> Themia.Challenges.ChallengeVerifyResult!
+static Themia.Challenges.ChallengeVerifyResult.RateLimited(Themia.Challenges.ChallengeScope! scope) -> Themia.Challenges.ChallengeVerifyResult!
 static Themia.Challenges.ChallengeVerifyResult.Verified(Themia.Challenges.ChallengeScope! scope) -> Themia.Challenges.ChallengeVerifyResult!
 static Themia.Challenges.DependencyInjection.ChallengeServiceCollectionExtensions.AddThemiaChallenges(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Themia.Challenges.ChallengeOptions!>! configure) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!

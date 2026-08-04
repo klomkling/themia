@@ -12,7 +12,77 @@ with the *why* and concrete upgrade steps.
 
 ## Unreleased
 
-_Nothing yet._
+### `IChallengeDialect`: five statements became methods taking a shape
+
+**What changed:** `SelectLiveByScopeSql`, `SelectMostRecentByScopeSql` and `InvalidateLiveForScopeSql`
+are now methods taking a `ChallengeTenancy`; `IncrementWindowSql` and `DecrementWindowSql` are methods
+taking a `RateWindowBucket`. Two new public enums come with them.
+
+**Why:** each statement used to compare nullable columns with a null-safe form so that one SQL text
+covered both a bound parameter and a `NULL` one. Every such form — PostgreSQL's `IS NOT DISTINCT FROM`,
+MySQL's `<=>`, SQL Server's `(a = b OR (a IS NULL AND b IS NULL))` — is non-sargable, so none of the
+indexes the schema creates could be seeked. On PostgreSQL 16 over 200 000 rows the increment `UPDATE`
+that `IssueAsync` runs two or three times per call was a sequential scan at 16.2 ms; the shape-specific
+predicate is an index scan at 0.042 ms. The OR-guard does not recover it even with literals, so the SQL
+text itself had to change.
+
+**How to upgrade:**
+
+- **If you only reference the shipped engine packages** (`Themia.Challenges.PostgreSql` / `.MySql` /
+  `.SqlServer`) — nothing to do. `IChallengeService` is unchanged.
+- **If you implement `IChallengeDialect` yourself** — convert those five members from properties to
+  methods and emit a shape-specific predicate for each case:
+
+  ```csharp
+  // before
+  public string DecrementWindowSql => """
+      UPDATE challenge_rate_windows SET count = GREATEST(count - 1, 0)
+      WHERE tenant_id IS NOT DISTINCT FROM @TenantId AND "key" = @Key
+        AND purpose IS NOT DISTINCT FROM @Purpose AND window_start = @WindowStart;
+      """;
+
+  // after
+  public string DecrementWindowSql(RateWindowBucket bucket)
+  {
+      var (tenant, purpose) = bucket switch
+      {
+          RateWindowBucket.TenantAndPurpose => ("tenant_id = @TenantId", "purpose = @Purpose"),
+          RateWindowBucket.TenantAllPurposes => ("tenant_id = @TenantId", "purpose IS NULL"),
+          RateWindowBucket.PlatformAndPurpose => ("tenant_id IS NULL", "purpose = @Purpose"),
+          RateWindowBucket.PlatformAllPurposes => ("tenant_id IS NULL", "purpose IS NULL"),
+          _ => throw new ArgumentOutOfRangeException(nameof(bucket)),
+      };
+
+      return $"""
+          UPDATE challenge_rate_windows SET count = GREATEST(count - 1, 0)
+          WHERE {tenant} AND "key" = @Key AND {purpose} AND window_start = @WindowStart;
+          """;
+  }
+  ```
+
+  **A shape that means `NULL` must say `IS NULL` and must never compare the column to its parameter.**
+  `column = @Param` against a `NULL` parameter matches zero rows in silence — no error, every
+  platform-level challenge and every per-key ceiling row simply invisible, and the per-key ceiling is
+  what bounds an SMS bill. `Themia.Challenges.Tests.ChallengeDialectContractTests` enforces both halves
+  of that if you run it against your dialect.
+
+### `Themia.Challenges`: `VerifyAsync` is now rate-limited
+
+**What changed:** a new `ChallengeOptions.VerifyWindow` (default 20 per 15 minutes) bounds verification
+attempts per key. A refused call returns the new `ChallengeVerifyOutcome.RateLimited`.
+
+**Why:** `MaxAttempts` lives on a challenge row, so it bounded nothing when no challenge was live —
+verification traffic against a key with nothing outstanding was unbounded and uncounted.
+
+**How to upgrade:**
+
+- **Handle the new outcome.** If you `switch` exhaustively over `ChallengeVerifyOutcome`, the compiler
+  will tell you where. Treat it as a failure the caller should retry later; on an anonymous endpoint it
+  must be as indistinguishable from the other failures as they are from each other.
+- **Tune it if 20 per 15 minutes is wrong for you.** It cannot be disabled, only tuned — an off switch
+  is how a rate limit ships disabled by accident.
+- A rate-limited call does **not** count against `MaxAttempts`, so it cannot be used to burn someone
+  else's live challenge.
 
 ## 0.12.0
 

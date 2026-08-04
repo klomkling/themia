@@ -89,9 +89,9 @@ internal sealed class SqliteChallengeDialect : IChallengeDialect
 
     // No LIMIT: returns every live row for the scope, matching the shipped dialects' contract
     // (IChallengeDialect.SelectLiveByScopeSql) so MaxLiveChallenges > 1 is actually verifiable.
-    public string SelectLiveByScopeSql => """
+    public string SelectLiveByScopeSql(ChallengeTenancy tenancy) => $"""
         SELECT * FROM challenges
-        WHERE tenant_id IS @TenantId AND key = @Key AND purpose = @Purpose
+        WHERE {Tenant(tenancy)} AND key = @Key AND purpose = @Purpose
           AND consumed_at IS NULL AND expires_at > @Now
         ORDER BY created_at DESC;
         """;
@@ -104,9 +104,9 @@ internal sealed class SqliteChallengeDialect : IChallengeDialect
 
     // No liveness filter at all - used to classify why SelectLiveByScopeSql found nothing (never
     // issued vs. consumed vs. expired). See IChallengeDialect.SelectMostRecentByScopeSql's remarks.
-    public string SelectMostRecentByScopeSql => """
+    public string SelectMostRecentByScopeSql(ChallengeTenancy tenancy) => $"""
         SELECT * FROM challenges
-        WHERE tenant_id IS @TenantId AND key = @Key AND purpose = @Purpose
+        WHERE {Tenant(tenancy)} AND key = @Key AND purpose = @Purpose
         ORDER BY created_at DESC LIMIT 1;
         """;
 
@@ -125,26 +125,46 @@ internal sealed class SqliteChallengeDialect : IChallengeDialect
         UPDATE challenges SET attempts = attempts + 1 WHERE id = @Id AND consumed_at IS NULL;
         """;
 
-    public string InvalidateLiveForScopeSql => """
+    public string InvalidateLiveForScopeSql(ChallengeTenancy tenancy) => $"""
         UPDATE challenges SET consumed_at = @ConsumedAt
-        WHERE tenant_id IS @TenantId AND key = @Key AND purpose = @Purpose
+        WHERE {Tenant(tenancy)} AND key = @Key AND purpose = @Purpose
           AND consumed_at IS NULL AND expires_at > @Now;
         """;
 
     public string PurgeExpiredSql => """DELETE FROM challenges WHERE rowid IN (SELECT rowid FROM challenges WHERE expires_at < @OlderThan LIMIT @Batch);""";
 
-    public string IncrementWindowSql => """
-        INSERT INTO challenge_rate_windows (id, tenant_id, key, purpose, window_start, count)
-        VALUES (@Id, @TenantId, @Key, @Purpose, @WindowStart, 1)
-        ON CONFLICT (COALESCE(tenant_id, ''), key, COALESCE(purpose, ''), window_start)
-        DO UPDATE SET count = count + 1
-        RETURNING count;
-        """;
+    public string IncrementWindowSql(RateWindowBucket bucket)
+    {
+        var (tenant, purpose) = Bucket(bucket);
+        return $"""
+            INSERT INTO challenge_rate_windows (id, tenant_id, key, purpose, window_start, count)
+            VALUES (@Id, @TenantId, @Key, @Purpose, @WindowStart, 1)
+            ON CONFLICT (COALESCE(tenant_id, ''), key, COALESCE(purpose, ''), window_start)
+            DO UPDATE SET count = count + 1
+            RETURNING count;
+            """;
+    }
 
-    public string DecrementWindowSql => """
-        UPDATE challenge_rate_windows SET count = MAX(count - 1, 0)
-        WHERE tenant_id IS @TenantId AND key = @Key AND purpose IS @Purpose AND window_start = @WindowStart;
-        """;
+    public string DecrementWindowSql(RateWindowBucket bucket)
+    {
+        var (tenant, purpose) = Bucket(bucket);
+        return $"""
+            UPDATE challenge_rate_windows SET count = MAX(count - 1, 0)
+            WHERE {tenant} AND key = @Key AND {purpose} AND window_start = @WindowStart;
+            """;
+    }
+
+    private static string Tenant(ChallengeTenancy tenancy) =>
+        tenancy == ChallengeTenancy.Tenant ? "tenant_id = @TenantId" : "tenant_id IS NULL";
+
+    private static (string Tenant, string Purpose) Bucket(RateWindowBucket bucket) => bucket switch
+    {
+        RateWindowBucket.TenantAndPurpose => ("tenant_id = @TenantId", "purpose = @Purpose"),
+        RateWindowBucket.TenantAllPurposes => ("tenant_id = @TenantId", "purpose IS NULL"),
+        RateWindowBucket.PlatformAndPurpose => ("tenant_id IS NULL", "purpose = @Purpose"),
+        RateWindowBucket.PlatformAllPurposes => ("tenant_id IS NULL", "purpose IS NULL"),
+        _ => throw new ArgumentOutOfRangeException(nameof(bucket)),
+    };
 
     public string PurgeElapsedWindowsSql => """DELETE FROM challenge_rate_windows WHERE rowid IN (SELECT rowid FROM challenge_rate_windows WHERE window_start < @OlderThan LIMIT @Batch);""";
 }

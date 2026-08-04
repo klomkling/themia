@@ -22,6 +22,9 @@ public sealed class PostgresChallengeDialect : IChallengeDialect
     /// <summary>Creates the dialect over <paramref name="connectionString"/>.</summary>
     public PostgresChallengeDialect(string connectionString) => this.connectionString = connectionString;
 
+    /// <summary>The engine-appropriate quoting of the reserved <c>key</c> column.</summary>
+    private const string KeyColumn = "\"key\"";
+
     /// <inheritdoc />
     public DbConnection CreateConnection() => new NpgsqlConnection(connectionString);
 
@@ -37,9 +40,9 @@ public sealed class PostgresChallengeDialect : IChallengeDialect
     /// remarks: capping this to one row is exactly what would make <see cref="PurposeOptions.MaxLiveChallenges"/>
     /// values above 1 silently do nothing.
     /// </remarks>
-    public string SelectLiveByScopeSql => """
+    public string SelectLiveByScopeSql(ChallengeTenancy tenancy) => $"""
         SELECT * FROM challenges
-        WHERE tenant_id IS NOT DISTINCT FROM @TenantId AND "key" = @Key AND purpose = @Purpose
+        WHERE {TenantPredicate(tenancy)} AND {KeyColumn} = @Key AND purpose = @Purpose
           AND consumed_at IS NULL AND expires_at > @Now
         ORDER BY created_at DESC;
         """;
@@ -52,9 +55,9 @@ public sealed class PostgresChallengeDialect : IChallengeDialect
         """;
 
     /// <inheritdoc />
-    public string SelectMostRecentByScopeSql => """
+    public string SelectMostRecentByScopeSql(ChallengeTenancy tenancy) => $"""
         SELECT * FROM challenges
-        WHERE tenant_id IS NOT DISTINCT FROM @TenantId AND "key" = @Key AND purpose = @Purpose
+        WHERE {TenantPredicate(tenancy)} AND {KeyColumn} = @Key AND purpose = @Purpose
         ORDER BY created_at DESC LIMIT 1;
         """;
 
@@ -78,9 +81,9 @@ public sealed class PostgresChallengeDialect : IChallengeDialect
         """;
 
     /// <inheritdoc />
-    public string InvalidateLiveForScopeSql => """
+    public string InvalidateLiveForScopeSql(ChallengeTenancy tenancy) => $"""
         UPDATE challenges SET consumed_at = @ConsumedAt
-        WHERE tenant_id IS NOT DISTINCT FROM @TenantId AND "key" = @Key AND purpose = @Purpose
+        WHERE {TenantPredicate(tenancy)} AND {KeyColumn} = @Key AND purpose = @Purpose
           AND consumed_at IS NULL AND expires_at > @Now;
         """;
 
@@ -122,26 +125,54 @@ public sealed class PostgresChallengeDialect : IChallengeDialect
     /// <c>ON CONFLICT DO NOTHING</c> insert produces none), so the caller reads it as a single scalar.
     /// </para>
     /// </remarks>
-    public string IncrementWindowSql => """
-        INSERT INTO challenge_rate_windows (id, tenant_id, "key", purpose, window_start, count)
-        VALUES (@Id, @TenantId, @Key, @Purpose, @WindowStart, 0)
-        ON CONFLICT DO NOTHING;
-        UPDATE challenge_rate_windows SET count = count + 1
-        WHERE tenant_id IS NOT DISTINCT FROM @TenantId AND "key" = @Key AND purpose IS NOT DISTINCT FROM @Purpose
-          AND window_start = @WindowStart
-        RETURNING count;
-        """;
+    public string IncrementWindowSql(RateWindowBucket bucket)
+    {
+        var (tenant, purpose) = BucketPredicates(bucket);
+        return $"""
+            INSERT INTO challenge_rate_windows (id, tenant_id, {KeyColumn}, purpose, window_start, count)
+            VALUES (@Id, @TenantId, @Key, @Purpose, @WindowStart, 0)
+            ON CONFLICT DO NOTHING;
+            UPDATE challenge_rate_windows SET count = count + 1
+            WHERE {tenant} AND {KeyColumn} = @Key AND {purpose}
+              AND window_start = @WindowStart
+            RETURNING count;
+            """;
+    }
 
     /// <inheritdoc />
-    public string DecrementWindowSql => """
-        UPDATE challenge_rate_windows SET count = GREATEST(count - 1, 0)
-        WHERE tenant_id IS NOT DISTINCT FROM @TenantId AND "key" = @Key AND purpose IS NOT DISTINCT FROM @Purpose
-          AND window_start = @WindowStart;
-        """;
+    public string DecrementWindowSql(RateWindowBucket bucket)
+    {
+        var (tenant, purpose) = BucketPredicates(bucket);
+        return $"""
+            UPDATE challenge_rate_windows SET count = GREATEST(count - 1, 0)
+            WHERE {tenant} AND {KeyColumn} = @Key AND {purpose}
+              AND window_start = @WindowStart;
+            """;
+    }
 
     /// <inheritdoc />
     public string PurgeElapsedWindowsSql => """
         DELETE FROM challenge_rate_windows
         WHERE ctid IN (SELECT ctid FROM challenge_rate_windows WHERE window_start < @OlderThan LIMIT @Batch);
         """;
+
+    // Predicate fragments, selected by shape rather than compared null-safely — see ChallengeTenancy
+    // and RateWindowBucket for the measurement behind that. Each variant states its own IS NULL or
+    // = @Param, so the null-safety guarantee the interface documents is preserved per branch; what
+    // changes is that the planner now sees a constant and can seek the matching index.
+    private static string TenantPredicate(ChallengeTenancy tenancy) => tenancy switch
+    {
+        ChallengeTenancy.Tenant => "tenant_id = @TenantId",
+        ChallengeTenancy.Platform => "tenant_id IS NULL",
+        _ => throw new ArgumentOutOfRangeException(nameof(tenancy)),
+    };
+
+    private static (string Tenant, string Purpose) BucketPredicates(RateWindowBucket bucket) => bucket switch
+    {
+        RateWindowBucket.TenantAndPurpose => ("tenant_id = @TenantId", "purpose = @Purpose"),
+        RateWindowBucket.TenantAllPurposes => ("tenant_id = @TenantId", "purpose IS NULL"),
+        RateWindowBucket.PlatformAndPurpose => ("tenant_id IS NULL", "purpose = @Purpose"),
+        RateWindowBucket.PlatformAllPurposes => ("tenant_id IS NULL", "purpose IS NULL"),
+        _ => throw new ArgumentOutOfRangeException(nameof(bucket)),
+    };
 }

@@ -101,6 +101,7 @@ public sealed class ChallengeOptions
     private int _challengeRetentionHours = 24;
     private (int Limit, TimeSpan Window) _perKeyWindow = (20, TimeSpan.FromHours(1));
     private (int Limit, TimeSpan Window)? _perKeyGlobalWindow;
+    private (int Limit, TimeSpan Window) _verifyWindow = (20, TimeSpan.FromMinutes(15));
 
     /// <summary>
     /// The rate limit on issuance for one key across all purposes: at most <c>Limit</c> secrets may be
@@ -146,6 +147,78 @@ public sealed class ChallengeOptions
     /// purpose rather than <see langword="null"/>.
     /// </remarks>
     public const string GlobalKeyBucketPurpose = "__themia_global_key__";
+
+    /// <summary>
+    /// The purpose value reserved for the <see cref="VerifyWindow"/> counter row. Like
+    /// <see cref="GlobalKeyBucketPurpose"/> it is rejected by <see cref="ConfigurePurpose"/>, and exposed
+    /// only so the reservation is discoverable.
+    /// </summary>
+    public const string VerifyBucketPurpose = "__themia_verify__";
+
+    /// <summary>
+    /// The rate limit on <see cref="IChallengeService.VerifyAsync"/> for one key: at most <c>Limit</c>
+    /// verification attempts against the same key within <c>Window</c>, whatever their purpose and
+    /// whether or not anything is live. Defaults to 20 per 15 minutes.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>This is not the same control as <see cref="PurposeOptions.MaxAttempts"/>, and neither replaces
+    /// the other.</b> <c>MaxAttempts</c> lives on a challenge ROW: it bounds guesses against one issued
+    /// secret, which is what stops brute force. It bounds nothing at all when no challenge is live —
+    /// a caller can submit wrong codes forever against a key whose challenge was consumed, expired or
+    /// exhausted, and every one of those calls still costs two queries. This window is the bound on that
+    /// traffic: attempts per key, counted whether or not there was anything to verify against.
+    /// </para>
+    /// <para>
+    /// It is also what keeps the enumeration surface finite. <see cref="ChallengeVerifyOutcome"/>
+    /// deliberately distinguishes <c>Consumed</c>/<c>Expired</c> from <c>NotFound</c>, which is an
+    /// oracle for "has this address ever been challenged" if an adopter surfaces the difference; a bound
+    /// on attempts per key limits how much of an address list can be probed regardless.
+    /// </para>
+    /// <para>
+    /// Not nullable, and not disableable — only tunable — for the same reason the issuance limiter is
+    /// not: an off switch is how a rate limit ships disabled by accident. Charged before the lookup, and
+    /// never refunded: unlike an issuance charge, which pays for an SMS that may never be sent, a verify
+    /// charge pays for work the store has already done by the time the outcome is known.
+    /// </para>
+    /// <para>
+    /// <b>This is a bound on RATE, not on TOTAL guesses, and the difference matters for a long-lived
+    /// flow.</b> The counter resets every window. Combined with the issuance limits that caps the
+    /// classic cycling attack — request a code, burn <see cref="PurposeOptions.MaxAttempts"/> guesses,
+    /// request another, repeat — at roughly <c>Limit</c> guesses per window rather than the unbounded
+    /// figure a row-scoped attempt cap allows on its own. Over a day, though, a 20-per-15-minutes
+    /// setting still permits some 1 900 guesses against a key. For a short flow (a login code that lives
+    /// five minutes) that is irrelevant. For one that stays open for days — a contract-signing link, an
+    /// enrolment that waits on a human — it is not.
+    /// </para>
+    /// <para>
+    /// Two ways to close that, and the second is usually the right one:
+    /// <list type="number">
+    /// <item><description>
+    /// <b>Widen the window</b> — e.g. <c>(15, TimeSpan.FromDays(30))</c> approximates a total cap. Three
+    /// caveats: buckets are fixed-width, so a caller straddling a boundary gets up to twice the limit in
+    /// a short span; the counter is keyed by <em>key</em>, so two unrelated flows sharing one phone
+    /// number share the allowance; and counter rows must outlive the widest configured window, so
+    /// retention grows with it (<see cref="Internal.ChallengePurgeService"/> already computes that
+    /// horizon, but the rows are real).
+    /// </description></item>
+    /// <item><description>
+    /// <b>Keep a total cap of your own, scoped to the thing that ends.</b> An adopter knows what bounds a
+    /// flow — this contract, this enrolment — and Themia does not; a cap keyed on a phone number that
+    /// never resets is a permanent lockout anyone who knows the number can trigger, which is why this
+    /// package does not ship one. A monotonic counter on your own row, not reset by re-issue, costs no
+    /// extra store and expires when the flow does. If you already have one, <b>keep it</b> — adopting
+    /// <c>Themia.Challenges</c> does not replace it.
+    /// </description></item>
+    /// </list>
+    /// </para>
+    /// </remarks>
+    /// <exception cref="ArgumentOutOfRangeException"><c>Limit</c> or <c>Window</c> is zero or negative.</exception>
+    public (int Limit, TimeSpan Window) VerifyWindow
+    {
+        get => _verifyWindow;
+        set => _verifyWindow = PurposeOptions.ValidateWindow(value);
+    }
 
     /// <summary>
     /// An optional third rate-limit layer: at most <c>Limit</c> secrets to the same key within
@@ -220,6 +293,11 @@ public sealed class ChallengeOptions
         }
 
         var widest = PerKeyWindow.Window;
+        if (VerifyWindow.Window > widest)
+        {
+            widest = VerifyWindow.Window;
+        }
+
         if (PerKeyGlobalWindow is { } global && global.Window > widest)
         {
             widest = global.Window;
@@ -249,13 +327,14 @@ public sealed class ChallengeOptions
         ArgumentException.ThrowIfNullOrEmpty(purpose);
         ArgumentNullException.ThrowIfNull(configure);
 
-        if (string.Equals(purpose, GlobalKeyBucketPurpose, StringComparison.Ordinal))
+        if (string.Equals(purpose, GlobalKeyBucketPurpose, StringComparison.Ordinal)
+            || string.Equals(purpose, VerifyBucketPurpose, StringComparison.Ordinal))
         {
-            // Registering it would make ordinary issuance write into the tenant-agnostic ceiling's own
-            // counter row, so that ceiling would trip on unrelated traffic and its refunds would credit
-            // the wrong bucket. Rejected here rather than documented, since nothing detects it later.
+            // Registering either would make ordinary traffic write into a reserved counter row, so that
+            // limit would trip on unrelated activity and its refunds would credit the wrong bucket.
+            // Rejected here rather than documented, since nothing detects it later.
             throw new ArgumentException(
-                $"'{GlobalKeyBucketPurpose}' is reserved for the {nameof(PerKeyGlobalWindow)} counter row and cannot be configured as a purpose.",
+                $"'{purpose}' is reserved for an internal counter row and cannot be configured as a purpose.",
                 nameof(purpose));
         }
 

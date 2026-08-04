@@ -248,6 +248,85 @@ public sealed class ChallengeServiceTests : IDisposable
         Assert.Equal(ChallengeVerifyOutcome.Verified, result.Outcome);
     }
 
+    // ---- Verify rate limiting (issue #190) -----------------------------------------------------
+
+    [Fact]
+    public async Task Verify_ShouldRateLimit_EvenWhenNothingIsLive()
+    {
+        // The whole point: MaxAttempts lives on a challenge ROW, so it bounds nothing at all when no
+        // challenge is live. Wrong codes against a key that never had one used to cost two queries each,
+        // forever, and probe the Consumed-vs-NotFound oracle for free.
+        var service = CreateService(o =>
+        {
+            o.VerifyWindow = (3, TimeSpan.FromMinutes(15));
+            o.ConfigurePurpose("login", p => Configure(p));
+        });
+        var scope = new ChallengeScope("+66818181818", "login", "tenantA");
+
+        for (var i = 0; i < 3; i++)
+        {
+            Assert.Equal(ChallengeVerifyOutcome.NotFound, (await service.VerifyAsync(scope, "000000")).Outcome);
+        }
+
+        Assert.Equal(ChallengeVerifyOutcome.RateLimited, (await service.VerifyAsync(scope, "000000")).Outcome);
+    }
+
+    [Fact]
+    public async Task Verify_ShouldRateLimit_AcrossPurposesForTheSameKey()
+    {
+        // Counted per key, not per (key, purpose): the surface being protected — the store, and the
+        // ability to probe whether an address was ever challenged — is not partitioned by purpose, so an
+        // attacker must not get a fresh allowance by switching purpose.
+        var service = CreateService(o =>
+        {
+            o.VerifyWindow = (2, TimeSpan.FromMinutes(15));
+            o.ConfigurePurpose("login", p => Configure(p));
+            o.ConfigurePurpose("reset", p => Configure(p));
+        });
+        const string key = "+66828282828";
+
+        Assert.Equal(ChallengeVerifyOutcome.NotFound, (await service.VerifyAsync(new ChallengeScope(key, "login", "tenantA"), "000000")).Outcome);
+        Assert.Equal(ChallengeVerifyOutcome.NotFound, (await service.VerifyAsync(new ChallengeScope(key, "reset", "tenantA"), "000000")).Outcome);
+
+        var third = await service.VerifyAsync(new ChallengeScope(key, "login", "tenantA"), "000000");
+        Assert.Equal(ChallengeVerifyOutcome.RateLimited, third.Outcome);
+    }
+
+    [Fact]
+    public async Task Verify_ShouldNotCountRateLimitedCalls_AgainstMaxAttempts()
+    {
+        // A refused call never reaches the comparison, so it must not burn a guess. If it did, an
+        // attacker could exhaust a victim's live challenge without ever submitting a code — turning a
+        // throttle meant to protect the store into a way to kill someone else's valid secret.
+        var service = CreateService(o =>
+        {
+            o.VerifyWindow = (1, TimeSpan.FromMinutes(15));
+            // TTL outlives the verify window on purpose: the assertion below rolls the window forward,
+            // and a 5-minute default TTL would expire the challenge first and prove nothing.
+            o.ConfigurePurpose("login", p => Configure(p, maxAttempts: 2, ttl: TimeSpan.FromHours(1)));
+        });
+        var scope = new ChallengeScope("+66838383838", "login", "tenantA");
+        var secret = (await service.IssueAsync(scope)).Secret!;
+
+        var wrong = secret == "000000" ? "111111" : "000000";
+        Assert.Equal(ChallengeVerifyOutcome.Incorrect, (await service.VerifyAsync(scope, wrong)).Outcome);
+        Assert.Equal(ChallengeVerifyOutcome.RateLimited, (await service.VerifyAsync(scope, wrong)).Outcome);
+        Assert.Equal(ChallengeVerifyOutcome.RateLimited, (await service.VerifyAsync(scope, wrong)).Outcome);
+
+        // One attempt was recorded, not three. Move past the window and the correct code still verifies.
+        time.Advance(TimeSpan.FromMinutes(16));
+        Assert.Equal(ChallengeVerifyOutcome.Verified, (await service.VerifyAsync(scope, secret)).Outcome);
+    }
+
+    [Fact]
+    public void ConfigurePurpose_ShouldReject_TheReservedVerifyBucketPurpose()
+    {
+        var options = new ChallengeOptions();
+
+        Assert.ThrowsAny<ArgumentException>(() =>
+            options.ConfigurePurpose(ChallengeOptions.VerifyBucketPurpose, p => Configure(p)));
+    }
+
     // ---- Verify outcomes ----------------------------------------------------------------------
 
     [Fact]

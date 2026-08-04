@@ -26,17 +26,28 @@ namespace Themia.Challenges.Tests;
 /// </remarks>
 public class ChallengeDialectContractTests
 {
-    /// <summary>The statements that predicate on <c>tenant_id</c> against <c>@TenantId</c>, per the
-    /// SQL each dialect actually emits — <see cref="IChallengeDialect.InsertSql"/> also mentions both
-    /// but only in a <c>VALUES</c> list, not a predicate, so it is deliberately excluded here.</summary>
-    private static readonly (string Name, Func<IChallengeDialect, string> Select)[] TenantPredicateStatements =
-    [
-        (nameof(IChallengeDialect.SelectLiveByScopeSql), d => d.SelectLiveByScopeSql),
-        (nameof(IChallengeDialect.SelectMostRecentByScopeSql), d => d.SelectMostRecentByScopeSql),
-        (nameof(IChallengeDialect.InvalidateLiveForScopeSql), d => d.InvalidateLiveForScopeSql),
-        (nameof(IChallengeDialect.IncrementWindowSql), d => d.IncrementWindowSql),
-        (nameof(IChallengeDialect.DecrementWindowSql), d => d.DecrementWindowSql),
-    ];
+    /// <summary>Every <c>challenges</c> statement that predicates on <c>tenant_id</c>, paired with the
+    /// tenancy it was asked for. <see cref="IChallengeDialect.InsertSql"/> mentions the column too, but
+    /// only in a <c>VALUES</c> list rather than a predicate, so it is deliberately excluded.</summary>
+    private static IEnumerable<(string Name, ChallengeTenancy Tenancy, string Sql)> TenancyStatements(IChallengeDialect d)
+    {
+        foreach (var tenancy in new[] { ChallengeTenancy.Tenant, ChallengeTenancy.Platform })
+        {
+            yield return (nameof(IChallengeDialect.SelectLiveByScopeSql), tenancy, d.SelectLiveByScopeSql(tenancy));
+            yield return (nameof(IChallengeDialect.SelectMostRecentByScopeSql), tenancy, d.SelectMostRecentByScopeSql(tenancy));
+            yield return (nameof(IChallengeDialect.InvalidateLiveForScopeSql), tenancy, d.InvalidateLiveForScopeSql(tenancy));
+        }
+    }
+
+    /// <summary>Every <c>challenge_rate_windows</c> statement, once per bucket shape.</summary>
+    private static IEnumerable<(string Name, RateWindowBucket Bucket, string Sql)> BucketStatements(IChallengeDialect d)
+    {
+        foreach (var bucket in Enum.GetValues<RateWindowBucket>())
+        {
+            yield return (nameof(IChallengeDialect.IncrementWindowSql), bucket, d.IncrementWindowSql(bucket));
+            yield return (nameof(IChallengeDialect.DecrementWindowSql), bucket, d.DecrementWindowSql(bucket));
+        }
+    }
 
     public static IEnumerable<object[]> AllDialects()
     {
@@ -89,59 +100,102 @@ public class ChallengeDialectContractTests
     }
 
     /// <summary>
-    /// <c>tenant_id</c> is nullable on every table it appears on, and the interface's type-level
-    /// remarks state <c>@TenantId</c> may always be <see langword="null"/> (a platform-level
-    /// challenge). Plain <c>=</c> never matches <c>NULL</c>, so every predicate on <c>tenant_id</c>
-    /// must use one of the three documented null-safe forms instead — this does not error if missed,
-    /// it just makes every platform-level row invisible to the query.
+    /// A statement asked for a <see langword="null"/> shape must say <c>IS NULL</c> and must not compare
+    /// that column to its parameter at all.
     /// </summary>
+    /// <remarks>
+    /// This replaces an earlier theory that required the null-safe comparison forms
+    /// (<c>IS NOT DISTINCT FROM</c> / <c>&lt;=&gt;</c> / the OR-guard) on every one of these statements.
+    /// Those were correct and are now wrong: all three are non-sargable, so the indexes
+    /// <c>ChallengeSchemaMigration</c> creates could never be seeked through them — measured on
+    /// PostgreSQL 16 over 200 000 rows as a sequential scan at 16.2 ms where the shape-specific
+    /// predicate is an index scan at 0.042 ms, on a statement <c>IssueAsync</c> runs two or three times
+    /// per call. The SQL is now selected per shape instead (<see cref="ChallengeTenancy"/>,
+    /// <see cref="RateWindowBucket"/>).
+    /// <para>
+    /// The defect the old theory guarded is unchanged and still guarded here, just expressed for the new
+    /// shape: a <see langword="null"/> shape that emits <c>column = @Param</c> matches zero rows in
+    /// silence — no error, every platform-level challenge and every per-key ceiling row simply invisible.
+    /// The per-key ceiling is what bounds an SMS bill, so getting it wrong disables that protection with
+    /// nothing to see in a log.
+    /// </para>
+    /// </remarks>
     [Theory]
     [MemberData(nameof(AllDialects))]
-    public void TenantId_ShouldUseNullSafeComparison(IChallengeDialect dialect)
+    public void NullShapes_ShouldTestForNull_NeverCompareToTheParameter(IChallengeDialect dialect)
     {
-        foreach (var (name, select) in TenantPredicateStatements)
+        foreach (var (name, tenancy, sql) in TenancyStatements(dialect))
         {
-            var sql = select(dialect);
+            AssertShape(sql, "tenant_id", "@TenantId", isNull: tenancy == ChallengeTenancy.Platform, $"{name}/{tenancy}");
+        }
 
-            Assert.True(
-                IsNullSafeComparison(sql, "tenant_id", "@TenantId"),
-                $"{name} compares tenant_id to @TenantId without one of the documented null-safe forms: {sql}");
+        foreach (var (name, bucket, sql) in BucketStatements(dialect))
+        {
+            var tenantIsNull = bucket is RateWindowBucket.PlatformAndPurpose or RateWindowBucket.PlatformAllPurposes;
+            var purposeIsNull = bucket is RateWindowBucket.TenantAllPurposes or RateWindowBucket.PlatformAllPurposes;
+
+            AssertShape(sql, "tenant_id", "@TenantId", tenantIsNull, $"{name}/{bucket}");
+            AssertShape(sql, "purpose", "@Purpose", purposeIsNull, $"{name}/{bucket}");
         }
     }
 
     /// <summary>
-    /// <c>purpose</c> is nullable only on <c>challenge_rate_windows</c>, and only
-    /// <see cref="IChallengeDialect.IncrementWindowSql"/> and
-    /// <see cref="IChallengeDialect.DecrementWindowSql"/> document <c>@Purpose</c> as sometimes
-    /// <see langword="null"/> (the per-key ceiling row — the layer that bounds the SMS bill). Every
-    /// other member's <c>@Purpose</c> is always a concrete purpose string, so plain <c>=</c> there is
-    /// correct, not a bug; scoping this assertion to just these two members avoids a false positive
-    /// against a member whose <c>@Purpose</c> is intentionally compared with plain <c>=</c>.
+    /// No statement may keep a null-safe comparison form. They are the exact forms that defeat the
+    /// indexes, so one surviving in a dialect is the regression this whole change exists to prevent —
+    /// and it would be invisible, since the SQL stays correct and only the plan degrades.
     /// </summary>
     [Theory]
     [MemberData(nameof(AllDialects))]
-    public void Purpose_ShouldUseNullSafeComparison_OnIncrementAndDecrementWindow(IChallengeDialect dialect)
+    public void NoStatement_ShouldUseANonSargableNullSafeComparison(IChallengeDialect dialect)
     {
-        Assert.True(
-            IsNullSafeComparison(dialect.IncrementWindowSql, "purpose", "@Purpose"),
-            $"IncrementWindowSql compares purpose to @Purpose without one of the documented null-safe forms: {dialect.IncrementWindowSql}");
-        Assert.True(
-            IsNullSafeComparison(dialect.DecrementWindowSql, "purpose", "@Purpose"),
-            $"DecrementWindowSql compares purpose to @Purpose without one of the documented null-safe forms: {dialect.DecrementWindowSql}");
+        var all = TenancyStatements(dialect).Select(x => ($"{x.Name}/{x.Tenancy}", x.Sql))
+            .Concat(BucketStatements(dialect).Select(x => ($"{x.Name}/{x.Bucket}", x.Sql)));
+
+        foreach (var (name, sql) in all)
+        {
+            Assert.DoesNotContain("IS NOT DISTINCT FROM", sql, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("<=>", sql, StringComparison.Ordinal);
+            Assert.False(
+                Regex.IsMatch(sql, @"IS\s+NULL\s+AND\s+@\w+\s+IS\s+NULL", RegexOptions.IgnoreCase),
+                $"{name} still carries the SQL Server OR-guard, which is non-sargable: {sql}");
+        }
+    }
+
+    // A column whose shape is NULL must be tested with IS NULL and never compared to its parameter;
+    // a column whose shape is bound must be compared and never tested for NULL.
+    private static void AssertShape(string sql, string column, string parameter, bool isNull, string what)
+    {
+        var comparesToParameter = Regex.IsMatch(sql, $@"\b{column}\s*=\s*{Regex.Escape(parameter)}\b", RegexOptions.IgnoreCase);
+        var testsForNull = Regex.IsMatch(sql, $@"\b{column}\s+IS\s+NULL\b", RegexOptions.IgnoreCase);
+
+        if (isNull)
+        {
+            Assert.True(testsForNull, $"{what}: {column} shape is NULL but the statement never tests {column} IS NULL: {sql}");
+            Assert.False(comparesToParameter, $"{what}: {column} shape is NULL but the statement compares {column} = {parameter}, which matches zero rows in silence: {sql}");
+        }
+        else
+        {
+            Assert.True(comparesToParameter, $"{what}: {column} shape is bound but the statement never compares {column} = {parameter}: {sql}");
+        }
     }
 
     private static IEnumerable<(string Name, string Sql)> AllStatements(IChallengeDialect dialect)
     {
         yield return (nameof(IChallengeDialect.InsertSql), dialect.InsertSql);
-        yield return (nameof(IChallengeDialect.SelectLiveByScopeSql), dialect.SelectLiveByScopeSql);
+        yield return (nameof(IChallengeDialect.SelectLiveByScopeSql), dialect.SelectLiveByScopeSql(ChallengeTenancy.Tenant));
+        yield return (nameof(IChallengeDialect.SelectLiveByScopeSql), dialect.SelectLiveByScopeSql(ChallengeTenancy.Platform));
         yield return (nameof(IChallengeDialect.SelectLiveByTokenHashSql), dialect.SelectLiveByTokenHashSql);
-        yield return (nameof(IChallengeDialect.SelectMostRecentByScopeSql), dialect.SelectMostRecentByScopeSql);
+        yield return (nameof(IChallengeDialect.SelectMostRecentByScopeSql), dialect.SelectMostRecentByScopeSql(ChallengeTenancy.Tenant));
+        yield return (nameof(IChallengeDialect.SelectMostRecentByScopeSql), dialect.SelectMostRecentByScopeSql(ChallengeTenancy.Platform));
         yield return (nameof(IChallengeDialect.ConsumeSql), dialect.ConsumeSql);
         yield return (nameof(IChallengeDialect.RecordAttemptSql), dialect.RecordAttemptSql);
-        yield return (nameof(IChallengeDialect.InvalidateLiveForScopeSql), dialect.InvalidateLiveForScopeSql);
+        yield return (nameof(IChallengeDialect.InvalidateLiveForScopeSql), dialect.InvalidateLiveForScopeSql(ChallengeTenancy.Tenant));
         yield return (nameof(IChallengeDialect.PurgeExpiredSql), dialect.PurgeExpiredSql);
-        yield return (nameof(IChallengeDialect.IncrementWindowSql), dialect.IncrementWindowSql);
-        yield return (nameof(IChallengeDialect.DecrementWindowSql), dialect.DecrementWindowSql);
+        foreach (var bucket in Enum.GetValues<RateWindowBucket>())
+        {
+            yield return (nameof(IChallengeDialect.IncrementWindowSql), dialect.IncrementWindowSql(bucket));
+            yield return (nameof(IChallengeDialect.DecrementWindowSql), dialect.DecrementWindowSql(bucket));
+        }
         yield return (nameof(IChallengeDialect.PurgeElapsedWindowsSql), dialect.PurgeElapsedWindowsSql);
     }
 

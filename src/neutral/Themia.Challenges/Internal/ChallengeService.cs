@@ -185,7 +185,7 @@ internal sealed class ChallengeService : IChallengeService
             if (purpose.MaxLiveChallenges == 1)
             {
                 await connection.ExecuteAsync(new CommandDefinition(
-                    dialect.InvalidateLiveForScopeSql,
+                    dialect.InvalidateLiveForScopeSql(TenancyOf(scope)),
                     new { TenantId = scope.TenantId, Key = scope.Key, Purpose = scope.Purpose, Now = now, ConsumedAt = now },
                     transaction,
                     cancellationToken: cancellationToken));
@@ -292,7 +292,7 @@ internal sealed class ChallengeService : IChallengeService
         CancellationToken cancellationToken)
     {
         var count = await connection.ExecuteScalarAsync<int?>(new CommandDefinition(
-            dialect.IncrementWindowSql,
+            dialect.IncrementWindowSql(BucketOf(scope, purpose)),
             new { Id = Guid.NewGuid(), TenantId = scope.TenantId, Key = scope.Key, Purpose = purpose, WindowStart = windowStart },
             cancellationToken: cancellationToken));
 
@@ -309,7 +309,7 @@ internal sealed class ChallengeService : IChallengeService
         DateTimeOffset windowStart,
         CancellationToken cancellationToken) =>
         connection.ExecuteAsync(new CommandDefinition(
-            dialect.DecrementWindowSql,
+            dialect.DecrementWindowSql(BucketOf(scope, purpose)),
             new { TenantId = scope.TenantId, Key = scope.Key, Purpose = purpose, WindowStart = windowStart },
             cancellationToken: cancellationToken));
 
@@ -324,12 +324,43 @@ internal sealed class ChallengeService : IChallengeService
 
         await using var connection = dialect.CreateConnection();
 
+        // Charge the verify counter FIRST, before any lookup, and compare the value this increment
+        // returned — the same charge-then-check the issuance path uses, for the same reason: reading a
+        // count and only then incrementing lets every concurrent caller observe the same pre-increment
+        // value and pass a ceiling of any size.
+        //
+        // This bound is separate from MaxAttempts and does not overlap it. MaxAttempts lives on a
+        // challenge row, so it stops brute force against an ISSUED secret and stops nothing when none is
+        // live — wrong codes against a key whose challenge was consumed, expired or exhausted cost two
+        // queries each, forever, and are the traffic that also probes the Consumed-vs-NotFound oracle.
+        // The bucket is (tenant, key) with a reserved purpose: per key, across every purpose, because
+        // the thing being protected is the key's surface and the store, neither of which is per-purpose.
+        //
+        // Not released on any path. An issuance charge pays for an SMS that may never be sent, which is
+        // why that one is compensated; a verify charge pays for work the store has already done by the
+        // time the outcome is known.
+        // `scope` is passed as-is: IncrementWindowAsync binds TenantId and Key from it and takes the
+        // bucket's purpose separately, so the scope's own purpose never reaches the row — which is what
+        // makes this one counter per key rather than one per (key, purpose).
+        var verifyCount = await IncrementWindowAsync(
+            connection,
+            scope,
+            ChallengeOptions.VerifyBucketPurpose,
+            FloorToWindowStart(now, options.VerifyWindow.Window),
+            cancellationToken);
+
+        if (verifyCount > options.VerifyWindow.Limit)
+        {
+            logger.LogInformation("Challenge verify rate-limited for purpose {Purpose}", scope.Purpose);
+            return ChallengeVerifyResult.RateLimited(scope);
+        }
+
         // Every live row for the scope, newest first — not just one. With the default
         // MaxLiveChallenges = 1 this is a single row as before; with a higher cap, a late-arriving
         // first code (the re-issue policy's entire reason to exist — see PurposeOptions.MaxLiveChallenges'
         // remarks) must still be checkable here, or raising the cap would change nothing observable.
         var liveRows = (await connection.QueryAsync<ChallengeRow>(new CommandDefinition(
-            dialect.SelectLiveByScopeSql, LiveByScopeParams(scope, now), cancellationToken: cancellationToken))).AsList();
+            dialect.SelectLiveByScopeSql(TenancyOf(scope)), LiveByScopeParams(scope, now), cancellationToken: cancellationToken))).AsList();
 
         if (liveRows.Count == 0)
         {
@@ -497,7 +528,7 @@ internal sealed class ChallengeService : IChallengeService
         System.Data.Common.DbConnection connection, ChallengeScope scope, CancellationToken cancellationToken)
     {
         var mostRecent = await connection.QueryFirstOrDefaultAsync<ChallengeRow>(new CommandDefinition(
-            dialect.SelectMostRecentByScopeSql,
+            dialect.SelectMostRecentByScopeSql(TenancyOf(scope)),
             new { TenantId = scope.TenantId, Key = scope.Key, Purpose = scope.Purpose },
             cancellationToken: cancellationToken));
 
@@ -520,6 +551,19 @@ internal sealed class ChallengeService : IChallengeService
     /// <summary>
     /// Fixed-bucket window start — see the type-level remarks for the sliding-vs-fixed rationale.
     /// </summary>
+    /// <summary>Which <c>challenges</c> predicate a scope needs — see <see cref="ChallengeTenancy"/>.</summary>
+    private static ChallengeTenancy TenancyOf(ChallengeScope scope) =>
+        scope.TenantId is null ? ChallengeTenancy.Platform : ChallengeTenancy.Tenant;
+
+    /// <summary>Which <c>challenge_rate_windows</c> bucket a (scope, purpose) pair charges.</summary>
+    private static RateWindowBucket BucketOf(ChallengeScope scope, string? purpose) => (scope.TenantId, purpose) switch
+    {
+        (not null, not null) => RateWindowBucket.TenantAndPurpose,
+        (not null, null) => RateWindowBucket.TenantAllPurposes,
+        (null, not null) => RateWindowBucket.PlatformAndPurpose,
+        (null, null) => RateWindowBucket.PlatformAllPurposes,
+    };
+
     private static DateTimeOffset FloorToWindowStart(DateTimeOffset now, TimeSpan window)
     {
         var ticks = now.UtcTicks - (now.UtcTicks % window.Ticks);
