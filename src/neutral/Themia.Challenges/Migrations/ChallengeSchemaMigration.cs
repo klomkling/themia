@@ -73,15 +73,32 @@ public sealed class ChallengeSchemaMigration : Migration
         // whitelists that MUST agree. Adding a provider here without adding its prefix to the guard
         // leaves it throwing NotSupportedException; adding it to the guard without a branch here lets
         // it through to a column-type failure. Edit BOTH when adding a provider.
-        IfDatabase("postgresql").Delegate(() => CreateTables(c => c.AsDateTimeOffset()));
-        IfDatabase("mysql").Delegate(() => CreateTables(c => c.AsCustom("DATETIME(6)")));
-        IfDatabase("sqlserver").Delegate(() => CreateTables(c => c.AsDateTimeOffset()));
-
-        // Filtered/functional unique indexes are not expressible via the fluent API, so they are
-        // emitted as raw SQL with `key` quoted per engine (see the type-level remarks).
-        IfDatabase("postgresql").Delegate(() => CreateRateWindowUniqueIndexes("\"key\""));
-        IfDatabase("sqlserver").Delegate(() => CreateRateWindowUniqueIndexes("[key]"));
-        IfDatabase("mysql").Delegate(CreateMySqlRateWindowUniqueIndexes);
+        // Order within each branch matters: collation is pinned BEFORE any index is created, because
+        // SQL Server cannot alter the collation of an already-indexed column in place (the Identity
+        // module's PinTokenHashBinaryCollationMigration has to drop and recreate its index precisely
+        // because it runs against an existing schema; here the schema is new, so ordering avoids the
+        // problem entirely). Filtered/functional unique indexes are not expressible via the fluent API,
+        // so they are emitted as raw SQL with `key` quoted per engine (see the type-level remarks).
+        IfDatabase("postgresql").Delegate(() =>
+        {
+            CreateTables(c => c.AsDateTimeOffset());
+            CreateIndexes();
+            CreateRateWindowUniqueIndexes("\"key\"");
+        });
+        IfDatabase("mysql").Delegate(() =>
+        {
+            CreateTables(c => c.AsCustom("DATETIME(6)"));
+            PinComparedColumnCollation(quote: c => $"`{c}`", alterVerb: "MODIFY COLUMN", text: n => $"VARCHAR({n})", collation: "utf8mb4_bin");
+            CreateIndexes();
+            CreateMySqlRateWindowUniqueIndexes();
+        });
+        IfDatabase("sqlserver").Delegate(() =>
+        {
+            CreateTables(c => c.AsDateTimeOffset());
+            PinComparedColumnCollation(quote: c => $"[{c}]", alterVerb: "ALTER COLUMN", text: n => $"NVARCHAR({n})", collation: "Latin1_General_BIN2");
+            CreateIndexes();
+            CreateRateWindowUniqueIndexes("[key]");
+        });
 
         IfDatabase(p =>
                 !p.StartsWith("Postgres", StringComparison.OrdinalIgnoreCase) &&
@@ -109,7 +126,32 @@ public sealed class ChallengeSchemaMigration : Migration
         dt(challenges.WithColumn("expires_at")).NotNullable();
         dt(challenges.WithColumn("consumed_at")).Nullable();
         dt(challenges.WithColumn("created_at")).NotNullable();
+        // Set once, by IChallengeDialect.MarkRefundedSql's guarded UPDATE, the first time an issuance's
+        // quota is handed back. It is what makes RefundAsync idempotent: the decrement runs only when
+        // that UPDATE claims the row, so a delivery-failure webhook retried three times refunds once.
+        // Without it a refund is a bare decrement anyone can replay to zero out the cost ceiling.
+        dt(challenges.WithColumn("refunded_at")).Nullable();
 
+        // Long-lived relative to challenges: counters outlive the rows they counted (see type-level
+        // remarks). purpose is nullable — a null row is the per-key ceiling across every purpose,
+        // the layer that protects the invoice; a non-null row is the per-scope UX limit for one
+        // purpose. Uniqueness is created separately below, per engine — see
+        // CreateRateWindowUniqueIndexes / CreateMySqlRateWindowUniqueIndexes.
+        var rateWindows = Create.Table(RateWindowsTable)
+            .WithColumn("id").AsGuid().NotNullable().PrimaryKey()
+            .WithColumn("tenant_id").AsString(100).Nullable()
+            .WithColumn("key").AsString(450).NotNullable()
+            .WithColumn("purpose").AsString(100).Nullable()
+            .WithColumn("count").AsInt32().NotNullable().WithDefaultValue(0);
+        dt(rateWindows.WithColumn("window_start")).NotNullable();
+    }
+
+    /// <summary>
+    /// Creates the two non-unique lookup indexes. Separate from <see cref="CreateTables"/> so every
+    /// engine branch can pin collation in between — see <see cref="Up"/>.
+    /// </summary>
+    private void CreateIndexes()
+    {
         // Live-challenge lookup: IssueAsync checks for an outstanding challenge, VerifyAsync loads
         // the row to consume. Not unique — see the type-level remarks on MaxLiveChallenges.
         Create.Index("ix_challenges_scope")
@@ -124,18 +166,66 @@ public sealed class ChallengeSchemaMigration : Migration
             .OnTable(ChallengesTable)
             .OnColumn("token_hash").Ascending();
 
-        // Long-lived relative to challenges: counters outlive the rows they counted (see type-level
-        // remarks). purpose is nullable — a null row is the per-key ceiling across every purpose,
-        // the layer that protects the invoice; a non-null row is the per-scope UX limit for one
-        // purpose. Uniqueness is created separately below, per engine — see
-        // CreateRateWindowUniqueIndexes / CreateMySqlRateWindowUniqueIndexes.
-        var rateWindows = Create.Table(RateWindowsTable)
-            .WithColumn("id").AsGuid().NotNullable().PrimaryKey()
-            .WithColumn("tenant_id").AsString(100).Nullable()
-            .WithColumn("key").AsString(450).NotNullable()
-            .WithColumn("purpose").AsString(100).Nullable()
-            .WithColumn("count").AsInt32().NotNullable().WithDefaultValue(0);
-        dt(rateWindows.WithColumn("window_start")).NotNullable();
+        // Retention support. Both purge statements filter on a single column with no other predicate
+        // (PurgeExpiredSql on expires_at, PurgeElapsedWindowsSql on window_start), and window_start
+        // appears in the unique indexes only as a trailing column, so neither could be seeked without
+        // these. An unindexed purge full-scans the two tables every IssueAsync and VerifyAsync
+        // contends on, and ChallengePurgeService retries hourly forever.
+        Create.Index("ix_challenges_expires_at")
+            .OnTable(ChallengesTable)
+            .OnColumn("expires_at").Ascending();
+
+        Create.Index("ix_challenge_rate_windows_window_start")
+            .OnTable(RateWindowsTable)
+            .OnColumn("window_start").Ascending();
+    }
+
+    /// <summary>
+    /// Pins a byte-exact collation on every string column that a dialect compares with <c>=</c>:
+    /// <c>tenant_id</c>, <c>key</c>, <c>purpose</c> (both tables) and <c>token_hash</c>.
+    /// <para>
+    /// MySQL 8 defaults to <c>utf8mb4_0900_ai_ci</c> and SQL Server to a <c>CI_AS</c> collation, both of
+    /// which fold case (and, on MySQL, accents). <see cref="ChallengeScope.Key"/> is documented as an
+    /// opaque value that is never parsed — for an adopter whose key is a case-sensitive user id, a code
+    /// issued for <c>"A1b2"</c> would be returned by <see cref="IChallengeDialect.SelectLiveByScopeSql"/>
+    /// for <c>"a1b2"</c> and verify against the wrong account, and the two would share one rate-limit
+    /// bucket so the ceiling would refuse the wrong principal. <c>token_hash</c> is mixed-case Base64
+    /// compared directly in SQL, so a folded comparison there is a wrong-row match on the magic-link path.
+    /// </para>
+    /// <para>
+    /// PostgreSQL needs no branch: its <c>text</c>/<c>varchar</c> comparison is already byte-exact. This
+    /// mirrors <c>Themia.Modules.Identity.Migrations.PinTokenHashBinaryCollationMigration</c>, which fixed
+    /// the same defect class after that schema had shipped; this one is new, so the pin is part of the
+    /// original DDL rather than a follow-up.
+    /// </para>
+    /// </summary>
+    private void PinComparedColumnCollation(
+        Func<string, string> quote,
+        string alterVerb,
+        Func<int, string> text,
+        string collation)
+    {
+        // (table, column, declared width, nullable) — the width and nullability must be restated on both
+        // engines, since MODIFY/ALTER COLUMN replaces the whole definition rather than patching it.
+        (string Table, string Column, int Width, bool Nullable)[] columns =
+        [
+            (ChallengesTable, "tenant_id", ChallengeScope.MaxTenantIdLength, true),
+            (ChallengesTable, "key", ChallengeScope.MaxKeyLength, false),
+            (ChallengesTable, "purpose", ChallengeScope.MaxPurposeLength, false),
+            (ChallengesTable, "token_hash", 256, true),
+            (RateWindowsTable, "tenant_id", ChallengeScope.MaxTenantIdLength, true),
+            (RateWindowsTable, "key", ChallengeScope.MaxKeyLength, false),
+            (RateWindowsTable, "purpose", ChallengeScope.MaxPurposeLength, true),
+        ];
+
+        foreach (var (table, column, width, nullable) in columns)
+        {
+            // COLLATE belongs to the type spec and must precede NULL/NOT NULL on both engines; placing
+            // it after is a syntax error, not a no-op.
+            Execute.Sql(
+                $"ALTER TABLE {table} {alterVerb} {quote(column)} {text(width)} COLLATE {collation} "
+                + (nullable ? "NULL;" : "NOT NULL;"));
+        }
     }
 
     /// <summary>

@@ -50,6 +50,10 @@ public abstract class ChallengeStoreTests
         var indexes = await fixture.GetIndexNamesAsync();
         Assert.Contains("ix_challenges_scope", indexes);
         Assert.Contains("ix_challenges_token_hash", indexes);
+        // The two retention indexes. Both purge statements filter on one column with no other predicate,
+        // so without these the hourly purge full-scans the tables every issue and verify contends on.
+        Assert.Contains("ix_challenges_expires_at", indexes);
+        Assert.Contains("ix_challenge_rate_windows_window_start", indexes);
         // The four filtered/functional unique indexes that together give challenge_rate_windows
         // exact-one-row-per-bucket semantics (see ChallengeSchemaMigration.CreateRateWindowUniqueIndexes'
         // remarks) — this is exactly the kind of thing that silently fails to create on one engine while
@@ -103,6 +107,33 @@ public abstract class ChallengeStoreTests
         // unaffected by tenant A having just exhausted theirs.
         var tenantBResult = await service.IssueAsync(scopeB);
         Assert.Equal(ChallengeIssueOutcome.Issued, tenantBResult.Outcome);
+    }
+
+    [Fact]
+    public async Task Verify_ShouldNotSucceed_ForACodeIssuedToAKeyDifferingOnlyByCase()
+    {
+        // ChallengeScope.Key is documented as opaque and never parsed, so an adopter may legitimately use
+        // a case-sensitive user id. MySQL 8 and SQL Server both default to a case-folding collation, and
+        // every dialect compares `key` with plain `=` — without the collation pinned by
+        // ChallengeSchemaMigration.PinComparedColumnCollation, a code issued for one key verifies against
+        // a different account whose key differs only by case, and the two share one rate-limit bucket.
+        var tenantId = UniqueTenant();
+        var lower = $"case-{Guid.NewGuid():N}".ToLowerInvariant();
+        var upper = lower.ToUpperInvariant();
+
+        var lowerScope = new ChallengeScope(lower, ChallengeEngineFixture.GenericPurpose, tenantId);
+        var upperScope = new ChallengeScope(upper, ChallengeEngineFixture.GenericPurpose, tenantId);
+
+        var issued = await fixture.Service.IssueAsync(lowerScope);
+        Assert.Equal(ChallengeIssueOutcome.Issued, issued.Outcome);
+
+        var crossCase = await fixture.Service.VerifyAsync(upperScope, issued.Secret!);
+        Assert.NotEqual(ChallengeVerifyOutcome.Verified, crossCase.Outcome);
+
+        // The code still works for the key it was actually issued to — this must fail closed on the
+        // wrong key, not break the right one.
+        var ownKey = await fixture.Service.VerifyAsync(lowerScope, issued.Secret!);
+        Assert.Equal(ChallengeVerifyOutcome.Verified, ownKey.Outcome);
     }
 
     /// <summary>A fresh, collision-free scope key — every test shares one running container's schema, so

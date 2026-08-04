@@ -54,21 +54,29 @@ public interface IChallengeService
         string token, string purpose, string? tenantId = null, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Returns the rate-limit quota an issuance consumed, for a delivery that is known to have failed
+    /// Returns the rate-limit quota one issuance consumed, for a delivery that is known to have failed
     /// (including <c>NotificationResult.NotConfigured</c>). Decrements both the per-scope and per-key
     /// windows, each floored at zero. A message that was never sent must not consume the victim's
     /// allowance.
     /// </summary>
-    /// <param name="scope">The scope whose issuance should be refunded.</param>
-    /// <param name="issuedAt">
-    /// <see cref="ChallengeIssueResult.IssuedAt"/> from the issuance being refunded. Required, and not
-    /// defaulted to the current time: rate-limit counters are fixed-width buckets keyed by window
-    /// start, so a refund computed from "now" targets whichever bucket is live when the failure is
-    /// noticed — which, for a delivery failure discovered asynchronously, is routinely not the bucket
-    /// the issue charged. That leaves the original charge standing and decrements a stranger's, so the
-    /// caller must carry the issuance time rather than let this method guess it.
-    /// </param>
+    /// <remarks>
+    /// <b>Idempotent, and identified by challenge rather than by scope.</b> The refund is claimed with a
+    /// guarded write against the challenge row, so calling this repeatedly for the same issuance refunds
+    /// once and returns <see langword="false"/> thereafter. That matters because the callers are
+    /// retry-prone by nature — provider delivery-status webhooks are redelivered, and adopters retry
+    /// their own failure handlers — and an unguarded refund is a decrement of the counter that bounds an
+    /// SMS bill: replayed enough times it drives the ceiling to zero and issuance becomes unlimited.
+    /// Taking the challenge id also lets the window buckets be derived from the row's own creation time,
+    /// which is the only thing that identifies the buckets the issuance actually charged.
+    /// </remarks>
+    /// <param name="challengeId"><see cref="ChallengeIssueResult.ChallengeId"/> from the issuance being refunded.</param>
     /// <param name="cancellationToken">Cancels the underlying store operations.</param>
-    /// <exception cref="InvalidOperationException"><paramref name="scope"/>'s purpose was never configured via <see cref="ChallengeOptions.ConfigurePurpose"/>.</exception>
-    Task RefundAsync(ChallengeScope scope, DateTimeOffset issuedAt, CancellationToken cancellationToken = default);
+    /// <returns>
+    /// <see langword="true"/> if this call performed the refund; <see langword="false"/> if there was
+    /// nothing to refund — the challenge was already refunded, or its row no longer exists (retention
+    /// deletes challenge rows well before the counters they charged elapse, so this is routine, not an
+    /// error).
+    /// </returns>
+    /// <exception cref="InvalidOperationException">The challenge's purpose is no longer configured via <see cref="ChallengeOptions.ConfigurePurpose"/>.</exception>
+    Task<bool> RefundAsync(Guid challengeId, CancellationToken cancellationToken = default);
 }

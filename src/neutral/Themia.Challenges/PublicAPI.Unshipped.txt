@@ -9,8 +9,8 @@ Themia.Challenges.ChallengeIssueOutcome
 Themia.Challenges.ChallengeIssueOutcome.Issued = 0 -> Themia.Challenges.ChallengeIssueOutcome
 Themia.Challenges.ChallengeIssueOutcome.RateLimited = 1 -> Themia.Challenges.ChallengeIssueOutcome
 Themia.Challenges.ChallengeIssueResult
+Themia.Challenges.ChallengeIssueResult.ChallengeId.get -> System.Guid?
 Themia.Challenges.ChallengeIssueResult.ExpiresAt.get -> System.DateTimeOffset?
-Themia.Challenges.ChallengeIssueResult.IssuedAt.get -> System.DateTimeOffset?
 Themia.Challenges.ChallengeIssueResult.Outcome.get -> Themia.Challenges.ChallengeIssueOutcome
 Themia.Challenges.ChallengeIssueResult.Secret.get -> string?
 Themia.Challenges.ChallengeIssueResult.Succeeded.get -> bool
@@ -20,6 +20,8 @@ Themia.Challenges.ChallengeOptions.ChallengeRetentionHours.get -> int
 Themia.Challenges.ChallengeOptions.ChallengeRetentionHours.set -> void
 Themia.Challenges.ChallengeOptions.ConfigurePurpose(string! purpose, System.Action<Themia.Challenges.PurposeOptions!>! configure) -> void
 Themia.Challenges.ChallengeOptions.GetPurpose(string! purpose) -> Themia.Challenges.PurposeOptions!
+Themia.Challenges.ChallengeOptions.PerKeyGlobalWindow.get -> (int Limit, System.TimeSpan Window)?
+Themia.Challenges.ChallengeOptions.PerKeyGlobalWindow.set -> void
 Themia.Challenges.ChallengeOptions.PerKeyWindow.get -> (int Limit, System.TimeSpan Window)
 Themia.Challenges.ChallengeOptions.PerKeyWindow.set -> void
 Themia.Challenges.ChallengeOptions.PurgeEnabled.get -> bool
@@ -52,15 +54,17 @@ Themia.Challenges.IChallengeDialect.DecrementWindowSql.get -> string!
 Themia.Challenges.IChallengeDialect.IncrementWindowSql.get -> string!
 Themia.Challenges.IChallengeDialect.InsertSql.get -> string!
 Themia.Challenges.IChallengeDialect.InvalidateLiveForScopeSql.get -> string!
+Themia.Challenges.IChallengeDialect.MarkRefundedSql.get -> string!
 Themia.Challenges.IChallengeDialect.PurgeElapsedWindowsSql.get -> string!
 Themia.Challenges.IChallengeDialect.PurgeExpiredSql.get -> string!
 Themia.Challenges.IChallengeDialect.RecordAttemptSql.get -> string!
+Themia.Challenges.IChallengeDialect.SelectByIdSql.get -> string!
 Themia.Challenges.IChallengeDialect.SelectLiveByScopeSql.get -> string!
 Themia.Challenges.IChallengeDialect.SelectLiveByTokenHashSql.get -> string!
 Themia.Challenges.IChallengeDialect.SelectMostRecentByScopeSql.get -> string!
 Themia.Challenges.IChallengeService
 Themia.Challenges.IChallengeService.IssueAsync(Themia.Challenges.ChallengeScope! scope, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Challenges.ChallengeIssueResult!>!
-Themia.Challenges.IChallengeService.RefundAsync(Themia.Challenges.ChallengeScope! scope, System.DateTimeOffset issuedAt, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Challenges.IChallengeService.RefundAsync(System.Guid challengeId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!
 Themia.Challenges.IChallengeService.VerifyAsync(Themia.Challenges.ChallengeScope! scope, string! code, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Challenges.ChallengeVerifyResult!>!
 Themia.Challenges.IChallengeService.VerifyByTokenAsync(string! token, string! purpose, string? tenantId = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Challenges.ChallengeVerifyResult!>!
 Themia.Challenges.Migrations.ChallengeSchemaMigration
@@ -77,6 +81,7 @@ Themia.Challenges.PurposeOptions.PerScopeWindow.set -> void
 Themia.Challenges.PurposeOptions.PurposeOptions() -> void
 Themia.Challenges.PurposeOptions.Ttl.get -> System.TimeSpan
 Themia.Challenges.PurposeOptions.Ttl.set -> void
+const Themia.Challenges.ChallengeOptions.GlobalKeyBucketPurpose = "__themia_global_key__" -> string!
 const Themia.Challenges.ChallengeScope.MaxKeyLength = 450 -> int
 const Themia.Challenges.ChallengeScope.MaxPurposeLength = 100 -> int
 const Themia.Challenges.ChallengeScope.MaxTenantIdLength = 100 -> int
@@ -85,7 +90,7 @@ override Themia.Challenges.Migrations.ChallengeSchemaMigration.Down() -> void
 override Themia.Challenges.Migrations.ChallengeSchemaMigration.Up() -> void
 static Themia.Challenges.ChallengeFormat.Numeric(int length) -> Themia.Challenges.ChallengeFormat!
 static Themia.Challenges.ChallengeFormat.OpaqueToken(int bytes) -> Themia.Challenges.ChallengeFormat!
-static Themia.Challenges.ChallengeIssueResult.Issued(string! secret, System.DateTimeOffset expiresAt, System.DateTimeOffset issuedAt) -> Themia.Challenges.ChallengeIssueResult!
+static Themia.Challenges.ChallengeIssueResult.Issued(System.Guid challengeId, string! secret, System.DateTimeOffset expiresAt) -> Themia.Challenges.ChallengeIssueResult!
 static Themia.Challenges.ChallengeIssueResult.RateLimited() -> Themia.Challenges.ChallengeIssueResult!
 static Themia.Challenges.ChallengeVerifyResult.AttemptsExhausted(Themia.Challenges.ChallengeScope! scope) -> Themia.Challenges.ChallengeVerifyResult!
 static Themia.Challenges.ChallengeVerifyResult.Consumed(Themia.Challenges.ChallengeScope! scope) -> Themia.Challenges.ChallengeVerifyResult!

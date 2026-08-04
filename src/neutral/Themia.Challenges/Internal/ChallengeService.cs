@@ -91,70 +91,180 @@ internal sealed class ChallengeService : IChallengeService
 
         await using var connection = dialect.CreateConnection();
 
-        // Charge both counters FIRST, then compare each against its limit using the value the
-        // increment itself returned. Reading the counts and only then incrementing — the obvious
-        // shape, and the one this originally had — is a read-then-act gate with nothing serializing
-        // it: 64 callers racing for the same bucket all read the same pre-increment count, all find
-        // it under the ceiling, and all issue. The counters would still be exact (no increment is
-        // lost) while the limit they exist to enforce is simply not enforced, which is the failure
-        // mode an SMS bill notices and a test asserting on the counter total does not. Charging first
-        // makes each caller's observed value unique and monotonic, so at most Limit callers can ever
-        // see a value at or below the ceiling, whatever the concurrency.
-        var scopeCount = await IncrementWindowAsync(connection, scope, scope.Purpose, scopeWindowStart, cancellationToken);
-        var keyCount = await IncrementWindowAsync(connection, scope, null, keyWindowStart, cancellationToken);
+        // Charge every counter FIRST, then compare each against its limit using the value the increment
+        // itself returned. Reading the counts and only then incrementing — the obvious shape, and the
+        // one this originally had — is a read-then-act gate with nothing serializing it: 64 callers
+        // racing for the same bucket all read the same pre-increment count, all find it under the
+        // ceiling, and all issue. The counters would still be exact (no increment is lost) while the
+        // limit they exist to enforce is simply not enforced, which is the failure mode an SMS bill
+        // notices and a test asserting on the counter total does not. Charging first makes each
+        // caller's observed value unique and monotonic, so at most Limit callers can ever see a value
+        // at or below the ceiling, whatever the concurrency.
+        //
+        // `charges` records what has actually been charged so far. Every entry must be released if the
+        // issuance does not end in a stored secret: a charge without a secret is quota burned for
+        // nothing, and under the default 3-per-15-minutes per-scope window three transient database
+        // failures leave a real user unable to request an OTP for the rest of the window despite never
+        // having received one.
+        var charges = new List<Charge>(3);
+        int scopeCount;
+        int keyCount;
+        int? globalCount = null;
 
-        // Both layers are required, not alternatives: per-key is the cost ceiling across every purpose
-        // for this key (the layer that protects the invoice), per-scope is the narrower UX-facing one.
-        if (keyCount > options.PerKeyWindow.Limit || scopeCount > purpose.PerScopeWindow.Limit)
+        try
         {
-            // Hand both charges back: no secret was generated and no challenge row was written, so a
+            scopeCount = await ChargeAsync(connection, charges, scope, scope.Purpose, scopeWindowStart, cancellationToken);
+            keyCount = await ChargeAsync(connection, charges, scope, null, keyWindowStart, cancellationToken);
+
+            // The tenant-agnostic ceiling, when configured. Bucketed by key alone — the scope's tenant
+            // is dropped — because the SMS invoice and the victim's inbox are not partitioned by tenant
+            // even though PerKeyWindow's counter is. See ChallengeOptions.PerKeyGlobalWindow.
+            if (options.PerKeyGlobalWindow is { } globalWindow)
+            {
+                globalCount = await ChargeAsync(
+                    connection,
+                    charges,
+                    scope with { TenantId = null },
+                    ChallengeOptions.GlobalKeyBucketPurpose,
+                    FloorToWindowStart(now, globalWindow.Window),
+                    cancellationToken);
+            }
+        }
+        catch
+        {
+            await ReleaseChargesAsync(connection, charges);
+            throw;
+        }
+
+        // Every configured layer is required, not an alternative: per-key is the cost ceiling across
+        // every purpose for this key, per-scope is the narrower UX-facing one, and the global layer —
+        // when enabled — is the ceiling on the physical key regardless of which tenant asked.
+        if (keyCount > options.PerKeyWindow.Limit
+            || scopeCount > purpose.PerScopeWindow.Limit
+            || (globalCount is { } g && options.PerKeyGlobalWindow is { } gw && g > gw.Limit))
+        {
+            // Hand every charge back: no secret was generated and no challenge row was written, so a
             // refused issue must not consume quota — otherwise a caller refused by the per-scope limit
             // would still burn the per-key ceiling, and repeated refusals would compound into a lockout
-            // that outlasts the window that produced it. The refund is best-effort by construction:
+            // that outlasts the window that produced it. The release is best-effort by construction:
             // DecrementWindowSql floors at zero, so a concurrent caller can briefly observe this
-            // caller's un-refunded +1 and be refused when it need not have been. That direction is the
+            // caller's un-released +1 and be refused when it need not have been. That direction is the
             // safe one (it over-refuses, never over-admits) and it self-corrects within the round trip.
-            await DecrementWindowAsync(connection, scope, scope.Purpose, scopeWindowStart, cancellationToken);
-            await DecrementWindowAsync(connection, scope, null, keyWindowStart, cancellationToken);
+            await ReleaseChargesAsync(connection, charges);
 
             logger.LogInformation("Challenge issue rate-limited for purpose {Purpose}", scope.Purpose);
             return ChallengeIssueResult.RateLimited();
         }
 
-        // Re-issue policy: only MaxLiveChallenges == 1 is exactly enforceable with this dialect's
-        // statements (see the type-level remarks) — invalidating on every issue is safe even when
-        // nothing was previously live, since InvalidateLiveForScopeSql is a no-op UPDATE in that case.
-        if (purpose.MaxLiveChallenges == 1)
-        {
-            await connection.ExecuteAsync(new CommandDefinition(
-                dialect.InvalidateLiveForScopeSql,
-                new { TenantId = scope.TenantId, Key = scope.Key, Purpose = scope.Purpose, Now = now, ConsumedAt = now },
-                cancellationToken: cancellationToken));
-        }
-
+        var challengeId = Guid.NewGuid();
         var secret = SecretGenerator.Generate(purpose.Format);
         var (hash, salt) = SecretHasher.Hash(secret);
         var expiresAt = now + purpose.Ttl;
 
-        await connection.ExecuteAsync(new CommandDefinition(
-            dialect.InsertSql,
-            new
+        try
+        {
+            if (connection.State != System.Data.ConnectionState.Open)
             {
-                Id = Guid.NewGuid(),
-                TenantId = scope.TenantId,
-                Key = scope.Key,
-                Purpose = scope.Purpose,
-                SecretHash = hash,
-                SecretSalt = salt,
-                TokenHash = (string?)null,
-                Attempts = 0,
-                ExpiresAt = expiresAt,
-                CreatedAt = now,
-            },
-            cancellationToken: cancellationToken));
+                await connection.OpenAsync(cancellationToken);
+            }
+
+            // The supersede-then-insert pair is atomic. Without the transaction, an insert that fails
+            // after a successful invalidate leaves the user with their previous code already killed and
+            // no new one — strictly worse than either operation not having run at all. The rate-limit
+            // counters are deliberately NOT in this transaction: they are separate statements precisely
+            // so concurrent callers serialize on their own row locks, and enrolling them here would
+            // hold those locks for the whole issuance.
+            await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+
+            // Re-issue policy: only MaxLiveChallenges == 1 is exactly enforceable with this dialect's
+            // statements (see the type-level remarks) — invalidating on every issue is safe even when
+            // nothing was previously live, since InvalidateLiveForScopeSql is a no-op UPDATE in that case.
+            if (purpose.MaxLiveChallenges == 1)
+            {
+                await connection.ExecuteAsync(new CommandDefinition(
+                    dialect.InvalidateLiveForScopeSql,
+                    new { TenantId = scope.TenantId, Key = scope.Key, Purpose = scope.Purpose, Now = now, ConsumedAt = now },
+                    transaction,
+                    cancellationToken: cancellationToken));
+            }
+
+            await connection.ExecuteAsync(new CommandDefinition(
+                dialect.InsertSql,
+                new
+                {
+                    Id = challengeId,
+                    TenantId = scope.TenantId,
+                    Key = scope.Key,
+                    Purpose = scope.Purpose,
+                    SecretHash = hash,
+                    SecretSalt = salt,
+                    TokenHash = (string?)null,
+                    Attempts = 0,
+                    ExpiresAt = expiresAt,
+                    CreatedAt = now,
+                },
+                transaction,
+                cancellationToken: cancellationToken));
+
+            await transaction.CommitAsync(cancellationToken);
+        }
+        catch
+        {
+            await ReleaseChargesAsync(connection, charges);
+            throw;
+        }
 
         logger.LogInformation("Challenge issued for purpose {Purpose}", scope.Purpose);
-        return ChallengeIssueResult.Issued(secret, expiresAt, now);
+        return ChallengeIssueResult.Issued(challengeId, secret, expiresAt);
+    }
+
+    /// <summary>One rate-limit bucket this issuance actually incremented, and therefore owes back if the
+    /// issuance does not end in a stored secret.</summary>
+    private readonly record struct Charge(ChallengeScope Scope, string? Purpose, DateTimeOffset WindowStart);
+
+    /// <summary>
+    /// Charges one bucket and records it in <paramref name="charges"/> before returning, so a failure in
+    /// any later step knows exactly what to release. The record happens after the increment succeeds:
+    /// a charge that threw may or may not have landed, and releasing one that never landed would credit
+    /// quota nobody spent.
+    /// </summary>
+    private async Task<int> ChargeAsync(
+        System.Data.Common.DbConnection connection,
+        List<Charge> charges,
+        ChallengeScope scope,
+        string? purpose,
+        DateTimeOffset windowStart,
+        CancellationToken cancellationToken)
+    {
+        var count = await IncrementWindowAsync(connection, scope, purpose, windowStart, cancellationToken);
+        charges.Add(new Charge(scope, purpose, windowStart));
+        return count;
+    }
+
+    /// <summary>
+    /// Hands back every charge an issuance made that did not produce a secret. Runs with
+    /// <see cref="CancellationToken.None"/> deliberately: this is compensation for work already done, and
+    /// the most common reason to reach it is the caller's own token being cancelled — passing that token
+    /// through would make the compensation fail exactly when it is needed. Failures are logged and
+    /// swallowed so the original exception is what the caller sees; the counter self-heals when the
+    /// window elapses.
+    /// </summary>
+    private async Task ReleaseChargesAsync(System.Data.Common.DbConnection connection, List<Charge> charges)
+    {
+        foreach (var charge in charges)
+        {
+            try
+            {
+                await DecrementWindowAsync(connection, charge.Scope, charge.Purpose, charge.WindowStart, CancellationToken.None);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(
+                    ex,
+                    "Failed to release a rate-limit charge for purpose {Purpose}; the quota stays consumed until the window elapses",
+                    charge.Scope.Purpose);
+            }
+        }
     }
 
     /// <summary>
@@ -162,16 +272,32 @@ internal sealed class ChallengeService : IChallengeService
     /// value is the caller's own increment, produced by the same statement that wrote it — see
     /// <see cref="IChallengeDialect.IncrementWindowSql"/> for why a separate read would not be.
     /// </summary>
-    private Task<int> IncrementWindowAsync(
+    /// <exception cref="InvalidOperationException">
+    /// The statement returned no scalar. Deliberately fatal rather than defaulted: since the ceiling is
+    /// now decided entirely by this value, a missing one silently read as 0 would be below every
+    /// configured limit and admit the issuance unconditionally — the rate limiter would fail open, and
+    /// do so invisibly. <c>ExecuteScalarAsync&lt;int&gt;</c> would have done exactly that, because Dapper
+    /// maps a NULL/absent result to <c>default(int)</c>; MySQL's dialect can legitimately produce NULL
+    /// (its statement resets the session variable first, precisely so a no-match UPDATE cannot return a
+    /// previous call's value). Failing closed turns "the ceiling did not work" into a loud error.
+    /// </exception>
+    private async Task<int> IncrementWindowAsync(
         System.Data.Common.DbConnection connection,
         ChallengeScope scope,
         string? purpose,
         DateTimeOffset windowStart,
-        CancellationToken cancellationToken) =>
-        connection.ExecuteScalarAsync<int>(new CommandDefinition(
+        CancellationToken cancellationToken)
+    {
+        var count = await connection.ExecuteScalarAsync<int?>(new CommandDefinition(
             dialect.IncrementWindowSql,
             new { Id = Guid.NewGuid(), TenantId = scope.TenantId, Key = scope.Key, Purpose = purpose, WindowStart = windowStart },
             cancellationToken: cancellationToken));
+
+        return count ?? throw new InvalidOperationException(
+            "IncrementWindowSql returned no count. The rate-limit ceiling is decided by that value, so "
+            + "the issuance is refused rather than admitted on an assumed count of zero. See the "
+            + "contract on IChallengeDialect.IncrementWindowSql.");
+    }
 
     private Task DecrementWindowAsync(
         System.Data.Common.DbConnection connection,
@@ -282,29 +408,71 @@ internal sealed class ChallengeService : IChallengeService
     }
 
     /// <inheritdoc />
-    public async Task RefundAsync(ChallengeScope scope, DateTimeOffset issuedAt, CancellationToken cancellationToken = default)
+    public async Task<bool> RefundAsync(Guid challengeId, CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(scope);
-
-        var purpose = options.GetPurpose(scope.Purpose);
-
-        // Floored from the issuance time, never from "now". Buckets are fixed-width, so a refund that
-        // arrives after the boundary the issue fell on — the common case, since delivery failure is
-        // discovered asynchronously — would otherwise decrement a bucket the issue never charged:
-        // the original charge stays for the rest of its window, and an unrelated live bucket loses a
-        // count that belongs to somebody else's issuance. Both directions are wrong, and the second
-        // is a quota bypass.
-        var scopeWindowStart = FloorToWindowStart(issuedAt, purpose.PerScopeWindow.Window);
-        var keyWindowStart = FloorToWindowStart(issuedAt, options.PerKeyWindow.Window);
-
         await using var connection = dialect.CreateConnection();
 
-        // Both layers, mirroring IssueAsync's two IncrementWindowSql calls — a refund undoes exactly
-        // what an issue charged. Each is independently floored at zero by the dialect.
+        var row = await connection.QueryFirstOrDefaultAsync<ChallengeRow>(new CommandDefinition(
+            dialect.SelectByIdSql, new { Id = challengeId }, cancellationToken: cancellationToken));
+
+        if (row is null)
+        {
+            // Purged, or never issued. Not an error: retention deletes challenge rows long before the
+            // counters they charged elapse, so a late webhook for a real issuance lands here routinely.
+            logger.LogInformation("Challenge refund skipped: no challenge {ChallengeId}", challengeId);
+            return false;
+        }
+
+        // The claim, and the whole reason a refund takes a challenge id rather than a scope and a
+        // timestamp. Delivery-status webhooks are retried by every provider and adopters retry their own
+        // failure handlers, so an unguarded decrement is refunded two or three times per failed send —
+        // and since DecrementWindowSql floors at zero and never errors, anyone who can make deliveries
+        // fail could replay it to drive the SMS cost ceiling to zero and keep issuing. Exactly one
+        // caller wins this UPDATE; everyone else gets 0 rows and stops here.
+        var claimed = await connection.ExecuteAsync(new CommandDefinition(
+            dialect.MarkRefundedSql,
+            new { Id = challengeId, Now = timeProvider.GetUtcNow() },
+            cancellationToken: cancellationToken));
+
+        if (claimed == 0)
+        {
+            logger.LogInformation("Challenge refund skipped: challenge {ChallengeId} was already refunded", challengeId);
+            return false;
+        }
+
+        // Buckets come from the row's own created_at, never from "now". They are fixed-width, so a
+        // refund arriving after the boundary the issue fell on — the common case, since delivery failure
+        // is discovered asynchronously — would otherwise decrement a bucket the issue never charged:
+        // the original charge stays for the rest of its window, and an unrelated live bucket loses a
+        // count belonging to somebody else's issuance. Both directions are wrong, and the second is a
+        // quota bypass.
+        var scope = new ChallengeScope(row.Key, row.Purpose, row.TenantId);
+        var purpose = options.GetPurpose(row.Purpose);
+        var scopeWindowStart = FloorToWindowStart(row.CreatedAt, purpose.PerScopeWindow.Window);
+        var keyWindowStart = FloorToWindowStart(row.CreatedAt, options.PerKeyWindow.Window);
+
+        // Every layer the issuance charged, mirroring IssueAsync — a refund undoes exactly what an issue
+        // charged, no more and no less. Each is independently floored at zero by the dialect.
         await DecrementWindowAsync(connection, scope, scope.Purpose, scopeWindowStart, cancellationToken);
         await DecrementWindowAsync(connection, scope, null, keyWindowStart, cancellationToken);
 
+        // The tenant-agnostic bucket, if that layer is configured. Read from the CURRENT options rather
+        // than from anything stored: an issuance made while the layer was off has no such row, and
+        // DecrementWindowSql is a no-op against a bucket that does not exist. The reverse — the layer
+        // turned off between issue and refund — leaves that one counter uncredited until its window
+        // elapses, which is the harmless direction.
+        if (options.PerKeyGlobalWindow is { } globalWindow)
+        {
+            await DecrementWindowAsync(
+                connection,
+                scope with { TenantId = null },
+                ChallengeOptions.GlobalKeyBucketPurpose,
+                FloorToWindowStart(row.CreatedAt, globalWindow.Window),
+                cancellationToken);
+        }
+
         logger.LogInformation("Challenge quota refunded for purpose {Purpose}", scope.Purpose);
+        return true;
     }
 
     /// <summary>

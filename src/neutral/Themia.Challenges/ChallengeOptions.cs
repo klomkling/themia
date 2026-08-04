@@ -100,6 +100,7 @@ public sealed class ChallengeOptions
     private readonly Dictionary<string, PurposeOptions> _purposes = new(StringComparer.Ordinal);
     private int _challengeRetentionHours = 24;
     private (int Limit, TimeSpan Window) _perKeyWindow = (20, TimeSpan.FromHours(1));
+    private (int Limit, TimeSpan Window)? _perKeyGlobalWindow;
 
     /// <summary>
     /// The rate limit on issuance for one key across all purposes: at most <c>Limit</c> secrets may be
@@ -130,6 +131,48 @@ public sealed class ChallengeOptions
     {
         get => _perKeyWindow;
         set => _perKeyWindow = PurposeOptions.ValidateWindow(value);
+    }
+
+    /// <summary>
+    /// The purpose value reserved for the <see cref="PerKeyGlobalWindow"/> counter row. Rejected by
+    /// <see cref="ConfigurePurpose"/> so an adopter cannot register a real purpose that shares the
+    /// bucket. Exposed only so the reservation is discoverable — nothing else should reference it.
+    /// </summary>
+    /// <remarks>
+    /// A sentinel is needed because the tenant-agnostic bucket is stored with <c>tenant_id IS NULL</c>,
+    /// and that coordinate is already taken: a platform-level challenge (<see cref="ChallengeScope.TenantId"/>
+    /// is <see langword="null"/>) writes its ordinary per-key row at exactly <c>(NULL, key, NULL)</c>. The
+    /// two counters mean different things and must not share a row, so the global one carries this
+    /// purpose rather than <see langword="null"/>.
+    /// </remarks>
+    public const string GlobalKeyBucketPurpose = "__themia_global_key__";
+
+    /// <summary>
+    /// An optional third rate-limit layer: at most <c>Limit</c> secrets to the same key within
+    /// <c>Window</c> <b>across every tenant</b>. <see langword="null"/> by default, which disables it.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <see cref="PerKeyWindow"/> is bucketed by <c>(tenant_id, key)</c>, because two tenants may hold the
+    /// same phone number and one tenant exhausting its ceiling must not lock the other out — that
+    /// isolation is deliberate and stays. But the SMS invoice and the victim's inbox are <em>not</em>
+    /// partitioned by tenant, so where an attacker can pick or create the tenant — a caller-influenced
+    /// subdomain, header, or path segment, and especially self-serve tenant signup — the same real phone
+    /// number can be charged <see cref="PerKeyWindow"/>'s limit once per tenant. This layer is the ceiling
+    /// on the physical thing: one bucket per key, no tenant in it.
+    /// </para>
+    /// <para>
+    /// Left off by default because it is wrong for the common deployment. When tenants come from
+    /// configuration rather than from request input, a global bucket only adds a way for one tenant's
+    /// traffic to refuse another's. Turn it on when tenant identity is attacker-influenced; size it above
+    /// the busiest legitimate tenant's real usage for a single key, not at it.
+    /// </para>
+    /// </remarks>
+    /// <exception cref="ArgumentOutOfRangeException">Assigned a value whose <c>Limit</c> or <c>Window</c> is zero or negative.</exception>
+    public (int Limit, TimeSpan Window)? PerKeyGlobalWindow
+    {
+        get => _perKeyGlobalWindow;
+        set => _perKeyGlobalWindow = value is null ? null : PurposeOptions.ValidateWindow(value.Value);
     }
 
     /// <summary>
@@ -177,6 +220,11 @@ public sealed class ChallengeOptions
         }
 
         var widest = PerKeyWindow.Window;
+        if (PerKeyGlobalWindow is { } global && global.Window > widest)
+        {
+            widest = global.Window;
+        }
+
         foreach (var purpose in _purposes.Values)
         {
             if (purpose.PerScopeWindow.Window > widest)
@@ -200,6 +248,16 @@ public sealed class ChallengeOptions
     {
         ArgumentException.ThrowIfNullOrEmpty(purpose);
         ArgumentNullException.ThrowIfNull(configure);
+
+        if (string.Equals(purpose, GlobalKeyBucketPurpose, StringComparison.Ordinal))
+        {
+            // Registering it would make ordinary issuance write into the tenant-agnostic ceiling's own
+            // counter row, so that ceiling would trip on unrelated traffic and its refunds would credit
+            // the wrong bucket. Rejected here rather than documented, since nothing detects it later.
+            throw new ArgumentException(
+                $"'{GlobalKeyBucketPurpose}' is reserved for the {nameof(PerKeyGlobalWindow)} counter row and cannot be configured as a purpose.",
+                nameof(purpose));
+        }
 
         var options = _purposes.TryGetValue(purpose, out var existing) ? existing : new PurposeOptions();
         configure(options);

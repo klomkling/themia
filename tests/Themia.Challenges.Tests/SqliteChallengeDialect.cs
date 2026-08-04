@@ -67,7 +67,8 @@ internal sealed class SqliteChallengeDialect : IChallengeDialect
             attempts INTEGER NOT NULL DEFAULT 0,
             expires_at TEXT NOT NULL,
             created_at TEXT NOT NULL,
-            consumed_at TEXT NULL
+            consumed_at TEXT NULL,
+            refunded_at TEXT NULL
         );
         CREATE TABLE IF NOT EXISTS challenge_rate_windows (
             id TEXT PRIMARY KEY,
@@ -107,6 +108,12 @@ internal sealed class SqliteChallengeDialect : IChallengeDialect
         SELECT * FROM challenges
         WHERE tenant_id IS @TenantId AND key = @Key AND purpose = @Purpose
         ORDER BY created_at DESC LIMIT 1;
+        """;
+
+    public string SelectByIdSql => """SELECT * FROM challenges WHERE id = @Id;""";
+
+    public string MarkRefundedSql => """
+        UPDATE challenges SET refunded_at = @Now WHERE id = @Id AND refunded_at IS NULL;
         """;
 
     public string ConsumeSql => """

@@ -117,10 +117,14 @@ public interface IChallengeService
         string token, string purpose, string? tenantId = null, CancellationToken ct = default);
 
     // Returns the quota consumed by an issue whose delivery failed. See "Rate limiting", layer 2.
-    // `issuedAt` is ChallengeIssueResult.IssuedAt: counters are fixed-width buckets keyed by window
-    // start, so only the issuance time identifies the buckets that were actually charged. Flooring
-    // "now" instead would leave the original charge standing and decrement a stranger's bucket.
-    Task RefundAsync(ChallengeScope scope, DateTimeOffset issuedAt, CancellationToken ct = default);
+    // Keyed on ChallengeIssueResult.ChallengeId, and idempotent: the refund is claimed with a guarded
+    // UPDATE on the challenge row (refunded_at IS NULL), and only the winner decrements. Callers here
+    // are retry-prone by nature — provider delivery webhooks are redelivered — and an unguarded refund
+    // is a decrement of the counter that bounds an SMS bill, so a replayed one drives it to zero.
+    // The buckets to credit come from the row's own created_at: counters are fixed-width buckets keyed
+    // by window start, so nothing but the issuance time identifies the ones actually charged.
+    // Returns false when there was nothing to refund (already refunded, or the row was purged).
+    Task<bool> RefundAsync(Guid challengeId, CancellationToken ct = default);
 }
 
 public enum ChallengeIssueOutcome { Issued, RateLimited }
@@ -278,6 +282,14 @@ guards.
      bucketed by window start, so a per-purpose window would floor the same key into a different bucket
      per purpose and hand the purpose-cycling attacker a fresh ceiling for each — the exact attack the
      layer exists to stop. One window per store makes that unrepresentable.
+   - *Per key across every tenant* (`key` alone) — **optional, off by default**
+     (`ChallengeOptions.PerKeyGlobalWindow`). The layer above is bucketed by `(tenant, key)` so one
+     tenant exhausting its ceiling cannot lock another out — correct, and kept. But the invoice and the
+     victim's inbox are not partitioned by tenant, so where the tenant is attacker-influenced (a
+     caller-supplied subdomain or header, above all self-serve tenant signup) the same real number can
+     be charged the per-key limit once per tenant. Off by default because for tenants that come from
+     configuration a global bucket only lets one tenant's traffic refuse another's. Its counter row
+     carries a reserved purpose, since a platform-level challenge already occupies `(NULL, key, NULL)`.
    - Per IP is deliberately not the mechanism: the attacker rotates IPs, and the victim is the account
      owner's number and your bill.
    - **Both layers charge before they check.** The counter is incremented first and the *returned*
@@ -307,8 +319,8 @@ so it is accepted, with two mitigations:
   brute-force is stopped by the attempt cap, not by the issue limit.
 - **`RefundAsync`.** Delivery is the adopter's job, so only the adopter knows a send failed. When it does
   — including `NotificationResult.NotConfigured` — the adopter calls
-  `RefundAsync(scope, result.IssuedAt!.Value)` and the quota is returned. A message that was never sent
-  must not consume the victim's allowance.
+  `RefundAsync(result.ChallengeId!.Value)` and the quota is returned. A message that was never sent must
+  not consume the victim's allowance. The call is idempotent — a redelivered webhook refunds once.
 
 ### Re-issue policy: `MaxLiveChallenges`, default 1
 
@@ -377,6 +389,10 @@ propertiezy made about identifier resolution on #0054.
 - **Both rate-limit layers separately**, including the purpose-cycling bypass: N requests across N
   distinct purposes must hit the per-key ceiling though no per-purpose limit was reached.
 - **`RefundAsync` returns quota**: ceiling reached, refund, next issue succeeds.
+- **`RefundAsync` is idempotent**: refunding the same challenge three times returns one slot, not three.
+- **A failed issuance does not burn quota**: when the insert throws, both charges are released.
+- **Keys differing only by case do not collide**: proven per engine — it fails on MySQL and SQL Server
+  without the pinned collation, and passes on PostgreSQL either way.
 - **The ceiling holds under concurrency**: with the per-key ceiling set well below N, N concurrent
   `IssueAsync` calls for one key yield at most `Limit` issued results (and at least one) on every
   engine. Asserting the counter equals N is a different, weaker claim and does not substitute.

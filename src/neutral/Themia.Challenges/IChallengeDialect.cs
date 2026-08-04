@@ -114,6 +114,29 @@ public interface IChallengeDialect
     string SelectMostRecentByScopeSql { get; }
 
     /// <summary>
+    /// Selects one challenge row by primary key, regardless of liveness. Params: <c>@Id</c>. Serves the
+    /// refund path, which needs the row's <c>tenant_id</c>, <c>key</c>, <c>purpose</c> and — critically —
+    /// its <c>created_at</c>, because the rate-limit buckets an issuance charged are identified by the
+    /// issuance time and nothing else.
+    /// </summary>
+    string SelectByIdSql { get; }
+
+    /// <summary>
+    /// Claims a challenge for refund: sets <c>refunded_at = @Now</c> on the row matching <c>@Id</c>
+    /// <b>only if <c>refunded_at IS NULL</c></b>, and returns rows affected. Params: <c>@Id</c>,
+    /// <c>@Now</c>.
+    /// <para>
+    /// The guard is the entire point. A refund is a decrement of a counter that bounds an SMS bill, and
+    /// the callers who trigger it — provider delivery-status webhooks, an adopter's own failure handler
+    /// — retry. Without a once-only claim the same failed send is refunded two or three times, and
+    /// anyone who can force deliveries to fail can drive the ceiling to zero on demand and keep issuing.
+    /// A caller must treat a return of 0 as "already refunded, do nothing", not as an error, and must
+    /// perform the decrements only when this returns 1.
+    /// </para>
+    /// </summary>
+    string MarkRefundedSql { get; }
+
+    /// <summary>
     /// Atomically consumes one challenge by id: sets <c>consumed_at = @ConsumedAt</c> for the row
     /// matching <c>@Id</c> where <c>consumed_at IS NULL AND expires_at &gt; @Now</c>. Params:
     /// <c>@Id</c>, <c>@Now</c>, <c>@ConsumedAt</c>.

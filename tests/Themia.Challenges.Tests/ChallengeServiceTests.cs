@@ -101,6 +101,82 @@ public sealed class ChallengeServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task Issue_ShouldNotApplyAGlobalKeyCeiling_WhenItIsNotConfigured()
+    {
+        // Default (null) keeps the pre-existing behaviour: the per-key ceiling is per (tenant, key), so
+        // one tenant exhausting it must not touch another. Turning the global layer on is opt-in
+        // precisely because this isolation is correct for deployments whose tenants come from config.
+        var service = CreateService(o =>
+        {
+            o.PerKeyWindow = (1, TimeSpan.FromHours(1));
+            o.ConfigurePurpose("login", p => Configure(p));
+        });
+        const string key = "+66717171717";
+
+        Assert.Equal(ChallengeIssueOutcome.Issued, (await service.IssueAsync(new ChallengeScope(key, "login", "tenantA"))).Outcome);
+        Assert.Equal(ChallengeIssueOutcome.RateLimited, (await service.IssueAsync(new ChallengeScope(key, "login", "tenantA"))).Outcome);
+        Assert.Equal(ChallengeIssueOutcome.Issued, (await service.IssueAsync(new ChallengeScope(key, "login", "tenantB"))).Outcome);
+    }
+
+    [Fact]
+    public async Task Issue_ShouldRateLimit_AcrossTenants_WhenTheGlobalKeyCeilingIsConfigured()
+    {
+        // The physical thing the ceiling protects — the SMS invoice and the victim's inbox — is not
+        // partitioned by tenant. Where an attacker can pick or create the tenant, the per-(tenant, key)
+        // ceiling is worth PerKeyWindow.Limit per tenant against one real phone number.
+        var service = CreateService(o =>
+        {
+            o.PerKeyWindow = (5, TimeSpan.FromHours(1));
+            o.PerKeyGlobalWindow = (2, TimeSpan.FromHours(1));
+            o.ConfigurePurpose("login", p => Configure(p));
+        });
+        const string key = "+66727272727";
+
+        Assert.Equal(ChallengeIssueOutcome.Issued, (await service.IssueAsync(new ChallengeScope(key, "login", "tenantA"))).Outcome);
+        Assert.Equal(ChallengeIssueOutcome.Issued, (await service.IssueAsync(new ChallengeScope(key, "login", "tenantB"))).Outcome);
+
+        // Fresh tenant, its own per-(tenant, key) counter at zero, but the key has had its two.
+        var third = await service.IssueAsync(new ChallengeScope(key, "login", "tenantC"));
+        Assert.Equal(ChallengeIssueOutcome.RateLimited, third.Outcome);
+
+        // A different key is unaffected — the ceiling is on the key, not on the store.
+        var otherKey = await service.IssueAsync(new ChallengeScope("+66737373737", "login", "tenantC"));
+        Assert.Equal(ChallengeIssueOutcome.Issued, otherKey.Outcome);
+    }
+
+    [Fact]
+    public async Task Issue_ShouldNotShareTheGlobalBucket_WithAPlatformLevelChallenge()
+    {
+        // A platform-level challenge (TenantId null) writes its ordinary per-key row at (NULL, key,
+        // NULL) — the same coordinate the tenant-agnostic bucket would occupy without its reserved
+        // purpose sentinel. If the two shared a row, the global ceiling would be double-charged by every
+        // platform-level issue and trip at half its configured limit.
+        var service = CreateService(o =>
+        {
+            o.PerKeyWindow = (1, TimeSpan.FromHours(1));
+            o.PerKeyGlobalWindow = (2, TimeSpan.FromHours(1));
+            o.ConfigurePurpose("login", p => Configure(p));
+        });
+        const string key = "+66747474747";
+
+        // Platform-level issue: charges (NULL, key, NULL) once and the global bucket once.
+        Assert.Equal(ChallengeIssueOutcome.Issued, (await service.IssueAsync(new ChallengeScope(key, "login"))).Outcome);
+
+        // A tenant's first issue has its own untouched per-key counter, and the global bucket is at 1 of
+        // 2 — so it must be admitted. It would be refused if the two buckets had collided.
+        Assert.Equal(ChallengeIssueOutcome.Issued, (await service.IssueAsync(new ChallengeScope(key, "login", "tenantA"))).Outcome);
+    }
+
+    [Fact]
+    public void ConfigurePurpose_ShouldReject_TheReservedGlobalBucketPurpose()
+    {
+        var options = new ChallengeOptions();
+
+        Assert.ThrowsAny<ArgumentException>(() =>
+            options.ConfigurePurpose(ChallengeOptions.GlobalKeyBucketPurpose, p => Configure(p)));
+    }
+
+    [Fact]
     public async Task Refund_ShouldReturnQuota_SoAFailedDeliveryDoesNotConsumeIt()
     {
         var service = CreateService(o => o.ConfigurePurpose("login", p => Configure(p, perScopeWindow: (1, TimeSpan.FromMinutes(15)))));
@@ -110,12 +186,46 @@ public sealed class ChallengeServiceTests : IDisposable
         Assert.Equal(ChallengeIssueOutcome.Issued, issued.Outcome);
         Assert.Equal(ChallengeIssueOutcome.RateLimited, (await service.IssueAsync(scope)).Outcome);
 
-        // The issuance time, not "now": the counters are fixed-width buckets keyed by window start, so
-        // only the bucket the issue charged is the one a refund may decrement.
-        await service.RefundAsync(scope, issued.IssuedAt!.Value);
+        // Keyed on the challenge, not the scope: the buckets to credit are read from the stored row's
+        // own created_at, and the guarded claim makes the refund once-only.
+        Assert.True(await service.RefundAsync(issued.ChallengeId!.Value));
 
         var afterRefund = await service.IssueAsync(scope);
         Assert.Equal(ChallengeIssueOutcome.Issued, afterRefund.Outcome);
+    }
+
+    [Fact]
+    public async Task Refund_ShouldBeIdempotent_SoARetriedDeliveryCallbackCannotEraseTheCeiling()
+    {
+        // Two per window, both consumed by the two issues below. If a repeated refund of the SAME
+        // issuance credited the counter twice, the ceiling would be worth nothing: a caller who can make
+        // delivery fail — an unroutable-but-valid number, a bouncing mailbox — replays the webhook and
+        // keeps issuing. DecrementWindowSql floors at zero and never errors, so nothing else stops it.
+        var service = CreateService(o => o.ConfigurePurpose("login", p => Configure(p, perScopeWindow: (2, TimeSpan.FromMinutes(15)))));
+        var scope = new ChallengeScope("+66393939393", "login", "tenantA");
+
+        var first = await service.IssueAsync(scope);
+        Assert.Equal(ChallengeIssueOutcome.Issued, first.Outcome);
+        Assert.Equal(ChallengeIssueOutcome.Issued, (await service.IssueAsync(scope)).Outcome);
+        Assert.Equal(ChallengeIssueOutcome.RateLimited, (await service.IssueAsync(scope)).Outcome);
+
+        Assert.True(await service.RefundAsync(first.ChallengeId!.Value));
+        Assert.False(await service.RefundAsync(first.ChallengeId!.Value));
+        Assert.False(await service.RefundAsync(first.ChallengeId!.Value));
+
+        // Exactly one slot came back, so exactly one more issue succeeds.
+        Assert.Equal(ChallengeIssueOutcome.Issued, (await service.IssueAsync(scope)).Outcome);
+        Assert.Equal(ChallengeIssueOutcome.RateLimited, (await service.IssueAsync(scope)).Outcome);
+    }
+
+    [Fact]
+    public async Task Refund_ShouldReportNothingToDo_ForAnUnknownChallenge()
+    {
+        var service = CreateService(o => o.ConfigurePurpose("login", p => Configure(p)));
+
+        // Retention deletes challenge rows long before the counters they charged elapse, so a late
+        // webhook for a real-but-purged issuance lands here routinely. Not an error.
+        Assert.False(await service.RefundAsync(Guid.NewGuid()));
     }
 
     // ---- Verify outcomes ----------------------------------------------------------------------

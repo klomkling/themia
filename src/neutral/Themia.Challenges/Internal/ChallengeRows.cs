@@ -30,4 +30,6 @@ internal sealed class ChallengeRow
     public DateTimeOffset CreatedAt { get; set; }
 
     public DateTimeOffset? ConsumedAt { get; set; }
+
+    public DateTimeOffset? RefundedAt { get; set; }
 }

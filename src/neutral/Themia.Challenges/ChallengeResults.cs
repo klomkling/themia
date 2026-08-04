@@ -57,12 +57,12 @@ public enum ChallengeVerifyOutcome
 /// <summary>The result of issuing a challenge.</summary>
 public sealed class ChallengeIssueResult
 {
-    private ChallengeIssueResult(ChallengeIssueOutcome outcome, string? secret, DateTimeOffset? expiresAt, DateTimeOffset? issuedAt)
+    private ChallengeIssueResult(ChallengeIssueOutcome outcome, Guid? challengeId, string? secret, DateTimeOffset? expiresAt)
     {
         Outcome = outcome;
+        ChallengeId = challengeId;
         Secret = secret;
         ExpiresAt = expiresAt;
-        IssuedAt = issuedAt;
     }
 
     /// <summary>How the issue attempt ended. Switch over this rather than reading <see cref="Succeeded"/>
@@ -82,29 +82,35 @@ public sealed class ChallengeIssueResult
     public DateTimeOffset? ExpiresAt { get; }
 
     /// <summary>
-    /// When the secret was issued, when <see cref="Outcome"/> is <see cref="ChallengeIssueOutcome.Issued"/>;
-    /// otherwise <see langword="null"/>. Pass this to <see cref="IChallengeService.RefundAsync"/> if the
-    /// delivery of this secret turns out to have failed — the rate-limit counters are fixed-width
-    /// buckets keyed by window start, so only the issuance time identifies the buckets that were
-    /// charged. Deriving it from <see cref="ExpiresAt"/> minus the configured TTL would break the
-    /// moment a purpose's TTL is reconfigured between issue and refund, which is why it is carried
-    /// explicitly.
+    /// Identifies the stored challenge, when <see cref="Outcome"/> is
+    /// <see cref="ChallengeIssueOutcome.Issued"/>; otherwise <see langword="null"/>. Pass it to
+    /// <see cref="IChallengeService.RefundAsync"/> if delivery of this secret turns out to have failed.
+    /// It is a handle, not a credential: verification is by secret or token hash, so knowing an id
+    /// grants nothing. Refund is keyed on it rather than on the scope so the refund can be made
+    /// once-only, and so the rate-limit buckets to credit are read from the row's own creation time
+    /// instead of being re-derived by the caller.
     /// </summary>
-    public DateTimeOffset? IssuedAt { get; }
+    public Guid? ChallengeId { get; }
 
     /// <summary>Whether a secret was issued.</summary>
     public bool Succeeded => Outcome == ChallengeIssueOutcome.Issued;
 
     /// <summary>Creates an <see cref="ChallengeIssueOutcome.Issued"/> result.</summary>
+    /// <param name="challengeId">The stored challenge's id — the value <see cref="IChallengeService.RefundAsync"/> needs.</param>
     /// <param name="secret">The plaintext secret handed to the caller for delivery.</param>
     /// <param name="expiresAt">When the secret expires.</param>
-    /// <param name="issuedAt">When the secret was issued — the value <see cref="IChallengeService.RefundAsync"/> needs.</param>
     /// <returns>An issued result carrying the plaintext secret.</returns>
     /// <exception cref="ArgumentException"><paramref name="secret"/> is null or empty.</exception>
-    public static ChallengeIssueResult Issued(string secret, DateTimeOffset expiresAt, DateTimeOffset issuedAt)
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="challengeId"/> is <see cref="Guid.Empty"/>.</exception>
+    public static ChallengeIssueResult Issued(Guid challengeId, string secret, DateTimeOffset expiresAt)
     {
         ArgumentException.ThrowIfNullOrEmpty(secret);
-        return new ChallengeIssueResult(ChallengeIssueOutcome.Issued, secret, expiresAt, issuedAt);
+        if (challengeId == Guid.Empty)
+        {
+            throw new ArgumentOutOfRangeException(nameof(challengeId), "An issued challenge must carry a real id.");
+        }
+
+        return new ChallengeIssueResult(ChallengeIssueOutcome.Issued, challengeId, secret, expiresAt);
     }
 
     /// <summary>Creates a <see cref="ChallengeIssueOutcome.RateLimited"/> result.</summary>

@@ -61,7 +61,48 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
     throws, by name, the first time `IChallengeService` is resolved — deliberately, rather than falling
     back to a silent in-memory store that would pass every test and lose every challenge on restart.
 
+### Added
+- **`ChallengeOptions.PerKeyGlobalWindow`** — an optional third rate-limit layer capping issuance to one
+  key **across every tenant**. `null` (off) by default. `PerKeyWindow` is bucketed by `(tenant_id, key)`
+  so one tenant exhausting its ceiling cannot lock another out, and that isolation stays; but the SMS
+  invoice and the victim's inbox are not partitioned by tenant, so where the tenant is attacker-influenced
+  — a caller-supplied subdomain or header, and especially self-serve tenant signup — one phone number can
+  be charged `PerKeyWindow`'s limit once per tenant. Turn this on for those deployments. The counter row
+  uses the reserved purpose `ChallengeOptions.GlobalKeyBucketPurpose`, which `ConfigurePurpose` now
+  rejects, because a platform-level challenge already occupies `(NULL, key, NULL)`.
+
 ### Changed
+- **(breaking) `Themia.Challenges` refund is keyed on the challenge, not the scope.**
+  `RefundAsync(ChallengeScope, DateTimeOffset)` becomes `Task<bool> RefundAsync(Guid challengeId)`, and
+  `ChallengeIssueResult` exposes `ChallengeId` instead of `IssuedAt`. The old shape was a bare decrement
+  with nothing tying it to an issuance: provider delivery-status webhooks are redelivered and adopters
+  retry their own failure handlers, so one failed send was refunded two or three times — and since the
+  decrement floors at zero and never errors, anyone able to force deliveries to fail could replay it to
+  drive the SMS cost ceiling to zero and keep issuing. The refund is now claimed with a guarded write
+  against a new `refunded_at` column and returns `false` when there was nothing to refund.
+
+### Fixed
+- **`Themia.Challenges` no longer burns quota for an issuance that never happened.** Both rate-limit
+  counters are charged before the row is written; a failure in the invalidate or insert left them
+  charged, so three transient database failures locked a real user out for the rest of the window under
+  the default 3-per-15-minutes. The charges are now released on any failure, and the supersede-then-insert
+  pair runs in one transaction so a failed insert can no longer kill the user's previous working code.
+- **`Themia.Challenges` rate limiter fails closed when the store returns no count.** The ceiling is
+  decided entirely by the value `IncrementWindowSql` returns, and `ExecuteScalarAsync<int>` mapped a
+  NULL result to `0` — below every configured limit, so the issuance was admitted unconditionally and
+  silently. A missing count is now an error.
+- **(breaking, schema) `Themia.Challenges` pins a byte-exact collation** (`utf8mb4_bin` on MySQL,
+  `Latin1_General_BIN2` on SQL Server) on every string column a dialect compares with `=`. MySQL 8 and
+  SQL Server both default to case-folding collations, so a code issued for key `"A1b2"` verified against
+  an account keyed `"a1b2"`, and the two shared one rate-limit bucket. Proven per engine: the new test
+  fails on MySQL and SQL Server without the pin. PostgreSQL was never affected.
+- **`Themia.Challenges` indexes its purge predicates** (`challenges.expires_at`,
+  `challenge_rate_windows.window_start`). Both purge statements filter on a single column, so without
+  them the hourly retention job full-scanned the two tables every issue and verify contends on.
+- **`Themia.Challenges.MySql` pins `GuidFormat=Char36`**, matching every sibling Themia MySQL dialect.
+  Both `id` columns are `CHAR(36)`; an adopter reusing a connection string carrying
+  `GuidFormat=Binary16` or `OldGuids=true` wrote a mangled id that no later lookup matched.
+
 - **(breaking) MariaDB is no longer claimed as a supported engine.** Package descriptions, XML docs and
   migration error messages said "MySQL/MariaDB"; the MySQL leg of the shared schema uses **functional
   key parts** (`CREATE UNIQUE INDEX ... ((expr))`, MySQL 8.0.13+) to emulate the partial/filtered unique

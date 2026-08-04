@@ -67,6 +67,14 @@ public sealed class SqlServerChallengeDialect : IChallengeDialect
         """;
 
     /// <inheritdoc />
+    public string SelectByIdSql => """SELECT * FROM challenges WHERE id = @Id;""";
+
+    /// <inheritdoc />
+    public string MarkRefundedSql => """
+        UPDATE challenges SET refunded_at = @Now WHERE id = @Id AND refunded_at IS NULL;
+        """;
+
+    /// <inheritdoc />
     public string ConsumeSql => """
         UPDATE challenges SET consumed_at = @ConsumedAt
         WHERE id = @Id AND consumed_at IS NULL AND expires_at > @Now;

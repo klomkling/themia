@@ -59,9 +59,16 @@ public sealed class MySqlChallengeDialect : IChallengeDialect
         // runtime, on every engine-specific path — a failure mode with no good diagnostic. Overriding
         // it here is safe: the flag only widens what the parser accepts, and every statement in this
         // dialect is a parameterised constant, so no user input ever reaches SQL text.
+        // GuidFormat is pinned for the same reason MySqlMessagingDialect and MySqlNotificationsDialect
+        // pin it, regardless of what the caller passed: ChallengeSchemaMigration declares both `id`
+        // columns with .AsGuid(), which FluentMigrator renders as CHAR(36) on MySQL. An adopter reusing a
+        // shared application connection string carrying GuidFormat=Binary16/LittleEndianBinary16 or
+        // OldGuids=true would have Guid parameters serialized as 16 raw bytes against a CHAR(36) column —
+        // InsertSql writes a mangled id and every later lookup by id silently stops matching it.
         this.connectionString = new MySqlConnectionStringBuilder(connectionString)
         {
             AllowUserVariables = true,
+            GuidFormat = MySqlGuidFormat.Char36,
         }.ConnectionString;
         logger = loggerFactory.CreateLogger<DeadlockRetryingConnection>();
     }
@@ -110,6 +117,14 @@ public sealed class MySqlChallengeDialect : IChallengeDialect
         SELECT * FROM challenges
         WHERE tenant_id <=> @TenantId AND `key` = @Key AND purpose = @Purpose
         ORDER BY created_at DESC LIMIT 1;
+        """;
+
+    /// <inheritdoc />
+    public string SelectByIdSql => """SELECT * FROM challenges WHERE id = @Id;""";
+
+    /// <inheritdoc />
+    public string MarkRefundedSql => """
+        UPDATE challenges SET refunded_at = @Now WHERE id = @Id AND refunded_at IS NULL;
         """;
 
     /// <inheritdoc />
