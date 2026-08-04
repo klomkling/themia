@@ -12,6 +12,10 @@ with the *why* and concrete upgrade steps.
 
 ## Unreleased
 
+_Nothing yet._
+
+## 0.12.1
+
 ### `IChallengeDialect`: five statements became methods taking a shape
 
 **What changed:** `SelectLiveByScopeSql`, `SelectMostRecentByScopeSql` and `InvalidateLiveForScopeSql`

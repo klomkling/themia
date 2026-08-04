@@ -27,8 +27,12 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+_Nothing yet._
+
+## [0.12.1] - 2026-08-05
+
 ### Added
-- **`ChallengeOptions.VerifyWindow`** (default 20 per 15 minutes) — `Themia.Challenges` now rate-limits
+- **(breaking) `ChallengeOptions.VerifyWindow`** (default 20 per 15 minutes) — `Themia.Challenges` now rate-limits
   `VerifyAsync` per key, closing [#190](https://github.com/klomkling/themia/issues/190). `MaxAttempts`
   lives on a challenge row, so it bounds guesses against an *issued* secret and bounded nothing at all
   when none was live: wrong codes against a key whose challenge was consumed, expired or exhausted cost
