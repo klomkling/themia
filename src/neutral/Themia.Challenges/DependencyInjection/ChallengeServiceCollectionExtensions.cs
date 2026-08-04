@@ -10,10 +10,12 @@ namespace Themia.Challenges.DependencyInjection;
 public static class ChallengeServiceCollectionExtensions
 {
     /// <summary>
-    /// Registers validated <see cref="ChallengeOptions"/>, <see cref="TimeProvider.System"/>, and
-    /// <see cref="IChallengeService"/>. Does <b>not</b> register an <see cref="IChallengeDialect"/> —
-    /// call exactly one engine package's registration method (<c>AddThemiaChallengesPostgres</c>,
-    /// <c>AddThemiaChallengesMySql</c>, or <c>AddThemiaChallengesSqlServer</c>) as well, in either order.
+    /// Registers validated <see cref="ChallengeOptions"/>, <see cref="TimeProvider.System"/>,
+    /// <see cref="IChallengeService"/>, logging (<c>AddLogging()</c>), and the
+    /// <c>Internal.ChallengePurgeService</c> retention background service. Does <b>not</b> register an
+    /// <see cref="IChallengeDialect"/> — call exactly one engine package's registration method
+    /// (<c>AddThemiaChallengesPostgres</c>, <c>AddThemiaChallengesMySql</c>, or
+    /// <c>AddThemiaChallengesSqlServer</c>) as well, in either order.
     /// </summary>
     /// <remarks>
     /// The dialect is checked when <see cref="IChallengeService"/> is first resolved, not here. Engine
@@ -38,6 +40,15 @@ public static class ChallengeServiceCollectionExtensions
 
         services.TryAddSingleton(options);
         services.TryAddSingleton(TimeProvider.System);
+
+        // ChallengePurgeService is constructed by DI (AddHostedService, below) rather than via a
+        // factory, so it cannot fall back to NullLogger the way the IChallengeService factory does
+        // below — its ILogger<ChallengePurgeService> constructor parameter must actually resolve.
+        // AddLogging() is TryAdd-based throughout, so a host that already configured logging (the
+        // common case) is unaffected; a bare host gets a working no-op logger instead of a DI failure
+        // at first hosted-service activation. Matches Themia.Modules.Messaging's own AddThemiaMessagingModule.
+        services.AddLogging();
+
         services.TryAddScoped<IChallengeService>(sp =>
         {
             var dialect = sp.GetService<IChallengeDialect>() ?? throw new InvalidOperationException(
@@ -48,6 +59,12 @@ public static class ChallengeServiceCollectionExtensions
             var logger = sp.GetService<ILogger<ChallengeService>>() ?? NullLogger<ChallengeService>.Instance;
             return new ChallengeService(dialect, sp.GetRequiredService<ChallengeOptions>(), sp.GetRequiredService<TimeProvider>(), logger);
         });
+
+        // Registered regardless of ChallengeOptions.PurgeEnabled and regardless of whether an engine
+        // package has registered an IChallengeDialect yet: ChallengePurgeService checks both itself on
+        // every poll, the same way OutboxDrainer's purge dialect is optional. This avoids forcing
+        // registration order between AddThemiaChallenges and the engine package's Add*(...) call.
+        services.AddHostedService<ChallengePurgeService>();
 
         return services;
     }

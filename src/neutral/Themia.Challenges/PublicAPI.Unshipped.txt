@@ -31,8 +31,12 @@ Themia.Challenges.ChallengeIssueResult.Secret.get -> string?
 Themia.Challenges.ChallengeIssueResult.Succeeded.get -> bool
 Themia.Challenges.ChallengeOptions
 Themia.Challenges.ChallengeOptions.ChallengeOptions() -> void
+Themia.Challenges.ChallengeOptions.ChallengeRetentionHours.get -> int
+Themia.Challenges.ChallengeOptions.ChallengeRetentionHours.set -> void
 Themia.Challenges.ChallengeOptions.ConfigurePurpose(string! purpose, System.Action<Themia.Challenges.PurposeOptions!>! configure) -> void
 Themia.Challenges.ChallengeOptions.GetPurpose(string! purpose) -> Themia.Challenges.PurposeOptions!
+Themia.Challenges.ChallengeOptions.PurgeEnabled.get -> bool
+Themia.Challenges.ChallengeOptions.PurgeEnabled.set -> void
 Themia.Challenges.ChallengeScope
 Themia.Challenges.ChallengeScope.ChallengeScope(string! Key, string! Purpose, string? TenantId = null) -> void
 Themia.Challenges.ChallengeScope.Key.get -> string!

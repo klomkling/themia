@@ -118,6 +118,63 @@ public sealed class PurposeOptions
 public sealed class ChallengeOptions
 {
     private readonly Dictionary<string, PurposeOptions> _purposes = new(StringComparer.Ordinal);
+    private int _challengeRetentionHours = 24;
+
+    /// <summary>
+    /// Whether the background retention purge (<see cref="Internal.ChallengePurgeService"/>) runs at
+    /// all. Defaults to <see langword="true"/> — this schema is new, so there is no pre-existing history
+    /// enabling it could destroy, unlike an outbox where flipping this on for an existing deployment
+    /// would delete accumulated rows on the first run.
+    /// </summary>
+    public bool PurgeEnabled { get; set; } = true;
+
+    /// <summary>
+    /// How long a challenge row survives after it is no longer live (consumed or expired) before the
+    /// purge hard-deletes it. Defaults to 24 hours. Applies only to the <c>challenges</c> table —
+    /// <c>challenge_rate_windows</c> rows are purged on their own elapsed-window rule regardless of this
+    /// setting: a window must outlive the challenges it counted, or purging it early hands an attacker a
+    /// free reset of the per-key ceiling that bounds the SMS bill. See
+    /// <see cref="IChallengeDialect.PurgeExpiredSql"/> and <see cref="IChallengeDialect.PurgeElapsedWindowsSql"/>.
+    /// </summary>
+    /// <exception cref="ArgumentOutOfRangeException">Assigned a value that is zero or negative.</exception>
+    public int ChallengeRetentionHours
+    {
+        get => _challengeRetentionHours;
+        set
+        {
+            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(value);
+            _challengeRetentionHours = value;
+        }
+    }
+
+    /// <summary>
+    /// The widest rate-limit window configured across every purpose registered so far — the longer of
+    /// each purpose's <see cref="PurposeOptions.PerScopeWindow"/> and <see cref="PurposeOptions.PerKeyWindow"/>
+    /// durations. <see cref="Internal.ChallengePurgeService"/> uses this to compute how long a
+    /// <c>challenge_rate_windows</c> row must survive: a fixed retention shorter than the widest
+    /// configured window would purge a counter a still-active window depends on, silently resetting the
+    /// cost ceiling the two-table split exists to protect (see <see cref="IChallengeDialect.PurgeElapsedWindowsSql"/>).
+    /// Returns <see cref="TimeSpan.Zero"/> if no purpose has been configured yet, which the caller treats
+    /// as "nothing to purge" rather than "purge everything".
+    /// </summary>
+    internal TimeSpan WidestConfiguredWindow()
+    {
+        var widest = TimeSpan.Zero;
+        foreach (var purpose in _purposes.Values)
+        {
+            if (purpose.PerScopeWindow.Window > widest)
+            {
+                widest = purpose.PerScopeWindow.Window;
+            }
+
+            if (purpose.PerKeyWindow.Window > widest)
+            {
+                widest = purpose.PerKeyWindow.Window;
+            }
+        }
+
+        return widest;
+    }
 
     /// <summary>
     /// Configures (or reconfigures) a purpose. Validation is eager: an invalid value throws from the
@@ -158,11 +215,12 @@ public sealed class ChallengeOptions
     }
 
     /// <summary>
-    /// Validates the options. A no-op today: every <see cref="PurposeOptions"/> tunable already
-    /// validates eagerly from its own property setter (see the type's remarks), so there is nothing
-    /// left to check at the top level. Called from <c>AddThemiaChallenges</c> regardless, matching
-    /// every other Themia options type's registration flow, and as the seam a future
-    /// package-level invariant (e.g. "at least one purpose configured") would hang off.
+    /// Validates the options. A no-op today: every tunable, on this type and on
+    /// <see cref="PurposeOptions"/>, already validates eagerly from its own property setter (see the
+    /// type's remarks), so there is nothing left to check at the top level. Called from
+    /// <c>AddThemiaChallenges</c> regardless, matching every other Themia options type's registration
+    /// flow, and as the seam a future package-level invariant (e.g. "at least one purpose configured")
+    /// would hang off.
     /// </summary>
     public void Validate()
     {

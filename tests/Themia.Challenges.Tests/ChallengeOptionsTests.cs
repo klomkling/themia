@@ -54,4 +54,50 @@ public class ChallengeOptionsTests
         Assert.ThrowsAny<ArgumentException>(() =>
             options.ConfigurePurpose("login", p => p.PerKeyWindow = (Limit: 0, Window: TimeSpan.FromMinutes(15))));
     }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void ChallengeRetentionHours_ShouldThrow_WhenNotPositive(int value)
+    {
+        var options = new ChallengeOptions();
+
+        Assert.ThrowsAny<ArgumentException>(() => options.ChallengeRetentionHours = value);
+    }
+
+    [Fact]
+    public void PurgeEnabled_ShouldDefaultToTrue()
+    {
+        Assert.True(new ChallengeOptions().PurgeEnabled);
+    }
+
+    [Fact]
+    public void ChallengeRetentionHours_ShouldDefaultTo24()
+    {
+        Assert.Equal(24, new ChallengeOptions().ChallengeRetentionHours);
+    }
+
+    [Fact]
+    public void WidestConfiguredWindow_ShouldReturnZero_WhenNoPurposeIsConfigured()
+    {
+        Assert.Equal(TimeSpan.Zero, new ChallengeOptions().WidestConfiguredWindow());
+    }
+
+    [Fact]
+    public void WidestConfiguredWindow_ShouldReturnTheLongestWindow_AcrossEveryPurposeAndBothLayers()
+    {
+        var options = new ChallengeOptions();
+        options.ConfigurePurpose("login", p =>
+        {
+            p.PerScopeWindow = (3, TimeSpan.FromMinutes(15));
+            p.PerKeyWindow = (20, TimeSpan.FromHours(1));
+        });
+        options.ConfigurePurpose("reset", p =>
+        {
+            p.PerScopeWindow = (3, TimeSpan.FromHours(6)); // the longest window in the whole configuration
+            p.PerKeyWindow = (20, TimeSpan.FromHours(1));
+        });
+
+        Assert.Equal(TimeSpan.FromHours(6), options.WidestConfiguredWindow());
+    }
 }

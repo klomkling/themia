@@ -27,6 +27,34 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+### Added
+- **`Themia.Challenges`** (+ `.PostgreSql` / `.MySql` / `.SqlServer`) — the one-time challenge core:
+  issues a secret bound to an opaque key, verifies it exactly once, and enforces TTL, an attempt cap,
+  and two layers of rate limiting. Serves phone OTP, email OTP, magic links, email verification, and
+  password reset. `IChallengeService.IssueAsync` / `VerifyAsync` / `VerifyByTokenAsync` / `RefundAsync`
+  over a per-engine `IChallengeDialect` (coord #0056), plus a background `ChallengePurgeService` that
+  purges expired `challenges` rows (`ChallengeOptions.ChallengeRetentionHours`, default 24) and elapsed
+  `challenge_rate_windows` rows on their own — longer — elapsed-window rule, never on the same setting;
+  `ChallengeOptions.PurgeEnabled` (default `true`) turns the whole thing off. Needs **no Themia data
+  peer** — each engine package opens its own connection — so it is adoptable by a consumer running none
+  of `Themia.Framework.Data.*`.
+
+  Three behaviours an adopter needs to know before wiring this up:
+  - **Re-issuing a challenge invalidates the outstanding one by default** (`PurposeOptions.MaxLiveChallenges
+    = 1`). Without the UI saying so, this reproduces the classic support ticket: a user taps "resend", the
+    *first* SMS arrives after the second was issued, and the code in that first message no longer
+    verifies — it was silently superseded, not delayed.
+  - **The per-key rate limit (`PurposeOptions.PerKeyWindow`) is an account-lockout vector, not a security
+    control.** Anyone who knows a phone number or email address can issue against it until the ceiling
+    trips, locking out the real owner; `MaxAttempts` is what actually stops brute force. Set
+    `PerKeyWindow` to bound delivery *cost*, not to "be safe", and call `IChallengeService.RefundAsync`
+    when a send is known to have failed so a bounced or undeliverable message never burns the victim's
+    quota.
+  - **`AddThemiaChallenges(...)` alone does not work.** Registering the core without also calling exactly
+    one of `AddThemiaChallengesPostgres` / `AddThemiaChallengesMySql` / `AddThemiaChallengesSqlServer`
+    throws, by name, the first time `IChallengeService` is resolved — deliberately, rather than falling
+    back to a silent in-memory store that would pass every test and lose every challenge on restart.
+
 ### Fixed
 - **(breaking) `Themia.Notifications`** — `LoggerEmailSender` and `LoggerSmsSender` reported
   `NotificationResult.Success()` having sent nothing, and `AddThemiaNotifications()` registers them via
