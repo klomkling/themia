@@ -85,8 +85,13 @@ public sealed class ChallengePurgeServiceTests : IDisposable
         InsertWindow(stillWithinWindow, now.AddMinutes(-30)); // well within the cutoff: not yet elapsed
         InsertWindow(fullyElapsed, now.AddDays(-2)); // long past the cutoff: elapsed
 
-        var options = new ChallengeOptions { ChallengeRetentionHours = 1 }; // deliberately shorter than the window cutoff
-        options.ConfigurePurpose("login", p => p.PerKeyWindow = (20, TimeSpan.FromHours(1))); // widest window = 1h; cutoff = now - 1h - 1h margin = now - 2h
+        // widest window = the store's 1h per-key window; cutoff = now - 1h - 1h margin = now - 2h
+        var options = new ChallengeOptions
+        {
+            ChallengeRetentionHours = 1, // deliberately shorter than the window cutoff
+            PerKeyWindow = (20, TimeSpan.FromHours(1)),
+        };
+        options.ConfigurePurpose("login", p => p.PerScopeWindow = (3, TimeSpan.FromMinutes(15)));
 
         var dialect = new RecordingChallengeDialect(connString);
         var service = new ChallengePurgeService(options, new FakeTimeProvider(now), NullLogger<ChallengePurgeService>.Instance, dialect);
@@ -213,7 +218,6 @@ public sealed class ChallengePurgeServiceTests : IDisposable
         public string InvalidateLiveForScopeSql => inner.InvalidateLiveForScopeSql;
         public string PurgeExpiredSql => inner.PurgeExpiredSql;
         public string IncrementWindowSql => inner.IncrementWindowSql;
-        public string SelectWindowCountsSql => inner.SelectWindowCountsSql;
         public string DecrementWindowSql => inner.DecrementWindowSql;
         public string PurgeElapsedWindowsSql => inner.PurgeElapsedWindowsSql;
     }

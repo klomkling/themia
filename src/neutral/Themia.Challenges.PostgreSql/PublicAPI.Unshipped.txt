@@ -14,5 +14,4 @@ Themia.Challenges.PostgreSql.PostgresChallengeDialect.RecordAttemptSql.get -> st
 Themia.Challenges.PostgreSql.PostgresChallengeDialect.SelectLiveByScopeSql.get -> string!
 Themia.Challenges.PostgreSql.PostgresChallengeDialect.SelectLiveByTokenHashSql.get -> string!
 Themia.Challenges.PostgreSql.PostgresChallengeDialect.SelectMostRecentByScopeSql.get -> string!
-Themia.Challenges.PostgreSql.PostgresChallengeDialect.SelectWindowCountsSql.get -> string!
 Themia.Challenges.PostgreSql.ServiceCollectionExtensions

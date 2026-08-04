@@ -134,6 +134,43 @@ public abstract class ConcurrencyTests
         Assert.Equal(ConcurrencyLevel, keyCeilingCount);
     }
 
+    /// <summary>
+    /// The invariant <see cref="ConcurrentIssues_ForTheSameKey_ShouldNotLoseACount"/> does <b>not</b>
+    /// establish, and the one the per-key ceiling actually exists for: with the ceiling set well below
+    /// <see cref="ConcurrencyLevel"/>, no more than that many concurrent callers may be issued a secret.
+    /// <para>
+    /// Counting correctly and limiting correctly are different properties, and only the second bounds an
+    /// SMS bill. An implementation that reads the count, compares it to the limit, and only then
+    /// increments satisfies the counter assertion perfectly — every increment lands — while letting all
+    /// <see cref="ConcurrencyLevel"/> callers through, because each of them read the same pre-increment
+    /// value before any of them wrote. That was the shipped behaviour until the increment was made to
+    /// return the post-increment count (see <c>IChallengeDialect.IncrementWindowSql</c>); this test is
+    /// what fails if it is ever reverted, on the engine that actually arbitrates the race.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public async Task ConcurrentIssues_ForTheSameKey_ShouldNotExceedThePerKeyCeiling()
+    {
+        var scope = new ChallengeScope(UniqueKey(), ChallengeEngineFixture.TightPurpose, UniqueTenant());
+        var service = fixture.CreateServiceWithTightKeyCeiling();
+
+        var results = await Task.WhenAll(Enumerable.Range(0, ConcurrencyLevel)
+            .Select(_ => service.IssueAsync(scope)));
+
+        var issued = results.Count(r => r.Outcome == ChallengeIssueOutcome.Issued);
+
+        Assert.True(
+            issued <= ChallengeEngineFixture.TightPerKeyLimit,
+            $"per-key ceiling is {ChallengeEngineFixture.TightPerKeyLimit} but {issued} of {ConcurrencyLevel} concurrent callers were issued a secret");
+        Assert.All(
+            results.Where(r => r.Outcome != ChallengeIssueOutcome.Issued),
+            r => Assert.Equal(ChallengeIssueOutcome.RateLimited, r.Outcome));
+
+        // Not merely "at most": the ceiling must still be reachable. A limiter that refuses everyone
+        // under contention also passes the assertion above while being useless.
+        Assert.True(issued > 0, "every concurrent caller was refused; the ceiling is unreachable, not enforced");
+    }
+
     /// <summary>A fresh, collision-free scope key — see <see cref="ChallengeStoreTests.UniqueKey"/>.</summary>
     protected static string UniqueKey() => $"key-{Guid.NewGuid():N}";
 

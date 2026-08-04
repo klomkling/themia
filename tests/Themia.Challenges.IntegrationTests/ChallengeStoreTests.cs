@@ -87,20 +87,21 @@ public abstract class ChallengeStoreTests
         var key = UniqueKey();
         var scopeA = new ChallengeScope(key, ChallengeEngineFixture.TightPurpose, UniqueTenant());
         var scopeB = scopeA with { TenantId = UniqueTenant() };
+        var service = fixture.CreateServiceWithTightKeyCeiling();
 
         for (var i = 0; i < ChallengeEngineFixture.TightPerKeyLimit; i++)
         {
-            var result = await fixture.Service.IssueAsync(scopeA);
+            var result = await service.IssueAsync(scopeA);
             Assert.Equal(ChallengeIssueOutcome.Issued, result.Outcome);
         }
 
-        var exhausted = await fixture.Service.IssueAsync(scopeA);
+        var exhausted = await service.IssueAsync(scopeA);
         Assert.Equal(ChallengeIssueOutcome.RateLimited, exhausted.Outcome);
 
         // Tenant B shares the exact same physical key but is a different tenant — its per-key ceiling
         // is a separate bucket (tenant_id is part of the composite key on both tables), so it must be
         // unaffected by tenant A having just exhausted theirs.
-        var tenantBResult = await fixture.Service.IssueAsync(scopeB);
+        var tenantBResult = await service.IssueAsync(scopeB);
         Assert.Equal(ChallengeIssueOutcome.Issued, tenantBResult.Outcome);
     }
 

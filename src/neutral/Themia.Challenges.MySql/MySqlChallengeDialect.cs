@@ -49,7 +49,20 @@ public sealed class MySqlChallengeDialect : IChallengeDialect
     /// <see cref="DeadlockRetryingConnection"/>'s retry activity through <paramref name="loggerFactory"/>.</summary>
     public MySqlChallengeDialect(string connectionString, ILoggerFactory loggerFactory)
     {
-        this.connectionString = connectionString;
+        ArgumentException.ThrowIfNullOrWhiteSpace(connectionString);
+        ArgumentNullException.ThrowIfNull(loggerFactory);
+
+        // AllowUserVariables is forced on rather than required of the caller: IncrementWindowSql needs
+        // a session variable to read back the count it just wrote (MySQL has no RETURNING on UPDATE),
+        // and MySqlConnector otherwise parses `@n` as an undefined command parameter and throws. An
+        // adopter who supplies a plain connection string would hit that at the first issuance, at
+        // runtime, on every engine-specific path — a failure mode with no good diagnostic. Overriding
+        // it here is safe: the flag only widens what the parser accepts, and every statement in this
+        // dialect is a parameterised constant, so no user input ever reaches SQL text.
+        this.connectionString = new MySqlConnectionStringBuilder(connectionString)
+        {
+            AllowUserVariables = true,
+        }.ConnectionString;
         logger = loggerFactory.CreateLogger<DeadlockRetryingConnection>();
     }
 
@@ -164,21 +177,28 @@ public sealed class MySqlChallengeDialect : IChallengeDialect
     /// other's collision is absorbed by <c>ON DUPLICATE KEY UPDATE id = id</c>) and then serialize again
     /// on the row lock during <c>UPDATE</c> (each sees the previous caller's committed count and adds 1),
     /// so no increment is ever lost and a new bucket always lands on 1, an existing one on n+1.
+    /// <para>
+    /// <b>Reading the new count back.</b> MySQL has no <c>RETURNING</c> on <c>UPDATE</c>, so the
+    /// post-increment value is captured into a session variable inside the <c>SET</c> expression and
+    /// selected afterwards — the assignment happens within the same statement that holds the row lock,
+    /// which is what makes the returned value the caller's own increment rather than a re-read that a
+    /// concurrent caller could have moved (see <see cref="IChallengeDialect.IncrementWindowSql"/> for
+    /// why a plain follow-up <c>SELECT</c> would be wrong). The variable is cleared first because
+    /// connections are pooled: without the reset, an <c>UPDATE</c> that matched no row would leave a
+    /// previous call's value visible and the caller would act on a count that is not its own.
+    /// <c>AllowUserVariables</c> is forced on in the constructor so MySqlConnector passes
+    /// <c>@themia_window_count</c> through instead of demanding a command parameter for it.
+    /// </para>
     /// </remarks>
     public string IncrementWindowSql => """
+        SET @themia_window_count = NULL;
         INSERT INTO challenge_rate_windows (id, tenant_id, `key`, purpose, window_start, count)
         VALUES (@Id, @TenantId, @Key, @Purpose, @WindowStart, 0)
         ON DUPLICATE KEY UPDATE id = id;
-        UPDATE challenge_rate_windows SET count = count + 1
+        UPDATE challenge_rate_windows SET count = (@themia_window_count := count + 1)
         WHERE tenant_id <=> @TenantId AND `key` = @Key AND purpose <=> @Purpose
           AND window_start = @WindowStart;
-        """;
-
-    /// <inheritdoc />
-    public string SelectWindowCountsSql => """
-        SELECT purpose, count FROM challenge_rate_windows
-        WHERE tenant_id <=> @TenantId AND `key` = @Key
-          AND ((purpose = @Purpose AND window_start = @ScopeWindowStart) OR (purpose IS NULL AND window_start = @KeyWindowStart));
+        SELECT @themia_window_count AS count;
         """;
 
     /// <inheritdoc />

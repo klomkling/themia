@@ -132,8 +132,10 @@ public class ChallengeOptionsTests
     {
         var options = new ChallengeOptions();
 
+        // PerKeyWindow is store-wide, not per purpose — a ceiling across purposes cannot have a
+        // per-purpose window without fragmenting into one bucket per purpose. See the design spec.
         Assert.ThrowsAny<ArgumentException>(() =>
-            options.ConfigurePurpose("login", p => p.PerKeyWindow = (Limit: 0, Window: TimeSpan.FromMinutes(15))));
+            options.PerKeyWindow = (Limit: 0, Window: TimeSpan.FromMinutes(15)));
     }
 }
 ```

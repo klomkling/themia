@@ -20,6 +20,17 @@ public enum ChallengeIssueOutcome
 /// and <see cref="NotFound"/> rather than collapsing them into one failure, because callers such as an
 /// audit log or a "resend" prompt behave differently for each: an expired code invites a resend, a
 /// consumed one signals replay, and a not-found one may mean the key was never challenged at all.
+/// <para>
+/// <b>Do not map these outcomes to distinguishable responses on an unauthenticated endpoint.</b> The
+/// distinction that makes this enum useful internally is also an account-enumeration oracle when it
+/// reaches an anonymous caller: <see cref="Consumed"/> or <see cref="Expired"/> means a challenge was
+/// once issued for that key and <see cref="NotFound"/> means none ever was, so an attacker submitting
+/// any wrong code to a login or password-reset endpoint learns whether the phone number or email
+/// address is registered — without ever needing a valid code. Branch on these values for logging,
+/// metrics, and internal flow control; return one indistinguishable failure (same status, same body,
+/// same timing) to the caller. An authenticated endpoint, where the caller already owns the key, has
+/// nothing to leak and may surface the difference.
+/// </para>
 /// </summary>
 public enum ChallengeVerifyOutcome
 {
@@ -46,11 +57,12 @@ public enum ChallengeVerifyOutcome
 /// <summary>The result of issuing a challenge.</summary>
 public sealed class ChallengeIssueResult
 {
-    private ChallengeIssueResult(ChallengeIssueOutcome outcome, string? secret, DateTimeOffset? expiresAt)
+    private ChallengeIssueResult(ChallengeIssueOutcome outcome, string? secret, DateTimeOffset? expiresAt, DateTimeOffset? issuedAt)
     {
         Outcome = outcome;
         Secret = secret;
         ExpiresAt = expiresAt;
+        IssuedAt = issuedAt;
     }
 
     /// <summary>How the issue attempt ended. Switch over this rather than reading <see cref="Succeeded"/>
@@ -69,23 +81,35 @@ public sealed class ChallengeIssueResult
     /// <see cref="ChallengeIssueOutcome.Issued"/>; otherwise <see langword="null"/>.</summary>
     public DateTimeOffset? ExpiresAt { get; }
 
+    /// <summary>
+    /// When the secret was issued, when <see cref="Outcome"/> is <see cref="ChallengeIssueOutcome.Issued"/>;
+    /// otherwise <see langword="null"/>. Pass this to <see cref="IChallengeService.RefundAsync"/> if the
+    /// delivery of this secret turns out to have failed — the rate-limit counters are fixed-width
+    /// buckets keyed by window start, so only the issuance time identifies the buckets that were
+    /// charged. Deriving it from <see cref="ExpiresAt"/> minus the configured TTL would break the
+    /// moment a purpose's TTL is reconfigured between issue and refund, which is why it is carried
+    /// explicitly.
+    /// </summary>
+    public DateTimeOffset? IssuedAt { get; }
+
     /// <summary>Whether a secret was issued.</summary>
     public bool Succeeded => Outcome == ChallengeIssueOutcome.Issued;
 
     /// <summary>Creates an <see cref="ChallengeIssueOutcome.Issued"/> result.</summary>
     /// <param name="secret">The plaintext secret handed to the caller for delivery.</param>
     /// <param name="expiresAt">When the secret expires.</param>
+    /// <param name="issuedAt">When the secret was issued — the value <see cref="IChallengeService.RefundAsync"/> needs.</param>
     /// <returns>An issued result carrying the plaintext secret.</returns>
     /// <exception cref="ArgumentException"><paramref name="secret"/> is null or empty.</exception>
-    public static ChallengeIssueResult Issued(string secret, DateTimeOffset expiresAt)
+    public static ChallengeIssueResult Issued(string secret, DateTimeOffset expiresAt, DateTimeOffset issuedAt)
     {
         ArgumentException.ThrowIfNullOrEmpty(secret);
-        return new ChallengeIssueResult(ChallengeIssueOutcome.Issued, secret, expiresAt);
+        return new ChallengeIssueResult(ChallengeIssueOutcome.Issued, secret, expiresAt, issuedAt);
     }
 
     /// <summary>Creates a <see cref="ChallengeIssueOutcome.RateLimited"/> result.</summary>
     /// <returns>A rate-limited result. No secret is generated.</returns>
-    public static ChallengeIssueResult RateLimited() => new(ChallengeIssueOutcome.RateLimited, null, null);
+    public static ChallengeIssueResult RateLimited() => new(ChallengeIssueOutcome.RateLimited, null, null, null);
 }
 
 /// <summary>The result of verifying a challenge.</summary>

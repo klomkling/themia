@@ -92,9 +92,6 @@ internal sealed class RaceGatingChallengeDialect : IChallengeDialect
     public string IncrementWindowSql => inner.IncrementWindowSql;
 
     /// <inheritdoc />
-    public string SelectWindowCountsSql => inner.SelectWindowCountsSql;
-
-    /// <inheritdoc />
     public string DecrementWindowSql => inner.DecrementWindowSql;
 
     /// <inheritdoc />

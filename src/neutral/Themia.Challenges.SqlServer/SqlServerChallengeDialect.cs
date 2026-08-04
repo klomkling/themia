@@ -145,6 +145,13 @@ public sealed class SqlServerChallengeDialect : IChallengeDialect
     /// always lands on 1, an existing one on n+1, two concurrent callers on 2 — never both on 1.
     /// </para>
     /// <para>
+    /// <b>Reading the new count back</b> uses <c>OUTPUT INSERTED.count</c> on the <c>UPDATE</c> — the
+    /// post-image, emitted by the statement that holds the row lock, which is what the contract on
+    /// <see cref="IChallengeDialect.IncrementWindowSql"/> requires and what makes the limit enforceable
+    /// rather than merely counted. Nothing earlier in the batch produces a result set, so it is the
+    /// caller's single scalar.
+    /// </para>
+    /// <para>
     /// <b>This is the only one of the three dialects whose upsert can raise for the benign
     /// collision.</b> PostgreSQL's <c>ON CONFLICT DO NOTHING</c> and MySQL's
     /// <c>ON DUPLICATE KEY UPDATE id = id</c> both suppress the duplicate at the engine level — no
@@ -214,16 +221,10 @@ public sealed class SqlServerChallengeDialect : IChallengeDialect
         END CATCH
         IF @xactAbortWasOn = 1 SET XACT_ABORT ON;
         UPDATE challenge_rate_windows SET count = count + 1
+        OUTPUT INSERTED.count
         WHERE (tenant_id = @TenantId OR (tenant_id IS NULL AND @TenantId IS NULL)) AND [key] = @Key
           AND (purpose = @Purpose OR (purpose IS NULL AND @Purpose IS NULL))
           AND window_start = @WindowStart;
-        """;
-
-    /// <inheritdoc />
-    public string SelectWindowCountsSql => """
-        SELECT purpose, count FROM challenge_rate_windows
-        WHERE (tenant_id = @TenantId OR (tenant_id IS NULL AND @TenantId IS NULL)) AND [key] = @Key
-          AND ((purpose = @Purpose AND window_start = @ScopeWindowStart) OR (purpose IS NULL AND window_start = @KeyWindowStart));
         """;
 
     /// <inheritdoc />

@@ -130,13 +130,8 @@ internal sealed class SqliteChallengeDialect : IChallengeDialect
         INSERT INTO challenge_rate_windows (id, tenant_id, key, purpose, window_start, count)
         VALUES (@Id, @TenantId, @Key, @Purpose, @WindowStart, 1)
         ON CONFLICT (COALESCE(tenant_id, ''), key, COALESCE(purpose, ''), window_start)
-        DO UPDATE SET count = count + 1;
-        """;
-
-    public string SelectWindowCountsSql => """
-        SELECT purpose, count FROM challenge_rate_windows
-        WHERE tenant_id IS @TenantId AND key = @Key
-          AND ((purpose = @Purpose AND window_start = @ScopeWindowStart) OR (purpose IS NULL AND window_start = @KeyWindowStart));
+        DO UPDATE SET count = count + 1
+        RETURNING count;
         """;
 
     public string DecrementWindowSql => """

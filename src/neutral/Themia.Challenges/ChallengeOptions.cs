@@ -2,10 +2,14 @@ namespace Themia.Challenges;
 
 /// <summary>
 /// Per-purpose tuning: the secret's shape, how long it lives, how many wrong guesses it tolerates,
-/// how many can be outstanding at once, and the two rate-limit windows. Every setter validates
+/// how many can be outstanding at once, and the per-scope rate-limit window. Every setter validates
 /// eagerly — an invalid value throws from the assignment itself, inside the <c>configure</c> callback
 /// passed to <see cref="ChallengeOptions.ConfigurePurpose"/>, rather than surfacing later from some
 /// separate validation sweep. That keeps the failure at the call site that caused it.
+/// <para>
+/// The per-key ceiling is deliberately <em>not</em> here: it spans every purpose, so it lives on
+/// <see cref="ChallengeOptions.PerKeyWindow"/>. See that property for why.
+/// </para>
 /// </summary>
 public sealed class PurposeOptions
 {
@@ -14,7 +18,6 @@ public sealed class PurposeOptions
     private int _maxAttempts = 5;
     private int _maxLiveChallenges = 1;
     private (int Limit, TimeSpan Window) _perScopeWindow = (3, TimeSpan.FromMinutes(15));
-    private (int Limit, TimeSpan Window) _perKeyWindow = (20, TimeSpan.FromHours(1));
 
     /// <summary>The shape of the secret this purpose issues. Defaults to a 6-digit numeric code.</summary>
     /// <exception cref="ArgumentNullException">Assigned <see langword="null"/>.</exception>
@@ -70,7 +73,7 @@ public sealed class PurposeOptions
     /// <summary>
     /// The rate limit on issuance for one scope (key + purpose + tenant): at most <c>Limit</c> secrets
     /// may be issued within <c>Window</c>. Defaults to 3 per 15 minutes. Narrower than
-    /// <see cref="PerKeyWindow"/>, which caps the same key across every purpose.
+    /// <see cref="ChallengeOptions.PerKeyWindow"/>, which caps the same key across every purpose.
     /// </summary>
     /// <exception cref="ArgumentOutOfRangeException"><c>Limit</c> or <c>Window</c> is zero or negative.</exception>
     public (int Limit, TimeSpan Window) PerScopeWindow
@@ -79,30 +82,7 @@ public sealed class PurposeOptions
         set => _perScopeWindow = ValidateWindow(value);
     }
 
-    /// <summary>
-    /// The rate limit on issuance for one key across all purposes: at most <c>Limit</c> secrets may be
-    /// issued to the same key within <c>Window</c>, regardless of purpose. Defaults to 20 per hour.
-    /// Wider than <see cref="PerScopeWindow"/> — it exists to cap an attacker cycling through purposes
-    /// against the same phone number or email address.
-    /// <para>
-    /// This is a cost ceiling, not a brute-force defense — <see cref="MaxAttempts"/> already stops
-    /// brute force on a single issued secret. Keep this limit far above what a real user ever reaches:
-    /// a real user asks once or twice, so even 10 already gives an attacker who merely knows the
-    /// victim's phone number or email a cheap way to burn the ceiling and lock that person out of
-    /// issuance until the window elapses. Widening it (currently 20) costs nothing against that
-    /// attack — the attempt cap is what actually protects the secret — but a low value converts "an
-    /// attacker knows your phone number" into "you can't receive an OTP for an hour". Do not lower
-    /// this "to be safe"; it does not make brute force harder and it does make lockout easier.
-    /// </para>
-    /// </summary>
-    /// <exception cref="ArgumentOutOfRangeException"><c>Limit</c> or <c>Window</c> is zero or negative.</exception>
-    public (int Limit, TimeSpan Window) PerKeyWindow
-    {
-        get => _perKeyWindow;
-        set => _perKeyWindow = ValidateWindow(value);
-    }
-
-    private static (int Limit, TimeSpan Window) ValidateWindow((int Limit, TimeSpan Window) value)
+    internal static (int Limit, TimeSpan Window) ValidateWindow((int Limit, TimeSpan Window) value)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(value.Limit);
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(value.Window, TimeSpan.Zero);
@@ -119,6 +99,38 @@ public sealed class ChallengeOptions
 {
     private readonly Dictionary<string, PurposeOptions> _purposes = new(StringComparer.Ordinal);
     private int _challengeRetentionHours = 24;
+    private (int Limit, TimeSpan Window) _perKeyWindow = (20, TimeSpan.FromHours(1));
+
+    /// <summary>
+    /// The rate limit on issuance for one key across all purposes: at most <c>Limit</c> secrets may be
+    /// issued to the same key within <c>Window</c>, regardless of purpose. Defaults to 20 per hour.
+    /// Wider than <see cref="PurposeOptions.PerScopeWindow"/> — it exists to cap an attacker cycling
+    /// through purposes against the same phone number or email address.
+    /// <para>
+    /// This lives on the store, not on <see cref="PurposeOptions"/>, because it is a ceiling
+    /// <em>across</em> purposes and therefore cannot have a per-purpose window. Counters are bucketed by
+    /// window start, so a per-purpose window would floor the same key's counter to a different bucket
+    /// per purpose: an attacker cycling through purposes configured with different window durations
+    /// would get a fresh ceiling for each, which is exactly the attack this limit exists to stop. One
+    /// window for the whole store makes that unrepresentable rather than merely discouraged.
+    /// </para>
+    /// <para>
+    /// This is a cost ceiling, not a brute-force defense — <see cref="PurposeOptions.MaxAttempts"/>
+    /// already stops brute force on a single issued secret. Keep this limit far above what a real user
+    /// ever reaches: a real user asks once or twice, so even 10 already gives an attacker who merely
+    /// knows the victim's phone number or email a cheap way to burn the ceiling and lock that person
+    /// out of issuance until the window elapses. Widening it (currently 20) costs nothing against that
+    /// attack — the attempt cap is what actually protects the secret — but a low value converts "an
+    /// attacker knows your phone number" into "you can't receive an OTP for an hour". Do not lower
+    /// this "to be safe"; it does not make brute force harder and it does make lockout easier.
+    /// </para>
+    /// </summary>
+    /// <exception cref="ArgumentOutOfRangeException"><c>Limit</c> or <c>Window</c> is zero or negative.</exception>
+    public (int Limit, TimeSpan Window) PerKeyWindow
+    {
+        get => _perKeyWindow;
+        set => _perKeyWindow = PurposeOptions.ValidateWindow(value);
+    }
 
     /// <summary>
     /// Whether the background retention purge (<see cref="Internal.ChallengePurgeService"/>) runs at
@@ -148,9 +160,9 @@ public sealed class ChallengeOptions
     }
 
     /// <summary>
-    /// The widest rate-limit window configured across every purpose registered so far — the longer of
-    /// each purpose's <see cref="PurposeOptions.PerScopeWindow"/> and <see cref="PurposeOptions.PerKeyWindow"/>
-    /// durations. <see cref="Internal.ChallengePurgeService"/> uses this to compute how long a
+    /// The widest rate-limit window in play — the longest of <see cref="PerKeyWindow"/> and every
+    /// registered purpose's <see cref="PurposeOptions.PerScopeWindow"/>
+    /// duration. <see cref="Internal.ChallengePurgeService"/> uses this to compute how long a
     /// <c>challenge_rate_windows</c> row must survive: a fixed retention shorter than the widest
     /// configured window would purge a counter a still-active window depends on, silently resetting the
     /// cost ceiling the two-table split exists to protect (see <see cref="IChallengeDialect.PurgeElapsedWindowsSql"/>).
@@ -159,17 +171,17 @@ public sealed class ChallengeOptions
     /// </summary>
     internal TimeSpan WidestConfiguredWindow()
     {
-        var widest = TimeSpan.Zero;
+        if (_purposes.Count == 0)
+        {
+            return TimeSpan.Zero;
+        }
+
+        var widest = PerKeyWindow.Window;
         foreach (var purpose in _purposes.Values)
         {
             if (purpose.PerScopeWindow.Window > widest)
             {
                 widest = purpose.PerScopeWindow.Window;
-            }
-
-            if (purpose.PerKeyWindow.Window > widest)
-            {
-                widest = purpose.PerKeyWindow.Window;
             }
         }
 

@@ -1,12 +1,14 @@
 using Dapper;
 
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
 
 using Testcontainers.MsSql;
 using Testcontainers.MySql;
 using Testcontainers.PostgreSql;
 
 using Themia.Challenges.DependencyInjection;
+using Themia.Challenges.Internal;
 using Themia.Challenges.MySql;
 using Themia.Challenges.PostgreSql;
 using Themia.Challenges.SqlServer;
@@ -41,11 +43,13 @@ public abstract class ChallengeEngineFixture : IAsyncLifetime
     /// <c>ConcurrencyTests</c> all succeed — the point of that test is the counter, not the gate.</summary>
     public const string ConcurrencyPurpose = "concurrency-issue";
 
-    /// <summary>A deliberately tight <see cref="PurposeOptions.PerKeyWindow"/> so
-    /// <c>RetentionTests</c> and the cross-tenant rate-limit test can exhaust it in a handful of calls.</summary>
+    /// <summary>The purpose <c>RetentionTests</c> and the cross-tenant rate-limit test issue against
+    /// while exhausting a tight per-key ceiling. The ceiling itself is store-wide (see
+    /// <see cref="ChallengeOptions.PerKeyWindow"/>), so those tests run against
+    /// <see cref="CreateServiceWithTightKeyCeiling"/> rather than the shared <see cref="Service"/>.</summary>
     public const string TightPurpose = "tight-key-ceiling";
 
-    /// <summary><see cref="TightPurpose"/>'s <see cref="PurposeOptions.PerKeyWindow"/> ceiling.</summary>
+    /// <summary>The per-key ceiling <see cref="CreateServiceWithTightKeyCeiling"/> configures.</summary>
     public const int TightPerKeyLimit = 3;
 
     private ServiceProvider provider = null!;
@@ -126,25 +130,29 @@ public abstract class ChallengeEngineFixture : IAsyncLifetime
         await StopContainerAsync();
     }
 
+    /// <summary>
+    /// A <see cref="IChallengeService"/> over this fixture's live <see cref="Dialect"/> whose per-key
+    /// ceiling is <see cref="TightPerKeyLimit"/> instead of the shared service's deliberately generous
+    /// one. A separate instance is needed rather than a "tight purpose" because the per-key ceiling is
+    /// store-wide by design (<see cref="ChallengeOptions.PerKeyWindow"/>) — a per-purpose ceiling would
+    /// bucket the same key differently per purpose and stop being a ceiling at all.
+    /// </summary>
+    public IChallengeService CreateServiceWithTightKeyCeiling()
+    {
+        var tight = new ChallengeOptions();
+        ConfigurePurposes(tight);
+        tight.PerKeyWindow = (TightPerKeyLimit, TimeSpan.FromHours(1));
+        return new ChallengeService(Dialect, tight, TimeProvider, NullLogger<ChallengeService>.Instance);
+    }
+
     private static void ConfigurePurposes(ChallengeOptions options)
     {
-        options.ConfigurePurpose(GenericPurpose, p =>
-        {
-            p.PerScopeWindow = (1_000, TimeSpan.FromMinutes(15));
-            p.PerKeyWindow = (1_000, TimeSpan.FromHours(1));
-        });
-
-        options.ConfigurePurpose(ConcurrencyPurpose, p =>
-        {
-            p.PerScopeWindow = (1_000, TimeSpan.FromMinutes(15));
-            p.PerKeyWindow = (1_000, TimeSpan.FromHours(1));
-        });
-
-        options.ConfigurePurpose(TightPurpose, p =>
-        {
-            p.PerScopeWindow = (1_000, TimeSpan.FromMinutes(15));
-            p.PerKeyWindow = (TightPerKeyLimit, TimeSpan.FromHours(1));
-        });
+        // Generous by default: every test but the two that deliberately exhaust a ceiling issues a
+        // handful — or, in ConcurrencyTests, 64 — challenges and must never be refused by a limit.
+        options.PerKeyWindow = (1_000, TimeSpan.FromHours(1));
+        options.ConfigurePurpose(GenericPurpose, p => p.PerScopeWindow = (1_000, TimeSpan.FromMinutes(15)));
+        options.ConfigurePurpose(ConcurrencyPurpose, p => p.PerScopeWindow = (1_000, TimeSpan.FromMinutes(15)));
+        options.ConfigurePurpose(TightPurpose, p => p.PerScopeWindow = (1_000, TimeSpan.FromMinutes(15)));
     }
 }
 

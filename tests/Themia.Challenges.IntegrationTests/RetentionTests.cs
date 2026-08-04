@@ -33,14 +33,15 @@ public sealed class RetentionTests
         var key = $"key-{Guid.NewGuid():N}";
         var tenantId = $"tenant-{Guid.NewGuid():N}";
         var scope = new ChallengeScope(key, ChallengeEngineFixture.TightPurpose, tenantId);
+        var service = fixture.CreateServiceWithTightKeyCeiling();
 
         for (var i = 0; i < ChallengeEngineFixture.TightPerKeyLimit; i++)
         {
-            var result = await fixture.Service.IssueAsync(scope);
+            var result = await service.IssueAsync(scope);
             Assert.Equal(ChallengeIssueOutcome.Issued, result.Outcome);
         }
 
-        var exhausted = await fixture.Service.IssueAsync(scope);
+        var exhausted = await service.IssueAsync(scope);
         Assert.Equal(ChallengeIssueOutcome.RateLimited, exhausted.Outcome);
 
         // Simulate the aggressive challenges-table retention job: purge every challenge, including ones
@@ -58,7 +59,7 @@ public sealed class RetentionTests
 
         // The specific failure this two-table split exists to prevent: the counter must have survived
         // the challenges purge untouched, so the next issue for this key is still refused.
-        var stillRateLimited = await fixture.Service.IssueAsync(scope);
+        var stillRateLimited = await service.IssueAsync(scope);
         Assert.Equal(ChallengeIssueOutcome.RateLimited, stillRateLimited.Outcome);
     }
 }

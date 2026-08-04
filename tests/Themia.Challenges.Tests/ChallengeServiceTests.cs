@@ -44,15 +44,13 @@ public sealed class ChallengeServiceTests : IDisposable
         int maxAttempts = 5,
         int maxLiveChallenges = 1,
         TimeSpan? ttl = null,
-        (int Limit, TimeSpan Window)? perScopeWindow = null,
-        (int Limit, TimeSpan Window)? perKeyWindow = null)
+        (int Limit, TimeSpan Window)? perScopeWindow = null)
     {
         p.Format = ChallengeFormat.Numeric(6);
         p.Ttl = ttl ?? TimeSpan.FromMinutes(5);
         p.MaxAttempts = maxAttempts;
         p.MaxLiveChallenges = maxLiveChallenges;
         p.PerScopeWindow = perScopeWindow ?? (100, TimeSpan.FromMinutes(15));
-        p.PerKeyWindow = perKeyWindow ?? (100, TimeSpan.FromHours(1));
     }
 
     private static int LiveCount(SqliteConnection connection, ChallengeScope scope) =>
@@ -79,14 +77,15 @@ public sealed class ChallengeServiceTests : IDisposable
     [Fact]
     public async Task Issue_ShouldRateLimit_PerKeyAcrossPurposes()
     {
-        // Every purpose shares the same PerKeyWindow (same limit AND window duration) so the per-key
-        // bucket they all increment is the same bucket. Each purpose's own PerScopeWindow is generous,
-        // so no per-purpose limit is ever the one that trips.
+        // The per-key ceiling is store-wide, so every purpose necessarily shares one bucket — there is
+        // no per-purpose window that could floor the same key into a different one. Each purpose's own
+        // PerScopeWindow is generous, so no per-purpose limit is ever the one that trips.
         var service = CreateService(o =>
         {
-            o.ConfigurePurpose("login", p => Configure(p, perKeyWindow: (3, TimeSpan.FromHours(1))));
-            o.ConfigurePurpose("reset", p => Configure(p, perKeyWindow: (3, TimeSpan.FromHours(1))));
-            o.ConfigurePurpose("verify", p => Configure(p, perKeyWindow: (3, TimeSpan.FromHours(1))));
+            o.PerKeyWindow = (3, TimeSpan.FromHours(1));
+            o.ConfigurePurpose("login", p => Configure(p));
+            o.ConfigurePurpose("reset", p => Configure(p));
+            o.ConfigurePurpose("verify", p => Configure(p));
         });
         const string key = "+66222222222";
 
@@ -107,10 +106,13 @@ public sealed class ChallengeServiceTests : IDisposable
         var service = CreateService(o => o.ConfigurePurpose("login", p => Configure(p, perScopeWindow: (1, TimeSpan.FromMinutes(15)))));
         var scope = new ChallengeScope("+66333333333", "login", "tenantA");
 
-        Assert.Equal(ChallengeIssueOutcome.Issued, (await service.IssueAsync(scope)).Outcome);
+        var issued = await service.IssueAsync(scope);
+        Assert.Equal(ChallengeIssueOutcome.Issued, issued.Outcome);
         Assert.Equal(ChallengeIssueOutcome.RateLimited, (await service.IssueAsync(scope)).Outcome);
 
-        await service.RefundAsync(scope);
+        // The issuance time, not "now": the counters are fixed-width buckets keyed by window start, so
+        // only the bucket the issue charged is the one a refund may decrement.
+        await service.RefundAsync(scope, issued.IssuedAt!.Value);
 
         var afterRefund = await service.IssueAsync(scope);
         Assert.Equal(ChallengeIssueOutcome.Issued, afterRefund.Outcome);

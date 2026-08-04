@@ -31,15 +31,3 @@ internal sealed class ChallengeRow
 
     public DateTimeOffset? ConsumedAt { get; set; }
 }
-
-/// <summary>
-/// Materializes one row of <see cref="IChallengeDialect.SelectWindowCountsSql"/>'s result: no
-/// underscores in either column name, so the default Dapper mapping already binds them without help.
-/// </summary>
-internal sealed class WindowCountRow
-{
-    /// <summary><see langword="null"/> for the per-key ceiling row; the purpose string for the per-scope row.</summary>
-    public string? Purpose { get; set; }
-
-    public int Count { get; set; }
-}

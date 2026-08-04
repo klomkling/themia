@@ -59,8 +59,16 @@ public interface IChallengeService
     /// windows, each floored at zero. A message that was never sent must not consume the victim's
     /// allowance.
     /// </summary>
-    /// <param name="scope">The scope whose most recent issuance should be refunded.</param>
+    /// <param name="scope">The scope whose issuance should be refunded.</param>
+    /// <param name="issuedAt">
+    /// <see cref="ChallengeIssueResult.IssuedAt"/> from the issuance being refunded. Required, and not
+    /// defaulted to the current time: rate-limit counters are fixed-width buckets keyed by window
+    /// start, so a refund computed from "now" targets whichever bucket is live when the failure is
+    /// noticed — which, for a delivery failure discovered asynchronously, is routinely not the bucket
+    /// the issue charged. That leaves the original charge standing and decrements a stranger's, so the
+    /// caller must carry the issuance time rather than let this method guess it.
+    /// </param>
     /// <param name="cancellationToken">Cancels the underlying store operations.</param>
     /// <exception cref="InvalidOperationException"><paramref name="scope"/>'s purpose was never configured via <see cref="ChallengeOptions.ConfigurePurpose"/>.</exception>
-    Task RefundAsync(ChallengeScope scope, CancellationToken cancellationToken = default);
+    Task RefundAsync(ChallengeScope scope, DateTimeOffset issuedAt, CancellationToken cancellationToken = default);
 }

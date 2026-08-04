@@ -35,7 +35,6 @@ public class ChallengeDialectContractTests
         (nameof(IChallengeDialect.SelectMostRecentByScopeSql), d => d.SelectMostRecentByScopeSql),
         (nameof(IChallengeDialect.InvalidateLiveForScopeSql), d => d.InvalidateLiveForScopeSql),
         (nameof(IChallengeDialect.IncrementWindowSql), d => d.IncrementWindowSql),
-        (nameof(IChallengeDialect.SelectWindowCountsSql), d => d.SelectWindowCountsSql),
         (nameof(IChallengeDialect.DecrementWindowSql), d => d.DecrementWindowSql),
     ];
 
@@ -117,8 +116,7 @@ public class ChallengeDialectContractTests
     /// <see langword="null"/> (the per-key ceiling row — the layer that bounds the SMS bill). Every
     /// other member's <c>@Purpose</c> is always a concrete purpose string, so plain <c>=</c> there is
     /// correct, not a bug; scoping this assertion to just these two members avoids a false positive
-    /// against <see cref="IChallengeDialect.SelectWindowCountsSql"/>'s intentional
-    /// <c>purpose = @Purpose</c> per-scope leg.
+    /// against a member whose <c>@Purpose</c> is intentionally compared with plain <c>=</c>.
     /// </summary>
     [Theory]
     [MemberData(nameof(AllDialects))]
@@ -143,7 +141,6 @@ public class ChallengeDialectContractTests
         yield return (nameof(IChallengeDialect.InvalidateLiveForScopeSql), dialect.InvalidateLiveForScopeSql);
         yield return (nameof(IChallengeDialect.PurgeExpiredSql), dialect.PurgeExpiredSql);
         yield return (nameof(IChallengeDialect.IncrementWindowSql), dialect.IncrementWindowSql);
-        yield return (nameof(IChallengeDialect.SelectWindowCountsSql), dialect.SelectWindowCountsSql);
         yield return (nameof(IChallengeDialect.DecrementWindowSql), dialect.DecrementWindowSql);
         yield return (nameof(IChallengeDialect.PurgeElapsedWindowsSql), dialect.PurgeElapsedWindowsSql);
     }

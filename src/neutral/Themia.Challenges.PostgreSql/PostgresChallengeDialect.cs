@@ -104,6 +104,12 @@ public sealed class PostgresChallengeDialect : IChallengeDialect
     /// <c>DO NOTHING</c>) and then serialize again on the row lock during <c>UPDATE</c> (each sees the
     /// previous caller's committed count and adds 1), so no increment is ever lost.
     /// </para>
+    /// <para>
+    /// The <c>RETURNING count</c> on the <c>UPDATE</c> is what makes the limit enforceable rather than
+    /// merely counted — see the contract on <see cref="IChallengeDialect.IncrementWindowSql"/>. It is
+    /// the only statement in the batch that produces a result set (a target-less
+    /// <c>ON CONFLICT DO NOTHING</c> insert produces none), so the caller reads it as a single scalar.
+    /// </para>
     /// </remarks>
     public string IncrementWindowSql => """
         INSERT INTO challenge_rate_windows (id, tenant_id, "key", purpose, window_start, count)
@@ -111,14 +117,8 @@ public sealed class PostgresChallengeDialect : IChallengeDialect
         ON CONFLICT DO NOTHING;
         UPDATE challenge_rate_windows SET count = count + 1
         WHERE tenant_id IS NOT DISTINCT FROM @TenantId AND "key" = @Key AND purpose IS NOT DISTINCT FROM @Purpose
-          AND window_start = @WindowStart;
-        """;
-
-    /// <inheritdoc />
-    public string SelectWindowCountsSql => """
-        SELECT purpose, count FROM challenge_rate_windows
-        WHERE tenant_id IS NOT DISTINCT FROM @TenantId AND "key" = @Key
-          AND ((purpose = @Purpose AND window_start = @ScopeWindowStart) OR (purpose IS NULL AND window_start = @KeyWindowStart));
+          AND window_start = @WindowStart
+        RETURNING count;
         """;
 
     /// <inheritdoc />

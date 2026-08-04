@@ -56,7 +56,6 @@ internal sealed class RaceGatingChallengeDialect : IChallengeDialect
     public string InvalidateLiveForScopeSql => inner.InvalidateLiveForScopeSql;
     public string PurgeExpiredSql => inner.PurgeExpiredSql;
     public string IncrementWindowSql => inner.IncrementWindowSql;
-    public string SelectWindowCountsSql => inner.SelectWindowCountsSql;
     public string DecrementWindowSql => inner.DecrementWindowSql;
     public string PurgeElapsedWindowsSql => inner.PurgeElapsedWindowsSql;
 

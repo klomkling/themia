@@ -52,7 +52,7 @@ public class ChallengeOptionsTests
         var options = new ChallengeOptions();
 
         Assert.ThrowsAny<ArgumentException>(() =>
-            options.ConfigurePurpose("login", p => p.PerKeyWindow = (Limit: 0, Window: TimeSpan.FromMinutes(15))));
+            options.PerKeyWindow = (Limit: 0, Window: TimeSpan.FromMinutes(15)));
     }
 
     [Theory]
@@ -86,17 +86,9 @@ public class ChallengeOptionsTests
     [Fact]
     public void WidestConfiguredWindow_ShouldReturnTheLongestWindow_AcrossEveryPurposeAndBothLayers()
     {
-        var options = new ChallengeOptions();
-        options.ConfigurePurpose("login", p =>
-        {
-            p.PerScopeWindow = (3, TimeSpan.FromMinutes(15));
-            p.PerKeyWindow = (20, TimeSpan.FromHours(1));
-        });
-        options.ConfigurePurpose("reset", p =>
-        {
-            p.PerScopeWindow = (3, TimeSpan.FromHours(6)); // the longest window in the whole configuration
-            p.PerKeyWindow = (20, TimeSpan.FromHours(1));
-        });
+        var options = new ChallengeOptions { PerKeyWindow = (20, TimeSpan.FromHours(1)) };
+        options.ConfigurePurpose("login", p => p.PerScopeWindow = (3, TimeSpan.FromMinutes(15)));
+        options.ConfigurePurpose("reset", p => p.PerScopeWindow = (3, TimeSpan.FromHours(6))); // the longest window in the whole configuration
 
         Assert.Equal(TimeSpan.FromHours(6), options.WidestConfiguredWindow());
     }

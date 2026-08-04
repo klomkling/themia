@@ -44,12 +44,18 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
     = 1`). Without the UI saying so, this reproduces the classic support ticket: a user taps "resend", the
     *first* SMS arrives after the second was issued, and the code in that first message no longer
     verifies — it was silently superseded, not delayed.
-  - **The per-key rate limit (`PurposeOptions.PerKeyWindow`) is an account-lockout vector, not a security
-    control.** Anyone who knows a phone number or email address can issue against it until the ceiling
-    trips, locking out the real owner; `MaxAttempts` is what actually stops brute force. Set
-    `PerKeyWindow` to bound delivery *cost*, not to "be safe", and call `IChallengeService.RefundAsync`
-    when a send is known to have failed so a bounced or undeliverable message never burns the victim's
-    quota.
+  - **The per-key rate limit (`ChallengeOptions.PerKeyWindow`) is an account-lockout vector, not a
+    security control.** Anyone who knows a phone number or email address can issue against it until the
+    ceiling trips, locking out the real owner; `MaxAttempts` is what actually stops brute force. Set
+    `PerKeyWindow` to bound delivery *cost*, not to "be safe", and call
+    `IChallengeService.RefundAsync(scope, result.IssuedAt!.Value)` when a send is known to have failed so
+    a bounced or undeliverable message never burns the victim's quota. It lives on `ChallengeOptions`
+    rather than per purpose because it is a ceiling *across* purposes: a per-purpose window would bucket
+    the same key differently per purpose, handing a purpose-cycling attacker a fresh ceiling for each.
+  - **`ChallengeVerifyOutcome` distinguishes `Consumed`, `Expired` and `NotFound` — do not pass that
+    distinction to an anonymous caller.** It is exactly an account-enumeration oracle on a login or
+    password-reset endpoint: any wrong code reveals whether the key was ever challenged, i.e. whether the
+    address is registered. Branch on it internally; return one indistinguishable failure outward.
   - **`AddThemiaChallenges(...)` alone does not work.** Registering the core without also calling exactly
     one of `AddThemiaChallengesPostgres` / `AddThemiaChallengesMySql` / `AddThemiaChallengesSqlServer`
     throws, by name, the first time `IChallengeService` is resolved — deliberately, rather than falling

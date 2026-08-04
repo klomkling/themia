@@ -43,7 +43,7 @@ namespace Themia.Challenges;
 /// </list>
 /// <c>purpose</c> on the <c>challenges</c> table is <c>NOT NULL</c>, so plain <c>=</c> is correct
 /// there and on any predicate where the doc states the parameter is always a concrete, non-null
-/// value (e.g. the per-scope leg of <see cref="SelectWindowCountsSql"/>'s <c>@Purpose</c>) — null-safe
+/// value (e.g. the per-scope leg of <see cref="IncrementWindowSql"/>'s <c>@Purpose</c>) — null-safe
 /// comparison is only required where the column is nullable AND the parameter may legitimately be
 /// null for that call.
 /// </para>
@@ -180,23 +180,23 @@ public interface IChallengeDialect
     /// </para>
     /// <para>
     /// <c>@WindowStart</c> is a fixed-width bucket boundary the caller computes by flooring the
-    /// current time to the purpose's configured window duration; this statement does not decide
-    /// bucket width, it only targets the bucket it is given.
+    /// current time to the configured window duration; this statement does not decide bucket width,
+    /// it only targets the bucket it is given.
+    /// </para>
+    /// <para>
+    /// <b>Must return exactly one row of one column: the bucket's <c>count</c> after this
+    /// increment.</b> That return value is the whole point — it is what makes the rate limit
+    /// enforceable. A dialect that increments without returning the new count forces the caller back
+    /// into read-then-act (SELECT the count, compare it to the limit, then increment), and under
+    /// concurrent issuance for the same bucket every caller reads the same pre-increment value and
+    /// every caller passes the ceiling. The check must be a comparison against a value produced
+    /// <em>by the increment itself</em>, in one statement the engine serializes, so at most
+    /// <c>Limit</c> callers can ever observe a value at or below the limit. Use <c>RETURNING</c>,
+    /// <c>OUTPUT INSERTED</c>, or an engine-local assignment — whatever the engine offers that keeps
+    /// the read and the write in the same atomic unit.
     /// </para>
     /// </summary>
     string IncrementWindowSql { get; }
-
-    /// <summary>
-    /// Reads the current counts for both rate-limit layers of one issuance check in a single
-    /// round trip: the per-scope window (<c>purpose = @Purpose</c>, <c>window_start = @ScopeWindowStart</c>)
-    /// and the per-key ceiling window (<c>purpose IS NULL</c>, <c>window_start = @KeyWindowStart</c>).
-    /// Params: <c>@TenantId</c>, <c>@Key</c>, <c>@Purpose</c>, <c>@ScopeWindowStart</c>,
-    /// <c>@KeyWindowStart</c>. Returns zero, one, or two rows, each carrying the row's nullable
-    /// <c>purpose</c> and its <c>count</c>; the caller distinguishes which layer a row answers by
-    /// whether its <c>purpose</c> is <see langword="null"/>. A layer with no matching row has not
-    /// been charged yet in the current window and its count is 0.
-    /// </summary>
-    string SelectWindowCountsSql { get; }
 
     /// <summary>
     /// Atomically decrements the rate-limit counter for one window bucket — the refund path: the row
@@ -205,7 +205,10 @@ public interface IChallengeDialect
     /// <c>@Key</c>, <c>@Purpose</c>, <c>@WindowStart</c>. Mirrors <see cref="IncrementWindowSql"/>:
     /// called once per layer, with the same <c>@Purpose</c>/<see langword="null"/> convention, and
     /// with the same <c>@WindowStart</c> value that the original <see cref="IncrementWindowSql"/>
-    /// call for that issuance used. A message that was never delivered must not consume the victim's
+    /// call for that issuance used — which is why the refund path takes the issuance time, not the
+    /// refund time: flooring "now" at refund would target a different bucket than the one charged,
+    /// leaving the original charge in place and decrementing an unrelated live bucket instead.
+    /// A message that was never delivered must not consume the victim's
     /// quota — this is what a caller invokes when delivery is known to have failed. If the bucket has
     /// already been purged by <see cref="PurgeElapsedWindowsSql"/> (the window elapsed before the
     /// refund arrived), no row matches and this is a no-op rather than an error.
@@ -215,7 +218,7 @@ public interface IChallengeDialect
     /// <summary>
     /// Hard-deletes counter rows whose <c>window_start &lt; @OlderThan</c>. Params: <c>@OlderThan</c>.
     /// Returns rows affected. The caller computes <c>@OlderThan</c> from the longest window duration
-    /// configured across every purpose's <c>PerScopeWindow</c>/<c>PerKeyWindow</c>, plus a safety
+    /// in play — the store's <c>PerKeyWindow</c> and every purpose's <c>PerScopeWindow</c> — plus a safety
     /// margin — never from a fixed retention shorter than a configured window. A counter row has no
     /// stored duration of its own, so purging it too early deletes evidence a still-active window
     /// depends on, silently resetting the cost ceiling the two-table split exists to protect; a

@@ -16,14 +16,14 @@ namespace Themia.Challenges.Internal;
 /// (now.UtcTicks % window.Ticks)</c>, giving every caller the same deterministic bucket boundary
 /// (aligned to <see cref="DateTimeOffset.MinValue"/>, not to any per-scope epoch) rather than one that
 /// depends on when the scope first issued. This was chosen over a sliding window because
-/// <see cref="IChallengeDialect.SelectWindowCountsSql"/> and <see cref="IChallengeDialect.IncrementWindowSql"/>
+/// <see cref="IChallengeDialect.IncrementWindowSql"/> and <see cref="IChallengeDialect.DecrementWindowSql"/>
 /// are both keyed by a single <c>window_start</c> value per bucket — a sliding window needs either a
 /// rolling log of individual issuance timestamps (a third table) or an approximation, neither of which
 /// this schema carries. The accepted tradeoff is bucket-boundary bursting: a caller can issue up to
 /// <c>Limit</c> secrets in the last second of one bucket and <c>Limit</c> more in the first second of
 /// the next, i.e. up to <c>2 * Limit</c> in a short span straddling the boundary. This is acceptable
 /// here because the per-key ceiling exists to bound cost, not to stop brute force (see
-/// <see cref="PurposeOptions.PerKeyWindow"/>'s remarks) — a fixed bucket's worst-case burst is still a
+/// <see cref="ChallengeOptions.PerKeyWindow"/>'s remarks) — a fixed bucket's worst-case burst is still a
 /// small, bounded multiple of the configured limit, not an unbounded one.
 /// </para>
 /// <para>
@@ -87,41 +87,36 @@ internal sealed class ChallengeService : IChallengeService
         var purpose = options.GetPurpose(scope.Purpose);
         var now = timeProvider.GetUtcNow();
         var scopeWindowStart = FloorToWindowStart(now, purpose.PerScopeWindow.Window);
-        var keyWindowStart = FloorToWindowStart(now, purpose.PerKeyWindow.Window);
+        var keyWindowStart = FloorToWindowStart(now, options.PerKeyWindow.Window);
 
         await using var connection = dialect.CreateConnection();
 
-        var counts = await connection.QueryAsync<WindowCountRow>(new CommandDefinition(
-            dialect.SelectWindowCountsSql,
-            new
-            {
-                TenantId = scope.TenantId,
-                Key = scope.Key,
-                Purpose = scope.Purpose,
-                ScopeWindowStart = scopeWindowStart,
-                KeyWindowStart = keyWindowStart,
-            },
-            cancellationToken: cancellationToken));
+        // Charge both counters FIRST, then compare each against its limit using the value the
+        // increment itself returned. Reading the counts and only then incrementing — the obvious
+        // shape, and the one this originally had — is a read-then-act gate with nothing serializing
+        // it: 64 callers racing for the same bucket all read the same pre-increment count, all find
+        // it under the ceiling, and all issue. The counters would still be exact (no increment is
+        // lost) while the limit they exist to enforce is simply not enforced, which is the failure
+        // mode an SMS bill notices and a test asserting on the counter total does not. Charging first
+        // makes each caller's observed value unique and monotonic, so at most Limit callers can ever
+        // see a value at or below the ceiling, whatever the concurrency.
+        var scopeCount = await IncrementWindowAsync(connection, scope, scope.Purpose, scopeWindowStart, cancellationToken);
+        var keyCount = await IncrementWindowAsync(connection, scope, null, keyWindowStart, cancellationToken);
 
-        var keyCount = 0;
-        var scopeCount = 0;
-        foreach (var row in counts)
+        // Both layers are required, not alternatives: per-key is the cost ceiling across every purpose
+        // for this key (the layer that protects the invoice), per-scope is the narrower UX-facing one.
+        if (keyCount > options.PerKeyWindow.Limit || scopeCount > purpose.PerScopeWindow.Limit)
         {
-            if (row.Purpose is null)
-            {
-                keyCount = row.Count;
-            }
-            else
-            {
-                scopeCount = row.Count;
-            }
-        }
+            // Hand both charges back: no secret was generated and no challenge row was written, so a
+            // refused issue must not consume quota — otherwise a caller refused by the per-scope limit
+            // would still burn the per-key ceiling, and repeated refusals would compound into a lockout
+            // that outlasts the window that produced it. The refund is best-effort by construction:
+            // DecrementWindowSql floors at zero, so a concurrent caller can briefly observe this
+            // caller's un-refunded +1 and be refused when it need not have been. That direction is the
+            // safe one (it over-refuses, never over-admits) and it self-corrects within the round trip.
+            await DecrementWindowAsync(connection, scope, scope.Purpose, scopeWindowStart, cancellationToken);
+            await DecrementWindowAsync(connection, scope, null, keyWindowStart, cancellationToken);
 
-        // Per-key first: it is the cost ceiling across every purpose defined for this key — the layer
-        // that protects the invoice. Per-scope is the narrower, UX-facing limit. Either refusing means
-        // no secret is generated and no row is written; the caller pays nothing for a refused issue.
-        if (keyCount >= purpose.PerKeyWindow.Limit || scopeCount >= purpose.PerScopeWindow.Limit)
-        {
             logger.LogInformation("Challenge issue rate-limited for purpose {Purpose}", scope.Purpose);
             return ChallengeIssueResult.RateLimited();
         }
@@ -158,19 +153,36 @@ internal sealed class ChallengeService : IChallengeService
             },
             cancellationToken: cancellationToken));
 
-        // Both layers, always — see the type's remarks on the per-key ceiling being the cost layer.
-        await connection.ExecuteAsync(new CommandDefinition(
+        logger.LogInformation("Challenge issued for purpose {Purpose}", scope.Purpose);
+        return ChallengeIssueResult.Issued(secret, expiresAt, now);
+    }
+
+    /// <summary>
+    /// Charges one rate-limit bucket and returns its count <em>after</em> this increment. The returned
+    /// value is the caller's own increment, produced by the same statement that wrote it — see
+    /// <see cref="IChallengeDialect.IncrementWindowSql"/> for why a separate read would not be.
+    /// </summary>
+    private Task<int> IncrementWindowAsync(
+        System.Data.Common.DbConnection connection,
+        ChallengeScope scope,
+        string? purpose,
+        DateTimeOffset windowStart,
+        CancellationToken cancellationToken) =>
+        connection.ExecuteScalarAsync<int>(new CommandDefinition(
             dialect.IncrementWindowSql,
-            new { Id = Guid.NewGuid(), TenantId = scope.TenantId, Key = scope.Key, Purpose = scope.Purpose, WindowStart = scopeWindowStart },
-            cancellationToken: cancellationToken));
-        await connection.ExecuteAsync(new CommandDefinition(
-            dialect.IncrementWindowSql,
-            new { Id = Guid.NewGuid(), TenantId = scope.TenantId, Key = scope.Key, Purpose = (string?)null, WindowStart = keyWindowStart },
+            new { Id = Guid.NewGuid(), TenantId = scope.TenantId, Key = scope.Key, Purpose = purpose, WindowStart = windowStart },
             cancellationToken: cancellationToken));
 
-        logger.LogInformation("Challenge issued for purpose {Purpose}", scope.Purpose);
-        return ChallengeIssueResult.Issued(secret, expiresAt);
-    }
+    private Task DecrementWindowAsync(
+        System.Data.Common.DbConnection connection,
+        ChallengeScope scope,
+        string? purpose,
+        DateTimeOffset windowStart,
+        CancellationToken cancellationToken) =>
+        connection.ExecuteAsync(new CommandDefinition(
+            dialect.DecrementWindowSql,
+            new { TenantId = scope.TenantId, Key = scope.Key, Purpose = purpose, WindowStart = windowStart },
+            cancellationToken: cancellationToken));
 
     /// <inheritdoc />
     public async Task<ChallengeVerifyResult> VerifyAsync(ChallengeScope scope, string code, CancellationToken cancellationToken = default)
@@ -270,27 +282,27 @@ internal sealed class ChallengeService : IChallengeService
     }
 
     /// <inheritdoc />
-    public async Task RefundAsync(ChallengeScope scope, CancellationToken cancellationToken = default)
+    public async Task RefundAsync(ChallengeScope scope, DateTimeOffset issuedAt, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(scope);
 
         var purpose = options.GetPurpose(scope.Purpose);
-        var now = timeProvider.GetUtcNow();
-        var scopeWindowStart = FloorToWindowStart(now, purpose.PerScopeWindow.Window);
-        var keyWindowStart = FloorToWindowStart(now, purpose.PerKeyWindow.Window);
+
+        // Floored from the issuance time, never from "now". Buckets are fixed-width, so a refund that
+        // arrives after the boundary the issue fell on — the common case, since delivery failure is
+        // discovered asynchronously — would otherwise decrement a bucket the issue never charged:
+        // the original charge stays for the rest of its window, and an unrelated live bucket loses a
+        // count that belongs to somebody else's issuance. Both directions are wrong, and the second
+        // is a quota bypass.
+        var scopeWindowStart = FloorToWindowStart(issuedAt, purpose.PerScopeWindow.Window);
+        var keyWindowStart = FloorToWindowStart(issuedAt, options.PerKeyWindow.Window);
 
         await using var connection = dialect.CreateConnection();
 
         // Both layers, mirroring IssueAsync's two IncrementWindowSql calls — a refund undoes exactly
         // what an issue charged. Each is independently floored at zero by the dialect.
-        await connection.ExecuteAsync(new CommandDefinition(
-            dialect.DecrementWindowSql,
-            new { TenantId = scope.TenantId, Key = scope.Key, Purpose = scope.Purpose, WindowStart = scopeWindowStart },
-            cancellationToken: cancellationToken));
-        await connection.ExecuteAsync(new CommandDefinition(
-            dialect.DecrementWindowSql,
-            new { TenantId = scope.TenantId, Key = scope.Key, Purpose = (string?)null, WindowStart = keyWindowStart },
-            cancellationToken: cancellationToken));
+        await DecrementWindowAsync(connection, scope, scope.Purpose, scopeWindowStart, cancellationToken);
+        await DecrementWindowAsync(connection, scope, null, keyWindowStart, cancellationToken);
 
         logger.LogInformation("Challenge quota refunded for purpose {Purpose}", scope.Purpose);
     }

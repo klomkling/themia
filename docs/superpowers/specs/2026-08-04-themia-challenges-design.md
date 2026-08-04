@@ -117,7 +117,10 @@ public interface IChallengeService
         string token, string purpose, string? tenantId = null, CancellationToken ct = default);
 
     // Returns the quota consumed by an issue whose delivery failed. See "Rate limiting", layer 2.
-    Task RefundAsync(ChallengeScope scope, CancellationToken ct = default);
+    // `issuedAt` is ChallengeIssueResult.IssuedAt: counters are fixed-width buckets keyed by window
+    // start, so only the issuance time identifies the buckets that were actually charged. Flooring
+    // "now" instead would leave the original charge standing and decrement a stranger's bucket.
+    Task RefundAsync(ChallengeScope scope, DateTimeOffset issuedAt, CancellationToken ct = default);
 }
 
 public enum ChallengeIssueOutcome { Issued, RateLimited }
@@ -267,13 +270,22 @@ guards.
    backup: 10⁶ candidates fall to a GPU instantly, salted or not. What makes a leaked row worthless is
    the **short TTL and single-use**. The hash is defence in depth, not the defence.
 2. **Rate limit in two layers, both required.**
-   - *Per scope* (`tenant + key + purpose`) — the UX limit.
+   - *Per scope* (`tenant + key + purpose`) — the UX limit. Configured on `PurposeOptions`.
    - *Per key across all purposes* (`tenant + key`) — the **cost ceiling**. Without it an attacker cycles
      `login` → `reset` → `verify` → `enroll` and multiplies SMS volume by the number of purposes defined,
      never touching a per-purpose limit. The per-purpose layer protects the user's experience; only this
-     layer protects the invoice.
+     layer protects the invoice. Configured on `ChallengeOptions`, **not** per purpose: counters are
+     bucketed by window start, so a per-purpose window would floor the same key into a different bucket
+     per purpose and hand the purpose-cycling attacker a fresh ceiling for each — the exact attack the
+     layer exists to stop. One window per store makes that unrepresentable.
    - Per IP is deliberately not the mechanism: the attacker rotates IPs, and the victim is the account
      owner's number and your bill.
+   - **Both layers charge before they check.** The counter is incremented first and the *returned*
+     post-increment value is compared against the limit; a refused issue hands both charges back. The
+     obvious ordering — read the count, compare, then increment — is a read-then-act gate with nothing
+     serializing it: every concurrent caller reads the same pre-increment value, so all of them pass a
+     ceiling of any size. The counters stay exact either way, which is why a test that asserts on the
+     counter total cannot see the defect; only a test that asserts *how many callers were issued* can.
 3. **Attempt cap per challenge.** A 6-digit code with unlimited guesses is not a second factor.
 4. **Single use, atomically.** Verification and consumption are one database operation, never
    read-then-write. Two concurrent verifications must not both succeed.
@@ -294,8 +306,9 @@ so it is accepted, with two mitigations:
   above what a real user reaches. A ceiling tuned low "to be safe" makes lockout easy and buys nothing;
   brute-force is stopped by the attempt cap, not by the issue limit.
 - **`RefundAsync`.** Delivery is the adopter's job, so only the adopter knows a send failed. When it does
-  — including `NotificationResult.NotConfigured` — the adopter calls `RefundAsync(scope)` and the quota
-  is returned. A message that was never sent must not consume the victim's allowance.
+  — including `NotificationResult.NotConfigured` — the adopter calls
+  `RefundAsync(scope, result.IssuedAt!.Value)` and the quota is returned. A message that was never sent
+  must not consume the victim's allowance.
 
 ### Re-issue policy: `MaxLiveChallenges`, default 1
 
@@ -364,6 +377,9 @@ propertiezy made about identifier resolution on #0054.
 - **Both rate-limit layers separately**, including the purpose-cycling bypass: N requests across N
   distinct purposes must hit the per-key ceiling though no per-purpose limit was reached.
 - **`RefundAsync` returns quota**: ceiling reached, refund, next issue succeeds.
+- **The ceiling holds under concurrency**: with the per-key ceiling set well below N, N concurrent
+  `IssueAsync` calls for one key yield at most `Limit` issued results (and at least one) on every
+  engine. Asserting the counter equals N is a different, weaker claim and does not substitute.
 - **Retention does not reset a limit**: purge the challenge rows, then assert the per-key ceiling is
   still enforced. This is the specific failure that made rev 2's single-table design wrong.
 - **Cross-tenant isolation**: a code issued for `(tenant A, +66…, login)` must not verify under tenant B,
