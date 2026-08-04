@@ -12,6 +12,39 @@ with the *why* and concrete upgrade steps.
 
 ## Unreleased
 
+_Nothing yet._
+
+## 0.12.0
+
+### MariaDB is no longer a supported engine
+
+**What changed:** the package descriptions, XML docs and migration error messages that said
+"MySQL/MariaDB" now say MySQL. `README.md` and `docs/themia-architecture-overview.md` state the
+supported set as SQL Server, **MySQL 8.0.13+**, and PostgreSQL. No code path changed, and nothing
+changes for MySQL adopters.
+
+**Why:** the claim was never true for every package that carried it. The MySQL leg of the shared schema
+uses **functional key parts** (`CREATE UNIQUE INDEX ... ((expr))`, MySQL 8.0.13+) to emulate the
+partial and filtered unique indexes PostgreSQL and SQL Server have natively — see
+`Themia.Modules.Pdf.Migrations.PdfTemplateSchemaMigration` and
+`Themia.Challenges.Migrations.ChallengeSchemaMigration`. MariaDB has no equivalent syntax at any
+version, so those migrations fail to parse and the module cannot install. The claim was inherited
+across specs and had never been tested on any package carrying such an index; the only package with
+real MariaDB coverage is `Themia.Data.Migrations`, whose `mariadb:11` advisory-lock test still runs and
+whose lock semantics stay deliberately portable to it.
+
+**How to upgrade:**
+
+- **On MySQL 8.0.13 or newer** — nothing to do. This is a documentation correction, not a behaviour
+  change.
+- **On MySQL older than 8.0.13** — `Themia.Modules.Pdf` and `Themia.Challenges` will fail at migration
+  time. Upgrade the server; there is no supported workaround.
+- **On MariaDB** — Themia does not install. `Themia.Data.Migrations` alone still works, but any module
+  whose schema uses a functional index does not. Migrate to MySQL 8.0.13+ or PostgreSQL. If MariaDB
+  support matters to you, file a coord request: closing the gap means replacing every functional index
+  with a persisted generated column plus an index on it, across every module that uses one, and that
+  work is deferred until an adopter actually needs it.
+
 ### `Themia.Notifications`: the logger stubs no longer report success
 
 **What changed:** `LoggerEmailSender` and `LoggerSmsSender` returned `NotificationResult.Success()`

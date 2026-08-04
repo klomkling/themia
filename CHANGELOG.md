@@ -27,10 +27,14 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+_Nothing yet._
+
+## [0.12.0] - 2026-08-04
+
 ### Added
 - **`Themia.Challenges`** (+ `.PostgreSql` / `.MySql` / `.SqlServer`) — the one-time challenge core:
   issues a secret bound to an opaque key, verifies it exactly once, and enforces TTL, an attempt cap,
-  and two layers of rate limiting. Serves phone OTP, email OTP, magic links, email verification, and
+  and three layers of rate limiting. Serves phone OTP, email OTP, magic links, email verification, and
   password reset. `IChallengeService.IssueAsync` / `VerifyAsync` / `VerifyByTokenAsync` / `RefundAsync`
   over a per-engine `IChallengeDialect` (coord #0056), plus a background `ChallengePurgeService` that
   purges expired `challenges` rows (`ChallengeOptions.ChallengeRetentionHours`, default 24) and elapsed
@@ -39,7 +43,7 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
   peer** — each engine package opens its own connection — so it is adoptable by a consumer running none
   of `Themia.Framework.Data.*`.
 
-  Three behaviours an adopter needs to know before wiring this up:
+  Four behaviours an adopter needs to know before wiring this up:
   - **Re-issuing a challenge invalidates the outstanding one by default** (`PurposeOptions.MaxLiveChallenges
     = 1`). Without the UI saying so, this reproduces the classic support ticket: a user taps "resend", the
     *first* SMS arrives after the second was issued, and the code in that first message no longer
@@ -48,7 +52,7 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
     security control.** Anyone who knows a phone number or email address can issue against it until the
     ceiling trips, locking out the real owner; `MaxAttempts` is what actually stops brute force. Set
     `PerKeyWindow` to bound delivery *cost*, not to "be safe", and call
-    `IChallengeService.RefundAsync(scope, result.IssuedAt!.Value)` when a send is known to have failed so
+    `IChallengeService.RefundAsync(result.ChallengeId!.Value)` when a send is known to have failed so
     a bounced or undeliverable message never burns the victim's quota. It lives on `ChallengeOptions`
     rather than per purpose because it is a ceiling *across* purposes: a per-purpose window would bucket
     the same key differently per purpose, handing a purpose-cycling attacker a fresh ceiling for each.
@@ -61,7 +65,14 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
     throws, by name, the first time `IChallengeService` is resolved — deliberately, rather than falling
     back to a silent in-memory store that would pass every test and lose every challenge on restart.
 
-### Added
+  Two known gaps ship with it, both found by review and tracked rather than quietly carried:
+  - **`VerifyAsync` has no rate limit of its own** ([#190](https://github.com/klomkling/themia/issues/190)).
+    `MaxAttempts` lives on a challenge row, so it bounds guesses against an *issued* secret and bounds
+    nothing when none is live. Put your own limit in front of an anonymous verify endpoint until this
+    lands; closing it needs a counter design, not a patch.
+  - **The null-safe predicates are non-sargable** ([#189](https://github.com/klomkling/themia/issues/189)),
+    so the indexes are not seeked on the hot path. Correctness is unaffected; this is a query-plan issue.
+
 - **`ChallengeOptions.PerKeyGlobalWindow`** — an optional third rate-limit layer capping issuance to one
   key **across every tenant**. `null` (off) by default. `PerKeyWindow` is bucketed by `(tenant_id, key)`
   so one tenant exhausting its ceiling cannot lock another out, and that isolation stays; but the SMS
@@ -72,14 +83,32 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
   rejects, because a platform-level challenge already occupies `(NULL, key, NULL)`.
 
 ### Changed
-- **(breaking) `Themia.Challenges` refund is keyed on the challenge, not the scope.**
-  `RefundAsync(ChallengeScope, DateTimeOffset)` becomes `Task<bool> RefundAsync(Guid challengeId)`, and
-  `ChallengeIssueResult` exposes `ChallengeId` instead of `IssuedAt`. The old shape was a bare decrement
+- **(breaking) MariaDB is no longer claimed as a supported engine.** Package descriptions, XML docs and
+  migration error messages said "MySQL/MariaDB"; the MySQL leg of the shared schema uses **functional
+  key parts** (`CREATE UNIQUE INDEX ... ((expr))`, MySQL 8.0.13+) to emulate the partial/filtered unique
+  indexes PostgreSQL and SQL Server have natively, and MariaDB has no equivalent syntax at any version —
+  so `Themia.Modules.Pdf` and `Themia.Challenges` fail at migration time on MariaDB. The claim was
+  inherited across specs and never tested on any package except `Themia.Data.Migrations`, whose
+  `mariadb:11` container test still runs and whose advisory-lock semantics stay deliberately portable.
+  Nothing changes for MySQL adopters; the supported floor is now stated as **MySQL 8.0.13+**.
+
+> The `Themia.Challenges` entries below record decisions made **within this release**, before the
+> package ever shipped. They are not breaking changes — there is no earlier version to break — and have
+> no [MIGRATION.md](MIGRATION.md) section. They are kept because each one is a design decision an
+> adopter reading the API will want the reasoning for.
+
+- **`Themia.Challenges` refund is keyed on the challenge, not the scope.**
+  `RefundAsync(ChallengeScope, DateTimeOffset)` became `Task<bool> RefundAsync(Guid challengeId)`, and
+  `ChallengeIssueResult` exposes `ChallengeId` rather than `IssuedAt`. The original shape was a bare decrement
   with nothing tying it to an issuance: provider delivery-status webhooks are redelivered and adopters
   retry their own failure handlers, so one failed send was refunded two or three times — and since the
   decrement floors at zero and never errors, anyone able to force deliveries to fail could replay it to
   drive the SMS cost ceiling to zero and keep issuing. The refund is now claimed with a guarded write
   against a new `refunded_at` column and returns `false` when there was nothing to refund.
+
+- **`tests`** — one shared `Themia.TestSupport` project now owns `RecordingLogger<T>` and
+  `RecordingLoggerProvider`, which had been hand-copied member-for-member into four test projects. Test
+  infrastructure only; nothing shipped changes.
 
 ### Fixed
 - **`Themia.Challenges` no longer burns quota for an issuance that never happened.** Both rate-limit
@@ -91,7 +120,7 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
   decided entirely by the value `IncrementWindowSql` returns, and `ExecuteScalarAsync<int>` mapped a
   NULL result to `0` — below every configured limit, so the issuance was admitted unconditionally and
   silently. A missing count is now an error.
-- **(breaking, schema) `Themia.Challenges` pins a byte-exact collation** (`utf8mb4_bin` on MySQL,
+- **`Themia.Challenges` pins a byte-exact collation** (`utf8mb4_bin` on MySQL,
   `Latin1_General_BIN2` on SQL Server) on every string column a dialect compares with `=`. MySQL 8 and
   SQL Server both default to case-folding collations, so a code issued for key `"A1b2"` verified against
   an account keyed `"a1b2"`, and the two shared one rate-limit bucket. Proven per engine: the new test
@@ -108,17 +137,6 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 - **`Themia.Challenges.MySql` pins `GuidFormat=Char36`**, matching every sibling Themia MySQL dialect.
   Both `id` columns are `CHAR(36)`; an adopter reusing a connection string carrying
   `GuidFormat=Binary16` or `OldGuids=true` wrote a mangled id that no later lookup matched.
-
-- **(breaking) MariaDB is no longer claimed as a supported engine.** Package descriptions, XML docs and
-  migration error messages said "MySQL/MariaDB"; the MySQL leg of the shared schema uses **functional
-  key parts** (`CREATE UNIQUE INDEX ... ((expr))`, MySQL 8.0.13+) to emulate the partial/filtered unique
-  indexes PostgreSQL and SQL Server have natively, and MariaDB has no equivalent syntax at any version —
-  so `Themia.Modules.Pdf` and `Themia.Challenges` fail at migration time on MariaDB. The claim was
-  inherited across specs and never tested on any package except `Themia.Data.Migrations`, whose
-  `mariadb:11` container test still runs and whose advisory-lock semantics stay deliberately portable.
-  Nothing changes for MySQL adopters; the supported floor is now stated as **MySQL 8.0.13+**.
-
-### Fixed
 - **(breaking) `Themia.Notifications`** — `LoggerEmailSender` and `LoggerSmsSender` reported
   `NotificationResult.Success()` having sent nothing, and `AddThemiaNotifications()` registers them via
   `TryAdd` so the DI graph always resolves. A host that never configured a real provider — or configured
@@ -146,14 +164,9 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
   Running without a provider stays a fully supported state. What changes is that it is no longer
   indistinguishable from delivery. See [MIGRATION.md](MIGRATION.md) — including a warning about the one
-  substitution that would restore the original defect. Found while scoping `Themia.Otp` (coord #0056),
+  substitution that would restore the original defect. Found while scoping what shipped here as `Themia.Challenges` (coord #0056),
   where the same path would have turned a missing SMS provider into an authentication outage with no
   signal (coord #0057).
-
-### Changed
-- **`tests`** — one shared `Themia.TestSupport` project now owns `RecordingLogger<T>` and
-  `RecordingLoggerProvider`, which had been hand-copied member-for-member into four test projects. Test
-  infrastructure only; nothing shipped changes.
 
 ## [0.11.0] - 2026-08-02
 
