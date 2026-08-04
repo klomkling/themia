@@ -7,9 +7,9 @@ using Themia.Notifications;
 
 namespace Themia.Modules.Notifications.MySql;
 
-/// <summary>MySQL/MariaDB implementation of <see cref="INotificationsSqlDialect"/> (MySqlConnector).
+/// <summary>MySQL implementation of <see cref="INotificationsSqlDialect"/> (MySqlConnector).
 /// MySQL has no <c>UPDATE ... RETURNING</c>, so a claim selects-and-locks due ids with
-/// <c>FOR UPDATE SKIP LOCKED</c> (MySQL 8.0+/MariaDB 10.6+), updates them, then re-reads the claimed
+/// <c>FOR UPDATE SKIP LOCKED</c> (MySQL 8.0+), updates them, then re-reads the claimed
 /// rows — all inside one transaction. On MySQL the <c>notifications</c> schema is the database the
 /// connection string selects, so tables are referenced unqualified.
 ///
@@ -51,7 +51,7 @@ internal sealed class MySqlNotificationsDialect : INotificationsSqlDialect
     /// <c>CHAR(36)</c> (FluentMigrator <c>AsGuid()</c> on MySQL), so the dialect pins
     /// <c>GuidFormat=Char36</c> on its own connections regardless of the caller's setting — guaranteeing
     /// <see cref="System.Guid"/> values round-trip and by-id lookups match.</summary>
-    /// <param name="connectionString">The MySQL/MariaDB connection string for the drain database.</param>
+    /// <param name="connectionString">The MySQL connection string for the drain database.</param>
     public MySqlNotificationsDialect(string connectionString)
     {
         var builder = new MySqlConnectionStringBuilder(connectionString)

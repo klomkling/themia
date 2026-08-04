@@ -4,7 +4,7 @@ using FluentMigrator.Builders.Create.Table;
 namespace Themia.Challenges.Migrations;
 
 /// <summary>Creates the <c>challenges</c> and <c>challenge_rate_windows</c> tables on PostgreSQL,
-/// MySQL/MariaDB, and SQL Server. FluentMigrator is the single DDL authority for both the EF and
+/// MySQL, and SQL Server. FluentMigrator is the single DDL authority for both the EF and
 /// Dapper data layers (DECISION #6).</summary>
 /// <remarks>
 /// <para>
@@ -88,7 +88,7 @@ public sealed class ChallengeSchemaMigration : Migration
                 !p.StartsWith("MySql", StringComparison.OrdinalIgnoreCase) &&
                 !p.StartsWith("SqlServer", StringComparison.OrdinalIgnoreCase))
             .Delegate(() => throw new NotSupportedException(
-                "Themia.Challenges supports only PostgreSQL, MySQL/MariaDB, and SQL Server. The active " +
+                "Themia.Challenges supports only PostgreSQL, MySQL, and SQL Server. The active " +
                 "database provider is not supported; add a migration branch for it."));
     }
 
@@ -182,6 +182,12 @@ public sealed class ChallengeSchemaMigration : Migration
     /// <c>INSERT ... ON DUPLICATE KEY UPDATE</c> relying on a plain index: that construct fires only on
     /// a real unique-key violation, so against a plain index it would silently insert a second row
     /// per bucket instead of updating the first.
+    /// <para>
+    /// <b>Requires MySQL 8.0.13+, and does not run on MariaDB at any version</b> — functional key parts
+    /// are the syntax being used here, and MariaDB has no equivalent (its generated-column route needs a
+    /// different schema, not a different index). This is the concrete reason MariaDB is not a supported
+    /// engine; see "Multi-database requirement" in <c>docs/themia-architecture-overview.md</c>.
+    /// </para>
     /// </summary>
     private void CreateMySqlRateWindowUniqueIndexes()
     {

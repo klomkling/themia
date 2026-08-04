@@ -7,7 +7,7 @@ using Themia.Messaging.Outbox;
 
 namespace Themia.Messaging.MySql;
 
-/// <summary>MySQL/MariaDB retention deletes for the messaging outbox and inbox. MySQL supports
+/// <summary>MySQL retention deletes for the messaging outbox and inbox. MySQL supports
 /// <c>DELETE ... LIMIT</c> directly, so each statement is bounded without the <c>ctid</c>-subquery trick
 /// PostgreSQL needs: an unbounded DELETE on a large table holds long locks and bloats it, so the caller
 /// loops until a batch comes back short. Tables use the <c>messaging_</c>-prefixed name in the connection

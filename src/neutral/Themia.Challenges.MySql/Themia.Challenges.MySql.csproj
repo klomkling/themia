@@ -3,7 +3,7 @@
     <!-- Neutral cross-framework package: MUST include net8.0 (cross-framework reuse). -->
     <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
     <PackageId>Themia.Challenges.MySql</PackageId>
-    <Description>MySQL/MariaDB dialect + MySqlConnector driver + FluentMigrator runner for Themia.Challenges.</Description>
+    <Description>MySQL dialect + MySqlConnector driver + FluentMigrator runner for Themia.Challenges.</Description>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />

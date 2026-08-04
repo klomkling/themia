@@ -9,11 +9,11 @@ using Themia.Messaging.Outbox;
 
 namespace Themia.Messaging.MySql;
 
-/// <summary>DI entry point for the MySQL/MariaDB messaging dialects.</summary>
+/// <summary>DI entry point for the MySQL messaging dialects.</summary>
 public static class ServiceCollectionExtensions
 {
     /// <summary>
-    /// Registers the MySQL/MariaDB claim, purge, and inbox-admission dialects, resolving the connection
+    /// Registers the MySQL claim, purge, and inbox-admission dialects, resolving the connection
     /// string from <c>ConnectionStrings:<paramref name="connectionStringName"/></c> at first use.
     /// </summary>
     /// <param name="services">The service collection.</param>

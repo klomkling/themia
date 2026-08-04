@@ -6,7 +6,7 @@ using Themia.Challenges;
 
 namespace Themia.Challenges.MySql;
 
-/// <summary>MySQL/MariaDB implementation of <see cref="IChallengeDialect"/> (MySqlConnector).</summary>
+/// <summary>MySQL implementation of <see cref="IChallengeDialect"/> (MySqlConnector).</summary>
 /// <remarks>
 /// <para>
 /// <b><c>key</c> is a reserved word on MySQL</b> (not on PostgreSQL): every statement below that

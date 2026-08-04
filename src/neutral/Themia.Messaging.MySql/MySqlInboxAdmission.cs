@@ -8,7 +8,7 @@ using Themia.Messaging.Inbox;
 
 namespace Themia.Messaging.MySql;
 
-/// <summary>MySQL/MariaDB inbox admission. A plain <c>INSERT</c> raises every error class — including a
+/// <summary>MySQL inbox admission. A plain <c>INSERT</c> raises every error class — including a
 /// duplicate-key conflict — and this dialect narrowly catches only the duplicate-key case and treats it as
 /// a (non-exceptional) duplicate, letting every other error propagate. <c>received_at</c> is left to the
 /// database clock via <c>UTC_TIMESTAMP(6)</c> so a skewed app-server clock cannot distort the retention

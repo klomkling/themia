@@ -48,8 +48,9 @@ EF Core (`Themia.Framework.Data.EFCore`) and Dapper (`Themia.Framework.Data.Dapp
 enforce tenant isolation, audit, soft-delete, and unit-of-work over the **same schema**, which is
 owned by FluentMigrator (`Themia.Data.Migrations`) as the single authority for both layers.
 
-Phase 1 targets **SQL Server, MySQL (incl. MariaDB), and PostgreSQL** via a dialect strategy and
-per-provider packages.
+Phase 1 targets **SQL Server, MySQL 8.0.13+, and PostgreSQL** via a dialect strategy and
+per-provider packages. **MariaDB is not supported** — see the multi-database note in
+[the architecture overview](docs/themia-architecture-overview.md#multi-database-requirement).
 
 ## Which packages do I reference?
 

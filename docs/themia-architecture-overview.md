@@ -252,9 +252,21 @@ module first needs it; the EF concurrency-seam refactor rides with the EF MySQL 
 
 ## Multi-database requirement
 
-Phase 1 relational support across the framework + data-backed modules: **SQL Server, MySQL
-(incl. MariaDB), PostgreSQL** (via dialect strategy + per-provider packages, per the Exception
-spec). Later phases extend (SQLite, Oracle) without public-surface breaks.
+Phase 1 relational support across the framework + data-backed modules: **SQL Server, MySQL 8.0.13+,
+PostgreSQL** (via dialect strategy + per-provider packages, per the Exception spec). Later phases
+extend (SQLite, Oracle) without public-surface breaks.
+
+**MariaDB is not supported** (UPDATED 2026-08-04 — supersedes the earlier "MySQL (incl. MariaDB)"
+claim). The MySQL leg of the shared schema uses **functional key parts** (`CREATE UNIQUE INDEX ... ((expr))`,
+MySQL 8.0.13+) to emulate the partial/filtered unique indexes PostgreSQL and SQL Server have natively —
+see `Themia.Modules.Pdf.Migrations.PdfTemplateSchemaMigration` and
+`Themia.Challenges.Migrations.ChallengeSchemaMigration`. MariaDB has no equivalent syntax at any
+version, so those migrations fail to parse and the module cannot install. The claim was inherited
+across specs and never tested; only `Themia.Data.Migrations` ever had a real MariaDB container test
+(`MigrationLockTests`, `mariadb:11` — it still runs, and its advisory-lock semantics are deliberately
+written to hold on both engines). Supporting MariaDB would mean replacing every functional index with a
+persisted generated column plus an index on it, across every module that uses one — deferred until an
+adopter actually needs it.
 
 ## Phase roadmap (proposed)
 

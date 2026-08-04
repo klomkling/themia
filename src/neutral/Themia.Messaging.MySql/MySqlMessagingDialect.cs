@@ -9,9 +9,9 @@ using Themia.Messaging.Outbox;
 
 namespace Themia.Messaging.MySql;
 
-/// <summary>MySQL/MariaDB implementation of <see cref="IOutboxDialect{TRow}"/> for the messaging outbox
+/// <summary>MySQL implementation of <see cref="IOutboxDialect{TRow}"/> for the messaging outbox
 /// (MySqlConnector). MySQL has no <c>UPDATE ... RETURNING</c>, so a claim selects-and-locks due ids with
-/// <c>FOR UPDATE SKIP LOCKED</c> (MySQL 8.0+/MariaDB 10.6+), updates them, then re-reads the claimed rows
+/// <c>FOR UPDATE SKIP LOCKED</c> (MySQL 8.0+), updates them, then re-reads the claimed rows
 /// — all inside one transaction. Tables use the <c>messaging_</c>-prefixed name in the connection
 /// string's default database rather than a dedicated schema (FluentMigrator drops <c>InSchema(...)</c> on
 /// MySQL, so a schema-qualified name would mean something different per engine).
@@ -67,7 +67,7 @@ internal sealed class MySqlMessagingDialect : IOutboxDialect<ClaimedMessageRow>
     /// <c>message_id</c> columns are <c>CHAR(36)</c> (FluentMigrator <c>AsGuid()</c> on MySQL), so the
     /// dialect pins <c>GuidFormat=Char36</c> on its own connections regardless of the caller's setting —
     /// guaranteeing <see cref="Guid"/> values round-trip and by-id lookups match.</summary>
-    /// <param name="connectionString">The MySQL/MariaDB connection string for the drain database.</param>
+    /// <param name="connectionString">The MySQL connection string for the drain database.</param>
     public MySqlMessagingDialect(string connectionString)
     {
         var builder = new MySqlConnectionStringBuilder(connectionString)

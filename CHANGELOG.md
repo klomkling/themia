@@ -61,6 +61,16 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
     throws, by name, the first time `IChallengeService` is resolved — deliberately, rather than falling
     back to a silent in-memory store that would pass every test and lose every challenge on restart.
 
+### Changed
+- **(breaking) MariaDB is no longer claimed as a supported engine.** Package descriptions, XML docs and
+  migration error messages said "MySQL/MariaDB"; the MySQL leg of the shared schema uses **functional
+  key parts** (`CREATE UNIQUE INDEX ... ((expr))`, MySQL 8.0.13+) to emulate the partial/filtered unique
+  indexes PostgreSQL and SQL Server have natively, and MariaDB has no equivalent syntax at any version —
+  so `Themia.Modules.Pdf` and `Themia.Challenges` fail at migration time on MariaDB. The claim was
+  inherited across specs and never tested on any package except `Themia.Data.Migrations`, whose
+  `mariadb:11` container test still runs and whose advisory-lock semantics stay deliberately portable.
+  Nothing changes for MySQL adopters; the supported floor is now stated as **MySQL 8.0.13+**.
+
 ### Fixed
 - **(breaking) `Themia.Notifications`** — `LoggerEmailSender` and `LoggerSmsSender` reported
   `NotificationResult.Success()` having sent nothing, and `AddThemiaNotifications()` registers them via

@@ -79,7 +79,14 @@ public sealed class PdfTemplateSchemaMigration : Migration
     /// treats each <c>NULL</c> as distinct in a unique index, so filtered-out rows do not collide).
     /// Soft-deleted rows are folded into the "filtered out" case so a deleted key can be re-created.
     /// This functional-index uniqueness is verified by the MySQL conformance suite
-    /// (<c>Themia.Modules.Pdf.Dapper.MySql.IntegrationTests</c>).</summary>
+    /// (<c>Themia.Modules.Pdf.Dapper.MySql.IntegrationTests</c>).
+    /// <para>
+    /// <b>Requires MySQL 8.0.13+, and does not run on MariaDB at any version</b> — functional key parts
+    /// are the syntax being used here, and MariaDB has no equivalent (its generated-column route needs a
+    /// different schema, not a different index). This is the concrete reason MariaDB is not a supported
+    /// engine; see "Multi-database requirement" in <c>docs/themia-architecture-overview.md</c>.
+    /// </para>
+    /// </summary>
     private void CreateMySqlUniqueIndexes()
     {
         Execute.Sql("CREATE UNIQUE INDEX ux_pdf_templates_tenant_key ON pdf_templates ((IF(tenant_id IS NULL OR is_deleted, NULL, tenant_id)), (IF(tenant_id IS NULL OR is_deleted, NULL, `key`)));");

@@ -30,7 +30,7 @@ public sealed class ExceptionLogMigration : Migration
                 !p.StartsWith("MySql", System.StringComparison.OrdinalIgnoreCase) &&
                 !p.StartsWith("SqlServer", System.StringComparison.OrdinalIgnoreCase))
             .Delegate(() => throw new System.NotSupportedException(
-                "Themia.Exceptional supports only PostgreSQL, MySQL/MariaDB, and SQL Server. " +
+                "Themia.Exceptional supports only PostgreSQL, MySQL, and SQL Server. " +
                 "The active database provider is not supported; add a migration branch for it."));
     }
 

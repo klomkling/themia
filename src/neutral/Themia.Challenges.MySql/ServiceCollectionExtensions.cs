@@ -8,7 +8,7 @@ using Themia.Data.Migrations;
 
 namespace Themia.Challenges.MySql;
 
-/// <summary>DI entry point for the MySQL/MariaDB-backed <c>Themia.Challenges</c> store.</summary>
+/// <summary>DI entry point for the MySQL-backed <c>Themia.Challenges</c> store.</summary>
 public static class ServiceCollectionExtensions
 {
     /// <summary>
@@ -17,7 +17,7 @@ public static class ServiceCollectionExtensions
     /// <c>challenge_rate_windows</c> tables exist.
     /// </summary>
     /// <param name="services">The service collection.</param>
-    /// <param name="connectionString">MySQL/MariaDB connection string.</param>
+    /// <param name="connectionString">MySQL connection string.</param>
     /// <remarks>
     /// Resolves <see cref="ILoggerFactory"/> from <paramref name="services"/> at first
     /// <see cref="IChallengeDialect"/> resolution (via a factory registration, not eagerly — the same
