@@ -291,6 +291,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Themia.Challenges.MySql", "
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Themia.Challenges.SqlServer", "src\neutral\Themia.Challenges.SqlServer\Themia.Challenges.SqlServer.csproj", "{CDDD54DA-3A0B-411F-964C-B2B63279845F}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Themia.Challenges.IntegrationTests", "tests\Themia.Challenges.IntegrationTests\Themia.Challenges.IntegrationTests.csproj", "{F0024051-2492-4A1D-95F5-46FEE39EF358}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -1933,6 +1935,18 @@ Global
 		{CDDD54DA-3A0B-411F-964C-B2B63279845F}.Release|x64.Build.0 = Release|Any CPU
 		{CDDD54DA-3A0B-411F-964C-B2B63279845F}.Release|x86.ActiveCfg = Release|Any CPU
 		{CDDD54DA-3A0B-411F-964C-B2B63279845F}.Release|x86.Build.0 = Release|Any CPU
+		{F0024051-2492-4A1D-95F5-46FEE39EF358}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F0024051-2492-4A1D-95F5-46FEE39EF358}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F0024051-2492-4A1D-95F5-46FEE39EF358}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{F0024051-2492-4A1D-95F5-46FEE39EF358}.Debug|x64.Build.0 = Debug|Any CPU
+		{F0024051-2492-4A1D-95F5-46FEE39EF358}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{F0024051-2492-4A1D-95F5-46FEE39EF358}.Debug|x86.Build.0 = Debug|Any CPU
+		{F0024051-2492-4A1D-95F5-46FEE39EF358}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F0024051-2492-4A1D-95F5-46FEE39EF358}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F0024051-2492-4A1D-95F5-46FEE39EF358}.Release|x64.ActiveCfg = Release|Any CPU
+		{F0024051-2492-4A1D-95F5-46FEE39EF358}.Release|x64.Build.0 = Release|Any CPU
+		{F0024051-2492-4A1D-95F5-46FEE39EF358}.Release|x86.ActiveCfg = Release|Any CPU
+		{F0024051-2492-4A1D-95F5-46FEE39EF358}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -2078,5 +2092,6 @@ Global
 		{E89E4A21-5EA4-4955-825C-ADF9FAB43AE9} = {1F655D57-935D-D295-E882-5052ED9A6376}
 		{3B271174-C50D-49B4-B5BE-27EADD0D55B7} = {1F655D57-935D-D295-E882-5052ED9A6376}
 		{CDDD54DA-3A0B-411F-964C-B2B63279845F} = {1F655D57-935D-D295-E882-5052ED9A6376}
+		{F0024051-2492-4A1D-95F5-46FEE39EF358} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 	EndGlobalSection
 EndGlobal
