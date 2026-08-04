@@ -1,4 +1,6 @@
 using System.Data.Common;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using MySqlConnector;
 using Themia.Challenges;
 
@@ -32,9 +34,24 @@ namespace Themia.Challenges.MySql;
 public sealed class MySqlChallengeDialect : IChallengeDialect
 {
     private readonly string connectionString;
+    private readonly ILogger<DeadlockRetryingConnection> logger;
 
-    /// <summary>Creates the dialect over <paramref name="connectionString"/>.</summary>
-    public MySqlChallengeDialect(string connectionString) => this.connectionString = connectionString;
+    /// <summary>Creates the dialect over <paramref name="connectionString"/>, with no deadlock-retry
+    /// logging (<see cref="NullLogger{T}"/>). Prefer the <see cref="ILoggerFactory"/> overload in
+    /// production — <c>AddThemiaChallengesMySql</c> uses it — so retry pressure and bound exhaustion are
+    /// diagnosable; this overload exists for callers (tests, ad-hoc scripts) that construct the dialect
+    /// directly without a DI-resolved logging pipeline.</summary>
+    public MySqlChallengeDialect(string connectionString) : this(connectionString, NullLoggerFactory.Instance)
+    {
+    }
+
+    /// <summary>Creates the dialect over <paramref name="connectionString"/>, logging
+    /// <see cref="DeadlockRetryingConnection"/>'s retry activity through <paramref name="loggerFactory"/>.</summary>
+    public MySqlChallengeDialect(string connectionString, ILoggerFactory loggerFactory)
+    {
+        this.connectionString = connectionString;
+        logger = loggerFactory.CreateLogger<DeadlockRetryingConnection>();
+    }
 
     /// <inheritdoc />
     /// <remarks>
@@ -47,7 +64,7 @@ public sealed class MySqlChallengeDialect : IChallengeDialect
     /// inserts into the same bucket), so a deadlock retry added to those dialects "by symmetry" would be
     /// dead code masking nothing.
     /// </remarks>
-    public DbConnection CreateConnection() => new DeadlockRetryingConnection(connectionString);
+    public DbConnection CreateConnection() => new DeadlockRetryingConnection(connectionString, logger);
 
     /// <inheritdoc />
     public string InsertSql => """

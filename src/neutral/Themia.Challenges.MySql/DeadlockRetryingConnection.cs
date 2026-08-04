@@ -1,6 +1,7 @@
 using System.Data;
 using System.Data.Common;
 using System.Diagnostics.CodeAnalysis;
+using Microsoft.Extensions.Logging;
 using MySqlConnector;
 
 namespace Themia.Challenges.MySql;
@@ -45,6 +46,19 @@ namespace Themia.Challenges.MySql;
 /// <c>INSERT</c> already committed before the following <c>UPDATE</c> deadlocked, re-running the
 /// <c>INSERT</c> on retry is a no-op against the row that now exists, not a duplicate increment.
 /// </para>
+/// <para>
+/// <b>Logged, not silent.</b> The scenario this exists for — many-way same-key contention — is exactly
+/// the SMS-amplification shape the per-key rate-limit ceiling in <c>IncrementWindowSql</c> exists to
+/// stop, and the deadlock fires <em>before</em> that ceiling gets to refuse anything (coord #0057 is the
+/// same failure class in this repo: a guard that dropped work correctly but silently). An individual
+/// retry logs at <see cref="LogLevel.Debug"/> — routine, expected under real contention, and would flood
+/// production logs at a higher level for something that resolves itself; bound exhaustion (the retries
+/// ran out and the deadlock propagates to the caller) logs at <see cref="LogLevel.Warning"/> — that is a
+/// real, caller-visible failure, and an operator needs it to show up by default, not only when Debug
+/// logging happens to be enabled. Neither ever logs <c>@Key</c> (PII, per <c>ChallengeScope.ToString()</c>'s
+/// own masking) — only the purpose (extracted from the command's own <c>@Purpose</c> parameter when
+/// present) and the attempt count.
+/// </para>
 /// </remarks>
 internal sealed class DeadlockRetryingConnection : DbConnection
 {
@@ -56,12 +70,25 @@ internal sealed class DeadlockRetryingConnection : DbConnection
     /// directly: <c>ConcurrentIssues_ForTheSameKey_ShouldNotLoseACount</c> failed with an unretried
     /// <c>ER_LOCK_DEADLOCK</c> at 3). 30 matches the bound the test's own now-removed workaround used to
     /// survive the same benchmark reliably across repeated runs.
+    /// <para>
+    /// <b>Trade-off a future tuner should know:</b> at 30 retries and <c>BackoffDelay</c>'s 500ms
+    /// cap, the worst case for one statement under sustained contention is roughly 29 retries × up to
+    /// 500ms — call it ~14.5 seconds — before either it succeeds or the bound is exhausted and the
+    /// deadlock propagates. That is the price of surviving <c>ConcurrencyTests.ConcurrencyLevel</c>-way
+    /// (64-way) contention without a lost update; lowering this value trades that reliability back for a
+    /// lower worst-case latency.
+    /// </para>
     /// </summary>
     internal const int MaxDeadlockRetries = 30;
 
     private readonly MySqlConnection inner;
+    private readonly ILogger logger;
 
-    public DeadlockRetryingConnection(string connectionString) => inner = new MySqlConnection(connectionString);
+    public DeadlockRetryingConnection(string connectionString, ILogger logger)
+    {
+        inner = new MySqlConnection(connectionString);
+        this.logger = logger;
+    }
 
     [AllowNull]
     public override string ConnectionString
@@ -90,7 +117,7 @@ internal sealed class DeadlockRetryingConnection : DbConnection
 
     protected override DbCommand CreateDbCommand()
     {
-        var command = new DeadlockRetryingCommand(inner.CreateCommand());
+        var command = new DeadlockRetryingCommand((MySqlCommand)inner.CreateCommand(), logger);
         command.Connection = this;
         return command;
     }
@@ -110,10 +137,15 @@ internal sealed class DeadlockRetryingConnection : DbConnection
     private sealed class DeadlockRetryingCommand : DbCommand
     {
         private readonly MySqlCommand inner;
+        private readonly ILogger logger;
         private DbConnection? connection;
         private DbTransaction? transaction;
 
-        public DeadlockRetryingCommand(MySqlCommand inner) => this.inner = inner;
+        public DeadlockRetryingCommand(MySqlCommand inner, ILogger logger)
+        {
+            this.inner = inner;
+            this.logger = logger;
+        }
 
         [AllowNull]
         public override string CommandText
@@ -179,19 +211,22 @@ internal sealed class DeadlockRetryingConnection : DbConnection
         protected override DbDataReader ExecuteDbDataReader(CommandBehavior behavior) => Retry(() => inner.ExecuteReader(behavior));
 
         public override Task<int> ExecuteNonQueryAsync(CancellationToken cancellationToken) =>
-            RetryAsync(() => inner.ExecuteNonQueryAsync(cancellationToken));
+            RetryAsync(() => inner.ExecuteNonQueryAsync(cancellationToken), cancellationToken);
 
         public override Task<object?> ExecuteScalarAsync(CancellationToken cancellationToken) =>
-            RetryAsync(() => inner.ExecuteScalarAsync(cancellationToken));
+            RetryAsync(() => inner.ExecuteScalarAsync(cancellationToken), cancellationToken);
 
         protected override Task<DbDataReader> ExecuteDbDataReaderAsync(CommandBehavior behavior, CancellationToken cancellationToken) =>
-            RetryAsync<DbDataReader>(async () => await inner.ExecuteReaderAsync(behavior, cancellationToken).ConfigureAwait(false));
+            RetryAsync<DbDataReader>(
+                async () => await inner.ExecuteReaderAsync(behavior, cancellationToken).ConfigureAwait(false), cancellationToken);
 
         // Only ER_LOCK_DEADLOCK (1213) is retried — see the type-level remarks on why this is safe to
         // retry as a whole command. Any other MySqlException (a genuine constraint violation, a syntax
         // error, a connection failure) is not transient and must surface immediately, not be silently
-        // absorbed.
-        private static T Retry<T>(Func<T> execute)
+        // absorbed. No CancellationToken on the sync ADO.NET surface (ExecuteNonQuery/ExecuteScalar/
+        // ExecuteDbDataReader take none), so Thread.Sleep has nothing to honour here — see RetryAsync for
+        // the async path, which does.
+        private T Retry<T>(Func<T> execute)
         {
             for (var attempt = 1; ; attempt++)
             {
@@ -199,16 +234,21 @@ internal sealed class DeadlockRetryingConnection : DbConnection
                 {
                     return execute();
                 }
-                catch (MySqlException ex) when (ex.ErrorCode == MySqlErrorCode.LockDeadlock && attempt < MaxDeadlockRetries)
+                catch (MySqlException ex) when (ex.ErrorCode == MySqlErrorCode.LockDeadlock)
                 {
-                    // Transient InnoDB deadlock — the statement's own implicit transaction is already
-                    // rolled back; retry it, after backing off (see BackoffDelay).
+                    if (attempt >= MaxDeadlockRetries)
+                    {
+                        LogExhausted(attempt);
+                        throw;
+                    }
+
+                    LogRetry(attempt);
                     Thread.Sleep(BackoffDelay(attempt));
                 }
             }
         }
 
-        private static async Task<T> RetryAsync<T>(Func<Task<T>> execute)
+        private async Task<T> RetryAsync<T>(Func<Task<T>> execute, CancellationToken cancellationToken)
         {
             for (var attempt = 1; ; attempt++)
             {
@@ -216,13 +256,54 @@ internal sealed class DeadlockRetryingConnection : DbConnection
                 {
                     return await execute().ConfigureAwait(false);
                 }
-                catch (MySqlException ex) when (ex.ErrorCode == MySqlErrorCode.LockDeadlock && attempt < MaxDeadlockRetries)
+                catch (MySqlException ex) when (ex.ErrorCode == MySqlErrorCode.LockDeadlock)
                 {
-                    // Transient InnoDB deadlock — the statement's own implicit transaction is already
-                    // rolled back; retry it, after backing off (see BackoffDelay).
-                    await Task.Delay(BackoffDelay(attempt)).ConfigureAwait(false);
+                    if (attempt >= MaxDeadlockRetries)
+                    {
+                        LogExhausted(attempt);
+                        throw;
+                    }
+
+                    LogRetry(attempt);
+                    // Honours cancellation during the backoff itself — without the token, a caller that
+                    // cancels mid-backoff would wait out the delay before the cancellation takes effect.
+                    await Task.Delay(BackoffDelay(attempt), cancellationToken).ConfigureAwait(false);
                 }
             }
+        }
+
+        // Routine and expected under real contention (this is the retry path the per-key rate limit
+        // exists behind, not ahead of — see the type-level remarks); logging every occurrence above
+        // Debug would flood production logs for something that resolves itself. An operator actively
+        // investigating latency enables Debug and sees the full retry pressure building up.
+        private void LogRetry(int attempt) =>
+            logger.LogDebug(
+                "Retrying after MySQL deadlock (ER_LOCK_DEADLOCK), attempt {Attempt} of {MaxDeadlockRetries}, purpose {Purpose}",
+                attempt, MaxDeadlockRetries, TryGetPurpose());
+
+        // A real, caller-visible failure (the deadlock propagates from here) — must show up by default,
+        // not only when Debug logging happens to be enabled.
+        private void LogExhausted(int attempt) =>
+            logger.LogWarning(
+                "MySQL deadlock retry bound ({MaxDeadlockRetries}) exhausted after {Attempt} attempts, purpose {Purpose}",
+                MaxDeadlockRetries, attempt, TryGetPurpose());
+
+        // Best-effort: not every statement binds @Purpose (e.g. ConsumeSql/RecordAttemptSql key off @Id
+        // alone), so this can legitimately find nothing. Never inspects @Key or @TenantId — the key is
+        // PII (ChallengeScope.ToString() masks it for exactly this reason) and neither is needed to make
+        // the log line actionable.
+        private string TryGetPurpose()
+        {
+            foreach (DbParameter parameter in inner.Parameters)
+            {
+                if (string.Equals(parameter.ParameterName.TrimStart('@'), "Purpose", StringComparison.OrdinalIgnoreCase)
+                    && parameter.Value is string purpose)
+                {
+                    return purpose;
+                }
+            }
+
+            return "(unknown)";
         }
 
         // Full jitter, exponential, capped: at many-way contention on the same brand-new bucket, a fixed

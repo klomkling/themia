@@ -8,6 +8,7 @@ Themia.Challenges.MySql.MySqlChallengeDialect.IncrementWindowSql.get -> string!
 Themia.Challenges.MySql.MySqlChallengeDialect.InsertSql.get -> string!
 Themia.Challenges.MySql.MySqlChallengeDialect.InvalidateLiveForScopeSql.get -> string!
 Themia.Challenges.MySql.MySqlChallengeDialect.MySqlChallengeDialect(string! connectionString) -> void
+Themia.Challenges.MySql.MySqlChallengeDialect.MySqlChallengeDialect(string! connectionString, Microsoft.Extensions.Logging.ILoggerFactory! loggerFactory) -> void
 Themia.Challenges.MySql.MySqlChallengeDialect.PurgeElapsedWindowsSql.get -> string!
 Themia.Challenges.MySql.MySqlChallengeDialect.PurgeExpiredSql.get -> string!
 Themia.Challenges.MySql.MySqlChallengeDialect.RecordAttemptSql.get -> string!
