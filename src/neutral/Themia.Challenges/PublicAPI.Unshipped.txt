@@ -1,0 +1,62 @@
+#nullable enable
+static Themia.Challenges.ChallengeFormat.Numeric(int length) -> Themia.Challenges.ChallengeFormat!
+static Themia.Challenges.ChallengeFormat.OpaqueToken(int bytes) -> Themia.Challenges.ChallengeFormat!
+static Themia.Challenges.ChallengeIssueResult.Issued(string! secret, System.DateTimeOffset expiresAt) -> Themia.Challenges.ChallengeIssueResult!
+static Themia.Challenges.ChallengeIssueResult.RateLimited() -> Themia.Challenges.ChallengeIssueResult!
+static Themia.Challenges.ChallengeVerifyResult.AttemptsExhausted(Themia.Challenges.ChallengeScope! scope) -> Themia.Challenges.ChallengeVerifyResult!
+static Themia.Challenges.ChallengeVerifyResult.Consumed(Themia.Challenges.ChallengeScope! scope) -> Themia.Challenges.ChallengeVerifyResult!
+static Themia.Challenges.ChallengeVerifyResult.Expired(Themia.Challenges.ChallengeScope! scope) -> Themia.Challenges.ChallengeVerifyResult!
+static Themia.Challenges.ChallengeVerifyResult.Incorrect(Themia.Challenges.ChallengeScope! scope) -> Themia.Challenges.ChallengeVerifyResult!
+static Themia.Challenges.ChallengeVerifyResult.NotFound(Themia.Challenges.ChallengeScope! scope) -> Themia.Challenges.ChallengeVerifyResult!
+static Themia.Challenges.ChallengeVerifyResult.Verified(Themia.Challenges.ChallengeScope! scope) -> Themia.Challenges.ChallengeVerifyResult!
+Themia.Challenges.ChallengeFormat
+Themia.Challenges.ChallengeFormat.Kind.get -> Themia.Challenges.ChallengeFormatKind
+Themia.Challenges.ChallengeFormat.Length.get -> int
+Themia.Challenges.ChallengeFormatKind
+Themia.Challenges.ChallengeFormatKind.Numeric = 0 -> Themia.Challenges.ChallengeFormatKind
+Themia.Challenges.ChallengeFormatKind.OpaqueToken = 1 -> Themia.Challenges.ChallengeFormatKind
+Themia.Challenges.ChallengeIssueOutcome
+Themia.Challenges.ChallengeIssueOutcome.Issued = 0 -> Themia.Challenges.ChallengeIssueOutcome
+Themia.Challenges.ChallengeIssueOutcome.RateLimited = 1 -> Themia.Challenges.ChallengeIssueOutcome
+Themia.Challenges.ChallengeIssueResult
+Themia.Challenges.ChallengeIssueResult.ExpiresAt.get -> System.DateTimeOffset?
+Themia.Challenges.ChallengeIssueResult.Outcome.get -> Themia.Challenges.ChallengeIssueOutcome
+Themia.Challenges.ChallengeIssueResult.Secret.get -> string?
+Themia.Challenges.ChallengeIssueResult.Succeeded.get -> bool
+Themia.Challenges.ChallengeOptions
+Themia.Challenges.ChallengeOptions.ChallengeOptions() -> void
+Themia.Challenges.ChallengeOptions.ConfigurePurpose(string! purpose, System.Action<Themia.Challenges.PurposeOptions!>! configure) -> void
+Themia.Challenges.ChallengeOptions.GetPurpose(string! purpose) -> Themia.Challenges.PurposeOptions!
+Themia.Challenges.ChallengeScope
+Themia.Challenges.ChallengeScope.ChallengeScope(string! Key, string! Purpose, string? TenantId = null) -> void
+Themia.Challenges.ChallengeScope.Key.get -> string!
+Themia.Challenges.ChallengeScope.Key.init -> void
+Themia.Challenges.ChallengeScope.Purpose.get -> string!
+Themia.Challenges.ChallengeScope.Purpose.init -> void
+Themia.Challenges.ChallengeScope.TenantId.get -> string?
+Themia.Challenges.ChallengeScope.TenantId.init -> void
+Themia.Challenges.ChallengeVerifyOutcome
+Themia.Challenges.ChallengeVerifyOutcome.AttemptsExhausted = 4 -> Themia.Challenges.ChallengeVerifyOutcome
+Themia.Challenges.ChallengeVerifyOutcome.Consumed = 3 -> Themia.Challenges.ChallengeVerifyOutcome
+Themia.Challenges.ChallengeVerifyOutcome.Expired = 2 -> Themia.Challenges.ChallengeVerifyOutcome
+Themia.Challenges.ChallengeVerifyOutcome.Incorrect = 1 -> Themia.Challenges.ChallengeVerifyOutcome
+Themia.Challenges.ChallengeVerifyOutcome.NotFound = 5 -> Themia.Challenges.ChallengeVerifyOutcome
+Themia.Challenges.ChallengeVerifyOutcome.Verified = 0 -> Themia.Challenges.ChallengeVerifyOutcome
+Themia.Challenges.ChallengeVerifyResult
+Themia.Challenges.ChallengeVerifyResult.Outcome.get -> Themia.Challenges.ChallengeVerifyOutcome
+Themia.Challenges.ChallengeVerifyResult.Scope.get -> Themia.Challenges.ChallengeScope!
+Themia.Challenges.ChallengeVerifyResult.Succeeded.get -> bool
+Themia.Challenges.PurposeOptions
+Themia.Challenges.PurposeOptions.Format.get -> Themia.Challenges.ChallengeFormat!
+Themia.Challenges.PurposeOptions.Format.set -> void
+Themia.Challenges.PurposeOptions.MaxAttempts.get -> int
+Themia.Challenges.PurposeOptions.MaxAttempts.set -> void
+Themia.Challenges.PurposeOptions.MaxLiveChallenges.get -> int
+Themia.Challenges.PurposeOptions.MaxLiveChallenges.set -> void
+Themia.Challenges.PurposeOptions.PerKeyWindow.get -> (int Limit, System.TimeSpan Window)
+Themia.Challenges.PurposeOptions.PerKeyWindow.set -> void
+Themia.Challenges.PurposeOptions.PerScopeWindow.get -> (int Limit, System.TimeSpan Window)
+Themia.Challenges.PurposeOptions.PerScopeWindow.set -> void
+Themia.Challenges.PurposeOptions.PurposeOptions() -> void
+Themia.Challenges.PurposeOptions.Ttl.get -> System.TimeSpan
+Themia.Challenges.PurposeOptions.Ttl.set -> void
