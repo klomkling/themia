@@ -1,4 +1,7 @@
 #nullable enable
+const Themia.Challenges.ChallengeScope.MaxKeyLength = 450 -> int
+const Themia.Challenges.ChallengeScope.MaxPurposeLength = 100 -> int
+const Themia.Challenges.ChallengeScope.MaxTenantIdLength = 100 -> int
 override Themia.Challenges.ChallengeScope.ToString() -> string!
 override Themia.Challenges.Migrations.ChallengeSchemaMigration.Down() -> void
 override Themia.Challenges.Migrations.ChallengeSchemaMigration.Up() -> void
