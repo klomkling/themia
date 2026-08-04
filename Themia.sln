@@ -285,6 +285,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Themia.Challenges", "src\ne
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Themia.Challenges.Tests", "tests\Themia.Challenges.Tests\Themia.Challenges.Tests.csproj", "{1B050C6F-D01C-4429-A57F-C1719D476C94}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Themia.Challenges.PostgreSql", "src\neutral\Themia.Challenges.PostgreSql\Themia.Challenges.PostgreSql.csproj", "{E89E4A21-5EA4-4955-825C-ADF9FAB43AE9}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -1891,6 +1893,18 @@ Global
 		{1B050C6F-D01C-4429-A57F-C1719D476C94}.Release|x64.Build.0 = Release|Any CPU
 		{1B050C6F-D01C-4429-A57F-C1719D476C94}.Release|x86.ActiveCfg = Release|Any CPU
 		{1B050C6F-D01C-4429-A57F-C1719D476C94}.Release|x86.Build.0 = Release|Any CPU
+		{E89E4A21-5EA4-4955-825C-ADF9FAB43AE9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E89E4A21-5EA4-4955-825C-ADF9FAB43AE9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E89E4A21-5EA4-4955-825C-ADF9FAB43AE9}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{E89E4A21-5EA4-4955-825C-ADF9FAB43AE9}.Debug|x64.Build.0 = Debug|Any CPU
+		{E89E4A21-5EA4-4955-825C-ADF9FAB43AE9}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{E89E4A21-5EA4-4955-825C-ADF9FAB43AE9}.Debug|x86.Build.0 = Debug|Any CPU
+		{E89E4A21-5EA4-4955-825C-ADF9FAB43AE9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E89E4A21-5EA4-4955-825C-ADF9FAB43AE9}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E89E4A21-5EA4-4955-825C-ADF9FAB43AE9}.Release|x64.ActiveCfg = Release|Any CPU
+		{E89E4A21-5EA4-4955-825C-ADF9FAB43AE9}.Release|x64.Build.0 = Release|Any CPU
+		{E89E4A21-5EA4-4955-825C-ADF9FAB43AE9}.Release|x86.ActiveCfg = Release|Any CPU
+		{E89E4A21-5EA4-4955-825C-ADF9FAB43AE9}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -2033,5 +2047,6 @@ Global
 		{888680EB-24D9-420A-992E-45719EF86F4B} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 		{4A961D99-C185-4AFA-A0F7-552E4BB390AB} = {1F655D57-935D-D295-E882-5052ED9A6376}
 		{1B050C6F-D01C-4429-A57F-C1719D476C94} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
+		{E89E4A21-5EA4-4955-825C-ADF9FAB43AE9} = {1F655D57-935D-D295-E882-5052ED9A6376}
 	EndGlobalSection
 EndGlobal

@@ -19,5 +19,6 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/neutral/Themia.Challenges/Themia.Challenges.csproj" />
+    <ProjectReference Include="../../src/neutral/Themia.Challenges.PostgreSql/Themia.Challenges.PostgreSql.csproj" />
   </ItemGroup>
 </Project>
