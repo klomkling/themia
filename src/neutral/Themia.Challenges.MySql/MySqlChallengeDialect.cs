@@ -98,20 +98,38 @@ public sealed class MySqlChallengeDialect : IChallengeDialect
     /// <c>ChallengeDialectContractTests.TenantId_ShouldUseNullSafeComparison</c> /
     /// <c>Purpose_ShouldUseNullSafeComparison_OnIncrementAndDecrementWindow</c> — both of which assert
     /// against this member's SQL text and would pass vacuously (finding nothing to check) against a
-    /// bare <c>ON DUPLICATE KEY UPDATE</c> form. So, matching <c>PostgresChallengeDialect</c>'s shape:
-    /// <c>INSERT IGNORE</c> seeds a fresh bucket at <c>count = 0</c> (or is silently skipped — MySQL's
-    /// <c>IGNORE</c> modifier suppresses <c>ER_DUP_ENTRY</c> for a violation of <i>any</i> unique index
-    /// on the table, so it works uniformly across all four functional indexes, the same way Postgres's
-    /// target-less <c>ON CONFLICT DO NOTHING</c> does); the following <c>UPDATE</c>, carrying the
-    /// explicit null-safe predicate, then unconditionally adds 1 to whichever row now exists. Concurrent
-    /// callers for the same brand-new bucket serialize on the functional unique index during
-    /// <c>INSERT IGNORE</c> (exactly one of them creates the row) and then serialize again on the row
-    /// lock during <c>UPDATE</c> (each sees the previous caller's committed count and adds 1), so no
-    /// increment is ever lost and a new bucket always lands on 1, an existing one on n+1.
+    /// bare <c>ON DUPLICATE KEY UPDATE</c> form.
+    /// <para>
+    /// <b>The seed <c>INSERT</c> uses <c>ON DUPLICATE KEY UPDATE id = id</c>, not <c>INSERT IGNORE</c>.</b>
+    /// <c>IGNORE</c> is not the MySQL analogue of Postgres's target-less <c>ON CONFLICT DO NOTHING</c> —
+    /// it downgrades a whole class of errors to warnings (duplicate key, data truncation, <c>NULL</c>
+    /// into a <c>NOT NULL</c> column, out-of-range values), and it does so <i>regardless of</i>
+    /// <c>sql_mode</c>: even under strict mode, which would otherwise abort on truncation, <c>IGNORE</c>
+    /// overrides it and silently adjusts the value instead of erroring. That is not theoretical for this
+    /// table: <c>key</c> is <c>varchar(450)</c>, and the caller-supplied scope key it stores
+    /// (<c>ChallengeScope.Key</c> — "never parsed", unbounded in length by anything in
+    /// <c>Themia.Challenges</c>) can exceed 450 characters. Under <c>INSERT IGNORE</c> that silently
+    /// truncates into a different bucket than the caller intended, so the per-key ceiling — the only
+    /// layer bounding the SMS bill — counts the wrong thing, with no error and no way for an adopter to
+    /// detect it, strict mode notwithstanding. <c>ON DUPLICATE KEY UPDATE id = id</c> is a no-op on
+    /// collision exactly like <c>IGNORE</c> (assigning a column its own current value changes nothing)
+    /// but fires only on a genuine duplicate-key violation, leaving truncation and <c>NOT NULL</c>
+    /// protection intact — a real error surfaces instead of a silently mis-bucketed counter. It still
+    /// works uniformly across all four functional indexes for the same reason <c>IGNORE</c> would have:
+    /// <c>ON DUPLICATE KEY UPDATE</c> fires on a violation of <i>any</i> unique index on the table, not
+    /// one named target.
+    /// </para>
+    /// The following <c>UPDATE</c>, carrying the explicit null-safe predicate, then unconditionally adds
+    /// 1 to whichever row now exists. Concurrent callers for the same brand-new bucket serialize on the
+    /// functional unique index during the seed <c>INSERT</c> (exactly one of them creates the row, the
+    /// other's collision is absorbed by <c>ON DUPLICATE KEY UPDATE id = id</c>) and then serialize again
+    /// on the row lock during <c>UPDATE</c> (each sees the previous caller's committed count and adds 1),
+    /// so no increment is ever lost and a new bucket always lands on 1, an existing one on n+1.
     /// </remarks>
     public string IncrementWindowSql => """
-        INSERT IGNORE INTO challenge_rate_windows (id, tenant_id, `key`, purpose, window_start, count)
-        VALUES (@Id, @TenantId, @Key, @Purpose, @WindowStart, 0);
+        INSERT INTO challenge_rate_windows (id, tenant_id, `key`, purpose, window_start, count)
+        VALUES (@Id, @TenantId, @Key, @Purpose, @WindowStart, 0)
+        ON DUPLICATE KEY UPDATE id = id;
         UPDATE challenge_rate_windows SET count = count + 1
         WHERE tenant_id <=> @TenantId AND `key` = @Key AND purpose <=> @Purpose
           AND window_start = @WindowStart;

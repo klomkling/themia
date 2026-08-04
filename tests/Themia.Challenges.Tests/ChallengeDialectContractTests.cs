@@ -69,7 +69,15 @@ public class ChallengeDialectContractTests
     {
         foreach (var (name, sql) in AllStatements(dialect))
         {
-            var withoutQuotedKey = Regex.Replace(sql, "\"key\"|`key`|\\[key\\]", string.Empty, RegexOptions.IgnoreCase);
+            // "DUPLICATE KEY UPDATE" is stripped alongside the quoted forms: it is MySQL's own fixed
+            // upsert-clause keyword phrase (see MySqlChallengeDialect.IncrementWindowSql), not a
+            // reference to the `key` column, so a bare "KEY" inside it is not the defect this theory
+            // hunts for.
+            var withoutQuotedKey = Regex.Replace(
+                sql,
+                "\"key\"|`key`|\\[key\\]|DUPLICATE\\s+KEY\\s+UPDATE",
+                string.Empty,
+                RegexOptions.IgnoreCase);
 
             // (?<!@) excludes the @Key Dapper parameter name — a legitimate bare "key" that is not
             // the column and needs no quoting.
