@@ -132,15 +132,75 @@ public sealed class SqlServerChallengeDialect : IChallengeDialect
     /// previous caller's committed count and adds 1), so no increment is ever lost and a new bucket
     /// always lands on 1, an existing one on n+1, two concurrent callers on 2 — never both on 1.
     /// </para>
+    /// <para>
+    /// <b>This is the only one of the three dialects whose upsert can raise for the benign
+    /// collision.</b> PostgreSQL's <c>ON CONFLICT DO NOTHING</c> and MySQL's
+    /// <c>ON DUPLICATE KEY UPDATE id = id</c> both suppress the duplicate at the engine level — no
+    /// error is ever raised, so neither statement interacts with transaction-doom semantics at all.
+    /// SQL Server has no such "insert, but silently no-op on collision" form, so this statement
+    /// raises 2601/2627 and then <i>catches</i> it — which matters because of how <c>SET XACT_ABORT</c>
+    /// changes what an error does to the ambient transaction. <c>System.Transactions.TransactionScope</c>
+    /// sets <c>XACT_ABORT ON</c> automatically the moment a <see cref="SqlConnection"/> enlists in it —
+    /// the obvious way an issuance flow (insert the challenge, then call this statement for both the
+    /// per-scope and per-key windows) would be made atomic. Under <c>XACT_ABORT ON</c>, a run-time
+    /// error dooms the <i>entire</i> transaction — confirmed empirically against a live SQL Server
+    /// 2022 instance: with an ambient <c>XACT_ABORT ON</c> transaction and a colliding bucket, by the
+    /// time the <c>CATCH</c> block runs, <c>XACT_STATE()</c> already reads <c>-1</c> (uncommittable),
+    /// not <c>1</c> — the <c>THROW</c> filter never gets a live, committable transaction to return to,
+    /// even though the filter itself still correctly identifies the error as benign.
+    /// </para>
+    /// <para>
+    /// <b><c>SAVE TRANSACTION</c> / <c>ROLLBACK TRANSACTION</c> &lt;savepoint&gt; does not fix this —
+    /// verified, not assumed.</b> The natural first fix is to wrap the seed <c>INSERT</c> in a
+    /// savepoint and roll back only to it on the benign error, leaving the rest of the ambient
+    /// transaction intact. Tested directly against a live SQL Server 2022 container: under an ambient
+    /// <c>XACT_ABORT ON</c> transaction, a savepoint taken before the colliding <c>INSERT</c>, and a
+    /// <c>ROLLBACK TRANSACTION</c> to that savepoint issued from the <c>CATCH</c> block once the error
+    /// is confirmed benign — the rollback itself fails with <c>"The current transaction cannot be
+    /// committed and cannot be rolled back to a savepoint. Roll back the entire transaction."</c>
+    /// <c>XACT_ABORT ON</c> dooms the <i>whole</i> transaction on error, unconditionally, ignoring any
+    /// savepoint taken earlier in it — a doomed transaction (<c>XACT_STATE() = -1</c>) can only be
+    /// rolled back in full, never partially. This is a documented SQL Server interaction (see Erland
+    /// Sommarskog's error-handling series), not specific to this schema, so no future revision of this
+    /// statement should reach for <c>SAVE TRANSACTION</c> as the fix here.
+    /// </para>
+    /// <para>
+    /// <b>What actually works: suppress the escalation for just the seed <c>INSERT</c>, not the
+    /// symptom after the fact.</b> <c>SET XACT_ABORT OFF</c> immediately before the <c>INSERT</c>
+    /// downgrades a duplicate-key violation back to the ordinary statement-level recoverable error it
+    /// would be without <c>XACT_ABORT</c> — the exact behavior this statement already relied on before
+    /// this fix, and the behavior every plain (non-<c>TransactionScope</c>) caller already gets by
+    /// default. The original session setting is captured first via <c>@@OPTIONS &amp; 16384</c> (the
+    /// documented <c>XACT_ABORT</c> bit — <c>SESSIONPROPERTY('XACT_ABORT')</c> looks like the obvious
+    /// way to read it back but is <i>not</i> a valid option name for that function and silently returns
+    /// <see langword="null"/>, confirmed against a live instance) and restored to exactly that value —
+    /// not unconditionally forced back <c>ON</c> — both on the benign-collision path and immediately
+    /// before <c>THROW</c> on a genuine error, so a caller who runs with <c>XACT_ABORT OFF</c> gets
+    /// their setting back unchanged rather than having it silently flipped for the rest of their
+    /// session. Verified against a live SQL Server 2022 instance across all three cases this remark
+    /// describes: a colliding bucket inside an ambient <c>XACT_ABORT ON</c> transaction (the
+    /// <c>TransactionScope</c> case) commits with the ambient transaction's other work intact and
+    /// <c>XACT_STATE()</c> staying <c>1</c> throughout; the same collision under plain autocommit
+    /// behaves exactly as before; and a genuine, unrelated error (a forced <c>NOT NULL</c> violation)
+    /// still propagates via <c>THROW</c> and still dooms/rolls back the transaction — the fix narrows
+    /// exactly the benign case, it does not widen what gets swallowed.
+    /// </para>
     /// </remarks>
     public string IncrementWindowSql => """
+        DECLARE @xactAbortWasOn bit = CASE WHEN @@OPTIONS & 16384 = 16384 THEN 1 ELSE 0 END;
+        SET XACT_ABORT OFF;
         BEGIN TRY
             INSERT INTO challenge_rate_windows (id, tenant_id, [key], purpose, window_start, count)
             VALUES (@Id, @TenantId, @Key, @Purpose, @WindowStart, 0);
         END TRY
         BEGIN CATCH
-            IF ERROR_NUMBER() NOT IN (2601, 2627) THROW;
+            IF ERROR_NUMBER() NOT IN (2601, 2627)
+            BEGIN
+                IF @xactAbortWasOn = 1 SET XACT_ABORT ON;
+                THROW;
+            END
         END CATCH
+        IF @xactAbortWasOn = 1 SET XACT_ABORT ON;
         UPDATE challenge_rate_windows SET count = count + 1
         WHERE (tenant_id = @TenantId OR (tenant_id IS NULL AND @TenantId IS NULL)) AND [key] = @Key
           AND (purpose = @Purpose OR (purpose IS NULL AND @Purpose IS NULL))
