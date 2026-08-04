@@ -33,6 +33,15 @@ internal static class SecretHasher
     // a 6-digit secret's tiny keyspace means a large iteration count buys negligible additional
     // resistance while adding real latency to every single verification attempt. The TTL and
     // single-use semantics are what actually protect a leaked row, not this number.
+    //
+    // Crucially, this is not only a latency argument: Verify runs behind an UNAUTHENTICATED
+    // endpoint. An attacker submits wrong codes and the server pays the full KDF cost on every
+    // attempt, up to MaxAttempts times per challenge, with no auth gate in front of it. Raising
+    // the iteration count toward password-hashing guidance would hand that same attacker a
+    // cheap CPU-exhaustion lever against the live endpoint — so the ceiling here is a security
+    // constraint, not merely a performance preference. Do not raise this on the theory that a
+    // higher count is "free defense in depth"; it is not free, and it is futile against the tiny
+    // keyspace besides.
     private const int Iterations = 10_000;
     private const int SaltSizeBytes = 16;
     private const int HashSizeBytes = 32;
