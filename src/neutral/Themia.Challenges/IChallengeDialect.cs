@@ -15,6 +15,14 @@ namespace Themia.Challenges;
 /// enforce tenant isolation by construction — the caller always supplies <c>@TenantId</c> (which may be
 /// <see langword="null"/> for a platform-level challenge) and every statement scopes its predicate to
 /// exactly the value it was given.
+/// <para>
+/// <b><c>key</c> is a reserved word on MySQL and SQL Server</b> (not on PostgreSQL) — every statement
+/// below that references the <c>key</c> column must quote it per engine (<c>"key"</c> on PostgreSQL,
+/// <c>`key`</c> on MySQL, <c>[key]</c> on SQL Server) or the statement fails to parse on two of the
+/// three. See <c>Themia.Modules.Storage.Migrations.StorageSchemaMigration</c> and
+/// <c>Themia.Modules.Pdf.Migrations.PdfTemplateSchemaMigration</c> for the same rule applied to their
+/// own <c>key</c> columns.
+/// </para>
 /// </remarks>
 public interface IChallengeDialect
 {

@@ -42,7 +42,10 @@ public class ChallengeDialectContractTests
     /// A minimal, non-functional <see cref="IChallengeDialect"/> that exists only to give
     /// <see cref="AllDialects"/> a case to run before a real engine package lands. Its SQL properties
     /// are illustrative text satisfying each member's documented contract, not statements ever
-    /// executed against a database — <see cref="CreateConnection"/> throws if called.
+    /// executed against a database — <see cref="CreateConnection"/> throws if called. The <c>key</c>
+    /// column is quoted ANSI-style (<c>"key"</c>) throughout, matching PostgreSQL's quoting, because
+    /// <c>key</c> is a reserved word on MySQL and SQL Server too — see the type-level remarks on
+    /// <see cref="IChallengeDialect"/>. A real per-engine dialect quotes it that engine's way instead.
     /// </summary>
     private sealed class ReferenceChallengeDialect : IChallengeDialect
     {
@@ -50,11 +53,11 @@ public class ChallengeDialectContractTests
             throw new NotSupportedException($"{nameof(ReferenceChallengeDialect)} is a contract-test stub, not a real dialect.");
 
         public string InsertSql =>
-            "INSERT INTO challenges (id, tenant_id, key, purpose, secret_hash, secret_salt, token_hash, attempts, expires_at, created_at) " +
+            "INSERT INTO challenges (id, tenant_id, \"key\", purpose, secret_hash, secret_salt, token_hash, attempts, expires_at, created_at) " +
             "VALUES (@Id, @TenantId, @Key, @Purpose, @SecretHash, @SecretSalt, @TokenHash, @Attempts, @ExpiresAt, @CreatedAt)";
 
         public string SelectLiveByScopeSql =>
-            "SELECT * FROM challenges WHERE tenant_id = @TenantId AND key = @Key AND purpose = @Purpose " +
+            "SELECT * FROM challenges WHERE tenant_id = @TenantId AND \"key\" = @Key AND purpose = @Purpose " +
             "AND consumed_at IS NULL AND expires_at > @Now ORDER BY created_at DESC";
 
         public string SelectLiveByTokenHashSql =>
@@ -67,22 +70,22 @@ public class ChallengeDialectContractTests
             "UPDATE challenges SET attempts = attempts + 1 WHERE id = @Id AND consumed_at IS NULL";
 
         public string InvalidateLiveForScopeSql =>
-            "UPDATE challenges SET consumed_at = @ConsumedAt WHERE tenant_id = @TenantId AND key = @Key AND purpose = @Purpose " +
+            "UPDATE challenges SET consumed_at = @ConsumedAt WHERE tenant_id = @TenantId AND \"key\" = @Key AND purpose = @Purpose " +
             "AND consumed_at IS NULL AND expires_at > @Now";
 
         public string PurgeExpiredSql => "DELETE FROM challenges WHERE expires_at < @OlderThan";
 
         public string IncrementWindowSql =>
-            "UPSERT challenge_rate_windows (id, tenant_id, key, purpose, window_start, count) " +
+            "UPSERT challenge_rate_windows (id, tenant_id, \"key\", purpose, window_start, count) " +
             "TARGET (@Id, @TenantId, @Key, @Purpose, @WindowStart, 1) INCREMENT count";
 
         public string SelectWindowCountsSql =>
-            "SELECT purpose, count FROM challenge_rate_windows WHERE tenant_id = @TenantId AND key = @Key " +
+            "SELECT purpose, count FROM challenge_rate_windows WHERE tenant_id = @TenantId AND \"key\" = @Key " +
             "AND ((purpose = @Purpose AND window_start = @ScopeWindowStart) OR (purpose IS NULL AND window_start = @KeyWindowStart))";
 
         public string DecrementWindowSql =>
             "UPDATE challenge_rate_windows SET count = GREATEST(count - 1, 0) " +
-            "WHERE tenant_id = @TenantId AND key = @Key AND purpose = @Purpose AND window_start = @WindowStart";
+            "WHERE tenant_id = @TenantId AND \"key\" = @Key AND purpose = @Purpose AND window_start = @WindowStart";
 
         public string PurgeElapsedWindowsSql => "DELETE FROM challenge_rate_windows WHERE window_start < @OlderThan";
     }
