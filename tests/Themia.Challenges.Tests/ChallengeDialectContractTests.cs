@@ -1,5 +1,6 @@
 using System.Text.RegularExpressions;
 using Themia.Challenges;
+using Themia.Challenges.MySql;
 using Themia.Challenges.PostgreSql;
 using Xunit;
 
@@ -18,8 +19,8 @@ namespace Themia.Challenges.Tests;
 /// <remarks>
 /// <see cref="AllDialects"/> carries <see cref="PostgresChallengeDialect"/> as of Task 4, which
 /// replaced the illustrative reference stub this theory ran against under Task 3 — a real
-/// implementation makes a stub-only case redundant. Tasks 5-6 append the MySQL and SQL Server
-/// dialects the same way, one `yield return` per engine, alongside this one.
+/// implementation makes a stub-only case redundant. <see cref="MySqlChallengeDialect"/> was appended
+/// under Task 5 the same way. Task 6 appends SQL Server, one more `yield return` alongside these two.
 /// </remarks>
 public class ChallengeDialectContractTests
 {
@@ -40,8 +41,9 @@ public class ChallengeDialectContractTests
         // Never opened by this theory (it only inspects SQL text properties), so an unreachable host
         // is fine here.
         yield return new object[] { new PostgresChallengeDialect("Host=localhost;Database=themia_challenges_test") };
-        // Tasks 5-6 append one `yield return new object[] { new <Provider>ChallengeDialect(...) };`
-        // per engine as MySQL and SQL Server land.
+        yield return new object[] { new MySqlChallengeDialect("Server=localhost;Database=themia_challenges_test") };
+        // Task 6 appends one more `yield return new object[] { new <Provider>ChallengeDialect(...) };`
+        // for SQL Server.
     }
 
     [Theory]

@@ -1,0 +1,17 @@
+#nullable enable
+static Themia.Challenges.MySql.ServiceCollectionExtensions.AddThemiaChallengesMySql(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, string! connectionString) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+Themia.Challenges.MySql.MySqlChallengeDialect
+Themia.Challenges.MySql.MySqlChallengeDialect.ConsumeSql.get -> string!
+Themia.Challenges.MySql.MySqlChallengeDialect.CreateConnection() -> System.Data.Common.DbConnection!
+Themia.Challenges.MySql.MySqlChallengeDialect.DecrementWindowSql.get -> string!
+Themia.Challenges.MySql.MySqlChallengeDialect.IncrementWindowSql.get -> string!
+Themia.Challenges.MySql.MySqlChallengeDialect.InsertSql.get -> string!
+Themia.Challenges.MySql.MySqlChallengeDialect.InvalidateLiveForScopeSql.get -> string!
+Themia.Challenges.MySql.MySqlChallengeDialect.MySqlChallengeDialect(string! connectionString) -> void
+Themia.Challenges.MySql.MySqlChallengeDialect.PurgeElapsedWindowsSql.get -> string!
+Themia.Challenges.MySql.MySqlChallengeDialect.PurgeExpiredSql.get -> string!
+Themia.Challenges.MySql.MySqlChallengeDialect.RecordAttemptSql.get -> string!
+Themia.Challenges.MySql.MySqlChallengeDialect.SelectLiveByScopeSql.get -> string!
+Themia.Challenges.MySql.MySqlChallengeDialect.SelectLiveByTokenHashSql.get -> string!
+Themia.Challenges.MySql.MySqlChallengeDialect.SelectWindowCountsSql.get -> string!
+Themia.Challenges.MySql.ServiceCollectionExtensions
