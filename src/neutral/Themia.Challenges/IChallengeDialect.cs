@@ -23,6 +23,30 @@ namespace Themia.Challenges;
 /// <c>Themia.Modules.Pdf.Migrations.PdfTemplateSchemaMigration</c> for the same rule applied to their
 /// own <c>key</c> columns.
 /// </para>
+/// <para>
+/// <b><c>tenant_id</c> (both tables) and <c>purpose</c> (<c>challenge_rate_windows</c> only) are
+/// nullable</b> — <c>null</c> means a platform-level challenge (no tenant) or the per-key ceiling row
+/// (every purpose, not one), respectively. Every predicate comparing one of these columns to a
+/// parameter that may itself be <see langword="null"/> (<c>@TenantId</c> throughout;
+/// <c>@Purpose</c> only where the member's docs say it may be <see langword="null"/>) MUST use a
+/// null-safe comparison, never plain <c>=</c>. Ordinary SQL <c>=</c> never matches a <c>NULL</c>
+/// operand, so <c>tenant_id = @TenantId</c> with <c>@TenantId = NULL</c> silently matches zero rows
+/// instead of the platform-level rows it was meant to find — <b>this does not error</b>, it just
+/// makes every platform-level challenge and every per-key ceiling row invisible to every query that
+/// gets this wrong. The per-key ceiling is the layer that bounds the SMS bill, so getting this wrong
+/// there disables that protection without any visible failure. Per-engine null-safe forms:
+/// <list type="bullet">
+/// <item><description>PostgreSQL — <c>IS NOT DISTINCT FROM</c> (e.g. <c>tenant_id IS NOT DISTINCT FROM @TenantId</c>).</description></item>
+/// <item><description>MySQL — <c>&lt;=&gt;</c>, the null-safe equal operator (e.g. <c>tenant_id &lt;=&gt; @TenantId</c>).</description></item>
+/// <item><description>SQL Server — no operator exists; use <c>(tenant_id = @TenantId OR (tenant_id IS NULL AND @TenantId IS NULL))</c>,
+/// or the equivalent <c>EXISTS (SELECT tenant_id INTERSECT SELECT @TenantId)</c> form.</description></item>
+/// </list>
+/// <c>purpose</c> on the <c>challenges</c> table is <c>NOT NULL</c>, so plain <c>=</c> is correct
+/// there and on any predicate where the doc states the parameter is always a concrete, non-null
+/// value (e.g. the per-scope leg of <see cref="SelectWindowCountsSql"/>'s <c>@Purpose</c>) — null-safe
+/// comparison is only required where the column is nullable AND the parameter may legitimately be
+/// null for that call.
+/// </para>
 /// </remarks>
 public interface IChallengeDialect
 {
