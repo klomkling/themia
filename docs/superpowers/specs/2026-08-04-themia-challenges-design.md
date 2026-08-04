@@ -1,7 +1,7 @@
 # Themia.Challenges — one-time secrets, one core
 
 **Date:** 2026-08-04
-**Status:** approved (rev 3 — see "What earlier revisions got wrong")
+**Status:** approved (rev 4 — see "What earlier revisions got wrong")
 **Tracks:** coord #0056 (filed as `Themia.Otp`), and item (2) of coord #0054
 **Renames:** the package accepted on #0056 as `Themia.Otp` ships as **`Themia.Challenges`**.
 
@@ -22,10 +22,37 @@ One neutral core that issues a secret bound to an opaque key, verifies it exactl
 policy around it. It knows nothing about SMS, email, or users.
 
 ```
-Themia.Challenges              the core: issue / verify / consume, rate limit, attempt cap, TTL, hashing
-Themia.Challenges.Dapper       persistent store over the Dapper peer
-Themia.Challenges.EFCore       persistent store over the EF peer
+Themia.Challenges              net8.0;net10.0 — the core: issue / verify / consume, rate limit,
+                               attempt cap, TTL, hashing, the FluentMigrator schema, and the
+                               IChallengeDialect seam
+Themia.Challenges.PostgreSql   per-engine dialect
+Themia.Challenges.MySql
+Themia.Challenges.SqlServer
 ```
+
+### Why per-engine dialects and not `.Dapper` / `.EFCore` — and why it matters more than naming
+
+rev 3 proposed stores over the Dapper and EF data peers. That was copied from the Messaging **module**,
+which is the wrong precedent: Messaging's inbox needs a peer because *admission must commit inside the
+caller's transaction*, so it needs the caller's ambient connection.
+
+**Challenges has no such requirement.** Issue and verify are standalone operations that own their
+transaction. Nothing needs to enlist in a caller's unit of work.
+
+The right precedent is `Themia.Exceptional` — a neutral core with per-engine packages that opens its own
+connection (`IOutboxDialect.CreateConnection()` in Messaging shows the same seam). Verified:
+`src/neutral/Themia.Exceptional/Themia.Exceptional.csproj` targets `net8.0;net10.0`, references Dapper
+and FluentMigrator directly, owns `Migrations/ExceptionLogMigration.cs`, and depends on no data peer.
+
+Three consequences, and the second is the reason this rev exists:
+
+1. **`net8.0;net10.0` becomes real.** A data peer is net10-only; without one the neutral-core TFM policy
+   applies as written.
+2. **ezy-assets can adopt v1 unchanged.** rev 3 carried a section explaining that they could not, because
+   both stores required a peer they deliberately do not take. That section is gone: with a dialect
+   opening its own connection, the constraint never existed. It was self-inflicted by the wrong
+   precedent, and it had already been escalated to them on #0056 as a question they needed to answer.
+3. **Atomic consume stays engine-specific**, which it must be — the whole point of a dialect.
 
 ### Why not `Themia.Otp`
 
@@ -55,6 +82,17 @@ Recorded because each error is the kind that gets re-introduced by someone readi
 4. **rev 2 decided two things without noticing it was deciding them**: that a rate limit per key is an
    acceptable account-lockout vector, and that re-issuing invalidates the outstanding secret. Both are
    real tradeoffs and are now stated as choices with their consequences.
+5. **rev 3 copied the wrong precedent for storage** — `.Dapper` / `.EFCore` stores over the data peers,
+   taken from the Messaging *module*. Messaging's inbox needs a peer because its admission must commit
+   inside the caller's transaction; Challenges has no such requirement. The cost was not cosmetic: it
+   forced net10-only, and it produced a whole section declaring that ezy-assets could not adopt v1 — a
+   constraint that only existed because of the wrong choice, and which had already been escalated to
+   them on #0056. Fixed by following `Themia.Exceptional`: per-engine dialects that open their own
+   connection.
+6. **rev 3 silently dropped a section rev 2 had.** rev 3 was written by replacing the whole file, and the
+   "no silent in-memory store" requirement disappeared in the rewrite — noticed only when rev 4 grepped
+   for it. Restored under "Registration". Rewriting a document wholesale loses content the same way
+   rewriting a file does; the guard is to diff against the previous revision, not to re-read the new one.
 
 ## Public API
 
@@ -183,6 +221,27 @@ for `VerifyByTokenAsync`; `(tenant_id, key)` on the counter table.
 Retention runs as a background purge with `PurgeEnabled` / `ChallengeRetentionHours` options, mirroring
 `MessagingModuleOptions`.
 
+### Registration: a dialect is mandatory, and there is no silent in-memory fallback
+
+```csharp
+services.AddThemiaChallenges(o => { /* purposes */ });
+services.AddThemiaChallengesPostgres(connectionString);   // or MySql / SqlServer
+```
+
+`AddThemiaChallenges()` registers the policy engine and **does not `TryAdd` an in-memory dialect as a
+convenience**. Registering the core without a dialect **throws at registration time**, naming
+`AddThemiaChallenges{Postgres|MySql|SqlServer}(...)`, in the same shape as the guards
+`AddThemiaMessagingModule` and `AddThemiaMessagingVerification` already use.
+
+A host adopting this package specifically to stop losing challenges on restart, and silently receiving an
+in-memory store instead, is worse off than before: it believes the problem is fixed when it is not. That
+is the same failure class as the Notifications logger stub that reported success without sending
+(coord #0057).
+
+If an in-memory dialect ever ships it is an explicitly named opt-in
+(`AddThemiaChallengesInMemory()`) documented as single-instance and non-durable. Never a default, never a
+`TryAdd` fallback.
+
 ### Why not `Themia.Caching`
 
 `Themia.Caching` exists (`src/framework/Themia.Caching/`) and is the obvious home for TTL-bound data. It
@@ -272,17 +331,17 @@ The point is that this is now a decision with a stated consequence rather than a
 - **Tenant resolution.** The caller passes `TenantId` explicitly rather than the core reading an ambient
   tenant — a neutral core must not depend on `Themia.MultiTenancy`.
 
-### ⚠️ ezy-assets cannot adopt v1, and that is a known gap
+### Both consumers can adopt v1 — no data peer required
 
 ezy-assets takes **no Themia data peer at all** — not Dapper, not EF (`Directory.Packages.props:43`,
-deliberate, confirmed by them on coord #0050). Both v1 stores require a peer, so `AddThemiaChallenges()`
-throws on their host.
+deliberate, confirmed by them on coord #0050). rev 3 concluded they therefore could not use this package,
+and that was escalated to them on #0056 as a question they had to answer.
 
-Same wall the Messaging inbox hit, recorded here rather than discovered by them at build time. #0054
-states plainly that ezy-assets will need this feature. Options, none chosen and none blocking v1: they
-adopt a data peer (their call); a store taking a `DbConnection` directly, with no peer dependency; or a
-Redis-backed store, which suits short-TTL challenges well. The decision belongs on #0056 with ezy-assets
-in the thread.
+**The constraint was self-inflicted and is gone.** A dialect opens its own connection from a connection
+string, exactly as `Themia.Exceptional` does — which ezy-assets already consumes without a peer. They
+reference `Themia.Challenges` + the engine package for their database and are done.
+
+Retract the store question on #0056 rather than leaving them to answer a question that no longer exists.
 
 ## Identity integration — separate spec, boundary recorded here
 
@@ -325,4 +384,5 @@ propertiezy made about identifier resolution on #0054.
 - The opaque-token generator (API present, generator unimplemented — no adopter asked).
 - Any SMS or email provider implementation.
 - The Identity integration flow (separate spec).
-- A peer-free store for ezy-assets (decision belongs on #0056).
+- A Redis or other non-relational store. The three relational dialects cover both consumers; a
+  cache-shaped store would have to re-prove atomic single-use, which is the hard part.
