@@ -1,0 +1,17 @@
+#nullable enable
+static Themia.Challenges.SqlServer.ServiceCollectionExtensions.AddThemiaChallengesSqlServer(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, string! connectionString) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+Themia.Challenges.SqlServer.SqlServerChallengeDialect
+Themia.Challenges.SqlServer.SqlServerChallengeDialect.ConsumeSql.get -> string!
+Themia.Challenges.SqlServer.SqlServerChallengeDialect.CreateConnection() -> System.Data.Common.DbConnection!
+Themia.Challenges.SqlServer.SqlServerChallengeDialect.DecrementWindowSql.get -> string!
+Themia.Challenges.SqlServer.SqlServerChallengeDialect.IncrementWindowSql.get -> string!
+Themia.Challenges.SqlServer.SqlServerChallengeDialect.InsertSql.get -> string!
+Themia.Challenges.SqlServer.SqlServerChallengeDialect.InvalidateLiveForScopeSql.get -> string!
+Themia.Challenges.SqlServer.SqlServerChallengeDialect.PurgeElapsedWindowsSql.get -> string!
+Themia.Challenges.SqlServer.SqlServerChallengeDialect.PurgeExpiredSql.get -> string!
+Themia.Challenges.SqlServer.SqlServerChallengeDialect.RecordAttemptSql.get -> string!
+Themia.Challenges.SqlServer.SqlServerChallengeDialect.SelectLiveByScopeSql.get -> string!
+Themia.Challenges.SqlServer.SqlServerChallengeDialect.SelectLiveByTokenHashSql.get -> string!
+Themia.Challenges.SqlServer.SqlServerChallengeDialect.SelectWindowCountsSql.get -> string!
+Themia.Challenges.SqlServer.SqlServerChallengeDialect.SqlServerChallengeDialect(string! connectionString) -> void
+Themia.Challenges.SqlServer.ServiceCollectionExtensions
