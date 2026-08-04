@@ -64,12 +64,22 @@ public interface IChallengeDialect
     string InsertSql { get; }
 
     /// <summary>
-    /// Selects the live challenge for a scope — the row matching <c>@TenantId</c>, <c>@Key</c>,
-    /// <c>@Purpose</c> whose <c>consumed_at IS NULL</c> and <c>expires_at &gt; @Now</c>. Params:
-    /// <c>@TenantId</c>, <c>@Key</c>, <c>@Purpose</c>, <c>@Now</c>. Under the default
-    /// <c>MaxLiveChallenges = 1</c> at most one row can match; when a purpose is configured with a
-    /// higher cap and more than one still-live row exists, implementations order by
-    /// <c>created_at DESC</c> and return the most recently issued one.
+    /// Selects <b>every</b> live challenge for a scope — every row matching <c>@TenantId</c>,
+    /// <c>@Key</c>, <c>@Purpose</c> whose <c>consumed_at IS NULL</c> and <c>expires_at &gt; @Now</c>,
+    /// ordered <c>created_at DESC</c>. Params: <c>@TenantId</c>, <c>@Key</c>, <c>@Purpose</c>,
+    /// <c>@Now</c>.
+    /// <para>
+    /// <b>Must not cap the result to one row.</b> Under the default <c>MaxLiveChallenges = 1</c> at
+    /// most one row will match, so the distinction is invisible there — but
+    /// <see cref="PurposeOptions.MaxLiveChallenges"/> exists specifically so a purpose can keep more
+    /// than one challenge live at once (see its remarks: a late-arriving first SMS must still verify
+    /// after a resend). A caller has no way to verify against an older still-live challenge if this
+    /// statement only ever returns the newest one — raising <c>MaxLiveChallenges</c> would then change
+    /// nothing observable, silently defeating the one thing it exists to do. The <c>ORDER BY</c> is
+    /// still required (newest first) so a caller that only wants the most recent — e.g. a re-issue
+    /// policy checking whether anything is currently live — doesn't have to re-sort; the caller decides
+    /// how many rows to consume, not this statement.
+    /// </para>
     /// </summary>
     string SelectLiveByScopeSql { get; }
 

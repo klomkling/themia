@@ -27,18 +27,27 @@ namespace Themia.Challenges.Internal;
 /// small, bounded multiple of the configured limit, not an unbounded one.
 /// </para>
 /// <para>
-/// <b>Known limitation: <see cref="IChallengeDialect.SelectLiveByScopeSql"/> returns at most one row</b>
-/// (every shipped dialect orders by <c>created_at DESC</c> and takes only the most recent), so
-/// <see cref="VerifyAsync"/> can only ever compare against the most recently issued live challenge for a
-/// scope. With the default <c>MaxLiveChallenges = 1</c> this is exactly correct — there is only ever one
-/// live row. When a purpose configures <c>MaxLiveChallenges &gt; 1</c>, an older still-live challenge
-/// that is not the most recent cannot be verified through this path even though it has not expired or
-/// been invalidated; the dialect interface has no statement that returns more than one live row. The
-/// re-issue policy below is written around the same constraint: it invalidates outstanding challenges
-/// only when <see cref="PurposeOptions.MaxLiveChallenges"/> is 1 (the statement that would enforce a
-/// higher cap — invalidate all but a chosen subset — does not exist; <see cref="IChallengeDialect.InvalidateLiveForScopeSql"/>
-/// only supports invalidating every live row for a scope, not a subset of them), and relies on the
-/// per-scope rate-limit window plus each challenge's own TTL to bound how many can accumulate.
+/// <b><see cref="VerifyAsync"/> checks every live row for the scope, not just the newest.</b>
+/// <see cref="IChallengeDialect.SelectLiveByScopeSql"/> returns every unconsumed, unexpired row
+/// (<c>created_at DESC</c>) — this is load-bearing, not incidental: <see cref="PurposeOptions.MaxLiveChallenges"/>
+/// exists specifically so a late-arriving first code (see its remarks) can still verify after a resend,
+/// and that is only true if verification can see it. A row that has already hit
+/// <see cref="PurposeOptions.MaxAttempts"/> is excluded from matching (a correct-but-late guess must not
+/// revive it — see <see cref="VerifyAsync"/>'s own comments); on a mismatch, the failed guess is recorded
+/// against every remaining guessable row, not just the newest, so a wider brute-force surface never opens
+/// up as a side effect of raising <see cref="PurposeOptions.MaxLiveChallenges"/>, and
+/// <see cref="ChallengeVerifyOutcome.AttemptsExhausted"/> is reported only once every live row has hit
+/// its cap.
+/// </para>
+/// <para>
+/// <b>Known limitation: the re-issue policy cannot enforce <c>MaxLiveChallenges &gt; 1</c> as an exact
+/// ceiling.</b> It invalidates outstanding challenges only when <see cref="PurposeOptions.MaxLiveChallenges"/>
+/// is 1, because the statement that would enforce a higher cap — invalidate all but the newest
+/// <c>N - 1</c> — does not exist; <see cref="IChallengeDialect.InvalidateLiveForScopeSql"/> only supports
+/// invalidating every live row for a scope, not a chosen subset of them. Above 1, live count is bounded
+/// only loosely, by the per-scope rate-limit window plus each challenge's own TTL. This is a real gap
+/// (unlike the verification limitation above, which this revision closed) — a future statement could
+/// close it, but "invalidate everything or nothing" is what the shipped dialects currently offer.
 /// </para>
 /// </remarks>
 internal sealed class ChallengeService : IChallengeService
@@ -174,34 +183,71 @@ internal sealed class ChallengeService : IChallengeService
 
         await using var connection = dialect.CreateConnection();
 
-        var row = await connection.QueryFirstOrDefaultAsync<ChallengeRow>(new CommandDefinition(
-            dialect.SelectLiveByScopeSql, LiveByScopeParams(scope, now), cancellationToken: cancellationToken));
+        // Every live row for the scope, newest first — not just one. With the default
+        // MaxLiveChallenges = 1 this is a single row as before; with a higher cap, a late-arriving
+        // first code (the re-issue policy's entire reason to exist — see PurposeOptions.MaxLiveChallenges'
+        // remarks) must still be checkable here, or raising the cap would change nothing observable.
+        var liveRows = (await connection.QueryAsync<ChallengeRow>(new CommandDefinition(
+            dialect.SelectLiveByScopeSql, LiveByScopeParams(scope, now), cancellationToken: cancellationToken))).AsList();
 
-        if (row is null)
+        if (liveRows.Count == 0)
         {
             var outcome = await ClassifyMissingAsync(connection, scope, cancellationToken);
             logger.LogInformation("Challenge verify {Outcome} for purpose {Purpose}", outcome.Outcome, scope.Purpose);
             return outcome;
         }
 
-        if (SecretHasher.Verify(code, row.SecretHash, row.SecretSalt))
+        // Rows that have already hit the cap from earlier guesses are excluded from matching entirely —
+        // not just reported as exhausted after the fact. Comparing the secret against an already-
+        // exhausted row and letting a correct-but-late guess still succeed would make MaxAttempts purely
+        // advisory: an attacker who keeps guessing past "exhausted" would eventually get through anyway.
+        // Once a row hits its cap it is dead for verification, the same as Consumed or Expired, even
+        // though it remains a live (unconsumed, unexpired) row in storage.
+        var guessable = liveRows.Where(row => row.Attempts < purpose.MaxAttempts).ToList();
+
+        foreach (var row in guessable)
         {
+            if (!SecretHasher.Verify(code, row.SecretHash, row.SecretSalt))
+            {
+                continue;
+            }
+
             var consumedRows = await connection.ExecuteAsync(new CommandDefinition(
                 dialect.ConsumeSql, new { row.Id, Now = now, ConsumedAt = now }, cancellationToken: cancellationToken));
 
             // Rows-affected 0 means someone else's concurrent VerifyAsync already consumed this exact
             // row between our SELECT and our UPDATE — they won the race. Reporting Verified here too
             // would let the same secret succeed twice.
-            var outcome = consumedRows > 0 ? ChallengeVerifyResult.Verified(scope) : ChallengeVerifyResult.Consumed(scope);
-            logger.LogInformation("Challenge verify {Outcome} for purpose {Purpose}", outcome.Outcome, scope.Purpose);
-            return outcome;
+            var matchOutcome = consumedRows > 0 ? ChallengeVerifyResult.Verified(scope) : ChallengeVerifyResult.Consumed(scope);
+            logger.LogInformation("Challenge verify {Outcome} for purpose {Purpose}", matchOutcome.Outcome, scope.Purpose);
+            return matchOutcome;
         }
 
-        await connection.ExecuteAsync(new CommandDefinition(
-            dialect.RecordAttemptSql, new { row.Id }, cancellationToken: cancellationToken));
+        // No guessable row matched (there may be none left, or none of them matched). Attempt
+        // accounting: record the failed guess against every still-guessable live row, not just one. The
+        // attempt cap is a brute-force defence (design spec, "Security requirements" #3) — if a wrong
+        // guess only counted against the newest row, an attacker could burn MaxAttempts guesses against
+        // it for free while an older still-live row's counter stayed untouched, then switch targets and
+        // get a fresh MaxAttempts budget there. Charging every guessable row in lockstep keeps the total
+        // brute-force surface at MaxAttempts regardless of how many challenges are live, matching the
+        // design spec's re-issue-policy note that "the brute-force surface does not widen" with a higher
+        // MaxLiveChallenges. Already-exhausted rows are skipped here too — incrementing a dead row's
+        // counter further serves no purpose.
+        foreach (var row in guessable)
+        {
+            await connection.ExecuteAsync(new CommandDefinition(
+                dialect.RecordAttemptSql, new { row.Id }, cancellationToken: cancellationToken));
+        }
 
-        var attemptsAfter = row.Attempts + 1;
-        var mismatchOutcome = attemptsAfter >= purpose.MaxAttempts
+        // Exhausted only once every live row — the ones just incremented, and any that were already
+        // exhausted before this call — has hit the cap. As long as one guessable row remains, the caller
+        // has a genuine remaining path to success and reporting AttemptsExhausted would be wrong for it,
+        // not just imprecise.
+        // (row.Attempts + 1 covers both cases: for a just-incremented guessable row it reflects the new
+        // count; for an already-exhausted row, Attempts was already >= MaxAttempts, so Attempts + 1 is
+        // too — no separate branch needed.)
+        var allExhausted = liveRows.TrueForAll(row => row.Attempts + 1 >= purpose.MaxAttempts);
+        var mismatchOutcome = allExhausted
             ? ChallengeVerifyResult.AttemptsExhausted(scope)
             : ChallengeVerifyResult.Incorrect(scope);
         logger.LogInformation("Challenge verify {Outcome} for purpose {Purpose}", mismatchOutcome.Outcome, scope.Purpose);
@@ -265,6 +311,9 @@ internal sealed class ChallengeService : IChallengeService
         var everLive = await connection.QueryFirstOrDefaultAsync<ChallengeRow>(new CommandDefinition(
             dialect.SelectLiveByScopeSql, LiveByScopeParams(scope, DateTimeOffset.MinValue), cancellationToken: cancellationToken));
 
+        // Only existence matters here (Expired vs NotFound), not how many rows would come back with the
+        // expiry filter defeated — QueryFirstOrDefaultAsync is deliberate, not a leftover single-row
+        // assumption.
         return everLive is null ? ChallengeVerifyResult.NotFound(scope) : ChallengeVerifyResult.Expired(scope);
     }
 

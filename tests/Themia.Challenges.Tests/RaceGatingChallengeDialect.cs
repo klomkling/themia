@@ -20,6 +20,16 @@ namespace Themia.Challenges.Tests;
 /// IS NULL</c> guard now excludes the row the first just consumed (0 rows affected) — exactly the
 /// "someone else won the race" case <see cref="Internal.ChallengeService.VerifyAsync"/> must turn into
 /// <see cref="ChallengeVerifyOutcome.Consumed"/> rather than <see cref="ChallengeVerifyOutcome.Verified"/>.
+/// <para>
+/// <b>What this does and does not prove.</b> The barrier only manufactures the interleaving; it proves
+/// <see cref="Internal.ChallengeService.VerifyAsync"/>'s own logic — reading rows-affected off
+/// <see cref="IChallengeDialect.ConsumeSql"/> and mapping 0 to <see cref="ChallengeVerifyOutcome.Consumed"/>
+/// — behaves correctly when a race happens. It does <b>not</b> prove that <see cref="ConsumeSql"/>'s
+/// guarded <c>UPDATE</c> is atomic on any real engine: that guarantee comes from each engine's own
+/// row-level locking, which this test double does not exercise the way a genuine concurrent race against
+/// Postgres/MySQL/SQL Server would. Whether the SQL itself is atomic under real concurrent connections is
+/// Task 8's integration tests against the real engines to prove, not this one.
+/// </para>
 /// </remarks>
 internal sealed class RaceGatingChallengeDialect : IChallengeDialect
 {

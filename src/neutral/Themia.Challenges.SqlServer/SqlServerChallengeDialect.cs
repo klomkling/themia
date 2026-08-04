@@ -40,8 +40,13 @@ public sealed class SqlServerChallengeDialect : IChallengeDialect
         """;
 
     /// <inheritdoc />
+    /// <remarks>
+    /// No <c>TOP</c> — returns every live row for the scope, not just the newest. See the interface's
+    /// remarks: capping this to one row is exactly what would make <see cref="PurposeOptions.MaxLiveChallenges"/>
+    /// values above 1 silently do nothing.
+    /// </remarks>
     public string SelectLiveByScopeSql => """
-        SELECT TOP (1) * FROM challenges
+        SELECT * FROM challenges
         WHERE (tenant_id = @TenantId OR (tenant_id IS NULL AND @TenantId IS NULL)) AND [key] = @Key AND purpose = @Purpose
           AND consumed_at IS NULL AND expires_at > @Now
         ORDER BY created_at DESC;

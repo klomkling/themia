@@ -86,11 +86,13 @@ internal sealed class SqliteChallengeDialect : IChallengeDialect
         VALUES (@Id, @TenantId, @Key, @Purpose, @SecretHash, @SecretSalt, @TokenHash, @Attempts, @ExpiresAt, @CreatedAt);
         """;
 
+    // No LIMIT: returns every live row for the scope, matching the shipped dialects' contract
+    // (IChallengeDialect.SelectLiveByScopeSql) so MaxLiveChallenges > 1 is actually verifiable.
     public string SelectLiveByScopeSql => """
         SELECT * FROM challenges
         WHERE tenant_id IS @TenantId AND key = @Key AND purpose = @Purpose
           AND consumed_at IS NULL AND expires_at > @Now
-        ORDER BY created_at DESC LIMIT 1;
+        ORDER BY created_at DESC;
         """;
 
     public string SelectLiveByTokenHashSql => """

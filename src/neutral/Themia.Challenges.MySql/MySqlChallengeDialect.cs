@@ -46,11 +46,16 @@ public sealed class MySqlChallengeDialect : IChallengeDialect
         """;
 
     /// <inheritdoc />
+    /// <remarks>
+    /// No <c>LIMIT</c> — returns every live row for the scope, not just the newest. See the interface's
+    /// remarks: capping this to one row is exactly what would make <see cref="PurposeOptions.MaxLiveChallenges"/>
+    /// values above 1 silently do nothing.
+    /// </remarks>
     public string SelectLiveByScopeSql => """
         SELECT * FROM challenges
         WHERE tenant_id <=> @TenantId AND `key` = @Key AND purpose = @Purpose
           AND consumed_at IS NULL AND expires_at > @Now
-        ORDER BY created_at DESC LIMIT 1;
+        ORDER BY created_at DESC;
         """;
 
     /// <inheritdoc />

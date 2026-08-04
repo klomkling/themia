@@ -237,6 +237,62 @@ public sealed class ChallengeServiceTests : IDisposable
         Assert.Equal(2, LiveCount(keepAlive, scope));
     }
 
+    /// <summary>
+    /// The point of <see cref="PurposeOptions.MaxLiveChallenges"/> &gt; 1, proven directly: a
+    /// late-arriving first SMS (see its remarks — mobile queues don't preserve send order) must still
+    /// verify after a resend. Asserting only that both rows stay un-invalidated (as
+    /// <see cref="Issue_ShouldKeepBothLive_WhenMaxLiveIsTwo"/> does) is not enough — it would pass even
+    /// if verification only ever looked at the newest row, which is exactly the defect this test guards
+    /// against. Fails against a dialect (or a <c>VerifyAsync</c>) that only returns/checks the most
+    /// recently issued live challenge for a scope.
+    /// </summary>
+    [Fact]
+    public async Task Verify_ShouldSucceedWithTheOlderCode_WhenMaxLiveIsTwo()
+    {
+        var service = CreateService(o => o.ConfigurePurpose("login", p => Configure(p, maxLiveChallenges: 2)));
+        var scope = new ChallengeScope("+66102020202", "login", "tenantA");
+
+        var a = await service.IssueAsync(scope);
+        var b = await service.IssueAsync(scope);
+
+        var verifyA = await service.VerifyAsync(scope, a.Secret!);
+
+        Assert.Equal(ChallengeVerifyOutcome.Verified, verifyA.Outcome);
+
+        // b is unaffected by a's consumption - still separately live and verifiable.
+        var verifyB = await service.VerifyAsync(scope, b.Secret!);
+        Assert.Equal(ChallengeVerifyOutcome.Verified, verifyB.Outcome);
+    }
+
+    /// <summary>
+    /// Attempt accounting when several challenges are live: a wrong guess must count against every live
+    /// row, not just the newest — otherwise an attacker could exhaust the newest row's budget for free
+    /// and still have a fresh <see cref="PurposeOptions.MaxAttempts"/> budget left on the older one,
+    /// widening the brute-force surface with <see cref="PurposeOptions.MaxLiveChallenges"/>, which the
+    /// design spec explicitly rules out.
+    /// </summary>
+    [Fact]
+    public async Task Verify_ShouldRecordAttemptAgainstEveryLiveChallenge_WhenMultipleAreLive()
+    {
+        var service = CreateService(o => o.ConfigurePurpose("login", p => Configure(p, maxLiveChallenges: 2, maxAttempts: 2)));
+        var scope = new ChallengeScope("+66103030303", "login", "tenantA");
+
+        var a = await service.IssueAsync(scope);
+        var b = await service.IssueAsync(scope);
+        var wrong = new[] { a.Secret!, b.Secret! }.Contains("000000") ? "111111" : "000000";
+
+        // Two wrong guesses reach MaxAttempts (2) - if it only counted against one row, a's code would
+        // still verify afterwards despite two total wrong attempts against the scope.
+        var first = await service.VerifyAsync(scope, wrong);
+        var second = await service.VerifyAsync(scope, wrong);
+
+        Assert.Equal(ChallengeVerifyOutcome.Incorrect, first.Outcome);
+        Assert.Equal(ChallengeVerifyOutcome.AttemptsExhausted, second.Outcome);
+
+        var verifyA = await service.VerifyAsync(scope, a.Secret!);
+        Assert.Equal(ChallengeVerifyOutcome.AttemptsExhausted, verifyA.Outcome);
+    }
+
     // ---- Tenant isolation ----------------------------------------------------------------------
 
     [Fact]
