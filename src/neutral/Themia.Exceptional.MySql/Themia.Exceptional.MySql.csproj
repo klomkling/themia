@@ -2,7 +2,7 @@
   <PropertyGroup>
     <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
     <PackageId>Themia.Exceptional.MySql</PackageId>
-    <Description>MySQL/MariaDB dialect + MySqlConnector driver + FluentMigrator runner for Themia.Exceptional.</Description>
+    <Description>MySQL dialect + MySqlConnector driver + FluentMigrator runner for Themia.Exceptional.</Description>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="MySqlConnector" />

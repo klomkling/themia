@@ -27,6 +27,97 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+### Added
+- **`Themia.Challenges`** (+ `.PostgreSql` / `.MySql` / `.SqlServer`) — the one-time challenge core:
+  issues a secret bound to an opaque key, verifies it exactly once, and enforces TTL, an attempt cap,
+  and two layers of rate limiting. Serves phone OTP, email OTP, magic links, email verification, and
+  password reset. `IChallengeService.IssueAsync` / `VerifyAsync` / `VerifyByTokenAsync` / `RefundAsync`
+  over a per-engine `IChallengeDialect` (coord #0056), plus a background `ChallengePurgeService` that
+  purges expired `challenges` rows (`ChallengeOptions.ChallengeRetentionHours`, default 24) and elapsed
+  `challenge_rate_windows` rows on their own — longer — elapsed-window rule, never on the same setting;
+  `ChallengeOptions.PurgeEnabled` (default `true`) turns the whole thing off. Needs **no Themia data
+  peer** — each engine package opens its own connection — so it is adoptable by a consumer running none
+  of `Themia.Framework.Data.*`.
+
+  Three behaviours an adopter needs to know before wiring this up:
+  - **Re-issuing a challenge invalidates the outstanding one by default** (`PurposeOptions.MaxLiveChallenges
+    = 1`). Without the UI saying so, this reproduces the classic support ticket: a user taps "resend", the
+    *first* SMS arrives after the second was issued, and the code in that first message no longer
+    verifies — it was silently superseded, not delayed.
+  - **The per-key rate limit (`ChallengeOptions.PerKeyWindow`) is an account-lockout vector, not a
+    security control.** Anyone who knows a phone number or email address can issue against it until the
+    ceiling trips, locking out the real owner; `MaxAttempts` is what actually stops brute force. Set
+    `PerKeyWindow` to bound delivery *cost*, not to "be safe", and call
+    `IChallengeService.RefundAsync(scope, result.IssuedAt!.Value)` when a send is known to have failed so
+    a bounced or undeliverable message never burns the victim's quota. It lives on `ChallengeOptions`
+    rather than per purpose because it is a ceiling *across* purposes: a per-purpose window would bucket
+    the same key differently per purpose, handing a purpose-cycling attacker a fresh ceiling for each.
+  - **`ChallengeVerifyOutcome` distinguishes `Consumed`, `Expired` and `NotFound` — do not pass that
+    distinction to an anonymous caller.** It is exactly an account-enumeration oracle on a login or
+    password-reset endpoint: any wrong code reveals whether the key was ever challenged, i.e. whether the
+    address is registered. Branch on it internally; return one indistinguishable failure outward.
+  - **`AddThemiaChallenges(...)` alone does not work.** Registering the core without also calling exactly
+    one of `AddThemiaChallengesPostgres` / `AddThemiaChallengesMySql` / `AddThemiaChallengesSqlServer`
+    throws, by name, the first time `IChallengeService` is resolved — deliberately, rather than falling
+    back to a silent in-memory store that would pass every test and lose every challenge on restart.
+
+### Added
+- **`ChallengeOptions.PerKeyGlobalWindow`** — an optional third rate-limit layer capping issuance to one
+  key **across every tenant**. `null` (off) by default. `PerKeyWindow` is bucketed by `(tenant_id, key)`
+  so one tenant exhausting its ceiling cannot lock another out, and that isolation stays; but the SMS
+  invoice and the victim's inbox are not partitioned by tenant, so where the tenant is attacker-influenced
+  — a caller-supplied subdomain or header, and especially self-serve tenant signup — one phone number can
+  be charged `PerKeyWindow`'s limit once per tenant. Turn this on for those deployments. The counter row
+  uses the reserved purpose `ChallengeOptions.GlobalKeyBucketPurpose`, which `ConfigurePurpose` now
+  rejects, because a platform-level challenge already occupies `(NULL, key, NULL)`.
+
+### Changed
+- **(breaking) `Themia.Challenges` refund is keyed on the challenge, not the scope.**
+  `RefundAsync(ChallengeScope, DateTimeOffset)` becomes `Task<bool> RefundAsync(Guid challengeId)`, and
+  `ChallengeIssueResult` exposes `ChallengeId` instead of `IssuedAt`. The old shape was a bare decrement
+  with nothing tying it to an issuance: provider delivery-status webhooks are redelivered and adopters
+  retry their own failure handlers, so one failed send was refunded two or three times — and since the
+  decrement floors at zero and never errors, anyone able to force deliveries to fail could replay it to
+  drive the SMS cost ceiling to zero and keep issuing. The refund is now claimed with a guarded write
+  against a new `refunded_at` column and returns `false` when there was nothing to refund.
+
+### Fixed
+- **`Themia.Challenges` no longer burns quota for an issuance that never happened.** Both rate-limit
+  counters are charged before the row is written; a failure in the invalidate or insert left them
+  charged, so three transient database failures locked a real user out for the rest of the window under
+  the default 3-per-15-minutes. The charges are now released on any failure, and the supersede-then-insert
+  pair runs in one transaction so a failed insert can no longer kill the user's previous working code.
+- **`Themia.Challenges` rate limiter fails closed when the store returns no count.** The ceiling is
+  decided entirely by the value `IncrementWindowSql` returns, and `ExecuteScalarAsync<int>` mapped a
+  NULL result to `0` — below every configured limit, so the issuance was admitted unconditionally and
+  silently. A missing count is now an error.
+- **(breaking, schema) `Themia.Challenges` pins a byte-exact collation** (`utf8mb4_bin` on MySQL,
+  `Latin1_General_BIN2` on SQL Server) on every string column a dialect compares with `=`. MySQL 8 and
+  SQL Server both default to case-folding collations, so a code issued for key `"A1b2"` verified against
+  an account keyed `"a1b2"`, and the two shared one rate-limit bucket. Proven per engine: the new test
+  fails on MySQL and SQL Server without the pin. PostgreSQL was never affected.
+- **`Themia.Challenges` retention is indexed and batched.** Both purge predicates now have an index
+  (`challenges.expires_at`, `challenge_rate_windows.window_start`) — each filters on a single column, so
+  without one the hourly job full-scanned the tables every issue and verify contends on — and both
+  statements are bounded (`LIMIT`/`TOP @Batch`) with the service looping until a batch comes back short,
+  matching `Themia.Messaging`'s purge loop. An unbounded `DELETE` held locks for the whole delete.
+- **`Themia.Challenges` survives a column being added to `challenges`.** Every dialect's scope and by-id
+  lookups are `SELECT *`, and the Dapper column map threw on any column with no `ChallengeRow` property,
+  so a later migration in this package or a DBA adding an audit column to a shared database took every
+  `VerifyAsync` down. Unmatched columns are now ignored, which is what a `SELECT *` consumer should do.
+- **`Themia.Challenges.MySql` pins `GuidFormat=Char36`**, matching every sibling Themia MySQL dialect.
+  Both `id` columns are `CHAR(36)`; an adopter reusing a connection string carrying
+  `GuidFormat=Binary16` or `OldGuids=true` wrote a mangled id that no later lookup matched.
+
+- **(breaking) MariaDB is no longer claimed as a supported engine.** Package descriptions, XML docs and
+  migration error messages said "MySQL/MariaDB"; the MySQL leg of the shared schema uses **functional
+  key parts** (`CREATE UNIQUE INDEX ... ((expr))`, MySQL 8.0.13+) to emulate the partial/filtered unique
+  indexes PostgreSQL and SQL Server have natively, and MariaDB has no equivalent syntax at any version —
+  so `Themia.Modules.Pdf` and `Themia.Challenges` fail at migration time on MariaDB. The claim was
+  inherited across specs and never tested on any package except `Themia.Data.Migrations`, whose
+  `mariadb:11` container test still runs and whose advisory-lock semantics stay deliberately portable.
+  Nothing changes for MySQL adopters; the supported floor is now stated as **MySQL 8.0.13+**.
+
 ### Fixed
 - **(breaking) `Themia.Notifications`** — `LoggerEmailSender` and `LoggerSmsSender` reported
   `NotificationResult.Success()` having sent nothing, and `AddThemiaNotifications()` registers them via

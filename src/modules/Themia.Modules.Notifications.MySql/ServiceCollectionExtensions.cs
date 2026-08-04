@@ -6,11 +6,11 @@ using Themia.Modules.Notifications.Outbox;
 
 namespace Themia.Modules.Notifications.MySql;
 
-/// <summary>DI entry point for the MySQL/MariaDB outbox-claim dialect.</summary>
+/// <summary>DI entry point for the MySQL outbox-claim dialect.</summary>
 public static class ServiceCollectionExtensions
 {
     /// <summary>
-    /// Registers the MySQL/MariaDB <see cref="INotificationsSqlDialect"/>, resolving its connection
+    /// Registers the MySQL <see cref="INotificationsSqlDialect"/>, resolving its connection
     /// string from <c>ConnectionStrings:<paramref name="connectionStringName"/></c> at first use.
     /// </summary>
     /// <param name="services">The service collection.</param>

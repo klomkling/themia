@@ -28,7 +28,7 @@ public sealed class DataProtectionKeysMigration : Migration
                 !p.StartsWith("MySql", StringComparison.OrdinalIgnoreCase) &&
                 !p.StartsWith("SqlServer", StringComparison.OrdinalIgnoreCase))
             .Delegate(() => throw new NotSupportedException(
-                "Themia.AspNetCore.DataProtection supports only PostgreSQL, MySQL/MariaDB, and SQL Server. " +
+                "Themia.AspNetCore.DataProtection supports only PostgreSQL, MySQL, and SQL Server. " +
                 "The active database provider is not supported; add a migration branch for it."));
     }
 

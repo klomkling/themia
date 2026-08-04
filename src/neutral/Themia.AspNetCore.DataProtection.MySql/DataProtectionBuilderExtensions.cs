@@ -3,11 +3,11 @@ using Themia.Data.Migrations;
 
 namespace Themia.AspNetCore.DataProtection.MySql;
 
-/// <summary>DI entry point for the MySQL/MariaDB-backed Data Protection key store.</summary>
+/// <summary>DI entry point for the MySQL-backed Data Protection key store.</summary>
 public static class DataProtectionBuilderExtensions
 {
     /// <summary>
-    /// Persists the Data Protection key ring to MySQL/MariaDB and applies the schema migration so the
+    /// Persists the Data Protection key ring to MySQL and applies the schema migration so the
     /// <c>data_protection_keys</c> table exists.
     /// </summary>
     /// <remarks>
@@ -22,7 +22,7 @@ public static class DataProtectionBuilderExtensions
     /// both, including why <c>SetApplicationName</c> is not an isolation boundary.</para>
     /// </remarks>
     /// <param name="builder">The Data Protection builder.</param>
-    /// <param name="connectionString">MySQL/MariaDB connection string.</param>
+    /// <param name="connectionString">MySQL connection string.</param>
     /// <param name="runMigration">Whether to apply the schema migration during registration. Defaults to true.</param>
     /// <param name="migrationOptions">
     /// Migration-lock settings. Supply a <see cref="ThemiaMigrationOptions.Logger"/> whenever more than one

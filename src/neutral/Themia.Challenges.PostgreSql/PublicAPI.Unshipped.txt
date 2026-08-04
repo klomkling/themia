@@ -1,0 +1,19 @@
+#nullable enable
+Themia.Challenges.PostgreSql.PostgresChallengeDialect
+Themia.Challenges.PostgreSql.PostgresChallengeDialect.ConsumeSql.get -> string!
+Themia.Challenges.PostgreSql.PostgresChallengeDialect.CreateConnection() -> System.Data.Common.DbConnection!
+Themia.Challenges.PostgreSql.PostgresChallengeDialect.DecrementWindowSql.get -> string!
+Themia.Challenges.PostgreSql.PostgresChallengeDialect.IncrementWindowSql.get -> string!
+Themia.Challenges.PostgreSql.PostgresChallengeDialect.InsertSql.get -> string!
+Themia.Challenges.PostgreSql.PostgresChallengeDialect.InvalidateLiveForScopeSql.get -> string!
+Themia.Challenges.PostgreSql.PostgresChallengeDialect.MarkRefundedSql.get -> string!
+Themia.Challenges.PostgreSql.PostgresChallengeDialect.PostgresChallengeDialect(string! connectionString) -> void
+Themia.Challenges.PostgreSql.PostgresChallengeDialect.PurgeElapsedWindowsSql.get -> string!
+Themia.Challenges.PostgreSql.PostgresChallengeDialect.PurgeExpiredSql.get -> string!
+Themia.Challenges.PostgreSql.PostgresChallengeDialect.RecordAttemptSql.get -> string!
+Themia.Challenges.PostgreSql.PostgresChallengeDialect.SelectByIdSql.get -> string!
+Themia.Challenges.PostgreSql.PostgresChallengeDialect.SelectLiveByScopeSql.get -> string!
+Themia.Challenges.PostgreSql.PostgresChallengeDialect.SelectLiveByTokenHashSql.get -> string!
+Themia.Challenges.PostgreSql.PostgresChallengeDialect.SelectMostRecentByScopeSql.get -> string!
+Themia.Challenges.PostgreSql.ServiceCollectionExtensions
+static Themia.Challenges.PostgreSql.ServiceCollectionExtensions.AddThemiaChallengesPostgres(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, string! connectionString) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!

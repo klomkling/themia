@@ -1,0 +1,69 @@
+using Dapper;
+
+using Xunit;
+
+namespace Themia.Challenges.IntegrationTests;
+
+/// <summary>
+/// Pins the specific failure that made an earlier design wrong (see
+/// <see cref="Migrations.ChallengeSchemaMigration"/>'s type-level remarks): counters and challenges once
+/// shared one table, so purging expired challenges reset the per-key ceiling that bounds an SMS bill for
+/// free. <see cref="IChallengeDialect.PurgeExpiredSql"/> only ever touches <c>challenges</c>;
+/// <c>challenge_rate_windows</c> is a separate table with its own, much longer retention horizon
+/// (<see cref="IChallengeDialect.PurgeElapsedWindowsSql"/>), purged independently.
+/// <para>
+/// Runs on PostgreSQL only: <c>PurgeExpiredSql</c> deletes on <c>expires_at &lt; @OlderThan</c> bounded by
+/// <c>@Batch</c>, and the two-table split
+/// this test protects is a schema-level property, not a per-engine one — a second and third run would
+/// prove nothing the first didn't already prove.
+/// </para>
+/// </summary>
+[Collection(PostgresChallengesCollection.Name)]
+[Trait("Category", "Integration")]
+public sealed class RetentionTests
+{
+    private readonly PostgresChallengeFixture fixture;
+
+    /// <summary>Creates the suite over the shared <see cref="PostgresChallengeFixture"/> container.</summary>
+    public RetentionTests(PostgresChallengeFixture fixture) => this.fixture = fixture;
+
+    [Fact]
+    public async Task PurgingChallenges_ShouldNotResetThePerKeyCeiling()
+    {
+        var key = $"key-{Guid.NewGuid():N}";
+        var tenantId = $"tenant-{Guid.NewGuid():N}";
+        var scope = new ChallengeScope(key, ChallengeEngineFixture.TightPurpose, tenantId);
+        var service = fixture.CreateServiceWithTightKeyCeiling();
+
+        for (var i = 0; i < ChallengeEngineFixture.TightPerKeyLimit; i++)
+        {
+            var result = await service.IssueAsync(scope);
+            Assert.Equal(ChallengeIssueOutcome.Issued, result.Outcome);
+        }
+
+        var exhausted = await service.IssueAsync(scope);
+        Assert.Equal(ChallengeIssueOutcome.RateLimited, exhausted.Outcome);
+
+        // Simulate the aggressive challenges-table retention job: purge every challenge, including ones
+        // that are not even expired yet, to prove the counter's survival does not depend on TTL timing.
+        await using var connection = fixture.Dialect.CreateConnection();
+        await connection.OpenAsync();
+        // @Batch is part of the statement's contract — it is bounded so one DELETE cannot hold locks
+        // across a whole backlog (ChallengePurgeService loops until a batch comes back short). This test
+        // seeds only TightPerKeyLimit rows, so one generous batch drains them all.
+        var purged = await connection.ExecuteAsync(
+            fixture.Dialect.PurgeExpiredSql,
+            new { OlderThan = DateTimeOffset.UtcNow.AddDays(1), Batch = 1_000 });
+        Assert.True(purged >= ChallengeEngineFixture.TightPerKeyLimit, $"expected at least {ChallengeEngineFixture.TightPerKeyLimit} rows purged, got {purged}");
+
+        var remainingChallenges = await connection.ExecuteScalarAsync<int>(
+            $"SELECT COUNT(*) FROM challenges WHERE tenant_id = @TenantId AND {fixture.KeyColumn} = @Key",
+            new { TenantId = tenantId, Key = key });
+        Assert.Equal(0, remainingChallenges);
+
+        // The specific failure this two-table split exists to prevent: the counter must have survived
+        // the challenges purge untouched, so the next issue for this key is still refused.
+        var stillRateLimited = await service.IssueAsync(scope);
+        Assert.Equal(ChallengeIssueOutcome.RateLimited, stillRateLimited.Outcome);
+    }
+}

@@ -2,7 +2,7 @@
   <PropertyGroup>
     <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
     <PackageId>Themia.AspNetCore.DataProtection.MySql</PackageId>
-    <Description>MySQL/MariaDB dialect + MySqlConnector driver for the Themia Data Protection key store.</Description>
+    <Description>MySQL dialect + MySqlConnector driver for the Themia Data Protection key store.</Description>
   </PropertyGroup>
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />

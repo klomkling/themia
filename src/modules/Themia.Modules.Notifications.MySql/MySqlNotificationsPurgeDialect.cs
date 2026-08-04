@@ -7,7 +7,7 @@ using Themia.Modules.Notifications.Outbox;
 
 namespace Themia.Modules.Notifications.MySql;
 
-/// <summary>MySQL/MariaDB retention deletes for the notifications outbox. MySQL supports
+/// <summary>MySQL retention deletes for the notifications outbox. MySQL supports
 /// <c>DELETE ... LIMIT</c> directly, so each statement is bounded without PostgreSQL's <c>ctid</c>
 /// subquery: an unbounded DELETE on a large table holds long locks and bloats it, so the caller loops
 /// until a batch comes back short. The table is referenced unqualified — on MySQL the

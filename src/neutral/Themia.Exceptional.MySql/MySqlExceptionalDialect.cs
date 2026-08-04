@@ -6,7 +6,7 @@ using Themia.Exceptional;
 
 namespace Themia.Exceptional.MySql;
 
-/// <summary>MySQL/MariaDB implementation of <see cref="IExceptionalSqlDialect"/> (MySqlConnector).</summary>
+/// <summary>MySQL implementation of <see cref="IExceptionalSqlDialect"/> (MySqlConnector).</summary>
 public sealed class MySqlExceptionalDialect : IExceptionalSqlDialect
 {
     private readonly string connectionString;

@@ -3,7 +3,7 @@ using MySqlConnector;
 
 namespace Themia.AspNetCore.DataProtection.MySql;
 
-/// <summary>MySQL/MariaDB implementation of <see cref="IDataProtectionKeyDialect"/> (MySqlConnector).</summary>
+/// <summary>MySQL implementation of <see cref="IDataProtectionKeyDialect"/> (MySqlConnector).</summary>
 public sealed class MySqlDataProtectionKeyDialect : IDataProtectionKeyDialect
 {
     private readonly string connectionString;
