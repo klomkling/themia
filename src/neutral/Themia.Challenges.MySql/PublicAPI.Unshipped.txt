@@ -2,10 +2,10 @@
 Themia.Challenges.MySql.MySqlChallengeDialect
 Themia.Challenges.MySql.MySqlChallengeDialect.ConsumeSql.get -> string!
 Themia.Challenges.MySql.MySqlChallengeDialect.CreateConnection() -> System.Data.Common.DbConnection!
-Themia.Challenges.MySql.MySqlChallengeDialect.DecrementWindowSql.get -> string!
-Themia.Challenges.MySql.MySqlChallengeDialect.IncrementWindowSql.get -> string!
+Themia.Challenges.MySql.MySqlChallengeDialect.DecrementWindowSql(Themia.Challenges.RateWindowBucket bucket) -> string!
+Themia.Challenges.MySql.MySqlChallengeDialect.IncrementWindowSql(Themia.Challenges.RateWindowBucket bucket) -> string!
 Themia.Challenges.MySql.MySqlChallengeDialect.InsertSql.get -> string!
-Themia.Challenges.MySql.MySqlChallengeDialect.InvalidateLiveForScopeSql.get -> string!
+Themia.Challenges.MySql.MySqlChallengeDialect.InvalidateLiveForScopeSql(Themia.Challenges.ChallengeTenancy tenancy) -> string!
 Themia.Challenges.MySql.MySqlChallengeDialect.MarkRefundedSql.get -> string!
 Themia.Challenges.MySql.MySqlChallengeDialect.MySqlChallengeDialect(string! connectionString) -> void
 Themia.Challenges.MySql.MySqlChallengeDialect.MySqlChallengeDialect(string! connectionString, Microsoft.Extensions.Logging.ILoggerFactory! loggerFactory) -> void
@@ -13,8 +13,8 @@ Themia.Challenges.MySql.MySqlChallengeDialect.PurgeElapsedWindowsSql.get -> stri
 Themia.Challenges.MySql.MySqlChallengeDialect.PurgeExpiredSql.get -> string!
 Themia.Challenges.MySql.MySqlChallengeDialect.RecordAttemptSql.get -> string!
 Themia.Challenges.MySql.MySqlChallengeDialect.SelectByIdSql.get -> string!
-Themia.Challenges.MySql.MySqlChallengeDialect.SelectLiveByScopeSql.get -> string!
+Themia.Challenges.MySql.MySqlChallengeDialect.SelectLiveByScopeSql(Themia.Challenges.ChallengeTenancy tenancy) -> string!
 Themia.Challenges.MySql.MySqlChallengeDialect.SelectLiveByTokenHashSql.get -> string!
-Themia.Challenges.MySql.MySqlChallengeDialect.SelectMostRecentByScopeSql.get -> string!
+Themia.Challenges.MySql.MySqlChallengeDialect.SelectMostRecentByScopeSql(Themia.Challenges.ChallengeTenancy tenancy) -> string!
 Themia.Challenges.MySql.ServiceCollectionExtensions
 static Themia.Challenges.MySql.ServiceCollectionExtensions.AddThemiaChallengesMySql(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, string! connectionString) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!

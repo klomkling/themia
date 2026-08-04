@@ -33,6 +33,9 @@ public sealed class SqlServerChallengeDialect : IChallengeDialect
     /// <inheritdoc />
     public DbConnection CreateConnection() => new SqlConnection(connectionString);
 
+    /// <summary>The engine-appropriate quoting of the reserved <c>key</c> column.</summary>
+    private const string KeyColumn = "[key]";
+
     /// <inheritdoc />
     public string InsertSql => """
         INSERT INTO challenges (id, tenant_id, [key], purpose, secret_hash, secret_salt, token_hash, attempts, expires_at, created_at)
@@ -45,9 +48,9 @@ public sealed class SqlServerChallengeDialect : IChallengeDialect
     /// remarks: capping this to one row is exactly what would make <see cref="PurposeOptions.MaxLiveChallenges"/>
     /// values above 1 silently do nothing.
     /// </remarks>
-    public string SelectLiveByScopeSql => """
+    public string SelectLiveByScopeSql(ChallengeTenancy tenancy) => $"""
         SELECT * FROM challenges
-        WHERE (tenant_id = @TenantId OR (tenant_id IS NULL AND @TenantId IS NULL)) AND [key] = @Key AND purpose = @Purpose
+        WHERE {TenantPredicate(tenancy)} AND {KeyColumn} = @Key AND purpose = @Purpose
           AND consumed_at IS NULL AND expires_at > @Now
         ORDER BY created_at DESC;
         """;
@@ -60,9 +63,9 @@ public sealed class SqlServerChallengeDialect : IChallengeDialect
         """;
 
     /// <inheritdoc />
-    public string SelectMostRecentByScopeSql => """
+    public string SelectMostRecentByScopeSql(ChallengeTenancy tenancy) => $"""
         SELECT TOP (1) * FROM challenges
-        WHERE (tenant_id = @TenantId OR (tenant_id IS NULL AND @TenantId IS NULL)) AND [key] = @Key AND purpose = @Purpose
+        WHERE {TenantPredicate(tenancy)} AND {KeyColumn} = @Key AND purpose = @Purpose
         ORDER BY created_at DESC;
         """;
 
@@ -86,9 +89,9 @@ public sealed class SqlServerChallengeDialect : IChallengeDialect
         """;
 
     /// <inheritdoc />
-    public string InvalidateLiveForScopeSql => """
+    public string InvalidateLiveForScopeSql(ChallengeTenancy tenancy) => $"""
         UPDATE challenges SET consumed_at = @ConsumedAt
-        WHERE (tenant_id = @TenantId OR (tenant_id IS NULL AND @TenantId IS NULL)) AND [key] = @Key AND purpose = @Purpose
+        WHERE {TenantPredicate(tenancy)} AND {KeyColumn} = @Key AND purpose = @Purpose
           AND consumed_at IS NULL AND expires_at > @Now;
         """;
 
@@ -213,27 +216,30 @@ public sealed class SqlServerChallengeDialect : IChallengeDialect
     /// exactly the benign case, it does not widen what gets swallowed.
     /// </para>
     /// </remarks>
-    public string IncrementWindowSql => """
-        DECLARE @xactAbortWasOn bit = CASE WHEN @@OPTIONS & 16384 = 16384 THEN 1 ELSE 0 END;
-        SET XACT_ABORT OFF;
-        BEGIN TRY
-            INSERT INTO challenge_rate_windows (id, tenant_id, [key], purpose, window_start, count)
-            VALUES (@Id, @TenantId, @Key, @Purpose, @WindowStart, 0);
-        END TRY
-        BEGIN CATCH
-            IF ERROR_NUMBER() NOT IN (2601, 2627)
-            BEGIN
-                IF @xactAbortWasOn = 1 SET XACT_ABORT ON;
-                THROW;
-            END
-        END CATCH
-        IF @xactAbortWasOn = 1 SET XACT_ABORT ON;
-        UPDATE challenge_rate_windows SET count = count + 1
-        OUTPUT INSERTED.count
-        WHERE (tenant_id = @TenantId OR (tenant_id IS NULL AND @TenantId IS NULL)) AND [key] = @Key
-          AND (purpose = @Purpose OR (purpose IS NULL AND @Purpose IS NULL))
-          AND window_start = @WindowStart;
-        """;
+    public string IncrementWindowSql(RateWindowBucket bucket)
+    {
+        var (tenant, purpose) = BucketPredicates(bucket);
+        return $"""
+            DECLARE @xactAbortWasOn bit = CASE WHEN @@OPTIONS & 16384 = 16384 THEN 1 ELSE 0 END;
+            SET XACT_ABORT OFF;
+            BEGIN TRY
+                INSERT INTO challenge_rate_windows (id, tenant_id, {KeyColumn}, purpose, window_start, count)
+                VALUES (@Id, @TenantId, @Key, @Purpose, @WindowStart, 0);
+            END TRY
+            BEGIN CATCH
+                IF ERROR_NUMBER() NOT IN (2601, 2627)
+                BEGIN
+                    IF @xactAbortWasOn = 1 SET XACT_ABORT ON;
+                    THROW;
+                END
+            END CATCH
+            IF @xactAbortWasOn = 1 SET XACT_ABORT ON;
+            UPDATE challenge_rate_windows SET count = count + 1
+            OUTPUT INSERTED.count
+            WHERE {tenant} AND {KeyColumn} = @Key AND {purpose}
+              AND window_start = @WindowStart;
+            """;
+    }
 
     /// <inheritdoc />
     /// <remarks>
@@ -243,13 +249,36 @@ public sealed class SqlServerChallengeDialect : IChallengeDialect
     /// SQL Server version, matching PostgreSQL's <c>GREATEST(count - 1, 0)</c> and MySQL's
     /// <c>GREATEST(count - 1, 0)</c> in effect, not in syntax.
     /// </remarks>
-    public string DecrementWindowSql => """
-        UPDATE challenge_rate_windows SET count = CASE WHEN count - 1 < 0 THEN 0 ELSE count - 1 END
-        WHERE (tenant_id = @TenantId OR (tenant_id IS NULL AND @TenantId IS NULL)) AND [key] = @Key
-          AND (purpose = @Purpose OR (purpose IS NULL AND @Purpose IS NULL))
-          AND window_start = @WindowStart;
-        """;
+    public string DecrementWindowSql(RateWindowBucket bucket)
+    {
+        var (tenant, purpose) = BucketPredicates(bucket);
+        return $"""
+            UPDATE challenge_rate_windows SET count = CASE WHEN count > 0 THEN count - 1 ELSE 0 END
+            WHERE {tenant} AND {KeyColumn} = @Key AND {purpose}
+              AND window_start = @WindowStart;
+            """;
+    }
 
     /// <inheritdoc />
     public string PurgeElapsedWindowsSql => """DELETE TOP (@Batch) FROM challenge_rate_windows WHERE window_start < @OlderThan;""";
+
+    // Predicate fragments, selected by shape rather than compared null-safely — see ChallengeTenancy
+    // and RateWindowBucket for the measurement behind that. Each variant states its own IS NULL or
+    // = @Param, so the null-safety guarantee the interface documents is preserved per branch; what
+    // changes is that the planner now sees a constant and can seek the matching index.
+    private static string TenantPredicate(ChallengeTenancy tenancy) => tenancy switch
+    {
+        ChallengeTenancy.Tenant => "tenant_id = @TenantId",
+        ChallengeTenancy.Platform => "tenant_id IS NULL",
+        _ => throw new ArgumentOutOfRangeException(nameof(tenancy)),
+    };
+
+    private static (string Tenant, string Purpose) BucketPredicates(RateWindowBucket bucket) => bucket switch
+    {
+        RateWindowBucket.TenantAndPurpose => ("tenant_id = @TenantId", "purpose = @Purpose"),
+        RateWindowBucket.TenantAllPurposes => ("tenant_id = @TenantId", "purpose IS NULL"),
+        RateWindowBucket.PlatformAndPurpose => ("tenant_id IS NULL", "purpose = @Purpose"),
+        RateWindowBucket.PlatformAllPurposes => ("tenant_id IS NULL", "purpose IS NULL"),
+        _ => throw new ArgumentOutOfRangeException(nameof(bucket)),
+    };
 }

@@ -43,7 +43,7 @@ namespace Themia.Challenges;
 /// </list>
 /// <c>purpose</c> on the <c>challenges</c> table is <c>NOT NULL</c>, so plain <c>=</c> is correct
 /// there and on any predicate where the doc states the parameter is always a concrete, non-null
-/// value (e.g. the per-scope leg of <see cref="IncrementWindowSql"/>'s <c>@Purpose</c>) — null-safe
+/// value (e.g. the per-scope leg of <see cref="IncrementWindowSql(RateWindowBucket)"/>'s <c>@Purpose</c>) — null-safe
 /// comparison is only required where the column is nullable AND the parameter may legitimately be
 /// null for that call.
 /// </para>
@@ -81,14 +81,16 @@ public interface IChallengeDialect
     /// how many rows to consume, not this statement.
     /// </para>
     /// </summary>
-    string SelectLiveByScopeSql { get; }
+    /// <param name="tenancy">Selects the predicate for <c>tenant_id</c> — see <see cref="ChallengeTenancy"/>
+    /// for why this picks SQL rather than binding a parameter.</param>
+    string SelectLiveByScopeSql(ChallengeTenancy tenancy);
 
     /// <summary>
     /// Selects the live challenge by its token hash — the row matching <c>@TokenHash</c> whose
     /// <c>consumed_at IS NULL</c> and <c>expires_at &gt; @Now</c>. Params: <c>@TokenHash</c>,
     /// <c>@Now</c>. Serves the magic-link / email-verification path, where the caller has only the
     /// token and not the original key and purpose. Same tie-break as
-    /// <see cref="SelectLiveByScopeSql"/> if more than one row matches.
+    /// <see cref="SelectLiveByScopeSql(ChallengeTenancy)"/> if more than one row matches.
     /// </summary>
     string SelectLiveByTokenHashSql { get; }
 
@@ -99,19 +101,20 @@ public interface IChallengeDialect
     /// <c>@Key</c>, <c>@Purpose</c>. No <c>WHERE</c> clause beyond the scope match: unlike every other
     /// <c>Select*</c> statement on this interface, this one is not a liveness query.
     /// <para>
-    /// Exists to classify why <see cref="SelectLiveByScopeSql"/> found nothing live: a caller that gets
+    /// Exists to classify why <see cref="SelectLiveByScopeSql(ChallengeTenancy)"/> found nothing live: a caller that gets
     /// no rows from that statement cannot tell "never issued", "issued, then consumed" and "issued, then
-    /// expired" apart from that result alone, because <see cref="SelectLiveByScopeSql"/>'s own
+    /// expired" apart from that result alone, because <see cref="SelectLiveByScopeSql(ChallengeTenancy)"/>'s own
     /// <c>consumed_at IS NULL</c> filter is not something a caller-supplied parameter can defeat the way
     /// <c>@Now</c> can defeat <c>expires_at &gt; @Now</c>. This statement has no such filter at all, so a
     /// caller distinguishes the three cases from its result alone: no row → never issued; a row with
     /// <c>consumed_at</c> set → consumed (whether by a genuine verification or by
-    /// <see cref="InvalidateLiveForScopeSql"/>'s re-issue supersession — both mean "this exact code no
+    /// <see cref="InvalidateLiveForScopeSql(ChallengeTenancy)"/>'s re-issue supersession — both mean "this exact code no
     /// longer verifies", the distinction a caller needs); a row with <c>consumed_at IS NULL</c> and
     /// <c>expires_at</c> in the past → expired.
     /// </para>
     /// </summary>
-    string SelectMostRecentByScopeSql { get; }
+    /// <param name="tenancy">Selects the predicate for <c>tenant_id</c>.</param>
+    string SelectMostRecentByScopeSql(ChallengeTenancy tenancy);
 
     /// <summary>
     /// Selects one challenge row by primary key, regardless of liveness. Params: <c>@Id</c>. Serves the
@@ -151,7 +154,7 @@ public interface IChallengeDialect
     /// affected is the entire result the caller needs: 1 means this call won, 0 means it lost
     /// (already consumed, expired, or the id does not exist) — the caller does not need to
     /// distinguish those three cases from this statement alone, since a prior read (or
-    /// <see cref="SelectLiveByScopeSql"/> / <see cref="SelectLiveByTokenHashSql"/>) already
+    /// <see cref="SelectLiveByScopeSql(ChallengeTenancy)"/> / <see cref="SelectLiveByTokenHashSql"/>) already
     /// established which applies.
     /// </para>
     /// </summary>
@@ -173,7 +176,8 @@ public interface IChallengeDialect
     /// it reuses <c>consumed_at</c> rather than a separate flag because every liveness predicate in
     /// this interface already keys off <c>consumed_at IS NULL</c>.
     /// </summary>
-    string InvalidateLiveForScopeSql { get; }
+    /// <param name="tenancy">Selects the predicate for <c>tenant_id</c>.</param>
+    string InvalidateLiveForScopeSql(ChallengeTenancy tenancy);
 
     /// <summary>
     /// Hard-deletes challenge rows whose <c>expires_at &lt; @OlderThan</c>. Params: <c>@OlderThan</c>.
@@ -220,15 +224,18 @@ public interface IChallengeDialect
     /// the read and the write in the same atomic unit.
     /// </para>
     /// </summary>
-    string IncrementWindowSql { get; }
+    /// <param name="bucket">Selects the predicate for the nullable key columns — see
+    /// <see cref="RateWindowBucket"/>, which also records the measurement that made this a parameterised
+    /// statement rather than one null-safe form.</param>
+    string IncrementWindowSql(RateWindowBucket bucket);
 
     /// <summary>
     /// Atomically decrements the rate-limit counter for one window bucket — the refund path: the row
     /// identified by <c>@TenantId</c>, <c>@Key</c>, <c>@Purpose</c>, <c>@WindowStart</c> has its
     /// <c>count</c> reduced by 1, floored at 0 (never negative). Params: <c>@TenantId</c>,
-    /// <c>@Key</c>, <c>@Purpose</c>, <c>@WindowStart</c>. Mirrors <see cref="IncrementWindowSql"/>:
+    /// <c>@Key</c>, <c>@Purpose</c>, <c>@WindowStart</c>. Mirrors <see cref="IncrementWindowSql(RateWindowBucket)"/>:
     /// called once per layer, with the same <c>@Purpose</c>/<see langword="null"/> convention, and
-    /// with the same <c>@WindowStart</c> value that the original <see cref="IncrementWindowSql"/>
+    /// with the same <c>@WindowStart</c> value that the original <see cref="IncrementWindowSql(RateWindowBucket)"/>
     /// call for that issuance used — which is why the refund path takes the issuance time, not the
     /// refund time: flooring "now" at refund would target a different bucket than the one charged,
     /// leaving the original charge in place and decrementing an unrelated live bucket instead.
@@ -237,7 +244,7 @@ public interface IChallengeDialect
     /// already been purged by <see cref="PurgeElapsedWindowsSql"/> (the window elapsed before the
     /// refund arrived), no row matches and this is a no-op rather than an error.
     /// </summary>
-    string DecrementWindowSql { get; }
+    string DecrementWindowSql(RateWindowBucket bucket);
 
     /// <summary>
     /// Hard-deletes at most <c>@Batch</c> counter rows whose <c>window_start &lt; @OlderThan</c>.

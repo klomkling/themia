@@ -86,6 +86,9 @@ public sealed class MySqlChallengeDialect : IChallengeDialect
     /// </remarks>
     public DbConnection CreateConnection() => new DeadlockRetryingConnection(connectionString, logger);
 
+    /// <summary>The engine-appropriate quoting of the reserved <c>key</c> column.</summary>
+    private const string KeyColumn = "`key`";
+
     /// <inheritdoc />
     public string InsertSql => """
         INSERT INTO challenges (id, tenant_id, `key`, purpose, secret_hash, secret_salt, token_hash, attempts, expires_at, created_at)
@@ -98,9 +101,9 @@ public sealed class MySqlChallengeDialect : IChallengeDialect
     /// remarks: capping this to one row is exactly what would make <see cref="PurposeOptions.MaxLiveChallenges"/>
     /// values above 1 silently do nothing.
     /// </remarks>
-    public string SelectLiveByScopeSql => """
+    public string SelectLiveByScopeSql(ChallengeTenancy tenancy) => $"""
         SELECT * FROM challenges
-        WHERE tenant_id <=> @TenantId AND `key` = @Key AND purpose = @Purpose
+        WHERE {TenantPredicate(tenancy)} AND {KeyColumn} = @Key AND purpose = @Purpose
           AND consumed_at IS NULL AND expires_at > @Now
         ORDER BY created_at DESC;
         """;
@@ -113,9 +116,9 @@ public sealed class MySqlChallengeDialect : IChallengeDialect
         """;
 
     /// <inheritdoc />
-    public string SelectMostRecentByScopeSql => """
+    public string SelectMostRecentByScopeSql(ChallengeTenancy tenancy) => $"""
         SELECT * FROM challenges
-        WHERE tenant_id <=> @TenantId AND `key` = @Key AND purpose = @Purpose
+        WHERE {TenantPredicate(tenancy)} AND {KeyColumn} = @Key AND purpose = @Purpose
         ORDER BY created_at DESC LIMIT 1;
         """;
 
@@ -139,9 +142,9 @@ public sealed class MySqlChallengeDialect : IChallengeDialect
         """;
 
     /// <inheritdoc />
-    public string InvalidateLiveForScopeSql => """
+    public string InvalidateLiveForScopeSql(ChallengeTenancy tenancy) => $"""
         UPDATE challenges SET consumed_at = @ConsumedAt
-        WHERE tenant_id <=> @TenantId AND `key` = @Key AND purpose = @Purpose
+        WHERE {TenantPredicate(tenancy)} AND {KeyColumn} = @Key AND purpose = @Purpose
           AND consumed_at IS NULL AND expires_at > @Now;
         """;
 
@@ -205,24 +208,52 @@ public sealed class MySqlChallengeDialect : IChallengeDialect
     /// <c>@themia_window_count</c> through instead of demanding a command parameter for it.
     /// </para>
     /// </remarks>
-    public string IncrementWindowSql => """
-        SET @themia_window_count = NULL;
-        INSERT INTO challenge_rate_windows (id, tenant_id, `key`, purpose, window_start, count)
-        VALUES (@Id, @TenantId, @Key, @Purpose, @WindowStart, 0)
-        ON DUPLICATE KEY UPDATE id = id;
-        UPDATE challenge_rate_windows SET count = (@themia_window_count := count + 1)
-        WHERE tenant_id <=> @TenantId AND `key` = @Key AND purpose <=> @Purpose
-          AND window_start = @WindowStart;
-        SELECT @themia_window_count AS count;
-        """;
+    public string IncrementWindowSql(RateWindowBucket bucket)
+    {
+        var (tenant, purpose) = BucketPredicates(bucket);
+        return $"""
+            SET @themia_window_count = NULL;
+            INSERT INTO challenge_rate_windows (id, tenant_id, {KeyColumn}, purpose, window_start, count)
+            VALUES (@Id, @TenantId, @Key, @Purpose, @WindowStart, 0)
+            ON DUPLICATE KEY UPDATE id = id;
+            UPDATE challenge_rate_windows SET count = (@themia_window_count := count + 1)
+            WHERE {tenant} AND {KeyColumn} = @Key AND {purpose}
+              AND window_start = @WindowStart;
+            SELECT @themia_window_count AS count;
+            """;
+    }
 
     /// <inheritdoc />
-    public string DecrementWindowSql => """
-        UPDATE challenge_rate_windows SET count = GREATEST(count - 1, 0)
-        WHERE tenant_id <=> @TenantId AND `key` = @Key AND purpose <=> @Purpose
-          AND window_start = @WindowStart;
-        """;
+    public string DecrementWindowSql(RateWindowBucket bucket)
+    {
+        var (tenant, purpose) = BucketPredicates(bucket);
+        return $"""
+            UPDATE challenge_rate_windows SET count = GREATEST(count - 1, 0)
+            WHERE {tenant} AND {KeyColumn} = @Key AND {purpose}
+              AND window_start = @WindowStart;
+            """;
+    }
 
     /// <inheritdoc />
     public string PurgeElapsedWindowsSql => """DELETE FROM challenge_rate_windows WHERE window_start < @OlderThan LIMIT @Batch;""";
+
+    // Predicate fragments, selected by shape rather than compared null-safely — see ChallengeTenancy
+    // and RateWindowBucket for the measurement behind that. Each variant states its own IS NULL or
+    // = @Param, so the null-safety guarantee the interface documents is preserved per branch; what
+    // changes is that the planner now sees a constant and can seek the matching index.
+    private static string TenantPredicate(ChallengeTenancy tenancy) => tenancy switch
+    {
+        ChallengeTenancy.Tenant => "tenant_id = @TenantId",
+        ChallengeTenancy.Platform => "tenant_id IS NULL",
+        _ => throw new ArgumentOutOfRangeException(nameof(tenancy)),
+    };
+
+    private static (string Tenant, string Purpose) BucketPredicates(RateWindowBucket bucket) => bucket switch
+    {
+        RateWindowBucket.TenantAndPurpose => ("tenant_id = @TenantId", "purpose = @Purpose"),
+        RateWindowBucket.TenantAllPurposes => ("tenant_id = @TenantId", "purpose IS NULL"),
+        RateWindowBucket.PlatformAndPurpose => ("tenant_id IS NULL", "purpose = @Purpose"),
+        RateWindowBucket.PlatformAllPurposes => ("tenant_id IS NULL", "purpose IS NULL"),
+        _ => throw new ArgumentOutOfRangeException(nameof(bucket)),
+    };
 }

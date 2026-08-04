@@ -52,6 +52,13 @@ public enum ChallengeVerifyOutcome
     /// <summary>No challenge is outstanding for the scope — it was never issued, or already expired
     /// and purged.</summary>
     NotFound,
+
+    /// <summary>
+    /// Verification was refused before any lookup because the key exceeded
+    /// <see cref="ChallengeOptions.VerifyWindow"/>. No challenge was read and no attempt was recorded,
+    /// so this does not count against <see cref="PurposeOptions.MaxAttempts"/> — nothing was compared.
+    /// </summary>
+    RateLimited,
 }
 
 /// <summary>The result of issuing a challenge.</summary>
@@ -161,6 +168,11 @@ public sealed class ChallengeVerifyResult
     /// <param name="scope">The scope that was verified.</param>
     /// <returns>An attempts-exhausted result.</returns>
     public static ChallengeVerifyResult AttemptsExhausted(ChallengeScope scope) => new(ChallengeVerifyOutcome.AttemptsExhausted, scope);
+
+    /// <summary>Creates a <see cref="ChallengeVerifyOutcome.RateLimited"/> result.</summary>
+    /// <param name="scope">The scope whose verification was refused.</param>
+    /// <returns>A rate-limited result. No challenge was read.</returns>
+    public static ChallengeVerifyResult RateLimited(ChallengeScope scope) => new(ChallengeVerifyOutcome.RateLimited, scope);
 
     /// <summary>Creates a <see cref="ChallengeVerifyOutcome.NotFound"/> result.</summary>
     /// <param name="scope">The scope that was verified.</param>

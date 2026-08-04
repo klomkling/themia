@@ -56,13 +56,13 @@ internal sealed class RaceGatingChallengeDialect : IChallengeDialect
     public string InsertSql => inner.InsertSql;
 
     /// <inheritdoc />
-    public string SelectLiveByScopeSql => inner.SelectLiveByScopeSql;
+    public string SelectLiveByScopeSql(ChallengeTenancy tenancy) => inner.SelectLiveByScopeSql(tenancy);
 
     /// <inheritdoc />
     public string SelectLiveByTokenHashSql => inner.SelectLiveByTokenHashSql;
 
     /// <inheritdoc />
-    public string SelectMostRecentByScopeSql => inner.SelectMostRecentByScopeSql;
+    public string SelectMostRecentByScopeSql(ChallengeTenancy tenancy) => inner.SelectMostRecentByScopeSql(tenancy);
 
     /// <inheritdoc />
     public string SelectByIdSql => inner.SelectByIdSql;
@@ -89,16 +89,16 @@ internal sealed class RaceGatingChallengeDialect : IChallengeDialect
     public string RecordAttemptSql => inner.RecordAttemptSql;
 
     /// <inheritdoc />
-    public string InvalidateLiveForScopeSql => inner.InvalidateLiveForScopeSql;
+    public string InvalidateLiveForScopeSql(ChallengeTenancy tenancy) => inner.InvalidateLiveForScopeSql(tenancy);
 
     /// <inheritdoc />
     public string PurgeExpiredSql => inner.PurgeExpiredSql;
 
     /// <inheritdoc />
-    public string IncrementWindowSql => inner.IncrementWindowSql;
+    public string IncrementWindowSql(RateWindowBucket bucket) => inner.IncrementWindowSql(bucket);
 
     /// <inheritdoc />
-    public string DecrementWindowSql => inner.DecrementWindowSql;
+    public string DecrementWindowSql(RateWindowBucket bucket) => inner.DecrementWindowSql(bucket);
 
     /// <inheritdoc />
     public string PurgeElapsedWindowsSql => inner.PurgeElapsedWindowsSql;

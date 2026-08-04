@@ -27,7 +27,41 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
-_Nothing yet._
+### Added
+- **`ChallengeOptions.VerifyWindow`** (default 20 per 15 minutes) — `Themia.Challenges` now rate-limits
+  `VerifyAsync` per key, closing [#190](https://github.com/klomkling/themia/issues/190). `MaxAttempts`
+  lives on a challenge row, so it bounds guesses against an *issued* secret and bounded nothing at all
+  when none was live: wrong codes against a key whose challenge was consumed, expired or exhausted cost
+  two queries each, forever, and probed the `Consumed`-vs-`NotFound` oracle for free. Counted per key
+  across every purpose, charged before the lookup and never refunded, and not disableable — only
+  tunable, like the issuance limiter. A refused call returns the new
+  `ChallengeVerifyOutcome.RateLimited` and does **not** count against `MaxAttempts`, since nothing was
+  compared. `ChallengeOptions.VerifyBucketPurpose` is reserved and rejected by `ConfigurePurpose`.
+
+### Changed
+- **(breaking) `IChallengeDialect`'s scope- and window-predicated statements are now methods taking a
+  shape**, closing [#189](https://github.com/klomkling/themia/issues/189).
+  `SelectLiveByScopeSql` / `SelectMostRecentByScopeSql` / `InvalidateLiveForScopeSql` take a
+  `ChallengeTenancy`; `IncrementWindowSql` / `DecrementWindowSql` take a `RateWindowBucket`.
+
+  Every one of them previously compared nullable columns with a null-safe form
+  (`IS NOT DISTINCT FROM`, `<=>`, or SQL Server's OR-guard) so that one statement could cover both a
+  bound and a `NULL` parameter. All three forms are **non-sargable**: no index can be seeked through
+  them. Measured on PostgreSQL 16 over 200 000 rows, the `IncrementWindowSql` `UPDATE` — which
+  `IssueAsync` runs two or three times per call — planned as a sequential scan removing all 200 000
+  rows, 1921 buffers, **16.2 ms**; the same row through a shape-specific predicate is an index scan,
+  3 buffers, **0.042 ms**. All four bucket shapes behaved identically, and the OR-guard does not
+  recover it even with literal values, so this had to be a change of SQL text rather than of hint.
+
+  The four `RateWindowBucket` members map one-to-one onto the four filtered/functional unique indexes
+  the schema already created — the indexes were right; only the predicate could not reach them.
+
+  Null-safety is unchanged: each shape states its own `IS NULL` or `= @Param` explicitly, and two
+  contract tests enforce it — one asserting a `NULL` shape never compares to its parameter, one
+  asserting no statement carries a null-safe form again. Both fail if a single shape regresses.
+
+  **Custom `IChallengeDialect` implementations must be updated.** The three shipped engine packages are
+  the only implementations in this repo.
 
 ## [0.12.0] - 2026-08-04
 
