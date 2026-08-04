@@ -93,6 +93,27 @@ public interface IChallengeDialect
     string SelectLiveByTokenHashSql { get; }
 
     /// <summary>
+    /// Selects the single most recently created challenge for a scope — the row matching
+    /// <c>@TenantId</c>, <c>@Key</c>, <c>@Purpose</c>, ordered <c>created_at DESC</c>, taking only the
+    /// first — <b>regardless of <c>consumed_at</c> or <c>expires_at</c></b>. Params: <c>@TenantId</c>,
+    /// <c>@Key</c>, <c>@Purpose</c>. No <c>WHERE</c> clause beyond the scope match: unlike every other
+    /// <c>Select*</c> statement on this interface, this one is not a liveness query.
+    /// <para>
+    /// Exists to classify why <see cref="SelectLiveByScopeSql"/> found nothing live: a caller that gets
+    /// no rows from that statement cannot tell "never issued", "issued, then consumed" and "issued, then
+    /// expired" apart from that result alone, because <see cref="SelectLiveByScopeSql"/>'s own
+    /// <c>consumed_at IS NULL</c> filter is not something a caller-supplied parameter can defeat the way
+    /// <c>@Now</c> can defeat <c>expires_at &gt; @Now</c>. This statement has no such filter at all, so a
+    /// caller distinguishes the three cases from its result alone: no row → never issued; a row with
+    /// <c>consumed_at</c> set → consumed (whether by a genuine verification or by
+    /// <see cref="InvalidateLiveForScopeSql"/>'s re-issue supersession — both mean "this exact code no
+    /// longer verifies", the distinction a caller needs); a row with <c>consumed_at IS NULL</c> and
+    /// <c>expires_at</c> in the past → expired.
+    /// </para>
+    /// </summary>
+    string SelectMostRecentByScopeSql { get; }
+
+    /// <summary>
     /// Atomically consumes one challenge by id: sets <c>consumed_at = @ConsumedAt</c> for the row
     /// matching <c>@Id</c> where <c>consumed_at IS NULL AND expires_at &gt; @Now</c>. Params:
     /// <c>@Id</c>, <c>@Now</c>, <c>@ConsumedAt</c>.

@@ -146,6 +146,17 @@ public sealed class ChallengeServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task Verify_ShouldReturnNotFound_WhenNoChallengeWasEverIssued()
+    {
+        var service = CreateService(o => o.ConfigurePurpose("login", p => Configure(p)));
+        var scope = new ChallengeScope("+66878787878", "login", "tenantA");
+
+        var result = await service.VerifyAsync(scope, "000000");
+
+        Assert.Equal(ChallengeVerifyOutcome.NotFound, result.Outcome);
+    }
+
+    [Fact]
     public async Task Verify_ShouldReturnExpired_AfterTheTtl()
     {
         var service = CreateService(o => o.ConfigurePurpose("login", p => Configure(p, ttl: TimeSpan.FromMinutes(1))));
@@ -171,6 +182,28 @@ public sealed class ChallengeServiceTests : IDisposable
 
         Assert.Equal(ChallengeVerifyOutcome.Incorrect, first.Outcome);
         Assert.Equal(ChallengeVerifyOutcome.AttemptsExhausted, second.Outcome);
+    }
+
+    /// <summary>
+    /// The mundane path, not the race: verify once successfully, then verify again with the exact same
+    /// (now-consumed) secret a moment later — a double-submitted form, a refresh after success. Must
+    /// report <see cref="ChallengeVerifyOutcome.Consumed"/>, not <see cref="ChallengeVerifyOutcome.NotFound"/>
+    /// — the two are distinct, meaningful outcomes precisely so a caller can tell "this code was already
+    /// used" from "no such challenge" apart, and collapsing them into <c>NotFound</c> reads as an outage
+    /// to any caller building alerting or rate-limit logic on that outcome.
+    /// </summary>
+    [Fact]
+    public async Task Verify_ShouldReturnConsumed_ForASequentialReVerifyOfAnAlreadyUsedCode()
+    {
+        var service = CreateService(o => o.ConfigurePurpose("login", p => Configure(p)));
+        var scope = new ChallengeScope("+66898989898", "login", "tenantA");
+        var secret = (await service.IssueAsync(scope)).Secret!;
+
+        var first = await service.VerifyAsync(scope, secret);
+        var second = await service.VerifyAsync(scope, secret);
+
+        Assert.Equal(ChallengeVerifyOutcome.Verified, first.Outcome);
+        Assert.Equal(ChallengeVerifyOutcome.Consumed, second.Outcome);
     }
 
     /// <summary>

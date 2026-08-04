@@ -32,6 +32,7 @@ public class ChallengeDialectContractTests
     private static readonly (string Name, Func<IChallengeDialect, string> Select)[] TenantPredicateStatements =
     [
         (nameof(IChallengeDialect.SelectLiveByScopeSql), d => d.SelectLiveByScopeSql),
+        (nameof(IChallengeDialect.SelectMostRecentByScopeSql), d => d.SelectMostRecentByScopeSql),
         (nameof(IChallengeDialect.InvalidateLiveForScopeSql), d => d.InvalidateLiveForScopeSql),
         (nameof(IChallengeDialect.IncrementWindowSql), d => d.IncrementWindowSql),
         (nameof(IChallengeDialect.SelectWindowCountsSql), d => d.SelectWindowCountsSql),
@@ -136,6 +137,7 @@ public class ChallengeDialectContractTests
         yield return (nameof(IChallengeDialect.InsertSql), dialect.InsertSql);
         yield return (nameof(IChallengeDialect.SelectLiveByScopeSql), dialect.SelectLiveByScopeSql);
         yield return (nameof(IChallengeDialect.SelectLiveByTokenHashSql), dialect.SelectLiveByTokenHashSql);
+        yield return (nameof(IChallengeDialect.SelectMostRecentByScopeSql), dialect.SelectMostRecentByScopeSql);
         yield return (nameof(IChallengeDialect.ConsumeSql), dialect.ConsumeSql);
         yield return (nameof(IChallengeDialect.RecordAttemptSql), dialect.RecordAttemptSql);
         yield return (nameof(IChallengeDialect.InvalidateLiveForScopeSql), dialect.InvalidateLiveForScopeSql);

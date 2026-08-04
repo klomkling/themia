@@ -4,8 +4,6 @@ using Dapper;
 
 using Microsoft.Extensions.Logging.Abstractions;
 
-using MySqlConnector;
-
 using Themia.Challenges.Internal;
 
 using Xunit;
@@ -98,16 +96,18 @@ public abstract class ConcurrencyTests
     /// <para>
     /// <b>MySQL only, confirmed:</b> at this concurrency level, InnoDB's gap locking on
     /// <c>challenge_rate_windows</c>' functional unique indexes (see
-    /// <c>MySqlChallengeDialect.IncrementWindowSql</c>'s remarks) reliably raises
+    /// <c>MySqlChallengeDialect.IncrementWindowSql</c>'s remarks) reliably raised
     /// <c>ER_LOCK_DEADLOCK</c> ("Deadlock found when trying to get lock") for one or more of the
     /// concurrent callers — reproduced deterministically across repeated runs. <c>ON DUPLICATE KEY
     /// UPDATE id = id</c> suppresses the benign <i>duplicate-key</i> error the same bucket collision
     /// would otherwise raise, but a deadlock is a different InnoDB failure mode that no SQL-text
-    /// construct suppresses; only an application-level retry does, and
-    /// <c>ChallengeService.IssueAsync</c> has none. <see cref="IssueWithMySqlDeadlockRetryAsync"/> retries
-    /// only that one, narrowly-identified transient error (MySQL error 1213) so this test still proves the
-    /// actual invariant — no update is ever lost — rather than papering over it; see the task report for
-    /// this finding written up as a concern for <c>ChallengeService</c>, which is not fixed here.
+    /// construct suppresses. This test originally carried its own bounded retry on MySQL error 1213 to
+    /// keep the invariant assertion honest while flagging the gap rather than hiding it (see the task 7
+    /// fix-round-2 report). <c>MySqlChallengeDialect.CreateConnection()</c> now returns a
+    /// <c>DeadlockRetryingConnection</c> that retries exactly that error at the ADO.NET layer — see its
+    /// remarks for why the fix belongs in the dialect, not <c>ChallengeService</c> — so this test calls
+    /// <see cref="IChallengeService.IssueAsync"/> directly again: a bare call, no test-side retry, is now
+    /// the actual proof the deadlock is handled rather than merely made rarer.
     /// </para>
     /// </summary>
     [Fact]
@@ -118,7 +118,7 @@ public abstract class ConcurrencyTests
         var scope = new ChallengeScope(key, ChallengeEngineFixture.ConcurrencyPurpose, tenantId);
 
         var results = await Task.WhenAll(Enumerable.Range(0, ConcurrencyLevel)
-            .Select(_ => IssueWithMySqlDeadlockRetryAsync(fixture.Service, scope)));
+            .Select(_ => fixture.Service.IssueAsync(scope)));
 
         Assert.All(results, r => Assert.Equal(ChallengeIssueOutcome.Issued, r.Outcome));
 
@@ -132,34 +132,6 @@ public abstract class ConcurrencyTests
             new { TenantId = tenantId, Key = key });
 
         Assert.Equal(ConcurrencyLevel, keyCeilingCount);
-    }
-
-    /// <summary>
-    /// Retries only <c>ER_LOCK_DEADLOCK</c> (MySQL error 1213) — see this method's caller for why. Never
-    /// retries anything else: a lost-update assertion failure, a genuine constraint violation, or any
-    /// other exception must still fail the test immediately, not be silently absorbed by a broad retry.
-    /// </summary>
-    private static async Task<ChallengeIssueResult> IssueWithMySqlDeadlockRetryAsync(IChallengeService service, ChallengeScope scope)
-    {
-        const int maxAttempts = 30;
-        for (var attempt = 1; ; attempt++)
-        {
-            try
-            {
-                return await service.IssueAsync(scope);
-            }
-            catch (MySqlException ex) when (attempt < maxAttempts && ex.Number == 1213)
-            {
-                // Full jitter, exponential, capped: at ConcurrencyLevel-way contention on the same
-                // brand-new bucket, a fixed or narrowly-jittered delay lets many retrying callers collide
-                // again on the very next attempt (a thundering herd against one row), so the delay is
-                // randomized across the *entire* [0, cap] range rather than a small offset from a fixed
-                // base — this decorrelates retries across all concurrent callers instead of just spacing
-                // them out slightly.
-                var capMs = Math.Min(500, 10 * (1 << attempt));
-                await Task.Delay(TimeSpan.FromMilliseconds(Random.Shared.Next(1, capMs)));
-            }
-        }
     }
 
     /// <summary>A fresh, collision-free scope key — see <see cref="ChallengeStoreTests.UniqueKey"/>.</summary>

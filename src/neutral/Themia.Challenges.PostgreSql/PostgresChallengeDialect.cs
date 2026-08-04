@@ -52,6 +52,13 @@ public sealed class PostgresChallengeDialect : IChallengeDialect
         """;
 
     /// <inheritdoc />
+    public string SelectMostRecentByScopeSql => """
+        SELECT * FROM challenges
+        WHERE tenant_id IS NOT DISTINCT FROM @TenantId AND "key" = @Key AND purpose = @Purpose
+        ORDER BY created_at DESC LIMIT 1;
+        """;
+
+    /// <inheritdoc />
     public string ConsumeSql => """
         UPDATE challenges SET consumed_at = @ConsumedAt
         WHERE id = @Id AND consumed_at IS NULL AND expires_at > @Now;

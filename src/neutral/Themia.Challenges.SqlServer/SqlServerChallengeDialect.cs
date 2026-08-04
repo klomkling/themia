@@ -60,6 +60,13 @@ public sealed class SqlServerChallengeDialect : IChallengeDialect
         """;
 
     /// <inheritdoc />
+    public string SelectMostRecentByScopeSql => """
+        SELECT TOP (1) * FROM challenges
+        WHERE (tenant_id = @TenantId OR (tenant_id IS NULL AND @TenantId IS NULL)) AND [key] = @Key AND purpose = @Purpose
+        ORDER BY created_at DESC;
+        """;
+
+    /// <inheritdoc />
     public string ConsumeSql => """
         UPDATE challenges SET consumed_at = @ConsumedAt
         WHERE id = @Id AND consumed_at IS NULL AND expires_at > @Now;

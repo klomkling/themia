@@ -64,6 +64,7 @@ Themia.Challenges.IChallengeDialect.PurgeExpiredSql.get -> string!
 Themia.Challenges.IChallengeDialect.RecordAttemptSql.get -> string!
 Themia.Challenges.IChallengeDialect.SelectLiveByScopeSql.get -> string!
 Themia.Challenges.IChallengeDialect.SelectLiveByTokenHashSql.get -> string!
+Themia.Challenges.IChallengeDialect.SelectMostRecentByScopeSql.get -> string!
 Themia.Challenges.IChallengeDialect.SelectWindowCountsSql.get -> string!
 Themia.Challenges.Migrations.ChallengeSchemaMigration
 Themia.Challenges.Migrations.ChallengeSchemaMigration.ChallengeSchemaMigration() -> void

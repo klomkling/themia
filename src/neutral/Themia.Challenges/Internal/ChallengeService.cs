@@ -296,25 +296,39 @@ internal sealed class ChallengeService : IChallengeService
     }
 
     /// <summary>
-    /// Distinguishes <see cref="ChallengeVerifyOutcome.Expired"/> from <see cref="ChallengeVerifyOutcome.NotFound"/>
-    /// when the live lookup found nothing. <see cref="IChallengeDialect.SelectLiveByScopeSql"/>'s own
-    /// <c>WHERE</c> clause filters both <c>consumed_at IS NULL</c> and <c>expires_at &gt; @Now</c>, and
-    /// the interface has no statement that selects ignoring expiry — so this re-runs the exact same
-    /// statement with <c>@Now</c> pinned to <see cref="DateTimeOffset.MinValue"/>. That value defeats
-    /// only the expiry filter (every real <c>expires_at</c> is after year 1) while leaving the
-    /// <c>consumed_at IS NULL</c> filter intact: a row still turns up here if and only if it was issued,
-    /// is not consumed or invalidated, and its TTL has since elapsed.
+    /// Distinguishes <see cref="ChallengeVerifyOutcome.Consumed"/>, <see cref="ChallengeVerifyOutcome.Expired"/>
+    /// and <see cref="ChallengeVerifyOutcome.NotFound"/> when the live lookup found nothing live for the
+    /// scope. Uses <see cref="IChallengeDialect.SelectMostRecentByScopeSql"/> — the one statement with no
+    /// liveness filter at all — rather than re-querying <see cref="IChallengeDialect.SelectLiveByScopeSql"/>:
+    /// that statement's own <c>consumed_at IS NULL</c> filter cannot be defeated by any parameter the way
+    /// its <c>expires_at &gt; @Now</c> filter can be defeated with <see cref="DateTimeOffset.MinValue"/>,
+    /// so it can never tell a consumed row apart from one that never existed — a plain sequential
+    /// re-verify of an already-consumed challenge (a double-submitted form, a refresh after success) has
+    /// no live row and no way to distinguish "already used" from "never issued" through that path alone.
+    /// This previously reported <see cref="ChallengeVerifyOutcome.NotFound"/> for that case; both are
+    /// distinct, meaningful outcomes a caller must be able to tell apart (design spec, "Public API"), and
+    /// collapsing them cost callers who build alerting or rate-limit logic on <c>NotFound</c> a spike of
+    /// false positives from ordinary double-submits.
     /// </summary>
     private async Task<ChallengeVerifyResult> ClassifyMissingAsync(
         System.Data.Common.DbConnection connection, ChallengeScope scope, CancellationToken cancellationToken)
     {
-        var everLive = await connection.QueryFirstOrDefaultAsync<ChallengeRow>(new CommandDefinition(
-            dialect.SelectLiveByScopeSql, LiveByScopeParams(scope, DateTimeOffset.MinValue), cancellationToken: cancellationToken));
+        var mostRecent = await connection.QueryFirstOrDefaultAsync<ChallengeRow>(new CommandDefinition(
+            dialect.SelectMostRecentByScopeSql,
+            new { TenantId = scope.TenantId, Key = scope.Key, Purpose = scope.Purpose },
+            cancellationToken: cancellationToken));
 
-        // Only existence matters here (Expired vs NotFound), not how many rows would come back with the
-        // expiry filter defeated — QueryFirstOrDefaultAsync is deliberate, not a leftover single-row
-        // assumption.
-        return everLive is null ? ChallengeVerifyResult.NotFound(scope) : ChallengeVerifyResult.Expired(scope);
+        if (mostRecent is null)
+        {
+            return ChallengeVerifyResult.NotFound(scope);
+        }
+
+        // consumed_at is set both by a genuine ConsumeSql (real verification) and by
+        // InvalidateLiveForScopeSql's re-issue supersession — both mean "this exact code no longer
+        // verifies", which is what Consumed communicates to the caller regardless of which set it.
+        return mostRecent.ConsumedAt is not null
+            ? ChallengeVerifyResult.Consumed(scope)
+            : ChallengeVerifyResult.Expired(scope);
     }
 
     private static object LiveByScopeParams(ChallengeScope scope, DateTimeOffset now) =>

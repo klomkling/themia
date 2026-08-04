@@ -50,6 +50,7 @@ internal sealed class RaceGatingChallengeDialect : IChallengeDialect
     public string InsertSql => inner.InsertSql;
     public string SelectLiveByScopeSql => inner.SelectLiveByScopeSql;
     public string SelectLiveByTokenHashSql => inner.SelectLiveByTokenHashSql;
+    public string SelectMostRecentByScopeSql => inner.SelectMostRecentByScopeSql;
     public string ConsumeSql => inner.ConsumeSql;
     public string RecordAttemptSql => inner.RecordAttemptSql;
     public string InvalidateLiveForScopeSql => inner.InvalidateLiveForScopeSql;

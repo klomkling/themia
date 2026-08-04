@@ -101,6 +101,14 @@ internal sealed class SqliteChallengeDialect : IChallengeDialect
         ORDER BY created_at DESC LIMIT 1;
         """;
 
+    // No liveness filter at all - used to classify why SelectLiveByScopeSql found nothing (never
+    // issued vs. consumed vs. expired). See IChallengeDialect.SelectMostRecentByScopeSql's remarks.
+    public string SelectMostRecentByScopeSql => """
+        SELECT * FROM challenges
+        WHERE tenant_id IS @TenantId AND key = @Key AND purpose = @Purpose
+        ORDER BY created_at DESC LIMIT 1;
+        """;
+
     public string ConsumeSql => """
         UPDATE challenges SET consumed_at = @ConsumedAt
         WHERE id = @Id AND consumed_at IS NULL AND expires_at > @Now;

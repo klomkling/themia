@@ -62,6 +62,9 @@ internal sealed class RaceGatingChallengeDialect : IChallengeDialect
     public string SelectLiveByTokenHashSql => inner.SelectLiveByTokenHashSql;
 
     /// <inheritdoc />
+    public string SelectMostRecentByScopeSql => inner.SelectMostRecentByScopeSql;
+
+    /// <inheritdoc />
     /// <remarks>Blocks until both racing calls have reached this point — i.e. both have already run
     /// <see cref="SelectLiveByScopeSql"/> and found the row live — before either is allowed to proceed to
     /// the guarded <c>UPDATE</c>. Whichever executes first commits (1 row affected); the second's

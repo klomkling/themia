@@ -13,5 +13,6 @@ Themia.Challenges.MySql.MySqlChallengeDialect.PurgeExpiredSql.get -> string!
 Themia.Challenges.MySql.MySqlChallengeDialect.RecordAttemptSql.get -> string!
 Themia.Challenges.MySql.MySqlChallengeDialect.SelectLiveByScopeSql.get -> string!
 Themia.Challenges.MySql.MySqlChallengeDialect.SelectLiveByTokenHashSql.get -> string!
+Themia.Challenges.MySql.MySqlChallengeDialect.SelectMostRecentByScopeSql.get -> string!
 Themia.Challenges.MySql.MySqlChallengeDialect.SelectWindowCountsSql.get -> string!
 Themia.Challenges.MySql.ServiceCollectionExtensions

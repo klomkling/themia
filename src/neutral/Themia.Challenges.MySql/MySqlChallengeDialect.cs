@@ -37,7 +37,17 @@ public sealed class MySqlChallengeDialect : IChallengeDialect
     public MySqlChallengeDialect(string connectionString) => this.connectionString = connectionString;
 
     /// <inheritdoc />
-    public DbConnection CreateConnection() => new MySqlConnection(connectionString);
+    /// <remarks>
+    /// Returns a <see cref="DeadlockRetryingConnection"/>, not a bare <see cref="MySqlConnection"/> —
+    /// see its remarks for why a bounded retry on <c>ER_LOCK_DEADLOCK</c> (MySQL error 1213) belongs
+    /// here rather than in <c>ChallengeService</c>. PostgreSQL and SQL Server need no equivalent: neither
+    /// takes InnoDB-style gap locks on a functional/filtered unique index the way MySQL does for
+    /// <see cref="IncrementWindowSql"/>'s seed-then-update upsert (PostgreSQL's partial unique indexes
+    /// and SQL Server's filtered indexes don't exhibit the same range-locking behaviour under concurrent
+    /// inserts into the same bucket), so a deadlock retry added to those dialects "by symmetry" would be
+    /// dead code masking nothing.
+    /// </remarks>
+    public DbConnection CreateConnection() => new DeadlockRetryingConnection(connectionString);
 
     /// <inheritdoc />
     public string InsertSql => """
@@ -62,6 +72,13 @@ public sealed class MySqlChallengeDialect : IChallengeDialect
     public string SelectLiveByTokenHashSql => """
         SELECT * FROM challenges
         WHERE token_hash = @TokenHash AND consumed_at IS NULL AND expires_at > @Now
+        ORDER BY created_at DESC LIMIT 1;
+        """;
+
+    /// <inheritdoc />
+    public string SelectMostRecentByScopeSql => """
+        SELECT * FROM challenges
+        WHERE tenant_id <=> @TenantId AND `key` = @Key AND purpose = @Purpose
         ORDER BY created_at DESC LIMIT 1;
         """;
 

@@ -12,6 +12,7 @@ Themia.Challenges.SqlServer.SqlServerChallengeDialect.PurgeExpiredSql.get -> str
 Themia.Challenges.SqlServer.SqlServerChallengeDialect.RecordAttemptSql.get -> string!
 Themia.Challenges.SqlServer.SqlServerChallengeDialect.SelectLiveByScopeSql.get -> string!
 Themia.Challenges.SqlServer.SqlServerChallengeDialect.SelectLiveByTokenHashSql.get -> string!
+Themia.Challenges.SqlServer.SqlServerChallengeDialect.SelectMostRecentByScopeSql.get -> string!
 Themia.Challenges.SqlServer.SqlServerChallengeDialect.SelectWindowCountsSql.get -> string!
 Themia.Challenges.SqlServer.SqlServerChallengeDialect.SqlServerChallengeDialect(string! connectionString) -> void
 Themia.Challenges.SqlServer.ServiceCollectionExtensions
