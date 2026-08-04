@@ -156,4 +156,15 @@ public sealed class ChallengeOptions
         throw new InvalidOperationException(
             $"Purpose '{purpose}' was never configured. Call {nameof(ChallengeOptions)}.{nameof(ConfigurePurpose)}(\"{purpose}\", ...) before issuing or verifying against it.");
     }
+
+    /// <summary>
+    /// Validates the options. A no-op today: every <see cref="PurposeOptions"/> tunable already
+    /// validates eagerly from its own property setter (see the type's remarks), so there is nothing
+    /// left to check at the top level. Called from <c>AddThemiaChallenges</c> regardless, matching
+    /// every other Themia options type's registration flow, and as the seam a future
+    /// package-level invariant (e.g. "at least one purpose configured") would hang off.
+    /// </summary>
+    public void Validate()
+    {
+    }
 }

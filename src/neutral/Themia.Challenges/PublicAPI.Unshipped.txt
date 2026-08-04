@@ -81,3 +81,11 @@ Themia.Challenges.PurposeOptions.PerScopeWindow.set -> void
 Themia.Challenges.PurposeOptions.PurposeOptions() -> void
 Themia.Challenges.PurposeOptions.Ttl.get -> System.TimeSpan
 Themia.Challenges.PurposeOptions.Ttl.set -> void
+Themia.Challenges.ChallengeOptions.Validate() -> void
+Themia.Challenges.IChallengeService
+Themia.Challenges.IChallengeService.IssueAsync(Themia.Challenges.ChallengeScope! scope, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Challenges.ChallengeIssueResult!>!
+Themia.Challenges.IChallengeService.VerifyAsync(Themia.Challenges.ChallengeScope! scope, string! code, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Challenges.ChallengeVerifyResult!>!
+Themia.Challenges.IChallengeService.VerifyByTokenAsync(string! token, string! purpose, string? tenantId = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Challenges.ChallengeVerifyResult!>!
+Themia.Challenges.IChallengeService.RefundAsync(Themia.Challenges.ChallengeScope! scope, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Challenges.DependencyInjection.ChallengeServiceCollectionExtensions
+static Themia.Challenges.DependencyInjection.ChallengeServiceCollectionExtensions.AddThemiaChallenges(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Themia.Challenges.ChallengeOptions!>! configure) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
