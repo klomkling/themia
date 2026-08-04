@@ -52,6 +52,11 @@ internal sealed class ChallengePurgeService(
     /// </summary>
     private static readonly TimeSpan WindowSafetyMargin = TimeSpan.FromHours(1);
 
+    /// <summary>Rows deleted per purge statement, matching <c>Themia.Messaging</c>'s purge loop. Small
+    /// enough that a single batch's locks are short, large enough that a day's backlog drains in a
+    /// handful of round trips.</summary>
+    private const int PurgeBatchSize = 1_000;
+
     private DateTimeOffset nextPurgeAt = DateTimeOffset.MinValue;
 
     /// <inheritdoc />
@@ -126,10 +131,8 @@ internal sealed class ChallengePurgeService(
         await connection.OpenAsync(ct).ConfigureAwait(false);
 
         var expiredCutoff = now.AddHours(-options.ChallengeRetentionHours);
-        var expiredDeleted = await connection.ExecuteAsync(new CommandDefinition(
-            activeDialect.PurgeExpiredSql,
-            new { OlderThan = expiredCutoff },
-            cancellationToken: ct)).ConfigureAwait(false);
+        var expiredDeleted = await PurgeInBatchesAsync(
+            connection, activeDialect.PurgeExpiredSql, expiredCutoff, ct).ConfigureAwait(false);
 
         // A window row must outlive every challenge it counted, so this never purges on
         // ChallengeRetentionHours — only once a window has fully elapsed. No purpose configured yet
@@ -140,12 +143,39 @@ internal sealed class ChallengePurgeService(
         if (widestWindow > TimeSpan.Zero)
         {
             var windowsCutoff = now - widestWindow - WindowSafetyMargin;
-            windowsDeleted = await connection.ExecuteAsync(new CommandDefinition(
-                activeDialect.PurgeElapsedWindowsSql,
-                new { OlderThan = windowsCutoff },
-                cancellationToken: ct)).ConfigureAwait(false);
+            windowsDeleted = await PurgeInBatchesAsync(
+                connection, activeDialect.PurgeElapsedWindowsSql, windowsCutoff, ct).ConfigureAwait(false);
         }
 
         return (expiredDeleted, windowsDeleted);
+    }
+
+    /// <summary>
+    /// Runs a bounded purge statement repeatedly until a batch comes back short, and returns the total
+    /// deleted. Same shape as <c>Themia.Messaging</c>'s and <c>Themia.Modules.Notifications</c>' purge
+    /// loops: one unbounded <c>DELETE</c> would hold locks for its whole duration on the two tables every
+    /// <c>IssueAsync</c> and <c>VerifyAsync</c> contends on, and a backlog only makes that worse.
+    /// Cancellation stops the loop between batches, keeping whatever earlier batches already committed —
+    /// retention is idempotent, so the next cycle simply continues.
+    /// </summary>
+    private static async Task<int> PurgeInBatchesAsync(
+        System.Data.Common.DbConnection connection, string sql, DateTimeOffset olderThan, CancellationToken ct)
+    {
+        var total = 0;
+        while (!ct.IsCancellationRequested)
+        {
+            var deleted = await connection.ExecuteAsync(new CommandDefinition(
+                sql,
+                new { OlderThan = olderThan, Batch = PurgeBatchSize },
+                cancellationToken: ct)).ConfigureAwait(false);
+
+            total += deleted;
+            if (deleted < PurgeBatchSize)
+            {
+                break;
+            }
+        }
+
+        return total;
     }
 }

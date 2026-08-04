@@ -12,8 +12,8 @@ namespace Themia.Challenges.IntegrationTests;
 /// <c>challenge_rate_windows</c> is a separate table with its own, much longer retention horizon
 /// (<see cref="IChallengeDialect.PurgeElapsedWindowsSql"/>), purged independently.
 /// <para>
-/// Runs on PostgreSQL only: <c>PurgeExpiredSql</c> is an unconditional <c>DELETE ... WHERE expires_at &lt;
-/// @OlderThan</c> with no engine-specific syntax on any of the three dialects, and the two-table split
+/// Runs on PostgreSQL only: <c>PurgeExpiredSql</c> deletes on <c>expires_at &lt; @OlderThan</c> bounded by
+/// <c>@Batch</c>, and the two-table split
 /// this test protects is a schema-level property, not a per-engine one — a second and third run would
 /// prove nothing the first didn't already prove.
 /// </para>
@@ -48,8 +48,12 @@ public sealed class RetentionTests
         // that are not even expired yet, to prove the counter's survival does not depend on TTL timing.
         await using var connection = fixture.Dialect.CreateConnection();
         await connection.OpenAsync();
+        // @Batch is part of the statement's contract — it is bounded so one DELETE cannot hold locks
+        // across a whole backlog (ChallengePurgeService loops until a batch comes back short). This test
+        // seeds only TightPerKeyLimit rows, so one generous batch drains them all.
         var purged = await connection.ExecuteAsync(
-            fixture.Dialect.PurgeExpiredSql, new { OlderThan = DateTimeOffset.UtcNow.AddDays(1) });
+            fixture.Dialect.PurgeExpiredSql,
+            new { OlderThan = DateTimeOffset.UtcNow.AddDays(1), Batch = 1_000 });
         Assert.True(purged >= ChallengeEngineFixture.TightPerKeyLimit, $"expected at least {ChallengeEngineFixture.TightPerKeyLimit} rows purged, got {purged}");
 
         var remainingChallenges = await connection.ExecuteScalarAsync<int>(

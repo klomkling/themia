@@ -62,7 +62,10 @@ internal sealed class ChallengeService : IChallengeService
         // Every shipped dialect's SELECT statements return the raw snake_case columns from the shared
         // schema (see ChallengeRow's remarks) — fold out underscores once, scoped to this type only, so
         // dialect authors never have to alias columns to PascalCase.
-        SqlMapper.SetTypeMap(typeof(ChallengeRow), new CustomPropertyTypeMap(typeof(ChallengeRow), MatchColumn));
+        // MatchColumn! — Dapper's delegate is typed non-nullable, but CustomPropertyTypeMap explicitly
+        // treats a null return as "ignore this column", which is exactly the behaviour we need (see
+        // MatchColumn's own remarks). The suppression is on the type signature, not on the contract.
+        SqlMapper.SetTypeMap(typeof(ChallengeRow), new CustomPropertyTypeMap(typeof(ChallengeRow), MatchColumn!));
     }
 
     /// <summary>Creates the engine over <paramref name="dialect"/>.</summary>
@@ -526,7 +529,7 @@ internal sealed class ChallengeService : IChallengeService
     // "tenant_id" -> "TenantId": strip underscores from the column name and match case-insensitively
     // against the property name (also stripped, so this is symmetric regardless of which side has
     // them). Every column in this schema round-trips uniquely this way; see ChallengeRow's remarks.
-    private static System.Reflection.PropertyInfo MatchColumn(Type type, string columnName)
+    private static System.Reflection.PropertyInfo? MatchColumn(Type type, string columnName)
     {
         var normalized = columnName.Replace("_", string.Empty);
         foreach (var property in type.GetProperties())
@@ -537,8 +540,14 @@ internal sealed class ChallengeService : IChallengeService
             }
         }
 
-        throw new InvalidOperationException(
-            $"No property on {type.Name} matches column '{columnName}'. Every dialect's SELECT column must " +
-            $"correspond to a ChallengeRow property once underscores are stripped.");
+        // Unmatched column -> null, which Dapper reads as "ignore this column". Deliberately not an
+        // exception: every dialect's scope and by-id lookups are SELECT *, so a column with no
+        // ChallengeRow property is not a Themia bug, it is any additive change to the table — a later
+        // migration in this package (Themia.Exceptional already ships an AddRequestContextColumn doing
+        // exactly that), or a DBA adding an audit or replication column to a shared database. Throwing
+        // turned a normally-safe ALTER TABLE into a total verification outage: every VerifyAsync would
+        // fail until the row type caught up. Ignoring the column leaves it unread, which is what a
+        // SELECT * consumer should do with a column it knows nothing about.
+        return null;
     }
 }

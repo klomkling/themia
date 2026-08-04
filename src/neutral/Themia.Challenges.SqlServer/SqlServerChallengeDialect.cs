@@ -93,7 +93,7 @@ public sealed class SqlServerChallengeDialect : IChallengeDialect
         """;
 
     /// <inheritdoc />
-    public string PurgeExpiredSql => """DELETE FROM challenges WHERE expires_at < @OlderThan;""";
+    public string PurgeExpiredSql => """DELETE TOP (@Batch) FROM challenges WHERE expires_at < @OlderThan;""";
 
     /// <inheritdoc />
     /// <remarks>
@@ -251,5 +251,5 @@ public sealed class SqlServerChallengeDialect : IChallengeDialect
         """;
 
     /// <inheritdoc />
-    public string PurgeElapsedWindowsSql => """DELETE FROM challenge_rate_windows WHERE window_start < @OlderThan;""";
+    public string PurgeElapsedWindowsSql => """DELETE TOP (@Batch) FROM challenge_rate_windows WHERE window_start < @OlderThan;""";
 }

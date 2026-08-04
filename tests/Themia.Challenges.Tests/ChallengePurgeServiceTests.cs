@@ -69,6 +69,29 @@ public sealed class ChallengePurgeServiceTests : IDisposable
         Assert.Equal(1, ChallengeCount());
     }
 
+    [Fact]
+    public async Task PurgeIfDueAsync_ShouldDeleteEveryEligibleRow_WhenTheBacklogExceedsOneBatch()
+    {
+        // Each purge statement is bounded (LIMIT/TOP @Batch) so one DELETE cannot hold locks across the
+        // whole backlog on the tables every issue and verify contends on. The bound is only safe because
+        // the service loops until a batch comes back short — without the loop, a backlog larger than one
+        // batch would drain 1000 rows per hour and never catch up, quietly retaining far more than the
+        // configured horizon. 2500 straddles two full batches plus a short one.
+        var now = DateTimeOffset.Parse("2026-08-04T00:00:00Z");
+        for (var i = 0; i < 2_500; i++)
+        {
+            InsertChallenge(Guid.NewGuid(), now.AddHours(-25));
+        }
+
+        var options = new ChallengeOptions { ChallengeRetentionHours = 24 };
+        var dialect = new RecordingChallengeDialect(connString);
+        var service = new ChallengePurgeService(options, new FakeTimeProvider(now), NullLogger<ChallengePurgeService>.Instance, dialect);
+
+        await service.PurgeIfDueAsync(CancellationToken.None);
+
+        Assert.Equal(0, ChallengeCount());
+    }
+
     // ---- Rate-window purge: must outlive the challenges it counted ----------------------------
 
     // The core requirement this task exists for: challenges purge on ChallengeRetentionHours, but rate

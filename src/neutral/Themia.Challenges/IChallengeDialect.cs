@@ -179,7 +179,8 @@ public interface IChallengeDialect
     /// Hard-deletes challenge rows whose <c>expires_at &lt; @OlderThan</c>. Params: <c>@OlderThan</c>.
     /// Returns rows affected. Challenges are purged aggressively (every login attempt creates one) —
     /// this is a real delete, not a soft delete, because nothing downstream reads a dead challenge
-    /// row. Contrast <see cref="PurgeElapsedWindowsSql"/>, which purges on a much longer horizon: the
+    /// row. Bounded by <c>@Batch</c> for the same reason as <see cref="PurgeElapsedWindowsSql"/> — see
+    /// its remarks. Contrast <see cref="PurgeElapsedWindowsSql"/>, which purges on a much longer horizon: the
     /// rate-limit counters must outlive the challenges they counted, or an attacker simply waits for
     /// this purge to run and the cost ceiling resets itself.
     /// </summary>
@@ -239,13 +240,20 @@ public interface IChallengeDialect
     string DecrementWindowSql { get; }
 
     /// <summary>
-    /// Hard-deletes counter rows whose <c>window_start &lt; @OlderThan</c>. Params: <c>@OlderThan</c>.
+    /// Hard-deletes at most <c>@Batch</c> counter rows whose <c>window_start &lt; @OlderThan</c>.
+    /// Params: <c>@OlderThan</c>, <c>@Batch</c>.
     /// Returns rows affected. The caller computes <c>@OlderThan</c> from the longest window duration
     /// in play — the store's <c>PerKeyWindow</c> and every purpose's <c>PerScopeWindow</c> — plus a safety
     /// margin — never from a fixed retention shorter than a configured window. A counter row has no
     /// stored duration of its own, so purging it too early deletes evidence a still-active window
     /// depends on, silently resetting the cost ceiling the two-table split exists to protect; a
     /// counter must outlive the challenges it counted.
+    /// <para>
+    /// <b>Bounded, and the caller loops until a batch comes back short.</b> An unbounded <c>DELETE</c> on
+    /// a large table holds locks for the whole delete and bloats it — and these two tables are the ones
+    /// every <c>IssueAsync</c> and <c>VerifyAsync</c> contends on, with the purge retrying hourly forever.
+    /// Same shape as <c>Themia.Messaging</c>'s and <c>Themia.Modules.Notifications</c>' purge dialects.
+    /// </para>
     /// </summary>
     string PurgeElapsedWindowsSql { get; }
 }

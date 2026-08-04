@@ -96,9 +96,15 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
   SQL Server both default to case-folding collations, so a code issued for key `"A1b2"` verified against
   an account keyed `"a1b2"`, and the two shared one rate-limit bucket. Proven per engine: the new test
   fails on MySQL and SQL Server without the pin. PostgreSQL was never affected.
-- **`Themia.Challenges` indexes its purge predicates** (`challenges.expires_at`,
-  `challenge_rate_windows.window_start`). Both purge statements filter on a single column, so without
-  them the hourly retention job full-scanned the two tables every issue and verify contends on.
+- **`Themia.Challenges` retention is indexed and batched.** Both purge predicates now have an index
+  (`challenges.expires_at`, `challenge_rate_windows.window_start`) — each filters on a single column, so
+  without one the hourly job full-scanned the tables every issue and verify contends on — and both
+  statements are bounded (`LIMIT`/`TOP @Batch`) with the service looping until a batch comes back short,
+  matching `Themia.Messaging`'s purge loop. An unbounded `DELETE` held locks for the whole delete.
+- **`Themia.Challenges` survives a column being added to `challenges`.** Every dialect's scope and by-id
+  lookups are `SELECT *`, and the Dapper column map threw on any column with no `ChallengeRow` property,
+  so a later migration in this package or a DBA adding an audit column to a shared database took every
+  `VerifyAsync` down. Unmatched columns are now ignored, which is what a `SELECT *` consumer should do.
 - **`Themia.Challenges.MySql` pins `GuidFormat=Char36`**, matching every sibling Themia MySQL dialect.
   Both `id` columns are `CHAR(36)`; an adopter reusing a connection string carrying
   `GuidFormat=Binary16` or `OldGuids=true` wrote a mangled id that no later lookup matched.

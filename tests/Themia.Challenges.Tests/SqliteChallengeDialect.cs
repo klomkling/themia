@@ -131,7 +131,7 @@ internal sealed class SqliteChallengeDialect : IChallengeDialect
           AND consumed_at IS NULL AND expires_at > @Now;
         """;
 
-    public string PurgeExpiredSql => """DELETE FROM challenges WHERE expires_at < @OlderThan;""";
+    public string PurgeExpiredSql => """DELETE FROM challenges WHERE rowid IN (SELECT rowid FROM challenges WHERE expires_at < @OlderThan LIMIT @Batch);""";
 
     public string IncrementWindowSql => """
         INSERT INTO challenge_rate_windows (id, tenant_id, key, purpose, window_start, count)
@@ -146,5 +146,5 @@ internal sealed class SqliteChallengeDialect : IChallengeDialect
         WHERE tenant_id IS @TenantId AND key = @Key AND purpose IS @Purpose AND window_start = @WindowStart;
         """;
 
-    public string PurgeElapsedWindowsSql => """DELETE FROM challenge_rate_windows WHERE window_start < @OlderThan;""";
+    public string PurgeElapsedWindowsSql => """DELETE FROM challenge_rate_windows WHERE rowid IN (SELECT rowid FROM challenge_rate_windows WHERE window_start < @OlderThan LIMIT @Batch);""";
 }

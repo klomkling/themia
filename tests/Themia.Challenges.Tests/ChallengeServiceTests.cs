@@ -228,6 +228,26 @@ public sealed class ChallengeServiceTests : IDisposable
         Assert.False(await service.RefundAsync(Guid.NewGuid()));
     }
 
+    [Fact]
+    public async Task Verify_ShouldStillWork_AfterAColumnIsAddedToTheChallengesTable()
+    {
+        // Every dialect's scope and by-id lookups are SELECT *, so any column the table gains that has no
+        // ChallengeRow property flows into Dapper's column map. That is not a Themia bug — it is any
+        // additive change: a later migration in this package (Themia.Exceptional already ships an
+        // AddRequestContextColumn doing exactly that), or a DBA adding an audit column to a shared
+        // database. The map used to throw on it, which turned a normally-safe ALTER TABLE into a total
+        // verification outage.
+        var service = CreateService(o => o.ConfigurePurpose("login", p => Configure(p)));
+        var scope = new ChallengeScope("+66757575757", "login", "tenantA");
+        var secret = (await service.IssueAsync(scope)).Secret!;
+
+        keepAlive.Execute("ALTER TABLE challenges ADD COLUMN some_operator_added_column TEXT NULL");
+
+        var result = await service.VerifyAsync(scope, secret);
+
+        Assert.Equal(ChallengeVerifyOutcome.Verified, result.Outcome);
+    }
+
     // ---- Verify outcomes ----------------------------------------------------------------------
 
     [Fact]

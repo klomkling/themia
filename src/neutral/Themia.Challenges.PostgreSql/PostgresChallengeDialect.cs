@@ -85,7 +85,10 @@ public sealed class PostgresChallengeDialect : IChallengeDialect
         """;
 
     /// <inheritdoc />
-    public string PurgeExpiredSql => """DELETE FROM challenges WHERE expires_at < @OlderThan;""";
+    public string PurgeExpiredSql => """
+        DELETE FROM challenges
+        WHERE ctid IN (SELECT ctid FROM challenges WHERE expires_at < @OlderThan LIMIT @Batch);
+        """;
 
     /// <inheritdoc />
     /// <remarks>
@@ -137,5 +140,8 @@ public sealed class PostgresChallengeDialect : IChallengeDialect
         """;
 
     /// <inheritdoc />
-    public string PurgeElapsedWindowsSql => """DELETE FROM challenge_rate_windows WHERE window_start < @OlderThan;""";
+    public string PurgeElapsedWindowsSql => """
+        DELETE FROM challenge_rate_windows
+        WHERE ctid IN (SELECT ctid FROM challenge_rate_windows WHERE window_start < @OlderThan LIMIT @Batch);
+        """;
 }
