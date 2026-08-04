@@ -66,8 +66,14 @@ Two structural rules drive nearly every design choice:
   outside the data layer), so isolation holds by construction, not just by convention. The sanctioned
   ad-hoc query path is `ITenantQueryFactory.For<T>()` (pre-seeds the tenant predicate). Full rationale +
   acceptance criteria: DECISION #6 in `docs/themia-architecture-overview.md`.
-- **Multi-DB Phase 1:** SQL Server, MySQL (incl. MariaDB), PostgreSQL via a dialect strategy +
-  per-provider packages.
+- **Multi-DB Phase 1:** SQL Server, MySQL **8.0.13+**, PostgreSQL via a dialect strategy +
+  per-provider packages. **MariaDB is NOT supported** (UPDATED 2026-08-04 — supersedes the earlier
+  "incl. MariaDB"): the MySQL leg of the shared schema uses functional key parts
+  (`CREATE UNIQUE INDEX ... ((expr))`) to emulate partial/filtered unique indexes, and MariaDB has no
+  equivalent at any version, so `Themia.Modules.Pdf` and `Themia.Challenges` fail at migration time.
+  Do not re-add the claim. The one real MariaDB coverage is `Themia.Data.Migrations`' `mariadb:11`
+  advisory-lock test — keep it. Full rationale: "Multi-database requirement" in
+  `docs/themia-architecture-overview.md`.
 - **Exception logging engine** is a custom Dapper store with an `IExceptionalSqlDialect` strategy
   and **one schema across all three engines** — *not* built on StackExchange.Exceptional's store.
 - **Typed exceptions + ProblemDetails middleware live in `Themia.AspNetCore`**, NOT in
