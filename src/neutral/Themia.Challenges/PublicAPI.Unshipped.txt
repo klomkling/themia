@@ -1,4 +1,5 @@
 #nullable enable
+override Themia.Challenges.ChallengeScope.ToString() -> string!
 static Themia.Challenges.ChallengeFormat.Numeric(int length) -> Themia.Challenges.ChallengeFormat!
 static Themia.Challenges.ChallengeFormat.OpaqueToken(int bytes) -> Themia.Challenges.ChallengeFormat!
 static Themia.Challenges.ChallengeIssueResult.Issued(string! secret, System.DateTimeOffset expiresAt) -> Themia.Challenges.ChallengeIssueResult!

@@ -14,7 +14,7 @@ public sealed class PurposeOptions
     private int _maxAttempts = 5;
     private int _maxLiveChallenges = 1;
     private (int Limit, TimeSpan Window) _perScopeWindow = (3, TimeSpan.FromMinutes(15));
-    private (int Limit, TimeSpan Window) _perKeyWindow = (10, TimeSpan.FromHours(1));
+    private (int Limit, TimeSpan Window) _perKeyWindow = (20, TimeSpan.FromHours(1));
 
     /// <summary>The shape of the secret this purpose issues. Defaults to a 6-digit numeric code.</summary>
     /// <exception cref="ArgumentNullException">Assigned <see langword="null"/>.</exception>
@@ -81,9 +81,19 @@ public sealed class PurposeOptions
 
     /// <summary>
     /// The rate limit on issuance for one key across all purposes: at most <c>Limit</c> secrets may be
-    /// issued to the same key within <c>Window</c>, regardless of purpose. Defaults to 10 per hour.
+    /// issued to the same key within <c>Window</c>, regardless of purpose. Defaults to 20 per hour.
     /// Wider than <see cref="PerScopeWindow"/> — it exists to cap an attacker cycling through purposes
     /// against the same phone number or email address.
+    /// <para>
+    /// This is a cost ceiling, not a brute-force defense — <see cref="MaxAttempts"/> already stops
+    /// brute force on a single issued secret. Keep this limit far above what a real user ever reaches:
+    /// a real user asks once or twice, so even 10 already gives an attacker who merely knows the
+    /// victim's phone number or email a cheap way to burn the ceiling and lock that person out of
+    /// issuance until the window elapses. Widening it (currently 20) costs nothing against that
+    /// attack — the attempt cap is what actually protects the secret — but a low value converts "an
+    /// attacker knows your phone number" into "you can't receive an OTP for an hour". Do not lower
+    /// this "to be safe"; it does not make brute force harder and it does make lockout easier.
+    /// </para>
     /// </summary>
     /// <exception cref="ArgumentOutOfRangeException"><c>Limit</c> or <c>Window</c> is zero or negative.</exception>
     public (int Limit, TimeSpan Window) PerKeyWindow
@@ -130,6 +140,7 @@ public sealed class ChallengeOptions
     /// <summary>Retrieves the configuration for a purpose.</summary>
     /// <param name="purpose">The purpose name.</param>
     /// <returns>The purpose's configuration.</returns>
+    /// <exception cref="ArgumentException"><paramref name="purpose"/> is null or empty.</exception>
     /// <exception cref="InvalidOperationException">
     /// <paramref name="purpose"/> was never configured via <see cref="ConfigurePurpose"/>.
     /// </exception>
