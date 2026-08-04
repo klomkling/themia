@@ -322,7 +322,9 @@ Two tables, **unprefixed literal names on every engine** (`challenges`, `challen
 
 `challenge_rate_windows` — `id` (guid PK), `tenant_id` (nullable), `key` (450), `purpose` (nullable — **null means the per-key ceiling across all purposes**), `window_start`, `count` (int).
 
-Indexes: unique on `(tenant_id, key, purpose)` filtered to live rows where the engine supports it, otherwise plain; index on `token_hash`; index on `(tenant_id, key, purpose, window_start)`.
+Indexes: plain on `(tenant_id, key, purpose)`; on `token_hash`; on `(tenant_id, key, purpose, window_start)`.
+
+**Not unique** on `(tenant_id, key, purpose)`, and this corrects an earlier draft of this plan that said unique. `PurposeOptions.MaxLiveChallenges` is configurable above 1 precisely so a late-arriving first code can still verify (spec, "Re-issue policy") — a unique index makes more than one live challenge per scope impossible and breaks that option the moment anyone sets it. Uniqueness of the *live* challenge is a policy the engine enforces when it invalidates, not a database constraint.
 
 Note in the migration's XML doc **why `key` is 450 and not longer**: SQL Server caps an indexed nvarchar key at 450 characters.
 
