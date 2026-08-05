@@ -75,7 +75,7 @@ public static class ThemiaMigrations
         // unknown engine fails as a clean guard before any infrastructure is built.
         var (addProcessor, displayName) = Describe(engine);
 
-        using var provider = new ServiceCollection()
+        var provider = new ServiceCollection()
             .AddFluentMigratorCore()
             .ConfigureRunner(rb =>
             {
@@ -85,8 +85,88 @@ public static class ThemiaMigrations
             })
             .BuildServiceProvider(false);
 
-        using var scope = provider.CreateScope();
-        var serviceProvider = scope.ServiceProvider;
+        var scope = provider.CreateScope();
+        var bodyFaulted = true;
+        try
+        {
+            RunCore(scope.ServiceProvider, engine, connectionString, options, displayName, migrationAssemblies);
+            bodyFaulted = false;
+        }
+        finally
+        {
+            // NOT `using`. When a using-variable's Dispose throws while an exception is already in
+            // flight, the Dispose exception REPLACES it — and FluentMigrator's processor disposes by
+            // calling RollbackTransaction(), which throws InvalidOperationException("This SqlTransaction
+            // has completed") whenever the transaction was already killed. A migration that lost a
+            // deadlock or timed out therefore reported the rollback failure and lost the SqlException
+            // that caused it: the operator saw a zombied-transaction message instead of "deadlock" or
+            // "permission denied", and the carefully worded wraps below were discarded in exactly the
+            // case they exist for. It also breaks every caller that retries on SQL error numbers, since
+            // what reaches their catch is no longer a SqlException.
+            //
+            // A dispose failure is a consequence, never a cause. It is reported only when there is
+            // nothing better to report — i.e. when the body completed and the disposal is the only thing
+            // that went wrong.
+            DisposeQuietly(scope, provider, bodyFaulted);
+        }
+    }
+
+    /// <summary>
+    /// Disposes the migration scope and provider without letting a dispose-time failure replace the
+    /// exception the body already reported.
+    /// </summary>
+    /// <param name="scope">The migration scope.</param>
+    /// <param name="provider">The provider that owns it.</param>
+    /// <param name="bodyFaulted">
+    /// Whether the body threw. The runtime offers no way to ask "is an exception unwinding through this
+    /// finally", so the caller records it — and rethrowing from a finally while one is would reintroduce
+    /// exactly the masking this method exists to prevent.
+    /// </param>
+    internal static void DisposeQuietly(IServiceScope scope, IDisposable provider, bool bodyFaulted)
+    {
+        Exception? disposeFailure = null;
+
+        try
+        {
+            scope.Dispose();
+        }
+        catch (Exception ex)
+        {
+            disposeFailure = ex;
+        }
+
+        try
+        {
+            provider.Dispose();
+        }
+        catch (Exception ex)
+        {
+            // First failure wins: the scope disposes first and owns the processor, so its error is the
+            // one closer to the cause.
+            disposeFailure ??= ex;
+        }
+
+        if (disposeFailure is null || bodyFaulted)
+        {
+            return;
+        }
+
+        // Reported only when nothing else was: migrations applied, and the runner could not tear down.
+        // Worth surfacing rather than swallowing — a processor that cannot dispose may be holding a
+        // connection or a transaction open.
+        throw new InvalidOperationException(
+            "Themia.Data.Migrations: the migration runner failed to dispose cleanly. The migrations "
+            + "themselves completed; see the inner exception.", disposeFailure);
+    }
+
+    private static void RunCore(
+        IServiceProvider serviceProvider,
+        MigrationEngine engine,
+        string connectionString,
+        ThemiaMigrationOptions? options,
+        string displayName,
+        Assembly[] migrationAssemblies)
+    {
 
         // Fail fast if the supplied assemblies carry no migrations: discovery happens in memory (no DB
         // connection), so a wrong/empty assembly is caught before MigrateUp would silently no-op and leave
