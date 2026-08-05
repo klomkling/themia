@@ -27,6 +27,10 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+_Nothing yet._
+
+## [0.13.0] - 2026-08-05
+
 ### Added
 - **`Themia.Modules.Identity.Dapper` and `Themia.Modules.Identity.EFCore`** — the identity store splits into
   engine packages, the same shape `Themia.Challenges` already uses (coord #0058). Reference the core plus

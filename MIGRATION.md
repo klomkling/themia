@@ -12,6 +12,10 @@ with the *why* and concrete upgrade steps.
 
 ## Unreleased
 
+_Nothing yet._
+
+## 0.13.0
+
 ### `Themia.Modules.Identity` splits into engine packages
 
 **What changed:** the identity store's engine-specific pieces move into
