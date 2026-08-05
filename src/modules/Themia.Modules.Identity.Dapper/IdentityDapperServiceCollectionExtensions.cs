@@ -11,7 +11,7 @@ public static class IdentityDapperServiceCollectionExtensions
 {
     /// <summary>
     /// Registers the Identity services and contributes the Identity entity mappings to the Dapper
-    /// <see cref="EntityMappingRegistry"/>. Use this instead of <c>AddThemiaIdentityServices</c> when your
+    /// <see cref="EntityMappingRegistry"/>. Use this instead of <c>AddThemiaIdentityCore</c> when your
     /// data peer is Dapper.
     /// </summary>
     /// <remarks>
@@ -36,9 +36,8 @@ public static class IdentityDapperServiceCollectionExtensions
     {
         ArgumentNullException.ThrowIfNull(services);
 
-        services.AddThemiaIdentityServices(configure);
-        ContributeMappings(services);
-        return services;
+        services.AddThemiaIdentityCore(configure);
+        return services.RequireDapperMappings(IdentityDapperMappings.Apply, nameof(AddThemiaIdentityDapper));
     }
 
     /// <summary>
@@ -51,27 +50,7 @@ public static class IdentityDapperServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(options);
 
-        services.AddThemiaIdentityServices(options);
-        ContributeMappings(services);
-        return services;
-    }
-
-    private static void ContributeMappings(IServiceCollection services)
-    {
-        for (var i = services.Count - 1; i >= 0; i--)
-        {
-            if (services[i].ServiceType == typeof(EntityMappingRegistry)
-                && services[i].ImplementationInstance is EntityMappingRegistry registry)
-            {
-                IdentityDapperMappings.Apply(registry);
-                return;
-            }
-        }
-
-        // Loud, because the alternative is the failure this package exists to remove: mappings silently
-        // not applied, and a query returning the wrong columns much later with nothing to connect it to.
-        throw new InvalidOperationException(
-            "AddThemiaIdentityDapper found no Dapper EntityMappingRegistry. Register the Dapper data peer "
-            + "first (e.g. services.AddThemiaDapperPostgres(configuration)), then call this.");
+        services.AddThemiaIdentityCore(options);
+        return services.RequireDapperMappings(IdentityDapperMappings.Apply, nameof(AddThemiaIdentityDapper));
     }
 }

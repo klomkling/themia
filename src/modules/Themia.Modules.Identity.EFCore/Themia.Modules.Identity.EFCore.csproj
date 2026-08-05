@@ -13,6 +13,11 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Shared source with Themia.Modules.Identity.Dapper: one migration-run body, compiled into both. -->
+    <Compile Include="../shared/IdentityModuleMigrations.cs" Link="IdentityModuleMigrations.cs" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers">

@@ -9,7 +9,7 @@ namespace Themia.Modules.Identity.Tests.DependencyInjection;
 
 /// <summary>
 /// The Dapper half of the engine split (coord #0058): the mapping contribution that used to happen
-/// implicitly inside <c>AddThemiaIdentityServices</c> now has its own named entry point.
+/// implicitly inside the core registration now has its own named entry point.
 /// </summary>
 public class IdentityDapperRegistrationTests
 {
@@ -35,7 +35,8 @@ public class IdentityDapperRegistrationTests
 
         var ex = Assert.Throws<InvalidOperationException>(() => services.AddThemiaIdentityDapper());
 
-        Assert.Contains("Register the Dapper data peer first", ex.Message, StringComparison.Ordinal);
+        Assert.Contains(nameof(IdentityDapperServiceCollectionExtensions.AddThemiaIdentityDapper), ex.Message, StringComparison.Ordinal);
+        Assert.Contains("Register the Dapper data peer FIRST", ex.Message, StringComparison.Ordinal);
     }
 
     [Fact]

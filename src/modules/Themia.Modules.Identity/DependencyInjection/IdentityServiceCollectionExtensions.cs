@@ -13,6 +13,14 @@ namespace Themia.Modules.Identity.DependencyInjection;
 /// <summary>Registers Themia Identity services and authorization integration.</summary>
 public static class IdentityServiceCollectionExtensions
 {
+    private const string RenamedMessage =
+        "AddThemiaIdentityServices no longer wires a data peer and has been renamed to "
+        + "AddThemiaIdentityCore. Dapper adopters must call AddThemiaIdentityDapper "
+        + "(package Themia.Modules.Identity.Dapper) and EF Core adopters AddThemiaIdentityEFCore "
+        + "(package Themia.Modules.Identity.EFCore); either one calls the core for you. Call "
+        + "AddThemiaIdentityCore directly only when you supply your own IRepository implementations. "
+        + "See MIGRATION.md, 'Themia.Modules.Identity splits into engine packages'.";
+
     /// <summary>Registers the Identity stores, services, password hasher, and options.</summary>
     /// <remarks>
     /// <b>Engine-agnostic: this registers nothing that knows about Dapper or EF Core.</b> Your data peer's
@@ -20,11 +28,17 @@ public static class IdentityServiceCollectionExtensions
     /// <c>Themia.Modules.Identity.Dapper</c>, or <c>AddThemiaIdentityEFCore</c> in
     /// <c>Themia.Modules.Identity.EFCore</c> — and each of those calls this method for you. Call this
     /// directly only if you are supplying your own <c>IRepository</c> implementations.
+    /// <para>
+    /// <b>It also applies no schema.</b> The core carries the FluentMigrator migration classes (see
+    /// <see cref="Migrations.IdentityMigrations"/>) but no runner, so calling this on its own creates no
+    /// <c>identity</c> tables. Either engine module runs them on startup; a caller that takes neither must
+    /// run <see cref="Migrations.IdentityMigrations.Assembly"/> through a migration runner of its own.
+    /// </para>
     /// </remarks>
     /// <param name="services">The service collection.</param>
     /// <param name="configure">Optional options configuration.</param>
     /// <returns>The same service collection.</returns>
-    public static IServiceCollection AddThemiaIdentityServices(this IServiceCollection services, Action<IdentityModuleOptions>? configure = null)
+    public static IServiceCollection AddThemiaIdentityCore(this IServiceCollection services, Action<IdentityModuleOptions>? configure = null)
     {
         ArgumentNullException.ThrowIfNull(services);
 
@@ -33,15 +47,16 @@ public static class IdentityServiceCollectionExtensions
         options.Validate();
         services.TryAddSingleton(options);
 
-        return AddThemiaIdentityServicesCore(services);
+        return RegisterCoreServices(services);
     }
 
-    /// <summary>Registers the Identity stores, services, password hasher, and the supplied options instance.</summary>
-    /// <remarks>Engine-agnostic — see the other overload.</remarks>
-    /// <param name="services">The service collection.</param>
-    /// <param name="options">The validated module options to register.</param>
-    /// <returns>The same service collection.</returns>
-    public static IServiceCollection AddThemiaIdentityServices(this IServiceCollection services, IdentityModuleOptions options)
+    /// <summary>
+    /// Same as the public overload but taking a pre-built options instance. Internal rather than public so
+    /// the options-instance form does not become a second public overload — the analyzer requires the
+    /// overload carrying optional parameters to have the most parameters (RS0027), and adopters have the
+    /// lambda. The engine packages reach it through <c>InternalsVisibleTo</c>.
+    /// </summary>
+    internal static IServiceCollection AddThemiaIdentityCore(this IServiceCollection services, IdentityModuleOptions options)
     {
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(options);
@@ -49,10 +64,34 @@ public static class IdentityServiceCollectionExtensions
         options.Validate();
         services.TryAddSingleton(options);
 
-        return AddThemiaIdentityServicesCore(services);
+        return RegisterCoreServices(services);
     }
 
-    private static IServiceCollection AddThemiaIdentityServicesCore(IServiceCollection services)
+    /// <summary>Renamed to <see cref="AddThemiaIdentityCore(IServiceCollection, Action{IdentityModuleOptions})"/>.</summary>
+    /// <remarks>
+    /// A compile error rather than a silent forward, deliberately. Until the engine split this method
+    /// contributed the Identity mappings to a Dapper <c>EntityMappingRegistry</c> if it found one; it no
+    /// longer does. Keeping the name callable would let an existing Dapper bootstrap recompile clean and
+    /// then query unqualified <c>users</c> instead of <c>identity.users</c> — no error, no log, an auth
+    /// outage on first login. The rename is the mechanical signal that the call site must change.
+    /// </remarks>
+    /// <param name="services">The service collection.</param>
+    /// <param name="configure">Optional options configuration.</param>
+    /// <returns>The same service collection.</returns>
+    [Obsolete(RenamedMessage, error: true)]
+    public static IServiceCollection AddThemiaIdentityServices(this IServiceCollection services, Action<IdentityModuleOptions>? configure = null)
+        => services.AddThemiaIdentityCore(configure);
+
+    /// <summary>Renamed to <see cref="AddThemiaIdentityCore(IServiceCollection, IdentityModuleOptions)"/>.</summary>
+    /// <remarks>See the other overload for why this is an error rather than a forward.</remarks>
+    /// <param name="services">The service collection.</param>
+    /// <param name="options">The validated module options to register.</param>
+    /// <returns>The same service collection.</returns>
+    [Obsolete(RenamedMessage, error: true)]
+    public static IServiceCollection AddThemiaIdentityServices(this IServiceCollection services, IdentityModuleOptions options)
+        => services.AddThemiaIdentityCore(options);
+
+    private static IServiceCollection RegisterCoreServices(IServiceCollection services)
     {
         // Services here depend on ILogger<T>; ensure logging is resolvable even on a bare
         // ServiceCollection (no generic host). AddLogging is idempotent/TryAdd-based.

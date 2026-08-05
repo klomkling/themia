@@ -34,26 +34,12 @@ public static class StorageServiceCollectionExtensions
         services.TryAddSingleton<IFileScanner, NullFileScanner>();
         services.TryAddScoped<ITenantStorage, TenantStorage>();
 
-        // Dapper adopters: contribute the StorageObject mapping to the registry they already registered
-        // (mirrors AddThemiaIdentityServices.ContributeDapperMappings). No-op when EF is the peer.
-        ContributeDapperMappings(services);
+        // Dapper adopters: contribute the StorageObject mapping to the registry they already registered.
+        // No-op when EF is the peer; throws when a Dapper peer is present but its registry is not, which
+        // can only mean this ran before the peer registration.
+        services.ContributeDapperMappings(StorageDapperMappings.Apply, nameof(AddThemiaStorage));
 
         return new StorageBuilder(services);
-    }
-
-    // Mirror Identity: scan the collection for the already-registered EntityMappingRegistry singleton
-    // instance and apply the Storage mappings to it. No service provider is built.
-    private static void ContributeDapperMappings(IServiceCollection services)
-    {
-        for (var i = services.Count - 1; i >= 0; i--)
-        {
-            if (services[i].ServiceType == typeof(EntityMappingRegistry)
-                && services[i].ImplementationInstance is EntityMappingRegistry registry)
-            {
-                StorageDapperMappings.Apply(registry);
-                return;
-            }
-        }
     }
 }
 

@@ -50,3 +50,6 @@ override Themia.Modules.Identity.Migrations.PinTokenHashBinaryCollationMigration
 override Themia.Modules.Identity.Migrations.PinTokenHashBinaryCollationMigration.Up() -> void
 override Themia.Modules.Identity.Migrations.RefreshTokensMigration.Down() -> void
 override Themia.Modules.Identity.Migrations.RefreshTokensMigration.Up() -> void
+Themia.Modules.Identity.Migrations.IdentityMigrations
+static Themia.Modules.Identity.DependencyInjection.IdentityServiceCollectionExtensions.AddThemiaIdentityCore(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Themia.Modules.Identity.Abstractions.IdentityModuleOptions!>? configure = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static Themia.Modules.Identity.Migrations.IdentityMigrations.Assembly.get -> System.Reflection.Assembly!

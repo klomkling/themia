@@ -64,24 +64,11 @@ public static class NotificationsServiceCollectionExtensions
         services.TryAddScoped<IProviderConfigResolver, ProviderConfigResolver>();
         services.TryAddScoped<INotificationDispatcher, NotificationDispatcher>();
 
-        ContributeDapperMappings(services);
+        // No-op when EF is the peer; throws when a Dapper peer is present but its registry is not, which
+        // can only mean this ran before the peer registration.
+        services.ContributeDapperMappings(NotificationsDapperMappings.Apply, nameof(AddThemiaNotificationsModule));
         services.AddHostedService<OutboxDrainer<ClaimedOutboxRow>>();
 
         return services;
-    }
-
-    // Mirror Storage: scan the collection for the already-registered EntityMappingRegistry singleton
-    // instance and apply the Notifications mappings to it. No service provider is built. No-op when EF is the peer.
-    private static void ContributeDapperMappings(IServiceCollection services)
-    {
-        for (var i = services.Count - 1; i >= 0; i--)
-        {
-            if (services[i].ServiceType == typeof(EntityMappingRegistry)
-                && services[i].ImplementationInstance is EntityMappingRegistry registry)
-            {
-                NotificationsDapperMappings.Apply(registry);
-                return;
-            }
-        }
     }
 }

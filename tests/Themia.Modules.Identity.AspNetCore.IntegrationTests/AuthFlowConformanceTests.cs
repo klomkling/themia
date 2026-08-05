@@ -62,7 +62,7 @@ public abstract class AuthFlowConformanceTests : IAsyncLifetime
     /// <summary>
     /// Registers Identity through the engine package matching <see cref="ConfigurePeer"/>. Since the engine
     /// split (coord #0058) the core registers nothing engine-specific, so a Dapper suite that called
-    /// AddThemiaIdentityServices would run against unmapped tables — the same mistake an adopter can make,
+    /// the identity registration would run against unmapped tables — the same mistake an adopter can make,
     /// avoided the same way an adopter has to avoid it.
     /// </summary>
     protected abstract void RegisterIdentity(IServiceCollection services, Action<IdentityModuleOptions> configure);
@@ -94,7 +94,7 @@ public abstract class AuthFlowConformanceTests : IAsyncLifetime
     /// <list type="bullet">
     ///   <item>The data peer from <see cref="ConfigurePeer"/>.</item>
     ///   <item>A FIXED <see cref="ITenantContext"/> (registered last — overrides any framework one).</item>
-    ///   <item><c>AddThemiaIdentityServices</c> + <c>AddThemiaIdentityAuthorization</c> + JWT.</item>
+    ///   <item><c>AddThemiaIdentityDapper</c>/<c>AddThemiaIdentityEFCore</c> + <c>AddThemiaIdentityAuthorization</c> + JWT.</item>
     ///   <item>JwtBearer via <c>AddThemiaJwtBearer</c>.</item>
     ///   <item>Pipeline: <c>UseThemiaProblemDetails</c> → <c>UseAuthentication</c> → <c>UseAuthorization</c>.</item>
     ///   <item><c>POST /auth/login|refresh|logout</c> + <c>GET /me</c> (protected probe).</item>

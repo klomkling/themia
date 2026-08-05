@@ -22,7 +22,7 @@ public sealed class ServiceRegistrationTests
     private static ServiceCollection WithCoreIdentity()
     {
         var services = new ServiceCollection();
-        services.AddThemiaIdentityServices(o => { });
+        services.AddThemiaIdentityCore(o => { });
         return services;
     }
 

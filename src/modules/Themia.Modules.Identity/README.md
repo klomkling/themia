@@ -7,6 +7,17 @@ lockout, the `ICurrentUser` principal, and ASP.NET Core authorization integratio
 Supports both data peers — **EF Core** and **Dapper** — over a single FluentMigrator schema
 (PostgreSQL and SQL Server).
 
+> **This package is the engine-agnostic core.** It carries no data peer, no database driver and no
+> migration runner. Reference it **plus exactly one engine package**:
+>
+> | Your data layer | Add this package | Register with |
+> |---|---|---|
+> | Dapper | `Themia.Modules.Identity.Dapper` | `AddThemiaIdentityDapper` / `IdentityDapperModule` |
+> | EF Core | `Themia.Modules.Identity.EFCore` | `AddThemiaIdentityEFCore` / `IdentityEFCoreModule` |
+>
+> Upgrading from 0.12.x? `AddThemiaIdentityServices` and `IdentityModule` are gone — see
+> [MIGRATION.md](../../../MIGRATION.md).
+
 ## Quick start
 
 ### 1. Register a data peer
@@ -44,7 +55,7 @@ Derive from `ThemiaDbContext` and call `modelBuilder.ApplyThemiaIdentity()` in `
 ```csharp
 using Themia.Framework.Data.EFCore;
 using Themia.Framework.Core.Abstractions.Security;
-using Themia.Modules.Identity.EntityConfiguration;
+using Themia.Modules.Identity.EntityConfiguration;   // from Themia.Modules.Identity.EFCore
 
 public sealed class AppDbContext(DbContextOptions options, ICurrentUserAccessor currentUser)
     : ThemiaDbContext(options)
@@ -63,32 +74,52 @@ The **Dapper** peer reads `ICurrentUserAccessor` directly, so no additional over
 
 ### 3. Register the Identity module
 
-Pass the migration engine that matches your database provider and register the module with Themia's
-host builder:
+Use the module from the engine package matching the peer you registered in step 1. The
+`MigrationEngine` argument is the **database** and is orthogonal to the peer — both are explicit.
 
 ```csharp
 using Themia.Data.Migrations;
-using Themia.Modules.Identity;
+using Themia.Modules.Identity.Dapper;   // or Themia.Modules.Identity.EFCore
 
-// Inside your IThemiaBuilder / host setup:
-builder.AddModule(new IdentityModule(MigrationEngine.Postgres));
+// Inside your IThemiaBuilder / host setup, AFTER the data peer registration:
+builder.AddModule(new IdentityDapperModule(MigrationEngine.Postgres));
 // or
-builder.AddModule(new IdentityModule(MigrationEngine.SqlServer));
+builder.AddModule(new IdentityEFCoreModule(MigrationEngine.SqlServer));
 ```
 
-`IdentityModule` automatically:
+> **Dapper: the module must be configured after `AddThemiaDapper*`.** `IdentityDapperModule` contributes
+> the identity entity mappings to the registry that call creates, and throws if it does not exist yet.
+> A host whose module loop runs first fails to start, with the ordering named in the message.
+
+The module automatically:
 - Runs the FluentMigrator identity schema migration on startup.
 - Registers `IUserService`, `IRoleService`, `IClaimService`, `IUserTokenService`, `IPasswordHasher`,
   `IClaimsPrincipalFactory`, and `ICurrentUser` in the DI container.
+- Wires the engine-specific store: the Dapper mappings, or (EF Core) a startup check that
+  `ApplyThemiaIdentity()` was actually applied to the context Themia resolves.
 
-`IdentityModule` already calls `AddThemiaIdentityAuthorization()` automatically, so you normally
-don't need to call it yourself. It registers `IHttpContextAccessor`, the `ICurrentUser` principal,
-and overrides the audit-user accessor (`ICurrentUserAccessor`) so it reads the authenticated user
-from the HTTP context. It does **not** register any authorization policies. Call it directly only
-when wiring the Identity services **without** the module:
+Prefer plain DI? Call the engine's extension method instead, again **after** the peer:
 
 ```csharp
+builder.Services.AddThemiaDapperPostgres(builder.Configuration);
+builder.Services.AddThemiaIdentityDapper(o => o.AllowPlatformLogin = true);
 builder.Services.AddThemiaIdentityAuthorization();
+```
+
+The module already calls `AddThemiaIdentityAuthorization()`, so you normally don't need to. It registers
+`IHttpContextAccessor`, the `ICurrentUser` principal, and overrides the audit-user accessor
+(`ICurrentUserAccessor`) so it reads the authenticated user from the HTTP context. It does **not** register
+any authorization policies.
+
+### Supplying your own repositories
+
+`AddThemiaIdentityCore` registers the services with no data peer at all — for an application providing its
+own `IRepository<T, TKey>` implementations. It also applies **no schema**: this package carries the
+FluentMigrator migration classes but no runner, because running them needs a driver for each engine and the
+core stays driver-free. Run them yourself:
+
+```csharp
+ThemiaMigrations.Run(MigrationEngine.Postgres, connectionString, IdentityMigrations.Assembly);
 ```
 
 ### 4. Use the services
@@ -119,17 +150,17 @@ Inject any of:
 
 ## Notes / gotchas
 
-- **Dapper: register the data peer first.** Adopters using the Dapper peer must call
-  `AddThemiaDapper*(...)` **before** registering the Identity module (or calling
-  `AddThemiaIdentityServices`). The module contributes its entity mappings to the Dapper
-  `EntityMappingRegistry` that the Dapper registration creates; if Identity is registered first the
-  registry doesn't exist yet, the mappings are silently skipped, and Dapper queries fail at runtime.
-  (EF adopters are unaffected — see `ApplyThemiaIdentity()` above.)
+- **Dapper: register the data peer first.** Call `AddThemiaDapper*(...)` **before**
+  `AddThemiaIdentityDapper` or `IdentityDapperModule`. The identity entity mappings go into the
+  `EntityMappingRegistry` that the peer registration creates; registering Identity first means there is no
+  registry to contribute to. That used to be skipped silently and surface much later as a query against
+  unqualified `users`; it now throws at registration. (EF adopters are unaffected — see
+  `ApplyThemiaIdentity()` above.)
 - **`AddThemiaIdentityAuthorization()` replaces `ICurrentUserAccessor`.** It calls
   `RemoveAll<ICurrentUserAccessor>()` and registers `IdentityCurrentUserAccessor`, so any
   previously-registered custom `ICurrentUserAccessor` is replaced. This is intentional — Identity
   becomes the audit-user source — but an adopter with a custom accessor should be aware it will not
-  survive. (`IdentityModule` calls this automatically.)
+  survive. (Both engine modules call this automatically.)
 
 ## Platform users
 
@@ -160,7 +191,8 @@ Configure it in your `AppDbContext.OnModelCreating`. Themia never touches this t
 
 ## Options
 
-`IdentityModuleOptions` (configurable via the `IdentityModule(engine, options)` overload):
+`IdentityModuleOptions` (configurable via the `IdentityDapperModule(engine, options)` /
+`IdentityEFCoreModule(engine, options)` overload, or the `AddThemiaIdentity*` lambda):
 
 | Property | Default | Description |
 |----------|---------|-------------|

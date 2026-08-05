@@ -1,11 +1,10 @@
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Themia.Data.Migrations;
 using Themia.Framework.Core.Modules;
 using Themia.Modules.Identity.Abstractions;
 using Themia.Modules.Identity.DependencyInjection;
 using Themia.Modules.Identity.EFCore.DependencyInjection;
-using Themia.Modules.Identity.Migrations;
+using Themia.Modules.Identity.Internal;
 
 namespace Themia.Modules.Identity.EFCore;
 
@@ -62,13 +61,7 @@ public sealed class IdentityEFCoreModule : ThemiaModuleBase
         ArgumentNullException.ThrowIfNull(serviceProvider);
         cancellationToken.ThrowIfCancellationRequested();
 
-        using var scope = serviceProvider.CreateScope();
-        var configuration = scope.ServiceProvider.GetRequiredService<IConfiguration>();
-        var connectionString = configuration.GetConnectionString(options.ConnectionStringName)
-            ?? throw new InvalidOperationException(
-                $"Connection string '{options.ConnectionStringName}' was not found; the identity module requires it.");
-
-        ThemiaMigrations.Run(engine, connectionString, typeof(IdentitySchemaMigration).Assembly);
+        IdentityModuleMigrations.Run(serviceProvider, engine, options);
         return ValueTask.CompletedTask;
     }
 }

@@ -38,23 +38,73 @@ adopt Identity without acquiring one (coord #0058).
 EF Core adopters call `AddThemiaIdentityEFCore` instead, and continue to call `ApplyThemiaIdentity` from
 `OnModelCreating` — the type name and namespace are unchanged, only the package that delivers it.
 
+**`AddThemiaIdentityServices` is now a compile error**, renamed to `AddThemiaIdentityCore`. It used to scan
+the service collection for an `EntityMappingRegistry` and contribute the identity mappings to whatever it
+found. That inferred the Dapper path rather than being told it, and inferred wrong — silently — whenever
+the two registrations ran in the other order: no exception, no log, identity mappings simply never applied,
+until a query came back against unqualified `users` instead of `identity.users`.
+
+Leaving the old name callable would have been worse than removing it. Its signature is unchanged, so an
+existing Dapper bootstrap — even one that already calls the peer first, in the correct order — would have
+recompiled with zero errors and zero warnings and then lost the `identity.` qualification: an auth outage
+on first login, with nothing pointing at the upgrade. `[Obsolete(error: true)]` puts the failure at build
+time and names the replacement in the message. `AddThemiaIdentityCore` still registers the engine-agnostic
+services; call it directly only if you are supplying your own `IRepository` implementations.
+
 **If you use the module:** `new IdentityModule(MigrationEngine.Postgres)` becomes
 `new IdentityDapperModule(MigrationEngine.Postgres)` or `new IdentityEFCoreModule(...)`. The
-`MigrationEngine` argument is the *database* and is orthogonal to the peer — it stays.
+`MigrationEngine` argument is the *database* and is orthogonal to the peer — it stays. **The rename is not
+the whole change for this path — two more things move:**
 
-**Why `AddThemiaIdentityServices` is no longer the Dapper entry point.** It used to scan the service
-collection for an `EntityMappingRegistry` and contribute the identity mappings to whatever it found. That
-inferred the Dapper path rather than being told it, and inferred wrong — silently — whenever the two
-registrations ran in the other order: no exception, no log, identity mappings simply never applied, until
-a query came back against unqualified `users` instead of `identity.users`. `AddThemiaIdentityDapper`
-throws if the registry is missing, so the same mistake is now loud.
+- **⚠ Configure the module AFTER the Dapper peer registration.** `IdentityDapperModule.ConfigureServices`
+  contributes the identity mappings and now *throws* when the registry does not exist yet, so a host whose
+  module loop runs before `AddThemiaDapperPostgres(configuration)` fails to start. `IdentityModule`
+  tolerated either order — wrongly, by leaving the tables unmapped — so a host that happened to be in the
+  bad order was working by accident and will now stop at boot with the ordering named. Move the peer
+  registration above the module loop.
+- **⚠ The module identifier changed, not just the type.** `ModuleDescriptor.Name` goes from
+  `"Themia.Identity"` to `"Themia.Identity.Dapper"` / `"Themia.Identity.EFCore"`. That string is the key
+  `ModuleDescriptor.Dependencies` resolves against, and hosts commonly key module enablement off it too —
+  a `modules` table row, a `Modules:Themia.Identity:Enabled` config entry. A stored `"Themia.Identity"`
+  matches nothing after the upgrade, so the module reads as disabled, `ConfigureServices` never runs, and
+  every authenticated request fails on an unresolved `IUserService`. Update the stored keys with the type.
 
-The core method still exists and still registers the engine-agnostic services. Call it directly only if
-you are supplying your own `IRepository` implementations.
+**EF Core: the model check now runs at startup.** `AddThemiaIdentityEFCore` registers a hosted service that
+verifies the resolved `ThemiaDbContext` actually maps `User` to `identity.users`. If you forgot
+`modelBuilder.ApplyThemiaIdentity()`, or applied it to a different context than the one passed to
+`AddThemiaDataRepositories<TContext>`, the host now fails to start with that sentence instead of succeeding
+into a first user operation that queries a table EF Core has never heard of.
+
+**The core applies no schema on its own.** It carries the FluentMigrator migration classes but no runner —
+running them needs a driver for every engine, and the core stays driver-free. Both engine modules run them
+on startup. If you reference only the core, pass
+`Themia.Modules.Identity.Migrations.IdentityMigrations.Assembly` to a runner of your own.
 
 **No compatibility shim ships** for the two moved members. Both consumers confirmed zero call sites, and a
 forwarding type nobody uses is a spare compatibility surface — it lets a caller keep an old assumption
 compiling, which is the failure mode `NotificationResult.Success()` demonstrated in 0.12.0.
+
+### Dapper mapping contribution is one mechanism across all modules
+
+**What changed:** `Themia.Framework.Data.Dapper` gains `ContributeDapperMappings` /
+`RequireDapperMappings`, and Identity, Storage, Notifications and Messaging all use them. Two behaviours
+change for adopters:
+
+- **`AddThemiaStorage` and `AddThemiaNotificationsModule` now throw** when a Dapper peer is registered but
+  its `EntityMappingRegistry` is not. They used to return quietly, which is never a legitimate state — it
+  means the module was registered before the peer, and the tables stay unmapped until a query fails.
+- **`AddThemiaDapperCore` called twice no longer registers two registries.** The second instance won
+  resolution while every mapping the modules had contributed sat on the first, so every module-mapped table
+  silently fell back to its convention name.
+
+**Why:** four modules had hand-rolled the same service-collection scan and the copies drifted into three
+different behaviours for one adopter mistake. Registering the peer after the modules produced a hard
+failure from Identity and silently unmapped `storage`/`notifications` tables in the same startup.
+
+**How to upgrade:** if your app starts and nothing throws, nothing to do. If one of these now throws, move
+`AddThemiaDapper{Postgres|MySql|SqlServer}(configuration)` above the module registrations — the exception
+names the method to move. A genuine EF Core adopter (no registry, no `IDapperConnectionContext`) is
+unaffected.
 
 ## 0.12.2
 

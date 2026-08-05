@@ -27,7 +27,7 @@ public abstract class IdentityStoreConformanceTests
 
     /// <summary>
     /// Registers Identity through the engine package matching <see cref="ConfigurePeer"/>. Deliberately not
-    /// a shared call to the core AddThemiaIdentityServices: since the engine split (coord #0058) the core
+    /// a shared call to the core AddThemiaIdentityCore: since the engine split (coord #0058) the core
     /// registers nothing engine-specific, so a Dapper suite that called it would run against unmapped
     /// tables — which is precisely the mistake an adopter can make, so the suite makes it the same way an
     /// adopter would have to avoid it.
@@ -66,7 +66,7 @@ public abstract class IdentityStoreConformanceTests
 
         var services = new ServiceCollection();
         services.AddSingleton<IConfiguration>(configuration);
-        // Logging is registered by AddThemiaIdentityServices below.
+        // Logging is registered by the engine registration below.
         services.AddScoped<ITenantContext>(_ => new TenantContext(tenant));
         if (timeProvider is not null)
         {

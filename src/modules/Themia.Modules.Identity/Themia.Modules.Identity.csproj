@@ -26,6 +26,9 @@
     <AdditionalFiles Include="PublicAPI.Unshipped.txt" />
   </ItemGroup>
   <ItemGroup>
+    <!-- The engine packages call the internal options-instance overload of AddThemiaIdentityCore. -->
+    <InternalsVisibleTo Include="Themia.Modules.Identity.Dapper" />
+    <InternalsVisibleTo Include="Themia.Modules.Identity.EFCore" />
     <InternalsVisibleTo Include="Themia.Modules.Identity.Tests" />
     <InternalsVisibleTo Include="Themia.Modules.Identity.IntegrationTests" />
   </ItemGroup>

@@ -64,7 +64,7 @@ public abstract class ExternalAuthConformanceTests : IAsyncLifetime
     /// <summary>
     /// Registers Identity through the engine package matching <see cref="ConfigurePeer"/>. Since the engine
     /// split (coord #0058) the core registers nothing engine-specific, so a Dapper suite that called
-    /// AddThemiaIdentityServices would run against unmapped tables — the same mistake an adopter can make,
+    /// the identity registration would run against unmapped tables — the same mistake an adopter can make,
     /// avoided the same way an adopter has to avoid it.
     /// </summary>
     protected abstract void RegisterIdentity(IServiceCollection services, Action<IdentityModuleOptions> configure);

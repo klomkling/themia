@@ -1,11 +1,10 @@
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Themia.Data.Migrations;
 using Themia.Framework.Core.Modules;
 using Themia.Modules.Identity.Abstractions;
 using Themia.Modules.Identity.DependencyInjection;
 using Themia.Modules.Identity.Dapper.DependencyInjection;
-using Themia.Modules.Identity.Migrations;
+using Themia.Modules.Identity.Internal;
 
 namespace Themia.Modules.Identity.Dapper;
 
@@ -18,6 +17,12 @@ namespace Themia.Modules.Identity.Dapper;
 /// engine-agnostic core, which on Dapper would mean entity mappings never contributed to the Dapper registry — silently, until a query failed.
 /// The <see cref="MigrationEngine"/> constructor argument is the DATABASE (PostgreSQL / SQL Server) and is
 /// orthogonal to the peer; it stays explicit because the data layers expose no uniform engine signal.
+/// <para>
+/// <b>Configure this module AFTER the Dapper peer registration.</b> <see cref="ConfigureServices"/>
+/// contributes the identity mappings to the peer's <c>EntityMappingRegistry</c> and throws when that
+/// registry does not exist yet — so a host that runs its module loop before
+/// <c>AddThemiaDapperPostgres(configuration)</c> fails to start rather than running on unmapped tables.
+/// </para>
 /// </remarks>
 public sealed class IdentityDapperModule : ThemiaModuleBase
 {
@@ -62,13 +67,7 @@ public sealed class IdentityDapperModule : ThemiaModuleBase
         ArgumentNullException.ThrowIfNull(serviceProvider);
         cancellationToken.ThrowIfCancellationRequested();
 
-        using var scope = serviceProvider.CreateScope();
-        var configuration = scope.ServiceProvider.GetRequiredService<IConfiguration>();
-        var connectionString = configuration.GetConnectionString(options.ConnectionStringName)
-            ?? throw new InvalidOperationException(
-                $"Connection string '{options.ConnectionStringName}' was not found; the identity module requires it.");
-
-        ThemiaMigrations.Run(engine, connectionString, typeof(IdentitySchemaMigration).Assembly);
+        IdentityModuleMigrations.Run(serviceProvider, engine, options);
         return ValueTask.CompletedTask;
     }
 }
