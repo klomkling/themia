@@ -67,6 +67,30 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
   `ConfirmPhoneNumberAsync` after your own proof, for which `Themia.Challenges` exists (Identity takes no
   dependency on it, so nothing here can check that you did).
 
+### Fixed
+- **`Themia.Data.Migrations` no longer replaces a migration failure with its own teardown error**
+  (closes [#195](https://github.com/klomkling/themia/issues/195)). `ThemiaMigrations.Run` held the
+  runner's scope and provider in `using var`. FluentMigrator's SQL Server processor disposes by calling
+  `RollbackTransaction()`, which throws `InvalidOperationException("This SqlTransaction has completed")`
+  whenever the transaction was already dead — and C# lets a `using` variable's dispose exception
+  **replace** the one already in flight.
+
+  So every migration that lost a deadlock or timed out on SQL Server reported the zombied-transaction
+  message and **lost the `SqlException` that caused it**. An operator debugging a failed deploy saw
+  "This SqlTransaction has completed" instead of a deadlock or a permission error, and the carefully
+  worded wrap ("Verify the connection string and that the principal has DDL permissions") was discarded
+  in precisely the case it exists for. It also silently broke every caller that retries on SQL error
+  numbers, since what reached their `catch` was no longer a `SqlException`.
+
+  Teardown now runs in a `finally` that reports a dispose failure **only when the body did not already
+  fail** — a dispose failure is a consequence, never a cause. A clean run whose teardown fails still
+  throws, because a processor that cannot dispose may be holding a connection or transaction open.
+
+  This is what had been surfacing as an intermittent `Themia.Modules.Scheduling` integration failure
+  under parallel container load. Two earlier attempts at it — matching the word "deadlock", then
+  matching SQL error numbers, then raising the command timeout to 120s — each diagnosed the *original*
+  exception correctly and each failed to close it, because that exception never arrived.
+
 ### Changed
 - **(breaking) `IUserService` gained three members and `UserService`'s constructor gained a parameter**
   (`IPhoneNumberNormalizer`). Only affects code that implements `IUserService` or constructs `UserService`
