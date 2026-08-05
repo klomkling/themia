@@ -22,7 +22,7 @@ public class UserServiceTests
     public UserServiceTests()
     {
         repo = new FakeRepository<User>(store, u => u.Id) { AmbientTenant = new TenantId("acme") };
-        sut = new UserService(repo, uow, new Argon2idPasswordHasher(), clock, options, new DataFilterScope());
+        sut = new UserService(repo, uow, new Argon2idPasswordHasher(), clock, options, new DataFilterScope(), new FormattingOnlyPhoneNumberNormalizer());
     }
 
     [Fact]
@@ -159,7 +159,7 @@ public class UserServiceTests
     public async Task VerifyPasswordAsync_rehashes_and_rotates_stamp_when_hash_is_outdated()
     {
         var stub = new StubPasswordHasher { VerifyResult = true, NeedsRehashResult = true, HashResult = "rehashed" };
-        var service = new UserService(repo, uow, stub, clock, options, new DataFilterScope());
+        var service = new UserService(repo, uow, stub, clock, options, new DataFilterScope(), new FormattingOnlyPhoneNumberNormalizer());
 
         // Seed with a distinct, outdated hash so the rehash to the "rehashed" sentinel is observable.
         var seeded = new User { UserName = "jane", NormalizedUserName = "JANE", PasswordHash = "outdated", TenantId = new TenantId("acme") };

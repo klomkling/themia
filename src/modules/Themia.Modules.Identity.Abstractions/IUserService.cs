@@ -41,6 +41,46 @@ public interface IUserService
     /// <returns>The user, or null.</returns>
     Task<User?> FindByEmailAsync(string email, CancellationToken cancellationToken = default);
 
+    /// <summary>Finds a user by phone number — first in the ambient tenant, then (when allowed) in the platform scope.</summary>
+    /// <remarks>
+    /// Matches on the normalized form, so the caller may pass the number in any accepted formatting.
+    /// Returns a user whose phone is <b>not</b> confirmed as readily as one whose phone is — confirmation
+    /// is an authorization question, and the caller that cares (the login flow) applies it. A lookup that
+    /// silently hid unconfirmed rows would make "no such number" and "not confirmed yet" the same answer
+    /// to code trying to tell them apart.
+    /// </remarks>
+    /// <param name="phoneNumber">The phone number, in any accepted formatting.</param>
+    /// <param name="cancellationToken">A cancellation token.</param>
+    /// <returns>The user, or null.</returns>
+    Task<User?> FindByPhoneAsync(string phoneNumber, CancellationToken cancellationToken = default);
+
+    /// <summary>Sets (or replaces) a user's phone number, storing its normalized form and clearing
+    /// <see cref="User.PhoneNumberConfirmed"/>.</summary>
+    /// <remarks>
+    /// Confirmation is always cleared, including when the number is unchanged: a phone is confirmed by
+    /// proving control of it, and that proof belongs to one number at one time. Leaving the flag set
+    /// across a change would let anyone who can edit a profile inherit someone else's confirmed status
+    /// and, once phone login is enabled, log in as them. Confirm again through
+    /// <see cref="ConfirmPhoneNumberAsync"/>.
+    /// </remarks>
+    /// <param name="userId">The user id.</param>
+    /// <param name="phoneNumber">The phone number as entered, or <see langword="null"/> to remove it.</param>
+    /// <param name="cancellationToken">A cancellation token.</param>
+    /// <returns>The outcome — see <see cref="SetPhoneNumberResult"/>.</returns>
+    Task<SetPhoneNumberResult> SetPhoneNumberAsync(Guid userId, string? phoneNumber, CancellationToken cancellationToken = default);
+
+    /// <summary>Marks a user's phone number as confirmed.</summary>
+    /// <remarks>
+    /// <b>Themia does not verify the number for you and this method asserts nothing about it.</b> Call it
+    /// only after your own proof of control has succeeded — a one-time code delivered to that number, for
+    /// which <c>Themia.Challenges</c> exists. Identity deliberately takes no dependency on it, so nothing
+    /// here can check that you did.
+    /// </remarks>
+    /// <param name="userId">The user id.</param>
+    /// <param name="cancellationToken">A cancellation token.</param>
+    /// <returns><see langword="true"/> when the user was found and has a phone number to confirm.</returns>
+    Task<bool> ConfirmPhoneNumberAsync(Guid userId, CancellationToken cancellationToken = default);
+
     /// <summary>Sets (or replaces) a user's password and reissues the security stamp.</summary>
     /// <param name="userId">The user id.</param>
     /// <param name="password">The new plaintext password.</param>

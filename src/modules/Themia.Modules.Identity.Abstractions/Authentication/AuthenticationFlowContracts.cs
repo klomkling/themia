@@ -140,11 +140,35 @@ public interface IAuthenticationFlow
 {
     /// <summary>Verifies credentials (driving lockout + timing mitigation), builds the principal, and
     /// issues an access + refresh pair. Any failure returns a non-success result.</summary>
-    /// <param name="userName">The login name.</param>
+    /// <remarks>
+    /// <para>
+    /// <b>The identifier may be a username, an email address or a phone number.</b> Resolution order is
+    /// normative, not incidental: <b>username, then email, then phone</b> — username first because it is
+    /// the only identifier that has always been unique.
+    /// </para>
+    /// <para>
+    /// <b>Email and phone match only when confirmed.</b> An unconfirmed address is a claim, not a proof,
+    /// and letting it authenticate would mean anyone who can type someone else's email into their own
+    /// profile can log in as them.
+    /// </para>
+    /// <para>
+    /// <b>An identifier matching two different users is refused, never resolved.</b> Per-column
+    /// uniqueness cannot stop one user's username equalling another's email, and choosing either of them
+    /// silently is account takeover. The refusal is reported to hooks as
+    /// <see cref="LoginFailureReason.AmbiguousIdentifier"/> and returned to the caller as the same
+    /// uniform failure as everything else.
+    /// </para>
+    /// <para>
+    /// <b>Every failure is one outcome.</b> Widening the identifier space widens the enumeration oracle
+    /// if it is not: three identifier spaces to probe instead of one. "No such identifier", "wrong
+    /// password", "unconfirmed", "ambiguous" and "inactive" are indistinguishable to the caller.
+    /// </para>
+    /// </remarks>
+    /// <param name="identifier">The username, confirmed email address, or confirmed phone number.</param>
     /// <param name="password">The plaintext password.</param>
     /// <param name="cancellationToken">A cancellation token.</param>
     /// <returns>The login result.</returns>
-    Task<LoginResult> LoginAsync(string userName, string password, CancellationToken cancellationToken = default);
+    Task<LoginResult> LoginAsync(string identifier, string password, CancellationToken cancellationToken = default);
 
     /// <summary>Rotates a refresh token and mints a fresh access + refresh pair.</summary>
     /// <param name="refreshToken">The presented refresh token.</param>

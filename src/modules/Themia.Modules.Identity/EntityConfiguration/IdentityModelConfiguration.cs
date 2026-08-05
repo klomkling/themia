@@ -39,6 +39,7 @@ public static class ModelBuilderExtensions
             b.Property(u => u.NormalizedEmail).HasColumnName("normalized_email").HasMaxLength(256);
             b.Property(u => u.EmailConfirmed).HasColumnName("email_confirmed");
             b.Property(u => u.PhoneNumber).HasColumnName("phone_number").HasMaxLength(64);
+            b.Property(u => u.NormalizedPhoneNumber).HasColumnName("normalized_phone_number").HasMaxLength(64);
             b.Property(u => u.PhoneNumberConfirmed).HasColumnName("phone_number_confirmed");
             b.Property(u => u.PasswordHash).HasColumnName("password_hash").HasMaxLength(1024);
             b.Property(u => u.SecurityStamp).HasColumnName("security_stamp").HasMaxLength(128).IsRequired();

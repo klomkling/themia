@@ -9,17 +9,53 @@ internal sealed class FakeUserService : IUserService
 {
     public PasswordVerificationResult VerifyResult { get; set; } = PasswordVerificationResult.Success;
     public User? UserToReturn { get; set; }
+
+    /// <summary>Returned by <see cref="FindByEmailAsync"/>. Null by default so an existing test that sets
+    /// only <see cref="UserToReturn"/> resolves by username alone — the pre-multi-identifier behaviour.</summary>
+    public User? EmailUserToReturn { get; set; }
+
+    /// <summary>Returned by <see cref="FindByPhoneAsync"/>. Null by default, as above.</summary>
+    public User? PhoneUserToReturn { get; set; }
     public int VerifyCalls { get; private set; }
+
+    /// <summary>The user name the flow actually verified against — proves the lockout state machine is
+    /// keyed on the account rather than on whichever identifier the caller happened to type.</summary>
+    public string? VerifiedUserName { get; private set; }
+
+    public int FindByUserNameCalls { get; private set; }
+
+    public int FindByEmailCalls { get; private set; }
+
+    public int FindByPhoneCalls { get; private set; }
 
     public Task<PasswordVerificationResult> VerifyPasswordAsync(string userName, string password, CancellationToken cancellationToken = default)
     {
         VerifyCalls++;
+        VerifiedUserName = userName;
         return Task.FromResult(VerifyResult);
     }
 
-    public Task<User?> FindByUserNameAsync(string userName, CancellationToken cancellationToken = default) => Task.FromResult(UserToReturn);
+    public Task<User?> FindByUserNameAsync(string userName, CancellationToken cancellationToken = default)
+    {
+        FindByUserNameCalls++;
+        return Task.FromResult(UserToReturn);
+    }
+
     public Task<User?> FindByIdAsync(Guid id, CancellationToken cancellationToken = default) => Task.FromResult(UserToReturn);
-    public Task<User?> FindByEmailAsync(string email, CancellationToken cancellationToken = default) => Task.FromResult(UserToReturn);
+
+    public Task<User?> FindByEmailAsync(string email, CancellationToken cancellationToken = default)
+    {
+        FindByEmailCalls++;
+        return Task.FromResult(EmailUserToReturn);
+    }
+
+    public Task<User?> FindByPhoneAsync(string phoneNumber, CancellationToken cancellationToken = default)
+    {
+        FindByPhoneCalls++;
+        return Task.FromResult(PhoneUserToReturn);
+    }
+    public Task<SetPhoneNumberResult> SetPhoneNumberAsync(Guid userId, string? phoneNumber, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    public Task<bool> ConfirmPhoneNumberAsync(Guid userId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
     public Task<UserCreationResult> CreateAsync(string userName, string password, string? email = null, CancellationToken cancellationToken = default) => throw new NotSupportedException();
     public Task<UserCreationResult> CreateExternalUserAsync(string userName, string? email, bool emailVerified, CancellationToken cancellationToken = default) => throw new NotSupportedException();
     public Task<bool> SetPasswordAsync(Guid userId, string password, CancellationToken cancellationToken = default) => throw new NotSupportedException();

@@ -55,6 +55,11 @@ public static class IdentityServiceCollectionExtensions
         services.TryAddSingleton(TimeProvider.System);
         services.TryAddSingleton<IPasswordHasher, Argon2idPasswordHasher>();
 
+        // TryAdd so an adopter can register their own BEFORE this call and keep it. The default only
+        // strips formatting — it deliberately does not decide that 08… and +668… are the same number,
+        // because that is only true given a region the framework cannot know. See the interface.
+        services.TryAddSingleton<IPhoneNumberNormalizer, FormattingOnlyPhoneNumberNormalizer>();
+
         services.TryAddScoped<IUserService, UserService>();
         services.TryAddScoped<IRoleService, RoleService>();
         services.TryAddScoped<IClaimService, ClaimService>();

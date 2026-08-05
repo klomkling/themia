@@ -38,6 +38,23 @@ internal sealed class PlatformUserByNormalizedEmailSpec : Specification<User>
     }
 }
 
+/// <summary>Finds a user by normalized phone number within the ambient tenant.</summary>
+internal sealed class UserByNormalizedPhoneSpec : Specification<User>
+{
+    public UserByNormalizedPhoneSpec(string normalizedPhone) =>
+        Where(u => u.NormalizedPhoneNumber == normalizedPhone);
+}
+
+/// <summary>Finds a platform (global) user by normalized phone number, bypassing the tenant filter.</summary>
+internal sealed class PlatformUserByNormalizedPhoneSpec : Specification<User>
+{
+    public PlatformUserByNormalizedPhoneSpec(string normalizedPhone)
+    {
+        Where(u => u.NormalizedPhoneNumber == normalizedPhone && u.TenantId == null);
+        WithoutTenantFilter();
+    }
+}
+
 /// <summary>Finds a platform (global) user by id, bypassing the tenant filter. The
 /// <c>TenantId == null</c> predicate guarantees only a genuine platform user matches — never
 /// another tenant's row — so it is safe to resolve outside the ambient tenant scope.</summary>

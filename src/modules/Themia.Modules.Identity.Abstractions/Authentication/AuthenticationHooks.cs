@@ -20,6 +20,18 @@ public enum LoginFailureReason
 
     /// <summary>A hook denied the attempt.</summary>
     Denied,
+
+    /// <summary>
+    /// The identifier matched more than one user across the username / email / phone columns, so the
+    /// attempt was refused rather than resolved to an arbitrary one of them.
+    /// </summary>
+    /// <remarks>
+    /// Reported to hooks so it can be alerted on: it means two accounts overlap in a way the store's
+    /// per-column uniqueness cannot prevent — one user's username equalling another's email, say — and
+    /// somebody is now unable to log in. The caller still sees the same uniform failure as every other
+    /// credential problem; surfacing it outward would confirm that a second account holds that string.
+    /// </remarks>
+    AmbiguousIdentifier,
 }
 
 /// <summary>Base for hook contexts that can short-circuit the flow to a uniform 401 via
