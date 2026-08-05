@@ -27,7 +27,46 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
-_Nothing yet._
+### Added
+- **`Themia.Modules.Identity.Dapper` and `Themia.Modules.Identity.EFCore`** — the identity store splits into
+  engine packages, the same shape `Themia.Challenges` already uses (coord #0058). Reference the core plus
+  exactly one engine package.
+
+  ezy-assets filed it after checking the package graph: adopting Identity meant taking
+  `Themia.Framework.Data.EFCore` and `Microsoft.EntityFrameworkCore` into an application that has no EF
+  Core anywhere, deliberately, purely to reach a store they would use through Dapper. propertiezy, who
+  chose the Dapper path in #0039, had been shipping four EF packages for an engine they never call.
+
+  The coupling turned out to be three things: one file touching EF Core, one holding the Dapper mappings,
+  and one registration hook. Every service — `UserService`, `RoleService`, `ExternalLoginService`,
+  `ClaimsPrincipalFactory`, the Argon2 hasher, every `Specification` — was already written against
+  `Themia.Framework.Data.Abstractions`, so the store was engine-agnostic all along.
+
+  **The core now carries no data peer, no database driver and no migration runner** — Abstractions,
+  `Themia.Framework.Core`, `Themia.Framework.Data.Abstractions`, `FluentMigrator` and Argon2. That is more
+  than the request asked for: EF Core leaves the graph, and so do Npgsql, MySqlConnector,
+  `Microsoft.Data.SqlClient` and the three FluentMigrator runners, which now arrive only with the engine
+  package that needs them.
+
+- **`AddThemiaIdentityDapper` fails loudly when the Dapper peer has not been registered.** The core used to
+  scan the service collection for an `EntityMappingRegistry` and contribute to whatever it found — so the
+  Dapper path was *inferred*, and inferred wrong, silently, whenever the peer registration ran second: no
+  error, no log, just identity mappings never applied until a query returned the wrong columns. That is the
+  ordering hazard propertiezy cites in #0039. It is now impossible to be on the Dapper path by accident.
+
+### Changed
+- **(breaking) `IdentityModule` becomes `IdentityDapperModule` / `IdentityEFCoreModule`**, in the matching
+  engine package. A single module could only register the engine-agnostic core, which on Dapper meant
+  mappings that were never contributed — the same silent failure, reached from the module instead of from
+  the registration. One module per peer makes choosing wrong a compile error.
+- **(breaking) `ModelBuilderExtensions.ApplyThemiaIdentity` moves to `Themia.Modules.Identity.EFCore`** and
+  **`IdentityDapperMappings.Apply` moves to `Themia.Modules.Identity.Dapper`.** Type names and namespaces
+  are unchanged, so only the package reference moves. Both consumers confirmed zero call sites, so no
+  compatibility shim ships — propertiezy argued for that themselves: a forwarding type nobody uses is a
+  spare compatibility surface that lets a caller keep an old assumption compiling.
+- **(breaking) Dapper adopters call `AddThemiaIdentityDapper` instead of `AddThemiaIdentityServices`**
+  (EF Core: `AddThemiaIdentityEFCore`). `AddThemiaIdentityServices` still exists and still registers the
+  engine-agnostic services — call it directly only when supplying your own `IRepository` implementations.
 
 ## [0.12.2] - 2026-08-05
 

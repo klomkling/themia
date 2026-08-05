@@ -59,6 +59,14 @@ public abstract class AuthFlowConformanceTests : IAsyncLifetime
     /// <summary>Wires the data peer (EF or Dapper) against the test connection string.</summary>
     protected abstract void ConfigurePeer(IServiceCollection services, IConfiguration configuration);
 
+    /// <summary>
+    /// Registers Identity through the engine package matching <see cref="ConfigurePeer"/>. Since the engine
+    /// split (coord #0058) the core registers nothing engine-specific, so a Dapper suite that called
+    /// AddThemiaIdentityServices would run against unmapped tables — the same mistake an adopter can make,
+    /// avoided the same way an adopter has to avoid it.
+    /// </summary>
+    protected abstract void RegisterIdentity(IServiceCollection services, Action<IdentityModuleOptions> configure);
+
     protected abstract Task ResetAsync();
 
     // ── IAsyncLifetime ───────────────────────────────────────────────────────
@@ -117,10 +125,7 @@ public abstract class AuthFlowConformanceTests : IAsyncLifetime
                     ConfigurePeer(services, configuration);
 
                     // Identity store services + authorization (ICurrentUser from HttpContext).
-                    services.AddThemiaIdentityServices(o =>
-                    {
-                        o.AllowPlatformLogin = allowPlatformLogin;
-                    });
+                    RegisterIdentity(services, o => o.AllowPlatformLogin = allowPlatformLogin);
                     services.AddThemiaIdentityAuthorization();
 
                     // JWT token services + auth flow.
@@ -206,7 +211,7 @@ public abstract class AuthFlowConformanceTests : IAsyncLifetime
         services.AddSingleton<IConfiguration>(configuration);
         services.AddScoped<ITenantContext>(_ => new TenantContext(tenant));
         ConfigurePeer(services, configuration);
-        services.AddThemiaIdentityServices(o => o.AllowPlatformLogin = allowPlatformLogin);
+        RegisterIdentity(services, o => o.AllowPlatformLogin = allowPlatformLogin);
         services.RemoveAll<ICurrentUserAccessor>();
         services.AddSingleton<ICurrentUserAccessor>(new FixedCurrentUserAccessor("seed-user"));
 
@@ -240,7 +245,7 @@ public abstract class AuthFlowConformanceTests : IAsyncLifetime
         services.AddSingleton<IConfiguration>(configuration);
         services.AddScoped<ITenantContext>(_ => new TenantContext(new TenantId(FixedTenantId)));
         ConfigurePeer(services, configuration);
-        services.AddThemiaIdentityServices(o => o.AllowPlatformLogin = false);
+        RegisterIdentity(services, o => o.AllowPlatformLogin = false);
         services.RemoveAll<ICurrentUserAccessor>();
         services.AddSingleton<ICurrentUserAccessor>(new FixedCurrentUserAccessor("seed-user"));
 

@@ -1,6 +1,16 @@
 #nullable enable
+*REMOVED*Themia.Modules.Identity.EntityConfiguration.ModelBuilderExtensions
+*REMOVED*Themia.Modules.Identity.IdentityModule
+*REMOVED*Themia.Modules.Identity.IdentityModule.IdentityModule(Themia.Data.Migrations.MigrationEngine engine) -> void
+*REMOVED*Themia.Modules.Identity.IdentityModule.IdentityModule(Themia.Data.Migrations.MigrationEngine engine, Themia.Modules.Identity.Abstractions.IdentityModuleOptions! options) -> void
+*REMOVED*Themia.Modules.Identity.Mapping.IdentityDapperMappings
 *REMOVED*Themia.Modules.Identity.Principal.ClaimsPrincipalFactory.ClaimsPrincipalFactory(Themia.Framework.Data.Abstractions.Repositories.IRepository<Themia.Modules.Identity.Abstractions.Entities.UserRole!, System.Guid>! memberships, Themia.Framework.Data.Abstractions.Repositories.IRepository<Themia.Modules.Identity.Abstractions.Entities.Role!, System.Guid>! roles, Themia.Modules.Identity.Abstractions.IClaimService! claims) -> void
 *REMOVED*Themia.Modules.Identity.Services.UserService.UserService(Themia.Framework.Data.Abstractions.Repositories.IRepository<Themia.Modules.Identity.Abstractions.Entities.User!, System.Guid>! users, Themia.Framework.Data.Abstractions.UnitOfWork.IUnitOfWork! unitOfWork, Themia.Modules.Identity.Abstractions.IPasswordHasher! passwordHasher, System.TimeProvider! timeProvider, Themia.Modules.Identity.Abstractions.IdentityModuleOptions! options, Themia.Framework.Data.Abstractions.Filtering.IDataFilterScope! filterScope) -> void
+*REMOVED*override Themia.Modules.Identity.IdentityModule.ConfigureServices(Microsoft.Extensions.DependencyInjection.IServiceCollection! services) -> void
+*REMOVED*override Themia.Modules.Identity.IdentityModule.Descriptor.get -> Themia.Framework.Core.Modules.ModuleDescriptor!
+*REMOVED*override Themia.Modules.Identity.IdentityModule.InitializeAsync(System.IServiceProvider! serviceProvider, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+*REMOVED*static Themia.Modules.Identity.EntityConfiguration.ModelBuilderExtensions.ApplyThemiaIdentity(this Microsoft.EntityFrameworkCore.ModelBuilder! modelBuilder) -> Microsoft.EntityFrameworkCore.ModelBuilder!
+*REMOVED*static Themia.Modules.Identity.Mapping.IdentityDapperMappings.Apply(Themia.Framework.Data.Dapper.Mapping.EntityMappingRegistry! registry) -> void
 Themia.Modules.Identity.Migrations.AddRefreshTokenReplacedTokenIdMigration
 Themia.Modules.Identity.Migrations.AddRefreshTokenReplacedTokenIdMigration.AddRefreshTokenReplacedTokenIdMigration() -> void
 Themia.Modules.Identity.Migrations.ExternalLoginsMigration

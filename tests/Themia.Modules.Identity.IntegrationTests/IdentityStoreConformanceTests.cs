@@ -25,6 +25,15 @@ public abstract class IdentityStoreConformanceTests
     /// <summary>Wires the peer-specific data layer (EF or Dapper) against the test connection string.</summary>
     protected abstract void ConfigurePeer(IServiceCollection services, IConfiguration configuration);
 
+    /// <summary>
+    /// Registers Identity through the engine package matching <see cref="ConfigurePeer"/>. Deliberately not
+    /// a shared call to the core AddThemiaIdentityServices: since the engine split (coord #0058) the core
+    /// registers nothing engine-specific, so a Dapper suite that called it would run against unmapped
+    /// tables — which is precisely the mistake an adopter can make, so the suite makes it the same way an
+    /// adopter would have to avoid it.
+    /// </summary>
+    protected abstract void RegisterIdentity(IServiceCollection services, Action<IdentityModuleOptions> configure);
+
     /// <summary>Truncates the identity tables between tests.</summary>
     protected abstract Task ResetAsync();
 
@@ -64,7 +73,7 @@ public abstract class IdentityStoreConformanceTests
             services.AddSingleton<TimeProvider>(timeProvider);
         }
         ConfigurePeer(services, configuration);
-        services.AddThemiaIdentityServices(o =>
+        RegisterIdentity(services, o =>
         {
             o.AllowPlatformLogin = allowPlatformLogin;
             if (maxFailedAccessAttempts is { } max)

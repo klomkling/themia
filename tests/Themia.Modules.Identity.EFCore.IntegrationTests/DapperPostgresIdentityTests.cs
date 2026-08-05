@@ -1,5 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Themia.Modules.Identity.Abstractions;
+using Themia.Modules.Identity.Dapper.DependencyInjection;
 using Themia.Framework.Data.Dapper.PostgreSql.DependencyInjection;
 using Themia.Modules.Identity.IntegrationTests;
 using Themia.Modules.Identity.IntegrationTests.Fixtures;
@@ -13,6 +15,9 @@ public sealed class DapperPostgresIdentityTests(PostgresIdentityFixture fixture)
 {
     protected override string ConnectionString => fixture.ConnectionString;
     protected override Task ResetAsync() => fixture.ResetAsync();
+
+    protected override void RegisterIdentity(IServiceCollection services, Action<IdentityModuleOptions> configure)
+        => services.AddThemiaIdentityDapper(configure);
 
     protected override void ConfigurePeer(IServiceCollection services, IConfiguration configuration)
     {

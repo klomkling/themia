@@ -36,14 +36,20 @@ public class IdentityServiceCollectionExtensionsTests
     }
 
     [Fact]
-    public void Contributes_dapper_mappings_when_registry_present()
+    public void AddThemiaIdentityServices_contributes_no_dapper_mappings()
     {
+        // The core no longer knows about Dapper. It used to scan the service collection for a registry and
+        // contribute to whatever it found, which meant the Dapper path was INFERRED — and inferred wrong,
+        // silently, whenever the peer registration ran second. AddThemiaIdentityDapper owns it now, and
+        // this asserts the inference is gone rather than merely unused.
         var services = new ServiceCollection();
         var registry = new EntityMappingRegistry();
-        services.AddSingleton(registry);     // simulate AddThemiaDapper* having run first
+        services.AddSingleton(registry);
         services.AddThemiaIdentityServices();
 
-        Assert.Equal("identity.users", registry.For<User>().Table);
+        // Not "does For<User>() throw" — an unmapped type falls back to the registry's own convention
+        // rather than failing. The invariant is that the IDENTITY mapping was not contributed.
+        Assert.NotEqual("identity.users", registry.For<User>().Table);
     }
 
     [Fact]

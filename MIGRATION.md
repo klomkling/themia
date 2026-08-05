@@ -12,7 +12,49 @@ with the *why* and concrete upgrade steps.
 
 ## Unreleased
 
-_Nothing yet._
+### `Themia.Modules.Identity` splits into engine packages
+
+**What changed:** the identity store's engine-specific pieces move into
+`Themia.Modules.Identity.Dapper` and `Themia.Modules.Identity.EFCore`. The core keeps every service and
+carries no data peer, no database driver and no migration runner.
+
+**Why:** the core depended on **both** `Themia.Framework.Data.Dapper` and `Themia.Framework.Data.EFCore`,
+so every adopter shipped an engine they do not use — and an application with no EF Core at all could not
+adopt Identity without acquiring one (coord #0058).
+
+**How to upgrade — pick exactly one engine package:**
+
+```xml
+<PackageVersion Include="Themia.Modules.Identity" Version="0.13.0" />
+<PackageVersion Include="Themia.Modules.Identity.Dapper" Version="0.13.0" />   <!-- or .EFCore -->
+```
+
+```csharp
+  services.AddThemiaDapperPostgres(configuration);   // peer first, unchanged
+- services.AddThemiaIdentityServices(o => o.AllowPlatformLogin = true);
++ services.AddThemiaIdentityDapper(o => o.AllowPlatformLogin = true);
+```
+
+EF Core adopters call `AddThemiaIdentityEFCore` instead, and continue to call `ApplyThemiaIdentity` from
+`OnModelCreating` — the type name and namespace are unchanged, only the package that delivers it.
+
+**If you use the module:** `new IdentityModule(MigrationEngine.Postgres)` becomes
+`new IdentityDapperModule(MigrationEngine.Postgres)` or `new IdentityEFCoreModule(...)`. The
+`MigrationEngine` argument is the *database* and is orthogonal to the peer — it stays.
+
+**Why `AddThemiaIdentityServices` is no longer the Dapper entry point.** It used to scan the service
+collection for an `EntityMappingRegistry` and contribute the identity mappings to whatever it found. That
+inferred the Dapper path rather than being told it, and inferred wrong — silently — whenever the two
+registrations ran in the other order: no exception, no log, identity mappings simply never applied, until
+a query came back against unqualified `users` instead of `identity.users`. `AddThemiaIdentityDapper`
+throws if the registry is missing, so the same mistake is now loud.
+
+The core method still exists and still registers the engine-agnostic services. Call it directly only if
+you are supplying your own `IRepository` implementations.
+
+**No compatibility shim ships** for the two moved members. Both consumers confirmed zero call sites, and a
+forwarding type nobody uses is a spare compatibility surface — it lets a caller keep an old assumption
+compiling, which is the failure mode `NotificationResult.Success()` demonstrated in 0.12.0.
 
 ## 0.12.2
 

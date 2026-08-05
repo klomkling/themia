@@ -1,5 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Themia.Modules.Identity.Abstractions;
+using Themia.Modules.Identity.Dapper.DependencyInjection;
 using Themia.Framework.Data.Dapper.SqlServer.DependencyInjection;
 using Themia.Modules.Identity.AspNetCore.IntegrationTests.Fixtures;
 using Xunit;
@@ -14,6 +16,9 @@ public sealed class DapperSqlServerAuthTests(SqlServerAuthFixture fixture)
     protected override string ConnectionString => fixture.ConnectionString;
 
     protected override Task ResetAsync() => fixture.ResetAsync();
+
+    protected override void RegisterIdentity(IServiceCollection services, Action<IdentityModuleOptions> configure)
+        => services.AddThemiaIdentityDapper(configure);
 
     protected override void ConfigurePeer(IServiceCollection services, IConfiguration configuration)
     {
