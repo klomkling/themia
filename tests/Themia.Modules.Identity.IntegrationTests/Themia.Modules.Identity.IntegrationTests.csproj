@@ -6,6 +6,7 @@
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
   </PropertyGroup>
   <ItemGroup>
+    <ProjectReference Include="../../src/modules/Themia.Modules.Identity.Dapper/Themia.Modules.Identity.Dapper.csproj" />
     <!-- xunit provides IAsyncLifetime + [Fact] used in the conformance base and fixtures. -->
     <PackageReference Include="xunit" />
     <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
@@ -19,6 +20,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/modules/Themia.Modules.Identity/Themia.Modules.Identity.csproj" />
+    <ProjectReference Include="../../src/modules/Themia.Modules.Identity.EFCore/Themia.Modules.Identity.EFCore.csproj" />
     <ProjectReference Include="../../src/framework/Themia.Framework.Data.EFCore.PostgreSql/Themia.Framework.Data.EFCore.PostgreSql.csproj" />
     <ProjectReference Include="../../src/framework/Themia.Framework.Data.EFCore.SqlServer/Themia.Framework.Data.EFCore.SqlServer.csproj" />
     <ProjectReference Include="../../src/framework/Themia.Framework.Data.Dapper.PostgreSql/Themia.Framework.Data.Dapper.PostgreSql.csproj" />

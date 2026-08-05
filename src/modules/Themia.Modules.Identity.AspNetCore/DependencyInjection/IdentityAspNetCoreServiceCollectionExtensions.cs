@@ -15,7 +15,7 @@ using Themia.Modules.Identity.Tokens.AspNetCore.Tokens;
 
 namespace Themia.Modules.Identity.AspNetCore.DependencyInjection;
 
-/// <summary>Registers the Themia Identity JWT slice. Requires <c>AddThemiaIdentityServices()</c> and
+/// <summary>Registers the Themia Identity JWT slice. Requires <c>AddThemiaIdentityDapper()</c> or <c>AddThemiaIdentityEFCore()</c> and
 /// <c>AddThemiaIdentityAuthorization()</c> to have run (for <c>IUserService</c>,
 /// <c>IRefreshTokenService</c>, <c>IClaimsPrincipalFactory</c>, <c>ICurrentUser</c>).</summary>
 public static class IdentityAspNetCoreServiceCollectionExtensions
@@ -42,7 +42,7 @@ public static class IdentityAspNetCoreServiceCollectionExtensions
             || !IsRegistered(services, typeof(IClaimsPrincipalFactory)))
         {
             throw new InvalidOperationException(
-                "AddThemiaIdentityAspNetCore requires AddThemiaIdentityServices() to be called first " +
+                "AddThemiaIdentityAspNetCore requires AddThemiaIdentityDapper()/AddThemiaIdentityEFCore() to be called first " +
                 "(IUserService, IRefreshTokenService, IExternalLoginService, and IClaimsPrincipalFactory " +
                 "must be registered).");
         }

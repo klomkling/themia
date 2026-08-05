@@ -61,6 +61,14 @@ public abstract class ExternalAuthConformanceTests : IAsyncLifetime
     /// <summary>Wires the data peer (EF or Dapper) against the test connection string.</summary>
     protected abstract void ConfigurePeer(IServiceCollection services, IConfiguration configuration);
 
+    /// <summary>
+    /// Registers Identity through the engine package matching <see cref="ConfigurePeer"/>. Since the engine
+    /// split (coord #0058) the core registers nothing engine-specific, so a Dapper suite that called
+    /// the identity registration would run against unmapped tables — the same mistake an adopter can make,
+    /// avoided the same way an adopter has to avoid it.
+    /// </summary>
+    protected abstract void RegisterIdentity(IServiceCollection services, Action<IdentityModuleOptions> configure);
+
     protected abstract Task ResetAsync();
 
     // ── IAsyncLifetime ───────────────────────────────────────────────────────
@@ -110,7 +118,7 @@ public abstract class ExternalAuthConformanceTests : IAsyncLifetime
 
                     ConfigurePeer(services, configuration);
 
-                    services.AddThemiaIdentityServices(o => o.AllowPlatformLogin = true);
+                    RegisterIdentity(services, o => o.AllowPlatformLogin = true);
                     services.AddThemiaIdentityAuthorization();
 
                     services.AddThemiaIdentityAspNetCore(o =>
@@ -308,7 +316,7 @@ public abstract class ExternalAuthConformanceTests : IAsyncLifetime
         services.AddSingleton<IConfiguration>(configuration);
         services.AddScoped<ITenantContext>(_ => new TenantContext(new TenantId(FixedTenantId)));
         ConfigurePeer(services, configuration);
-        services.AddThemiaIdentityServices(o => o.AllowPlatformLogin = false);
+        RegisterIdentity(services, o => o.AllowPlatformLogin = false);
         services.RemoveAll<ICurrentUserAccessor>();
         services.AddSingleton<ICurrentUserAccessor>(new FixedSeedCurrentUserAccessor("seed-user"));
 

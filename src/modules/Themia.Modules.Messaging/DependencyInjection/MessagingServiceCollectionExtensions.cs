@@ -78,7 +78,10 @@ public static class MessagingServiceCollectionExtensions
 
         services.TryAddScoped<IMessageOutboxStore, MessageOutboxStore>();
 
-        ContributeDapperMappings(services);
+        // No-op when EF is the peer; throws when a Dapper peer is present but its registry is not — the one
+        // ordering that leaves MessageOutboxEntry permanently unmapped, so the first enqueue fails at
+        // commit with a missing-relation error and nothing points back at the registration order.
+        services.ContributeDapperMappings(MessagingDapperMappings.Apply, nameof(AddThemiaMessagingModule));
         services.AddHostedService<OutboxDrainer<ClaimedMessageRow>>();
 
         return services;
@@ -131,33 +134,4 @@ public static class MessagingServiceCollectionExtensions
         return services;
     }
 
-    // Mirror Notifications: scan the collection for the already-registered EntityMappingRegistry singleton
-    // instance and apply the Messaging mappings to it. No service provider is built. No-op when EF is the
-    // peer — but a Dapper peer with no registry yet means AddThemiaDapperCore() has not run BEFORE this
-    // method, which is the one ordering that leaves MessageOutboxEntry permanently unmapped (the first
-    // enqueue then fails at commit with a missing-relation error), so that case throws instead of a silent
-    // no-op mirroring "genuine EF peer".
-    private static void ContributeDapperMappings(IServiceCollection services)
-    {
-        for (var i = services.Count - 1; i >= 0; i--)
-        {
-            if (services[i].ServiceType == typeof(EntityMappingRegistry)
-                && services[i].ImplementationInstance is EntityMappingRegistry registry)
-            {
-                MessagingDapperMappings.Apply(registry);
-                return;
-            }
-        }
-
-        if (services.Any(d => d.ServiceType == typeof(IDapperConnectionContext)))
-        {
-            throw new InvalidOperationException(
-                "AddThemiaMessagingModule found a Dapper data peer (IDapperConnectionContext) already "
-                + "registered but no EntityMappingRegistry to receive the Messaging entity mapping into. "
-                + "Call AddThemiaDapperCore() BEFORE AddThemiaMessagingModule(...) so the registry singleton "
-                + "exists when the Messaging mappings are contributed to it.");
-        }
-
-        // Neither is registered: an EF peer, which has no registry to contribute the mappings to.
-    }
 }

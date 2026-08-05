@@ -49,3 +49,7 @@ Themia.Framework.Data.Dapper.Tenancy.ITenantQueryFactory
 Themia.Framework.Data.Dapper.Tenancy.ITenantQueryFactory.For<T>() -> SqlKata.Query!
 Themia.Framework.Data.Dapper.Tenancy.ITenantQueryFactory.For<T>(bool includeGlobalRecords) -> SqlKata.Query!
 static Themia.Framework.Data.Dapper.DependencyInjection.DapperDataServiceCollectionExtensions.AddThemiaDapperCore(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Themia.Framework.Data.Dapper.DapperDataOptions!>? configure = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+Themia.Framework.Data.Dapper.Mapping.DapperMappingRegistration
+static Themia.Framework.Data.Dapper.Mapping.DapperMappingRegistration.ContributeDapperMappings(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Themia.Framework.Data.Dapper.Mapping.EntityMappingRegistry!>! apply, string! callerName) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static Themia.Framework.Data.Dapper.Mapping.DapperMappingRegistration.FindEntityMappingRegistry(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services) -> Themia.Framework.Data.Dapper.Mapping.EntityMappingRegistry?
+static Themia.Framework.Data.Dapper.Mapping.DapperMappingRegistration.RequireDapperMappings(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Themia.Framework.Data.Dapper.Mapping.EntityMappingRegistry!>! apply, string! callerName) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!

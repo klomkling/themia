@@ -19,6 +19,8 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/modules/Themia.Modules.Identity/Themia.Modules.Identity.csproj" />
+    <ProjectReference Include="../../src/modules/Themia.Modules.Identity.Dapper/Themia.Modules.Identity.Dapper.csproj" />
+    <ProjectReference Include="../../src/modules/Themia.Modules.Identity.EFCore/Themia.Modules.Identity.EFCore.csproj" />
     <ProjectReference Include="../../src/modules/Themia.Modules.Identity.Abstractions/Themia.Modules.Identity.Abstractions.csproj" />
     <ProjectReference Include="../../src/framework/Themia.Framework.Data.EFCore/Themia.Framework.Data.EFCore.csproj" />
     <ProjectReference Include="../../src/framework/Themia.Framework.Data.Dapper/Themia.Framework.Data.Dapper.csproj" />

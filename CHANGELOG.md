@@ -27,7 +27,93 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
-_Nothing yet._
+### Added
+- **`Themia.Modules.Identity.Dapper` and `Themia.Modules.Identity.EFCore`** — the identity store splits into
+  engine packages, the same shape `Themia.Challenges` already uses (coord #0058). Reference the core plus
+  exactly one engine package.
+
+  ezy-assets filed it after checking the package graph: adopting Identity meant taking
+  `Themia.Framework.Data.EFCore` and `Microsoft.EntityFrameworkCore` into an application that has no EF
+  Core anywhere, deliberately, purely to reach a store they would use through Dapper. propertiezy, who
+  chose the Dapper path in #0039, had been shipping four EF packages for an engine they never call.
+
+  The coupling turned out to be three things: one file touching EF Core, one holding the Dapper mappings,
+  and one registration hook. Every service — `UserService`, `RoleService`, `ExternalLoginService`,
+  `ClaimsPrincipalFactory`, the Argon2 hasher, every `Specification` — was already written against
+  `Themia.Framework.Data.Abstractions`, so the store was engine-agnostic all along.
+
+  **The core now carries no data peer, no database driver and no migration runner** — Abstractions,
+  `Themia.Framework.Core`, `Themia.Framework.Data.Abstractions`, `FluentMigrator` and Argon2. That is more
+  than the request asked for: EF Core leaves the graph, and so do Npgsql, MySqlConnector,
+  `Microsoft.Data.SqlClient` and the three FluentMigrator runners, which now arrive only with the engine
+  package that needs them.
+
+- **`AddThemiaIdentityDapper` fails loudly when the Dapper peer has not been registered.** The core used to
+  scan the service collection for an `EntityMappingRegistry` and contribute to whatever it found — so the
+  Dapper path was *inferred*, and inferred wrong, silently, whenever the peer registration ran second: no
+  error, no log, just identity mappings never applied until a query returned the wrong columns. That is the
+  ordering hazard propertiezy cites in #0039. It is now impossible to be on the Dapper path by accident.
+
+- **`AddThemiaIdentityEFCore` fails loudly when `ApplyThemiaIdentity` was never called.** The EF leg had
+  kept the exact failure the split removed from the Dapper leg: nothing observable at registration time
+  says whether the model configuration was applied, so a forgotten `OnModelCreating` line started cleanly,
+  let the module migrate `identity.users` into existence, and first surfaced as a query against a table
+  EF Core had never been told about. The registration now adds a startup check over the built model
+  (`IdentityModelValidation`), so the mistake fails the host with the missing call named.
+
+- **`Themia.Modules.Identity.Migrations.IdentityMigrations.Assembly`** — the core defines the `identity`
+  schema but ships no runner (running migrations needs a driver per engine, and the core stays
+  driver-free). Both engine modules apply it for you; an adopter who takes only the core, supplying their
+  own `IRepository` implementations, now has a named handle to run instead of a `typeof(...)` on a
+  migration class.
+
+- **`DapperMappingRegistration`** in `Themia.Framework.Data.Dapper` — one mapping-contribution mechanism
+  for every module. Identity, Storage, Notifications and Messaging had each hand-rolled the same
+  service-collection scan and the copies had drifted into three different behaviours for one adopter
+  mistake, so registering the peer after the modules produced a hard failure from one module and silently
+  unmapped tables from the others in the same startup. `ContributeDapperMappings` is for modules that
+  support both peers (silent only for a genuine EF adopter, loud when a Dapper peer is present without its
+  registry); `RequireDapperMappings` is for Dapper-only packages, where no registry can only mean the
+  wrong order.
+
+### Changed
+- **(breaking) `IdentityModule` becomes `IdentityDapperModule` / `IdentityEFCoreModule`**, in the matching
+  engine package. A single module could only register the engine-agnostic core, which on Dapper meant
+  mappings that were never contributed — the same silent failure, reached from the module instead of from
+  the registration. One module per peer makes choosing wrong a compile error.
+- **(breaking) `ModelBuilderExtensions.ApplyThemiaIdentity` moves to `Themia.Modules.Identity.EFCore`** and
+  **`IdentityDapperMappings.Apply` moves to `Themia.Modules.Identity.Dapper`.** Type names and namespaces
+  are unchanged, so only the package reference moves. Both consumers confirmed zero call sites, so no
+  compatibility shim ships — propertiezy argued for that themselves: a forwarding type nobody uses is a
+  spare compatibility surface that lets a caller keep an old assumption compiling.
+- **(breaking) `AddThemiaIdentityServices` is renamed `AddThemiaIdentityCore` and the old name is a
+  compile error.** Dapper adopters call `AddThemiaIdentityDapper`, EF Core adopters
+  `AddThemiaIdentityEFCore`; either one calls the core for you. Call `AddThemiaIdentityCore` directly only
+  when supplying your own `IRepository` implementations.
+
+  Keeping the old name callable was the larger hazard. It used to contribute the identity mappings to a
+  Dapper `EntityMappingRegistry` if it found one and no longer does, while its signature is unchanged — so
+  an existing Dapper bootstrap would have recompiled with zero errors and zero warnings and then queried
+  unqualified `users` instead of `identity.users`: an auth outage on first login with nothing connecting it
+  to the upgrade. `[Obsolete(error: true)]` makes the call site change mechanical rather than a line in
+  this file that somebody has to read.
+
+- **(breaking) `AddThemiaDapperCore` reuses an already-registered `EntityMappingRegistry`** instead of
+  registering a second one. Two registrations meant the later instance won resolution while every mapping
+  the modules had contributed sat on the first, so every module-mapped table silently fell back to its
+  convention name.
+
+- **(breaking) Storage, Notifications and Messaging throw when a Dapper peer is registered without its
+  mapping registry.** Previously Storage and Notifications returned quietly in that state, which is never
+  a legitimate configuration — it means the module was registered before the peer, and the tables stay
+  unmapped until a query fails. A genuine EF Core adopter (no registry, no `IDapperConnectionContext`) is
+  unaffected.
+
+- **(breaking) The module identifiers changed, not just the type names.** `ModuleDescriptor.Name` goes from
+  `"Themia.Identity"` to `"Themia.Identity.Dapper"` / `"Themia.Identity.EFCore"`. If your host keys module
+  enablement, ordering, or `ModuleDescriptor.Dependencies` off that string — a `modules` table, a
+  `Modules:Themia.Identity:Enabled` config entry — update the key as well as the type, or the module reads
+  as absent and `IUserService` never gets registered.
 
 ## [0.12.2] - 2026-08-05
 

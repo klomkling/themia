@@ -23,13 +23,24 @@ public static class DapperDataServiceCollectionExtensions
     /// </summary>
     public static IServiceCollection AddThemiaDapperCore(this IServiceCollection services, Action<DapperDataOptions>? configure = null)
     {
+        ArgumentNullException.ThrowIfNull(services);
+
         DapperConfiguration.EnsureConfigured();
         var options = new DapperDataOptions();
         configure?.Invoke(options);
-        var registry = new EntityMappingRegistry();
+
+        // Reuse the registry a prior call registered instead of registering a second one. A second
+        // instance would win resolution while the mappings modules contributed sat on the first, so every
+        // module-mapped table would silently fall back to its convention name.
+        var registry = services.FindEntityMappingRegistry();
+        if (registry is null)
+        {
+            registry = new EntityMappingRegistry();
+            services.AddSingleton(registry);
+        }
+
         options.ConfigureMappings?.Invoke(new EntityMappingRegistryConfigurator(registry));
         services.AddSingleton(options);
-        services.AddSingleton(registry);
         services.TryAddSingleton(TimeProvider.System);
         services.TryAddSingleton<ICurrentUserAccessor, NullCurrentUserAccessor>();
         services.TryAddScoped<IDataFilterScope, DataFilterScope>();

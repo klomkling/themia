@@ -1,0 +1,13 @@
+#nullable enable
+Themia.Modules.Identity.EFCore.DependencyInjection.IdentityEFCoreServiceCollectionExtensions
+Themia.Modules.Identity.EFCore.IdentityEFCoreModule
+Themia.Modules.Identity.EFCore.IdentityEFCoreModule.IdentityEFCoreModule(Themia.Data.Migrations.MigrationEngine engine) -> void
+Themia.Modules.Identity.EFCore.IdentityEFCoreModule.IdentityEFCoreModule(Themia.Data.Migrations.MigrationEngine engine, Themia.Modules.Identity.Abstractions.IdentityModuleOptions! options) -> void
+Themia.Modules.Identity.EntityConfiguration.ModelBuilderExtensions
+override Themia.Modules.Identity.EFCore.IdentityEFCoreModule.ConfigureServices(Microsoft.Extensions.DependencyInjection.IServiceCollection! services) -> void
+override Themia.Modules.Identity.EFCore.IdentityEFCoreModule.Descriptor.get -> Themia.Framework.Core.Modules.ModuleDescriptor!
+override Themia.Modules.Identity.EFCore.IdentityEFCoreModule.InitializeAsync(System.IServiceProvider! serviceProvider, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+static Themia.Modules.Identity.EFCore.DependencyInjection.IdentityEFCoreServiceCollectionExtensions.AddThemiaIdentityEFCore(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Themia.Modules.Identity.Abstractions.IdentityModuleOptions!>? configure = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static Themia.Modules.Identity.EntityConfiguration.ModelBuilderExtensions.ApplyThemiaIdentity(this Microsoft.EntityFrameworkCore.ModelBuilder! modelBuilder) -> Microsoft.EntityFrameworkCore.ModelBuilder!
+Themia.Modules.Identity.EFCore.IdentityModelValidation
+static Themia.Modules.Identity.EFCore.IdentityModelValidation.Validate(Microsoft.EntityFrameworkCore.Metadata.IModel! model) -> void

@@ -293,6 +293,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Themia.Challenges.SqlServer
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Themia.Challenges.IntegrationTests", "tests\Themia.Challenges.IntegrationTests\Themia.Challenges.IntegrationTests.csproj", "{F0024051-2492-4A1D-95F5-46FEE39EF358}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Themia.Modules.Identity.Dapper", "src\modules\Themia.Modules.Identity.Dapper\Themia.Modules.Identity.Dapper.csproj", "{1D843E0A-CCBD-4317-8662-8BBD1354AF5A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Themia.Modules.Identity.EFCore", "src\modules\Themia.Modules.Identity.EFCore\Themia.Modules.Identity.EFCore.csproj", "{2E1B6DAE-0260-4DAA-9A97-C335A6530410}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -1947,6 +1951,30 @@ Global
 		{F0024051-2492-4A1D-95F5-46FEE39EF358}.Release|x64.Build.0 = Release|Any CPU
 		{F0024051-2492-4A1D-95F5-46FEE39EF358}.Release|x86.ActiveCfg = Release|Any CPU
 		{F0024051-2492-4A1D-95F5-46FEE39EF358}.Release|x86.Build.0 = Release|Any CPU
+		{1D843E0A-CCBD-4317-8662-8BBD1354AF5A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1D843E0A-CCBD-4317-8662-8BBD1354AF5A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1D843E0A-CCBD-4317-8662-8BBD1354AF5A}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{1D843E0A-CCBD-4317-8662-8BBD1354AF5A}.Debug|x64.Build.0 = Debug|Any CPU
+		{1D843E0A-CCBD-4317-8662-8BBD1354AF5A}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{1D843E0A-CCBD-4317-8662-8BBD1354AF5A}.Debug|x86.Build.0 = Debug|Any CPU
+		{1D843E0A-CCBD-4317-8662-8BBD1354AF5A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1D843E0A-CCBD-4317-8662-8BBD1354AF5A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{1D843E0A-CCBD-4317-8662-8BBD1354AF5A}.Release|x64.ActiveCfg = Release|Any CPU
+		{1D843E0A-CCBD-4317-8662-8BBD1354AF5A}.Release|x64.Build.0 = Release|Any CPU
+		{1D843E0A-CCBD-4317-8662-8BBD1354AF5A}.Release|x86.ActiveCfg = Release|Any CPU
+		{1D843E0A-CCBD-4317-8662-8BBD1354AF5A}.Release|x86.Build.0 = Release|Any CPU
+		{2E1B6DAE-0260-4DAA-9A97-C335A6530410}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2E1B6DAE-0260-4DAA-9A97-C335A6530410}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2E1B6DAE-0260-4DAA-9A97-C335A6530410}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{2E1B6DAE-0260-4DAA-9A97-C335A6530410}.Debug|x64.Build.0 = Debug|Any CPU
+		{2E1B6DAE-0260-4DAA-9A97-C335A6530410}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{2E1B6DAE-0260-4DAA-9A97-C335A6530410}.Debug|x86.Build.0 = Debug|Any CPU
+		{2E1B6DAE-0260-4DAA-9A97-C335A6530410}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2E1B6DAE-0260-4DAA-9A97-C335A6530410}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2E1B6DAE-0260-4DAA-9A97-C335A6530410}.Release|x64.ActiveCfg = Release|Any CPU
+		{2E1B6DAE-0260-4DAA-9A97-C335A6530410}.Release|x64.Build.0 = Release|Any CPU
+		{2E1B6DAE-0260-4DAA-9A97-C335A6530410}.Release|x86.ActiveCfg = Release|Any CPU
+		{2E1B6DAE-0260-4DAA-9A97-C335A6530410}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -2093,5 +2121,7 @@ Global
 		{3B271174-C50D-49B4-B5BE-27EADD0D55B7} = {1F655D57-935D-D295-E882-5052ED9A6376}
 		{CDDD54DA-3A0B-411F-964C-B2B63279845F} = {1F655D57-935D-D295-E882-5052ED9A6376}
 		{F0024051-2492-4A1D-95F5-46FEE39EF358} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
+		{1D843E0A-CCBD-4317-8662-8BBD1354AF5A} = {EC447DCF-ABFA-6E24-52A5-D7FD48A5C558}
+		{2E1B6DAE-0260-4DAA-9A97-C335A6530410} = {EC447DCF-ABFA-6E24-52A5-D7FD48A5C558}
 	EndGlobalSection
 EndGlobal
