@@ -12,6 +12,10 @@ with the *why* and concrete upgrade steps.
 
 ## Unreleased
 
+_Nothing yet._
+
+## 0.12.2
+
 ### `Themia.Modules.Identity`: multi-identifier login, and a phone number that finally works
 
 **What changed:**

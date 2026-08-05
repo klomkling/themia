@@ -27,6 +27,10 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+_Nothing yet._
+
+## [0.12.2] - 2026-08-05
+
 ### Added
 - **`Themia.Modules.Identity` logs in by username, confirmed email, or confirmed phone** (coord #0054).
   `IAuthenticationFlow.LoginAsync`'s first parameter is now `identifier`. Resolution order is normative:
