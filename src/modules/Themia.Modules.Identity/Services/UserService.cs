@@ -16,6 +16,7 @@ public sealed class UserService : IUserService
     private readonly TimeProvider timeProvider;
     private readonly IdentityModuleOptions options;
     private readonly IDataFilterScope filterScope;
+    private readonly IPhoneNumberNormalizer phoneNormalizer;
 
     /// <summary>Creates the service.</summary>
     public UserService(
@@ -24,7 +25,8 @@ public sealed class UserService : IUserService
         IPasswordHasher passwordHasher,
         TimeProvider timeProvider,
         IdentityModuleOptions options,
-        IDataFilterScope filterScope)
+        IDataFilterScope filterScope,
+        IPhoneNumberNormalizer phoneNormalizer)
     {
         ArgumentNullException.ThrowIfNull(users);
         ArgumentNullException.ThrowIfNull(unitOfWork);
@@ -32,12 +34,14 @@ public sealed class UserService : IUserService
         ArgumentNullException.ThrowIfNull(timeProvider);
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(filterScope);
+        ArgumentNullException.ThrowIfNull(phoneNormalizer);
         this.users = users;
         this.unitOfWork = unitOfWork;
         this.passwordHasher = passwordHasher;
         this.timeProvider = timeProvider;
         this.options = options;
         this.filterScope = filterScope;
+        this.phoneNormalizer = phoneNormalizer;
     }
 
     /// <inheritdoc />
@@ -157,6 +161,81 @@ public sealed class UserService : IUserService
         }
 
         return await users.FirstOrDefaultAsync(new PlatformUserByNormalizedEmailSpec(normalized), cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task<User?> FindByPhoneAsync(string phoneNumber, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(phoneNumber);
+
+        // A number that normalizes to nothing is not "no filter" — it matches nothing. Returning null
+        // here rather than querying keeps punctuation-only input from resolving to whichever row happens
+        // to carry a null normalized form.
+        var normalized = phoneNormalizer.Normalize(phoneNumber);
+        if (normalized is null)
+        {
+            return null;
+        }
+
+        var inTenant = await users.FirstOrDefaultAsync(new UserByNormalizedPhoneSpec(normalized), cancellationToken).ConfigureAwait(false);
+        if (inTenant is not null)
+        {
+            return inTenant;
+        }
+
+        if (!options.AllowPlatformLogin)
+        {
+            return null;
+        }
+
+        return await users.FirstOrDefaultAsync(new PlatformUserByNormalizedPhoneSpec(normalized), cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task<SetPhoneNumberResult> SetPhoneNumberAsync(Guid userId, string? phoneNumber, CancellationToken cancellationToken = default)
+    {
+        var user = await IdentityScope.ResolveUserAsync(users, userId, cancellationToken).ConfigureAwait(false);
+        if (user is null)
+        {
+            return SetPhoneNumberResult.UserNotFound;
+        }
+
+        var normalized = phoneNormalizer.Normalize(phoneNumber);
+        if (normalized is not null)
+        {
+            var holder = await users.FirstOrDefaultAsync(new UserByNormalizedPhoneSpec(normalized), cancellationToken).ConfigureAwait(false);
+            if (holder is not null && holder.Id != user.Id)
+            {
+                return SetPhoneNumberResult.Duplicate;
+            }
+        }
+
+        user.PhoneNumber = string.IsNullOrWhiteSpace(phoneNumber) ? null : phoneNumber.Trim();
+        user.NormalizedPhoneNumber = normalized;
+
+        // Always cleared, including when the number did not change: confirmation is proof of control over
+        // one number at one time. Carrying it across a write would let a profile edit inherit someone
+        // else's confirmed status, which — once the number is a login identifier — is account takeover.
+        user.PhoneNumberConfirmed = false;
+
+        users.Update(user);
+        await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        return SetPhoneNumberResult.Success;
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> ConfirmPhoneNumberAsync(Guid userId, CancellationToken cancellationToken = default)
+    {
+        var user = await IdentityScope.ResolveUserAsync(users, userId, cancellationToken).ConfigureAwait(false);
+        if (user?.NormalizedPhoneNumber is null)
+        {
+            return false;
+        }
+
+        user.PhoneNumberConfirmed = true;
+        users.Update(user);
+        await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        return true;
     }
 
     /// <inheritdoc />

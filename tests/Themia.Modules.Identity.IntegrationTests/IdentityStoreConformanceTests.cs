@@ -772,6 +772,12 @@ file sealed class RaceWinnerUserService(
         => inner.FindByUserNameAsync(userName, cancellationToken);
     public Task<User?> FindByEmailAsync(string email, CancellationToken cancellationToken = default)
         => inner.FindByEmailAsync(email, cancellationToken);
+    public Task<User?> FindByPhoneAsync(string phoneNumber, CancellationToken cancellationToken = default)
+        => inner.FindByPhoneAsync(phoneNumber, cancellationToken);
+    public Task<SetPhoneNumberResult> SetPhoneNumberAsync(Guid userId, string? phoneNumber, CancellationToken cancellationToken = default)
+        => inner.SetPhoneNumberAsync(userId, phoneNumber, cancellationToken);
+    public Task<bool> ConfirmPhoneNumberAsync(Guid userId, CancellationToken cancellationToken = default)
+        => inner.ConfirmPhoneNumberAsync(userId, cancellationToken);
     public Task<bool> SetPasswordAsync(Guid userId, string password, CancellationToken cancellationToken = default)
         => inner.SetPasswordAsync(userId, password, cancellationToken);
     public Task<PasswordVerificationResult> VerifyPasswordAsync(string userName, string password, CancellationToken cancellationToken = default)
@@ -830,6 +836,12 @@ file sealed class RaceWinnerNameUserService(
         => inner.FindByUserNameAsync(userName, cancellationToken);
     public Task<User?> FindByEmailAsync(string email, CancellationToken cancellationToken = default)
         => inner.FindByEmailAsync(email, cancellationToken);
+    public Task<User?> FindByPhoneAsync(string phoneNumber, CancellationToken cancellationToken = default)
+        => inner.FindByPhoneAsync(phoneNumber, cancellationToken);
+    public Task<SetPhoneNumberResult> SetPhoneNumberAsync(Guid userId, string? phoneNumber, CancellationToken cancellationToken = default)
+        => inner.SetPhoneNumberAsync(userId, phoneNumber, cancellationToken);
+    public Task<bool> ConfirmPhoneNumberAsync(Guid userId, CancellationToken cancellationToken = default)
+        => inner.ConfirmPhoneNumberAsync(userId, cancellationToken);
     public Task<bool> SetPasswordAsync(Guid userId, string password, CancellationToken cancellationToken = default)
         => inner.SetPasswordAsync(userId, password, cancellationToken);
     public Task<PasswordVerificationResult> VerifyPasswordAsync(string userName, string password, CancellationToken cancellationToken = default)

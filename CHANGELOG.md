@@ -27,7 +27,57 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
-_Nothing yet._
+### Added
+- **`Themia.Modules.Identity` logs in by username, confirmed email, or confirmed phone** (coord #0054).
+  `IAuthenticationFlow.LoginAsync`'s first parameter is now `identifier`. Resolution order is normative:
+  **username, then email, then phone** — username first because it is the only identifier that has always
+  been unique. Propertiezy filed this after a production incident: their login field is labelled
+  "ชื่อผู้ใช้ / อีเมล" and an email returned a 401 indistinguishable from a wrong password.
+
+  Three behaviours are load-bearing rather than incidental:
+  - **All three columns are queried even after the first matches.** Stopping early would (a) miss a
+    collision — per-column uniqueness cannot stop one user's username equalling another's email — and
+    (b) make the number of round trips reveal which identifier space a string belongs to.
+  - **An identifier matching two *different* users is refused, never resolved.** Picking either silently
+    is account takeover. Hooks see `LoginFailureReason.AmbiguousIdentifier`; the caller sees the same
+    uniform failure as everything else. One user matching on two columns is not a collision.
+  - **Lockout and verification stay keyed on the username**, whatever the caller typed. Keying them on
+    the identifier would give each of a user's three identifiers its own attempt budget.
+
+  Email and phone match **only when confirmed** — an unconfirmed address is a claim, not proof of
+  control. Every failure remains one outcome: widening the identifier space widens the enumeration
+  oracle otherwise, three spaces to probe instead of one.
+
+- **A phone number can now become a login identifier at all.** `PhoneNumber` shipped on the entity and in
+  the schema but nothing ever wrote it, it had no normalized form, no uniqueness and no index — storable
+  and unusable. Added: `IUserService.SetPhoneNumberAsync` / `ConfirmPhoneNumberAsync` / `FindByPhoneAsync`,
+  a `normalized_phone_number` column with the same two filtered unique indexes `normalized_email` has, and
+  `IPhoneNumberNormalizer` with a `FormattingOnlyPhoneNumberNormalizer` default.
+
+  **The default deliberately does not understand phone numbers.** It strips formatting, so
+  `+66 81 111 2222` and `+66811112222` are one number — but `0811112222` and `+66811112222` are **not**,
+  because they are the same number only given a region the framework cannot know. Guessing it wrong in
+  one direction locks a user out of their own number; in the other it merges two people's accounts.
+  Supply your own normalizer over an E.164 library if you need national forms, and treat changing it as a
+  data migration — the value is persisted and uniquely indexed.
+
+  `SetPhoneNumberAsync` always clears `PhoneNumberConfirmed`, including when the number is unchanged:
+  confirmation is proof of control over one number at one time, and carrying it across a write would let
+  a profile edit inherit someone else's confirmed status. Themia does not verify the number — call
+  `ConfirmPhoneNumberAsync` after your own proof, for which `Themia.Challenges` exists (Identity takes no
+  dependency on it, so nothing here can check that you did).
+
+### Changed
+- **(breaking) `IUserService` gained three members and `UserService`'s constructor gained a parameter**
+  (`IPhoneNumberNormalizer`). Only affects code that implements `IUserService` or constructs `UserService`
+  directly; DI resolves the new dependency from `AddThemiaIdentity`, which registers the default with
+  `TryAdd` so an adopter's own registration wins.
+- **(breaking) `LoginFailureReason` gained `AmbiguousIdentifier`**, so an exhaustive `switch` over it
+  stops compiling until the case is handled.
+- **`Themia.Modules.Identity` masks the identifier in failed-login logs.** The line carried a username
+  verbatim; now that it may be an email address or a phone number, logging it would push PII into every
+  aggregator on the highest-volume line in the flow. Hooks still receive the unmasked value — they are
+  in-process adopter code and are where lockout and abuse detection belong.
 
 ## [0.12.1] - 2026-08-05
 

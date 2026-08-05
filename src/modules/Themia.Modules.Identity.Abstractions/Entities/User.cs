@@ -30,6 +30,21 @@ public sealed class User : SoftDeletableEntity<Guid>, ITenantEntity
     /// <summary>The phone number, as entered.</summary>
     public string? PhoneNumber { get; set; }
 
+    /// <summary>
+    /// The phone number reduced to its comparison form by <c>IPhoneNumberNormalizer</c> — the column the
+    /// unique indexes and every lookup use. <see cref="PhoneNumber"/> keeps what the user typed; this is
+    /// what "the same number" means for this deployment.
+    /// </summary>
+    /// <remarks>
+    /// Separate from <see cref="PhoneNumber"/> for the same reason <see cref="NormalizedEmail"/> is
+    /// separate from <see cref="Email"/>: uniqueness and lookup must not depend on formatting. Which
+    /// forms compare equal is a deployment decision — <c>08…</c> and <c>+668…</c> are the same number
+    /// only if you know the region — so the normalizer is injectable and this value is whatever it
+    /// produced. Changing normalizers therefore requires re-normalizing every stored row; the two must
+    /// stay in step or a user silently stops being findable by their own number.
+    /// </remarks>
+    public string? NormalizedPhoneNumber { get; set; }
+
     /// <summary>Whether the phone number has been confirmed.</summary>
     public bool PhoneNumberConfirmed { get; set; }
 

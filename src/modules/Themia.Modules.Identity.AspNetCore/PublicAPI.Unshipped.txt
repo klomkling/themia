@@ -1,35 +1,35 @@
 #nullable enable
-Themia.Modules.Identity.AspNetCore.Authentication.AuthenticationHooksBase
-Themia.Modules.Identity.AspNetCore.Authentication.AuthenticationHooksBase.AuthenticationHooksBase() -> void
-virtual Themia.Modules.Identity.AspNetCore.Authentication.AuthenticationHooksBase.OnBeforeLoginAsync(Themia.Modules.Identity.Abstractions.Authentication.BeforeLoginContext! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
-virtual Themia.Modules.Identity.AspNetCore.Authentication.AuthenticationHooksBase.OnLoginSucceededAsync(Themia.Modules.Identity.Abstractions.Authentication.LoginSucceededContext! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
-virtual Themia.Modules.Identity.AspNetCore.Authentication.AuthenticationHooksBase.OnLoginFailedAsync(Themia.Modules.Identity.Abstractions.Authentication.LoginFailedContext! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
-virtual Themia.Modules.Identity.AspNetCore.Authentication.AuthenticationHooksBase.OnBeforeRefreshAsync(Themia.Modules.Identity.Abstractions.Authentication.BeforeRefreshContext! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
-virtual Themia.Modules.Identity.AspNetCore.Authentication.AuthenticationHooksBase.OnRefreshSucceededAsync(Themia.Modules.Identity.Abstractions.Authentication.RefreshSucceededContext! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
-virtual Themia.Modules.Identity.AspNetCore.Authentication.AuthenticationHooksBase.OnLogoutAsync(Themia.Modules.Identity.Abstractions.Authentication.LogoutContext! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
 Themia.Modules.Identity.AspNetCore.Authentication.AuthenticationFlow
 Themia.Modules.Identity.AspNetCore.Authentication.AuthenticationFlow.AuthenticationFlow(Themia.Modules.Identity.Abstractions.IUserService! users, Themia.Modules.Identity.Abstractions.IClaimsPrincipalFactory! principalFactory, Themia.Modules.Identity.Abstractions.Authentication.IAccessTokenService! accessTokens, Themia.Modules.Identity.Abstractions.Authentication.IRefreshTokenService! refreshTokens, Themia.Modules.Identity.Abstractions.IPasswordHasher! passwordHasher, Themia.Modules.Identity.Abstractions.Authentication.IAuthenticationHooks! hooks, System.TimeProvider! timeProvider, Microsoft.Extensions.Logging.ILogger<Themia.Modules.Identity.AspNetCore.Authentication.AuthenticationFlow!>! logger) -> void
-Themia.Modules.Identity.AspNetCore.Authentication.AuthenticationFlow.LoginAsync(string! userName, string! password, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Identity.Abstractions.Authentication.LoginResult>!
-Themia.Modules.Identity.AspNetCore.Authentication.AuthenticationFlow.RefreshAsync(string! refreshToken, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Identity.Abstractions.Authentication.RefreshRotationResult>!
+Themia.Modules.Identity.AspNetCore.Authentication.AuthenticationFlow.LoginAsync(string! identifier, string! password, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Identity.Abstractions.Authentication.LoginResult>!
 Themia.Modules.Identity.AspNetCore.Authentication.AuthenticationFlow.LogoutAsync(string! refreshToken, bool allSessions, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Modules.Identity.AspNetCore.Authentication.AuthenticationFlow.RefreshAsync(string! refreshToken, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Identity.Abstractions.Authentication.RefreshRotationResult>!
+Themia.Modules.Identity.AspNetCore.Authentication.AuthenticationHooksBase
+Themia.Modules.Identity.AspNetCore.Authentication.AuthenticationHooksBase.AuthenticationHooksBase() -> void
 Themia.Modules.Identity.AspNetCore.DependencyInjection.IdentityAspNetCoreServiceCollectionExtensions
-static Themia.Modules.Identity.AspNetCore.DependencyInjection.IdentityAspNetCoreServiceCollectionExtensions.AddThemiaIdentityAspNetCore(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Themia.Modules.Identity.Tokens.AspNetCore.Options.JwtOptions!>! configure) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
-static Themia.Modules.Identity.AspNetCore.DependencyInjection.IdentityAspNetCoreServiceCollectionExtensions.AddThemiaJwtBearer(this Microsoft.AspNetCore.Authentication.AuthenticationBuilder! builder, string? scheme = null) -> Microsoft.AspNetCore.Authentication.AuthenticationBuilder!
+Themia.Modules.Identity.AspNetCore.Endpoints.IdentityAuthEndpointRouteBuilderExtensions
 Themia.Modules.Identity.AspNetCore.Endpoints.LoginRequest
 Themia.Modules.Identity.AspNetCore.Endpoints.LoginRequest.LoginRequest(string! UserName, string! Password) -> void
-Themia.Modules.Identity.AspNetCore.Endpoints.LoginRequest.UserName.get -> string!
-Themia.Modules.Identity.AspNetCore.Endpoints.LoginRequest.UserName.init -> void
 Themia.Modules.Identity.AspNetCore.Endpoints.LoginRequest.Password.get -> string!
 Themia.Modules.Identity.AspNetCore.Endpoints.LoginRequest.Password.init -> void
-Themia.Modules.Identity.AspNetCore.Endpoints.RefreshRequest
-Themia.Modules.Identity.AspNetCore.Endpoints.RefreshRequest.RefreshRequest(string! RefreshToken) -> void
-Themia.Modules.Identity.AspNetCore.Endpoints.RefreshRequest.RefreshToken.get -> string!
-Themia.Modules.Identity.AspNetCore.Endpoints.RefreshRequest.RefreshToken.init -> void
+Themia.Modules.Identity.AspNetCore.Endpoints.LoginRequest.UserName.get -> string!
+Themia.Modules.Identity.AspNetCore.Endpoints.LoginRequest.UserName.init -> void
 Themia.Modules.Identity.AspNetCore.Endpoints.LogoutRequest
 Themia.Modules.Identity.AspNetCore.Endpoints.LogoutRequest.All.get -> bool
 Themia.Modules.Identity.AspNetCore.Endpoints.LogoutRequest.All.init -> void
 Themia.Modules.Identity.AspNetCore.Endpoints.LogoutRequest.LogoutRequest(string! RefreshToken, bool All = false) -> void
 Themia.Modules.Identity.AspNetCore.Endpoints.LogoutRequest.RefreshToken.get -> string!
 Themia.Modules.Identity.AspNetCore.Endpoints.LogoutRequest.RefreshToken.init -> void
-Themia.Modules.Identity.AspNetCore.Endpoints.IdentityAuthEndpointRouteBuilderExtensions
+Themia.Modules.Identity.AspNetCore.Endpoints.RefreshRequest
+Themia.Modules.Identity.AspNetCore.Endpoints.RefreshRequest.RefreshRequest(string! RefreshToken) -> void
+Themia.Modules.Identity.AspNetCore.Endpoints.RefreshRequest.RefreshToken.get -> string!
+Themia.Modules.Identity.AspNetCore.Endpoints.RefreshRequest.RefreshToken.init -> void
+static Themia.Modules.Identity.AspNetCore.DependencyInjection.IdentityAspNetCoreServiceCollectionExtensions.AddThemiaIdentityAspNetCore(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Themia.Modules.Identity.Tokens.AspNetCore.Options.JwtOptions!>! configure) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static Themia.Modules.Identity.AspNetCore.DependencyInjection.IdentityAspNetCoreServiceCollectionExtensions.AddThemiaJwtBearer(this Microsoft.AspNetCore.Authentication.AuthenticationBuilder! builder, string? scheme = null) -> Microsoft.AspNetCore.Authentication.AuthenticationBuilder!
 static Themia.Modules.Identity.AspNetCore.Endpoints.IdentityAuthEndpointRouteBuilderExtensions.MapIdentityAuthEndpoints(this Microsoft.AspNetCore.Routing.IEndpointRouteBuilder! endpoints) -> Microsoft.AspNetCore.Routing.IEndpointRouteBuilder!
+virtual Themia.Modules.Identity.AspNetCore.Authentication.AuthenticationHooksBase.OnBeforeLoginAsync(Themia.Modules.Identity.Abstractions.Authentication.BeforeLoginContext! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+virtual Themia.Modules.Identity.AspNetCore.Authentication.AuthenticationHooksBase.OnBeforeRefreshAsync(Themia.Modules.Identity.Abstractions.Authentication.BeforeRefreshContext! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+virtual Themia.Modules.Identity.AspNetCore.Authentication.AuthenticationHooksBase.OnLoginFailedAsync(Themia.Modules.Identity.Abstractions.Authentication.LoginFailedContext! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+virtual Themia.Modules.Identity.AspNetCore.Authentication.AuthenticationHooksBase.OnLoginSucceededAsync(Themia.Modules.Identity.Abstractions.Authentication.LoginSucceededContext! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+virtual Themia.Modules.Identity.AspNetCore.Authentication.AuthenticationHooksBase.OnLogoutAsync(Themia.Modules.Identity.Abstractions.Authentication.LogoutContext! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+virtual Themia.Modules.Identity.AspNetCore.Authentication.AuthenticationHooksBase.OnRefreshSucceededAsync(Themia.Modules.Identity.Abstractions.Authentication.RefreshSucceededContext! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!

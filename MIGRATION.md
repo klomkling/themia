@@ -12,7 +12,60 @@ with the *why* and concrete upgrade steps.
 
 ## Unreleased
 
-_Nothing yet._
+### `Themia.Modules.Identity`: multi-identifier login, and a phone number that finally works
+
+**What changed:**
+
+- `IAuthenticationFlow.LoginAsync(string userName, …)` is now `LoginAsync(string identifier, …)` and
+  accepts a username, a **confirmed** email, or a **confirmed** phone number.
+- `LoginFailureReason` gained `AmbiguousIdentifier`.
+- `IUserService` gained `FindByPhoneAsync`, `SetPhoneNumberAsync` and `ConfirmPhoneNumberAsync`.
+- `UserService`'s constructor gained an `IPhoneNumberNormalizer` parameter.
+- New migration `202608050001` adds `identity.users.normalized_phone_number` and two filtered unique
+  indexes.
+
+**Why:** the login path resolved by username only, so a user typing their email got a 401 that could not
+be told apart from a wrong password — the production incident behind coord #0054. Underneath it,
+`PhoneNumber` had shipped with no normalized form, no uniqueness, no index and nothing that ever wrote
+it: storable and unusable.
+
+**How to upgrade:**
+
+- **Positional callers of `LoginAsync` need no change.** Only a named argument (`userName:`) breaks.
+- **Handle `LoginFailureReason.AmbiguousIdentifier`** if you `switch` exhaustively. It means one string
+  matched two different users, so somebody cannot log in and two accounts overlap in a way per-column
+  uniqueness cannot prevent — worth alerting on. Do not surface it to the caller; that would confirm a
+  second account holds that string.
+- **If you implement `IUserService`**, implement the three new members. If you construct `UserService`
+  directly, pass an `IPhoneNumberNormalizer` — `FormattingOnlyPhoneNumberNormalizer` is the default and
+  `AddThemiaIdentity` registers it with `TryAdd`.
+- **Nothing changes for username-only logins.** Email and phone match only when confirmed, and no
+  existing row has a normalized phone number until you set one.
+
+**⚠ THE MIGRATION FAILS IF TWO USERS ALREADY SHARE A PHONE NUMBER.** That is deliberate — creating the
+unique index is the first moment the database can tell you two accounts claim one number, and permitting
+it would leave exactly the ambiguity that makes phone login unsafe. Find them first:
+
+```sql
+-- per tenant
+SELECT tenant_id, phone_number, COUNT(*) FROM identity.users
+WHERE phone_number IS NOT NULL AND tenant_id IS NOT NULL
+GROUP BY tenant_id, phone_number HAVING COUNT(*) > 1;
+
+-- platform scope
+SELECT phone_number, COUNT(*) FROM identity.users
+WHERE phone_number IS NOT NULL AND tenant_id IS NULL
+GROUP BY phone_number HAVING COUNT(*) > 1;
+```
+
+Note this checks the raw column; the index is built on the *normalized* form, so two rows that differ
+only in formatting will collide even though this query says they are distinct.
+
+**Existing phone numbers are deliberately not backfilled.** They keep a null normalized form and are not
+login identifiers until re-set through `SetPhoneNumberAsync`. Normalizing them in the migration is
+impossible — the rule lives in your `IPhoneNumberNormalizer` and cannot be reached from there — and
+applying some other rule would write values the running application disagrees with: a row findable by the
+index but not by the code. They were unusable before this migration anyway.
 
 ## 0.12.1
 
