@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <!-- Neutral cross-framework package: MUST include net8.0 (cross-framework reuse). -->
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <PackageId>Themia.PromptPay</PackageId>
+    <Description>PromptPay QR payload construction — EMVCo TLV assembly and CRC-16 for Credit Transfer (Tag 29) and Bill Payment (Tag 30). Pure computation: no HTTP, no credentials, no clock, no I/O. QR image rendering is the application's choice and is not included.</Description>
+    <PackageTags>themia;promptpay;emvco;qr;payments;thailand</PackageTags>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+  <ItemGroup>
+    <AdditionalFiles Include="PublicAPI.Shipped.txt" />
+    <AdditionalFiles Include="PublicAPI.Unshipped.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Themia.PromptPay.Tests" />
+  </ItemGroup>
+</Project>

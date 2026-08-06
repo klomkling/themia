@@ -28,6 +28,42 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 ## [Unreleased]
 
 ### Added
+- **`Themia.PromptPay`** — PromptPay QR payload construction: EMVCo TLV assembly and CRC-16 for Credit
+  Transfer (Tag 29) and Bill Payment (Tag 30) (coord #0055, from #0052 item 4). `net8.0;net10.0`, pure
+  computation — no HTTP, no credentials, no clock, no I/O. QR **image** rendering is deliberately not
+  included; both consumers would otherwise write EMVCo TLV and CRC-16 themselves, twice, slightly
+  differently.
+
+  **The product discriminator lives on the registration, not the call.** Two products billing under one
+  Tax ID must be distinguishable, and where they are distinguished depends on what the bank issued:
+  `BillerRegistration.PerProductSuffix(taxId, suffix)` when the bank gives one suffix per product, or
+  `SharedSuffix(taxId, suffix, productPrefix)` when it gives one for both — in which case this package
+  prepends the prefix itself, so a call site never does prefix arithmetic and never omits it.
+
+  This replaces the guard originally promised on #0052 item 2, which took the biller id and suffix as
+  separate required inputs. ezy-assets pointed out that it covers one branch of two: under a shared
+  suffix both products pass the same value and the discriminator becomes a free-text prefix that nothing
+  validates — the original silent collision, with a call site that now *looks* guarded. With both
+  products' payments landing in one receiving account, that string is not a formatting convention with a
+  safety net behind it; it is the safety net. Switching branches when the bank answers is one line at the
+  composition root.
+
+  **`MaxReferenceLength` is derived, not guessed.** An EMVCo length field is two decimal digits, so Tag
+  30's whole value is capped at 99 characters, of which the AID takes 20 and a 15-digit Biller ID takes
+  19 — leaving **56** for Reference 1, or 53 once a 3-character product prefix is reserved. A Reference 2
+  lowers it further and `BillPayment` checks the exact total. A bank's own limit may be lower and is not
+  knowable from here, so nothing invents one: `maxReferenceLength` tightens it, and may only tighten.
+
+  Tag 29 rejects a mobile number that is not recognisably Thai rather than reinterpreting it — guessing
+  there does not fail, it succeeds, at whoever holds the resulting Thai number.
+
+  The wire format is pinned by golden vectors reproduced from an independent implementation and verified
+  before any of this package existed, by recomputing every checksum with a bitwise CRC written from the
+  algorithm rather than a borrowed lookup table.
+
+  **Not built: `Themia.SlipVerification`.** Verification is gated on a provider choice that has not come
+  back, and propertiezy — the consumer actually on the near path — reconciles manually through the back
+  office in their first slice. Building an adapter shape for a provider nobody has picked would be guessing.
 - **`IChallengeService.VerifyByTokenAsync` is implemented** (coord #0061) — it threw
   `NotSupportedException` on every call, because `IssueAsync` never populated a token hash. Everything
   else was already there and working: `ChallengeFormat.OpaqueToken`, `SecretGenerator`'s Base64Url
