@@ -232,6 +232,92 @@ public abstract class IdentityStoreConformanceTests
     }
 
     [Fact]
+    public async Task Confirming_email_persists_the_flag()
+    {
+        // The regression this exists for (coord #0060): consuming an EmailConfirm token returns Success
+        // but writes nothing to the user, so a verification endpoint could answer "confirmed" forever
+        // while the flag stayed false. Asserting the RESPONSE of the confirm call is exactly what failed
+        // to catch it — re-read the row.
+        await ResetAsync();
+        await using var s = NewScope(new TenantId("acme"));
+        var userId = (await s.Users.CreateAsync("hank", "pw", "hank@example.com")).UserId!.Value;
+        Assert.False((await s.Users.FindByIdAsync(userId))!.EmailConfirmed);
+
+        Assert.True(await s.Users.ConfirmEmailAsync(userId));
+
+        Assert.True((await s.Users.FindByIdAsync(userId))!.EmailConfirmed);
+    }
+
+    [Fact]
+    public async Task Confirming_email_is_refused_when_there_is_no_address()
+    {
+        await ResetAsync();
+        await using var s = NewScope(new TenantId("acme"));
+        var userId = (await s.Users.CreateAsync("ivy", "pw")).UserId!.Value;
+
+        Assert.False(await s.Users.ConfirmEmailAsync(userId));
+        Assert.False((await s.Users.FindByIdAsync(userId))!.EmailConfirmed);
+    }
+
+    [Fact]
+    public async Task Changing_the_email_clears_confirmation()
+    {
+        // A confirmed email is a login identifier. If confirmation survived a change, editing a profile
+        // to someone else's address would inherit their confirmed status and log in as them.
+        await ResetAsync();
+        await using var s = NewScope(new TenantId("acme"));
+        var userId = (await s.Users.CreateAsync("jane", "pw", "jane@example.com")).UserId!.Value;
+        Assert.True(await s.Users.ConfirmEmailAsync(userId));
+
+        Assert.Equal(SetEmailResult.Success, await s.Users.SetEmailAsync(userId, "jane.new@example.com"));
+
+        var reloaded = (await s.Users.FindByIdAsync(userId))!;
+        Assert.False(reloaded.EmailConfirmed);
+        Assert.Equal("jane.new@example.com", reloaded.Email);
+        Assert.NotNull(await s.Users.FindByEmailAsync("JANE.NEW@EXAMPLE.COM"));
+    }
+
+    [Fact]
+    public async Task Setting_an_email_another_user_holds_is_refused()
+    {
+        await ResetAsync();
+        await using var s = NewScope(new TenantId("acme"));
+        await s.Users.CreateAsync("kirk", "pw", "taken@example.com");
+        var userId = (await s.Users.CreateAsync("lana", "pw")).UserId!.Value;
+
+        Assert.Equal(SetEmailResult.Duplicate, await s.Users.SetEmailAsync(userId, "TAKEN@example.com"));
+        Assert.Null((await s.Users.FindByIdAsync(userId))!.Email);
+    }
+
+    [Fact]
+    public async Task Confirming_a_phone_number_persists_the_flag()
+    {
+        // Shipped in 0.12.2 with no behaviour test of its own — the email twin above is what surfaced it.
+        await ResetAsync();
+        await using var s = NewScope(new TenantId("acme"));
+        var userId = (await s.Users.CreateAsync("mona", "pw")).UserId!.Value;
+        Assert.Equal(SetPhoneNumberResult.Success, await s.Users.SetPhoneNumberAsync(userId, "+66 81 111 2222"));
+
+        Assert.True(await s.Users.ConfirmPhoneNumberAsync(userId));
+
+        Assert.True((await s.Users.FindByIdAsync(userId))!.PhoneNumberConfirmed);
+    }
+
+    [Fact]
+    public async Task Changing_the_phone_number_clears_confirmation()
+    {
+        await ResetAsync();
+        await using var s = NewScope(new TenantId("acme"));
+        var userId = (await s.Users.CreateAsync("nina", "pw")).UserId!.Value;
+        await s.Users.SetPhoneNumberAsync(userId, "+66811112222");
+        Assert.True(await s.Users.ConfirmPhoneNumberAsync(userId));
+
+        Assert.Equal(SetPhoneNumberResult.Success, await s.Users.SetPhoneNumberAsync(userId, "+66833334444"));
+
+        Assert.False((await s.Users.FindByIdAsync(userId))!.PhoneNumberConfirmed);
+    }
+
+    [Fact]
     public async Task Password_verifies_against_the_real_store()
     {
         await ResetAsync();
@@ -783,6 +869,10 @@ file sealed class RaceWinnerUserService(
         => inner.FindByEmailAsync(email, cancellationToken);
     public Task<User?> FindByPhoneAsync(string phoneNumber, CancellationToken cancellationToken = default)
         => inner.FindByPhoneAsync(phoneNumber, cancellationToken);
+    public Task<SetEmailResult> SetEmailAsync(Guid userId, string? email, CancellationToken cancellationToken = default)
+        => inner.SetEmailAsync(userId, email, cancellationToken);
+    public Task<bool> ConfirmEmailAsync(Guid userId, CancellationToken cancellationToken = default)
+        => inner.ConfirmEmailAsync(userId, cancellationToken);
     public Task<SetPhoneNumberResult> SetPhoneNumberAsync(Guid userId, string? phoneNumber, CancellationToken cancellationToken = default)
         => inner.SetPhoneNumberAsync(userId, phoneNumber, cancellationToken);
     public Task<bool> ConfirmPhoneNumberAsync(Guid userId, CancellationToken cancellationToken = default)
@@ -847,6 +937,10 @@ file sealed class RaceWinnerNameUserService(
         => inner.FindByEmailAsync(email, cancellationToken);
     public Task<User?> FindByPhoneAsync(string phoneNumber, CancellationToken cancellationToken = default)
         => inner.FindByPhoneAsync(phoneNumber, cancellationToken);
+    public Task<SetEmailResult> SetEmailAsync(Guid userId, string? email, CancellationToken cancellationToken = default)
+        => inner.SetEmailAsync(userId, email, cancellationToken);
+    public Task<bool> ConfirmEmailAsync(Guid userId, CancellationToken cancellationToken = default)
+        => inner.ConfirmEmailAsync(userId, cancellationToken);
     public Task<SetPhoneNumberResult> SetPhoneNumberAsync(Guid userId, string? phoneNumber, CancellationToken cancellationToken = default)
         => inner.SetPhoneNumberAsync(userId, phoneNumber, cancellationToken);
     public Task<bool> ConfirmPhoneNumberAsync(Guid userId, CancellationToken cancellationToken = default)

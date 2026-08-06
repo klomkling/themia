@@ -53,3 +53,5 @@ override Themia.Modules.Identity.Migrations.RefreshTokensMigration.Up() -> void
 Themia.Modules.Identity.Migrations.IdentityMigrations
 static Themia.Modules.Identity.DependencyInjection.IdentityServiceCollectionExtensions.AddThemiaIdentityCore(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Themia.Modules.Identity.Abstractions.IdentityModuleOptions!>? configure = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
 static Themia.Modules.Identity.Migrations.IdentityMigrations.Assembly.get -> System.Reflection.Assembly!
+Themia.Modules.Identity.Services.UserService.ConfirmEmailAsync(System.Guid userId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!
+Themia.Modules.Identity.Services.UserService.SetEmailAsync(System.Guid userId, string? email, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Identity.Abstractions.SetEmailResult>!
