@@ -101,6 +101,7 @@ public sealed class ChallengeOptions
     private int _challengeRetentionHours = 24;
     private (int Limit, TimeSpan Window) _perKeyWindow = (20, TimeSpan.FromHours(1));
     private (int Limit, TimeSpan Window)? _perKeyGlobalWindow;
+    private (int Limit, TimeSpan Window)? _tokenVerifyWindow;
     private (int Limit, TimeSpan Window) _verifyWindow = (20, TimeSpan.FromMinutes(15));
 
     /// <summary>
@@ -154,6 +155,19 @@ public sealed class ChallengeOptions
     /// only so the reservation is discoverable.
     /// </summary>
     public const string VerifyBucketPurpose = "__themia_verify__";
+
+    /// <summary>
+    /// The <see cref="ChallengeScope.Key"/> value reserved for the <see cref="TokenVerifyWindow"/>
+    /// counter rows. Exposed only so the reservation is discoverable.
+    /// </summary>
+    /// <remarks>
+    /// A reserved <em>key</em> rather than a reserved purpose, unlike the two above, because this bucket
+    /// is per purpose: hammering one purpose's token endpoint must not exhaust the ceiling for the
+    /// others. The purpose slot therefore carries the real purpose and the key slot carries this. An
+    /// adopter whose own <see cref="ChallengeScope.Key"/> is literally this string would share the
+    /// bucket; the value is shaped to make that impossible in practice rather than merely unlikely.
+    /// </remarks>
+    public const string TokenVerifyBucketKey = "__themia_token_verify__";
 
     /// <summary>
     /// The rate limit on <see cref="IChallengeService.VerifyAsync"/> for one key: at most <c>Limit</c>
@@ -249,6 +263,37 @@ public sealed class ChallengeOptions
     }
 
     /// <summary>
+    /// An optional ceiling on <see cref="IChallengeService.VerifyByTokenAsync"/> lookups, bucketed by
+    /// <c>(tenant_id, purpose)</c>. <see langword="null"/> by default, which disables it.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>This is a load bound, not a brute-force bound.</b> <see cref="VerifyWindow"/> exists because a
+    /// 6-digit code is guessable and an unthrottled verify endpoint walks that space. An opaque token is
+    /// 256 bits of <see cref="System.Security.Cryptography.RandomNumberGenerator"/> output, so guessing
+    /// is not the threat and no ceiling here is what stops it — the entropy is. What this bounds is the
+    /// store: a token that matches nothing still costs one indexed lookup, and nothing else charges for
+    /// that.
+    /// </para>
+    /// <para>
+    /// Off by default because enabling it is a real trade, not free defence in depth. The bucket cannot
+    /// be keyed on the challenge's key — a token lookup does not know the key until after it succeeds,
+    /// which is the whole reason the method exists — so it is keyed on the tenant and purpose instead.
+    /// That means one attacker hammering a tenant's verification endpoint can exhaust the ceiling and
+    /// refuse <em>legitimate</em> verifications for that tenant and purpose until the window rolls. A
+    /// lockout lever bought against a threat the entropy already handles is a bad trade for most
+    /// deployments; size it well above real link-click volume if you turn it on, and remember that email
+    /// scanners and link-preview bots fetch these URLs too.
+    /// </para>
+    /// </remarks>
+    /// <exception cref="ArgumentOutOfRangeException">Assigned a value whose <c>Limit</c> or <c>Window</c> is zero or negative.</exception>
+    public (int Limit, TimeSpan Window)? TokenVerifyWindow
+    {
+        get => _tokenVerifyWindow;
+        set => _tokenVerifyWindow = value is null ? null : PurposeOptions.ValidateWindow(value.Value);
+    }
+
+    /// <summary>
     /// Whether the background retention purge (<see cref="Internal.ChallengePurgeService"/>) runs at
     /// all. Defaults to <see langword="true"/> — this schema is new, so there is no pre-existing history
     /// enabling it could destroy, unlike an outbox where flipping this on for an existing deployment
@@ -301,6 +346,11 @@ public sealed class ChallengeOptions
         if (PerKeyGlobalWindow is { } global && global.Window > widest)
         {
             widest = global.Window;
+        }
+
+        if (TokenVerifyWindow is { } tokenVerify && tokenVerify.Window > widest)
+        {
+            widest = tokenVerify.Window;
         }
 
         foreach (var purpose in _purposes.Values)

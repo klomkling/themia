@@ -77,8 +77,8 @@ public interface IUserService
     /// it, so nothing here can check that you did.
     /// <para>
     /// Consuming an <c>IUserTokenService</c> token with <c>TokenPurpose.EmailConfirm</c> does NOT set this
-    /// flag — it only invalidates the token. Until 0.13.1 there was no way to set it at all after
-    /// creation, so a verification endpoint could consume the token, return success, and leave
+    /// flag — it only invalidates the token. Before this method existed there was no way to set it at all
+    /// after creation, so a verification endpoint could consume the token, return success, and leave
     /// <see cref="User.EmailConfirmed"/> false forever.
     /// </para>
     /// </remarks>

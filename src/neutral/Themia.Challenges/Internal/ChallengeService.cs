@@ -201,7 +201,13 @@ internal sealed class ChallengeService : IChallengeService
                     Purpose = scope.Purpose,
                     SecretHash = hash,
                     SecretSalt = salt,
-                    TokenHash = (string?)null,
+                    // Only an opaque-token challenge gets a lookup hash, and only it can afford one:
+                    // TokenHasher is deterministic (see its remarks), which is safe for 256 random bits
+                    // and would be a disclosure for a 6-digit code. A numeric row stays null here, so
+                    // VerifyByTokenAsync can never resolve one — a numeric code is not a magic link.
+                    TokenHash = purpose.Format.Kind == ChallengeFormatKind.OpaqueToken
+                        ? TokenHasher.Hash(secret)
+                        : null,
                     Attempts = 0,
                     ExpiresAt = expiresAt,
                     CreatedAt = now,
@@ -427,18 +433,92 @@ internal sealed class ChallengeService : IChallengeService
     }
 
     /// <inheritdoc />
-    /// <remarks>
-    /// Always throws — see <see cref="IChallengeService.VerifyByTokenAsync"/>'s remarks. Never touches
-    /// the dialect: <see cref="IssueAsync"/> never populates a token hash, so there is nothing to look up.
-    /// </remarks>
-    public Task<ChallengeVerifyResult> VerifyByTokenAsync(
+    public async Task<ChallengeVerifyResult> VerifyByTokenAsync(
         string token, string purpose, string? tenantId = null, CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException(
-            "VerifyByTokenAsync is not implemented in this release of Themia.Challenges: the opaque-token " +
-            "(ChallengeFormatKind.OpaqueToken) verification path has no generator wired into IssueAsync, so " +
-            "no challenge row ever carries a token hash for this method to look up. Use IssueAsync/VerifyAsync " +
-            "with ChallengeFormat.Numeric until opaque-token issuance ships.");
+        ArgumentException.ThrowIfNullOrEmpty(token);
+        ArgumentException.ThrowIfNullOrWhiteSpace(purpose);
+
+        // Throws for an unconfigured purpose, exactly as VerifyAsync does — the caller naming a purpose
+        // nobody registered is a wiring bug, not a failed verification.
+        var purposeOptions = options.GetPurpose(purpose);
+        var now = timeProvider.GetUtcNow();
+
+        // The scope every failure path reports. Nothing here learns the key unless the lookup succeeds,
+        // and inventing one would be worse than saying so.
+        var unresolved = new ChallengeScope(ChallengeScope.UnresolvedKey, purpose, tenantId);
+
+        await using var connection = dialect.CreateConnection();
+
+        // Opt-in, and a load bound rather than a brute-force bound — see TokenVerifyWindow's remarks for
+        // why it is off by default and why it cannot be keyed on the challenge's own key.
+        if (options.TokenVerifyWindow is { } tokenWindow)
+        {
+            var tokenVerifyCount = await IncrementWindowAsync(
+                connection,
+                new ChallengeScope(ChallengeOptions.TokenVerifyBucketKey, purpose, tenantId),
+                purpose,
+                FloorToWindowStart(now, tokenWindow.Window),
+                cancellationToken);
+
+            if (tokenVerifyCount > tokenWindow.Limit)
+            {
+                logger.LogInformation("Challenge token verify rate-limited for purpose {Purpose}", purpose);
+                return ChallengeVerifyResult.RateLimited(unresolved);
+            }
+        }
+
+        var row = await connection.QueryFirstOrDefaultAsync<ChallengeRow>(new CommandDefinition(
+            dialect.SelectLiveByTokenHashSql,
+            new { TokenHash = TokenHasher.Hash(token), Now = now },
+            cancellationToken: cancellationToken));
+
+        // One outcome for "no live row", "wrong purpose" and "wrong tenant", deliberately. The caller
+        // holding a token for another purpose or another tenant must not be able to tell those apart
+        // from an expired link: distinguishing them turns the endpoint into an oracle that confirms a
+        // token exists and says where it belongs.
+        if (row is null
+            || !string.Equals(row.Purpose, purpose, StringComparison.Ordinal)
+            || !string.Equals(row.TenantId, tenantId, StringComparison.Ordinal))
+        {
+            logger.LogInformation("Challenge token verify NotFound for purpose {Purpose}", purpose);
+            return ChallengeVerifyResult.NotFound(unresolved);
+        }
+
+        // From here the key is known, so results carry the real scope — see the interface remarks on what
+        // that discloses to a token holder.
+        var scope = new ChallengeScope(row.Key, row.Purpose, row.TenantId);
+
+        // MaxAttempts is meaningless on this path and is still honoured. A token lookup either finds the
+        // row or does not — there is no guessing to cap, so the counter never climbs here. But a row that
+        // was exhausted through VerifyAsync is dead for verification, and letting the same challenge
+        // succeed through its token would make the cap bypassable by changing endpoints.
+        if (row.Attempts >= purposeOptions.MaxAttempts)
+        {
+            logger.LogInformation("Challenge token verify AttemptsExhausted for purpose {Purpose}", purpose);
+            return ChallengeVerifyResult.AttemptsExhausted(scope);
+        }
+
+        // Redundant on its face — the lookup already matched a SHA-256 of the token — and kept because it
+        // is the step that decides, and it decides in constant time. The lookup narrows; this accepts.
+        if (!SecretHasher.Verify(token, row.SecretHash, row.SecretSalt))
+        {
+            logger.LogInformation("Challenge token verify Incorrect for purpose {Purpose}", purpose);
+            return ChallengeVerifyResult.Incorrect(scope);
+        }
+
+        var consumedRows = await connection.ExecuteAsync(new CommandDefinition(
+            dialect.ConsumeSql, new { row.Id, Now = now, ConsumedAt = now }, cancellationToken: cancellationToken));
+
+        // Rows-affected 0 means a concurrent verify consumed this row between the SELECT and the UPDATE.
+        // This matters more here than on the numeric path: a link in an inbox is fetched by scanners and
+        // preview bots as well as by the recipient, so genuine double-redemption is routine rather than
+        // exotic. Reporting Verified twice would let one token confirm two requests.
+        var outcome = consumedRows > 0
+            ? ChallengeVerifyResult.Verified(scope)
+            : ChallengeVerifyResult.Consumed(scope);
+        logger.LogInformation("Challenge token verify {Outcome} for purpose {Purpose}", outcome.Outcome, purpose);
+        return outcome;
     }
 
     /// <inheritdoc />
