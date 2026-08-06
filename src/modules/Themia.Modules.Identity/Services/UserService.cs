@@ -192,6 +192,54 @@ public sealed class UserService : IUserService
     }
 
     /// <inheritdoc />
+    public async Task<SetEmailResult> SetEmailAsync(Guid userId, string? email, CancellationToken cancellationToken = default)
+    {
+        var user = await IdentityScope.ResolveUserAsync(users, userId, cancellationToken).ConfigureAwait(false);
+        if (user is null)
+        {
+            return SetEmailResult.UserNotFound;
+        }
+
+        string? normalized = null;
+        if (!string.IsNullOrWhiteSpace(email))
+        {
+            normalized = IdentityScope.Normalize(email);
+            var holder = await users.FirstOrDefaultAsync(new UserByNormalizedEmailSpec(normalized), cancellationToken).ConfigureAwait(false);
+            if (holder is not null && holder.Id != user.Id)
+            {
+                return SetEmailResult.Duplicate;
+            }
+        }
+
+        user.Email = string.IsNullOrWhiteSpace(email) ? null : email.Trim();
+        user.NormalizedEmail = normalized;
+
+        // Always cleared, including when the address did not change — same reasoning as the phone number
+        // below: a confirmed email is a login identifier, so carrying confirmation across a write would
+        // let a profile edit inherit someone else's confirmed status.
+        user.EmailConfirmed = false;
+
+        users.Update(user);
+        await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        return SetEmailResult.Success;
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> ConfirmEmailAsync(Guid userId, CancellationToken cancellationToken = default)
+    {
+        var user = await IdentityScope.ResolveUserAsync(users, userId, cancellationToken).ConfigureAwait(false);
+        if (user?.NormalizedEmail is null)
+        {
+            return false;
+        }
+
+        user.EmailConfirmed = true;
+        users.Update(user);
+        await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        return true;
+    }
+
+    /// <inheritdoc />
     public async Task<SetPhoneNumberResult> SetPhoneNumberAsync(Guid userId, string? phoneNumber, CancellationToken cancellationToken = default)
     {
         var user = await IdentityScope.ResolveUserAsync(users, userId, cancellationToken).ConfigureAwait(false);

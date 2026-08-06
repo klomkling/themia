@@ -258,3 +258,9 @@ static Themia.Modules.Identity.Abstractions.Authentication.RefreshValidationResu
 static Themia.Modules.Identity.Abstractions.Authentication.RefreshValidationResult.ReuseDetected() -> Themia.Modules.Identity.Abstractions.Authentication.RefreshValidationResult
 static Themia.Modules.Identity.Abstractions.Authentication.RefreshValidationResult.Success(Themia.Modules.Identity.Abstractions.Entities.User! user, Themia.Modules.Identity.Abstractions.Authentication.RefreshIssue replacement) -> Themia.Modules.Identity.Abstractions.Authentication.RefreshValidationResult
 static Themia.Modules.Identity.Abstractions.Entities.UserLockoutExtensions.IsLockedOut(this Themia.Modules.Identity.Abstractions.Entities.User! user, System.DateTimeOffset now) -> bool
+Themia.Modules.Identity.Abstractions.IUserService.ConfirmEmailAsync(System.Guid userId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!
+Themia.Modules.Identity.Abstractions.IUserService.SetEmailAsync(System.Guid userId, string? email, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Identity.Abstractions.SetEmailResult>!
+Themia.Modules.Identity.Abstractions.SetEmailResult
+Themia.Modules.Identity.Abstractions.SetEmailResult.Duplicate = 2 -> Themia.Modules.Identity.Abstractions.SetEmailResult
+Themia.Modules.Identity.Abstractions.SetEmailResult.Success = 0 -> Themia.Modules.Identity.Abstractions.SetEmailResult
+Themia.Modules.Identity.Abstractions.SetEmailResult.UserNotFound = 1 -> Themia.Modules.Identity.Abstractions.SetEmailResult

@@ -47,6 +47,20 @@ public enum SetPhoneNumberResult
     Duplicate,
 }
 
+/// <summary>The outcome of setting a user's email address.</summary>
+/// <remarks>Shaped like <see cref="SetPhoneNumberResult"/>, and for the same reasons — see its remarks.</remarks>
+public enum SetEmailResult
+{
+    /// <summary>The address was stored (or cleared) and <c>EmailConfirmed</c> was reset to false.</summary>
+    Success,
+
+    /// <summary>No such user in the ambient tenant or the platform scope.</summary>
+    UserNotFound,
+
+    /// <summary>Another user in the same scope already holds this address in its normalized form.</summary>
+    Duplicate,
+}
+
 /// <summary>The outcome of consuming a user token.</summary>
 public enum TokenConsumeResult
 {

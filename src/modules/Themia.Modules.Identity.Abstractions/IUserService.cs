@@ -54,6 +54,39 @@ public interface IUserService
     /// <returns>The user, or null.</returns>
     Task<User?> FindByPhoneAsync(string phoneNumber, CancellationToken cancellationToken = default);
 
+    /// <summary>Sets (or replaces) a user's email address, storing its normalized form and clearing
+    /// <see cref="User.EmailConfirmed"/>.</summary>
+    /// <remarks>
+    /// Confirmation is always cleared, including when the address is unchanged, for the reason given on
+    /// <see cref="SetPhoneNumberAsync"/>: an email is confirmed by proving control of it, and since 0.12.2
+    /// a confirmed email is a login identifier. Carrying the flag across a change would let anyone who can
+    /// edit a profile inherit someone else's confirmed status and log in as them. Confirm again through
+    /// <see cref="ConfirmEmailAsync"/>.
+    /// </remarks>
+    /// <param name="userId">The user id.</param>
+    /// <param name="email">The address as entered, or <see langword="null"/> to remove it.</param>
+    /// <param name="cancellationToken">A cancellation token.</param>
+    /// <returns>The outcome — see <see cref="SetEmailResult"/>.</returns>
+    Task<SetEmailResult> SetEmailAsync(Guid userId, string? email, CancellationToken cancellationToken = default);
+
+    /// <summary>Marks a user's email address as confirmed.</summary>
+    /// <remarks>
+    /// <b>Themia does not verify the address for you and this method asserts nothing about it.</b> Call it
+    /// only after your own proof of control has succeeded — a one-time code or link delivered to that
+    /// address, for which <c>Themia.Challenges</c> exists. Identity deliberately takes no dependency on
+    /// it, so nothing here can check that you did.
+    /// <para>
+    /// Consuming an <c>IUserTokenService</c> token with <c>TokenPurpose.EmailConfirm</c> does NOT set this
+    /// flag — it only invalidates the token. Until 0.13.1 there was no way to set it at all after
+    /// creation, so a verification endpoint could consume the token, return success, and leave
+    /// <see cref="User.EmailConfirmed"/> false forever.
+    /// </para>
+    /// </remarks>
+    /// <param name="userId">The user id.</param>
+    /// <param name="cancellationToken">A cancellation token.</param>
+    /// <returns><see langword="true"/> when the user was found and has an email address to confirm.</returns>
+    Task<bool> ConfirmEmailAsync(Guid userId, CancellationToken cancellationToken = default);
+
     /// <summary>Sets (or replaces) a user's phone number, storing its normalized form and clearing
     /// <see cref="User.PhoneNumberConfirmed"/>.</summary>
     /// <remarks>

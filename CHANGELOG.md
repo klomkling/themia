@@ -27,7 +27,33 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
-_Nothing yet._
+### Added
+- **`IUserService.ConfirmEmailAsync`** (coord #0060) — email verification could not be completed through
+  the public surface. `EmailConfirmed` was writable only as an argument to `CreateExternalUserAsync`, so
+  after creation nothing could set it. Consuming an `IUserTokenService` token with
+  `TokenPurpose.EmailConfirm` invalidates the token and writes nothing to the user, which means the
+  framework shipped the exact token purpose the flow needs and then no way to act on a successful consume.
+
+  propertiezy shipped a `POST /auth/email/verify` that consumed the token and answered "Email confirmed
+  successfully" while `EmailConfirmed` stayed false forever. Nothing failed, nothing logged, and no test
+  caught it, because the endpoint's observable behaviour was exactly what a working implementation
+  produces. Their workaround reached past the service layer to write the identity-owned `User` entity from
+  application code.
+
+  The gap was ours twice over: 0.12.2 added `SetPhoneNumberAsync` **and** `ConfirmPhoneNumberAsync` for the
+  phone axis while `TokenPurpose.EmailConfirm` — which predates both — kept no setter at all, and
+  `ConfirmPhoneNumberAsync` itself shipped with no behaviour test. Both axes are now covered by conformance
+  tests that re-read the row rather than asserting the call's return value.
+
+- **`IUserService.SetEmailAsync`** — not requested, and shipped anyway because `ConfirmEmailAsync` alone
+  would have been the same half-a-pair mistake reported above. Since 0.12.2 a **confirmed email is a login
+  identifier**, and with no service method to change an address an adopter changes it by writing the entity
+  directly — which leaves `EmailConfirmed` true across the change. Editing a profile to another user's
+  address would then inherit their confirmed status and log in as them.
+
+  `SetEmailAsync` normalizes, rejects an address another user in the scope already holds
+  (`SetEmailResult.Duplicate`), and **always clears `EmailConfirmed`**, including when the address is
+  unchanged — the same rule and the same reasoning as `SetPhoneNumberAsync`.
 
 ## [0.13.0] - 2026-08-05
 
