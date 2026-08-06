@@ -112,3 +112,7 @@ static Themia.Challenges.ChallengeVerifyResult.NotFound(Themia.Challenges.Challe
 static Themia.Challenges.ChallengeVerifyResult.RateLimited(Themia.Challenges.ChallengeScope! scope) -> Themia.Challenges.ChallengeVerifyResult!
 static Themia.Challenges.ChallengeVerifyResult.Verified(Themia.Challenges.ChallengeScope! scope) -> Themia.Challenges.ChallengeVerifyResult!
 static Themia.Challenges.DependencyInjection.ChallengeServiceCollectionExtensions.AddThemiaChallenges(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Themia.Challenges.ChallengeOptions!>! configure) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+Themia.Challenges.ChallengeOptions.TokenVerifyWindow.get -> (int Limit, System.TimeSpan Window)?
+Themia.Challenges.ChallengeOptions.TokenVerifyWindow.set -> void
+const Themia.Challenges.ChallengeOptions.TokenVerifyBucketKey = "__themia_token_verify__" -> string!
+const Themia.Challenges.ChallengeScope.UnresolvedKey = "__themia_unresolved__" -> string!

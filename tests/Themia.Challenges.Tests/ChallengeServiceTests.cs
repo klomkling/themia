@@ -566,13 +566,63 @@ public sealed class ChallengeServiceTests : IDisposable
         Assert.Equal(ChallengeIssueOutcome.Issued, tenantBResult.Outcome);
     }
 
-    // ---- Opaque token (unshipped) ----------------------------------------------------------------------
+    // ---- Opaque token / magic link -----------------------------------------------------------------
+
+    // Replaces VerifyByToken_ShouldThrowNotSupported_InV1, which pinned the unconditional
+    // NotSupportedException the method threw until coord #0061 wired the opaque-token path up. The
+    // behaviour it asserted was deliberately removed, so the test is replaced rather than deleted —
+    // the store-level outcomes live in ChallengeStoreTests against all three engines.
 
     [Fact]
-    public async Task VerifyByToken_ShouldThrowNotSupported_InV1()
+    public async Task VerifyByToken_ShouldResolveTheKey_TheCallerNeverSupplied()
     {
-        var service = CreateService(o => o.ConfigurePurpose("login", p => Configure(p)));
+        var service = CreateService(o => o.ConfigurePurpose("magic-link", p => ConfigureToken(p)));
+        var scope = new ChallengeScope("user-42", "magic-link", "tenantA");
+        var issue = await service.IssueAsync(scope);
 
-        await Assert.ThrowsAsync<NotSupportedException>(() => service.VerifyByTokenAsync("some-token", "login"));
+        var result = await service.VerifyByTokenAsync(issue.Secret!, "magic-link", "tenantA");
+
+        Assert.Equal(ChallengeVerifyOutcome.Verified, result.Outcome);
+        Assert.Equal("user-42", result.Scope.Key);
+    }
+
+    [Fact]
+    public async Task VerifyByToken_ShouldNotResolve_ANumericChallenge()
+    {
+        // A numeric row stores no lookup hash: the hash has to be deterministic to be a lookup key, and a
+        // deterministic digest of a 6-digit code recovers the code.
+        var service = CreateService(o => o.ConfigurePurpose("login", p => Configure(p)));
+        var issue = await service.IssueAsync(new ChallengeScope("user-42", "login", "tenantA"));
+
+        var result = await service.VerifyByTokenAsync(issue.Secret!, "login", "tenantA");
+
+        Assert.Equal(ChallengeVerifyOutcome.NotFound, result.Outcome);
+    }
+
+    [Fact]
+    public async Task VerifyByToken_ShouldNotDiscloseAKey_WhenNothingResolves()
+    {
+        var service = CreateService(o => o.ConfigurePurpose("magic-link", p => ConfigureToken(p)));
+
+        var result = await service.VerifyByTokenAsync("no-such-token", "magic-link", "tenantA");
+
+        Assert.Equal(ChallengeVerifyOutcome.NotFound, result.Outcome);
+        Assert.Equal(ChallengeScope.UnresolvedKey, result.Scope.Key);
+    }
+
+    [Fact]
+    public async Task VerifyByToken_ShouldThrow_ForAnUnconfiguredPurpose()
+    {
+        // Same as VerifyAsync: naming a purpose nobody registered is a wiring bug, not a failed verify.
+        var service = CreateService(o => o.ConfigurePurpose("magic-link", p => ConfigureToken(p)));
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => service.VerifyByTokenAsync("some-token", "never-configured"));
+    }
+
+    private static void ConfigureToken(PurposeOptions p)
+    {
+        Configure(p);
+        p.Format = ChallengeFormat.OpaqueToken(32);
     }
 }

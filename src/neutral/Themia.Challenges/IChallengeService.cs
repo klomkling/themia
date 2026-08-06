@@ -40,16 +40,38 @@ public interface IChallengeService
     /// token, not the original key and purpose.
     /// </summary>
     /// <remarks>
-    /// <b>Not implemented in v1.</b> <see cref="IssueAsync"/> never populates a token hash, so there is
-    /// nothing this method could look up; always throws <see cref="NotSupportedException"/> rather than
-    /// <see cref="ChallengeVerifyOutcome.NotFound"/>, which would read as an expired or already-used
-    /// token and send an adopter debugging their own storage for a feature that was never wired up.
+    /// <b>Only resolves challenges issued with <see cref="ChallengeFormat.OpaqueToken"/>.</b> A numeric
+    /// challenge stores no lookup hash, so it can never be found here — a 6-digit code is not a magic
+    /// link, and one that could be redeemed without naming its key would be guessable by anyone.
+    /// <para>
+    /// <b>⚠ Redeem on POST, never on GET.</b> Email scanners, security gateways and link-preview bots
+    /// fetch every URL in a message before the recipient sees it, and this method consumes the challenge.
+    /// A verification page that redeems in its GET handler burns the token on the scanner's fetch and
+    /// shows the real user "invalid or expired". Render a confirm page on GET; call this from the POST
+    /// behind the user's click. A token-only link makes this worse than a link carrying a key, because
+    /// there is nothing else in the URL for the endpoint to be cautious about.
+    /// </para>
+    /// <para>
+    /// <b>A successful result discloses the key.</b> <see cref="ChallengeVerifyResult.Scope"/> is
+    /// populated on <see cref="ChallengeVerifyOutcome.Verified"/> — that is the point, since the caller
+    /// has no other way to learn which principal the token belongs to. Anyone holding a valid token
+    /// therefore learns the key. That is fine when the key is a user id its holder already owns; do not
+    /// use this path when the key is itself sensitive. Every failing outcome reports
+    /// <see cref="ChallengeScope.UnresolvedKey"/> instead.
+    /// </para>
+    /// <para>
+    /// Brute force is bounded by the token's entropy, not by a rate limit —
+    /// <see cref="ChallengeOptions.VerifyWindow"/> does not apply here because it is keyed on the
+    /// challenge's key, which this path does not know until after it has succeeded.
+    /// <see cref="ChallengeOptions.TokenVerifyWindow"/> is the optional ceiling on store load; see its
+    /// remarks for why it is off by default.
+    /// </para>
     /// </remarks>
     /// <param name="token">The plaintext token submitted by the caller.</param>
-    /// <param name="purpose">Asserted against the found row; a mismatch is treated as not found (not implemented in v1, so unreachable today).</param>
-    /// <param name="tenantId">Asserted against the found row; a mismatch is treated as not found (not implemented in v1, so unreachable today).</param>
+    /// <param name="purpose">Asserted against the found row; a mismatch is reported as not found, indistinguishable from an expired link.</param>
+    /// <param name="tenantId">Asserted against the found row; a mismatch is reported as not found, indistinguishable from an expired link.</param>
     /// <param name="cancellationToken">Cancels the underlying store operations.</param>
-    /// <exception cref="NotSupportedException">Always — the opaque-token format has no generator in v1.</exception>
+    /// <exception cref="InvalidOperationException"><paramref name="purpose"/> was never configured via <see cref="ChallengeOptions.ConfigurePurpose"/>.</exception>
     Task<ChallengeVerifyResult> VerifyByTokenAsync(
         string token, string purpose, string? tenantId = null, CancellationToken cancellationToken = default);
 

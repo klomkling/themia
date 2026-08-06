@@ -52,6 +52,14 @@ public abstract class ChallengeEngineFixture : IAsyncLifetime
     /// <summary>The per-key ceiling <see cref="CreateServiceWithTightKeyCeiling"/> configures.</summary>
     public const int TightPerKeyLimit = 3;
 
+    /// <summary>A purpose issuing <see cref="ChallengeFormat.OpaqueToken"/> secrets, so the magic-link
+    /// path (<see cref="IChallengeService.VerifyByTokenAsync"/>) has rows it can actually resolve.</summary>
+    public const string TokenPurpose = "token-link";
+
+    /// <summary>A second opaque-token purpose, so "a token does not verify under another purpose" is
+    /// testable against a purpose that is itself token-shaped rather than against a numeric one.</summary>
+    public const string OtherTokenPurpose = "token-link-other";
+
     private ServiceProvider provider = null!;
 
     /// <summary>The live <see cref="IChallengeService"/>, resolved from DI exactly as an adopter would —
@@ -153,6 +161,28 @@ public abstract class ChallengeEngineFixture : IAsyncLifetime
         options.ConfigurePurpose(GenericPurpose, p => p.PerScopeWindow = (1_000, TimeSpan.FromMinutes(15)));
         options.ConfigurePurpose(ConcurrencyPurpose, p => p.PerScopeWindow = (1_000, TimeSpan.FromMinutes(15)));
         options.ConfigurePurpose(TightPurpose, p => p.PerScopeWindow = (1_000, TimeSpan.FromMinutes(15)));
+        options.ConfigurePurpose(TokenPurpose, p =>
+        {
+            p.Format = ChallengeFormat.OpaqueToken(32);
+            p.PerScopeWindow = (1_000, TimeSpan.FromMinutes(15));
+        });
+        options.ConfigurePurpose(OtherTokenPurpose, p =>
+        {
+            p.Format = ChallengeFormat.OpaqueToken(32);
+            p.PerScopeWindow = (1_000, TimeSpan.FromMinutes(15));
+        });
+    }
+
+    /// <summary>
+    /// A service whose <see cref="ChallengeOptions.TokenVerifyWindow"/> is set tight, for the one test
+    /// that exercises the opt-in token-verify ceiling. Off on the shared service, as it ships.
+    /// </summary>
+    public IChallengeService CreateServiceWithTightTokenVerifyCeiling(int limit)
+    {
+        var tight = new ChallengeOptions();
+        ConfigurePurposes(tight);
+        tight.TokenVerifyWindow = (limit, TimeSpan.FromHours(1));
+        return new ChallengeService(Dialect, tight, TimeProvider, NullLogger<ChallengeService>.Instance);
     }
 }
 

@@ -22,6 +22,18 @@ public sealed record ChallengeScope(string Key, string Purpose, string? TenantId
     public const int MaxTenantIdLength = 100;
 
     /// <summary>
+    /// The <see cref="Key"/> carried by a <see cref="ChallengeVerifyResult"/> whose challenge was never
+    /// resolved — every failing outcome of <see cref="IChallengeService.VerifyByTokenAsync"/>.
+    /// </summary>
+    /// <remarks>
+    /// A token lookup that finds nothing has learned nothing, and <see cref="Key"/> cannot be empty. The
+    /// alternative — echoing back some part of the caller's input — would read like a resolved key and
+    /// invite a caller to act on it. Compare against this constant rather than testing the outcome if you
+    /// need to know whether <see cref="ChallengeVerifyResult.Scope"/> is real.
+    /// </remarks>
+    public const string UnresolvedKey = "__themia_unresolved__";
+
+    /// <summary>
     /// The opaque key — a phone number, an email address, a user id. Never parsed, but bounded: a key
     /// longer than <see cref="MaxKeyLength"/> is rejected here rather than reaching a dialect.
     /// </summary>

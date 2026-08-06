@@ -28,6 +28,41 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 ## [Unreleased]
 
 ### Added
+- **`IChallengeService.VerifyByTokenAsync` is implemented** (coord #0061) — it threw
+  `NotSupportedException` on every call, because `IssueAsync` never populated a token hash. Everything
+  else was already there and working: `ChallengeFormat.OpaqueToken`, `SecretGenerator`'s Base64Url
+  generator, the `token_hash` column, `ix_challenges_token_hash`, and `SelectLiveByTokenHashSql` on all
+  three dialects. Two wires were missing.
+
+  **The surface misled in both directions.** Reflecting over the assembly showed `ChallengeFormat.OpaqueToken`
+  and `VerifyByTokenAsync` side by side with nothing indicating either was inert, so a consumer trusting
+  the public surface ships a guaranteed 500 on their verification endpoint — propertiezy found the throw
+  by decompiling. Meanwhile #0056's "v1 ships numeric codes only" read as if opaque tokens were absent
+  altogether, when issuance worked fine.
+
+  Behaviour worth knowing before you use it:
+  - **A numeric challenge can never be resolved here.** Only `OpaqueToken` rows carry a lookup hash. The
+    hash has to be deterministic to be a lookup key, and a deterministic digest of a 6-digit code is a
+    disclosure — so numeric keeps the salted PBKDF2 and stores nothing to look up.
+  - **Wrong purpose and wrong tenant report `NotFound`,** indistinguishable from an expired link.
+    Telling them apart would confirm a token exists and say where it belongs.
+  - **Success discloses the key** through `ChallengeVerifyResult.Scope` — that is the point, since the
+    caller has no other way to learn which principal a token-only link belongs to. Fine when the key is a
+    user id its holder already owns; do not use this path when the key is itself sensitive. Every failing
+    outcome reports `ChallengeScope.UnresolvedKey`.
+  - **⚠ Redeem on POST, never on GET.** Email scanners and link-preview bots fetch every URL in a message
+    before the recipient does, and this method consumes the challenge — so a page that redeems in its GET
+    handler burns the token on the scanner's fetch and shows the real user "invalid or expired".
+    propertiezy hit exactly this on their own verify page; the warning is in the XML docs because
+    consumers will otherwise get it wrong.
+
+- **`ChallengeOptions.TokenVerifyWindow`** — an optional ceiling on token lookups, bucketed by
+  `(tenant_id, purpose)`. **Null by default**, and deliberately so: brute force here is bounded by 256
+  bits of entropy, not by a rate limit, so this bounds store load only. It also cannot be keyed on the
+  challenge's key — a token lookup does not know the key until it succeeds, which is the whole reason the
+  method exists — so enabling it lets one attacker exhaust a tenant's ceiling and refuse *legitimate*
+  verifications until the window rolls. That is a bad trade against a threat the entropy already handles.
+
 - **`IUserService.ConfirmEmailAsync`** (coord #0060) — email verification could not be completed through
   the public surface. `EmailConfirmed` was writable only as an argument to `CreateExternalUserAsync`, so
   after creation nothing could set it. Consuming an `IUserTokenService` token with
