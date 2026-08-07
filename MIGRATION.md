@@ -14,6 +14,32 @@ with the *why* and concrete upgrade steps.
 
 _Nothing yet._
 
+## 0.14.0
+
+### `IUserService` gained two members
+
+**What changed:** `IUserService` gained `SetEmailAsync` and `ConfirmEmailAsync`.
+
+**Why:** email verification could not be completed through the public surface at all — `EmailConfirmed`
+was writable only as an argument to `CreateExternalUserAsync`, and consuming a `TokenPurpose.EmailConfirm`
+token invalidates the token while writing nothing to the user. A consumer shipped an endpoint that
+answered "Email confirmed successfully" while the flag stayed false forever (coord #0060).
+
+`SetEmailAsync` was not requested and ships anyway: since 0.12.2 a **confirmed email is a login
+identifier**, and with no service method to change an address an adopter changes it by writing the entity
+directly — which leaves `EmailConfirmed` true across the change, so editing a profile to another user's
+address inherits their confirmed status. It always clears confirmation, like `SetPhoneNumberAsync`.
+
+**How to upgrade:**
+
+- **If you resolve `IUserService` from DI, nothing changes.** `UserService` implements both.
+- **If you implement `IUserService` yourself — including test doubles and decorators — you must add both
+  members.** This is a compile error (CS0535), not a silent break. Themia's own three test doubles broke
+  on this change, so a fake in your suite very likely will too.
+- **If you already flip `EmailConfirmed` by writing the `User` entity directly, replace that with
+  `ConfirmEmailAsync`**, and replace any direct email write with `SetEmailAsync` — a hand-rolled email
+  change that leaves `EmailConfirmed` set is the takeover path described above.
+
 ## 0.13.0
 
 ### `Themia.Modules.Identity` splits into engine packages
