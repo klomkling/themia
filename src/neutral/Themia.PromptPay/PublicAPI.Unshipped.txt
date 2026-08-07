@@ -1,0 +1,18 @@
+#nullable enable
+Themia.PromptPay.BillerRegistration
+Themia.PromptPay.BillerRegistration.BillerId.get -> string!
+Themia.PromptPay.BillerRegistration.MaxReferenceLength.get -> int
+Themia.PromptPay.BillerRegistration.ProductPrefix.get -> string?
+Themia.PromptPay.PromptPayProxy
+Themia.PromptPay.PromptPayQr
+const Themia.PromptPay.BillerRegistration.SuffixLength = 2 -> int
+const Themia.PromptPay.BillerRegistration.TaxIdLength = 13 -> int
+const Themia.PromptPay.PromptPayQr.BillPaymentAid = "A000000677010112" -> string!
+const Themia.PromptPay.PromptPayQr.CreditTransferAid = "A000000677010111" -> string!
+static Themia.PromptPay.BillerRegistration.PerProductSuffix(string! taxId, string! suffix, int? maxReferenceLength = null) -> Themia.PromptPay.BillerRegistration!
+static Themia.PromptPay.BillerRegistration.SharedSuffix(string! taxId, string! suffix, string! productPrefix, int? maxReferenceLength = null) -> Themia.PromptPay.BillerRegistration!
+static Themia.PromptPay.PromptPayProxy.EWalletId(string! eWalletId) -> Themia.PromptPay.PromptPayProxy!
+static Themia.PromptPay.PromptPayProxy.MobileNumber(string! mobileNumber) -> Themia.PromptPay.PromptPayProxy!
+static Themia.PromptPay.PromptPayProxy.NationalId(string! nationalOrTaxId) -> Themia.PromptPay.PromptPayProxy!
+static Themia.PromptPay.PromptPayQr.BillPayment(Themia.PromptPay.BillerRegistration! biller, string! reference, decimal? amount = null, string? reference2 = null) -> string!
+static Themia.PromptPay.PromptPayQr.CreditTransfer(Themia.PromptPay.PromptPayProxy! proxy, decimal? amount = null) -> string!
