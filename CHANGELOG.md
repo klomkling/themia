@@ -27,6 +27,10 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+_Nothing yet._
+
+## [0.14.1] - 2026-08-08
+
 ### Added
 - **`ChallengeIssueResult.RetryAfter` and `ChallengeVerifyResult.RetryAfter`** (coord #0064) — a
   `RateLimited` result now carries how long until the refused window resets. Without it an adopter could
