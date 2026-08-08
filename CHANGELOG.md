@@ -27,6 +27,10 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+_Nothing yet._
+
+## [0.15.0] - 2026-08-08
+
 ### Added
 - **Quartz clustering and a persistent execution-history store, both opt-in** (coord #0071, part 2).
 
