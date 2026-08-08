@@ -64,8 +64,10 @@ public enum ChallengeVerifyOutcome
 /// <summary>The result of issuing a challenge.</summary>
 public sealed class ChallengeIssueResult
 {
-    private ChallengeIssueResult(ChallengeIssueOutcome outcome, Guid? challengeId, string? secret, DateTimeOffset? expiresAt)
+    private ChallengeIssueResult(
+        ChallengeIssueOutcome outcome, Guid? challengeId, string? secret, DateTimeOffset? expiresAt, TimeSpan? retryAfter = null)
     {
+        RetryAfter = retryAfter;
         Outcome = outcome;
         ChallengeId = challengeId;
         Secret = secret;
@@ -99,6 +101,35 @@ public sealed class ChallengeIssueResult
     /// </summary>
     public Guid? ChallengeId { get; }
 
+    /// <summary>
+    /// How long until the refused window resets, or <see langword="null"/> when it could not be
+    /// determined. Set only when <see cref="Outcome"/> is <see cref="ChallengeIssueOutcome.RateLimited"/>.
+    /// </summary>
+    /// <remarks>
+    /// <b>⚠ Emitting this to an anonymous caller that supplied the identifier leaks membership.</b>
+    /// "Rate limited, retry in 43 seconds" is only reachable for a key that has a live window, which
+    /// means the phone number or email address is registered — so a password-reset, resend-verification
+    /// or send-OTP endpoint that answers uniformly today becomes an account-enumeration oracle the
+    /// moment it surfaces this. Surface it where the caller already knows the account exists: an
+    /// authenticated session, or a signing token that already names the principal. This is data, never
+    /// policy — nothing in Themia turns it into a status code or a header for you, deliberately, so
+    /// adopting a version cannot flip an endpoint from uniform to distinguishable with no diff on your
+    /// side.
+    /// <para>
+    /// <b><see langword="null"/> means "not determined", not "retry now".</b> Do not substitute
+    /// <c>?? 0</c> or <c>?? 60</c> — a hardcoded fallback is exactly the client-side guess that drifts
+    /// from the server's real window the moment anyone tunes it, which is the defect this property
+    /// exists to remove. Omit the <c>Retry-After</c> header entirely and answer without a countdown.
+    /// </para>
+    /// <para>
+    /// The value is the time until the <em>latest-resetting</em> window that is currently over its
+    /// limit, since every configured layer must be under its ceiling before the next call can succeed.
+    /// Windows are bucketed by start time rather than rolling, so a caller may occasionally succeed
+    /// slightly sooner than this; it never succeeds later.
+    /// </para>
+    /// </remarks>
+    public TimeSpan? RetryAfter { get; }
+
     /// <summary>Whether a secret was issued.</summary>
     public bool Succeeded => Outcome == ChallengeIssueOutcome.Issued;
 
@@ -120,18 +151,29 @@ public sealed class ChallengeIssueResult
         return new ChallengeIssueResult(ChallengeIssueOutcome.Issued, challengeId, secret, expiresAt);
     }
 
-    /// <summary>Creates a <see cref="ChallengeIssueOutcome.RateLimited"/> result.</summary>
-    /// <returns>A rate-limited result. No secret is generated.</returns>
+    /// <summary>Creates a <see cref="ChallengeIssueOutcome.RateLimited"/> result with no reset estimate.</summary>
+    /// <returns>A rate-limited result whose <see cref="RetryAfter"/> is <see langword="null"/>. No secret is generated.</returns>
     public static ChallengeIssueResult RateLimited() => new(ChallengeIssueOutcome.RateLimited, null, null, null);
+
+    /// <summary>Creates a <see cref="ChallengeIssueOutcome.RateLimited"/> result carrying the window's reset.</summary>
+    /// <param name="retryAfter">Time until the refused window resets. Read <see cref="RetryAfter"/> before surfacing it.</param>
+    /// <returns>A rate-limited result. No secret is generated.</returns>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="retryAfter"/> is negative.</exception>
+    public static ChallengeIssueResult RateLimited(TimeSpan retryAfter)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(retryAfter, TimeSpan.Zero);
+        return new ChallengeIssueResult(ChallengeIssueOutcome.RateLimited, null, null, null, retryAfter);
+    }
 }
 
 /// <summary>The result of verifying a challenge.</summary>
 public sealed class ChallengeVerifyResult
 {
-    private ChallengeVerifyResult(ChallengeVerifyOutcome outcome, ChallengeScope scope)
+    private ChallengeVerifyResult(ChallengeVerifyOutcome outcome, ChallengeScope scope, TimeSpan? retryAfter = null)
     {
         Outcome = outcome;
         Scope = scope;
+        RetryAfter = retryAfter;
     }
 
     /// <summary>How the verify attempt ended. Switch over this rather than reading <see cref="Succeeded"/>
@@ -140,6 +182,35 @@ public sealed class ChallengeVerifyResult
 
     /// <summary>The scope that was verified against.</summary>
     public ChallengeScope Scope { get; }
+
+    /// <summary>
+    /// How long until the refused window resets, or <see langword="null"/> when it could not be
+    /// determined. Set only when <see cref="Outcome"/> is <see cref="ChallengeVerifyOutcome.RateLimited"/>.
+    /// </summary>
+    /// <remarks>
+    /// <b>⚠ Emitting this to an anonymous caller that supplied the identifier leaks membership.</b>
+    /// "Rate limited, retry in 43 seconds" is only reachable for a key that has a live window, which
+    /// means the phone number or email address is registered — so a password-reset, resend-verification
+    /// or send-OTP endpoint that answers uniformly today becomes an account-enumeration oracle the
+    /// moment it surfaces this. Surface it where the caller already knows the account exists: an
+    /// authenticated session, or a signing token that already names the principal. This is data, never
+    /// policy — nothing in Themia turns it into a status code or a header for you, deliberately, so
+    /// adopting a version cannot flip an endpoint from uniform to distinguishable with no diff on your
+    /// side.
+    /// <para>
+    /// <b><see langword="null"/> means "not determined", not "retry now".</b> Do not substitute
+    /// <c>?? 0</c> or <c>?? 60</c> — a hardcoded fallback is exactly the client-side guess that drifts
+    /// from the server's real window the moment anyone tunes it, which is the defect this property
+    /// exists to remove. Omit the <c>Retry-After</c> header entirely and answer without a countdown.
+    /// </para>
+    /// <para>
+    /// The value is the time until the <em>latest-resetting</em> window that is currently over its
+    /// limit, since every configured layer must be under its ceiling before the next call can succeed.
+    /// Windows are bucketed by start time rather than rolling, so a caller may occasionally succeed
+    /// slightly sooner than this; it never succeeds later.
+    /// </para>
+    /// </remarks>
+    public TimeSpan? RetryAfter { get; }
 
     /// <summary>Whether the submitted secret was correct.</summary>
     public bool Succeeded => Outcome == ChallengeVerifyOutcome.Verified;
@@ -169,10 +240,25 @@ public sealed class ChallengeVerifyResult
     /// <returns>An attempts-exhausted result.</returns>
     public static ChallengeVerifyResult AttemptsExhausted(ChallengeScope scope) => new(ChallengeVerifyOutcome.AttemptsExhausted, scope);
 
-    /// <summary>Creates a <see cref="ChallengeVerifyOutcome.RateLimited"/> result.</summary>
+    /// <summary>Creates a <see cref="ChallengeVerifyOutcome.RateLimited"/> result with no reset estimate.</summary>
     /// <param name="scope">The scope whose verification was refused.</param>
-    /// <returns>A rate-limited result. No challenge was read.</returns>
+    /// <returns>A rate-limited result whose <see cref="RetryAfter"/> is <see langword="null"/>. No challenge was read.</returns>
     public static ChallengeVerifyResult RateLimited(ChallengeScope scope) => new(ChallengeVerifyOutcome.RateLimited, scope);
+
+    /// <summary>Creates a <see cref="ChallengeVerifyOutcome.RateLimited"/> result carrying the window's reset.</summary>
+    /// <remarks>
+    /// The enumeration warning on <see cref="RetryAfter"/> is sharper here than on issuance: a verify
+    /// refusal is reachable by submitting <em>any</em> wrong code, with no valid one needed.
+    /// </remarks>
+    /// <param name="scope">The scope whose verification was refused.</param>
+    /// <param name="retryAfter">Time until the verify window resets.</param>
+    /// <returns>A rate-limited result. No challenge was read.</returns>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="retryAfter"/> is negative.</exception>
+    public static ChallengeVerifyResult RateLimited(ChallengeScope scope, TimeSpan retryAfter)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(retryAfter, TimeSpan.Zero);
+        return new ChallengeVerifyResult(ChallengeVerifyOutcome.RateLimited, scope, retryAfter);
+    }
 
     /// <summary>Creates a <see cref="ChallengeVerifyOutcome.NotFound"/> result.</summary>
     /// <param name="scope">The scope that was verified.</param>
