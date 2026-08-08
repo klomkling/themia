@@ -27,6 +27,10 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+_Nothing yet._
+
+## [0.14.0] - 2026-08-08
+
 ### Added
 - **`Themia.PromptPay`** — PromptPay QR payload construction: EMVCo TLV assembly and CRC-16 for Credit
   Transfer (Tag 29) and Bill Payment (Tag 30) (coord #0055, from #0052 item 4). `net8.0;net10.0`, pure
@@ -99,7 +103,7 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
   method exists — so enabling it lets one attacker exhaust a tenant's ceiling and refuse *legitimate*
   verifications until the window rolls. That is a bad trade against a threat the entropy already handles.
 
-- **`IUserService.ConfirmEmailAsync`** (coord #0060) — email verification could not be completed through
+- **(breaking) `IUserService.ConfirmEmailAsync`** (coord #0060) — email verification could not be completed through
   the public surface. `EmailConfirmed` was writable only as an argument to `CreateExternalUserAsync`, so
   after creation nothing could set it. Consuming an `IUserTokenService` token with
   `TokenPurpose.EmailConfirm` invalidates the token and writes nothing to the user, which means the
@@ -116,7 +120,7 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
   `ConfirmPhoneNumberAsync` itself shipped with no behaviour test. Both axes are now covered by conformance
   tests that re-read the row rather than asserting the call's return value.
 
-- **`IUserService.SetEmailAsync`** — not requested, and shipped anyway because `ConfirmEmailAsync` alone
+- **(breaking) `IUserService.SetEmailAsync`** — not requested, and shipped anyway because `ConfirmEmailAsync` alone
   would have been the same half-a-pair mistake reported above. Since 0.12.2 a **confirmed email is a login
   identifier**, and with no service method to change an address an adopter changes it by writing the entity
   directly — which leaves `EmailConfirmed` true across the change. Editing a profile to another user's
