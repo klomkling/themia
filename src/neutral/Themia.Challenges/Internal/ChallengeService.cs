@@ -155,8 +155,29 @@ internal sealed class ChallengeService : IChallengeService
             // safe one (it over-refuses, never over-admits) and it self-corrects within the round trip.
             await ReleaseChargesAsync(connection, charges);
 
+            // Every configured layer must be under its ceiling before the next call can succeed, so the
+            // answer is the LATEST reset among the layers currently over — not the first one tripped.
+            // Reporting the earliest would tell a caller to retry into a refusal it could have predicted.
+            var resets = new List<DateTimeOffset>(3);
+            if (scopeCount > purpose.PerScopeWindow.Limit)
+            {
+                resets.Add(scopeWindowStart + purpose.PerScopeWindow.Window);
+            }
+
+            if (keyCount > options.PerKeyWindow.Limit)
+            {
+                resets.Add(keyWindowStart + options.PerKeyWindow.Window);
+            }
+
+            if (globalCount is { } over && options.PerKeyGlobalWindow is { } gwin && over > gwin.Limit)
+            {
+                resets.Add(FloorToWindowStart(now, gwin.Window) + gwin.Window);
+            }
+
             logger.LogInformation("Challenge issue rate-limited for purpose {Purpose}", scope.Purpose);
-            return ChallengeIssueResult.RateLimited();
+            return resets.Count == 0
+                ? ChallengeIssueResult.RateLimited()
+                : ChallengeIssueResult.RateLimited(RetryAfterFrom(resets.Max(), now));
         }
 
         var challengeId = Guid.NewGuid();
@@ -358,7 +379,9 @@ internal sealed class ChallengeService : IChallengeService
         if (verifyCount > options.VerifyWindow.Limit)
         {
             logger.LogInformation("Challenge verify rate-limited for purpose {Purpose}", scope.Purpose);
-            return ChallengeVerifyResult.RateLimited(scope);
+            return ChallengeVerifyResult.RateLimited(
+                scope,
+                RetryAfterFrom(FloorToWindowStart(now, options.VerifyWindow.Window) + options.VerifyWindow.Window, now));
         }
 
         // Every live row for the scope, newest first — not just one. With the default
@@ -464,7 +487,9 @@ internal sealed class ChallengeService : IChallengeService
             if (tokenVerifyCount > tokenWindow.Limit)
             {
                 logger.LogInformation("Challenge token verify rate-limited for purpose {Purpose}", purpose);
-                return ChallengeVerifyResult.RateLimited(unresolved);
+                return ChallengeVerifyResult.RateLimited(
+                    unresolved,
+                    RetryAfterFrom(FloorToWindowStart(now, tokenWindow.Window) + tokenWindow.Window, now));
             }
         }
 
@@ -643,6 +668,22 @@ internal sealed class ChallengeService : IChallengeService
         (null, not null) => RateWindowBucket.PlatformAndPurpose,
         (null, null) => RateWindowBucket.PlatformAllPurposes,
     };
+
+    /// <summary>
+    /// Time from <paramref name="now"/> until <paramref name="resetsAt"/>, floored at zero.
+    /// </summary>
+    /// <remarks>
+    /// Floored rather than allowed to go negative: a window whose start was floored against a clock that
+    /// has since moved backwards (NTP correction, a container resuming from suspend) would otherwise
+    /// produce a negative TimeSpan that a caller casts to a nonsense Retry-After. Zero reads as
+    /// "retry now", which is the safe direction — the next call is charged and refused again if the
+    /// window really is still open.
+    /// </remarks>
+    private static TimeSpan RetryAfterFrom(DateTimeOffset resetsAt, DateTimeOffset now)
+    {
+        var remaining = resetsAt - now;
+        return remaining > TimeSpan.Zero ? remaining : TimeSpan.Zero;
+    }
 
     private static DateTimeOffset FloorToWindowStart(DateTimeOffset now, TimeSpan window)
     {

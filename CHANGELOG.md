@@ -27,7 +27,35 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
-_Nothing yet._
+### Added
+- **`ChallengeIssueResult.RetryAfter` and `ChallengeVerifyResult.RetryAfter`** (coord #0064) — a
+  `RateLimited` result now carries how long until the refused window resets. Without it an adopter could
+  learn *that* it was refused and nothing about *when* it clears, and could not compute it either: the
+  counter rows are Themia's and nothing on `IChallengeService` exposes them. Keeping a parallel
+  "last issued at" beside ours is the bookkeeping `Themia.Challenges` exists to remove.
+
+  ezy-assets' four one-time-code flows answer 429 + `Retry-After` with a live countdown — a contract
+  **Themia built for them on coord #0001, its very first request** — so migrating those flows onto
+  `Themia.Challenges` would have regressed the thing they originally asked for.
+
+  **This is data, never policy — deliberately.** Nothing turns the value into a status code or a header
+  for you, and no middleware or mapper ships with it. propertiezy's `password/forgot`,
+  `email/resend-verification` and `phone/send-otp` answer *identically* whether the account exists, by
+  design; "rate limited, retry in 43s" is reachable only for a key with a live window, so an automatic
+  429 + `Retry-After` would rebuild the account-enumeration oracle those endpoints exist to close — on
+  upgrade, with no diff on their side and no test failing. **Surface it only where the caller already
+  knows the account exists** (an authenticated session, or a signing token that names the principal).
+  The warning is on the property itself, not just here.
+
+  **`null` means "not determined", not "retry now".** Do not write `?? 0` or `?? 60` — a hardcoded
+  fallback is exactly the client-side guess that drifts from the server's real window, which is the
+  defect this property removes. Omit the header and answer without a countdown.
+
+  The value is the **latest** reset among the layers currently over their limit, since every configured
+  layer must be under its ceiling before the next call can succeed; reporting the earliest would send a
+  caller back into a refusal it could have predicted. Covered on all three refusal points (issue, verify,
+  token verify). Falsified: reporting the earliest reset fails 1 test, breaking the remaining-time
+  arithmetic fails 5.
 
 ## [0.14.0] - 2026-08-08
 

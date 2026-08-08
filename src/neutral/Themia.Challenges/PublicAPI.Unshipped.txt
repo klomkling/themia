@@ -116,3 +116,7 @@ Themia.Challenges.ChallengeOptions.TokenVerifyWindow.get -> (int Limit, System.T
 Themia.Challenges.ChallengeOptions.TokenVerifyWindow.set -> void
 const Themia.Challenges.ChallengeOptions.TokenVerifyBucketKey = "__themia_token_verify__" -> string!
 const Themia.Challenges.ChallengeScope.UnresolvedKey = "__themia_unresolved__" -> string!
+Themia.Challenges.ChallengeIssueResult.RetryAfter.get -> System.TimeSpan?
+Themia.Challenges.ChallengeVerifyResult.RetryAfter.get -> System.TimeSpan?
+static Themia.Challenges.ChallengeIssueResult.RateLimited(System.TimeSpan retryAfter) -> Themia.Challenges.ChallengeIssueResult!
+static Themia.Challenges.ChallengeVerifyResult.RateLimited(Themia.Challenges.ChallengeScope! scope, System.TimeSpan retryAfter) -> Themia.Challenges.ChallengeVerifyResult!
