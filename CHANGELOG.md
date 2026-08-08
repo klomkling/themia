@@ -28,6 +28,36 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 ## [Unreleased]
 
 ### Added
+- **Quartz clustering and a persistent execution-history store, both opt-in** (coord #0071, part 2).
+
+  `SchedulingOptions.UseClustering` — **off by default.** Defaulting it on would add lock contention to
+  every existing single-instance adopter on upgrade, with no diff on their side and nothing failing.
+  `InstanceId` defaults to `AUTO`, which is what makes a duplicate id unrepresentable rather than a
+  deployment detail somebody has to get right on every node forever; setting it explicitly under
+  clustering now warns, because no process can observe another process's id and the configuration that
+  *permits* the fault is the most that is detectable from inside one.
+
+  `SchedulingOptions.UsePersistentExecutionHistory` — **off by default**, so adopting the package does
+  not silently start writing rows to a schema an existing host never asked for. `DapperExecutionHistoryStore`
+  writes to the `scheduling` schema over plain ADO.NET, behaviourally identical to the EF store and the
+  in-proc one — including the oldest→newest ordering the dashboard's time axis depends on. Persisting the
+  scheduler and persisting its history are separate decisions: AdoJobStore keeps triggers across a restart
+  and never touched history, which is why a host can have restart-surviving schedules and a dashboard that
+  still forgets.
+
+  The unclustered warning added in the previous release now fires only when clustering is genuinely off,
+  rather than whenever the store is persistent.
+
+  **Two defects were caught by falsification rather than by review, both mine, both from asserting
+  something checkable without checking it:**
+  - The SQL Server leg failed on `trigger`, a reserved keyword there and not on PostgreSQL. Quoting the
+    column was not enough — the `AS Trigger` **alias** needed it too, and the second error read almost
+    identically to the first, so the half-fix looked like a failed fix. Running both engines is what
+    surfaced it; a PostgreSQL-only suite would have shipped both.
+  - The store-replacement test could not tell `TryAdd` from `Add`, because the comment justifying the
+    choice was wrong: `AddThemiaQuartz` registers no history store at all — the plugin news up an in-proc
+    one when DI has none. What the registration actually has to beat is `Themia.Modules.Scheduling`'s EF
+    store, registered with `TryAddSingleton`; the test now stands one in.
 - **`Themia.Scheduling`** — persistent Quartz.NET without an ORM (coord #0071). AdoJobStore wiring, the
   `qrtz_*` and `scheduling` schemas as FluentMigrator migrations, `UseProperties` + System.Text.Json
   serialization. **Zero EF Core packages**, asserted by a test against the build output rather than

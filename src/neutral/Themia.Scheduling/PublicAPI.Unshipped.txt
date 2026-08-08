@@ -18,3 +18,23 @@ static Themia.Scheduling.SchedulingSchema.Assembly.get -> System.Reflection.Asse
 static Themia.Scheduling.SchedulingSchema.Migrate(Themia.Data.Migrations.MigrationEngine engine, string! connectionString) -> void
 Themia.Scheduling.DependencyInjection.SchedulingServiceCollectionExtensions
 static Themia.Scheduling.DependencyInjection.SchedulingServiceCollectionExtensions.AddThemiaScheduling(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, Themia.Data.Migrations.MigrationEngine engine, string! connectionString, System.Action<Themia.Scheduling.SchedulingOptions!>? configure = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+Themia.Scheduling.SchedulingOptions.InstanceId.get -> string!
+Themia.Scheduling.SchedulingOptions.InstanceId.set -> void
+Themia.Scheduling.SchedulingOptions.UseClustering.get -> bool
+Themia.Scheduling.SchedulingOptions.UseClustering.set -> void
+Themia.Scheduling.DapperExecutionHistoryStore
+Themia.Scheduling.DapperExecutionHistoryStore.DapperExecutionHistoryStore(System.Func<System.Data.Common.DbConnection!>! connectionFactory, Microsoft.Extensions.Logging.ILogger<Themia.Scheduling.DapperExecutionHistoryStore!>! logger) -> void
+Themia.Scheduling.DapperExecutionHistoryStore.SchedulerName.get -> string!
+Themia.Scheduling.DapperExecutionHistoryStore.SchedulerName.set -> void
+Themia.Scheduling.DapperExecutionHistoryStore.Get(string! fireInstanceId) -> System.Threading.Tasks.Task<Themia.Quartz.ExecutionHistoryEntry?>!
+Themia.Scheduling.DapperExecutionHistoryStore.Save(Themia.Quartz.ExecutionHistoryEntry! entry) -> System.Threading.Tasks.Task!
+Themia.Scheduling.DapperExecutionHistoryStore.Purge() -> System.Threading.Tasks.Task!
+Themia.Scheduling.DapperExecutionHistoryStore.FilterLastOfEveryJob(int limitPerJob) -> System.Threading.Tasks.Task<System.Collections.Generic.IEnumerable<Themia.Quartz.ExecutionHistoryEntry!>!>!
+Themia.Scheduling.DapperExecutionHistoryStore.FilterLastOfEveryTrigger(int limitPerTrigger) -> System.Threading.Tasks.Task<System.Collections.Generic.IEnumerable<Themia.Quartz.ExecutionHistoryEntry!>!>!
+Themia.Scheduling.DapperExecutionHistoryStore.FilterLast(int limit) -> System.Threading.Tasks.Task<System.Collections.Generic.IEnumerable<Themia.Quartz.ExecutionHistoryEntry!>!>!
+Themia.Scheduling.DapperExecutionHistoryStore.GetTotalJobsExecuted() -> System.Threading.Tasks.Task<int>!
+Themia.Scheduling.DapperExecutionHistoryStore.GetTotalJobsFailed() -> System.Threading.Tasks.Task<int>!
+Themia.Scheduling.DapperExecutionHistoryStore.IncrementTotalJobsExecuted() -> System.Threading.Tasks.Task!
+Themia.Scheduling.DapperExecutionHistoryStore.IncrementTotalJobsFailed() -> System.Threading.Tasks.Task!
+Themia.Scheduling.SchedulingOptions.UsePersistentExecutionHistory.get -> bool
+Themia.Scheduling.SchedulingOptions.UsePersistentExecutionHistory.set -> void

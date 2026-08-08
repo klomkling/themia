@@ -1,4 +1,9 @@
+using System.Data.Common;
+using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
+using Npgsql;
 using Quartz;
 using Themia.Data.Migrations;
 
@@ -62,10 +67,17 @@ public static class SchedulingServiceCollectionExtensions
         {
             q.SchedulerName = options.SchedulerName;
 
+            q.SchedulerId = options.InstanceId;
+
             q.UsePersistentStore(store =>
             {
                 store.UseProperties = true;
                 store.UseSystemTextJsonSerializer();
+
+                if (options.UseClustering)
+                {
+                    store.UseClustering();
+                }
 
                 switch (engine)
                 {
@@ -107,10 +119,50 @@ public static class SchedulingServiceCollectionExtensions
                 + $"{typeof(Themia.Quartz.ExecutionHistoryPlugin).Assembly.GetName().Name}");
         });
 
+        if (options.UsePersistentExecutionHistory)
+        {
+            // RemoveAll + Add rather than TryAdd, and the reason is specific: AddThemiaQuartz registers
+            // NO IExecutionHistoryStore at all — ExecutionHistoryPlugin falls back to
+            // `new InProcExecutionHistoryStore()` when DI has none — but Themia.Modules.Scheduling
+            // registers its EF store with TryAddSingleton. A host on the module that then opts into
+            // persistence here would keep the EF store under TryAdd, and this option would do nothing
+            // while reading as if it had. Last writer wins, explicitly.
+            var factory = ConnectionFactory(engine, connectionString);
+            services.RemoveAll<Themia.Quartz.IExecutionHistoryStore>();
+            services.AddSingleton<Themia.Quartz.IExecutionHistoryStore>(sp =>
+                new DapperExecutionHistoryStore(
+                    factory,
+                    sp.GetRequiredService<ILogger<DapperExecutionHistoryStore>>())
+                {
+                    SchedulerName = options.SchedulerName,
+                });
+        }
+
         services.AddQuartzHostedService(h => h.WaitForJobsToComplete = true);
 
-        // Unconditional, because the unsafe state cannot be detected — see the advisory's remarks.
-        services.AddHostedService<UnclusteredPersistenceAdvisory>();
+        if (!options.UseClustering)
+        {
+            // Unconditional within this branch, because the unsafe state cannot be detected — see the
+            // advisory's remarks. Clustering on is the supported configuration and says nothing.
+            services.AddHostedService<UnclusteredPersistenceAdvisory>();
+        }
+        else if (!string.Equals(options.InstanceId, "AUTO", StringComparison.Ordinal))
+        {
+            // A duplicate instance id across nodes corrupts scheduler state rather than failing cleanly,
+            // and no process can see another process's id. The configuration that PERMITS the fault is
+            // the most that is observable from here, so that is what gets named.
+            services.AddHostedService<ExplicitInstanceIdAdvisory>();
+        }
+
         return services;
     }
+
+    private static Func<DbConnection> ConnectionFactory(MigrationEngine engine, string connectionString) =>
+        engine switch
+        {
+            MigrationEngine.Postgres => () => new NpgsqlConnection(connectionString),
+            MigrationEngine.SqlServer => () => new SqlConnection(connectionString),
+            _ => throw new NotSupportedException(
+                $"Themia.Scheduling supports PostgreSQL and SQL Server; '{engine}' is not supported."),
+        };
 }

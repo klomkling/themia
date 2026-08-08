@@ -132,4 +132,85 @@ public class SchedulingRegistrationTests
     {
         Assert.Throws<ArgumentException>(() => SchedulingSchema.Migrate(MigrationEngine.Postgres, ""));
     }
+
+    [Fact]
+    public void Clustering_on_silences_the_unclustered_warning()
+    {
+        // The warning names an unsupported configuration. Once clustering is on, multi-instance is the
+        // supported one and there is nothing to say — a warning that fires when everything is correct is
+        // how a real warning stops being read.
+        var services = new ServiceCollection();
+        services.AddThemiaScheduling(MigrationEngine.Postgres, ConnectionString, o => o.UseClustering = true);
+
+        Assert.DoesNotContain(services, d => d.ImplementationType == typeof(UnclusteredPersistenceAdvisory));
+    }
+
+    [Fact]
+    public void Clustering_with_the_default_instance_id_warns_about_nothing()
+    {
+        var services = new ServiceCollection();
+        services.AddThemiaScheduling(MigrationEngine.Postgres, ConnectionString, o => o.UseClustering = true);
+
+        Assert.DoesNotContain(services, d => d.ImplementationType == typeof(ExplicitInstanceIdAdvisory));
+    }
+
+    [Fact]
+    public void Clustering_with_an_explicit_instance_id_warns()
+    {
+        // The duplicate itself is undetectable — no process can see another process's instance id — so
+        // what gets named is the configuration that permits it.
+        var services = new ServiceCollection();
+        services.AddThemiaScheduling(
+            MigrationEngine.Postgres, ConnectionString,
+            o => { o.UseClustering = true; o.InstanceId = "node-1"; });
+
+        Assert.Contains(services, d => d.ImplementationType == typeof(ExplicitInstanceIdAdvisory));
+    }
+
+    [Fact]
+    public void InstanceId_defaults_to_AUTO()
+    {
+        // AUTO is what makes a duplicate id unrepresentable rather than a deployment detail somebody has
+        // to get right on every node forever.
+        Assert.Equal("AUTO", new SchedulingOptions().InstanceId);
+    }
+
+    [Fact]
+    public void Clustering_is_off_by_default()
+    {
+        // Defaulting it on would add lock contention to every existing single-instance adopter on
+        // upgrade, with no diff on their side and nothing failing.
+        Assert.False(new SchedulingOptions().UseClustering);
+    }
+
+    [Fact]
+    public void Persistent_execution_history_is_off_by_default()
+    {
+        // Adopting the package must not silently start writing rows to a schema the host never asked
+        // for. /admin/jobs keeps behaving exactly as it does today unless someone opts in.
+        var services = new ServiceCollection();
+        services.AddThemiaScheduling(MigrationEngine.Postgres, ConnectionString);
+
+        Assert.DoesNotContain(services, d => d.ServiceType == typeof(Themia.Quartz.IExecutionHistoryStore));
+        Assert.False(new SchedulingOptions().UsePersistentExecutionHistory);
+    }
+
+    [Fact]
+    public void Opting_in_replaces_the_in_memory_store()
+    {
+        // Falsifiable only against a COMPETING registration. AddThemiaQuartz registers no store at all
+        // (the plugin news up an in-proc one when DI has none), so an earlier version of this test could
+        // not tell TryAdd from Add — it passed either way. What this has to beat is
+        // Themia.Modules.Scheduling's EF store, registered with TryAddSingleton; stand one in.
+        var services = new ServiceCollection();
+        services.AddSingleton<Themia.Quartz.IExecutionHistoryStore>(new Themia.Quartz.InProcExecutionHistoryStore());
+
+        services.AddThemiaScheduling(
+            MigrationEngine.Postgres, ConnectionString, o => o.UsePersistentExecutionHistory = true);
+
+        var registered = services.Where(d => d.ServiceType == typeof(Themia.Quartz.IExecutionHistoryStore)).ToList();
+        Assert.Single(registered);
+        var store = registered[0].ImplementationFactory!(new ServiceCollection().AddLogging().BuildServiceProvider());
+        Assert.IsType<DapperExecutionHistoryStore>(store);
+    }
 }
