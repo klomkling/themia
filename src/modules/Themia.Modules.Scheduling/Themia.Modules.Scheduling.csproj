@@ -9,7 +9,7 @@
     <ProjectReference Include="../../neutral/Themia.Quartz/Themia.Quartz.csproj" />
     <ProjectReference Include="../../framework/Themia.Framework.Core/Themia.Framework.Core.csproj" />
     <ProjectReference Include="../../framework/Themia.Framework.Data.EFCore/Themia.Framework.Data.EFCore.csproj" />
-    <ProjectReference Include="../../neutral/Themia.Data.Migrations/Themia.Data.Migrations.csproj" />
+    <ProjectReference Include="../../neutral/Themia.Scheduling/Themia.Scheduling.csproj" />
   </ItemGroup>
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />

@@ -27,7 +27,51 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
-_Nothing yet._
+### Added
+- **`Themia.Scheduling`** — persistent Quartz.NET without an ORM (coord #0071). AdoJobStore wiring, the
+  `qrtz_*` and `scheduling` schemas as FluentMigrator migrations, `UseProperties` + System.Text.Json
+  serialization. **Zero EF Core packages**, asserted by a test against the build output rather than
+  against the compiled assembly's references — see below.
+
+  ezy-assets wanted persistent Quartz and could not take `Themia.Modules.Scheduling`, because the module
+  dragged in `Themia.Framework.Data.EFCore` and four EF packages, into a codebase whose README says
+  "No: EF Core" and whose every data call would be flagged by the tenant-isolation analyzer that peer
+  brings. They asked whether the coupling was real before proposing anything.
+
+  **It was not.** `IDatabaseProvider` genuinely is EF-bound — it lives in the EF peer and takes a
+  `DbContextOptionsBuilder` — but `SchedulingModule` never called that member. All five sites read
+  `provider.ProviderName`, a string. An ORM was in every adopter's graph so a scheduler could read an
+  engine name. `AddThemiaScheduling` now takes the engine and connection string as arguments.
+
+  `Themia.Modules.Scheduling` stays and now composes on top, keeping the EF-backed execution-history
+  store. The migrations moved assembly but kept their namespace and the module references the core, so
+  **existing adopters need no change at all** — not a source edit, not a package edit.
+
+  `SchedulingSchema.Assembly` is exposed so a host with its own FluentMigrator runner can scan it
+  directly; ezy-assets said that alone would be most of the value, the alternative being to copy the
+  Quartz DDL out of the upstream repository and own it forever.
+
+- **A startup warning when a persistent scheduler is unclustered** (coord #0071, raised by propertiezy).
+  Quartz's own documentation is explicit: *"Never start a non-clustered instance against the same set of
+  database tables that any other instance is running against. You may get serious data corruption, and
+  will definitely experience erratic behavior."* Confirmed against the current Quartz.NET 3.x docs rather
+  than from memory — the real text is stronger than the recollection that prompted the check.
+
+  That makes today's RAMJobStore **safer under scale-out than persistence-without-clustering will be**,
+  which is backwards for a robustness upgrade, and it arrives on the day someone scales for an unrelated
+  reason — months after the decision that caused it.
+
+  **The warning is unconditional because the unsafe state cannot be detected.** An unclustered scheduler
+  never writes a `QRTZ_SCHEDULER_STATE` row at all (Quartz reaches `InsertSchedulerState` only through
+  the `ClusterManager`, constructed only when clustering is on), and `quartz.scheduler.instanceId`
+  defaults to the literal `NON_CLUSTERED`, so every node would collide on one key even if rows existed.
+  That is why the documentation states a prohibition instead of Quartz enforcing one.
+
+### Changed
+- **`Themia.Modules.Scheduling` no longer wires Quartz itself** — it delegates to `Themia.Scheduling` and
+  keeps only the EF execution-history store. Not breaking: same namespaces, same behaviour, and the
+  module's own integration suite (restart survival, cutover replay, case-sensitive collation) now runs
+  through the new package unchanged.
 
 ## [0.14.1] - 2026-08-08
 
