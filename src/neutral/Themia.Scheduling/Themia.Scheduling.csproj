@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <!-- net10.0 only: Themia.Quartz (IExecutionHistoryStore, the dashboard) is net10.0. -->
+    <TargetFramework>net10.0</TargetFramework>
+    <PackageId>Themia.Scheduling</PackageId>
+    <Description>Persistent Quartz.NET scheduling without an ORM — AdoJobStore wiring, the qrtz_* and scheduling schema as FluentMigrator migrations, and System.Text.Json serialization. No EF Core, no DbContext. Reference Themia.Modules.Scheduling instead if you want the EF-backed execution-history store.</Description>
+    <PackageTags>themia;scheduling;quartz;adojobstore;dapper</PackageTags>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Themia.Quartz/Themia.Quartz.csproj" />
+    <ProjectReference Include="../Themia.Data.Migrations/Themia.Data.Migrations.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Quartz" />
+    <PackageReference Include="Quartz.Serialization.SystemTextJson" />
+    <PackageReference Include="Quartz.Extensions.Hosting" />
+    <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Themia.Scheduling.Tests" />
+  </ItemGroup>
+  <ItemGroup>
+    <AdditionalFiles Include="PublicAPI.Shipped.txt" />
+    <AdditionalFiles Include="PublicAPI.Unshipped.txt" />
+  </ItemGroup>
+</Project>

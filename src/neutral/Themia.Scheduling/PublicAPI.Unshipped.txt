@@ -1,0 +1,20 @@
+#nullable enable
+override Themia.Modules.Scheduling.Migrations.QuartzAdoJobStoreMigration.Down() -> void
+override Themia.Modules.Scheduling.Migrations.QuartzAdoJobStoreMigration.Up() -> void
+Themia.Modules.Scheduling.Migrations.QuartzAdoJobStoreMigration
+Themia.Modules.Scheduling.Migrations.QuartzAdoJobStoreMigration.QuartzAdoJobStoreMigration() -> void
+override Themia.Modules.Scheduling.Migrations.SchedulingSchemaMigration.Down() -> void
+override Themia.Modules.Scheduling.Migrations.SchedulingSchemaMigration.Up() -> void
+Themia.Modules.Scheduling.Migrations.SchedulingSchemaMigration
+Themia.Modules.Scheduling.Migrations.SchedulingSchemaMigration.SchedulingSchemaMigration() -> void
+Themia.Scheduling.SchedulingOptions
+Themia.Scheduling.SchedulingOptions.SchedulingOptions() -> void
+Themia.Scheduling.SchedulingOptions.SchedulerName.get -> string!
+Themia.Scheduling.SchedulingOptions.SchedulerName.set -> void
+Themia.Scheduling.SchedulingOptions.UsePersistentStore.get -> bool
+Themia.Scheduling.SchedulingOptions.UsePersistentStore.set -> void
+Themia.Scheduling.SchedulingSchema
+static Themia.Scheduling.SchedulingSchema.Assembly.get -> System.Reflection.Assembly!
+static Themia.Scheduling.SchedulingSchema.Migrate(Themia.Data.Migrations.MigrationEngine engine, string! connectionString) -> void
+Themia.Scheduling.DependencyInjection.SchedulingServiceCollectionExtensions
+static Themia.Scheduling.DependencyInjection.SchedulingServiceCollectionExtensions.AddThemiaScheduling(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, Themia.Data.Migrations.MigrationEngine engine, string! connectionString, System.Action<Themia.Scheduling.SchedulingOptions!>? configure = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!

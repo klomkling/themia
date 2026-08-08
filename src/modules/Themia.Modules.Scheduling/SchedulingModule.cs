@@ -10,6 +10,7 @@ using Themia.Data.Migrations;
 using Themia.Framework.Core.Modules;
 using Themia.Framework.Data.EFCore.Abstractions;
 using Themia.Quartz;
+using Themia.Scheduling.DependencyInjection;
 
 namespace Themia.Modules.Scheduling;
 
@@ -129,10 +130,9 @@ public sealed class SchedulingModule : ThemiaModuleBase
 
         if (options.UsePersistentStore)
         {
-            // Engine + Default connection are needed at registration time to wire the persistent store.
-            // Read them from the already-registered singleton instances rather than building (and disposing)
-            // a throwaway provider — disposing one tears down its ILoggerFactory, which Quartz captures
-            // globally for logging, producing an ObjectDisposedException when the scheduler is later resolved.
+            // Engine + Default connection are read from the already-registered singleton instances rather
+            // than from a throwaway provider — disposing one tears down its ILoggerFactory, which Quartz
+            // captures globally, producing an ObjectDisposedException when the scheduler is later resolved.
             var provider = GetRegisteredInstance<IDatabaseProvider>(services)
                 ?? throw new InvalidOperationException(
                     "An IDatabaseProvider must be registered (call AddThemiaPostgres/AddThemiaSqlServer) before " +
@@ -143,56 +143,19 @@ public sealed class SchedulingModule : ThemiaModuleBase
             var connectionString = configuration.GetConnectionString(ConnectionStringName)
                 ?? throw new InvalidOperationException(
                     $"Connection string '{ConnectionStringName}' was not found; the scheduling module requires it.");
-            var providerName = provider.ProviderName;
 
-            services.AddQuartz(q =>
-            {
-                q.SchedulerName = schedulerName;
-
-                q.UsePersistentStore(s =>
+            // The AdoJobStore wiring lives in Themia.Scheduling now — it never needed EF, only a provider
+            // name and a connection string, which is exactly what this module reads off IDatabaseProvider
+            // and passes down (coord #0071). This module's remaining reason to exist is the EF-backed
+            // execution-history store registered above.
+            services.AddThemiaScheduling(
+                ToMigrationEngine(provider.ProviderName),
+                connectionString,
+                o =>
                 {
-                    s.UseProperties = true;          // JobDataMap stored as string key-values
-                    s.UseSystemTextJsonSerializer(); // no Newtonsoft (CLAUDE.md)
-
-                    // qrtz_* tables live in the `quartz` schema → schema-qualified table prefix.
-                    switch (providerName)
-                    {
-                        case DatabaseProviderNames.Postgres:
-                            s.UsePostgres(ado =>
-                            {
-                                ado.ConnectionString = connectionString;
-                                ado.TablePrefix = "quartz.qrtz_";
-                            });
-                            break;
-                        case DatabaseProviderNames.SqlServer:
-                            s.UseSqlServer(ado =>
-                            {
-                                ado.ConnectionString = connectionString;
-                                // UPPERCASE QRTZ_ to match the verbatim Quartz SQL Server DDL (which creates
-                                // [quartz].[QRTZ_*]). A case-insensitive collation forgives a lowercase prefix,
-                                // but a case-sensitive collation does not — Quartz's runtime object references
-                                // would then fail with "Invalid object name". The `quartz` schema is lowercase.
-                                ado.TablePrefix = "quartz.QRTZ_";
-                            });
-                            break;
-                        default:
-                            throw new NotSupportedException(
-                                $"Themia.Scheduling persistent Quartz supports PostgreSQL and SQL Server; provider '{providerName}' is not supported.");
-                    }
+                    o.SchedulerName = schedulerName;
+                    o.UsePersistentStore = true;
                 });
-
-                // Themia owns the execution-history plugin now (was configured by the host's Quartz wiring).
-                // Registered as a Quartz scheduler plugin (not a bare job listener) so its Initialize sets the
-                // listener Name and self-registers as a job listener, and its Start wires the execution-history
-                // store — the lifecycle the plugin is designed for. The DI-backed EF store is seeded onto the
-                // scheduler context in InitializeAsync, before the hosted service starts the scheduler, so the
-                // plugin reads it from there at Start().
-                q.SetProperty(
-                    "quartz.plugin.recentHistory.type",
-                    $"{typeof(ExecutionHistoryPlugin).FullName}, {typeof(ExecutionHistoryPlugin).Assembly.GetName().Name}");
-            });
-
-            services.AddQuartzHostedService(h => h.WaitForJobsToComplete = true);
         }
     }
 
@@ -224,10 +187,7 @@ public sealed class SchedulingModule : ThemiaModuleBase
                     $"Connection string '{ConnectionStringName}' was not found; the scheduling module requires it.");
         }
 
-        ThemiaMigrations.Run(
-            ToMigrationEngine(provider.ProviderName),
-            connectionString,
-            typeof(Migrations.SchedulingSchemaMigration).Assembly);
+        Themia.Scheduling.SchedulingSchema.Migrate(ToMigrationEngine(provider.ProviderName), connectionString);
 
         if (options.UsePersistentStore)
         {
