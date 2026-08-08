@@ -37,7 +37,7 @@ internal sealed class UnclusteredPersistenceAdvisory(ILogger<UnclusteredPersiste
             + "instance against the same qrtz_* tables in this state is prohibited by Quartz — it causes "
             + "data corruption and erratic scheduling, not merely duplicated work. This is safe on a single "
             + "instance; if you scale out, enable clustering first. Nothing can detect the unsafe state at "
-            + "runtime, which is why this warning is unconditional.");
+            + "runtime, which is why this warning is unconditional. Set UseClustering = true to silence it and make multi-instance safe.");
 
         return Task.CompletedTask;
     }

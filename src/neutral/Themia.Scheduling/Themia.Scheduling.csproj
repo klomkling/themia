@@ -12,6 +12,12 @@
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Quartz" />
+    <!-- Dapper is the only new dependency this package adds. Npgsql and Microsoft.Data.SqlClient are
+         already in the graph via Themia.Data.Migrations, so naming them explicitly costs nothing new
+         and keeps the connection factory honest about what it constructs. -->
+    <PackageReference Include="Dapper" />
+    <PackageReference Include="Npgsql" />
+    <PackageReference Include="Microsoft.Data.SqlClient" />
     <PackageReference Include="Quartz.Serialization.SystemTextJson" />
     <PackageReference Include="Quartz.Extensions.Hosting" />
     <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers">
