@@ -358,9 +358,11 @@ public sealed class SqlServerSchedulingModuleTests : SchedulingModuleTestsBase, 
 [Trait("Category", "Integration")]
 public sealed class SqlServerCaseSensitiveCollationTests : IAsyncLifetime
 {
+    private const string Collation = "SQL_Latin1_General_CP1_CS_AS";
+
     private readonly MsSqlContainer container =
         new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-CU14-ubuntu-22.04")
-            .WithEnvironment("MSSQL_COLLATION", "SQL_Latin1_General_CP1_CS_AS")
+            .WithEnvironment("MSSQL_COLLATION", Collation)
             .Build();
 
     [Fact]
@@ -504,7 +506,70 @@ public sealed class SqlServerCaseSensitiveCollationTests : IAsyncLifetime
         }
     }
 
-    public Task InitializeAsync() => container.StartAsync();
+    public async Task InitializeAsync()
+    {
+        await container.StartAsync();
+        await WaitForCollationAsync();
+    }
+
+    /// <summary>
+    /// Blocks until the server actually reports <see cref="Collation"/>, not merely until it accepts a login.
+    /// </summary>
+    /// <remarks>
+    /// Observed, from the server's own log: SQL Server writes "ready for client connections", and only
+    /// <em>then</em> writes "Attempting to change default collation", rebuilding the system-database indexes
+    /// (master, tempdb, model, msdb, model_replicatedmaster) before reporting success — ~4.5s on an idle
+    /// machine. Testcontainers' MsSql readiness probe is an in-container <c>sqlcmd SELECT 1</c>, so it can
+    /// return inside that window. Observed too: on an idle machine the change is already complete when the
+    /// probe returns, so this is a race, not a constant.
+    /// <para>
+    /// Observed failure: 1 run in 4 standalone, <c>SocketException: Connection refused</c> raised while
+    /// opening the migration lock's connection — the test's first act is a migration, which needs two
+    /// concurrent connections. Inferred: those runs are the ones where the rebuild window is still open.
+    /// The inference is not directly witnessed; what is witnessed is that gating on the collation removes
+    /// the failure across the runs recorded in the commit message.
+    /// </para>
+    /// <para>
+    /// This test carried the flake through four rounds of fixes (#82, #115, #119, #173), each reading the
+    /// symptom as lock contention between its two "processes" and answering with retries and longer
+    /// timeouts. A refused connection is not a lock wait, so none of them could help. Only this class sets a
+    /// custom collation, which is why only this test ever flaked.
+    /// </para>
+    /// <para>
+    /// Gating on <c>SERVERPROPERTY('Collation')</c> waits for exactly the state the test depends on, so it
+    /// cannot pass early the way a generic connectivity probe can.
+    /// </para>
+    /// </remarks>
+    private async Task WaitForCollationAsync()
+    {
+        var deadline = DateTimeOffset.UtcNow.AddMinutes(3);
+        Exception? last = null;
+        while (DateTimeOffset.UtcNow < deadline)
+        {
+            try
+            {
+                await using var connection = new SqlConnection(container.GetConnectionString());
+                await connection.OpenAsync();
+                await using var command = connection.CreateCommand();
+                command.CommandText = "SELECT CAST(SERVERPROPERTY('Collation') AS nvarchar(128))";
+                if (Collation.Equals(await command.ExecuteScalarAsync() as string, StringComparison.Ordinal))
+                {
+                    return;
+                }
+            }
+            catch (Exception ex) when (ex is SqlException or InvalidOperationException)
+            {
+                // The rebuild window: refused, reset, or a login that fails while master is being rewritten.
+                last = ex;
+            }
+
+            await Task.Delay(TimeSpan.FromMilliseconds(500));
+        }
+
+        throw new InvalidOperationException(
+            $"SQL Server did not report collation {Collation} within the startup deadline.", last);
+    }
+
     public Task DisposeAsync() => container.DisposeAsync().AsTask();
 }
 
