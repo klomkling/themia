@@ -27,6 +27,39 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+_Nothing yet._
+
+## [0.16.0] - 2026-08-13
+
+### Fixed
+- **(breaking) Themia migrations no longer share the consumer's `VersionInfo` table** (coord #0078).
+  Each migration assembly now records itself in `themia_version_<assembly>`.
+
+  `ThemiaMigrations.Run` configured no version table, so every Themia migration recorded itself in
+  FluentMigrator's default `VersionInfo` — **the same table the consumer's own runner uses.**
+  FluentMigrator skips any version already listed and neither runner can see the other's assemblies, so
+  a duplicate version number made one migration of the pair **a silent no-op**: no exception, no log
+  line, no failed deploy, and a missing table discovered whenever something first touched it.
+
+  ezy-assets lost `data_protection_keys` to this in production for fifteen days, and reproduced it
+  against a real PostgreSQL rather than reasoning about it. Both sides number `yyyyMMddNNNN`, so a
+  collision needs only two teams writing a migration on the same day — and a deployed number is frozen,
+  because migrations are forward-only.
+
+  **Themia also collided with itself, which nobody had noticed.** `Themia.Exceptional`'s
+  `AddRequestContextColumn` and `Themia.Modules.Notifications`' `NotificationsSchemaMigration` both
+  carried `202606220001`, so a host taking both packages silently lost one of them with no consumer
+  involved at all. A ledger per assembly makes a repeated number across modules mean nothing.
+
+- **Every Themia migration is now replay-safe.** The new ledger starts empty on an existing database, so
+  each migration is replayed exactly once on upgrade. Every one of them now checks for what it creates
+  and adopts it instead — which is also what **self-heals** a migration a version collision had already
+  skipped: where the object genuinely does not exist, the replay creates it.
+
+  A backfill (copying known version numbers out of `VersionInfo`) was considered and rejected: in
+  ezy-assets' production state the row exists while the table does not, so a backfill would have marked
+  the skipped migration applied and made the missing table permanent.
+
 ### Security
 - **Pinned `SSH.NET` to 2026.0.0** (`GHSA-q939-rpr3-3284`, high). `ScpClient`'s recursive download honours
   server-supplied filenames, so a hostile SSH server can write outside the download directory. The

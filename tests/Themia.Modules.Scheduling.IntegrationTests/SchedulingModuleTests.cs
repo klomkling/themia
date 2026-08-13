@@ -17,6 +17,18 @@ using Xunit;
 namespace Themia.Modules.Scheduling.IntegrationTests;
 
 /// <summary>
+/// The version ledger Themia.Scheduling owns. Since coord #0078 each migration assembly records itself in
+/// its own table instead of FluentMigrator's shared VersionInfo, so a cutover simulation has to clear the
+/// right one — clearing VersionInfo would leave these tests passing against a replay that never happened.
+/// </summary>
+internal static class SchedulingLedgerName
+{
+    internal static readonly string Value =
+        new global::Themia.Data.Migrations.ThemiaVersionTable(
+            global::Themia.Scheduling.SchedulingSchema.Assembly).TableName;
+}
+
+/// <summary>
 /// Lifecycle integration tests for <see cref="SchedulingModule"/> against a real database:
 /// <see cref="SchedulingModule.InitializeAsync"/> applies the FluentMigrator schema migration, and the
 /// registered <see cref="IExecutionHistoryStore"/> resolves to the EF-backed store and round-trips data.
@@ -300,7 +312,7 @@ public sealed class PostgresSchedulingModuleTests : SchedulingModuleTestsBase, I
     protected override string DropHistoryIndexSql =>
         "DROP INDEX scheduling.ix_execution_history_scheduler_trigger_fired";
     protected override string ClearVersionInfoSql =>
-        "DELETE FROM public.\"VersionInfo\"";
+        "DELETE FROM public.\"" + SchedulingLedgerName.Value + "\"";
     protected override string HistoryIndexCountSql =>
         "SELECT COUNT(*) AS \"Value\" FROM pg_indexes WHERE schemaname = 'scheduling' AND indexname = 'ix_execution_history_scheduler_trigger_fired'";
     protected override string QrtzJobDetailsCountSql =>
@@ -322,7 +334,7 @@ public sealed class SqlServerSchedulingModuleTests : SchedulingModuleTestsBase, 
     protected override string DropHistoryIndexSql =>
         "DROP INDEX ix_execution_history_scheduler_trigger_fired ON scheduling.execution_history";
     protected override string ClearVersionInfoSql =>
-        "DELETE FROM [dbo].[VersionInfo]";
+        "DELETE FROM [dbo].[" + SchedulingLedgerName.Value + "]";
     // sys.indexes names are unique per-table, not per-database — scope by object_id so an identically-named
     // index on another table cannot produce a false positive.
     protected override string HistoryIndexCountSql =>
@@ -346,9 +358,11 @@ public sealed class SqlServerSchedulingModuleTests : SchedulingModuleTestsBase, 
 [Trait("Category", "Integration")]
 public sealed class SqlServerCaseSensitiveCollationTests : IAsyncLifetime
 {
+    private const string Collation = "SQL_Latin1_General_CP1_CS_AS";
+
     private readonly MsSqlContainer container =
         new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-CU14-ubuntu-22.04")
-            .WithEnvironment("MSSQL_COLLATION", "SQL_Latin1_General_CP1_CS_AS")
+            .WithEnvironment("MSSQL_COLLATION", Collation)
             .Build();
 
     [Fact]
@@ -397,8 +411,13 @@ public sealed class SqlServerCaseSensitiveCollationTests : IAsyncLifetime
             await RunWithMigrationContentionRetry(async () =>
             {
                 await using var scope = p2.CreateAsyncScope();
+                // EF1003: the table name is derived from an assembly name at build time, not from input —
+                // there is nothing here a parameter could carry, since a parameter cannot be a table name.
+                // Scoped to this statement rather than the file.
+#pragma warning disable EF1003
                 await scope.ServiceProvider.GetRequiredService<SchedulingDbContext>()
-                    .Database.ExecuteSqlRawAsync("DELETE FROM [dbo].[VersionInfo]");
+                    .Database.ExecuteSqlRawAsync("DELETE FROM [dbo].[" + SchedulingLedgerName.Value + "]");
+#pragma warning restore EF1003
             });
 
             LogContext.SetCurrentLogProvider(p2.GetRequiredService<ILoggerFactory>());
@@ -487,7 +506,70 @@ public sealed class SqlServerCaseSensitiveCollationTests : IAsyncLifetime
         }
     }
 
-    public Task InitializeAsync() => container.StartAsync();
+    public async Task InitializeAsync()
+    {
+        await container.StartAsync();
+        await WaitForCollationAsync();
+    }
+
+    /// <summary>
+    /// Blocks until the server actually reports <see cref="Collation"/>, not merely until it accepts a login.
+    /// </summary>
+    /// <remarks>
+    /// Observed, from the server's own log: SQL Server writes "ready for client connections", and only
+    /// <em>then</em> writes "Attempting to change default collation", rebuilding the system-database indexes
+    /// (master, tempdb, model, msdb, model_replicatedmaster) before reporting success — ~4.5s on an idle
+    /// machine. Testcontainers' MsSql readiness probe is an in-container <c>sqlcmd SELECT 1</c>, so it can
+    /// return inside that window. Observed too: on an idle machine the change is already complete when the
+    /// probe returns, so this is a race, not a constant.
+    /// <para>
+    /// Observed failure: 1 run in 4 standalone, <c>SocketException: Connection refused</c> raised while
+    /// opening the migration lock's connection — the test's first act is a migration, which needs two
+    /// concurrent connections. Inferred: those runs are the ones where the rebuild window is still open.
+    /// The inference is not directly witnessed; what is witnessed is that gating on the collation removes
+    /// the failure across the runs recorded in the commit message.
+    /// </para>
+    /// <para>
+    /// This test carried the flake through four rounds of fixes (#82, #115, #119, #173), each reading the
+    /// symptom as lock contention between its two "processes" and answering with retries and longer
+    /// timeouts. A refused connection is not a lock wait, so none of them could help. Only this class sets a
+    /// custom collation, which is why only this test ever flaked.
+    /// </para>
+    /// <para>
+    /// Gating on <c>SERVERPROPERTY('Collation')</c> waits for exactly the state the test depends on, so it
+    /// cannot pass early the way a generic connectivity probe can.
+    /// </para>
+    /// </remarks>
+    private async Task WaitForCollationAsync()
+    {
+        var deadline = DateTimeOffset.UtcNow.AddMinutes(3);
+        Exception? last = null;
+        while (DateTimeOffset.UtcNow < deadline)
+        {
+            try
+            {
+                await using var connection = new SqlConnection(container.GetConnectionString());
+                await connection.OpenAsync();
+                await using var command = connection.CreateCommand();
+                command.CommandText = "SELECT CAST(SERVERPROPERTY('Collation') AS nvarchar(128))";
+                if (Collation.Equals(await command.ExecuteScalarAsync() as string, StringComparison.Ordinal))
+                {
+                    return;
+                }
+            }
+            catch (Exception ex) when (ex is SqlException or InvalidOperationException)
+            {
+                // The rebuild window: refused, reset, or a login that fails while master is being rewritten.
+                last = ex;
+            }
+
+            await Task.Delay(TimeSpan.FromMilliseconds(500));
+        }
+
+        throw new InvalidOperationException(
+            $"SQL Server did not report collation {Collation} within the startup deadline.", last);
+    }
+
     public Task DisposeAsync() => container.DisposeAsync().AsTask();
 }
 

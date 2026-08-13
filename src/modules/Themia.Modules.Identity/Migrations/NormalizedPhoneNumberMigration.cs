@@ -39,6 +39,13 @@ public sealed class NormalizedPhoneNumberMigration : Migration
     /// <inheritdoc />
     public override void Up()
     {
+        // Replay-safe (coord #0078). The column and its two filtered indexes are created together, so the
+        // column's presence is the whole migration's presence.
+        if (Schema.Schema(SchemaName).Table("users").Column("normalized_phone_number").Exists())
+        {
+            return;
+        }
+
         Alter.Table("users").InSchema(SchemaName)
             .AddColumn("normalized_phone_number").AsString(64).Nullable();
 

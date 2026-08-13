@@ -10,6 +10,15 @@ public sealed class AddRequestContextColumn : Migration
     /// <inheritdoc />
     public override void Up()
     {
+        // Replay-safe (coord #0078): Themia migrations moved off FluentMigrator's shared VersionInfo onto
+        // a per-assembly ledger, so every one of them replays once on an existing database. Without this
+        // the replay fails the deploy; with it, it adopts what is there — and creates what a version-number
+        // collision had silently skipped.
+        if (Schema.Table("Exceptions").Column("RequestContext").Exists())
+        {
+            return;
+        }
+
         // LOCKSTEP with ExceptionLogMigration's provider whitelist (PostgreSQL/MySQL/SqlServer).
         IfDatabase("postgresql", "mysql", "sqlserver")
             .Alter.Table("Exceptions")

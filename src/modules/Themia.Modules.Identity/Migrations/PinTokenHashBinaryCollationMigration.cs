@@ -58,7 +58,11 @@ public sealed class PinTokenHashBinaryCollationMigration : Migration
     private void RecollateTokenHash(string table, string uniqueIndex, string? collation)
     {
         var collate = collation is null ? string.Empty : $" COLLATE {collation}";
-        Execute.Sql($"DROP INDEX {uniqueIndex} ON [{SchemaName}].{table};");
+        // IF EXISTS is what makes this replay-safe (coord #0078), and it is enough on its own: the drop is
+        // followed immediately by a recreate, so the index is guaranteed absent at CREATE time whether or
+        // not it was present at DROP time. Re-applying the same COLLATE to a column already carrying it is
+        // a no-op on SQL Server, so the ALTER needs no guard.
+        Execute.Sql($"DROP INDEX IF EXISTS {uniqueIndex} ON [{SchemaName}].{table};");
         Execute.Sql($"ALTER TABLE [{SchemaName}].{table} ALTER COLUMN token_hash nvarchar(256){collate} NOT NULL;");
         Execute.Sql($"CREATE UNIQUE INDEX {uniqueIndex} ON [{SchemaName}].{table} (token_hash);");
     }

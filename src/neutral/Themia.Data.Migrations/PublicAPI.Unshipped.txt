@@ -13,3 +13,17 @@ Themia.Data.Migrations.ThemiaMigrations
 static Themia.Data.Migrations.ThemiaMigrationOptions.DefaultLockTimeout.get -> System.TimeSpan
 static Themia.Data.Migrations.ThemiaMigrations.Run(Themia.Data.Migrations.MigrationEngine engine, string! connectionString, Themia.Data.Migrations.ThemiaMigrationOptions? options, System.Reflection.Assembly![]! migrationAssemblies) -> void
 static Themia.Data.Migrations.ThemiaMigrations.Run(Themia.Data.Migrations.MigrationEngine engine, string! connectionString, params System.Reflection.Assembly![]! migrationAssemblies) -> void
+Themia.Data.Migrations.ThemiaVersionTable
+Themia.Data.Migrations.ThemiaVersionTable.ThemiaVersionTable(System.Reflection.Assembly! migrationAssembly) -> void
+Themia.Data.Migrations.ThemiaVersionTable.TableName.get -> string!
+Themia.Data.Migrations.ThemiaVersionTable.SchemaName.get -> string!
+Themia.Data.Migrations.ThemiaVersionTable.ColumnName.get -> string!
+Themia.Data.Migrations.ThemiaVersionTable.DescriptionColumnName.get -> string!
+Themia.Data.Migrations.ThemiaVersionTable.UniqueIndexName.get -> string!
+Themia.Data.Migrations.ThemiaVersionTable.AppliedOnColumnName.get -> string!
+Themia.Data.Migrations.ThemiaVersionTable.ApplicationContext.get -> object!
+Themia.Data.Migrations.ThemiaVersionTable.ApplicationContext.set -> void
+Themia.Data.Migrations.ThemiaVersionTable.OwnsSchema.get -> bool
+Themia.Data.Migrations.ThemiaVersionTable.CreateWithPrimaryKey.get -> bool
+const Themia.Data.Migrations.ThemiaVersionTable.Prefix = "themia_version_" -> string!
+static Themia.Data.Migrations.ThemiaVersionTable.Tokenize(string! assemblyName) -> string!

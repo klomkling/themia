@@ -15,6 +15,15 @@ public sealed class AddRefreshTokenReplacedTokenIdMigration : Migration
     /// <inheritdoc />
     public override void Up()
     {
+        // Replay-safe (coord #0078): Themia migrations moved off FluentMigrator's shared VersionInfo onto
+        // a per-assembly ledger, so every one of them replays once on an existing database. Without this
+        // the replay fails the deploy; with it, it adopts what is there — and creates what a version-number
+        // collision had silently skipped.
+        if (Schema.Schema(SchemaName).Table("refresh_tokens").Column("replaced_token_id").Exists())
+        {
+            return;
+        }
+
         IfDatabase("postgresql", "sqlserver").Delegate(AddColumn);
         // 'identity' is a reserved keyword in SQL Server — the schema qualifier must be bracketed.
         IfDatabase("postgresql").Delegate(() => CreateFilteredIndex(SchemaName));
