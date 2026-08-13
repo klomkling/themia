@@ -307,6 +307,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Themia.Scheduling.Tests", "
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Themia.Scheduling.IntegrationTests", "tests\Themia.Scheduling.IntegrationTests\Themia.Scheduling.IntegrationTests.csproj", "{8E05219B-B070-407B-8DE7-482924C96F0A}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Themia.Migrations.ReplayTests", "tests\Themia.Migrations.ReplayTests\Themia.Migrations.ReplayTests.csproj", "{25A0F774-026E-4F00-B5F6-9CABADD99485}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -2045,6 +2047,18 @@ Global
 		{8E05219B-B070-407B-8DE7-482924C96F0A}.Release|x64.Build.0 = Release|Any CPU
 		{8E05219B-B070-407B-8DE7-482924C96F0A}.Release|x86.ActiveCfg = Release|Any CPU
 		{8E05219B-B070-407B-8DE7-482924C96F0A}.Release|x86.Build.0 = Release|Any CPU
+		{25A0F774-026E-4F00-B5F6-9CABADD99485}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{25A0F774-026E-4F00-B5F6-9CABADD99485}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{25A0F774-026E-4F00-B5F6-9CABADD99485}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{25A0F774-026E-4F00-B5F6-9CABADD99485}.Debug|x64.Build.0 = Debug|Any CPU
+		{25A0F774-026E-4F00-B5F6-9CABADD99485}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{25A0F774-026E-4F00-B5F6-9CABADD99485}.Debug|x86.Build.0 = Debug|Any CPU
+		{25A0F774-026E-4F00-B5F6-9CABADD99485}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{25A0F774-026E-4F00-B5F6-9CABADD99485}.Release|Any CPU.Build.0 = Release|Any CPU
+		{25A0F774-026E-4F00-B5F6-9CABADD99485}.Release|x64.ActiveCfg = Release|Any CPU
+		{25A0F774-026E-4F00-B5F6-9CABADD99485}.Release|x64.Build.0 = Release|Any CPU
+		{25A0F774-026E-4F00-B5F6-9CABADD99485}.Release|x86.ActiveCfg = Release|Any CPU
+		{25A0F774-026E-4F00-B5F6-9CABADD99485}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -2198,5 +2212,6 @@ Global
 		{F9B200C2-12E7-498A-BC57-F26845CCEA21} = {1F655D57-935D-D295-E882-5052ED9A6376}
 		{C3E3B01B-A63D-4893-9703-24032767A911} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 		{8E05219B-B070-407B-8DE7-482924C96F0A} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
+		{25A0F774-026E-4F00-B5F6-9CABADD99485} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 	EndGlobalSection
 EndGlobal

@@ -1,5 +1,6 @@
 using System.Reflection;
 using FluentMigrator.Runner;
+using FluentMigrator.Runner.VersionTableInfo;
 using FluentMigrator.Runner.Exceptions;
 using FluentMigrator.Runner.Initialization;
 using Microsoft.Extensions.DependencyInjection;
@@ -75,21 +76,44 @@ public static class ThemiaMigrations
         // unknown engine fails as a clean guard before any infrastructure is built.
         var (addProcessor, displayName) = Describe(engine);
 
+        // ONE RUNNER PER ASSEMBLY, each with its own version ledger. A single runner over every assembly
+        // would put them all back in one table, which is the whole defect: two migrations carrying the
+        // same number then make one of them a silent no-op, and Themia's own modules already collided
+        // that way (see ThemiaVersionTable). Every caller passes exactly one assembly today; the loop is
+        // what keeps the multi-assembly overload from quietly reintroducing the shared ledger.
+        foreach (var migrationAssembly in migrationAssemblies)
+        {
+            RunAssembly(engine, connectionString, options, addProcessor, displayName, migrationAssembly);
+        }
+    }
+
+    private static void RunAssembly(
+        MigrationEngine engine,
+        string connectionString,
+        ThemiaMigrationOptions? options,
+        Action<IMigrationRunnerBuilder> addProcessor,
+        string displayName,
+        Assembly migrationAssembly)
+    {
         var provider = new ServiceCollection()
             .AddFluentMigratorCore()
             .ConfigureRunner(rb =>
             {
                 addProcessor(rb);
                 rb.WithGlobalConnectionString(connectionString)
-                  .ScanIn(migrationAssemblies).For.Migrations();
+                  .ScanIn(migrationAssembly).For.Migrations();
             })
+            // Registered outside ConfigureRunner deliberately: .For.Migrations() scans for [Migration]
+            // types only, so an IVersionTableMetaData sitting in the scanned assembly would never be
+            // picked up. It has to be handed to the container explicitly.
+            .AddSingleton<IVersionTableMetaData>(new ThemiaVersionTable(migrationAssembly))
             .BuildServiceProvider(false);
 
         var scope = provider.CreateScope();
         var bodyFaulted = true;
         try
         {
-            RunCore(scope.ServiceProvider, engine, connectionString, options, displayName, migrationAssemblies);
+            RunCore(scope.ServiceProvider, engine, connectionString, options, displayName, migrationAssembly);
             bodyFaulted = false;
         }
         finally
@@ -165,7 +189,7 @@ public static class ThemiaMigrations
         string connectionString,
         ThemiaMigrationOptions? options,
         string displayName,
-        Assembly[] migrationAssemblies)
+        Assembly migrationAssembly)
     {
 
         // Fail fast if the supplied assemblies carry no migrations: discovery happens in memory (no DB
@@ -192,8 +216,9 @@ public static class ThemiaMigrations
 
         if (migrationCount == 0)
             throw new ArgumentException(
-                "The supplied assemblies contain no FluentMigrator [Migration] types; nothing would be applied.",
-                nameof(migrationAssemblies));
+                $"Assembly '{migrationAssembly.GetName().Name}' contains no FluentMigrator [Migration] types; "
+                + "nothing would be applied.",
+                nameof(migrationAssembly));
 
         var runner = serviceProvider.GetRequiredService<IMigrationRunner>();
 

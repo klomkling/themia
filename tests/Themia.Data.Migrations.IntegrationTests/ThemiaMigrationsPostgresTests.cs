@@ -39,7 +39,11 @@ public class ThemiaMigrationsPostgresTests : IAsyncLifetime
     {
         // The scenario the boot lock exists for: several instances start together, all see the same
         // migration pending, and all call Run. Without serialization they collide on the DDL and duplicate
-        // the VersionInfo row; with it, one applies and the rest find the work already done.
+        // the version row; with it, one applies and the rest find the work already done.
+        //
+        // The ledger is per assembly since coord #0078 — Themia no longer writes FluentMigrator's shared
+        // VersionInfo — so the count comes from this assembly's own table, derived rather than spelled
+        // out so a rename cannot leave this asserting against a table nothing writes.
         const int Instances = 6;
 
         var boots = Enumerable.Range(0, Instances).Select(_ => Task.Run(
@@ -48,7 +52,8 @@ public class ThemiaMigrationsPostgresTests : IAsyncLifetime
         await Task.WhenAll(boots);
 
         Assert.True(await TableExistsAsync("migrations_probe"));
-        Assert.Equal(1, await CountAsync("SELECT COUNT(*) FROM \"VersionInfo\""));
+        var ledger = new ThemiaVersionTable(typeof(ProbeMigration).Assembly).TableName;
+        Assert.Equal(1, await CountAsync($"SELECT COUNT(*) FROM \"{ledger}\""));
     }
 
     [Fact]

@@ -17,6 +17,18 @@ using Xunit;
 namespace Themia.Modules.Scheduling.IntegrationTests;
 
 /// <summary>
+/// The version ledger Themia.Scheduling owns. Since coord #0078 each migration assembly records itself in
+/// its own table instead of FluentMigrator's shared VersionInfo, so a cutover simulation has to clear the
+/// right one — clearing VersionInfo would leave these tests passing against a replay that never happened.
+/// </summary>
+internal static class SchedulingLedgerName
+{
+    internal static readonly string Value =
+        new global::Themia.Data.Migrations.ThemiaVersionTable(
+            global::Themia.Scheduling.SchedulingSchema.Assembly).TableName;
+}
+
+/// <summary>
 /// Lifecycle integration tests for <see cref="SchedulingModule"/> against a real database:
 /// <see cref="SchedulingModule.InitializeAsync"/> applies the FluentMigrator schema migration, and the
 /// registered <see cref="IExecutionHistoryStore"/> resolves to the EF-backed store and round-trips data.
@@ -300,7 +312,7 @@ public sealed class PostgresSchedulingModuleTests : SchedulingModuleTestsBase, I
     protected override string DropHistoryIndexSql =>
         "DROP INDEX scheduling.ix_execution_history_scheduler_trigger_fired";
     protected override string ClearVersionInfoSql =>
-        "DELETE FROM public.\"VersionInfo\"";
+        "DELETE FROM public.\"" + SchedulingLedgerName.Value + "\"";
     protected override string HistoryIndexCountSql =>
         "SELECT COUNT(*) AS \"Value\" FROM pg_indexes WHERE schemaname = 'scheduling' AND indexname = 'ix_execution_history_scheduler_trigger_fired'";
     protected override string QrtzJobDetailsCountSql =>
@@ -322,7 +334,7 @@ public sealed class SqlServerSchedulingModuleTests : SchedulingModuleTestsBase, 
     protected override string DropHistoryIndexSql =>
         "DROP INDEX ix_execution_history_scheduler_trigger_fired ON scheduling.execution_history";
     protected override string ClearVersionInfoSql =>
-        "DELETE FROM [dbo].[VersionInfo]";
+        "DELETE FROM [dbo].[" + SchedulingLedgerName.Value + "]";
     // sys.indexes names are unique per-table, not per-database — scope by object_id so an identically-named
     // index on another table cannot produce a false positive.
     protected override string HistoryIndexCountSql =>
@@ -397,8 +409,13 @@ public sealed class SqlServerCaseSensitiveCollationTests : IAsyncLifetime
             await RunWithMigrationContentionRetry(async () =>
             {
                 await using var scope = p2.CreateAsyncScope();
+                // EF1003: the table name is derived from an assembly name at build time, not from input —
+                // there is nothing here a parameter could carry, since a parameter cannot be a table name.
+                // Scoped to this statement rather than the file.
+#pragma warning disable EF1003
                 await scope.ServiceProvider.GetRequiredService<SchedulingDbContext>()
-                    .Database.ExecuteSqlRawAsync("DELETE FROM [dbo].[VersionInfo]");
+                    .Database.ExecuteSqlRawAsync("DELETE FROM [dbo].[" + SchedulingLedgerName.Value + "]");
+#pragma warning restore EF1003
             });
 
             LogContext.SetCurrentLogProvider(p2.GetRequiredService<ILoggerFactory>());

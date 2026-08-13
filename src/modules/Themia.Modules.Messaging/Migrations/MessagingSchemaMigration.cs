@@ -29,6 +29,14 @@ public sealed class MessagingSchemaMigration : Migration
     /// <inheritdoc />
     public override void Up()
     {
+        // Replay-safe (coord #0078): Themia migrations moved off FluentMigrator's shared VersionInfo onto a
+        // per-assembly ledger, so each replays once on an existing database. All objects here are created
+        // as one block, so the anchor table's presence is the whole migration's presence.
+        if (Schema.Table(OutboxTable).Exists())
+        {
+            return;
+        }
+
         IfDatabase("postgresql").Delegate(() => CreateTables(c => c.AsDateTimeOffset()));
         IfDatabase("mysql").Delegate(() => CreateTables(c => c.AsCustom("DATETIME(6)")));
         IfDatabase("sqlserver").Delegate(() => CreateTables(c => c.AsDateTimeOffset()));

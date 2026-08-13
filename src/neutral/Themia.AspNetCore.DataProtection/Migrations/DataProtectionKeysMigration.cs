@@ -12,6 +12,19 @@ public sealed class DataProtectionKeysMigration : Migration
     /// <inheritdoc />
     public override void Up()
     {
+        // Replay-safe: the ledger this migration records itself in moved from FluentMigrator's shared
+        // VersionInfo to a Themia-owned table (coord #0078), so on an existing database every Themia
+        // migration is replayed once. Without this guard that replay is a CREATE TABLE against a table
+        // that already exists — a boot failure. With it, a replay adopts what is there.
+        //
+        // It also self-heals the defect that prompted the change: where a consumer migration carrying the
+        // same version number silently skipped this one, the table genuinely does not exist and the
+        // replay creates it.
+        if (Schema.Table("data_protection_keys").Exists())
+        {
+            return;
+        }
+
         // LOCKSTEP: this per-provider list and the unsupported-provider guard below are two parallel
         // whitelists that MUST agree. Adding a provider here without adding its prefix to the guard leaves it
         // throwing NotSupportedException; adding it to the guard without a branch here lets it through to a

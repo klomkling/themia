@@ -69,6 +69,14 @@ public sealed class ChallengeSchemaMigration : Migration
     /// <inheritdoc />
     public override void Up()
     {
+        // Replay-safe (coord #0078): Themia migrations moved off FluentMigrator's shared VersionInfo onto a
+        // per-assembly ledger, so each replays once on an existing database. All objects here are created
+        // as one block, so the anchor table's presence is the whole migration's presence.
+        if (Schema.Table(ChallengesTable).Exists())
+        {
+            return;
+        }
+
         // LOCKSTEP: this per-provider list and the unsupported-provider guard below are two parallel
         // whitelists that MUST agree. Adding a provider here without adding its prefix to the guard
         // leaves it throwing NotSupportedException; adding it to the guard without a branch here lets

@@ -12,7 +12,62 @@ with the *why* and concrete upgrade steps.
 
 ## Unreleased
 
-_Nothing yet._
+### Themia migrations move to their own version tables
+
+**What changed:** every Themia migration assembly now records itself in `themia_version_<assembly>`
+instead of FluentMigrator's shared `VersionInfo`.
+
+**Why:** `VersionInfo` is also where your own FluentMigrator runner records. Neither runner can see the
+other's assemblies, and FluentMigrator skips any version number already listed — so a number used on
+both sides made one migration of the pair a silent no-op. Not a failed deploy: a missing table,
+discovered whenever something first touched it. ezy-assets lost `data_protection_keys` this way for
+fifteen days (coord #0078). Themia had also collided with *itself*: `Themia.Exceptional` and
+`Themia.Modules.Notifications` both shipped `202606220001`.
+
+**What happens on your first deploy with this version:**
+
+Each Themia migration **runs once more**. The new ledger is empty, so nothing in it says the migration
+already ran. This is safe and deliberate — every Themia migration now checks for the objects it creates
+and returns if they are there. You should see no schema change and no error.
+
+Where a collision had already skipped one of ours, the object genuinely does not exist and the replay
+**creates it**. That is the fix, not a side effect: if you have been missing a Themia table, this is the
+deploy that restores it.
+
+**What you should do:**
+
+- Nothing, for the upgrade itself. There is no configuration and no opt-out — a consumer choosing the
+  table name would be the same coordination problem one level up.
+- **Leave your existing `VersionInfo` rows alone.** They are harmless and deleting them makes the
+  upgrade irreversible. Themia no longer reads them.
+- Consider a reflection guard in your own suite, which catches a future collision at bump time — the
+  only window in which anything can still be renumbered:
+
+```csharp
+var ours   = VersionsIn(typeof(MigrationAssemblyMarker).Assembly);
+var theirs = VersionsIn(typeof(SomeThemiaMigration).Assembly);
+Assert.Empty(ours.Keys.Intersect(theirs.Keys));
+```
+
+**A backfill was considered and rejected.** Copying Themia's known version numbers out of `VersionInfo`
+into the new table would be cheaper, and it would have cemented exactly the bug this fixes: in the
+reported production state the row exists while the table does not, so a backfill marks a skipped
+migration as applied and the missing table never comes back.
+
+**Version numbers Themia owns**, so you can check them against your own:
+
+| Package | Versions |
+|---|---|
+| `Themia.Exceptional` | 202606060001, 202606220001 |
+| `Themia.Scheduling` | 202606120001, 202606130001 |
+| `Themia.Modules.Identity` | 202606140001, 202606150001, 202606160001, 202606160002, 202606160003, 202608050001 |
+| `Themia.Modules.Storage` | 202606170001, 202607150001 |
+| `Themia.Modules.Notifications` | 202606220001, 202607310002 |
+| `Themia.Modules.Export` | 202606270001 |
+| `Themia.Modules.Pdf` | 202607070001 |
+| `Themia.AspNetCore.DataProtection` | 202607260001 |
+| `Themia.Modules.Messaging` | 202607310001 |
+| `Themia.Challenges` | 202608040001 |
 
 ## 0.14.0
 

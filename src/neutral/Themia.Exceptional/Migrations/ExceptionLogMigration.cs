@@ -10,7 +10,14 @@ public sealed class ExceptionLogMigration : Migration
     /// <inheritdoc />
     public override void Up()
     {
-        // LOCKSTEP: this per-provider list and the unsupported-provider guard below are two parallel
+                // Replay-safe — see ThemiaVersionTable: moving off the shared VersionInfo replays every Themia
+        // migration once on an existing database.
+        if (Schema.Table("Exceptions").Exists())
+        {
+            return;
+        }
+
+// LOCKSTEP: this per-provider list and the unsupported-provider guard below are two parallel
         // whitelists that MUST agree. Adding a provider here (a CreateTable branch) without adding its
         // prefix to the guard leaves it throwing NotSupportedException; adding it to the guard without a
         // branch here lets it through to a column-type failure. Edit BOTH when adding a provider.

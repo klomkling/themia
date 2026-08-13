@@ -8,14 +8,39 @@ namespace Themia.Modules.Notifications.Migrations;
 public sealed class NotificationsPurgeIndexMigration : Migration
 {
     /// <inheritdoc />
+    private const string SchemaName = "notifications";
+    private const string IndexName = "ix_outbox_purge";
+
+    /// <inheritdoc />
     public override void Up()
     {
-        IfDatabase("postgresql").Execute.Sql(
-            "CREATE INDEX ix_outbox_purge ON \"notifications\".\"outbox_messages\" (status, sent_at);");
-        IfDatabase("sqlserver").Execute.Sql(
-            "CREATE INDEX ix_outbox_purge ON [notifications].[outbox_messages] (status, sent_at);");
-        IfDatabase("mysql").Execute.Sql(
-            "CREATE INDEX ix_outbox_purge ON outbox_messages (status, sent_at);");
+        // Replay-safe (coord #0078). No engine here supports CREATE INDEX IF NOT EXISTS across the board —
+        // PostgreSQL does, MySQL and SQL Server do not — so existence is checked before the statement is
+        // enqueued. The check is per engine for the same reason the SQL is: FluentMigrator drops InSchema
+        // on MySQL, where schema and database are one concept, so the index lives on an unqualified table.
+        IfDatabase("postgresql").Delegate(() =>
+        {
+            if (!Schema.Schema(SchemaName).Table("outbox_messages").Index(IndexName).Exists())
+            {
+                Execute.Sql($"CREATE INDEX {IndexName} ON \"{SchemaName}\".\"outbox_messages\" (status, sent_at);");
+            }
+        });
+
+        IfDatabase("sqlserver").Delegate(() =>
+        {
+            if (!Schema.Schema(SchemaName).Table("outbox_messages").Index(IndexName).Exists())
+            {
+                Execute.Sql($"CREATE INDEX {IndexName} ON [{SchemaName}].[outbox_messages] (status, sent_at);");
+            }
+        });
+
+        IfDatabase("mysql").Delegate(() =>
+        {
+            if (!Schema.Table("outbox_messages").Index(IndexName).Exists())
+            {
+                Execute.Sql($"CREATE INDEX {IndexName} ON outbox_messages (status, sent_at);");
+            }
+        });
     }
 
     /// <inheritdoc />
