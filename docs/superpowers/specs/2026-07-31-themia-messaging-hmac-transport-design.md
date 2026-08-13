@@ -36,6 +36,31 @@ This is not negotiable and not configurable. Canonicalization is where signature
 an adopter-swappable canonical string would reintroduce exactly the protocol drift #0050 exists to
 prevent.
 
+#### The timestamp format: two rules, and only one of them is about the sender
+
+Added 2026-08-14 answering propertiezy's question on coord #0068 — *is a `+00:00` sender
+non-conformant?* The answer needs both halves, because either alone is misleading.
+
+1. **A sender MUST emit the trailing `Z` form** (`2026-07-14T09:30:00.0000000Z`), which is what
+   `ThemiaHmacV1.FormatTimestamp` produces and what every golden vector carries. In .NET this means
+   formatting `DateTimeOffset.UtcDateTime`, not the `DateTimeOffset` — the latter renders a zero offset
+   as `+00:00`. A sender emitting `+00:00` is **off-spec**.
+
+2. **A verifier MUST sign the literal header value it received, never a reformatted one.** The parse
+   exists only to place the request in the freshness window. This is what keeps rule 1 from being
+   load-bearing for interop: an off-spec sender still verifies.
+
+So a `+00:00` sender is non-conformant but **not rejected**, and that is deliberate rather than an
+oversight. ezy-assets' marketplace signer emitted `+00:00` from the day the channel was built until
+2026-08-08 and nothing ever failed, because both verifiers echo (coord #0069). Rule 2 is the reason
+there is no forced migration; rule 1 is the reason the wire converges anyway.
+
+Rule 2 is the dangerous one to lose. A verifier that "normalises the timestamp before signing" 401s
+every request from a non-`Z` sender — total, permanent, and indistinguishable from a rotated secret, so
+the operator rotates the key and nothing changes. Pinned by
+`HmacVerifierTests.Verify_ShouldSucceed_WhenTheSenderEmitsAZeroOffsetInsteadOfZ` and its naive-timestamp
+sibling; falsified by making the verifier reformat, which fails exactly those two and nothing else.
+
 ### The rejection statuses are part of the scheme, not an implementation choice
 
 A conformant `themia-hmac-v1` verifier — in any language, in or out of this repo — **must** answer:

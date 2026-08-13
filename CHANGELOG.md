@@ -27,7 +27,30 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
-_Nothing yet._
+### Changed
+- **The fifth golden vector `lead-post-thai-multiline-body` is now `confirmed`** (coord #0068, #0069).
+  Both peers reproduced its signature independently: ezy-assets three ways, one of them a Python
+  implementation written from the documented rule rather than transcribed from any C#; propertiezy
+  recomputed all five canonical strings and signatures independently of its own signer. A vector Themia
+  generated and Themia verified proved only that Themia agrees with itself.
+
+  Its comment previously claimed the vector pins Thai payloads on this channel. Narrowed, per
+  propertiezy's finding: `System.Text.Json` escapes a newline to `\n` whatever the encoder, so **no .NET
+  producer can emit that body** — it is a **verifier** conformance case (a hand-built body, a non-.NET
+  producer or a rewriting proxy can deliver one). The decoded body is deliberately not parseable JSON,
+  which is the point: the newline must be read as data, not as a fifth canonical field.
+
+  **Consumers must re-copy the fixture** — `status` and two comments changed, so a byte-identical drift
+  guard will fail until they do. No signed field moved.
+
+### Fixed
+- **The `themia-hmac-v1` timestamp rule is now stated as two rules, and the second one is tested**
+  (coord #0068). A sender MUST emit the trailing `Z` form; a verifier MUST sign the literal header value
+  it received, never a reformatted one. The second is what keeps an off-spec `+00:00` sender working —
+  ezy-assets shipped one to production for two and a half weeks and nothing failed, because both
+  verifiers echo. A verifier that normalises before signing would 401 every request from that sender:
+  total, permanent, and indistinguishable from a rotated secret. Themia's verifier already behaved
+  correctly; **nothing pinned it**, so a future refactor could have removed it silently.
 
 ## [0.16.0] - 2026-08-13
 

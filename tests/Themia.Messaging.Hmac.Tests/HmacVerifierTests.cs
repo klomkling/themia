@@ -82,6 +82,54 @@ public class HmacVerifierTests
         Assert.Equal("in-2", result.MatchedKeyId);
     }
 
+    // THE VERIFIER SIGNS THE TIMESTAMP IT RECEIVED, NEVER A REFORMATTED ONE. themia-hmac-v1 requires
+    // senders to emit a trailing Z, but a sender that emits +00:00 must still verify: the canonical string
+    // is the literal header value, and the parse exists only to place the request in the skew window.
+    //
+    // This is not hypothetical. ezy-assets' marketplace signer emitted +00:00 from the day the channel was
+    // built until 2026-08-08 (coord #0069) and nothing ever failed, precisely because both verifiers echo.
+    // The day a verifier "normalises the timestamp before signing" instead, every inbound request from a
+    // non-Z sender 401s — a total, permanent failure indistinguishable from a rotated secret, so the
+    // operator rotates the key and nothing changes. Their side pinned this; ours had not.
+    [Fact]
+    public void Verify_ShouldSucceed_WhenTheSenderEmitsAZeroOffsetInsteadOfZ()
+    {
+        var peer = Peer();
+        const string OffsetTimestamp = "2026-07-14T09:30:00.0000000+00:00";
+        Assert.NotEqual(OffsetTimestamp, ThemiaHmacV1.FormatTimestamp(Now));
+
+        var headers = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase)
+        {
+            [peer.HeaderNames.Timestamp] = OffsetTimestamp,
+            [peer.HeaderNames.Signature] = ThemiaHmacV1.Sign(
+                ThemiaHmacV1.Canonicalize(
+                    OffsetTimestamp, "PUT", "/api/v1/ingest/listings", "{}"),
+                Secret),
+        };
+
+        Assert.Equal(HmacVerdict.Verified, Verify(peer, headers).Verdict);
+    }
+
+    // The same rule at the other end of the format range: a naive timestamp (no designator at all) is read
+    // as UTC for the window, and signed as the literal it arrived as.
+    [Fact]
+    public void Verify_ShouldSucceed_WhenTheSenderEmitsANaiveTimestamp()
+    {
+        var peer = Peer();
+        const string NaiveTimestamp = "2026-07-14T09:30:00.0000000";
+
+        var headers = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase)
+        {
+            [peer.HeaderNames.Timestamp] = NaiveTimestamp,
+            [peer.HeaderNames.Signature] = ThemiaHmacV1.Sign(
+                ThemiaHmacV1.Canonicalize(
+                    NaiveTimestamp, "PUT", "/api/v1/ingest/listings", "{}"),
+                Secret),
+        };
+
+        Assert.Equal(HmacVerdict.Verified, Verify(peer, headers).Verdict);
+    }
+
     // Absence must mean v1 specifically, never "newest" — otherwise adding v2 later silently
     // reinterprets every legacy request that predates the header.
     [Fact]

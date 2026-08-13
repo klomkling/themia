@@ -51,9 +51,11 @@ public class GoldenVectorTests
     }
 
     // The fixture must be reachable at runtime; an empty load would make every Theory above vacuous.
+    // Five since 2026-08-14, when lead-post-thai-multiline-body was promoted from candidate after both
+    // peers reproduced its signature independently (coord #0068, #0069).
     [Fact]
-    public void Vectors_ShouldLoad_AndContainTheFourConfirmedCases()
-        => Assert.Equal(4, Load().Count(v => v.Status == "confirmed"));
+    public void Vectors_ShouldLoad_AndContainTheFiveConfirmedCases()
+        => Assert.Equal(5, Load().Count(v => v.Status == "confirmed"));
 
     [Fact]
     public void Canonicalize_ShouldRetainTheSeparatorNewline_ForAnEmptyBody()
