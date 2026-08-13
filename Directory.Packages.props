@@ -13,6 +13,17 @@
          full suite green. Revisit if MDS publishes its own SQLitePCLRaw 3.x baseline. -->
     <PackageVersion Include="SQLitePCLRaw.core" Version="3.0.3" />
     <PackageVersion Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.3" />
+
+    <!-- Transitive pin (test-only, via Testcontainers 4.13.0): force SSH.NET to 2026.0.0. Testcontainers
+         pulls 2025.1.0, which carries the high-severity GHSA-q939-rpr3-3284 (NU1903) — ScpClient's
+         recursive download honours server-supplied filenames, so a hostile SSH server can write outside
+         the download directory. The advisory's range is <= 2025.1.0 and 2026.0.0 is its first patched
+         version, verified against the advisory rather than assumed from the version being newer.
+         Testcontainers 4.13.0 is already the latest, so bumping it does not clear this; the pin does.
+         Themia never calls ScpClient — SSH.NET arrives only because Testcontainers can drive Docker over
+         SSH — but the graph is what the audit sees, and suppressing an advisory we can simply outrun is
+         the wrong trade. Drop this when Testcontainers ships a build that pulls 2026.x itself. -->
+    <PackageVersion Include="SSH.NET" Version="2026.0.0" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.6.0" />
     <PackageVersion Include="xunit" Version="2.9.3" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
