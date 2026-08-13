@@ -27,7 +27,18 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
-_Nothing yet._
+### Security
+- **Pinned `SSH.NET` to 2026.0.0** (`GHSA-q939-rpr3-3284`, high). `ScpClient`'s recursive download honours
+  server-supplied filenames, so a hostile SSH server can write outside the download directory. The
+  advisory's affected range is `<= 2025.1.0` and 2026.0.0 is its first patched version — read from the
+  advisory rather than inferred from the version being newer.
+
+  Test-only exposure: SSH.NET arrives transitively through Testcontainers, which can drive Docker over
+  SSH, and Themia never calls `ScpClient`. Bumping Testcontainers does not clear it — 4.13.0 is already
+  the latest and still pulls 2025.1.0 — so this is a transitive pin, matching how the SQLitePCLRaw
+  advisory was handled. Not suppressed: the graph is what an audit sees, and suppressing an advisory a
+  pin can outrun is the wrong trade. The pin comes out when Testcontainers ships a build that pulls
+  2026.x itself.
 
 ## [0.15.0] - 2026-08-08
 
