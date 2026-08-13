@@ -54,6 +54,8 @@ public sealed class HmacVerifier : IHmacVerifier
             return HmacVerificationResult.SignatureMismatch();
         }
 
+        // THE LITERAL HEADER VALUE, never a reformatted one. A sender that emits +00:00 or a naive
+        // timestamp is off-spec but must still verify; reformatting here would 401 it permanently.
         var canonical = ThemiaHmacV1.Canonicalize(timestampHeader!, method, pathAndQuery, body);
         foreach (var (keyId, secret) in candidates)
         {
