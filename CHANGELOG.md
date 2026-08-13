@@ -27,6 +27,10 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+_Nothing yet._
+
+## [0.16.0] - 2026-08-13
+
 ### Fixed
 - **(breaking) Themia migrations no longer share the consumer's `VersionInfo` table** (coord #0078).
   Each migration assembly now records itself in `themia_version_<assembly>`.
