@@ -12,15 +12,23 @@ updates:
     # — e.g. FluentMigrator + its per-engine runners — produce separate, mutually-conflicting PRs
     # that Dependabot then auto-closes as "no longer updatable". Pattern groups are listed BEFORE
     # the catch-all nuget-minor-patch so a matching dependency joins its family group first.
+    #
+    # ORDER IS LOAD-BEARING, and not only for the catch-all. The NuGet updater re-runs full project
+    # discovery per dependency, and discovery of this repo is expensive — 145 csproj, central package
+    # management, 36 projects on two TFMs. Measured on the 2026-08-10 and 2026-08-17 runs: the first
+    # discovery alone took 10m46s, each re-run 4-17s, 154 discoveries in total, and the job was killed
+    # by the ~55-minute cap having analyzed 18 of 77 dependencies. Both runs ended
+    # "##[error]The operation was canceled." within one second of the same duration.
+    #
+    # Dependabot analyses groups in the order declared here, so whatever sits below roughly the first
+    # 20 dependencies is never reached at all. The order is therefore risk-first: security-facing and
+    # runtime packages before build-time tooling, and test-only families last. This does NOT fix the
+    # timeout — it decides which dependencies get the time there is.
     groups:
-      fluentmigrator:
+      aspnetcore:
+        # First deliberately: CLAUDE.md requires Microsoft.AspNetCore.* to stay patched.
         patterns:
-          - "FluentMigrator*"
-      efcore:
-        patterns:
-          - "Microsoft.EntityFrameworkCore*"
-          - "Npgsql*"
-          - "EFCore.NamingConventions"
+          - "Microsoft.AspNetCore.*"
       identitymodel:
         # The Microsoft.IdentityModel.* family must be version-consistent (a split bump breaks token
         # validation); keep them in one PR. Note they are pinned to override JwtBearer's transitive
@@ -28,9 +36,18 @@ updates:
         patterns:
           - "Microsoft.IdentityModel.*"
           - "System.IdentityModel.Tokens.Jwt"
-      testcontainers:
+      microsoft-extensions:
         patterns:
-          - "Testcontainers*"
+          - "Microsoft.Extensions.*"
+      efcore:
+        # Carries Npgsql, i.e. a database driver, which is why it sits above the build-time families.
+        patterns:
+          - "Microsoft.EntityFrameworkCore*"
+          - "Npgsql*"
+          - "EFCore.NamingConventions"
+      fluentmigrator:
+        patterns:
+          - "FluentMigrator*"
       quartz:
         patterns:
           - "Quartz*"
@@ -41,19 +58,24 @@ updates:
         patterns:
           - "AWSSDK*"
       roslyn:
+        # Build-time only (analyzers, source generators) — below anything that ships at runtime.
         patterns:
           - "Microsoft.CodeAnalysis*"
-      aspnetcore:
+      testcontainers:
+        # Test-only from here down: last to be analysed, because a stale test dependency costs a
+        # developer minutes and a stale runtime one can cost a consumer an advisory.
         patterns:
-          - "Microsoft.AspNetCore.*"
-      microsoft-extensions:
-        patterns:
-          - "Microsoft.Extensions.*"
+          - "Testcontainers*"
       xunit:
         patterns:
           - "xunit*"
       # Catch-all for everything else: bundle remaining minor/patch updates into one PR.
       # Must stay LAST — it has no patterns, so it would otherwise grab every dependency first.
+      #
+      # WARNING: nothing here is currently reached before the timeout, and the ungrouped set includes
+      # security-facing packages — SSH.NET (which needed a manual pin for GHSA-q939-rpr3-3284 in #209),
+      # Microsoft.Data.SqlClient, MySqlConnector, StackExchange.Redis, Konscious…Argon2, MessagePack.
+      # Reordering above does not solve that; only cutting the per-job discovery cost will.
       nuget-minor-patch:
         update-types:
           - minor
