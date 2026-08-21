@@ -52,6 +52,24 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
   total, permanent, and indistinguishable from a rotated secret. Themia's verifier already behaved
   correctly; **nothing pinned it**, so a future refactor could have removed it silently.
 
+## [0.16.1] - 2026-08-22
+
+### Fixed
+- **Four migration assemblies were not replay-safe, so the 0.16.0 upgrade crash-looped any host taking
+  them** (coord #0096). 0.16.0 moved every Themia migration onto a per-assembly ledger, which starts
+  empty on an existing database and therefore replays each migration exactly once — safe only because
+  every migration was said to check for what it creates. `Themia.Modules.Identity`,
+  `Themia.Modules.Notifications`, `Themia.Modules.Storage` and `Themia.Modules.Export` guarded only the
+  **schema** they create and then created their tables unconditionally, so the replay failed
+  `CREATE TABLE` with 42P07 and the host died at boot. `Themia.Scheduling` had guarded each object
+  individually and was never affected; neither were the assemblies that create no schema of their own.
+
+  **Nothing pinned the claim.** `Applying_twice_is_safe` is named for this case and cannot reach it: its
+  first pass records the version in the ledger, so FluentMigrator skips the migration on the second and
+  `Up()` is never re-entered — it tested the runner's idempotence, not the migration's. The new
+  `LedgerlessReplayTests` drops the ledger between the two passes, which reproduces the upgrade state
+  without installing the old package, and it failed for exactly those four assemblies before the fix.
+
 ## [0.16.0] - 2026-08-13
 
 ### Fixed

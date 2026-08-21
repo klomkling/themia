@@ -18,6 +18,7 @@ public sealed class StorageSchemaMigration : Migration
         IfDatabase("postgresql").Delegate(() => CreateFilteredIndexes(SchemaName, "\"key\"", "false"));
         IfDatabase("sqlserver").Delegate(() => CreateFilteredIndexes($"[{SchemaName}]", "[key]", "0"));
 
+
         IfDatabase(p =>
                 !p.StartsWith("Postgres", StringComparison.OrdinalIgnoreCase) &&
                 !p.StartsWith("SqlServer", StringComparison.OrdinalIgnoreCase))
@@ -26,11 +27,33 @@ public sealed class StorageSchemaMigration : Migration
                 "is not supported; add a migration branch for it."));
     }
 
+    private const string TenantIndexName = "ix_storage_objects_tenant";
+
+    // Replay-safe, per OBJECT rather than per schema. The per-assembly version ledger (coord #0078)
+    // starts empty on every existing database, so this Up() runs once against objects that are already
+    // there — guarding only the schema would then leave CREATE TABLE to fail with 42P07 and crash the
+    // host at boot. Existence is captured before any CREATE so the checks read the pre-migration state
+    // and never depend on statement order within Up().
     private void CreateSchemaAndTable()
     {
-        if (!Schema.Schema(SchemaName).Exists())
+        var schemaExists = Schema.Schema(SchemaName).Exists();
+        var tableExists = Schema.Schema(SchemaName).Table("storage_objects").Exists();
+        var tenantIndexExists = tableExists
+            && Schema.Schema(SchemaName).Table("storage_objects").Index(TenantIndexName).Exists();
+
+        if (!schemaExists)
         {
             Create.Schema(SchemaName);
+        }
+
+        if (tableExists)
+        {
+            if (!tenantIndexExists)
+            {
+                CreateTenantIndex();
+            }
+
+            return;
         }
 
         Create.Table("storage_objects").InSchema(SchemaName)
@@ -51,10 +74,13 @@ public sealed class StorageSchemaMigration : Migration
             .WithColumn("restored_at").AsDateTimeOffset().Nullable()
             .WithColumn("restored_by").AsString(100).Nullable();
 
-        // Quota scan path: usage is summed per tenant.
-        Create.Index("ix_storage_objects_tenant").OnTable("storage_objects").InSchema(SchemaName)
-            .OnColumn("tenant_id").Ascending();
+        CreateTenantIndex();
     }
+
+    /// <summary>Quota scan path: usage is summed per tenant.</summary>
+    private void CreateTenantIndex() =>
+        Create.Index(TenantIndexName).OnTable("storage_objects").InSchema(SchemaName)
+            .OnColumn("tenant_id").Ascending();
 
     /// <summary>Emits the per-tenant + platform filtered unique indexes on the logical key, excluding
     /// soft-deleted rows so a deleted key can be re-uploaded. <paramref name="schema"/> is pre-escaped
@@ -64,8 +90,19 @@ public sealed class StorageSchemaMigration : Migration
     /// (<c>false</c> on PostgreSQL, <c>0</c> on SQL Server).</summary>
     private void CreateFilteredIndexes(string schema, string keyColumn, string falseLiteral)
     {
-        Execute.Sql($"CREATE UNIQUE INDEX ux_storage_objects_tenant_key ON {schema}.storage_objects (tenant_id, {keyColumn}) WHERE tenant_id IS NOT NULL AND is_deleted = {falseLiteral};");
-        Execute.Sql($"CREATE UNIQUE INDEX ux_storage_objects_platform_key ON {schema}.storage_objects ({keyColumn}) WHERE tenant_id IS NULL AND is_deleted = {falseLiteral};");
+        // Guarded for the same reason as the table above: a replay against an existing database reaches
+        // here too. These are raw SQL because neither engine expresses a filtered unique index through
+        // FluentMigrator's builder, so the existence check has to be made explicitly rather than by IF
+        // NOT EXISTS — SQL Server has no such clause for CREATE INDEX.
+        if (!Schema.Schema(SchemaName).Table("storage_objects").Index("ux_storage_objects_tenant_key").Exists())
+        {
+            Execute.Sql($"CREATE UNIQUE INDEX ux_storage_objects_tenant_key ON {schema}.storage_objects (tenant_id, {keyColumn}) WHERE tenant_id IS NOT NULL AND is_deleted = {falseLiteral};");
+        }
+
+        if (!Schema.Schema(SchemaName).Table("storage_objects").Index("ux_storage_objects_platform_key").Exists())
+        {
+            Execute.Sql($"CREATE UNIQUE INDEX ux_storage_objects_platform_key ON {schema}.storage_objects ({keyColumn}) WHERE tenant_id IS NULL AND is_deleted = {falseLiteral};");
+        }
     }
 
     /// <inheritdoc />
