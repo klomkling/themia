@@ -20,12 +20,16 @@ Themia.AspNetCore.DataProtection.IDataProtectionKeyStore
 Themia.AspNetCore.DataProtection.IDataProtectionKeyStore.Delete(long id) -> bool
 Themia.AspNetCore.DataProtection.IDataProtectionKeyStore.GetAll() -> System.Collections.Generic.IReadOnlyList<Themia.AspNetCore.DataProtection.DataProtectionKeyRecord!>!
 Themia.AspNetCore.DataProtection.IDataProtectionKeyStore.StoreXml(string? friendlyName, string! xml) -> void
+Themia.AspNetCore.DataProtection.Migrations.DataProtectionKeysCreatedAtDefaultMigration
+Themia.AspNetCore.DataProtection.Migrations.DataProtectionKeysCreatedAtDefaultMigration.DataProtectionKeysCreatedAtDefaultMigration() -> void
 Themia.AspNetCore.DataProtection.Migrations.DataProtectionKeysMigration
 Themia.AspNetCore.DataProtection.Migrations.DataProtectionKeysMigration.DataProtectionKeysMigration() -> void
 Themia.AspNetCore.DataProtection.ThemiaXmlRepository
 Themia.AspNetCore.DataProtection.ThemiaXmlRepository.GetAllElements() -> System.Collections.Generic.IReadOnlyCollection<System.Xml.Linq.XElement!>!
 Themia.AspNetCore.DataProtection.ThemiaXmlRepository.StoreElement(System.Xml.Linq.XElement! element, string! friendlyName) -> void
 Themia.AspNetCore.DataProtection.ThemiaXmlRepository.ThemiaXmlRepository(Themia.AspNetCore.DataProtection.IDataProtectionKeyStore! keys) -> void
+override Themia.AspNetCore.DataProtection.Migrations.DataProtectionKeysCreatedAtDefaultMigration.Down() -> void
+override Themia.AspNetCore.DataProtection.Migrations.DataProtectionKeysCreatedAtDefaultMigration.Up() -> void
 override Themia.AspNetCore.DataProtection.Migrations.DataProtectionKeysMigration.Down() -> void
 override Themia.AspNetCore.DataProtection.Migrations.DataProtectionKeysMigration.Up() -> void
 static Themia.AspNetCore.DataProtection.DataProtectionBuilderExtensions.PersistKeysToThemia(this Microsoft.AspNetCore.DataProtection.IDataProtectionBuilder! builder, Themia.AspNetCore.DataProtection.IDataProtectionKeyDialect! dialect, Themia.Data.Migrations.MigrationEngine engine, string! connectionString, bool runMigration = true, Themia.Data.Migrations.ThemiaMigrationOptions? migrationOptions = null) -> Microsoft.AspNetCore.DataProtection.IDataProtectionBuilder!
