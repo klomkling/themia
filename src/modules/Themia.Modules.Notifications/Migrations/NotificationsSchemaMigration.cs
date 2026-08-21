@@ -42,6 +42,11 @@ public sealed class NotificationsSchemaMigration : Migration
                 "database provider is not supported; add a migration branch for it."));
     }
 
+    // Replay-safe per TABLE, not merely per schema. The per-assembly version ledger (coord #0078)
+    // starts empty on every existing database, so this Up() runs once against objects that are already
+    // there; guarding only the schema leaves CREATE TABLE to fail 42P07 and crashes the host at boot.
+    // Each table's index is created with it, so skipping a table skips its index too — these objects
+    // are only ever created here, together.
     private void CreateTables(DateTimeType dt)
     {
         if (!Schema.Schema(SchemaName).Exists())
@@ -49,76 +54,88 @@ public sealed class NotificationsSchemaMigration : Migration
             Create.Schema(SchemaName);
         }
 
-        // Operational outbox row — not soft-deletable. Terminal rows are deleted by the retention purge,
-        // which is OPT-IN via NotificationsModuleOptions.PurgeEnabled; without it this table grows forever.
-        var outbox = Create.Table("outbox_messages").InSchema(SchemaName)
-            .WithColumn("id").AsGuid().NotNullable().PrimaryKey()
-            .WithColumn("tenant_id").AsString(100).Nullable()
-            .WithColumn("channel").AsInt32().NotNullable()
-            .WithColumn("recipient").AsString(512).NotNullable()
-            .WithColumn("subject").AsString(1024).Nullable()
-            .WithColumn("body").AsString(int.MaxValue).NotNullable()
-            .WithColumn("status").AsInt32().NotNullable()
-            .WithColumn("attempts").AsInt32().NotNullable();
-        dt(outbox.WithColumn("next_attempt_at")).NotNullable();
-        dt(outbox.WithColumn("scheduled_for")).Nullable();
-        outbox.WithColumn("lease_owner").AsString(100).Nullable();
-        dt(outbox.WithColumn("lease_expires_at")).Nullable();
-        dt(outbox.WithColumn("created_at")).NotNullable();
-        dt(outbox.WithColumn("sent_at")).Nullable();
-        outbox.WithColumn("last_error").AsString(int.MaxValue).Nullable();
+        if (!Schema.Schema(SchemaName).Table("outbox_messages").Exists())
+        {
+            // Operational outbox row — not soft-deletable. Terminal rows are deleted by the retention purge,
+            // which is OPT-IN via NotificationsModuleOptions.PurgeEnabled; without it this table grows forever.
+            var outbox = Create.Table("outbox_messages").InSchema(SchemaName)
+                .WithColumn("id").AsGuid().NotNullable().PrimaryKey()
+                .WithColumn("tenant_id").AsString(100).Nullable()
+                .WithColumn("channel").AsInt32().NotNullable()
+                .WithColumn("recipient").AsString(512).NotNullable()
+                .WithColumn("subject").AsString(1024).Nullable()
+                .WithColumn("body").AsString(int.MaxValue).NotNullable()
+                .WithColumn("status").AsInt32().NotNullable()
+                .WithColumn("attempts").AsInt32().NotNullable();
+            dt(outbox.WithColumn("next_attempt_at")).NotNullable();
+            dt(outbox.WithColumn("scheduled_for")).Nullable();
+            outbox.WithColumn("lease_owner").AsString(100).Nullable();
+            dt(outbox.WithColumn("lease_expires_at")).Nullable();
+            dt(outbox.WithColumn("created_at")).NotNullable();
+            dt(outbox.WithColumn("sent_at")).Nullable();
+            outbox.WithColumn("last_error").AsString(int.MaxValue).Nullable();
 
-        Create.Index("ix_outbox_tenant").OnTable("outbox_messages").InSchema(SchemaName)
-            .OnColumn("tenant_id").Ascending();
+            Create.Index("ix_outbox_tenant").OnTable("outbox_messages").InSchema(SchemaName)
+                .OnColumn("tenant_id").Ascending();
+        }
 
-        var inApp = Create.Table("in_app_notifications").InSchema(SchemaName)
-            .WithColumn("id").AsGuid().NotNullable().PrimaryKey()
-            .WithColumn("tenant_id").AsString(100).Nullable()
-            .WithColumn("user_id").AsString(100).NotNullable()
-            .WithColumn("title").AsString(512).NotNullable()
-            .WithColumn("body").AsString(int.MaxValue).NotNullable()
-            .WithColumn("is_read").AsBoolean().NotNullable();
-        dt(inApp.WithColumn("read_at")).Nullable();
-        dt(inApp.WithColumn("created_at")).NotNullable();
-        inApp.WithColumn("created_by").AsString(100).Nullable();
-        dt(inApp.WithColumn("last_modified_at")).Nullable();
-        inApp.WithColumn("last_modified_by").AsString(100).Nullable();
+        if (!Schema.Schema(SchemaName).Table("in_app_notifications").Exists())
+        {
+            var inApp = Create.Table("in_app_notifications").InSchema(SchemaName)
+                .WithColumn("id").AsGuid().NotNullable().PrimaryKey()
+                .WithColumn("tenant_id").AsString(100).Nullable()
+                .WithColumn("user_id").AsString(100).NotNullable()
+                .WithColumn("title").AsString(512).NotNullable()
+                .WithColumn("body").AsString(int.MaxValue).NotNullable()
+                .WithColumn("is_read").AsBoolean().NotNullable();
+            dt(inApp.WithColumn("read_at")).Nullable();
+            dt(inApp.WithColumn("created_at")).NotNullable();
+            inApp.WithColumn("created_by").AsString(100).Nullable();
+            dt(inApp.WithColumn("last_modified_at")).Nullable();
+            inApp.WithColumn("last_modified_by").AsString(100).Nullable();
 
-        Create.Index("ix_in_app_tenant_user").OnTable("in_app_notifications").InSchema(SchemaName)
-            .OnColumn("tenant_id").Ascending().OnColumn("user_id").Ascending().OnColumn("is_read").Ascending();
+            Create.Index("ix_in_app_tenant_user").OnTable("in_app_notifications").InSchema(SchemaName)
+                .OnColumn("tenant_id").Ascending().OnColumn("user_id").Ascending().OnColumn("is_read").Ascending();
+        }
 
-        var pref = Create.Table("notification_preferences").InSchema(SchemaName)
-            .WithColumn("id").AsGuid().NotNullable().PrimaryKey()
-            .WithColumn("tenant_id").AsString(100).Nullable()
-            .WithColumn("user_id").AsString(100).Nullable()
-            .WithColumn("channel").AsInt32().NotNullable()
-            .WithColumn("is_enabled").AsBoolean().NotNullable()
-            .WithColumn("locale").AsString(20).Nullable();
-        dt(pref.WithColumn("created_at")).NotNullable();
-        pref.WithColumn("created_by").AsString(100).Nullable();
-        dt(pref.WithColumn("last_modified_at")).Nullable();
-        pref.WithColumn("last_modified_by").AsString(100).Nullable();
+        if (!Schema.Schema(SchemaName).Table("notification_preferences").Exists())
+        {
+            var pref = Create.Table("notification_preferences").InSchema(SchemaName)
+                .WithColumn("id").AsGuid().NotNullable().PrimaryKey()
+                .WithColumn("tenant_id").AsString(100).Nullable()
+                .WithColumn("user_id").AsString(100).Nullable()
+                .WithColumn("channel").AsInt32().NotNullable()
+                .WithColumn("is_enabled").AsBoolean().NotNullable()
+                .WithColumn("locale").AsString(20).Nullable();
+            dt(pref.WithColumn("created_at")).NotNullable();
+            pref.WithColumn("created_by").AsString(100).Nullable();
+            dt(pref.WithColumn("last_modified_at")).Nullable();
+            pref.WithColumn("last_modified_by").AsString(100).Nullable();
 
-        Create.Index("ix_pref_tenant_user_channel").OnTable("notification_preferences").InSchema(SchemaName)
-            .OnColumn("tenant_id").Ascending().OnColumn("user_id").Ascending().OnColumn("channel").Ascending();
+            Create.Index("ix_pref_tenant_user_channel").OnTable("notification_preferences").InSchema(SchemaName)
+                .OnColumn("tenant_id").Ascending().OnColumn("user_id").Ascending().OnColumn("channel").Ascending();
+        }
 
-        var provider = Create.Table("tenant_provider_configs").InSchema(SchemaName)
-            .WithColumn("id").AsGuid().NotNullable().PrimaryKey()
-            .WithColumn("tenant_id").AsString(100).Nullable()
-            .WithColumn("channel").AsInt32().NotNullable()
-            .WithColumn("host").AsString(256).Nullable()
-            .WithColumn("port").AsInt32().Nullable()
-            .WithColumn("username").AsString(256).Nullable()
-            .WithColumn("password").AsString(512).Nullable()
-            .WithColumn("from_address").AsString(256).Nullable()
-            .WithColumn("use_ssl").AsBoolean().NotNullable();
-        dt(provider.WithColumn("created_at")).NotNullable();
-        provider.WithColumn("created_by").AsString(100).Nullable();
-        dt(provider.WithColumn("last_modified_at")).Nullable();
-        provider.WithColumn("last_modified_by").AsString(100).Nullable();
+        if (!Schema.Schema(SchemaName).Table("tenant_provider_configs").Exists())
+        {
+            var provider = Create.Table("tenant_provider_configs").InSchema(SchemaName)
+                .WithColumn("id").AsGuid().NotNullable().PrimaryKey()
+                .WithColumn("tenant_id").AsString(100).Nullable()
+                .WithColumn("channel").AsInt32().NotNullable()
+                .WithColumn("host").AsString(256).Nullable()
+                .WithColumn("port").AsInt32().Nullable()
+                .WithColumn("username").AsString(256).Nullable()
+                .WithColumn("password").AsString(512).Nullable()
+                .WithColumn("from_address").AsString(256).Nullable()
+                .WithColumn("use_ssl").AsBoolean().NotNullable();
+            dt(provider.WithColumn("created_at")).NotNullable();
+            provider.WithColumn("created_by").AsString(100).Nullable();
+            dt(provider.WithColumn("last_modified_at")).Nullable();
+            provider.WithColumn("last_modified_by").AsString(100).Nullable();
 
-        Create.Index("ix_provider_tenant_channel").OnTable("tenant_provider_configs").InSchema(SchemaName)
-            .OnColumn("tenant_id").Ascending().OnColumn("channel").Ascending();
+            Create.Index("ix_provider_tenant_channel").OnTable("tenant_provider_configs").InSchema(SchemaName)
+                .OnColumn("tenant_id").Ascending().OnColumn("channel").Ascending();
+        }
     }
 
     /// <summary>Creates the composite index the per-engine claim query scans (status, next_attempt_at).
@@ -126,6 +143,14 @@ public sealed class NotificationsSchemaMigration : Migration
     /// is interpolated, only the fixed identifier.</summary>
     private void CreateClaimIndex(string table)
     {
+        // Guarded for the same reason as the tables: a replay reaches here too. Raw SQL because the
+        // per-engine quoting differs, so the check is explicit rather than IF NOT EXISTS — SQL Server
+        // has no such clause for CREATE INDEX.
+        if (Schema.Schema(SchemaName).Table("outbox_messages").Index("ix_outbox_claim").Exists())
+        {
+            return;
+        }
+
         Execute.Sql($"CREATE INDEX ix_outbox_claim ON {table} (status, next_attempt_at);");
     }
 

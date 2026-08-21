@@ -40,6 +40,11 @@ public sealed class ExportSchemaMigration : Migration
         Delete.Schema(SchemaName);
     }
 
+    // Replay-safe per TABLE, not merely per schema. The per-assembly version ledger (coord #0078) starts
+    // empty on every existing database, so this Up() runs once against objects that are already there;
+    // guarding only the schema leaves CREATE TABLE to fail 42P07 and crashes the host at boot. Each table
+    // carries its own indexes, so skipping a table skips them with it — these objects are only ever
+    // created here, together, which is why a half-present table is not a state worth repairing.
     private void CreateTables(DateTimeType dt)
     {
         if (!Schema.Schema(SchemaName).Exists())
@@ -47,8 +52,15 @@ public sealed class ExportSchemaMigration : Migration
             Create.Schema(SchemaName);
         }
 
-        CreateRuns(dt);
-        CreateSchedules(dt);
+        if (!Schema.Schema(SchemaName).Table("export_runs").Exists())
+        {
+            CreateRuns(dt);
+        }
+
+        if (!Schema.Schema(SchemaName).Table("export_schedules").Exists())
+        {
+            CreateSchedules(dt);
+        }
     }
 
     private void CreateRuns(DateTimeType dt)

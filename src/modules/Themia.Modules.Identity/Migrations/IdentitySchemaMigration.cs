@@ -25,6 +25,18 @@ public sealed class IdentitySchemaMigration : Migration
                 "is not supported; add a migration branch for it."));
     }
 
+    // Replay-safe, PER OBJECT. The per-assembly version ledger (coord #0078) starts empty on every
+    // existing database, so this Up() runs once against objects that are already there; guarding only the
+    // schema left CREATE TABLE identity.users to fail 42P07 and crash the host at boot (coord #0096).
+    //
+    // A single sentinel on `users` would be shorter and is not enough. This migration creates its objects
+    // in one transaction, so IT cannot leave a partial schema — but a consumer can, by creating one of
+    // these tables itself before adopting the module, which is precisely what happened to
+    // data_protection_keys in coord #0085. Returning on the first object found would then leave the rest
+    // missing forever, which is the same defect that made a version backfill unacceptable on #0078.
+    //
+    // Existence is captured before any CREATE, so every check reads the pre-migration state and none of
+    // them depends on statement order within this method.
     private void CreateSchemaAndTables()
     {
         if (!Schema.Schema(SchemaName).Exists())
@@ -32,108 +44,174 @@ public sealed class IdentitySchemaMigration : Migration
             Create.Schema(SchemaName);
         }
 
-        Create.Table("users").InSchema(SchemaName)
-            .WithColumn("id").AsGuid().NotNullable().PrimaryKey()
-            .WithColumn("tenant_id").AsString(100).Nullable()
-            .WithColumn("user_name").AsString(256).NotNullable()
-            .WithColumn("normalized_user_name").AsString(256).NotNullable()
-            .WithColumn("email").AsString(256).Nullable()
-            .WithColumn("normalized_email").AsString(256).Nullable()
-            .WithColumn("email_confirmed").AsBoolean().NotNullable()
-            .WithColumn("phone_number").AsString(64).Nullable()
-            .WithColumn("phone_number_confirmed").AsBoolean().NotNullable()
-            .WithColumn("password_hash").AsString(1024).Nullable()
-            .WithColumn("security_stamp").AsString(128).NotNullable()
-            .WithColumn("is_active").AsBoolean().NotNullable()
-            .WithColumn("access_failed_count").AsInt32().NotNullable()
-            .WithColumn("lockout_end").AsDateTimeOffset().Nullable()
-            .WithColumn("lockout_enabled").AsBoolean().NotNullable()
-            .WithColumn("two_factor_enabled").AsBoolean().NotNullable()
-            .WithColumn("created_at").AsDateTimeOffset().NotNullable()
-            .WithColumn("created_by").AsString(100).Nullable()
-            .WithColumn("last_modified_at").AsDateTimeOffset().Nullable()
-            .WithColumn("last_modified_by").AsString(100).Nullable()
-            .WithColumn("is_deleted").AsBoolean().NotNullable()
-            .WithColumn("deleted_at").AsDateTimeOffset().Nullable()
-            .WithColumn("deleted_by").AsString(100).Nullable()
-            .WithColumn("restored_at").AsDateTimeOffset().Nullable()
-            .WithColumn("restored_by").AsString(100).Nullable();
+        var usersExists = TableExists("users");
+        var rolesExists = TableExists("roles");
+        var userRolesExists = TableExists("user_roles");
+        var userClaimsExists = TableExists("user_claims");
+        var roleClaimsExists = TableExists("role_claims");
+        var userTokensExists = TableExists("user_tokens");
 
-        Create.Table("roles").InSchema(SchemaName)
-            .WithColumn("id").AsGuid().NotNullable().PrimaryKey()
-            .WithColumn("tenant_id").AsString(100).Nullable()
-            .WithColumn("name").AsString(256).NotNullable()
-            .WithColumn("normalized_name").AsString(256).NotNullable()
-            .WithColumn("description").AsString(512).Nullable()
-            .WithColumn("created_at").AsDateTimeOffset().NotNullable()
-            .WithColumn("created_by").AsString(100).Nullable()
-            .WithColumn("last_modified_at").AsDateTimeOffset().Nullable()
-            .WithColumn("last_modified_by").AsString(100).Nullable()
-            .WithColumn("is_deleted").AsBoolean().NotNullable()
-            .WithColumn("deleted_at").AsDateTimeOffset().Nullable()
-            .WithColumn("deleted_by").AsString(100).Nullable()
-            .WithColumn("restored_at").AsDateTimeOffset().Nullable()
-            .WithColumn("restored_by").AsString(100).Nullable();
+        if (!usersExists)
+        {
+            Create.Table("users").InSchema(SchemaName)
+                .WithColumn("id").AsGuid().NotNullable().PrimaryKey()
+                .WithColumn("tenant_id").AsString(100).Nullable()
+                .WithColumn("user_name").AsString(256).NotNullable()
+                .WithColumn("normalized_user_name").AsString(256).NotNullable()
+                .WithColumn("email").AsString(256).Nullable()
+                .WithColumn("normalized_email").AsString(256).Nullable()
+                .WithColumn("email_confirmed").AsBoolean().NotNullable()
+                .WithColumn("phone_number").AsString(64).Nullable()
+                .WithColumn("phone_number_confirmed").AsBoolean().NotNullable()
+                .WithColumn("password_hash").AsString(1024).Nullable()
+                .WithColumn("security_stamp").AsString(128).NotNullable()
+                .WithColumn("is_active").AsBoolean().NotNullable()
+                .WithColumn("access_failed_count").AsInt32().NotNullable()
+                .WithColumn("lockout_end").AsDateTimeOffset().Nullable()
+                .WithColumn("lockout_enabled").AsBoolean().NotNullable()
+                .WithColumn("two_factor_enabled").AsBoolean().NotNullable()
+                .WithColumn("created_at").AsDateTimeOffset().NotNullable()
+                .WithColumn("created_by").AsString(100).Nullable()
+                .WithColumn("last_modified_at").AsDateTimeOffset().Nullable()
+                .WithColumn("last_modified_by").AsString(100).Nullable()
+                .WithColumn("is_deleted").AsBoolean().NotNullable()
+                .WithColumn("deleted_at").AsDateTimeOffset().Nullable()
+                .WithColumn("deleted_by").AsString(100).Nullable()
+                .WithColumn("restored_at").AsDateTimeOffset().Nullable()
+                .WithColumn("restored_by").AsString(100).Nullable();
+        }
 
-        Create.Table("user_roles").InSchema(SchemaName)
-            .WithColumn("id").AsGuid().NotNullable().PrimaryKey()
-            .WithColumn("user_id").AsGuid().NotNullable()
-            .WithColumn("role_id").AsGuid().NotNullable();
+        if (!rolesExists)
+        {
+            Create.Table("roles").InSchema(SchemaName)
+                .WithColumn("id").AsGuid().NotNullable().PrimaryKey()
+                .WithColumn("tenant_id").AsString(100).Nullable()
+                .WithColumn("name").AsString(256).NotNullable()
+                .WithColumn("normalized_name").AsString(256).NotNullable()
+                .WithColumn("description").AsString(512).Nullable()
+                .WithColumn("created_at").AsDateTimeOffset().NotNullable()
+                .WithColumn("created_by").AsString(100).Nullable()
+                .WithColumn("last_modified_at").AsDateTimeOffset().Nullable()
+                .WithColumn("last_modified_by").AsString(100).Nullable()
+                .WithColumn("is_deleted").AsBoolean().NotNullable()
+                .WithColumn("deleted_at").AsDateTimeOffset().Nullable()
+                .WithColumn("deleted_by").AsString(100).Nullable()
+                .WithColumn("restored_at").AsDateTimeOffset().Nullable()
+                .WithColumn("restored_by").AsString(100).Nullable();
+        }
 
-        Create.Table("user_claims").InSchema(SchemaName)
-            .WithColumn("id").AsGuid().NotNullable().PrimaryKey()
-            .WithColumn("user_id").AsGuid().NotNullable()
-            .WithColumn("claim_type").AsString(256).NotNullable()
-            .WithColumn("claim_value").AsString(1024).NotNullable();
+        if (!userRolesExists)
+        {
+            Create.Table("user_roles").InSchema(SchemaName)
+                .WithColumn("id").AsGuid().NotNullable().PrimaryKey()
+                .WithColumn("user_id").AsGuid().NotNullable()
+                .WithColumn("role_id").AsGuid().NotNullable();
+        }
 
-        Create.Table("role_claims").InSchema(SchemaName)
-            .WithColumn("id").AsGuid().NotNullable().PrimaryKey()
-            .WithColumn("role_id").AsGuid().NotNullable()
-            .WithColumn("claim_type").AsString(256).NotNullable()
-            .WithColumn("claim_value").AsString(1024).NotNullable();
+        if (!userClaimsExists)
+        {
+            Create.Table("user_claims").InSchema(SchemaName)
+                .WithColumn("id").AsGuid().NotNullable().PrimaryKey()
+                .WithColumn("user_id").AsGuid().NotNullable()
+                .WithColumn("claim_type").AsString(256).NotNullable()
+                .WithColumn("claim_value").AsString(1024).NotNullable();
+        }
 
-        Create.Table("user_tokens").InSchema(SchemaName)
-            .WithColumn("id").AsGuid().NotNullable().PrimaryKey()
-            .WithColumn("user_id").AsGuid().NotNullable()
-            .WithColumn("purpose").AsInt32().NotNullable()
-            .WithColumn("token_hash").AsString(256).NotNullable()
-            .WithColumn("expires_at").AsDateTimeOffset().NotNullable()
-            .WithColumn("consumed_at").AsDateTimeOffset().Nullable();
+        if (!roleClaimsExists)
+        {
+            Create.Table("role_claims").InSchema(SchemaName)
+                .WithColumn("id").AsGuid().NotNullable().PrimaryKey()
+                .WithColumn("role_id").AsGuid().NotNullable()
+                .WithColumn("claim_type").AsString(256).NotNullable()
+                .WithColumn("claim_value").AsString(1024).NotNullable();
+        }
+
+        if (!userTokensExists)
+        {
+            Create.Table("user_tokens").InSchema(SchemaName)
+                .WithColumn("id").AsGuid().NotNullable().PrimaryKey()
+                .WithColumn("user_id").AsGuid().NotNullable()
+                .WithColumn("purpose").AsInt32().NotNullable()
+                .WithColumn("token_hash").AsString(256).NotNullable()
+                .WithColumn("expires_at").AsDateTimeOffset().NotNullable()
+                .WithColumn("consumed_at").AsDateTimeOffset().Nullable();
+        }
 
         // Non-filtered lookup indexes (FK access paths) — fluent API is portable for these.
-        Create.Index("ix_user_roles_user").OnTable("user_roles").InSchema(SchemaName)
-            .OnColumn("user_id").Ascending();
-        Create.Index("ix_user_claims_user").OnTable("user_claims").InSchema(SchemaName)
-            .OnColumn("user_id").Ascending();
-        Create.Index("ix_role_claims_role").OnTable("role_claims").InSchema(SchemaName)
-            .OnColumn("role_id").Ascending();
-        Create.Index("ix_user_tokens_user_purpose").OnTable("user_tokens").InSchema(SchemaName)
-            .OnColumn("user_id").Ascending().OnColumn("purpose").Ascending();
+        if (!IndexExists("user_roles", "ix_user_roles_user"))
+        {
+            Create.Index("ix_user_roles_user").OnTable("user_roles").InSchema(SchemaName)
+                .OnColumn("user_id").Ascending();
+        }
+        if (!IndexExists("user_claims", "ix_user_claims_user"))
+        {
+            Create.Index("ix_user_claims_user").OnTable("user_claims").InSchema(SchemaName)
+                .OnColumn("user_id").Ascending();
+        }
+        if (!IndexExists("role_claims", "ix_role_claims_role"))
+        {
+            Create.Index("ix_role_claims_role").OnTable("role_claims").InSchema(SchemaName)
+                .OnColumn("role_id").Ascending();
+        }
+        if (!IndexExists("user_tokens", "ix_user_tokens_user_purpose"))
+        {
+            Create.Index("ix_user_tokens_user_purpose").OnTable("user_tokens").InSchema(SchemaName)
+                .OnColumn("user_id").Ascending().OnColumn("purpose").Ascending();
+        }
 
         // No-duplicate-membership: a plain unique index (no NULLs involved).
-        Create.Index("ux_user_roles_user_role").OnTable("user_roles").InSchema(SchemaName)
-            .OnColumn("user_id").Ascending().OnColumn("role_id").Ascending()
-            .WithOptions().Unique();
+        if (!IndexExists("user_roles", "ux_user_roles_user_role"))
+        {
+            Create.Index("ux_user_roles_user_role").OnTable("user_roles").InSchema(SchemaName)
+                .OnColumn("user_id").Ascending().OnColumn("role_id").Ascending()
+                .WithOptions().Unique();
+        }
 
         // A SHA-256 of 32 random bytes is effectively collision-free; uniqueness blocks duplicate/forged
         // hash rows and makes the consume lookup a guaranteed single row.
-        Create.Index("ux_user_tokens_token_hash").OnTable("user_tokens").InSchema(SchemaName)
-            .OnColumn("token_hash").Ascending().WithOptions().Unique();
+        if (!IndexExists("user_tokens", "ux_user_tokens_token_hash"))
+        {
+            Create.Index("ux_user_tokens_token_hash").OnTable("user_tokens").InSchema(SchemaName)
+                .OnColumn("token_hash").Ascending().WithOptions().Unique();
+        }
 
         // Child-table referential integrity. No cascade: users/roles are soft-deleted (rows persist),
         // so cascade is unnecessary and risky — restrict (the default) is correct. Fluent Create.ForeignKey
         // is portable across PostgreSQL and SQL Server.
-        Create.ForeignKey("fk_user_roles_user_id").FromTable("user_roles").InSchema(SchemaName).ForeignColumn("user_id")
-            .ToTable("users").InSchema(SchemaName).PrimaryColumn("id");
-        Create.ForeignKey("fk_user_roles_role_id").FromTable("user_roles").InSchema(SchemaName).ForeignColumn("role_id")
-            .ToTable("roles").InSchema(SchemaName).PrimaryColumn("id");
-        Create.ForeignKey("fk_user_claims_user_id").FromTable("user_claims").InSchema(SchemaName).ForeignColumn("user_id")
-            .ToTable("users").InSchema(SchemaName).PrimaryColumn("id");
-        Create.ForeignKey("fk_role_claims_role_id").FromTable("role_claims").InSchema(SchemaName).ForeignColumn("role_id")
-            .ToTable("roles").InSchema(SchemaName).PrimaryColumn("id");
-        Create.ForeignKey("fk_user_tokens_user_id").FromTable("user_tokens").InSchema(SchemaName).ForeignColumn("user_id")
-            .ToTable("users").InSchema(SchemaName).PrimaryColumn("id");
+        if (!ConstraintExists("user_roles", "fk_user_roles_user_id"))
+        {
+            Create.ForeignKey("fk_user_roles_user_id").FromTable("user_roles").InSchema(SchemaName).ForeignColumn("user_id")
+                .ToTable("users").InSchema(SchemaName).PrimaryColumn("id");
+        }
+        if (!ConstraintExists("user_roles", "fk_user_roles_role_id"))
+        {
+            Create.ForeignKey("fk_user_roles_role_id").FromTable("user_roles").InSchema(SchemaName).ForeignColumn("role_id")
+                .ToTable("roles").InSchema(SchemaName).PrimaryColumn("id");
+        }
+        if (!ConstraintExists("user_claims", "fk_user_claims_user_id"))
+        {
+            Create.ForeignKey("fk_user_claims_user_id").FromTable("user_claims").InSchema(SchemaName).ForeignColumn("user_id")
+                .ToTable("users").InSchema(SchemaName).PrimaryColumn("id");
+        }
+        if (!ConstraintExists("role_claims", "fk_role_claims_role_id"))
+        {
+            Create.ForeignKey("fk_role_claims_role_id").FromTable("role_claims").InSchema(SchemaName).ForeignColumn("role_id")
+                .ToTable("roles").InSchema(SchemaName).PrimaryColumn("id");
+        }
+        if (!ConstraintExists("user_tokens", "fk_user_tokens_user_id"))
+        {
+            Create.ForeignKey("fk_user_tokens_user_id").FromTable("user_tokens").InSchema(SchemaName).ForeignColumn("user_id")
+                .ToTable("users").InSchema(SchemaName).PrimaryColumn("id");
+        }
     }
+
+    private bool TableExists(string table) => Schema.Schema(SchemaName).Table(table).Exists();
+
+    private bool IndexExists(string table, string index) =>
+        TableExists(table) && Schema.Schema(SchemaName).Table(table).Index(index).Exists();
+
+    private bool ConstraintExists(string table, string constraint) =>
+        TableExists(table) && Schema.Schema(SchemaName).Table(table).Constraint(constraint).Exists();
 
     /// <summary>Emits the six per-tenant + platform filtered unique indexes. <paramref name="schema"/> is
     /// the SQL schema qualifier already escaped for the active engine (<c>identity</c> on PostgreSQL,
@@ -141,6 +219,14 @@ public sealed class IdentitySchemaMigration : Migration
     /// is otherwise identical across engines.</summary>
     private void CreateFilteredIndexes(string schema)
     {
+        // Guarded independently of the tables above: this runs from its own IfDatabase delegate, so a
+        // future change that stops creating the tables here must not silently stop guarding these.
+        // Explicit checks rather than IF NOT EXISTS — SQL Server has no such clause for CREATE INDEX.
+        if (Schema.Schema(SchemaName).Table("users").Index("ux_users_tenant_user_name").Exists())
+        {
+            return;
+        }
+
         Execute.Sql($"CREATE UNIQUE INDEX ux_users_tenant_user_name ON {schema}.users (tenant_id, normalized_user_name) WHERE tenant_id IS NOT NULL;");
         Execute.Sql($"CREATE UNIQUE INDEX ux_users_platform_user_name ON {schema}.users (normalized_user_name) WHERE tenant_id IS NULL;");
         Execute.Sql($"CREATE UNIQUE INDEX ux_users_tenant_email ON {schema}.users (tenant_id, normalized_email) WHERE tenant_id IS NOT NULL AND normalized_email IS NOT NULL;");

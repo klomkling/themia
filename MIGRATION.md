@@ -27,12 +27,39 @@ fifteen days (coord #0078). Themia had also collided with *itself*: `Themia.Exce
 **What happens on your first deploy with this version:**
 
 Each Themia migration **runs once more**. The new ledger is empty, so nothing in it says the migration
-already ran. This is safe and deliberate — every Themia migration now checks for the objects it creates
-and returns if they are there. You should see no schema change and no error.
+already ran. Every Themia migration checks for the objects it creates and returns if they are there, so
+you should see no schema change and no error.
+
+> **0.16.0 did not do this for four assemblies.** `Themia.Modules.Identity`,
+> `Themia.Modules.Notifications`, `Themia.Modules.Storage` and `Themia.Modules.Export` guarded only the
+> *schema* they create and then created their tables unconditionally, so the replay above failed
+> `CREATE TABLE` with **42P07 / "already exists"** and crash-looped the host at boot. If you take
+> DataProtection, Exceptional, Challenges, Messaging, Pdf or Scheduling only, you were never affected.
+> Fixed in **0.16.1** — upgrade straight to it and the replay behaves as described above. Nothing to
+> undo if you already tried and rolled back: the failing migration ran in a transaction, so it left
+> nothing behind. See coord #0096.
 
 Where a collision had already skipped one of ours, the object genuinely does not exist and the replay
 **creates it**. That is the fix, not a side effect: if you have been missing a Themia table, this is the
 deploy that restores it.
+
+**Give the container a health check with a start period longer than your migrations.**
+
+Not specific to this version, and not optional if you deploy with rolling updates. Themia migrates during
+service registration, so a migration that fails is a process that never starts — and an orchestrator with
+no health check has no way to know the new container is sick, so it retires the last healthy one anyway.
+That is what turned a revert into an outage on coord #0085: two failures, not one.
+
+Declare it in the Dockerfile so it beats a platform-generated default. The `aspnet` runtime image has no
+`curl`, but bash and `/dev/tcp` are there (propertiezy PR #116, on Coolify):
+
+```dockerfile
+HEALTHCHECK --interval=15s --timeout=5s --start-period=40s --retries=3 \
+  CMD bash -c 'exec 3<>/dev/tcp/127.0.0.1/8080; printf "GET /health HTTP/1.0\r\n\r\n" >&3; grep -q " 200 " <&3'
+```
+
+`--start-period` must exceed your slowest migration run, or the probe kills a container that is migrating
+correctly.
 
 **What you should do:**
 
