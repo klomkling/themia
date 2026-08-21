@@ -1,7 +1,7 @@
 version: 2
 updates:
   - package-ecosystem: nuget
-    directory: "/src"
+    directory: "/"
     schedule:
       interval: weekly
     open-pull-requests-limit: 10
@@ -13,22 +13,17 @@ updates:
     # that Dependabot then auto-closes as "no longer updatable". Pattern groups are listed BEFORE
     # the catch-all nuget-minor-patch so a matching dependency joins its family group first.
     #
-    # SCOPED TO /src ON PURPOSE, and the reason is a timeout. The NuGet updater re-runs full project
+    # ORDER IS LOAD-BEARING, and not only for the catch-all. The NuGet updater re-runs full project
     # discovery per dependency, and discovery of this repo is expensive — 145 csproj, central package
     # management, 36 projects on two TFMs. Measured on the 2026-08-10 and 2026-08-17 runs: the first
     # discovery alone took 10m46s, each re-run 4-17s, 154 discoveries in total, and the job was killed
     # by the ~55-minute cap having analyzed 18 of 77 dependencies. Both runs ended
-    # "##[error]The operation was canceled." within one second of the same duration — a cap being hit,
-    # not a run that occasionally overruns.
+    # "##[error]The operation was canceled." within one second of the same duration.
     #
-    # One job over "/" cannot fit. Two jobs can: /src holds the 68 projects that ship and /tests the 77
-    # that do not, so each discovers roughly half as much AND gets its own cap. Splitting by directory
-    # is the only lever that does not cost architecture — the per-engine package split under src/ is
-    # what coord #0058 and #0071 required so adopters are not forced to take peers they refuse.
-    #
-    # ORDER IS STILL LOAD-BEARING. Dependabot analyses groups in the order declared here, so anything
-    # below what the cap allows is never looked at. Risk-first: security-facing and runtime packages
-    # before build-time tooling.
+    # Dependabot analyses groups in the order declared here, so whatever sits below roughly the first
+    # 20 dependencies is never reached at all. The order is therefore risk-first: security-facing and
+    # runtime packages before build-time tooling, and test-only families last. This does NOT fix the
+    # timeout — it decides which dependencies get the time there is.
     groups:
       aspnetcore:
         # First deliberately: CLAUDE.md requires Microsoft.AspNetCore.* to stay patched.
@@ -63,46 +58,25 @@ updates:
         patterns:
           - "AWSSDK*"
       roslyn:
-        # Build-time only (analyzers, source generators) — last before the catch-all, because nothing
-        # here reaches a consumer's runtime.
+        # Build-time only (analyzers, source generators) — below anything that ships at runtime.
         patterns:
           - "Microsoft.CodeAnalysis*"
-      # Catch-all for everything else: bundle remaining minor/patch updates into one PR.
-      # Must stay LAST — it has no patterns, so it would otherwise grab every dependency first.
-      #
-      # WATCH THIS ONE. The ungrouped set is not harmless — SSH.NET (which needed a manual pin for
-      # GHSA-q939-rpr3-3284 in #209), Microsoft.Data.SqlClient, MySqlConnector, StackExchange.Redis,
-      # Konscious…Argon2, MessagePack — and before the /src|/tests split nothing reached it at all.
-      # The split is supposed to change that. If a run still dies before this group, the next lever is
-      # cutting discovery cost further, not reordering again.
-      nuget-minor-patch:
-        update-types:
-          - minor
-          - patch
-
-  - package-ecosystem: nuget
-    directory: "/tests"
-    schedule:
-      interval: weekly
-    open-pull-requests-limit: 5
-    labels:
-      - dependencies
-      - tests
-    # Test-only dependencies, deliberately in their own job. Split out so they stop competing for the
-    # same ~55-minute cap as the packages that ship: a stale test dependency costs a developer minutes,
-    # a stale runtime one can cost a consumer an advisory.
-    groups:
       testcontainers:
+        # Test-only from here down: last to be analysed, because a stale test dependency costs a
+        # developer minutes and a stale runtime one can cost a consumer an advisory.
         patterns:
           - "Testcontainers*"
       xunit:
         patterns:
           - "xunit*"
-      verify:
-        patterns:
-          - "Verify.*"
-      # Catch-all, last for the same reason as in the /src entry.
-      nuget-test-minor-patch:
+      # Catch-all for everything else: bundle remaining minor/patch updates into one PR.
+      # Must stay LAST — it has no patterns, so it would otherwise grab every dependency first.
+      #
+      # WARNING: nothing here is currently reached before the timeout, and the ungrouped set includes
+      # security-facing packages — SSH.NET (which needed a manual pin for GHSA-q939-rpr3-3284 in #209),
+      # Microsoft.Data.SqlClient, MySqlConnector, StackExchange.Redis, Konscious…Argon2, MessagePack.
+      # Reordering above does not solve that; only cutting the per-job discovery cost will.
+      nuget-minor-patch:
         update-types:
           - minor
           - patch
