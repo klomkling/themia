@@ -10,6 +10,41 @@ with the *why* and concrete upgrade steps.
 - Each entry states: **What changed**, **Why**, and **How to upgrade** (before → after).
 - Non-breaking changes are *not* listed here — see the CHANGELOG.
 
+## 0.16.2
+
+### Mixed Themia versions are now refused at startup
+
+**What changed:** `ThemiaMigrations.Run` compares its own version against each `Themia.*` migration
+assembly it is asked to apply, and throws when the major.minor differ — before opening any connection.
+
+**Why:** Themia ships every package at one version, and a mixed set is how coord #0085 reached
+production. A 0.16.0 runner drove a 0.15.0 migration set: the newer runner starts an empty per-assembly
+ledger and replays the older migrations, which may predate the guards that make a replay safe. The host
+crash-looped on `CREATE TABLE`.
+
+The route in is ordinary. With central package management and `CentralPackageTransitivePinningEnabled`,
+a package you reference only transitively is pinned to whatever your direct reference asks for. A
+grouped dependency-bot PR that raises most Themia packages and leaves one behind therefore holds that
+one — and its transitive core — at the old version. **Nothing is downgraded**, so NuGet warns about
+nothing, and restore, build and tests are green. The mismatch exists only in the built image.
+
+**How to upgrade:**
+
+- Align every `Themia.*` package to the same version. If a bot bumps them, group the whole family so a
+  partial bump cannot be produced.
+- Worth asserting in your own suite, since it is one line and catches the same thing at build time:
+
+```csharp
+var versions = AppDomain.CurrentDomain.GetAssemblies()
+    .Where(a => a.GetName().Name?.StartsWith("Themia.") == true)
+    .Select(a => a.GetName().Version).Distinct().ToList();
+Assert.Single(versions);
+```
+
+**What is NOT checked:** your own migration assemblies. Passing them to `Run` is the supported way to
+use it, and their versioning has nothing to do with Themia's — only names beginning `Themia.` are
+compared. A patch-level difference is allowed; the minor is where a pre-1.0 breaking change lands.
+
 ## 0.16.0
 
 ### Themia migrations move to their own version tables

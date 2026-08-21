@@ -40,7 +40,7 @@ public static class ThemiaMigrations
     /// <exception cref="ArgumentException">The connection string is null/whitespace, no assemblies were supplied, or the assemblies contain no <c>[Migration]</c> types.</exception>
     /// <exception cref="ArgumentNullException"><paramref name="migrationAssemblies"/> is null.</exception>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="engine"/> is not a known engine.</exception>
-    /// <exception cref="InvalidOperationException">The migrations could not be loaded (e.g. duplicate version numbers) or failed to apply; the message names the engine.</exception>
+    /// <exception cref="InvalidOperationException">A <c>Themia.*</c> migration assembly was built from a different major.minor than this runner (see <see cref="MigrationAssemblyVersion"/>), or the migrations could not be loaded (e.g. duplicate version numbers) or failed to apply; the message names the engine.</exception>
     public static void Run(MigrationEngine engine, string connectionString, params Assembly[] migrationAssemblies) =>
         Run(engine, connectionString, options: null, migrationAssemblies);
 
@@ -75,6 +75,13 @@ public static class ThemiaMigrations
         // One source of truth for per-engine knowledge (processor + display name). Resolved up front so an
         // unknown engine fails as a clean guard before any infrastructure is built.
         var (addProcessor, displayName) = Describe(engine);
+
+        // Every assembly is version-checked BEFORE any of them is applied: a mixed set must fail without
+        // having half-migrated the database, and this costs two reflection reads with no connection open.
+        foreach (var migrationAssembly in migrationAssemblies)
+        {
+            MigrationAssemblyVersion.Verify(migrationAssembly);
+        }
 
         // ONE RUNNER PER ASSEMBLY, each with its own version ledger. A single runner over every assembly
         // would put them all back in one table, which is the whole defect: two migrations carrying the
