@@ -1,7 +1,14 @@
 version: 2
 updates:
   - package-ecosystem: nuget
-    directory: "/"
+    # NOT directory: "/". Two entries exist so the NuGet updater gets two ~55-minute caps instead
+    # of one it cannot fit inside (see the comment below). Scoping by `directory` was tried in #215
+    # and reverted in #217: dependabot does not walk down to find project files, and src/ holds none
+    # directly — they are at src/<layer>/<package>/. Both jobs logged "No project files found." and
+    # reported SUCCESS in 80 seconds, which is the same silent-green shape this whole file is about.
+    # `directories` takes globs, so the depth is stated explicitly rather than assumed.
+    directories:
+      - "/src/*/*"
     schedule:
       interval: weekly
     open-pull-requests-limit: 10
@@ -61,14 +68,6 @@ updates:
         # Build-time only (analyzers, source generators) — below anything that ships at runtime.
         patterns:
           - "Microsoft.CodeAnalysis*"
-      testcontainers:
-        # Test-only from here down: last to be analysed, because a stale test dependency costs a
-        # developer minutes and a stale runtime one can cost a consumer an advisory.
-        patterns:
-          - "Testcontainers*"
-      xunit:
-        patterns:
-          - "xunit*"
       # Catch-all for everything else: bundle remaining minor/patch updates into one PR.
       # Must stay LAST — it has no patterns, so it would otherwise grab every dependency first.
       #
@@ -77,6 +76,34 @@ updates:
       # Microsoft.Data.SqlClient, MySqlConnector, StackExchange.Redis, Konscious…Argon2, MessagePack.
       # Reordering above does not solve that; only cutting the per-job discovery cost will.
       nuget-minor-patch:
+        update-types:
+          - minor
+          - patch
+
+  - package-ecosystem: nuget
+    directories:
+      - "/tests/*"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - tests
+    # Test-only dependencies in their own job, so they stop competing for the same cap as the
+    # packages that ship: a stale test dependency costs a developer minutes, a stale runtime one can
+    # cost a consumer an advisory. Test csproj sit one level down (tests/<package>/), hence "/tests/*"
+    # rather than the "/src/*/*" the source tree needs.
+    groups:
+      testcontainers:
+        patterns:
+          - "Testcontainers*"
+      xunit:
+        patterns:
+          - "xunit*"
+      verify:
+        patterns:
+          - "Verify.*"
+      nuget-test-minor-patch:
         update-types:
           - minor
           - patch
