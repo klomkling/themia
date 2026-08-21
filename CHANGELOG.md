@@ -52,6 +52,29 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
   total, permanent, and indistinguishable from a rotated secret. Themia's verifier already behaved
   correctly; **nothing pinned it**, so a future refactor could have removed it silently.
 
+## [0.16.2] - 2026-08-22
+
+### Added
+- **(breaking) `ThemiaMigrations.Run` refuses a `Themia.*` migration assembly built from a different
+  major.minor than the runner** (coord #0085). A production image held `Themia.Data.Migrations` 0.16.0
+  driving `Themia.AspNetCore.DataProtection` 0.15.0: the newer runner started an empty per-assembly
+  ledger and replayed a 0.15 migration that had no adopt-if-exists guard, so the host crash-looped on
+  `CREATE TABLE`. Themia ships every package at one version precisely so that cannot happen, and nothing
+  enforced it.
+
+  **It arises without anyone doing anything wrong.** The affected consumer had no lock file. Under
+  central package management with `CentralPackageTransitivePinningEnabled`, only `…PostgreSql` was a
+  direct reference and the core arrived transitively; a grouped dependency-bot PR raised nine Themia
+  entries and left that one behind, so pinning held the core at the un-raised version. **Nothing was
+  downgraded** — a package was merely never raised — so NuGet emits no warning and restore, build and
+  tests are all green. The mismatch exists only in the image, first observable as a boot crash.
+
+  Marked **(breaking)** because an application in that state stops booting where it previously started
+  and then failed: the failure moves to a startup error naming both versions. Patch differences are
+  allowed, and **assemblies that are not `Themia.*` are never checked** — passing your own migration
+  assembly to `Run` is the supported way to use it. The check reads two attributes and opens no
+  connection.
+
 ## [0.16.1] - 2026-08-22
 
 ### Fixed
