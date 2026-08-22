@@ -54,6 +54,20 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [0.16.2] - 2026-08-22
 
+### Fixed
+- **`data_protection_keys.created_at` now has a server-clock UTC default** (coord #0096). The column has
+  always been `NOT NULL` with no default, which is invisible to Themia — every dialect supplies the value
+  explicitly — and visible to anyone else. A consumer who created the table before adopting the module may
+  have declared a default, and the adopt-if-exists guard takes either shape without comment, so whether an
+  `INSERT` omitting `created_at` succeeds depended on which of two histories a database happened to have,
+  with nothing recording which.
+
+  A new forward-only migration rather than an edit to the deployed one, so fresh and upgraded databases
+  end in the same state. **UTC on every engine** — `now() AT TIME ZONE 'utc'`, `UTC_TIMESTAMP()`,
+  `SYSUTCDATETIME()` — matching what each dialect already writes. A local-clock default such as
+  PostgreSQL's bare `NOW()` would be worse than none: local timestamps mixed into a column whose existing
+  rows are UTC are indistinguishable afterwards.
+
 ### Added
 - **(breaking) `ThemiaMigrations.Run` refuses a `Themia.*` migration assembly built from a different
   major.minor than the runner** (coord #0085). A production image held `Themia.Data.Migrations` 0.16.0

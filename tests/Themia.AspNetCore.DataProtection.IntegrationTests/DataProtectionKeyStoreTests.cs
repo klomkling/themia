@@ -33,6 +33,30 @@ public abstract class DataProtectionKeyStoreTestsBase
     /// <summary>The XML of the oldest stored key, used to prove a key was reused rather than replaced.</summary>
     protected abstract Task<string?> FirstKeyXmlAsync();
 
+    /// <summary>Runs one statement against the test database.</summary>
+    protected abstract Task ExecuteAsync(string sql);
+
+    /// <summary>An INSERT that deliberately omits <c>created_at</c>.</summary>
+    protected abstract string InsertWithoutCreatedAtSql { get; }
+
+    [Fact]
+    public async Task Insert_WithoutCreatedAt_Succeeds()
+    {
+        // coord #0096. created_at was NOT NULL with no default, which Themia never noticed because every
+        // dialect supplies the value explicitly. A consumer who created this table before adopting the
+        // module may have declared a default, and the adopt guard takes either shape without comment — so
+        // whether this INSERT works depended on which of two histories a database happened to have.
+        //
+        // Asserted per engine rather than once, because the three implementations share no SQL: PostgreSQL
+        // sets a column default, MySQL restates the column, SQL Server adds a named constraint.
+        await using var provider = BuildInstance();
+        _ = Protector(provider).Protect("force-the-migration");
+
+        await ExecuteAsync(InsertWithoutCreatedAtSql);
+
+        Assert.True(await CountKeysAsync() >= 2);
+    }
+
     [Fact]
     public async Task ProtectedPayload_ShouldUnprotect_OnAnIndependentInstance()
     {
@@ -116,6 +140,18 @@ public class DataProtectionKeyStorePostgresTests : DataProtectionKeyStoreTestsBa
         return await command.ExecuteScalarAsync() as string;
     }
 
+    protected override async Task ExecuteAsync(string sql)
+    {
+        await using var connection = new NpgsqlConnection(ConnectionString);
+        await connection.OpenAsync();
+        await using var command = connection.CreateCommand();
+        command.CommandText = sql;
+        await command.ExecuteNonQueryAsync();
+    }
+
+    protected override string InsertWithoutCreatedAtSql =>
+        "INSERT INTO data_protection_keys (friendly_name, xml) VALUES ('no-created-at', '<key/>')";
+
     public async Task InitializeAsync() => await container.StartAsync();
 
     public async Task DisposeAsync() => await container.DisposeAsync();
@@ -148,6 +184,18 @@ public class DataProtectionKeyStoreMySqlTests : DataProtectionKeyStoreTestsBase,
         command.CommandText = "SELECT `xml` FROM data_protection_keys ORDER BY id LIMIT 1";
         return await command.ExecuteScalarAsync() as string;
     }
+
+    protected override async Task ExecuteAsync(string sql)
+    {
+        await using var connection = new MySqlConnection(ConnectionString);
+        await connection.OpenAsync();
+        await using var command = connection.CreateCommand();
+        command.CommandText = sql;
+        await command.ExecuteNonQueryAsync();
+    }
+
+    protected override string InsertWithoutCreatedAtSql =>
+        "INSERT INTO data_protection_keys (friendly_name, `xml`) VALUES ('no-created-at', '<key/>')";
 
     public async Task InitializeAsync() => await container.StartAsync();
 
@@ -182,6 +230,18 @@ public class DataProtectionKeyStoreSqlServerTests : DataProtectionKeyStoreTestsB
         command.CommandText = "SELECT TOP 1 [xml] FROM [data_protection_keys] ORDER BY [id]";
         return await command.ExecuteScalarAsync() as string;
     }
+
+    protected override async Task ExecuteAsync(string sql)
+    {
+        await using var connection = new SqlConnection(ConnectionString);
+        await connection.OpenAsync();
+        await using var command = connection.CreateCommand();
+        command.CommandText = sql;
+        await command.ExecuteNonQueryAsync();
+    }
+
+    protected override string InsertWithoutCreatedAtSql =>
+        "INSERT INTO [data_protection_keys] ([friendly_name], [xml]) VALUES ('no-created-at', '<key/>')";
 
     public async Task InitializeAsync() => await container.StartAsync();
 
