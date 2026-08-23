@@ -27,7 +27,29 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-08-24
+
+### Added
+- **`Themia.Data.Probes` — a boot-time PostgreSQL schema probe** (coord #0088). New neutral package
+  (`net8.0;net10.0`, no database driver and no FluentMigrator dependency — the caller supplies the
+  connection). Its `IHostedService` runs one `to_regclass` query per table at host startup and throws
+  `SchemaVisibilityException` when a table a Themia store addresses unqualified does not resolve
+  through the connection's `search_path`.
+
+  Registered by five packages: `Themia.AspNetCore.DataProtection.PostgreSql`,
+  `Themia.Exceptional.PostgreSql`, `Themia.Challenges.PostgreSql`, `Themia.Messaging.PostgreSql`, and
+  `Themia.Modules.Pdf` (the last gated at run time by `IDatabaseProvider`, because it serves every
+  engine from one assembly).
+
+  The probe asserts only that an identifier **resolves** — never that it resolves to `public`. Themia
+  cannot know which schema a table should be in: a consumer on `runMigration: false` owns its own
+  migration and may legitimately place the table elsewhere. A connection failure warns and continues,
+  deliberately: host startup must not become a database-liveness gate.
+
 ### Changed
+- **(breaking) A host whose Themia table is off the `search_path` now refuses to start** (coord #0088).
+  Previously this surfaced as `42P01` on first use of the store — for Data Protection, a user's first
+  request needing an auth cookie, not the deploy. See [MIGRATION.md](MIGRATION.md#0170).
 - **The fifth golden vector `lead-post-thai-multiline-body` is now `confirmed`** (coord #0068, #0069).
   Both peers reproduced its signature independently: ezy-assets three ways, one of them a Python
   implementation written from the documented rule rather than transcribed from any C#; propertiezy

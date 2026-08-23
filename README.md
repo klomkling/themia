@@ -28,7 +28,7 @@ Layered, with a strict downward dependency direction:
 |---|---|---|
 | **Tooling** (build-time) | `netstandard2.0` | `Themia.SourceGenerator`, `Themia.Analyzers`, `Themia.Generators.Abstractions` |
 | **Framework core** | `net10.0` | `Themia.Framework.Core`, `Themia.Framework.AspNetCore`, `Themia.Framework.Data.Abstractions` / `.EFCore(.SqlServer/.PostgreSql)` / `.Dapper(.SqlServer/.MySql/.PostgreSql)`, `Themia.MultiTenancy`, `Themia.Mediator`, `Themia.Caching`, `Themia.Logging`, `Themia.Services` |
-| **Neutral cores** | `net8.0;net10.0` | `Themia.DependencyInjection`, `Themia.Data.Migrations`, `Themia.Quartz`, `Themia.Exceptional(.SqlServer/.MySql/.PostgreSql)`, `Themia.AspNetCore` |
+| **Neutral cores** | `net8.0;net10.0` | `Themia.DependencyInjection`, `Themia.Data.Migrations`, `Themia.Data.Probes`, `Themia.Quartz`, `Themia.Exceptional(.SqlServer/.MySql/.PostgreSql)`, `Themia.AspNetCore` |
 | **Modules** | `net10.0` | `Themia.Modules.Scheduling`, `Themia.Modules.Identity(.Abstractions)`, `Themia.Modules.Identity.AspNetCore`, `Themia.Modules.Storage`, … (ExceptionLogging planned) |
 
 Two rules drive the design:
