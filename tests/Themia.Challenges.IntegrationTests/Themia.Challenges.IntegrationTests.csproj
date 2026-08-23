@@ -24,6 +24,7 @@
     <PackageReference Include="MySqlConnector" />
     <PackageReference Include="Microsoft.Data.SqlClient" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/neutral/Themia.Challenges/Themia.Challenges.csproj" />
