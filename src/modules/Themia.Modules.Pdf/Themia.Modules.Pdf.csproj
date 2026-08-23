@@ -11,6 +11,7 @@
     <ProjectReference Include="../../framework/Themia.Framework.Data.EFCore/Themia.Framework.Data.EFCore.csproj" />
     <ProjectReference Include="../../framework/Themia.Framework.Data.Dapper/Themia.Framework.Data.Dapper.csproj" />
     <ProjectReference Include="../../neutral/Themia.Data.Migrations/Themia.Data.Migrations.csproj" />
+    <ProjectReference Include="../../neutral/Themia.Data.Probes/Themia.Data.Probes.csproj" />
     <ProjectReference Include="../../neutral/Themia.Pdf/Themia.Pdf.csproj" />
   </ItemGroup>
   <ItemGroup>
@@ -18,6 +19,7 @@
     <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
+    <PackageReference Include="Npgsql" />
     <PackageReference Include="FluentMigrator" />
     <PackageReference Include="Dapper" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" />

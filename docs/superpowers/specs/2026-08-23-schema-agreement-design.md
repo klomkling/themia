@@ -174,13 +174,13 @@ fault; only a successful query that says "this table does not resolve" is eviden
 | `Themia.Exceptional.PostgreSql` | `AddThemiaExceptionalPostgres` (`ServiceCollectionExtensions.cs:31`) | `"Exceptions"` |
 | `Themia.Challenges.PostgreSql` | `AddThemiaChallengesPostgres` (`ServiceCollectionExtensions.cs:19`) | `challenges`, `challenge_rate_windows` |
 | `Themia.Messaging.PostgreSql` | `AddThemiaMessagingPostgreSql` (`ServiceCollectionExtensions.cs:27`) | `messaging_outbox_messages`, `messaging_inbox_messages` |
-| `Themia.Modules.Pdf` | `AddThemiaPdfModuleEfCore` and `AddThemiaPdfModuleDapper`, guarded by `engine == MigrationEngine.Postgres` | `pdf_templates` |
+| `Themia.Modules.Pdf` | `AddCommon`, reached from both `AddThemiaPdfModuleEfCore` and `AddThemiaPdfModuleDapper`; gated at run time by `appliesTo` on `IDatabaseProvider.ProviderName == DatabaseProviderNames.Postgres` | `pdf_templates` |
 
 The first four are per-engine packages, so "PostgreSQL only" is structural. `Themia.Modules.Pdf`
-is a single package serving all engines, but it already carries the engine as state
-(`PdfModule.cs:14`) and switches on it in DI (`PdfModuleServiceCollectionExtensions.cs:41,44`), so
-the registration is guarded there. It must be guarded on **both** entry points — the module has an
-EF Core and a Dapper one.
+is a single package serving all engines, but it resolves `IDatabaseProvider` from the container
+rather than knowing the engine at registration time (`PdfModuleServiceCollectionExtensions.cs:32,38`),
+so the gate is the `appliesTo` predicate, evaluated once at startup. It must be guarded on **both**
+entry points — the module has an EF Core and a Dapper one.
 
 MySQL binds schema to the connection's database and SQL Server defaults to `dbo`, which
 FluentMigrator agrees with. Neither engine has the split.
