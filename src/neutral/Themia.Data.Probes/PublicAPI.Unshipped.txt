@@ -1,0 +1,12 @@
+#nullable enable
+Themia.Data.Probes.PostgresSchemaProbe
+Themia.Data.Probes.ProbeResult
+Themia.Data.Probes.ProbeResult.ProbeResult() -> void
+Themia.Data.Probes.ProbeResult.ProbeResult(string? ResolvedSchema, bool PublicCopyExists) -> void
+Themia.Data.Probes.ProbeResult.PublicCopyExists.get -> bool
+Themia.Data.Probes.ProbeResult.PublicCopyExists.init -> void
+Themia.Data.Probes.ProbeResult.ResolvedSchema.get -> string?
+Themia.Data.Probes.ProbeResult.ResolvedSchema.init -> void
+Themia.Data.Probes.SchemaVisibilityException
+Themia.Data.Probes.SchemaVisibilityException.SchemaVisibilityException(string! message) -> void
+static Themia.Data.Probes.PostgresSchemaProbe.Probe(System.Data.IDbConnection! connection, string! tableName) -> Themia.Data.Probes.ProbeResult

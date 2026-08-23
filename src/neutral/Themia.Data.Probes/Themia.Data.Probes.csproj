@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <!-- Neutral cross-framework package: MUST include net8.0 (cross-framework reuse). -->
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <PackageId>Themia.Data.Probes</PackageId>
+    <Description>Boot-time database probes: confirms a table a Themia store addresses without a schema actually resolves through the connection's search_path.</Description>
+    <!-- Version is inherited from Directory.Build.props (shared). Do not set it here. -->
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- No database driver on purpose: the caller supplies the connection, so each store keeps
+         using the driver it already has and this package stays engine-agnostic. -->
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Themia.Data.Probes.IntegrationTests" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+  <ItemGroup>
+    <AdditionalFiles Include="PublicAPI.Shipped.txt" />
+    <AdditionalFiles Include="PublicAPI.Unshipped.txt" />
+  </ItemGroup>
+</Project>
