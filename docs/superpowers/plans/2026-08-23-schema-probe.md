@@ -147,7 +147,7 @@ namespace Themia.Data.Probes.IntegrationTests;
 public sealed class PostgresSchemaProbeTests : IAsyncLifetime
 {
     private readonly PostgreSqlContainer container =
-        new PostgreSqlBuilder().WithImage("postgres:16-alpine").Build();
+        new PostgreSqlBuilder("postgres:16-alpine").Build();
 
     public Task InitializeAsync() => container.StartAsync();
 
@@ -393,7 +393,7 @@ namespace Themia.Data.Probes.IntegrationTests;
 public sealed class PostgresSchemaProbeHostedServiceTests : IAsyncLifetime
 {
     private readonly PostgreSqlContainer container =
-        new PostgreSqlBuilder().WithImage("postgres:16-alpine").Build();
+        new PostgreSqlBuilder("postgres:16-alpine").Build();
 
     public Task InitializeAsync() => container.StartAsync();
 
@@ -827,7 +827,7 @@ namespace Themia.AspNetCore.DataProtection.IntegrationTests;
 public sealed class DataProtectionSchemaProbeTests : IAsyncLifetime
 {
     private readonly PostgreSqlContainer container =
-        new PostgreSqlBuilder().WithImage("postgres:16-alpine").Build();
+        new PostgreSqlBuilder("postgres:16-alpine").Build();
 
     public Task InitializeAsync() => container.StartAsync();
 
@@ -961,7 +961,7 @@ namespace Themia.Exceptional.PostgreSql.IntegrationTests;
 public sealed class ExceptionalSchemaProbeTests : IAsyncLifetime
 {
     private readonly PostgreSqlContainer container =
-        new PostgreSqlBuilder().WithImage("postgres:16-alpine").Build();
+        new PostgreSqlBuilder("postgres:16-alpine").Build();
 
     public Task InitializeAsync() => container.StartAsync();
 
@@ -1090,7 +1090,7 @@ namespace Themia.Challenges.IntegrationTests;
 public sealed class ChallengesSchemaProbeTests : IAsyncLifetime
 {
     private readonly PostgreSqlContainer container =
-        new PostgreSqlBuilder().WithImage("postgres:16-alpine").Build();
+        new PostgreSqlBuilder("postgres:16-alpine").Build();
 
     public Task InitializeAsync() => container.StartAsync();
 
@@ -1213,7 +1213,7 @@ namespace Themia.Messaging.PostgreSql.IntegrationTests;
 public sealed class MessagingSchemaProbeTests : IAsyncLifetime
 {
     private readonly PostgreSqlContainer container =
-        new PostgreSqlBuilder().WithImage("postgres:16-alpine").Build();
+        new PostgreSqlBuilder("postgres:16-alpine").Build();
 
     public Task InitializeAsync() => container.StartAsync();
 
@@ -1334,7 +1334,7 @@ namespace Themia.Modules.Pdf.IntegrationTests;
 public sealed class PdfSchemaProbeTests : IAsyncLifetime
 {
     private readonly PostgreSqlContainer container =
-        new PostgreSqlBuilder().WithImage("postgres:16-alpine").Build();
+        new PostgreSqlBuilder("postgres:16-alpine").Build();
 
     public Task InitializeAsync() => container.StartAsync();
 
