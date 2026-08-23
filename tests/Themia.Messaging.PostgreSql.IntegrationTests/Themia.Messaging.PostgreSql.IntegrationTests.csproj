@@ -22,5 +22,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/neutral/Themia.Messaging.PostgreSql/Themia.Messaging.PostgreSql.csproj" />
+    <ProjectReference Include="../../src/neutral/Themia.Data.Migrations/Themia.Data.Migrations.csproj" />
+    <ProjectReference Include="../../src/modules/Themia.Modules.Messaging/Themia.Modules.Messaging.csproj" />
   </ItemGroup>
 </Project>

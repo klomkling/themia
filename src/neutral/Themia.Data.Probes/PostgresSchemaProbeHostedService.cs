@@ -10,32 +10,35 @@ namespace Themia.Data.Probes;
 /// does not resolve stops the host instead of surfacing on a user's first request.
 /// </summary>
 internal sealed class PostgresSchemaProbeHostedService(
-    IServiceProvider services,
+    IServiceProvider rootProvider,
     ILogger<PostgresSchemaProbeHostedService> logger,
     PostgresSchemaProbeRegistration registration) : IHostedService
 {
     public Task StartAsync(CancellationToken cancellationToken)
     {
-        using var scope = services.CreateScope();
-        var provider = scope.ServiceProvider;
-
-        if (registration.AppliesTo is not null && !registration.AppliesTo(provider))
-        {
-            return Task.CompletedTask;
-        }
-
-        List<ProbeResult?> results;
+        List<ProbeResult> results;
         try
         {
+            using var scope = rootProvider.CreateScope();
+            var provider = scope.ServiceProvider;
+
+            if (registration.AppliesTo is not null && !registration.AppliesTo(provider))
+            {
+                return Task.CompletedTask;
+            }
+
             using var connection = registration.ConnectionFactory(provider);
             results = registration.Tables
-                .Select(table => (ProbeResult?)PostgresSchemaProbe.Probe(connection, table))
+                .Select(table => PostgresSchemaProbe.Probe(connection, table))
                 .ToList();
         }
         catch (Exception ex)
         {
-            // Availability, not configuration. Throwing here would newly couple host startup to
-            // database uptime for consumers that do not migrate on boot.
+            // Availability/configuration faults here -- unreachable database, a faulty appliesTo
+            // predicate, a bad connection factory -- are not evidence of a schema problem. Throwing
+            // would newly couple host startup to database uptime for consumers that do not migrate on
+            // boot. Only the SchemaVisibilityException thrown below, from a probe that actually ran, is
+            // allowed to stop the host.
             logger.LogWarning(
                 ex,
                 "{Component}: could not run the schema probe, so schema agreement was not verified. "
@@ -47,7 +50,7 @@ internal sealed class PostgresSchemaProbeHostedService(
         for (var i = 0; i < results.Count; i++)
         {
             var table = registration.Tables[i];
-            var result = results[i]!.Value;
+            var result = results[i];
 
             if (result.ResolvedSchema is null)
             {

@@ -48,8 +48,12 @@ public static class ServiceCollectionExtensions
 
         // Resolved from IServiceProvider, not captured: this package takes a connection string NAME and
         // reads the value from IConfiguration, exactly as the dialects above do via Resolve(...).
+        // Named after this package, not Themia.Modules.Messaging: unlike the other probe registrations
+        // (each in a package that references the one owning its migration), this package does not
+        // reference Themia.Modules.Messaging at all, so naming the diagnosis after it would point a
+        // debugging operator at a package this one has no structural relationship to.
         services.AddPostgresSchemaProbe(
-            "Themia.Modules.Messaging",
+            "Themia.Messaging.PostgreSql",
             sp =>
             {
                 var connection = new NpgsqlConnection(Resolve(sp, connectionStringName));

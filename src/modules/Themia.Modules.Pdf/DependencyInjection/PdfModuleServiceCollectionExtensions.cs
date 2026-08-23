@@ -104,7 +104,9 @@ public static class PdfModuleServiceCollectionExtensions
                 return connection;
             },
             ["pdf_templates"],
-            appliesTo: sp => sp.GetRequiredService<IDatabaseProvider>().ProviderName
+            // GetService, not GetRequiredService: the Dapper peer never registers IDatabaseProvider,
+            // so its absence means "not PostgreSQL as far as we can tell" -- skip, don't throw.
+            appliesTo: sp => sp.GetService<IDatabaseProvider>()?.ProviderName
                 == DatabaseProviderNames.Postgres);
     }
 }

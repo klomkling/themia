@@ -6,7 +6,9 @@ using Npgsql;
 
 using Testcontainers.PostgreSql;
 
+using Themia.Data.Migrations;
 using Themia.Data.Probes;
+using Themia.Modules.Messaging.Migrations;
 
 using Xunit;
 
@@ -34,6 +36,15 @@ public sealed class MessagingSchemaProbeTests : IAsyncLifetime
             command.ExecuteNonQuery();
         }
 
+        // Migrate once on the plain (default-search_path) connection string, not the msg_app-scoped one
+        // below, for the same reason ChallengesSchemaProbeTests does: MessagingSchemaMigration's index
+        // statements are raw Execute.Sql, which follows this connection's actual search_path rather than
+        // always landing in 'public' the way Create.Table does. Running the migration itself against a
+        // search_path that excludes 'public' therefore fails before the probe this test targets ever
+        // runs. Pre-applying the migration here keeps the assertion on the probe.
+        ThemiaMigrations.Run(
+            MigrationEngine.Postgres, builder.ConnectionString, typeof(MessagingSchemaMigration).Assembly);
+
         builder.SearchPath = "msg_app";
 
         using var host = new HostBuilder()
@@ -42,6 +53,8 @@ public sealed class MessagingSchemaProbeTests : IAsyncLifetime
             .ConfigureServices(services => services.AddThemiaMessagingPostgreSql())
             .Build();
 
-        await Assert.ThrowsAsync<SchemaVisibilityException>(() => host.StartAsync());
+        var ex = await Assert.ThrowsAsync<SchemaVisibilityException>(() => host.StartAsync());
+        Assert.Contains("messaging_outbox_messages", ex.Message, StringComparison.Ordinal);
+        Assert.Contains("public", ex.Message, StringComparison.Ordinal);
     }
 }

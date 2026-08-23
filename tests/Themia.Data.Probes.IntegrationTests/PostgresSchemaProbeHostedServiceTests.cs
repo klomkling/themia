@@ -141,6 +141,24 @@ public sealed class PostgresSchemaProbeHostedServiceTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Host_ShouldStartAndWarn_WhenAppliesToThrows()
+    {
+        // A faulty predicate is a configuration/availability fault, not a schema fault -- it must
+        // warn and let the host start, the same as an unreachable database.
+        var warnings = new List<string>();
+        using var host = BuildHost(
+            "Host=127.0.0.1;Port=1;Username=nobody;Password=nobody;Database=nothing;Timeout=1",
+            ["anything"],
+            warnings,
+            appliesTo: _ => throw new InvalidOperationException("boom"));
+
+        await host.StartAsync();
+        await host.StopAsync();
+
+        Assert.Single(warnings);
+    }
+
+    [Fact]
     public async Task Host_ShouldRunEveryRegistration_WhenTwoProbesAreRegistered()
     {
         // AddHostedService<T> de-duplicates by implementation type, which would silently collapse

@@ -24,11 +24,24 @@ and never fails a boot on a connection error.
 No configuration is added and nothing is opt-in. Coord #0088.
 
 **Known limitation — a non-default `search_path` can still fail inside a migration.**
-`Themia.Challenges` and `Themia.Modules.Messaging` each create their tables with fluent
-`Create.Table(...)` (forced to `public` by FluentMigrator) but create some of their indexes with
-raw `Execute.Sql(...)` (which follows `search_path`). On a non-default `search_path` these two
-migrations are internally inconsistent and throw during migration — before the new probe ever
-gets to run. So the probe does not fully close the gap for these two stores: a *first* boot on a
-non-default `search_path` still dies, just inside the migration instead of on first use, with a
-less specific error than the probe gives. The migrations are unchanged in this release; this is
-tracked as a known limitation, not a regression.
+Four of the five affected assemblies mix DDL styles that resolve schema differently on
+PostgreSQL: `Themia.Challenges`, `Themia.Modules.Messaging`, and `Themia.Modules.Pdf` each create
+their tables with fluent `Create.Table(...)` (forced to `public` by FluentMigrator) but create some
+of their indexes with raw `Execute.Sql(...)` (which follows `search_path`);
+`Themia.AspNetCore.DataProtection` has the inverse pairing — a later migration's raw
+`Execute.Sql("ALTER TABLE data_protection_keys ...")` targets a table an earlier migration created
+with fluent `Create.Table`. Only `Themia.Exceptional` is clean (its migrations use no `Execute.Sql`
+at all). On a non-default `search_path` these four migrations are internally inconsistent and throw
+during migration — before the new probe ever gets to run. So the probe does not fully close the gap
+for these four stores: a *first* boot on a non-default `search_path` still dies, just inside the
+migration instead of on first use, with a less specific error than the probe gives. The migrations
+are unchanged in this release; this is tracked as a known limitation, not a regression.
+
+**Known limitation — module initialisation must run before the probe.** `Themia.Modules.Pdf` and
+`Themia.Modules.Messaging` create their tables from `IThemiaModule.InitializeAsync`, which nothing
+in the framework drives — your host application calls it. If your `InitializeAsync` call runs as
+its own `IHostedService` registered *after* `AddThemiaPdfModule*` / `AddThemiaMessagingPostgreSql`,
+the probe (also an `IHostedService`, added by those same calls) can run before the tables exist and
+throw `SchemaVisibilityException` on a legitimate first boot against a fresh database. Initialise
+Themia modules before `IHost.StartAsync`, or, if your module initialisation itself runs as a
+hosted service, register it before the module's `Add...` call so it starts first.
