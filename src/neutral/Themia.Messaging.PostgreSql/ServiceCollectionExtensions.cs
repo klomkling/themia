@@ -4,6 +4,9 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
+using Npgsql;
+
+using Themia.Data.Probes;
 using Themia.Messaging.Inbox;
 using Themia.Messaging.Outbox;
 
@@ -42,6 +45,18 @@ public static class ServiceCollectionExtensions
         services.TryAddSingleton<IInboxPurgeDialect>(
             sp => sp.GetRequiredService<PostgresMessagingPurgeDialect>());
         services.TryAddSingleton<IInboxAdmissionDialect, PostgresInboxAdmission>();
+
+        // Resolved from IServiceProvider, not captured: this package takes a connection string NAME and
+        // reads the value from IConfiguration, exactly as the dialects above do via Resolve(...).
+        services.AddPostgresSchemaProbe(
+            "Themia.Modules.Messaging",
+            sp =>
+            {
+                var connection = new NpgsqlConnection(Resolve(sp, connectionStringName));
+                connection.Open();
+                return connection;
+            },
+            ["messaging_outbox_messages", "messaging_inbox_messages"]);
 
         return services;
     }

@@ -313,6 +313,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Themia.Data.Probes", "src\n
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Themia.Data.Probes.IntegrationTests", "tests\Themia.Data.Probes.IntegrationTests\Themia.Data.Probes.IntegrationTests.csproj", "{330DBAA9-6FC8-4730-A090-CD6B72820899}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Themia.Messaging.PostgreSql.IntegrationTests", "tests\Themia.Messaging.PostgreSql.IntegrationTests\Themia.Messaging.PostgreSql.IntegrationTests.csproj", "{8DEEBD29-CD68-407C-A65E-B7A76D6BBD19}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -2087,6 +2089,18 @@ Global
 		{330DBAA9-6FC8-4730-A090-CD6B72820899}.Release|x64.Build.0 = Release|Any CPU
 		{330DBAA9-6FC8-4730-A090-CD6B72820899}.Release|x86.ActiveCfg = Release|Any CPU
 		{330DBAA9-6FC8-4730-A090-CD6B72820899}.Release|x86.Build.0 = Release|Any CPU
+		{8DEEBD29-CD68-407C-A65E-B7A76D6BBD19}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8DEEBD29-CD68-407C-A65E-B7A76D6BBD19}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8DEEBD29-CD68-407C-A65E-B7A76D6BBD19}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{8DEEBD29-CD68-407C-A65E-B7A76D6BBD19}.Debug|x64.Build.0 = Debug|Any CPU
+		{8DEEBD29-CD68-407C-A65E-B7A76D6BBD19}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{8DEEBD29-CD68-407C-A65E-B7A76D6BBD19}.Debug|x86.Build.0 = Debug|Any CPU
+		{8DEEBD29-CD68-407C-A65E-B7A76D6BBD19}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8DEEBD29-CD68-407C-A65E-B7A76D6BBD19}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8DEEBD29-CD68-407C-A65E-B7A76D6BBD19}.Release|x64.ActiveCfg = Release|Any CPU
+		{8DEEBD29-CD68-407C-A65E-B7A76D6BBD19}.Release|x64.Build.0 = Release|Any CPU
+		{8DEEBD29-CD68-407C-A65E-B7A76D6BBD19}.Release|x86.ActiveCfg = Release|Any CPU
+		{8DEEBD29-CD68-407C-A65E-B7A76D6BBD19}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -2243,5 +2257,6 @@ Global
 		{25A0F774-026E-4F00-B5F6-9CABADD99485} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 		{43D15D78-B0FB-4C37-AA83-44413763C0EA} = {1F655D57-935D-D295-E882-5052ED9A6376}
 		{330DBAA9-6FC8-4730-A090-CD6B72820899} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
+		{8DEEBD29-CD68-407C-A65E-B7A76D6BBD19} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 	EndGlobalSection
 EndGlobal
