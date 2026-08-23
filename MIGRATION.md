@@ -10,6 +10,59 @@ with the *why* and concrete upgrade steps.
 - Each entry states: **What changed**, **Why**, and **How to upgrade** (before → after).
 - Non-breaking changes are *not* listed here — see the CHANGELOG.
 
+## 0.17.0
+
+### A table off the `search_path` now stops the host at startup
+
+**What changed:** five PostgreSQL stores — `Themia.AspNetCore.DataProtection`, `Themia.Exceptional`,
+`Themia.Challenges`, `Themia.Modules.Messaging` and `Themia.Modules.Pdf` — now verify at host startup
+that the table they address without a schema actually resolves through the connection's `search_path`.
+A table that does not resolve throws `Themia.Data.Probes.SchemaVisibilityException` from
+`IHostedService.StartAsync`, and the host does not start.
+
+**Why:** FluentMigrator ignores `search_path` on PostgreSQL — it resolves an unqualified migration to
+`public` for both its existence probe and its DDL — while Themia's stores issue unqualified SQL through
+Npgsql, which follows `search_path`. On a non-default `search_path` the migration manages one table and
+the store reads another, and nothing says so.
+
+The expensive shape is a fresh database with `public` off the path: the migration creates
+`public.<table>`, the deploy goes green, health checks pass, and the first runtime use fails with
+`42P01`. For Data Protection the key ring is not read at boot but when the first protector is created —
+so it presented as *"deploy went green, users cannot sign in"*, with the fault dating from the deploy.
+Moving the failure to startup is the whole point of the change (coord #0088).
+
+**How to upgrade:** nothing to do if your `search_path` resolves the schema holding these tables — which
+is every deployment on the PostgreSQL default. If your host now refuses to start, the message names the
+identifier and the schemas that do hold a table of that name. Either:
+
+```
+# put the schema Themia's migrations write to on the path
+ALTER ROLE <app_role> SET search_path = public;
+```
+
+or point the connection at the schema that actually holds the table.
+
+**What it does NOT assert:** that the table lives in `public`. If you run Themia tables in your own
+schema with your own migrations (`runMigration: false`), that keeps working — resolvability is the only
+claim Themia is entitled to make, because it cannot know which schema a table should be in.
+
+**A connection failure does not stop the host.** The probe warns and continues if it cannot reach the
+database. It is not a liveness check, and a database blip will not fail your deploy.
+
+**Known limitation — a case the probe cannot reach.** Four migrations mix DDL styles that resolve schema
+differently: fluent `Create.Table(...)`, which FluentMigrator forces to `public`, alongside raw
+`Execute.Sql` DDL, which follows `search_path`. `Themia.Challenges`, `Themia.Modules.Messaging`,
+`Themia.Modules.Pdf` and `Themia.AspNetCore.DataProtection` are all affected; only `Themia.Exceptional`
+is clean. On a non-default `search_path` those migrations are internally inconsistent and throw *during
+migration*, before the probe runs — so on a first boot you get the migration's own, less specific error.
+The migrations are deliberately unchanged: they are shipped, and Themia's migrations are forward-only.
+
+**Module initialisation ordering.** `Themia.Modules.Pdf` and `Themia.Modules.Messaging` create their
+tables in `IThemiaModule.InitializeAsync`, which your application drives — nothing in the framework
+calls it. If you initialise Themia modules from your own `IHostedService`, register it *before* the
+module's `Add...` call, or initialise before `IHost.StartAsync`; otherwise the probe runs first and a
+legitimate first boot against a fresh database fails.
+
 ## 0.16.2
 
 ### Mixed Themia versions are now refused at startup
