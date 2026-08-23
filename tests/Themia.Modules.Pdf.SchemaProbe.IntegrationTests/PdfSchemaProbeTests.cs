@@ -8,7 +8,7 @@ using Themia.Data.Probes;
 using Themia.Framework.Data.EFCore.Abstractions;
 using Xunit;
 
-namespace Themia.Modules.Pdf.IntegrationTests;
+namespace Themia.Modules.Pdf.SchemaProbe.IntegrationTests;
 
 public sealed class PdfSchemaProbeTests : IAsyncLifetime
 {

@@ -2,22 +2,12 @@
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <IsPackable>false</IsPackable>
-    <IsTestProject>true</IsTestProject>
+    <IsTestProject>false</IsTestProject>
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
   </PropertyGroup>
   <ItemGroup>
-    <!-- xunit provides IAsyncLifetime + [Fact] used in the conformance base, the fixtures, and the
-         probe-gating tests run directly from this project. -->
-    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <!-- xunit provides IAsyncLifetime + [Fact] used in the conformance base and fixtures. -->
     <PackageReference Include="xunit" />
-    <PackageReference Include="xunit.runner.visualstudio">
-      <PrivateAssets>all</PrivateAssets>
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-    </PackageReference>
-    <PackageReference Include="coverlet.collector">
-      <PrivateAssets>all</PrivateAssets>
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-    </PackageReference>
     <PackageReference Include="Testcontainers.PostgreSql" />
     <PackageReference Include="Testcontainers.MsSql" />
     <PackageReference Include="Testcontainers.MySql" />
@@ -26,7 +16,6 @@
     <PackageReference Include="MySqlConnector" />
     <PackageReference Include="Microsoft.Extensions.Configuration" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
-    <PackageReference Include="Microsoft.Extensions.Hosting" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/modules/Themia.Modules.Pdf/Themia.Modules.Pdf.csproj" />
