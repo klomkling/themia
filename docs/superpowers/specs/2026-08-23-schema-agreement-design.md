@@ -270,6 +270,21 @@ failure, and distinguishing them would mean Themia recording which tables it cre
 what `themia_version_<assembly>` does, but reading it here would make the probe depend on the
 migration runner and undo the package split. Accepted; documented in the warning text.
 
+Two migrations mix DDL styles that resolve schema differently on PostgreSQL, a shape the
+inventory above missed and Task 5 found, then confirmed a second time in a second assembly.
+`Themia.Challenges/Migrations/ChallengeSchemaMigration.cs` creates its tables with fluent
+`Create.Table(...)`, which FluentMigrator forces to `public`, but creates four partial unique
+indexes at lines 267-270 with raw `Execute.Sql($"CREATE UNIQUE INDEX ... ON {RateWindowsTable}
+...")`, which follows `search_path`. `Themia.Modules.Messaging/Migrations/MessagingSchemaMigration.cs`
+has the same shape — fluent `Create.Table(OutboxTable)` alongside `Execute.Sql($"CREATE INDEX ...
+ON {table} ...")` at lines 106-110. On a non-default `search_path` these migrations are internally
+inconsistent and throw during migration, before the probe can run: the table lands in `public` while
+the index statement targets whatever schema `search_path` resolves to, which does not yet exist there.
+So for `Themia.Challenges` the probe only helps on a LATER boot; a first boot on a non-default
+`search_path` dies inside the migration with a less specific error. The split is inside one
+migration, not merely between migration and store — a shape coord #0088 does not describe. The
+migrations are deliberately not changed here: they are shipped, and this plan is about probes.
+
 ## Open question for the coord thread
 
 Whether anyone runs Themia tables outside `public` today. The answer does not change this design —
