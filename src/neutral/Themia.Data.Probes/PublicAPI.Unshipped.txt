@@ -10,3 +10,5 @@ Themia.Data.Probes.ProbeResult.ResolvedSchema.init -> void
 Themia.Data.Probes.SchemaVisibilityException
 Themia.Data.Probes.SchemaVisibilityException.SchemaVisibilityException(string! message) -> void
 static Themia.Data.Probes.PostgresSchemaProbe.Probe(System.Data.IDbConnection! connection, string! tableName) -> Themia.Data.Probes.ProbeResult
+Themia.Data.Probes.PostgresSchemaProbeServiceCollectionExtensions
+static Themia.Data.Probes.PostgresSchemaProbeServiceCollectionExtensions.AddPostgresSchemaProbe(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, string! componentName, System.Func<System.IServiceProvider!, System.Data.IDbConnection!>! connectionFactory, string![]! tables, System.Func<System.IServiceProvider!, bool>? appliesTo = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
