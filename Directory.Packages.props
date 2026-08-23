@@ -54,6 +54,9 @@
     <PackageVersion Include="Microsoft.Extensions.Logging" Version="10.0.9" />
     <PackageVersion Include="Microsoft.Extensions.Caching.Memory" Version="10.0.9" />
     <PackageVersion Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.9" />
+    <!-- Test-only: Themia.Data.Probes.IntegrationTests needs the generic HostBuilder, which
+         Hosting.Abstractions does not include. -->
+    <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.9" />
     <!-- Messaging.Http (Tier 2): IHttpClientFactory for the themia-hmac-v1 outbox dispatcher -->
     <PackageVersion Include="Microsoft.Extensions.Http" Version="10.0.9" />
     <!-- MultiTenancy (Tier 2): Dapper catalog store + ASP.NET Core middleware -->

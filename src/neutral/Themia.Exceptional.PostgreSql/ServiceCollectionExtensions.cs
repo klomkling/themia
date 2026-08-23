@@ -1,5 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
+using Npgsql;
 using Themia.Data.Migrations;
+using Themia.Data.Probes;
 using Themia.Exceptional;
 
 namespace Themia.Exceptional.PostgreSql;
@@ -34,10 +36,24 @@ public static class ServiceCollectionExtensions
         ArgumentException.ThrowIfNullOrWhiteSpace(connectionString);
         ArgumentNullException.ThrowIfNull(configure);
 
-        return services.AddThemiaExceptionalProvider(
+        services.AddThemiaExceptionalProvider(
             dialect: new PostgresExceptionalDialect(connectionString),
             configure: configure,
             engine: MigrationEngine.Postgres,
             connectionString: connectionString);
+
+        // "Exceptions" is created quoted, so it must be probed quoted -- an unquoted probe folds to
+        // lower case and would report a table that exists as missing.
+        services.AddPostgresSchemaProbe(
+            "Themia.Exceptional",
+            _ =>
+            {
+                var connection = new NpgsqlConnection(connectionString);
+                connection.Open();
+                return connection;
+            },
+            ["\"Exceptions\""]);
+
+        return services;
     }
 }

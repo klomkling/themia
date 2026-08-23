@@ -16,20 +16,13 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="Testcontainers.PostgreSql" />
-    <PackageReference Include="Testcontainers.MsSql" />
-    <PackageReference Include="Testcontainers.MySql" />
-    <PackageReference Include="Dapper" />
     <PackageReference Include="Npgsql" />
-    <PackageReference Include="MySqlConnector" />
-    <PackageReference Include="Microsoft.Data.SqlClient" />
+    <PackageReference Include="Testcontainers.PostgreSql" />
+    <PackageReference Include="Microsoft.Extensions.Configuration" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
     <PackageReference Include="Microsoft.Extensions.Hosting" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="../../src/neutral/Themia.Challenges/Themia.Challenges.csproj" />
-    <ProjectReference Include="../../src/neutral/Themia.Challenges.PostgreSql/Themia.Challenges.PostgreSql.csproj" />
-    <ProjectReference Include="../../src/neutral/Themia.Challenges.MySql/Themia.Challenges.MySql.csproj" />
-    <ProjectReference Include="../../src/neutral/Themia.Challenges.SqlServer/Themia.Challenges.SqlServer.csproj" />
+    <ProjectReference Include="../../src/modules/Themia.Modules.Pdf/Themia.Modules.Pdf.csproj" />
   </ItemGroup>
 </Project>

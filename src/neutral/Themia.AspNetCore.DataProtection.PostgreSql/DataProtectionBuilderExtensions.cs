@@ -1,5 +1,8 @@
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.Extensions.DependencyInjection;
+using Npgsql;
 using Themia.Data.Migrations;
+using Themia.Data.Probes;
 
 namespace Themia.AspNetCore.DataProtection.PostgreSql;
 
@@ -38,11 +41,26 @@ public static class DataProtectionBuilderExtensions
         ArgumentNullException.ThrowIfNull(builder);
         ArgumentException.ThrowIfNullOrWhiteSpace(connectionString);
 
-        return builder.PersistKeysToThemia(
+        builder.PersistKeysToThemia(
             new PostgresDataProtectionKeyDialect(connectionString),
             MigrationEngine.Postgres,
             connectionString,
             runMigration,
             migrationOptions);
+
+        // Boot-time check: the migration writes public.data_protection_keys, but this store reads
+        // unqualified and follows search_path. A mismatch otherwise surfaces on the first protector,
+        // which is a user request, not startup.
+        builder.Services.AddPostgresSchemaProbe(
+            "Themia.AspNetCore.DataProtection",
+            _ =>
+            {
+                var connection = new NpgsqlConnection(connectionString);
+                connection.Open();
+                return connection;
+            },
+            ["data_protection_keys"]);
+
+        return builder;
     }
 }

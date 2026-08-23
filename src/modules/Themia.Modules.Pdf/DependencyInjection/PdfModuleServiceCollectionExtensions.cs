@@ -2,6 +2,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
+using Npgsql;
+using Themia.Data.Probes;
 using Themia.Framework.Data.Abstractions.Filtering;
 using Themia.Framework.Data.EFCore.Abstractions;
 using Themia.Modules.Pdf;
@@ -85,5 +87,26 @@ public static class PdfModuleServiceCollectionExtensions
         services.AddThemiaPdf(); // neutral renderers (singletons)
         services.TryAddScoped<IDataFilterScope, DataFilterScope>();
         services.TryAddScoped<IPdfDocumentRenderer, PdfDocumentRenderer>();
+
+        // This module serves every engine from one assembly and only learns which one from the
+        // container, so the probe is registered unconditionally and gated by appliesTo.
+        services.AddPostgresSchemaProbe(
+            "Themia.Modules.Pdf",
+            sp =>
+            {
+                var configuration = sp.GetRequiredService<IConfiguration>();
+                var moduleOptions = sp.GetRequiredService<IOptions<PdfModuleOptions>>().Value;
+                var connectionString = configuration.GetConnectionString(moduleOptions.ConnectionStringName)
+                    ?? throw new InvalidOperationException(
+                        $"Connection string '{moduleOptions.ConnectionStringName}' was not found; the PDF module requires it.");
+                var connection = new NpgsqlConnection(connectionString);
+                connection.Open();
+                return connection;
+            },
+            ["pdf_templates"],
+            // GetService, not GetRequiredService: the Dapper peer never registers IDatabaseProvider,
+            // so its absence means "not PostgreSQL as far as we can tell" -- skip, don't throw.
+            appliesTo: sp => sp.GetService<IDatabaseProvider>()?.ProviderName
+                == DatabaseProviderNames.Postgres);
     }
 }
