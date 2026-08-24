@@ -44,6 +44,11 @@ jobs:
       - name: Restore
         run: dotnet restore
 
+      - name: Verify Dependabot sees every centrally managed package
+        # The Dependabot NuGet job discovers .github/dependabot-nuget/ instead of the solution.
+        # A PackageVersion referenced by none of those manifests is silently never updated.
+        run: bash .github/dependabot-nuget/verify-coverage.sh
+
       - name: Setup reviewdog
         uses: reviewdog/action-setup@v1
         with:

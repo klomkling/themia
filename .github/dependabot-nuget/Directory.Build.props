@@ -1,0 +1,16 @@
+<Project>
+  <!--
+    Deliberately does NOT import the repository's Directory.Build.props. The projects in this
+    directory exist only for Dependabot's NuGet discovery (see README.md); they are never built by
+    CI and must not inherit TreatWarningsAsErrors, PublicAPI tracking or packaging.
+
+    Directory.Packages.props is still found: NuGet walks up from the project directory
+    independently of Directory.Build.props, so central package management applies as usual.
+  -->
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <IsPackable>false</IsPackable>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <EnableDefaultItems>false</EnableDefaultItems>
+  </PropertyGroup>
+</Project>

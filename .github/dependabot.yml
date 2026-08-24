@@ -1,7 +1,14 @@
 version: 2
 updates:
   - package-ecosystem: nuget
-    directory: "/"
+    # NOT the repository root. Dependabot discovers the three tiny projects in this directory
+    # instead of the 145-project solution, and still edits the root Directory.Packages.props —
+    # see .github/dependabot-nuget/README.md for why, and PRs #214–#219 for what did not work.
+    #
+    # Against the real solution the updater's per-dependency re-discovery hit the fixed 55-minute
+    # cap on every weekly run from 2026-07-27 to 2026-08-21, having analysed 11–18 of 78 packages.
+    # No NuGet update PR was produced in that time. Discovery here takes seconds.
+    directory: "/.github/dependabot-nuget"
     schedule:
       interval: weekly
     open-pull-requests-limit: 10
@@ -13,17 +20,9 @@ updates:
     # that Dependabot then auto-closes as "no longer updatable". Pattern groups are listed BEFORE
     # the catch-all nuget-minor-patch so a matching dependency joins its family group first.
     #
-    # ORDER IS LOAD-BEARING, and not only for the catch-all. The NuGet updater re-runs full project
-    # discovery per dependency, and discovery of this repo is expensive — 145 csproj, central package
-    # management, 36 projects on two TFMs. Measured on the 2026-08-10 and 2026-08-17 runs: the first
-    # discovery alone took 10m46s, each re-run 4-17s, 154 discoveries in total, and the job was killed
-    # by the ~55-minute cap having analyzed 18 of 77 dependencies. Both runs ended
-    # "##[error]The operation was canceled." within one second of the same duration.
-    #
-    # Dependabot analyses groups in the order declared here, so whatever sits below roughly the first
-    # 20 dependencies is never reached at all. The order is therefore risk-first: security-facing and
-    # runtime packages before build-time tooling, and test-only families last. This does NOT fix the
-    # timeout — it decides which dependencies get the time there is.
+    # Order is still analysis order (measured on #214), so it stays risk-first: security-facing and
+    # runtime packages before build-time tooling, test-only families last. With discovery no longer
+    # the bottleneck the whole list should be reached; the order now decides PR sequence, not survival.
     groups:
       aspnetcore:
         # First deliberately: CLAUDE.md requires Microsoft.AspNetCore.* to stay patched.
@@ -71,11 +70,9 @@ updates:
           - "xunit*"
       # Catch-all for everything else: bundle remaining minor/patch updates into one PR.
       # Must stay LAST — it has no patterns, so it would otherwise grab every dependency first.
-      #
-      # WARNING: nothing here is currently reached before the timeout, and the ungrouped set includes
-      # security-facing packages — SSH.NET (which needed a manual pin for GHSA-q939-rpr3-3284 in #209),
-      # Microsoft.Data.SqlClient, MySqlConnector, StackExchange.Redis, Konscious…Argon2, MessagePack.
-      # Reordering above does not solve that; only cutting the per-job discovery cost will.
+      # The ungrouped set includes security-facing packages (SSH.NET, Microsoft.Data.SqlClient,
+      # MySqlConnector, StackExchange.Redis, Konscious…Argon2, MessagePack); under the old root
+      # discovery none of them was ever reached.
       nuget-minor-patch:
         update-types:
           - minor

@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Every centrally managed package that can share one restore graph. See README.md. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- Version is blanked: CPM forbids it on a PackageReference, and the item transform would
+         otherwise copy it across from the PackageVersion item. -->
+    <PackageReference Include="@(PackageVersion)" Version="" />
+    <!-- Roslyn 4.x is pinned for the netstandard2.0 source generators and never shares a project
+         with anything that needs Roslyn 5 (the analyzer-testing harness pulls Workspaces 5.x).
+         Mirrored: these two live in Manifest.Tooling.csproj. Every Remove here MUST appear in
+         another manifest — verify-coverage.sh fails CI otherwise. -->
+    <PackageReference Remove="Microsoft.CodeAnalysis.CSharp" />
+    <PackageReference Remove="Microsoft.CodeAnalysis.Analyzers" />
+  </ItemGroup>
+</Project>
