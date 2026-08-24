@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- The one package whose PackageVersion is conditioned per target framework. Manifest.csproj
+       sees the net10.0 line; this project exists so the net8.0 line is discovered too. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.TestHost" />
+  </ItemGroup>
+</Project>
