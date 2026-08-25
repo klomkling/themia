@@ -12,8 +12,21 @@ public static class ServiceCollectionExtensions
     private static readonly IConfiguration EmptyConfiguration = new ConfigurationBuilder().Build();
 
     /// <summary>
-    /// Adds Themia caching with default configuration (MemoryCache + MessagePack).
+    /// Adds Themia caching with default configuration: in-memory cache, MessagePack serialization.
     /// </summary>
+    /// <remarks>
+    /// <b>The MessagePack default constrains your model types.</b> MessagePack needs a contract: a type
+    /// must carry <c>[MessagePackObject]</c> (or be covered by a resolver), and a value declared as an
+    /// interface — <c>IReadOnlyList&lt;T&gt;</c>, <c>IEnumerable&lt;T&gt;</c> — cannot be serialized at
+    /// all. Plain positional records returned through an interface, which is ordinary modern C#, are
+    /// rejected.
+    /// <para>
+    /// A rejected type does not fail the request. The cache write is swallowed so a cache fault cannot
+    /// break a handler, which means caching is silently a no-op for that type; the pipeline reports it
+    /// once per request type at <c>Warning</c>. If your cached types are plain records, call
+    /// <c>UseJsonSerialization()</c> instead — see the builder overload of this method.
+    /// </para>
+    /// </remarks>
     /// <param name="services">The service collection.</param>
     /// <returns>The service collection for chaining.</returns>
     public static IServiceCollection AddThemiaCaching(this IServiceCollection services)

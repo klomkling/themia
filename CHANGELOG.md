@@ -27,6 +27,52 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.17.1] - 2026-08-26
+
+### Added
+- **`ValidateThemiaCachingSerialization()` — an opt-in startup check for uncacheable response types**
+  (coord #0100). A `[Cacheable]` request whose response type the configured serializer cannot handle
+  is never cached, and until now that was only discoverable when the first request of that particular
+  query ran — long after the deploy, for a query that is hit rarely. The check logs a single `Error`
+  naming every affected request. It **never stops the host**: such a request still answers correctly,
+  and a deployment that runs today keeps running.
+
+  It reads the service collection when the host starts rather than when it is registered, so it works
+  whether it is called before or after your handlers.
+
+- **`ISerializationProvider.CanHandle(Type)`** — a default interface method returning `true`, so
+  existing implementations are unaffected and a provider that cannot answer never raises a false
+  alarm. `MessagePackSerializationProvider` overrides it by asking its resolver for a formatter,
+  walking generic arguments as well as the type itself: `IReadOnlyList<T>` *has* a formatter, so
+  checking only the outer type reports a collection of contract-less records as serializable when
+  serializing it throws. `JsonSerializationProvider` does not override it — its reflection serializer
+  handles essentially anything.
+
+- **`CacheSerializationException`**, thrown by both serialization providers, carrying the rejected
+  type and the provider name. It derives from `InvalidOperationException`, which is what the providers
+  threw before, so existing `catch (InvalidOperationException)` handlers are unaffected.
+
+### Changed
+- **A serializer rejecting a response type is now reported as permanent, once per request type**
+  (coord #0100). It was logged as `Failed to cache response for {RequestType}` on *every* request,
+  which reads as transient and flooded hot paths. It now names the serializer and the response type
+  and says the response will **never** be stored. Other cache faults keep the per-request warning —
+  for a connection or timeout fault the repetition is the signal.
+
+  **Observable:** if you alert on the old message text, it no longer appears for serialization
+  failures, and the replacement fires once per request type per process rather than per request.
+
+- **`AddThemiaCaching()` now documents that the MessagePack default constrains your model types** —
+  MessagePack needs a contract, and a value declared as an interface (`IReadOnlyList<T>`) cannot be
+  serialized at all. Plain positional records returned through an interface, which is ordinary modern
+  C#, are rejected. Use `UseJsonSerialization()` for those.
+
+### Fixed
+- **The caching pipeline now has a test that drives it through a real serializer.** Every existing
+  test in that area used a fake cache provider that stores objects directly and never serializes, so
+  nothing in the suite could observe a serializer rejecting a response type — which is how this
+  reached a consumer.
+
 ## [0.17.0] - 2026-08-24
 
 ### Added

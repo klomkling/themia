@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Hosting;
 using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -64,6 +66,31 @@ public static class ServiceCollectionExtension
         services.AddScoped(typeof(IPipelineBehavior<,>), typeof(CachingBehavior<,>));
         services.AddScoped(typeof(IPipelineBehavior<,>), typeof(PerformanceBehavior<,>));
         services.AddScoped(typeof(IPipelineBehavior<,>), typeof(TransactionBehavior<,>));
+
+        return services;
+    }
+
+    /// <summary>
+    /// Reports at startup, as a single <c>Error</c> log, every <c>[Cacheable]</c> request whose response
+    /// type the configured <see cref="Themia.Caching.ISerializationProvider"/> cannot serialize.
+    /// </summary>
+    /// <remarks>
+    /// Opt-in, and it <b>never stops the host</b>: such a request still answers correctly, it simply is
+    /// not cached, and a deployment that runs today keeps running. Call it anywhere — the check reads the
+    /// service collection when the host starts, so it does not matter whether handlers are registered
+    /// before or after this call.
+    /// </remarks>
+    /// <param name="services">The service collection.</param>
+    /// <returns>The service collection for chaining.</returns>
+    public static IServiceCollection ValidateThemiaCachingSerialization(this IServiceCollection services)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+
+        // The closure keeps the collection itself, which is why call order does not matter.
+        services.AddSingleton<IHostedService>(sp => new CachingSerializationValidator(
+            services,
+            sp,
+            sp.GetRequiredService<ILogger<CachingSerializationValidator>>()));
 
         return services;
     }
