@@ -3,3 +3,4 @@ Themia.Mediator.Configuration.MediatorCachingOptions.KnownTypeSuffixes.get -> Sy
 Themia.Mediator.Configuration.MediatorCachingOptions.KnownTypeSuffixes.set -> void
 Themia.Mediator.Configuration.MediatorCachingOptions.KnownVerbPrefixes.get -> System.Collections.Generic.IReadOnlyList<string!>!
 Themia.Mediator.Configuration.MediatorCachingOptions.KnownVerbPrefixes.set -> void
+static Themia.Mediator.Extensions.ServiceCollectionExtension.ValidateThemiaCachingSerialization(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
