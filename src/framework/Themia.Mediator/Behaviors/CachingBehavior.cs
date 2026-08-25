@@ -25,6 +25,13 @@ public sealed class CachingBehavior<TRequest, TResponse> : IPipelineBehavior<TRe
     private readonly MediatorCachingOptions _options;
 
     /// <summary>
+    /// 1 once a permanent serialization failure has been reported for this closed generic type.
+    /// Static per <c>CachingBehavior&lt;TRequest, TResponse&gt;</c>, which is exactly the granularity
+    /// we want: one warning per (request, response) pair for the lifetime of the process.
+    /// </summary>
+    private static int _permanentSerializationFailureLogged;
+
+    /// <summary>
     /// Initializes a new instance of the <see cref="CachingBehavior{TRequest, TResponse}"/> class.
     /// </summary>
     /// <param name="logger">The logger instance.</param>
@@ -152,8 +159,31 @@ public sealed class CachingBehavior<TRequest, TResponse> : IPipelineBehavior<TRe
             await _keyIndex.TrackAsync(cacheKey, typeof(TRequest), scopeRoot, customPrefix, cancellationToken)
                 .ConfigureAwait(false);
         }
+        catch (CacheSerializationException ex)
+        {
+            // Permanent, not transient: the configured serializer will reject this response type on
+            // every future request, so caching is off for it until the configuration changes. Logged
+            // once per closed generic type - _permanentSerializationFailureLogged is a static of
+            // CachingBehavior<TRequest, TResponse>, so the CLR gives us one flag per (request,
+            // response) pair for free, and a hot path cannot flood the log.
+            if (Interlocked.Exchange(ref _permanentSerializationFailureLogged, 1) == 0)
+            {
+                _logger.LogWarning(
+                    ex,
+                    "Caching is DISABLED for {RequestType}: the configured serializer ({SerializerName}) "
+                    + "cannot serialize {ResponseType}. Responses for this request will NEVER be stored, "
+                    + "on this or any later request, until the serializer or the type changes. This "
+                    + "message is logged once per request type.",
+                    typeof(TRequest).Name,
+                    ex.SerializerName,
+                    ex.SerializedType.FullName);
+            }
+            // Don't throw - caching failures should not break the pipeline
+        }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
+            // Transient by assumption (connection, timeout, eviction race) - logged every time, because
+            // the next request may well succeed and the repetition is the signal.
             _logger.LogWarning(ex, "Failed to cache response for {RequestType}", typeof(TRequest).Name);
             // Don't throw - caching failures should not break the pipeline
         }

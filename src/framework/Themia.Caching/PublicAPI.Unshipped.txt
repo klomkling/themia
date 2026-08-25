@@ -1,1 +1,5 @@
 #nullable enable
+Themia.Caching.CacheSerializationException
+Themia.Caching.CacheSerializationException.CacheSerializationException(string! message, System.Type! serializedType, string! serializerName, System.Exception? innerException) -> void
+Themia.Caching.CacheSerializationException.SerializedType.get -> System.Type!
+Themia.Caching.CacheSerializationException.SerializerName.get -> string!

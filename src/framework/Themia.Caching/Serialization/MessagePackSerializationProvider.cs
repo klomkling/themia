@@ -25,8 +25,14 @@ public sealed class MessagePackSerializationProvider : ISerializationProvider
         }
         catch (MessagePackSerializationException ex)
         {
-            throw new InvalidOperationException(
-                $"Failed to serialize type {typeof(T).FullName} via MessagePack.", ex);
+            throw new CacheSerializationException(
+                $"Failed to serialize type {typeof(T).FullName} via MessagePack. MessagePack requires a "
+                + "contract: types need [MessagePackObject] (or a resolver), and interface-typed members "
+                + "such as IReadOnlyList<T> are not serializable. Configure UseJsonSerialization() if your "
+                + "model types are plain records.",
+                typeof(T),
+                nameof(MessagePackSerializationProvider),
+                ex);
         }
     }
 
@@ -44,8 +50,11 @@ public sealed class MessagePackSerializationProvider : ISerializationProvider
         }
         catch (MessagePackSerializationException ex)
         {
-            throw new InvalidOperationException(
-                $"Failed to deserialize MessagePack payload to {typeof(T).FullName}.", ex);
+            throw new CacheSerializationException(
+                $"Failed to deserialize MessagePack payload to {typeof(T).FullName}.",
+                typeof(T),
+                nameof(MessagePackSerializationProvider),
+                ex);
         }
     }
 }

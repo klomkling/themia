@@ -43,8 +43,11 @@ public sealed class JsonSerializationProvider : ISerializationProvider
         }
         catch (JsonException ex)
         {
-            throw new InvalidOperationException(
-                $"Failed to serialize type {typeof(T).FullName} via System.Text.Json.", ex);
+            throw new CacheSerializationException(
+                $"Failed to serialize type {typeof(T).FullName} via System.Text.Json.",
+                typeof(T),
+                nameof(JsonSerializationProvider),
+                ex);
         }
     }
 
@@ -62,8 +65,11 @@ public sealed class JsonSerializationProvider : ISerializationProvider
         }
         catch (JsonException ex)
         {
-            throw new InvalidOperationException(
-                $"Failed to deserialize JSON payload to {typeof(T).FullName}.", ex);
+            throw new CacheSerializationException(
+                $"Failed to deserialize JSON payload to {typeof(T).FullName}.",
+                typeof(T),
+                nameof(JsonSerializationProvider),
+                ex);
         }
     }
 
