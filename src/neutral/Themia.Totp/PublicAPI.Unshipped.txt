@@ -1,6 +1,6 @@
 #nullable enable
 Themia.Totp.ITotpReplayStore
-Themia.Totp.ITotpReplayStore.TryConsumeAsync(string! secretId, long matchedStep, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<bool>
+Themia.Totp.ITotpReplayStore.TryAdvanceAsync(string! secretId, long matchedStep, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<bool>
 Themia.Totp.ITotpService
 Themia.Totp.ITotpService.CreateProvisioningUri(string! secret, string! issuer, string! accountName) -> System.Uri!
 Themia.Totp.ITotpService.GenerateCode(string! secret) -> string!

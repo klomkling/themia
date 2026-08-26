@@ -1,4 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 using Themia.Totp;
 using Xunit;
 
@@ -12,13 +14,13 @@ public sealed class AddThemiaTotpTests
 {
     private sealed class NoopStore : ITotpReplayStore
     {
-        public ValueTask<bool> TryConsumeAsync(string secretId, long matchedStep, CancellationToken ct = default)
+        public ValueTask<bool> TryAdvanceAsync(string secretId, long matchedStep, CancellationToken ct = default)
             => ValueTask.FromResult(true);
     }
 
     private sealed class OtherStore : ITotpReplayStore
     {
-        public ValueTask<bool> TryConsumeAsync(string secretId, long matchedStep, CancellationToken ct = default)
+        public ValueTask<bool> TryAdvanceAsync(string secretId, long matchedStep, CancellationToken ct = default)
             => ValueTask.FromResult(true);
     }
 
@@ -65,6 +67,34 @@ public sealed class AddThemiaTotpTests
         var service = scope.ServiceProvider.GetRequiredService<ITotpService>();
 
         Assert.Equal(8, service.GenerateCode("GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ").Length);
+    }
+
+    [Fact]
+    public async Task Bad_options_fail_the_host_at_startup_and_name_the_value()
+    {
+        // Without ValidateOnStart this surfaces as an exception from DI resolution on the first login,
+        // because TotpService is scoped — a configuration error reported as a runtime failure, by
+        // whichever user happened to sign in first.
+        var builder = Host.CreateApplicationBuilder();
+        builder.Services.AddThemiaTotp<NoopStore>(o => o.Period = TimeSpan.FromMilliseconds(500));
+
+        using var host = builder.Build();
+
+        var error = await Assert.ThrowsAsync<OptionsValidationException>(() => host.StartAsync());
+
+        Assert.Contains("Period", string.Join(" ", error.Failures), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Valid_options_start_the_host()
+    {
+        var builder = Host.CreateApplicationBuilder();
+        builder.Services.AddThemiaTotp<NoopStore>(o => o.Digits = 8);
+
+        using var host = builder.Build();
+
+        await host.StartAsync();
+        await host.StopAsync();
     }
 
     [Fact]

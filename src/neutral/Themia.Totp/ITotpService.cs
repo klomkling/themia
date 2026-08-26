@@ -32,7 +32,7 @@ public interface ITotpService
     /// Verifies a submitted code against the window, and consumes its step so it cannot be used twice.
     /// </summary>
     /// <param name="secretId">
-    /// Opaque identifier for the credential — see <see cref="ITotpReplayStore.TryConsumeAsync"/>. Not
+    /// Opaque identifier for the credential — see <see cref="ITotpReplayStore.TryAdvanceAsync"/>. Not
     /// the secret itself.
     /// </param>
     /// <param name="secret">The base32 shared secret.</param>

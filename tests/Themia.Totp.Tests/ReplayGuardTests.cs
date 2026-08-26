@@ -15,17 +15,28 @@ public sealed class ReplayGuardTests
     private const string Secret = "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ";
     private const string SecretId = "user-1";
 
-    /// <summary>Records consumed steps. The test owns this; the package ships no default (see AddThemiaTotpTests).</summary>
+    /// <summary>
+    /// The monotonic store the contract asks for: one highest-accepted step per credential, and a step
+    /// at or below it is refused. The test owns this; the package ships no default (see
+    /// AddThemiaTotpTests).
+    /// </summary>
     private sealed class RecordingReplayStore : ITotpReplayStore
     {
-        private readonly HashSet<(string, long)> _consumed = [];
+        private readonly Dictionary<string, long> _highest = [];
 
         public List<(string SecretId, long Step)> Calls { get; } = [];
 
-        public ValueTask<bool> TryConsumeAsync(string secretId, long matchedStep, CancellationToken ct = default)
+        public ValueTask<bool> TryAdvanceAsync(string secretId, long matchedStep, CancellationToken ct = default)
         {
             Calls.Add((secretId, matchedStep));
-            return ValueTask.FromResult(_consumed.Add((secretId, matchedStep)));
+
+            if (_highest.TryGetValue(secretId, out var highest) && matchedStep <= highest)
+            {
+                return ValueTask.FromResult(false);
+            }
+
+            _highest[secretId] = matchedStep;
+            return ValueTask.FromResult(true);
         }
     }
 
@@ -82,6 +93,27 @@ public sealed class ReplayGuardTests
 
         var replayed = await service.VerifyAsync(SecretId, Secret, nextStepCode);
         Assert.Equal(TotpOutcome.Replayed, replayed.Outcome);
+    }
+
+    [Fact]
+    public async Task An_older_code_still_inside_the_window_is_refused_after_a_newer_one_is_used()
+    {
+        // The near-miss the monotonic contract exists for. Consuming only the matched step stops the
+        // same code twice and still admits THIS: an observer captures the code for step S, the real
+        // user signs in at S+1, and the captured code is then presented at S+1 — where a ±1 window
+        // still covers step S, and nothing ever consumed it.
+        var (service, clock, _) = Build(windowSteps: 1);
+
+        var capturedAtS = service.GenerateCode(Secret);
+        clock.AdvanceSeconds(30);
+        var freshAtSPlus1 = service.GenerateCode(Secret);
+
+        Assert.Equal(TotpOutcome.Valid, (await service.VerifyAsync(SecretId, Secret, freshAtSPlus1)).Outcome);
+
+        var replayed = await service.VerifyAsync(SecretId, Secret, capturedAtS);
+
+        Assert.Equal(TotpOutcome.Replayed, replayed.Outcome);
+        Assert.False(replayed.Succeeded);
     }
 
     [Fact]

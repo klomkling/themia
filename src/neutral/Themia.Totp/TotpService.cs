@@ -27,20 +27,11 @@ public sealed class TotpService : ITotpService
         _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
         _options = options.Value ?? throw new ArgumentNullException(nameof(options));
 
-        if (_options.Digits is < 6 or > 10)
+        // Also validated at startup by AddThemiaTotp, so a bad value fails the boot rather than the
+        // first login. Kept here too: this type is constructible directly, including by a test.
+        if (_options.Validate() is { } problem)
         {
-            throw new ArgumentOutOfRangeException(nameof(options), _options.Digits, "Digits must be between 6 and 10.");
-        }
-
-        if (_options.Period <= TimeSpan.Zero)
-        {
-            throw new ArgumentOutOfRangeException(nameof(options), _options.Period, "Period must be positive.");
-        }
-
-        if (_options.VerificationWindowSteps < 0)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(options), _options.VerificationWindowSteps, "VerificationWindowSteps cannot be negative.");
+            throw new ArgumentException(problem, nameof(options));
         }
     }
 
@@ -111,7 +102,7 @@ public sealed class TotpService : ITotpService
 
             // Consume the step the code MATCHED, not the current one. With a tolerance the two differ,
             // and recording the current step would admit this same code again one step later.
-            var free = await _replayStore.TryConsumeAsync(secretId, step, ct).ConfigureAwait(false);
+            var free = await _replayStore.TryAdvanceAsync(secretId, step, ct).ConfigureAwait(false);
 
             return free
                 ? new TotpVerification(TotpOutcome.Valid, step)
@@ -127,6 +118,17 @@ public sealed class TotpService : ITotpService
     private string ComputeCode(string secret, long step)
     {
         var key = Base32.Decode(secret);
+
+        // Base32 ignores padding and separators, so "========" decodes to nothing at all and would HMAC
+        // against an empty key — producing a perfectly ordinary-looking code that anyone can reproduce.
+        // GenerateSecret already refuses to mint below this floor; verifying below it is the same
+        // weakness arriving through a stored value instead.
+        if (key.Length < TotpOptions.MinimumSecretBytes)
+        {
+            throw new ArgumentException(
+                $"A TOTP secret must decode to at least {TotpOptions.MinimumSecretBytes} bytes, but this one decoded to {key.Length}.",
+                nameof(secret));
+        }
 
         Span<byte> counter = stackalloc byte[8];
         System.Buffers.Binary.BinaryPrimitives.WriteInt64BigEndian(counter, step);
@@ -146,7 +148,15 @@ public sealed class TotpService : ITotpService
             | (hash[offset + 2] << 8)
             | hash[offset + 3];
 
-        var modulo = (int)Math.Pow(10, _options.Digits);
+        // long, not int: Digits = 10 needs a modulus of 10_000_000_000, and (int)Math.Pow(10, 10)
+        // saturates to int.MaxValue instead of overflowing loudly — so the one input that reaches it
+        // (binary == int.MaxValue) yields a code no authenticator will ever produce.
+        var modulo = 1L;
+        for (var i = 0; i < _options.Digits; i++)
+        {
+            modulo *= 10;
+        }
+
         return (binary % modulo).ToString(CultureInfo.InvariantCulture).PadLeft(_options.Digits, '0');
     }
 

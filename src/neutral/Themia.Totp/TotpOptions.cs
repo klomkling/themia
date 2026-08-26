@@ -22,4 +22,43 @@ public sealed class TotpOptions
     /// package is built to prevent.
     /// </remarks>
     public int VerificationWindowSteps { get; set; } = 1;
+
+    /// <summary>The smallest decoded secret this package will verify against, in bytes (RFC 4226 §4).</summary>
+    /// <remarks>
+    /// Matches the floor <see cref="ITotpService.GenerateSecret"/> refuses to mint below. Verifying a
+    /// shorter key than the package will issue is the asymmetry worth closing: base32 ignores padding,
+    /// so a secret that decodes to nothing at all — <c>"========"</c>, or whatever a broken decrypt
+    /// leaves behind — otherwise HMACs happily against an empty key and produces codes anyone can
+    /// reproduce.
+    /// </remarks>
+    internal const int MinimumSecretBytes = 16;
+
+    /// <summary>Reports the first configuration problem, or null when the options are usable.</summary>
+    /// <remarks>
+    /// Shared by <see cref="TotpService"/>'s constructor and the <c>ValidateOnStart</c> registration, so
+    /// a bad value is refused at boot rather than on somebody's first login.
+    /// </remarks>
+    internal string? Validate()
+    {
+        if (Digits is < 6 or > 10)
+        {
+            return $"Digits must be between 6 and 10, but was {Digits}.";
+        }
+
+        // Not just "> TimeSpan.Zero": the step is computed as unix seconds / (long)Period.TotalSeconds,
+        // so a sub-second period truncates to a divisor of zero and every call throws
+        // DivideByZeroException, while CreateProvisioningUri emits period=0. A fractional period
+        // truncates silently to a different window than the one configured.
+        if (Period < TimeSpan.FromSeconds(1) || Period.Ticks % TimeSpan.TicksPerSecond != 0)
+        {
+            return $"Period must be a whole number of seconds and at least one, but was {Period}.";
+        }
+
+        if (VerificationWindowSteps < 0)
+        {
+            return $"VerificationWindowSteps cannot be negative, but was {VerificationWindowSteps}.";
+        }
+
+        return null;
+    }
 }

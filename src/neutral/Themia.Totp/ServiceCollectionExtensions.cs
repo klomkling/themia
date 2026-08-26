@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
 
 namespace Themia.Totp;
 
@@ -38,14 +39,18 @@ public static class ServiceCollectionExtensions
         services.TryAddScoped<ITotpReplayStore, TReplayStore>();
         services.TryAddSingleton(TimeProvider.System);
 
+        // ValidateOnStart rather than only the service constructor: TotpService is scoped, so a bad
+        // Digits or Period would otherwise surface as an exception from DI resolution on somebody's
+        // first login instead of at boot. Same shape as the other Themia modules.
+        var optionsBuilder = services.AddOptions<TotpOptions>();
         if (configure is not null)
         {
-            services.Configure(configure);
+            optionsBuilder.Configure(configure);
         }
-        else
-        {
-            services.Configure<TotpOptions>(_ => { });
-        }
+
+        optionsBuilder.ValidateOnStart();
+        services.TryAddEnumerable(
+            ServiceDescriptor.Singleton<IValidateOptions<TotpOptions>, TotpOptionsValidator>());
 
         services.TryAddScoped<ITotpService, TotpService>();
 

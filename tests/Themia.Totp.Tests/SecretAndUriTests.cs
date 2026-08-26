@@ -9,7 +9,7 @@ public sealed class SecretAndUriTests
 {
     private sealed class NoopStore : ITotpReplayStore
     {
-        public ValueTask<bool> TryConsumeAsync(string secretId, long matchedStep, CancellationToken ct = default)
+        public ValueTask<bool> TryAdvanceAsync(string secretId, long matchedStep, CancellationToken ct = default)
             => ValueTask.FromResult(true);
     }
 
@@ -29,6 +29,45 @@ public sealed class SecretAndUriTests
         Assert.Matches("^[A-Z2-7]+=*$", secret);
         // The real property: it can actually be used, which a pure format assertion would not prove.
         Assert.Equal(6, service.GenerateCode(secret).Length);
+    }
+
+    [Theory]
+    [InlineData("========")]          // padding only — base32 ignores it, so this decodes to nothing
+    [InlineData("--  --")]            // separators only, which authenticator apps also strip
+    [InlineData("GEZDGNBVGY3TQOJQ==")] // 10 decoded bytes: below the floor GenerateSecret refuses to mint
+    public void A_secret_that_decodes_below_the_minimum_is_refused_rather_than_HMACd(string secret)
+    {
+        var service = Build();
+
+        // Not "returns InvalidCode": an empty key produces a perfectly ordinary code that anyone can
+        // reproduce, so a login would succeed against a credential with no secret behind it. A stored
+        // secret this shape is broken data, and the caller needs to hear about it.
+        Assert.Throws<ArgumentException>(() => service.GenerateCode(secret));
+    }
+
+    [Theory]
+    [InlineData(500)]     // sub-second: (long)TotalSeconds is 0, and the step arithmetic divides by it
+    [InlineData(30_500)]  // fractional: truncates to a different window than the one configured
+    public void A_period_that_is_not_a_whole_number_of_seconds_is_refused_at_construction(int milliseconds)
+    {
+        var options = new TotpOptions { Period = TimeSpan.FromMilliseconds(milliseconds) };
+
+        var error = Assert.Throws<ArgumentException>(() => Build(options));
+
+        Assert.Contains("Period", error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Ten_digit_codes_are_ten_digits_and_not_truncated_by_an_int_modulus()
+    {
+        // (int)Math.Pow(10, 10) saturates to int.MaxValue rather than overflowing, so a 10-digit
+        // configuration silently applies a modulus of 2147483647.
+        var service = Build(new TotpOptions { Digits = 10 });
+
+        var code = service.GenerateCode("GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ");
+
+        Assert.Equal(10, code.Length);
+        Assert.Matches("^[0-9]{10}$", code);
     }
 
     [Fact]

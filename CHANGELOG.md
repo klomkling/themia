@@ -40,13 +40,19 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
   a code matches the window is self-consistently correct and still lets an observer replay it for the
   rest of that window. Every test written from the RFC's description passes without the guard.
 
-  Two things a reimplementation gets wrong, both pinned by a test:
+  Three things a reimplementation gets wrong, each pinned by a test:
 
   - The store consumes the step the code **matched**, not the step the clock is on. With a tolerance
     the two differ, and recording the current step admits the same code again one step later — the
     guard passes its own test without closing the window.
-  - `ITotpReplayStore.TryConsumeAsync` is a single atomic test-and-set rather than a check followed by
-    a record, which would race between the two calls.
+  - **The guard is monotonic, not set membership.** `ITotpReplayStore.TryAdvanceAsync` accepts a step
+    only when it is strictly higher than every step already accepted for that credential. Recording
+    "step S was used" stops the same code twice and still admits an older captured code after a newer
+    login: the observer's code for S is presented at S+1, where a ±1 window still covers S and nothing
+    consumed it. The method is named for the semantic because the set-membership version reads as
+    correct — the first implementation written for this package's own tests was that version.
+  - It is a single atomic compare-and-set rather than a check followed by a record, which would race
+    between the two calls.
 
   **There is no default replay store, and `AddThemiaTotp<TReplayStore>()` takes one as a required type
   parameter.** An in-memory default holds nothing on a second instance, so every verification would

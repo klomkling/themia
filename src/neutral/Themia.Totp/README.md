@@ -125,35 +125,46 @@ it for the rest of that window. Every test written from the RFC's description pa
 ```csharp
 public interface ITotpReplayStore
 {
-    ValueTask<bool> TryConsumeAsync(string secretId, long matchedStep, CancellationToken ct = default);
+    ValueTask<bool> TryAdvanceAsync(string secretId, long matchedStep, CancellationToken ct = default);
 }
 ```
 
 Three requirements, each with a wrong answer that still compiles:
 
-**It must be atomic.** One test-and-set, not a read followed by a write. Split in two, concurrent
-verifications of the same code race between the check and the record and both are admitted.
+**It must be monotonic — one highest step per credential, not a set of used ones.** This is the
+requirement that reads as done when it is not. Storing "step S was used" stops the *same* code twice
+and still admits this:
+
+1. an observer captures the code for step **S**
+2. the real user signs in at **S+1** with a fresh code
+3. the observer submits the captured code — and a ±1 window still covers step S, which nothing ever
+   consumed
+
+So accept `matchedStep` only when it is **strictly greater** than the highest step already accepted for
+that credential. It is also the cheaper implementation: one row per credential instead of one per step,
+and no expiry to sweep.
 
 ```csharp
-// Redis: SET key value NX EX ttl is the whole operation
-public async ValueTask<bool> TryConsumeAsync(string secretId, long matchedStep, CancellationToken ct)
-    => await _redis.StringSetAsync(
-        $"totp:{secretId}:{matchedStep}", "1",
-        expiry: TimeSpan.FromMinutes(2), when: When.NotExists);
-
-// SQL: a unique constraint on (secret_id, matched_step) and a caught duplicate-key
-// INSERT INTO totp_consumed (secret_id, matched_step, consumed_at) VALUES (@id, @step, @now)
+// SQL: one row per credential, advanced by a single conditional write
+public async ValueTask<bool> TryAdvanceAsync(string secretId, long matchedStep, CancellationToken ct)
+    => await _db.ExecuteAsync(
+        """
+        INSERT INTO totp_replay (secret_id, last_step) VALUES (@id, @step)
+        ON CONFLICT (secret_id) DO UPDATE SET last_step = @step
+        WHERE totp_replay.last_step < @step
+        """, new { id = secretId, step = matchedStep }, ct) == 1;
 ```
+
+**It must be atomic.** One compare-and-set, not a read followed by a write. Split in two, concurrent
+verifications of the same code race between the check and the record and both are admitted. The SQL
+above is atomic because the comparison is inside the write; on Redis, use a Lua script rather than
+`GET` then `SET`.
 
 **It must be shared across instances.** A store scoped to one process holds nothing on the second one,
 so on a two-instance deployment every verification reports correct with the window wide open. That is
 why no in-memory implementation is registered by default and why `AddThemiaTotp` will not compile
 without a store: an implementation that appears to work with a green test suite either side is worse
 than none.
-
-**Entries can expire.** A consumed step is only meaningful while a code for it is still inside the
-window — `Period × (2 × VerificationWindowSteps + 1)`. Anything past that is dead weight. Two minutes
-covers the defaults comfortably.
 
 `secretId` is yours to choose: a user id, a credential id, whatever identifies the credential the code
 belongs to. It **must not be the secret itself** — this package never handles secrets at rest and the

@@ -67,7 +67,7 @@ public sealed class Rfc6238VectorTests
 
     private sealed class AlwaysFreeReplayStore : ITotpReplayStore
     {
-        public ValueTask<bool> TryConsumeAsync(string secretId, long matchedStep, CancellationToken ct = default)
+        public ValueTask<bool> TryAdvanceAsync(string secretId, long matchedStep, CancellationToken ct = default)
             => ValueTask.FromResult(true);
     }
 }
