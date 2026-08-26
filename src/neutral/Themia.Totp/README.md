@@ -20,6 +20,17 @@ under test rather than supplied.
 - **Enrolment, recovery codes, the pending-second-factor session, and any policy about when 2FA is
   required.** All of those bind to a users table.
 
+## TOTP or passkeys?
+
+`Themia.WebAuthn` ships passkeys, and they are not alternatives to each other — TOTP is a second factor
+beside a password and stores a **shared** secret, so a database leak yields working codes for every
+user; a passkey replaces the password, stores only a **public** key, and is bound to an origin so it
+cannot be phished in real time.
+
+If you are choosing one to build first, build passkeys. Keep TOTP for what they cannot do: a device
+with no platform authenticator, step-up verification on a high-risk action, and a recovery path for a
+user who has lost every device holding a passkey. The comparison table is in `Themia.WebAuthn`'s README.
+
 ## Registration
 
 ```csharp
