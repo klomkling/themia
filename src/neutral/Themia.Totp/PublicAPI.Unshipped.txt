@@ -1,0 +1,41 @@
+#nullable enable
+Themia.Totp.ITotpReplayStore
+Themia.Totp.ITotpReplayStore.TryConsumeAsync(string! secretId, long matchedStep, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<bool>
+Themia.Totp.ITotpService
+Themia.Totp.ITotpService.CreateProvisioningUri(string! secret, string! issuer, string! accountName) -> System.Uri!
+Themia.Totp.ITotpService.GenerateCode(string! secret) -> string!
+Themia.Totp.ITotpService.GenerateSecret(int byteLength = 20) -> string!
+Themia.Totp.ITotpService.VerifyAsync(string! secretId, string! secret, string! code, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<Themia.Totp.TotpVerification!>
+Themia.Totp.TotpAlgorithm
+Themia.Totp.TotpAlgorithm.Sha1 = 0 -> Themia.Totp.TotpAlgorithm
+Themia.Totp.TotpAlgorithm.Sha256 = 1 -> Themia.Totp.TotpAlgorithm
+Themia.Totp.TotpAlgorithm.Sha512 = 2 -> Themia.Totp.TotpAlgorithm
+Themia.Totp.TotpOptions
+Themia.Totp.TotpOptions.Algorithm.get -> Themia.Totp.TotpAlgorithm
+Themia.Totp.TotpOptions.Algorithm.set -> void
+Themia.Totp.TotpOptions.Digits.get -> int
+Themia.Totp.TotpOptions.Digits.set -> void
+Themia.Totp.TotpOptions.Period.get -> System.TimeSpan
+Themia.Totp.TotpOptions.Period.set -> void
+Themia.Totp.TotpOptions.TotpOptions() -> void
+Themia.Totp.TotpOptions.VerificationWindowSteps.get -> int
+Themia.Totp.TotpOptions.VerificationWindowSteps.set -> void
+Themia.Totp.TotpOutcome
+Themia.Totp.TotpOutcome.InvalidCode = 1 -> Themia.Totp.TotpOutcome
+Themia.Totp.TotpOutcome.Replayed = 2 -> Themia.Totp.TotpOutcome
+Themia.Totp.TotpOutcome.Valid = 0 -> Themia.Totp.TotpOutcome
+Themia.Totp.TotpService
+Themia.Totp.TotpService.CreateProvisioningUri(string! secret, string! issuer, string! accountName) -> System.Uri!
+Themia.Totp.TotpService.GenerateCode(string! secret) -> string!
+Themia.Totp.TotpService.GenerateSecret(int byteLength = 20) -> string!
+Themia.Totp.TotpService.TotpService(Themia.Totp.ITotpReplayStore! replayStore, System.TimeProvider! timeProvider, Microsoft.Extensions.Options.IOptions<Themia.Totp.TotpOptions!>! options) -> void
+Themia.Totp.TotpService.VerifyAsync(string! secretId, string! secret, string! code, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<Themia.Totp.TotpVerification!>
+Themia.Totp.TotpVerification
+Themia.Totp.TotpVerification.MatchedStep.get -> long
+Themia.Totp.TotpVerification.MatchedStep.init -> void
+Themia.Totp.TotpVerification.Outcome.get -> Themia.Totp.TotpOutcome
+Themia.Totp.TotpVerification.Outcome.init -> void
+Themia.Totp.TotpVerification.Succeeded.get -> bool
+Themia.Totp.TotpVerification.TotpVerification(Themia.Totp.TotpOutcome Outcome, long MatchedStep) -> void
+Themia.Totp.ServiceCollectionExtensions
+static Themia.Totp.ServiceCollectionExtensions.AddThemiaTotp<TReplayStore>(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Themia.Totp.TotpOptions!>? configure = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
