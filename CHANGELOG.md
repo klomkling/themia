@@ -27,9 +27,35 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
-## [0.19.0] - 2026-08-26
+## [0.20.0] - 2026-08-27
 
 ### Added
+- **`Themia.WebAuthn` — WebAuthn/passkey ceremonies** over Fido2NetLib 4.0.1 (MIT). Neutral,
+  `net8.0;net10.0`. Registration and authentication, with the two guards an integration omits:
+
+  - **The challenge is single-use.** `IWebAuthnChallengeStore.TryConsumeAsync` is an atomic
+    get-and-delete. The library verifies a response against the options it was issued with but stores
+    nothing, so an integration that keeps those options anywhere reusable accepts the same signed
+    response twice — and both sign-ins succeed.
+  - **The signature counter must move forward** (`SignCounterPolicy`, WebAuthn §7.2 step 21). A counter
+    that does not advance means two authenticators are answering for one credential. The library
+    reports the value and takes no position; an integration that ignores it looks entirely healthy,
+    because the cloned sign-in succeeds too. Both-zero is permitted — many platform authenticators do
+    not count, and rejecting that would lock out every such user on their second sign-in.
+
+  There is no default challenge store and `AddThemiaWebAuthn<TChallengeStore>()` takes one as a
+  required type parameter, for the same reason as `AddThemiaTotp`.
+
+  **Not included:** credential storage (the public key, its counter and the user it belongs to live in
+  your users table), and attestation via the FIDO metadata service — a synced passkey cannot be
+  meaningfully attested, and requesting it would put a network call in every registration.
+
+  **`Themia.Totp` is not superseded by this.** They solve different problems: TOTP is a second factor
+  beside a password and stores a **shared** secret, so a database breach yields working codes; a passkey
+  replaces the password, stores only a **public** key, and is bound to an origin so it cannot be phished
+  in real time. Passkeys still need a fallback, which is what TOTP remains good for.
+
+## [0.19.0] - 2026-08-26
 - **`IUserLifecycleHooks` — refuse or observe every change to a user's credential state**
   (`Themia.Modules.Identity`, coord #0099). `IAuthenticationHooks` covers the login lifecycle only, so
   an app holding a rule keyed on credential state — "this account must keep one usable way to sign in",
