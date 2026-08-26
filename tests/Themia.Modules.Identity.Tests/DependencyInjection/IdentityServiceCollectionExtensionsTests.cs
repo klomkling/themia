@@ -24,6 +24,36 @@ public class IdentityServiceCollectionExtensionsTests
     }
 
     [Fact]
+    public async Task Lifecycle_hooks_resolve_to_a_permissive_default()
+    {
+        var services = new ServiceCollection();
+        services.AddThemiaIdentityCore();
+
+        // UserService takes IUserLifecycleHooks as a required dependency, so a bare AddThemiaIdentityCore
+        // must supply one — otherwise every adopter is forced to register a no-op before the module works.
+        var hooks = services.BuildServiceProvider().GetRequiredService<IUserLifecycleHooks>();
+
+        Assert.True((await hooks.OnBeforeDeleteAsync(Guid.CreateVersion7())).IsAllowed);
+    }
+
+    [Fact]
+    public void An_adopters_lifecycle_hooks_survive_AddThemiaIdentityCore()
+    {
+        var services = new ServiceCollection();
+        services.AddScoped<IUserLifecycleHooks, RefusingHooks>();
+        services.AddThemiaIdentityCore();
+
+        Assert.IsType<RefusingHooks>(services.BuildServiceProvider().GetRequiredService<IUserLifecycleHooks>());
+    }
+
+    private sealed class RefusingHooks : IUserLifecycleHooks
+    {
+        public ValueTask<UserMutationDecision> OnBeforeDeleteAsync(
+            Guid userId, CancellationToken cancellationToken = default) =>
+            ValueTask.FromResult(UserMutationDecision.Refuse("no"));
+    }
+
+    [Fact]
     public void Authorization_replaces_the_null_current_user_accessor()
     {
         var services = new ServiceCollection();

@@ -143,10 +143,64 @@ Inject any of:
 | Interface | Purpose |
 |-----------|---------|
 | `IUserService` | Create, find, delete, set-active, change password, verify password |
+| `IUserLifecycleHooks` | Refuse or observe changes to a user's credential state (see below) |
 | `IRoleService` | Create roles, assign/remove users from roles |
 | `IClaimService` | Add/remove user and role claims, resolve effective claims |
 | `IUserTokenService` | Generate and consume one-time tokens (email confirm, password reset, etc.) |
 | `ICurrentUser` | Read the authenticated principal (UserId, TenantId, Roles, Claims) |
+
+## Refusing and observing user mutations
+
+`IUserLifecycleHooks` lets your app veto a change to a user's credential state, and see the ones that
+went through. `IAuthenticationHooks` covers the login lifecycle only; a rule keyed on credential state —
+"this account must keep one usable way to sign in", "you cannot remove the last administrator", "this
+user still owns open invoices" — could otherwise only be enforced by owning every call site.
+
+**Every mutation has a hook, not a chosen few.** A seam covering three of seven paths reads as covering
+all seven. Every method has a default implementation, so override only what you care about:
+
+```csharp
+internal sealed class LockoutGuard(AppDbContext db) : IUserLifecycleHooks
+{
+    public async ValueTask<UserMutationDecision> OnBeforeSetPhoneNumberAsync(
+        Guid userId, string? phoneNumber, CancellationToken ct = default)
+    {
+        // Setting a number clears its confirmation, so this is the path that can lock an
+        // SMS-only account out of its own sign-in.
+        if (phoneNumber is null && await db.IsPhoneOnlyAsync(userId, ct))
+            return UserMutationDecision.Refuse("This is the only way you can sign in.");
+
+        return UserMutationDecision.Allow();
+    }
+
+    public ValueTask OnUserMutatedAsync(Guid userId, UserMutation mutation, CancellationToken ct = default)
+        => auditTrail.RecordAsync(userId, mutation, ct);
+}
+
+// Register BEFORE AddThemiaIdentity* — the module's permissive default is registered with TryAdd.
+services.AddScoped<IUserLifecycleHooks, LockoutGuard>();
+```
+
+A refusal returns `UserMutationOutcome.Refused` carrying your reason, and nothing is written:
+
+```csharp
+var result = await users.SetPhoneNumberAsync(userId, null, ct);
+return result.Outcome switch
+{
+    UserMutationOutcome.Success      => NoContent(),
+    UserMutationOutcome.Refused      => Conflict(result.Reason),
+    UserMutationOutcome.Duplicate    => Conflict("That number is already in use."),
+    UserMutationOutcome.UserNotFound => NotFound(),
+    _ => throw new UnreachableException(),
+};
+```
+
+**Transaction contract.** A before-hook runs inside the caller's scope, before the module touches any
+entity and before its unit of work opens. It must not call `SaveChanges` and must not open a
+transaction on the same scoped connection — the module saves immediately after the hook returns, so a
+hook holding a transaction there turns a refusal into a deadlock. Read freely; write through your own
+connection if you must write at all. `OnUserMutatedAsync` runs after the save: the change is already
+committed, and throwing does not undo it.
 
 ## Notes / gotchas
 

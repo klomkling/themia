@@ -27,6 +27,34 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.19.0] - 2026-08-26
+
+### Added
+- **`IUserLifecycleHooks` — refuse or observe every change to a user's credential state**
+  (`Themia.Modules.Identity`, coord #0099). `IAuthenticationHooks` covers the login lifecycle only, so
+  an app holding a rule keyed on credential state — "this account must keep one usable way to sign in",
+  "you cannot remove the last administrator", "this user still owns open invoices" — could enforce it
+  only by owning every call site, which is the coupling the module exists to remove.
+
+  A before-hook guards **all seven** mutations (`SetEmail`, `ConfirmEmail`, `SetPhoneNumber`,
+  `ConfirmPhoneNumber`, `SetPassword`, `SetActive`, `Delete`), not the three the request named: a seam
+  covering three of seven reads as covering all seven, and the paths nobody wired fail silently.
+  `OnUserMutatedAsync` reports what was applied. Every method has a default implementation, so an
+  adopter overrides only what they care about, and the module registers a permissive default with
+  `TryAdd` so an implementation registered first survives.
+
+  A before-hook runs before the module touches any entity and before its unit of work opens; it must
+  not save or open a transaction on the same scoped connection. See the module README.
+
+### Changed
+- **(breaking)** The seven `IUserService` mutations now return `UserMutationResult` instead of `bool`,
+  `SetEmailResult`, or `SetPhoneNumberResult`. A hook's refusal needs to reach the caller *with its
+  reason*, which no `bool` can carry; one shared result type means the reason is reachable from every
+  mutation rather than the two that already had an enum. See [MIGRATION.md](MIGRATION.md).
+
+### Removed
+- **(breaking)** `SetEmailResult` and `SetPhoneNumberResult` — subsumed by `UserMutationOutcome`.
+
 ## [0.18.0] - 2026-08-26
 
 ### Added
