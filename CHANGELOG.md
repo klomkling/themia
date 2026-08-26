@@ -27,6 +27,50 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.18.0] - 2026-08-26
+
+### Added
+- **`Themia.Totp` — neutral TOTP core (RFC 6238)** with the single-use replay guard (coord #0094).
+  Secret generation, `otpauth://` provisioning URIs, and verification. Pure computation: no HTTP, no
+  I/O, no data peer. `net8.0;net10.0`. Two consumers asked for it (ezy-assets and propertiezy) and
+  neither takes `Themia.Modules.Identity`, so nothing here binds to a users table.
+
+  **The replay guard is the reason it exists.** A TOTP code stays valid for its entire step — 30
+  seconds by default, up to 90 with a ±1-step tolerance — so an implementation that only asks whether
+  a code matches the window is self-consistently correct and still lets an observer replay it for the
+  rest of that window. Every test written from the RFC's description passes without the guard.
+
+  Two things a reimplementation gets wrong, both pinned by a test:
+
+  - The store consumes the step the code **matched**, not the step the clock is on. With a tolerance
+    the two differ, and recording the current step admits the same code again one step later — the
+    guard passes its own test without closing the window.
+  - `ITotpReplayStore.TryConsumeAsync` is a single atomic test-and-set rather than a check followed by
+    a record, which would race between the two calls.
+
+  **There is no default replay store, and `AddThemiaTotp<TReplayStore>()` takes one as a required type
+  parameter.** An in-memory default holds nothing on a second instance, so every verification would
+  report correct with the replay window wide open — coord #0057's failure (`LoggerEmailSender`
+  reporting success without sending) applied to a security control. A type parameter rather than a
+  registration-time check, because a check would fail for a caller who registers their store
+  afterwards, which is the ordering trap coord #0100 reported.
+
+  Verification takes an injected `TimeProvider`, and the package is pinned against RFC 6238's full
+  Appendix B vector table for SHA-1, SHA-256 and SHA-512. Each vector supplies the time as an
+  **instant** and lets the package derive the step, so the step arithmetic is under test rather than
+  supplied — coord #0068's lesson, where a golden vector handed a literal timestamp could never catch
+  a formatter emitting the wrong shape.
+
+  **The package never stores a secret.** Generation and the URI belong here; persistence and
+  encryption at rest stay with the consumer, as the key material does for
+  `Themia.AspNetCore.DataProtection`.
+
+  Its README documents the enrolment sequence, the page the user scans, and one trap worth knowing
+  before configuring anything: **Google Authenticator and Microsoft Authenticator ignore the
+  `algorithm`, `digits` and `period` parameters entirely.** A SHA-256 configuration produces a URI they
+  scan happily and then every code they generate fails verification. The defaults are SHA-1 / 6 digits
+  / 30 seconds for that reason.
+
 ## [0.17.1] - 2026-08-26
 
 ### Added
