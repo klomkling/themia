@@ -1,0 +1,36 @@
+#nullable enable
+Themia.Imaging.IImageProcessor
+Themia.Imaging.IImageProcessor.ProcessAsync(System.IO.Stream! source, Themia.Imaging.ImageProcessingOptions? options = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Imaging.ProcessedImage!>!
+Themia.Imaging.ImageOutputFormat
+Themia.Imaging.ImageOutputFormat.Jpeg = 1 -> Themia.Imaging.ImageOutputFormat
+Themia.Imaging.ImageOutputFormat.Png = 2 -> Themia.Imaging.ImageOutputFormat
+Themia.Imaging.ImageOutputFormat.Webp = 0 -> Themia.Imaging.ImageOutputFormat
+Themia.Imaging.ImageProcessingOptions
+Themia.Imaging.ImageProcessingOptions.ImageProcessingOptions() -> void
+Themia.Imaging.ImageProcessingOptions.Format.get -> Themia.Imaging.ImageOutputFormat
+Themia.Imaging.ImageProcessingOptions.Format.set -> void
+Themia.Imaging.ImageProcessingOptions.MaxEdge.get -> int
+Themia.Imaging.ImageProcessingOptions.MaxEdge.set -> void
+Themia.Imaging.ImageProcessingOptions.MaxPixels.get -> long
+Themia.Imaging.ImageProcessingOptions.MaxPixels.set -> void
+Themia.Imaging.ImageProcessingOptions.Quality.get -> int
+Themia.Imaging.ImageProcessingOptions.Quality.set -> void
+Themia.Imaging.ProcessedImage
+Themia.Imaging.ProcessedImage.ProcessedImage(System.IO.Stream! Content, string! Extension, int Width, int Height) -> void
+Themia.Imaging.ProcessedImage.Content.get -> System.IO.Stream!
+Themia.Imaging.ProcessedImage.Content.init -> void
+Themia.Imaging.ProcessedImage.Extension.get -> string!
+Themia.Imaging.ProcessedImage.Extension.init -> void
+Themia.Imaging.ProcessedImage.Height.get -> int
+Themia.Imaging.ProcessedImage.Height.init -> void
+Themia.Imaging.ProcessedImage.Width.get -> int
+Themia.Imaging.ProcessedImage.Width.init -> void
+Themia.Imaging.ProcessedImage.Dispose() -> void
+Themia.Imaging.ServiceCollectionExtensions
+Themia.Imaging.SkiaImageProcessor
+Themia.Imaging.SkiaImageProcessor.SkiaImageProcessor(Microsoft.Extensions.Options.IOptions<Themia.Imaging.ImageProcessingOptions!>! options) -> void
+Themia.Imaging.SkiaImageProcessor.ProcessAsync(System.IO.Stream! source, Themia.Imaging.ImageProcessingOptions? options = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Imaging.ProcessedImage!>!
+static Themia.Imaging.ServiceCollectionExtensions.AddThemiaImaging(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Themia.Imaging.ImageProcessingOptions!>? configure = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static Themia.Imaging.SkiaImageProcessor.ApplyOrientation(SkiaSharp.SKBitmap! src, SkiaSharp.SKEncodedOrigin origin) -> SkiaSharp.SKBitmap!
+static Themia.Imaging.SkiaImageProcessor.ExceedsPixelBudget(int width, int height, long maxPixels) -> bool
+static Themia.Imaging.SkiaImageProcessor.SubsampleScale(int longestEdge, int maxEdge) -> float
