@@ -17,12 +17,13 @@ public class UserServiceTests
     private readonly FakeUnitOfWork uow = new();
     private readonly FakeTimeProvider clock = new(DateTimeOffset.Parse("2026-06-14T00:00:00Z"));
     private readonly IdentityModuleOptions options = new();
+    private readonly RecordingUserLifecycleHooks hooks = new();
     private readonly UserService sut;
 
     public UserServiceTests()
     {
         repo = new FakeRepository<User>(store, u => u.Id) { AmbientTenant = new TenantId("acme") };
-        sut = new UserService(repo, uow, new Argon2idPasswordHasher(), clock, options, new DataFilterScope(), new FormattingOnlyPhoneNumberNormalizer());
+        sut = new UserService(repo, uow, new Argon2idPasswordHasher(), clock, options, new DataFilterScope(), new FormattingOnlyPhoneNumberNormalizer(), hooks);
     }
 
     [Fact]
@@ -134,7 +135,7 @@ public class UserServiceTests
     public async Task DeleteAsync_soft_deletes_so_lookup_no_longer_finds_the_user()
     {
         var create = await sut.CreateAsync("hank", "pw");
-        Assert.True(await sut.DeleteAsync(create.UserId!.Value));
+        Assert.True((await sut.DeleteAsync(create.UserId!.Value)).Succeeded);
         Assert.Null(await sut.FindByUserNameAsync("hank"));
     }
 
@@ -159,7 +160,7 @@ public class UserServiceTests
     public async Task VerifyPasswordAsync_rehashes_and_rotates_stamp_when_hash_is_outdated()
     {
         var stub = new StubPasswordHasher { VerifyResult = true, NeedsRehashResult = true, HashResult = "rehashed" };
-        var service = new UserService(repo, uow, stub, clock, options, new DataFilterScope(), new FormattingOnlyPhoneNumberNormalizer());
+        var service = new UserService(repo, uow, stub, clock, options, new DataFilterScope(), new FormattingOnlyPhoneNumberNormalizer(), hooks);
 
         // Seed with a distinct, outdated hash so the rehash to the "rehashed" sentinel is observable.
         var seeded = new User { UserName = "jane", NormalizedUserName = "JANE", PasswordHash = "outdated", TenantId = new TenantId("acme") };
@@ -195,7 +196,7 @@ public class UserServiceTests
         var create = await sut.CreateAsync("liam", "oldpw");
         var stampBefore = Assert.Single(store).SecurityStamp;
 
-        Assert.True(await sut.SetPasswordAsync(create.UserId!.Value, "newpw"));
+        Assert.True((await sut.SetPasswordAsync(create.UserId!.Value, "newpw")).Succeeded);
 
         Assert.NotEqual(stampBefore, Assert.Single(store).SecurityStamp);
         Assert.Equal(PasswordVerificationResult.Success, await sut.VerifyPasswordAsync("liam", "newpw"));
@@ -224,7 +225,7 @@ public class UserServiceTests
         platform.SetId(Guid.NewGuid());
         store.Add(platform);
 
-        Assert.True(await sut.SetActiveAsync(platform.Id, false));
+        Assert.True((await sut.SetActiveAsync(platform.Id, false)).Succeeded);
         Assert.False(Assert.Single(store).IsActive);
     }
 

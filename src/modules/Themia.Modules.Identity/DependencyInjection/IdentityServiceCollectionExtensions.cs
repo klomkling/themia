@@ -105,6 +105,10 @@ public static class IdentityServiceCollectionExtensions
         // because that is only true given a region the framework cannot know. See the interface.
         services.TryAddSingleton<IPhoneNumberNormalizer, FormattingOnlyPhoneNumberNormalizer>();
 
+        // TryAdd so an adopter registering their own lifecycle hooks keeps them. Scoped, because a hook
+        // that reads the consumer's own tables needs the request's connection.
+        services.TryAddScoped<IUserLifecycleHooks, NoOpUserLifecycleHooks>();
+
         services.TryAddScoped<IUserService, UserService>();
         services.TryAddScoped<IRoleService, RoleService>();
         services.TryAddScoped<IClaimService, ClaimService>();

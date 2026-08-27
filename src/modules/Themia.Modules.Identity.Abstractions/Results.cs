@@ -28,39 +28,6 @@ public readonly record struct UserCreationResult
     public static UserCreationResult Failure(string error) => new(false, null, error);
 }
 
-/// <summary>The outcome of setting a user's phone number.</summary>
-/// <remarks>
-/// An enum rather than a <see cref="bool"/>: <see cref="UserNotFound"/> and <see cref="Duplicate"/> need
-/// different handling — one is a programming error, the other is something to show the user — and a bool
-/// would collapse them into a single false that every call site is free to ignore. Adding a state later
-/// then breaks an exhaustive <c>switch</c> instead of compiling silently at every existing caller.
-/// </remarks>
-public enum SetPhoneNumberResult
-{
-    /// <summary>The number was stored (or cleared) and <c>PhoneNumberConfirmed</c> was reset to false.</summary>
-    Success,
-
-    /// <summary>No such user in the ambient tenant or the platform scope.</summary>
-    UserNotFound,
-
-    /// <summary>Another user in the same scope already holds this number in its normalized form.</summary>
-    Duplicate,
-}
-
-/// <summary>The outcome of setting a user's email address.</summary>
-/// <remarks>Shaped like <see cref="SetPhoneNumberResult"/>, and for the same reasons — see its remarks.</remarks>
-public enum SetEmailResult
-{
-    /// <summary>The address was stored (or cleared) and <c>EmailConfirmed</c> was reset to false.</summary>
-    Success,
-
-    /// <summary>No such user in the ambient tenant or the platform scope.</summary>
-    UserNotFound,
-
-    /// <summary>Another user in the same scope already holds this address in its normalized form.</summary>
-    Duplicate,
-}
-
 /// <summary>The outcome of consuming a user token.</summary>
 public enum TokenConsumeResult
 {

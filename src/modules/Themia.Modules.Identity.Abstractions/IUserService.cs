@@ -66,8 +66,8 @@ public interface IUserService
     /// <param name="userId">The user id.</param>
     /// <param name="email">The address as entered, or <see langword="null"/> to remove it.</param>
     /// <param name="cancellationToken">A cancellation token.</param>
-    /// <returns>The outcome — see <see cref="SetEmailResult"/>.</returns>
-    Task<SetEmailResult> SetEmailAsync(Guid userId, string? email, CancellationToken cancellationToken = default);
+    /// <returns>The outcome — see <see cref="UserMutationResult"/>.</returns>
+    Task<UserMutationResult> SetEmailAsync(Guid userId, string? email, CancellationToken cancellationToken = default);
 
     /// <summary>Marks a user's email address as confirmed.</summary>
     /// <remarks>
@@ -85,7 +85,7 @@ public interface IUserService
     /// <param name="userId">The user id.</param>
     /// <param name="cancellationToken">A cancellation token.</param>
     /// <returns><see langword="true"/> when the user was found and has an email address to confirm.</returns>
-    Task<bool> ConfirmEmailAsync(Guid userId, CancellationToken cancellationToken = default);
+    Task<UserMutationResult> ConfirmEmailAsync(Guid userId, CancellationToken cancellationToken = default);
 
     /// <summary>Sets (or replaces) a user's phone number, storing its normalized form and clearing
     /// <see cref="User.PhoneNumberConfirmed"/>.</summary>
@@ -99,8 +99,8 @@ public interface IUserService
     /// <param name="userId">The user id.</param>
     /// <param name="phoneNumber">The phone number as entered, or <see langword="null"/> to remove it.</param>
     /// <param name="cancellationToken">A cancellation token.</param>
-    /// <returns>The outcome — see <see cref="SetPhoneNumberResult"/>.</returns>
-    Task<SetPhoneNumberResult> SetPhoneNumberAsync(Guid userId, string? phoneNumber, CancellationToken cancellationToken = default);
+    /// <returns>The outcome — see <see cref="UserMutationResult"/>.</returns>
+    Task<UserMutationResult> SetPhoneNumberAsync(Guid userId, string? phoneNumber, CancellationToken cancellationToken = default);
 
     /// <summary>Marks a user's phone number as confirmed.</summary>
     /// <remarks>
@@ -112,14 +112,14 @@ public interface IUserService
     /// <param name="userId">The user id.</param>
     /// <param name="cancellationToken">A cancellation token.</param>
     /// <returns><see langword="true"/> when the user was found and has a phone number to confirm.</returns>
-    Task<bool> ConfirmPhoneNumberAsync(Guid userId, CancellationToken cancellationToken = default);
+    Task<UserMutationResult> ConfirmPhoneNumberAsync(Guid userId, CancellationToken cancellationToken = default);
 
     /// <summary>Sets (or replaces) a user's password and reissues the security stamp.</summary>
     /// <param name="userId">The user id.</param>
     /// <param name="password">The new plaintext password.</param>
     /// <param name="cancellationToken">A cancellation token.</param>
     /// <returns><see langword="true"/> when the user was found and updated.</returns>
-    Task<bool> SetPasswordAsync(Guid userId, string password, CancellationToken cancellationToken = default);
+    Task<UserMutationResult> SetPasswordAsync(Guid userId, string password, CancellationToken cancellationToken = default);
 
     /// <summary>Verifies a password and applies the lockout state machine (increments/locks on failure, resets on success).</summary>
     /// <param name="userName">The login name.</param>
@@ -133,11 +133,11 @@ public interface IUserService
     /// <param name="isActive">Whether the account is enabled.</param>
     /// <param name="cancellationToken">A cancellation token.</param>
     /// <returns><see langword="true"/> when the user was found and updated.</returns>
-    Task<bool> SetActiveAsync(Guid userId, bool isActive, CancellationToken cancellationToken = default);
+    Task<UserMutationResult> SetActiveAsync(Guid userId, bool isActive, CancellationToken cancellationToken = default);
 
     /// <summary>Soft-deletes a user.</summary>
     /// <param name="userId">The user id.</param>
     /// <param name="cancellationToken">A cancellation token.</param>
     /// <returns><see langword="true"/> when the user was found and deleted.</returns>
-    Task<bool> DeleteAsync(Guid userId, CancellationToken cancellationToken = default);
+    Task<UserMutationResult> DeleteAsync(Guid userId, CancellationToken cancellationToken = default);
 }

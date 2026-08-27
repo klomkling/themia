@@ -227,7 +227,7 @@ public abstract class IdentityStoreConformanceTests
         await ResetAsync();
         await using var s = NewScope(new TenantId("acme"));
         var userId = (await s.Users.CreateAsync("erin", "pw")).UserId!.Value;
-        Assert.True(await s.Users.DeleteAsync(userId));
+        Assert.True((await s.Users.DeleteAsync(userId)).Succeeded);
         Assert.Null(await s.Users.FindByUserNameAsync("erin"));
     }
 
@@ -243,7 +243,7 @@ public abstract class IdentityStoreConformanceTests
         var userId = (await s.Users.CreateAsync("hank", "pw", "hank@example.com")).UserId!.Value;
         Assert.False((await s.Users.FindByIdAsync(userId))!.EmailConfirmed);
 
-        Assert.True(await s.Users.ConfirmEmailAsync(userId));
+        Assert.True((await s.Users.ConfirmEmailAsync(userId)).Succeeded);
 
         Assert.True((await s.Users.FindByIdAsync(userId))!.EmailConfirmed);
     }
@@ -255,7 +255,7 @@ public abstract class IdentityStoreConformanceTests
         await using var s = NewScope(new TenantId("acme"));
         var userId = (await s.Users.CreateAsync("ivy", "pw")).UserId!.Value;
 
-        Assert.False(await s.Users.ConfirmEmailAsync(userId));
+        Assert.False((await s.Users.ConfirmEmailAsync(userId)).Succeeded);
         Assert.False((await s.Users.FindByIdAsync(userId))!.EmailConfirmed);
     }
 
@@ -267,9 +267,9 @@ public abstract class IdentityStoreConformanceTests
         await ResetAsync();
         await using var s = NewScope(new TenantId("acme"));
         var userId = (await s.Users.CreateAsync("jane", "pw", "jane@example.com")).UserId!.Value;
-        Assert.True(await s.Users.ConfirmEmailAsync(userId));
+        Assert.True((await s.Users.ConfirmEmailAsync(userId)).Succeeded);
 
-        Assert.Equal(SetEmailResult.Success, await s.Users.SetEmailAsync(userId, "jane.new@example.com"));
+        Assert.True((await s.Users.SetEmailAsync(userId, "jane.new@example.com")).Succeeded);
 
         var reloaded = (await s.Users.FindByIdAsync(userId))!;
         Assert.False(reloaded.EmailConfirmed);
@@ -285,7 +285,7 @@ public abstract class IdentityStoreConformanceTests
         await s.Users.CreateAsync("kirk", "pw", "taken@example.com");
         var userId = (await s.Users.CreateAsync("lana", "pw")).UserId!.Value;
 
-        Assert.Equal(SetEmailResult.Duplicate, await s.Users.SetEmailAsync(userId, "TAKEN@example.com"));
+        Assert.Equal(UserMutationOutcome.Duplicate, (await s.Users.SetEmailAsync(userId, "TAKEN@example.com")).Outcome);
         Assert.Null((await s.Users.FindByIdAsync(userId))!.Email);
     }
 
@@ -296,9 +296,9 @@ public abstract class IdentityStoreConformanceTests
         await ResetAsync();
         await using var s = NewScope(new TenantId("acme"));
         var userId = (await s.Users.CreateAsync("mona", "pw")).UserId!.Value;
-        Assert.Equal(SetPhoneNumberResult.Success, await s.Users.SetPhoneNumberAsync(userId, "+66 81 111 2222"));
+        Assert.True((await s.Users.SetPhoneNumberAsync(userId, "+66 81 111 2222")).Succeeded);
 
-        Assert.True(await s.Users.ConfirmPhoneNumberAsync(userId));
+        Assert.True((await s.Users.ConfirmPhoneNumberAsync(userId)).Succeeded);
 
         Assert.True((await s.Users.FindByIdAsync(userId))!.PhoneNumberConfirmed);
     }
@@ -310,9 +310,9 @@ public abstract class IdentityStoreConformanceTests
         await using var s = NewScope(new TenantId("acme"));
         var userId = (await s.Users.CreateAsync("nina", "pw")).UserId!.Value;
         await s.Users.SetPhoneNumberAsync(userId, "+66811112222");
-        Assert.True(await s.Users.ConfirmPhoneNumberAsync(userId));
+        Assert.True((await s.Users.ConfirmPhoneNumberAsync(userId)).Succeeded);
 
-        Assert.Equal(SetPhoneNumberResult.Success, await s.Users.SetPhoneNumberAsync(userId, "+66833334444"));
+        Assert.True((await s.Users.SetPhoneNumberAsync(userId, "+66833334444")).Succeeded);
 
         Assert.False((await s.Users.FindByIdAsync(userId))!.PhoneNumberConfirmed);
     }
@@ -538,7 +538,7 @@ public abstract class IdentityStoreConformanceTests
         var u = await s.Users.CreateAsync("rt-deleted", "pw");
         var issue = await s.RefreshTokens.IssueAsync(u.UserId!.Value);
         await s.RefreshTokens.ValidateAndRotateAsync(issue.RawToken); // consume original
-        Assert.True(await s.Users.DeleteAsync(u.UserId!.Value));      // soft-delete owner
+        Assert.True((await s.Users.DeleteAsync(u.UserId!.Value)).Succeeded);      // soft-delete owner
 
         Assert.Equal(RefreshOutcome.Invalid, (await s.RefreshTokens.ValidateAndRotateAsync(issue.RawToken)).Outcome);
     }
@@ -721,7 +721,7 @@ public abstract class IdentityStoreConformanceTests
 
         var seeded = await s.Users.CreateAsync("inactiveowner", "pw", "inactive@acme.test");
         Assert.True(seeded.Succeeded);
-        Assert.True(await s.Users.SetActiveAsync(seeded.UserId!.Value, false));
+        Assert.True((await s.Users.SetActiveAsync(seeded.UserId!.Value, false)).Succeeded);
 
         var result = await s.ExternalLogins.ResolveOrProvisionAsync(
             new ExternalIdentity("Google", "sub-inactive", "inactive@acme.test", true, null));
@@ -869,21 +869,21 @@ file sealed class RaceWinnerUserService(
         => inner.FindByEmailAsync(email, cancellationToken);
     public Task<User?> FindByPhoneAsync(string phoneNumber, CancellationToken cancellationToken = default)
         => inner.FindByPhoneAsync(phoneNumber, cancellationToken);
-    public Task<SetEmailResult> SetEmailAsync(Guid userId, string? email, CancellationToken cancellationToken = default)
+    public Task<UserMutationResult> SetEmailAsync(Guid userId, string? email, CancellationToken cancellationToken = default)
         => inner.SetEmailAsync(userId, email, cancellationToken);
-    public Task<bool> ConfirmEmailAsync(Guid userId, CancellationToken cancellationToken = default)
+    public Task<UserMutationResult> ConfirmEmailAsync(Guid userId, CancellationToken cancellationToken = default)
         => inner.ConfirmEmailAsync(userId, cancellationToken);
-    public Task<SetPhoneNumberResult> SetPhoneNumberAsync(Guid userId, string? phoneNumber, CancellationToken cancellationToken = default)
+    public Task<UserMutationResult> SetPhoneNumberAsync(Guid userId, string? phoneNumber, CancellationToken cancellationToken = default)
         => inner.SetPhoneNumberAsync(userId, phoneNumber, cancellationToken);
-    public Task<bool> ConfirmPhoneNumberAsync(Guid userId, CancellationToken cancellationToken = default)
+    public Task<UserMutationResult> ConfirmPhoneNumberAsync(Guid userId, CancellationToken cancellationToken = default)
         => inner.ConfirmPhoneNumberAsync(userId, cancellationToken);
-    public Task<bool> SetPasswordAsync(Guid userId, string password, CancellationToken cancellationToken = default)
+    public Task<UserMutationResult> SetPasswordAsync(Guid userId, string password, CancellationToken cancellationToken = default)
         => inner.SetPasswordAsync(userId, password, cancellationToken);
     public Task<PasswordVerificationResult> VerifyPasswordAsync(string userName, string password, CancellationToken cancellationToken = default)
         => inner.VerifyPasswordAsync(userName, password, cancellationToken);
-    public Task<bool> SetActiveAsync(Guid userId, bool isActive, CancellationToken cancellationToken = default)
+    public Task<UserMutationResult> SetActiveAsync(Guid userId, bool isActive, CancellationToken cancellationToken = default)
         => inner.SetActiveAsync(userId, isActive, cancellationToken);
-    public Task<bool> DeleteAsync(Guid userId, CancellationToken cancellationToken = default)
+    public Task<UserMutationResult> DeleteAsync(Guid userId, CancellationToken cancellationToken = default)
         => inner.DeleteAsync(userId, cancellationToken);
 }
 
@@ -937,20 +937,20 @@ file sealed class RaceWinnerNameUserService(
         => inner.FindByEmailAsync(email, cancellationToken);
     public Task<User?> FindByPhoneAsync(string phoneNumber, CancellationToken cancellationToken = default)
         => inner.FindByPhoneAsync(phoneNumber, cancellationToken);
-    public Task<SetEmailResult> SetEmailAsync(Guid userId, string? email, CancellationToken cancellationToken = default)
+    public Task<UserMutationResult> SetEmailAsync(Guid userId, string? email, CancellationToken cancellationToken = default)
         => inner.SetEmailAsync(userId, email, cancellationToken);
-    public Task<bool> ConfirmEmailAsync(Guid userId, CancellationToken cancellationToken = default)
+    public Task<UserMutationResult> ConfirmEmailAsync(Guid userId, CancellationToken cancellationToken = default)
         => inner.ConfirmEmailAsync(userId, cancellationToken);
-    public Task<SetPhoneNumberResult> SetPhoneNumberAsync(Guid userId, string? phoneNumber, CancellationToken cancellationToken = default)
+    public Task<UserMutationResult> SetPhoneNumberAsync(Guid userId, string? phoneNumber, CancellationToken cancellationToken = default)
         => inner.SetPhoneNumberAsync(userId, phoneNumber, cancellationToken);
-    public Task<bool> ConfirmPhoneNumberAsync(Guid userId, CancellationToken cancellationToken = default)
+    public Task<UserMutationResult> ConfirmPhoneNumberAsync(Guid userId, CancellationToken cancellationToken = default)
         => inner.ConfirmPhoneNumberAsync(userId, cancellationToken);
-    public Task<bool> SetPasswordAsync(Guid userId, string password, CancellationToken cancellationToken = default)
+    public Task<UserMutationResult> SetPasswordAsync(Guid userId, string password, CancellationToken cancellationToken = default)
         => inner.SetPasswordAsync(userId, password, cancellationToken);
     public Task<PasswordVerificationResult> VerifyPasswordAsync(string userName, string password, CancellationToken cancellationToken = default)
         => inner.VerifyPasswordAsync(userName, password, cancellationToken);
-    public Task<bool> SetActiveAsync(Guid userId, bool isActive, CancellationToken cancellationToken = default)
+    public Task<UserMutationResult> SetActiveAsync(Guid userId, bool isActive, CancellationToken cancellationToken = default)
         => inner.SetActiveAsync(userId, isActive, cancellationToken);
-    public Task<bool> DeleteAsync(Guid userId, CancellationToken cancellationToken = default)
+    public Task<UserMutationResult> DeleteAsync(Guid userId, CancellationToken cancellationToken = default)
         => inner.DeleteAsync(userId, cancellationToken);
 }

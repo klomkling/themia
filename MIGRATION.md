@@ -10,6 +10,66 @@ with the *why* and concrete upgrade steps.
 - Each entry states: **What changed**, **Why**, and **How to upgrade** (before → after).
 - Non-breaking changes are *not* listed here — see the CHANGELOG.
 
+## 0.19.0
+
+### `IUserService` mutations return `UserMutationResult`
+
+**What changed:** the seven mutating methods on `IUserService` — `SetEmailAsync`, `ConfirmEmailAsync`,
+`SetPhoneNumberAsync`, `ConfirmPhoneNumberAsync`, `SetPasswordAsync`, `SetActiveAsync`, `DeleteAsync` —
+now return `Task<UserMutationResult>`. Five returned `Task<bool>`; the other two returned
+`SetEmailResult` / `SetPhoneNumberResult`, which are **removed**.
+
+**Why:** `IUserLifecycleHooks` (new in this release) lets an app refuse a mutation *with a reason*
+meant for whoever attempted it — "this is the only way you can sign in". A `bool` cannot carry that
+reason, and `false` already meant "no such user", so a refusal would have been indistinguishable from
+a programming error. Giving all seven the same result type means the reason is reachable from every
+mutation, not only the two that happened to have an enum already.
+
+`UserMutationResult` exposes `Outcome` (`Success` / `UserNotFound` / `Duplicate` / `Refused`),
+`Reason` (set only for `Refused`), and `Succeeded`.
+
+**How to upgrade:**
+
+```csharp
+// before — bool
+if (await users.SetActiveAsync(userId, false, ct)) { … }
+
+// after
+if ((await users.SetActiveAsync(userId, false, ct)).Succeeded) { … }
+```
+
+```csharp
+// before — SetEmailResult
+switch (await users.SetEmailAsync(userId, email, ct))
+{
+    case SetEmailResult.Success:      return NoContent();
+    case SetEmailResult.Duplicate:    return Conflict("That address is already in use.");
+    case SetEmailResult.UserNotFound: return NotFound();
+}
+
+// after — same shape, one extra state to map
+var result = await users.SetEmailAsync(userId, email, ct);
+return result.Outcome switch
+{
+    UserMutationOutcome.Success      => NoContent(),
+    UserMutationOutcome.Duplicate    => Conflict("That address is already in use."),
+    UserMutationOutcome.UserNotFound => NotFound(),
+    UserMutationOutcome.Refused      => Conflict(result.Reason),
+    _ => throw new UnreachableException(),
+};
+```
+
+Map `Refused` even if you register no hooks today — the exhaustive `switch` is what forces you to
+revisit this call site the day someone does.
+
+**If you implement `IUserService` yourself** (including test doubles and decorators), update the seven
+signatures. The compiler finds every one: the change is a return-type break, so nothing compiles
+silently against the old contract.
+
+**If you construct `UserService` directly**, it takes a new final constructor parameter,
+`IUserLifecycleHooks`. Through DI nothing changes — `AddThemiaIdentityCore` registers a permissive
+default with `TryAdd`, and an implementation you register first survives.
+
 ## 0.17.0
 
 ### A table off the `search_path` now stops the host at startup

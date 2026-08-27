@@ -54,15 +54,15 @@ internal sealed class FakeUserService : IUserService
         FindByPhoneCalls++;
         return Task.FromResult(PhoneUserToReturn);
     }
-    public Task<SetEmailResult> SetEmailAsync(Guid userId, string? email, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-    public Task<bool> ConfirmEmailAsync(Guid userId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-    public Task<SetPhoneNumberResult> SetPhoneNumberAsync(Guid userId, string? phoneNumber, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-    public Task<bool> ConfirmPhoneNumberAsync(Guid userId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    public Task<UserMutationResult> SetEmailAsync(Guid userId, string? email, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    public Task<UserMutationResult> ConfirmEmailAsync(Guid userId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    public Task<UserMutationResult> SetPhoneNumberAsync(Guid userId, string? phoneNumber, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    public Task<UserMutationResult> ConfirmPhoneNumberAsync(Guid userId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
     public Task<UserCreationResult> CreateAsync(string userName, string password, string? email = null, CancellationToken cancellationToken = default) => throw new NotSupportedException();
     public Task<UserCreationResult> CreateExternalUserAsync(string userName, string? email, bool emailVerified, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-    public Task<bool> SetPasswordAsync(Guid userId, string password, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-    public Task<bool> SetActiveAsync(Guid userId, bool isActive, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-    public Task<bool> DeleteAsync(Guid userId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    public Task<UserMutationResult> SetPasswordAsync(Guid userId, string password, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    public Task<UserMutationResult> SetActiveAsync(Guid userId, bool isActive, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    public Task<UserMutationResult> DeleteAsync(Guid userId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
 }
 
 internal sealed class FakeClaimsPrincipalFactory : IClaimsPrincipalFactory

@@ -17,6 +17,7 @@ public sealed class UserService : IUserService
     private readonly IdentityModuleOptions options;
     private readonly IDataFilterScope filterScope;
     private readonly IPhoneNumberNormalizer phoneNormalizer;
+    private readonly IUserLifecycleHooks hooks;
 
     /// <summary>Creates the service.</summary>
     public UserService(
@@ -26,7 +27,8 @@ public sealed class UserService : IUserService
         TimeProvider timeProvider,
         IdentityModuleOptions options,
         IDataFilterScope filterScope,
-        IPhoneNumberNormalizer phoneNormalizer)
+        IPhoneNumberNormalizer phoneNormalizer,
+        IUserLifecycleHooks hooks)
     {
         ArgumentNullException.ThrowIfNull(users);
         ArgumentNullException.ThrowIfNull(unitOfWork);
@@ -35,6 +37,7 @@ public sealed class UserService : IUserService
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(filterScope);
         ArgumentNullException.ThrowIfNull(phoneNormalizer);
+        ArgumentNullException.ThrowIfNull(hooks);
         this.users = users;
         this.unitOfWork = unitOfWork;
         this.passwordHasher = passwordHasher;
@@ -42,6 +45,7 @@ public sealed class UserService : IUserService
         this.options = options;
         this.filterScope = filterScope;
         this.phoneNormalizer = phoneNormalizer;
+        this.hooks = hooks;
     }
 
     /// <inheritdoc />
@@ -192,12 +196,20 @@ public sealed class UserService : IUserService
     }
 
     /// <inheritdoc />
-    public async Task<SetEmailResult> SetEmailAsync(Guid userId, string? email, CancellationToken cancellationToken = default)
+    public async Task<UserMutationResult> SetEmailAsync(Guid userId, string? email, CancellationToken cancellationToken = default)
     {
         var user = await IdentityScope.ResolveUserAsync(users, userId, cancellationToken).ConfigureAwait(false);
         if (user is null)
         {
-            return SetEmailResult.UserNotFound;
+            return UserMutationResult.UserNotFound();
+        }
+
+        // Before the duplicate probe, not after: a refusal is the consumer's rule and should not depend on
+        // whether the module happened to reject the value first for its own reasons.
+        var decision = await hooks.OnBeforeSetEmailAsync(userId, email, cancellationToken).ConfigureAwait(false);
+        if (!decision.IsAllowed)
+        {
+            return UserMutationResult.Refused(decision.Reason!);
         }
 
         string? normalized = null;
@@ -207,7 +219,7 @@ public sealed class UserService : IUserService
             var holder = await users.FirstOrDefaultAsync(new UserByNormalizedEmailSpec(normalized), cancellationToken).ConfigureAwait(false);
             if (holder is not null && holder.Id != user.Id)
             {
-                return SetEmailResult.Duplicate;
+                return UserMutationResult.Duplicate();
             }
         }
 
@@ -221,31 +233,45 @@ public sealed class UserService : IUserService
 
         users.Update(user);
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-        return SetEmailResult.Success;
+        await hooks.OnUserMutatedAsync(userId, UserMutation.Email, cancellationToken).ConfigureAwait(false);
+        return UserMutationResult.Success();
     }
 
     /// <inheritdoc />
-    public async Task<bool> ConfirmEmailAsync(Guid userId, CancellationToken cancellationToken = default)
+    public async Task<UserMutationResult> ConfirmEmailAsync(Guid userId, CancellationToken cancellationToken = default)
     {
         var user = await IdentityScope.ResolveUserAsync(users, userId, cancellationToken).ConfigureAwait(false);
         if (user?.NormalizedEmail is null)
         {
-            return false;
+            return UserMutationResult.UserNotFound();
+        }
+
+        var decision = await hooks.OnBeforeConfirmEmailAsync(userId, cancellationToken).ConfigureAwait(false);
+        if (!decision.IsAllowed)
+        {
+            return UserMutationResult.Refused(decision.Reason!);
         }
 
         user.EmailConfirmed = true;
         users.Update(user);
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-        return true;
+        await hooks.OnUserMutatedAsync(userId, UserMutation.EmailConfirmation, cancellationToken).ConfigureAwait(false);
+        return UserMutationResult.Success();
     }
 
     /// <inheritdoc />
-    public async Task<SetPhoneNumberResult> SetPhoneNumberAsync(Guid userId, string? phoneNumber, CancellationToken cancellationToken = default)
+    public async Task<UserMutationResult> SetPhoneNumberAsync(Guid userId, string? phoneNumber, CancellationToken cancellationToken = default)
     {
         var user = await IdentityScope.ResolveUserAsync(users, userId, cancellationToken).ConfigureAwait(false);
         if (user is null)
         {
-            return SetPhoneNumberResult.UserNotFound;
+            return UserMutationResult.UserNotFound();
+        }
+
+        var decision = await hooks.OnBeforeSetPhoneNumberAsync(userId, phoneNumber, cancellationToken).ConfigureAwait(false);
+        if (!decision.IsAllowed)
+        {
+            return UserMutationResult.Refused(decision.Reason!);
         }
 
         var normalized = phoneNormalizer.Normalize(phoneNumber);
@@ -254,7 +280,7 @@ public sealed class UserService : IUserService
             var holder = await users.FirstOrDefaultAsync(new UserByNormalizedPhoneSpec(normalized), cancellationToken).ConfigureAwait(false);
             if (holder is not null && holder.Id != user.Id)
             {
-                return SetPhoneNumberResult.Duplicate;
+                return UserMutationResult.Duplicate();
             }
         }
 
@@ -268,39 +294,54 @@ public sealed class UserService : IUserService
 
         users.Update(user);
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-        return SetPhoneNumberResult.Success;
+        await hooks.OnUserMutatedAsync(userId, UserMutation.Phone, cancellationToken).ConfigureAwait(false);
+        return UserMutationResult.Success();
     }
 
     /// <inheritdoc />
-    public async Task<bool> ConfirmPhoneNumberAsync(Guid userId, CancellationToken cancellationToken = default)
+    public async Task<UserMutationResult> ConfirmPhoneNumberAsync(Guid userId, CancellationToken cancellationToken = default)
     {
         var user = await IdentityScope.ResolveUserAsync(users, userId, cancellationToken).ConfigureAwait(false);
         if (user?.NormalizedPhoneNumber is null)
         {
-            return false;
+            return UserMutationResult.UserNotFound();
+        }
+
+        var decision = await hooks.OnBeforeConfirmPhoneNumberAsync(userId, cancellationToken).ConfigureAwait(false);
+        if (!decision.IsAllowed)
+        {
+            return UserMutationResult.Refused(decision.Reason!);
         }
 
         user.PhoneNumberConfirmed = true;
         users.Update(user);
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-        return true;
+        await hooks.OnUserMutatedAsync(userId, UserMutation.PhoneConfirmation, cancellationToken).ConfigureAwait(false);
+        return UserMutationResult.Success();
     }
 
     /// <inheritdoc />
-    public async Task<bool> SetPasswordAsync(Guid userId, string password, CancellationToken cancellationToken = default)
+    public async Task<UserMutationResult> SetPasswordAsync(Guid userId, string password, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(password);
         var user = await IdentityScope.ResolveUserAsync(users, userId, cancellationToken).ConfigureAwait(false);
         if (user is null)
         {
-            return false;
+            return UserMutationResult.UserNotFound();
+        }
+
+        var decision = await hooks.OnBeforeSetPasswordAsync(userId, cancellationToken).ConfigureAwait(false);
+        if (!decision.IsAllowed)
+        {
+            return UserMutationResult.Refused(decision.Reason!);
         }
 
         user.PasswordHash = passwordHasher.Hash(password);
         user.SecurityStamp = Guid.NewGuid().ToString("N");
         users.Update(user);
         await IdentityScope.SaveScopedAsync(unitOfWork, filterScope, user.TenantId is null, cancellationToken).ConfigureAwait(false);
-        return true;
+        await hooks.OnUserMutatedAsync(userId, UserMutation.Password, cancellationToken).ConfigureAwait(false);
+        return UserMutationResult.Success();
     }
 
     /// <inheritdoc />
@@ -363,31 +404,45 @@ public sealed class UserService : IUserService
     }
 
     /// <inheritdoc />
-    public async Task<bool> SetActiveAsync(Guid userId, bool isActive, CancellationToken cancellationToken = default)
+    public async Task<UserMutationResult> SetActiveAsync(Guid userId, bool isActive, CancellationToken cancellationToken = default)
     {
         var user = await IdentityScope.ResolveUserAsync(users, userId, cancellationToken).ConfigureAwait(false);
         if (user is null)
         {
-            return false;
+            return UserMutationResult.UserNotFound();
+        }
+
+        var decision = await hooks.OnBeforeSetActiveAsync(userId, isActive, cancellationToken).ConfigureAwait(false);
+        if (!decision.IsAllowed)
+        {
+            return UserMutationResult.Refused(decision.Reason!);
         }
 
         user.IsActive = isActive;
         users.Update(user);
         await IdentityScope.SaveScopedAsync(unitOfWork, filterScope, user.TenantId is null, cancellationToken).ConfigureAwait(false);
-        return true;
+        await hooks.OnUserMutatedAsync(userId, UserMutation.Active, cancellationToken).ConfigureAwait(false);
+        return UserMutationResult.Success();
     }
 
     /// <inheritdoc />
-    public async Task<bool> DeleteAsync(Guid userId, CancellationToken cancellationToken = default)
+    public async Task<UserMutationResult> DeleteAsync(Guid userId, CancellationToken cancellationToken = default)
     {
         var user = await IdentityScope.ResolveUserAsync(users, userId, cancellationToken).ConfigureAwait(false);
         if (user is null)
         {
-            return false;
+            return UserMutationResult.UserNotFound();
+        }
+
+        var decision = await hooks.OnBeforeDeleteAsync(userId, cancellationToken).ConfigureAwait(false);
+        if (!decision.IsAllowed)
+        {
+            return UserMutationResult.Refused(decision.Reason!);
         }
 
         users.Remove(user);
         await IdentityScope.SaveScopedAsync(unitOfWork, filterScope, user.TenantId is null, cancellationToken).ConfigureAwait(false);
-        return true;
+        await hooks.OnUserMutatedAsync(userId, UserMutation.Deleted, cancellationToken).ConfigureAwait(false);
+        return UserMutationResult.Success();
     }
 }

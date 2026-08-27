@@ -228,16 +228,10 @@ Themia.Modules.Identity.Abstractions.Entities.UserLockoutExtensions
 Themia.Modules.Identity.Abstractions.IClaimService.GetEffectiveClaimsAsync(System.Guid userId, System.Collections.Generic.IReadOnlyCollection<System.Guid>! roleIds, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<System.Security.Claims.Claim!>!>!
 Themia.Modules.Identity.Abstractions.IPhoneNumberNormalizer
 Themia.Modules.Identity.Abstractions.IPhoneNumberNormalizer.Normalize(string? phoneNumber) -> string?
-Themia.Modules.Identity.Abstractions.IUserService.ConfirmPhoneNumberAsync(System.Guid userId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!
 Themia.Modules.Identity.Abstractions.IUserService.CreateExternalUserAsync(string! userName, string? email, bool emailVerified, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Identity.Abstractions.UserCreationResult>!
 Themia.Modules.Identity.Abstractions.IUserService.FindByPhoneAsync(string! phoneNumber, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Identity.Abstractions.Entities.User?>!
-Themia.Modules.Identity.Abstractions.IUserService.SetPhoneNumberAsync(System.Guid userId, string? phoneNumber, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Identity.Abstractions.SetPhoneNumberResult>!
 Themia.Modules.Identity.Abstractions.IdentityModuleOptions.RefreshTokenLifetime.get -> System.TimeSpan
 Themia.Modules.Identity.Abstractions.IdentityModuleOptions.RefreshTokenLifetime.set -> void
-Themia.Modules.Identity.Abstractions.SetPhoneNumberResult
-Themia.Modules.Identity.Abstractions.SetPhoneNumberResult.Duplicate = 2 -> Themia.Modules.Identity.Abstractions.SetPhoneNumberResult
-Themia.Modules.Identity.Abstractions.SetPhoneNumberResult.Success = 0 -> Themia.Modules.Identity.Abstractions.SetPhoneNumberResult
-Themia.Modules.Identity.Abstractions.SetPhoneNumberResult.UserNotFound = 1 -> Themia.Modules.Identity.Abstractions.SetPhoneNumberResult
 static Themia.Modules.Identity.Abstractions.Authentication.AuthResponse.FromTokens(Themia.Modules.Identity.Abstractions.Authentication.AuthTokens tokens) -> Themia.Modules.Identity.Abstractions.Authentication.AuthResponse!
 static Themia.Modules.Identity.Abstractions.Authentication.ExternalAuthResult.Failed(string! reason) -> Themia.Modules.Identity.Abstractions.Authentication.ExternalAuthResult
 static Themia.Modules.Identity.Abstractions.Authentication.ExternalAuthResult.Success(Themia.Modules.Identity.Abstractions.Authentication.ExternalIdentity identity) -> Themia.Modules.Identity.Abstractions.Authentication.ExternalAuthResult
@@ -258,9 +252,48 @@ static Themia.Modules.Identity.Abstractions.Authentication.RefreshValidationResu
 static Themia.Modules.Identity.Abstractions.Authentication.RefreshValidationResult.ReuseDetected() -> Themia.Modules.Identity.Abstractions.Authentication.RefreshValidationResult
 static Themia.Modules.Identity.Abstractions.Authentication.RefreshValidationResult.Success(Themia.Modules.Identity.Abstractions.Entities.User! user, Themia.Modules.Identity.Abstractions.Authentication.RefreshIssue replacement) -> Themia.Modules.Identity.Abstractions.Authentication.RefreshValidationResult
 static Themia.Modules.Identity.Abstractions.Entities.UserLockoutExtensions.IsLockedOut(this Themia.Modules.Identity.Abstractions.Entities.User! user, System.DateTimeOffset now) -> bool
-Themia.Modules.Identity.Abstractions.IUserService.ConfirmEmailAsync(System.Guid userId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!
-Themia.Modules.Identity.Abstractions.IUserService.SetEmailAsync(System.Guid userId, string? email, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Identity.Abstractions.SetEmailResult>!
-Themia.Modules.Identity.Abstractions.SetEmailResult
-Themia.Modules.Identity.Abstractions.SetEmailResult.Duplicate = 2 -> Themia.Modules.Identity.Abstractions.SetEmailResult
-Themia.Modules.Identity.Abstractions.SetEmailResult.Success = 0 -> Themia.Modules.Identity.Abstractions.SetEmailResult
-Themia.Modules.Identity.Abstractions.SetEmailResult.UserNotFound = 1 -> Themia.Modules.Identity.Abstractions.SetEmailResult
+Themia.Modules.Identity.Abstractions.IUserService.ConfirmEmailAsync(System.Guid userId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Identity.Abstractions.UserMutationResult>!
+Themia.Modules.Identity.Abstractions.IUserService.ConfirmPhoneNumberAsync(System.Guid userId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Identity.Abstractions.UserMutationResult>!
+Themia.Modules.Identity.Abstractions.IUserService.DeleteAsync(System.Guid userId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Identity.Abstractions.UserMutationResult>!
+Themia.Modules.Identity.Abstractions.IUserService.SetActiveAsync(System.Guid userId, bool isActive, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Identity.Abstractions.UserMutationResult>!
+Themia.Modules.Identity.Abstractions.IUserService.SetEmailAsync(System.Guid userId, string? email, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Identity.Abstractions.UserMutationResult>!
+Themia.Modules.Identity.Abstractions.IUserService.SetPasswordAsync(System.Guid userId, string! password, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Identity.Abstractions.UserMutationResult>!
+Themia.Modules.Identity.Abstractions.IUserService.SetPhoneNumberAsync(System.Guid userId, string? phoneNumber, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Identity.Abstractions.UserMutationResult>!
+Themia.Modules.Identity.Abstractions.IUserLifecycleHooks
+Themia.Modules.Identity.Abstractions.IUserLifecycleHooks.OnBeforeConfirmEmailAsync(System.Guid userId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<Themia.Modules.Identity.Abstractions.UserMutationDecision>
+Themia.Modules.Identity.Abstractions.IUserLifecycleHooks.OnBeforeConfirmPhoneNumberAsync(System.Guid userId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<Themia.Modules.Identity.Abstractions.UserMutationDecision>
+Themia.Modules.Identity.Abstractions.IUserLifecycleHooks.OnBeforeDeleteAsync(System.Guid userId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<Themia.Modules.Identity.Abstractions.UserMutationDecision>
+Themia.Modules.Identity.Abstractions.IUserLifecycleHooks.OnBeforeSetActiveAsync(System.Guid userId, bool isActive, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<Themia.Modules.Identity.Abstractions.UserMutationDecision>
+Themia.Modules.Identity.Abstractions.IUserLifecycleHooks.OnBeforeSetEmailAsync(System.Guid userId, string? email, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<Themia.Modules.Identity.Abstractions.UserMutationDecision>
+Themia.Modules.Identity.Abstractions.IUserLifecycleHooks.OnBeforeSetPasswordAsync(System.Guid userId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<Themia.Modules.Identity.Abstractions.UserMutationDecision>
+Themia.Modules.Identity.Abstractions.IUserLifecycleHooks.OnBeforeSetPhoneNumberAsync(System.Guid userId, string? phoneNumber, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<Themia.Modules.Identity.Abstractions.UserMutationDecision>
+Themia.Modules.Identity.Abstractions.IUserLifecycleHooks.OnUserMutatedAsync(System.Guid userId, Themia.Modules.Identity.Abstractions.UserMutation mutation, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+Themia.Modules.Identity.Abstractions.UserMutation
+Themia.Modules.Identity.Abstractions.UserMutation.Active = 32 -> Themia.Modules.Identity.Abstractions.UserMutation
+Themia.Modules.Identity.Abstractions.UserMutation.Deleted = 64 -> Themia.Modules.Identity.Abstractions.UserMutation
+Themia.Modules.Identity.Abstractions.UserMutation.Email = 2 -> Themia.Modules.Identity.Abstractions.UserMutation
+Themia.Modules.Identity.Abstractions.UserMutation.EmailConfirmation = 4 -> Themia.Modules.Identity.Abstractions.UserMutation
+Themia.Modules.Identity.Abstractions.UserMutation.None = 0 -> Themia.Modules.Identity.Abstractions.UserMutation
+Themia.Modules.Identity.Abstractions.UserMutation.Password = 1 -> Themia.Modules.Identity.Abstractions.UserMutation
+Themia.Modules.Identity.Abstractions.UserMutation.Phone = 8 -> Themia.Modules.Identity.Abstractions.UserMutation
+Themia.Modules.Identity.Abstractions.UserMutation.PhoneConfirmation = 16 -> Themia.Modules.Identity.Abstractions.UserMutation
+Themia.Modules.Identity.Abstractions.UserMutationDecision
+Themia.Modules.Identity.Abstractions.UserMutationDecision.IsAllowed.get -> bool
+Themia.Modules.Identity.Abstractions.UserMutationDecision.Reason.get -> string?
+Themia.Modules.Identity.Abstractions.UserMutationDecision.UserMutationDecision() -> void
+Themia.Modules.Identity.Abstractions.UserMutationOutcome
+Themia.Modules.Identity.Abstractions.UserMutationOutcome.Duplicate = 2 -> Themia.Modules.Identity.Abstractions.UserMutationOutcome
+Themia.Modules.Identity.Abstractions.UserMutationOutcome.Refused = 3 -> Themia.Modules.Identity.Abstractions.UserMutationOutcome
+Themia.Modules.Identity.Abstractions.UserMutationOutcome.Success = 0 -> Themia.Modules.Identity.Abstractions.UserMutationOutcome
+Themia.Modules.Identity.Abstractions.UserMutationOutcome.UserNotFound = 1 -> Themia.Modules.Identity.Abstractions.UserMutationOutcome
+Themia.Modules.Identity.Abstractions.UserMutationResult
+Themia.Modules.Identity.Abstractions.UserMutationResult.Outcome.get -> Themia.Modules.Identity.Abstractions.UserMutationOutcome
+Themia.Modules.Identity.Abstractions.UserMutationResult.Reason.get -> string?
+Themia.Modules.Identity.Abstractions.UserMutationResult.Succeeded.get -> bool
+Themia.Modules.Identity.Abstractions.UserMutationResult.UserMutationResult() -> void
+static Themia.Modules.Identity.Abstractions.UserMutationDecision.Allow() -> Themia.Modules.Identity.Abstractions.UserMutationDecision
+static Themia.Modules.Identity.Abstractions.UserMutationDecision.Refuse(string! reason) -> Themia.Modules.Identity.Abstractions.UserMutationDecision
+static Themia.Modules.Identity.Abstractions.UserMutationResult.Duplicate() -> Themia.Modules.Identity.Abstractions.UserMutationResult
+static Themia.Modules.Identity.Abstractions.UserMutationResult.Refused(string! reason) -> Themia.Modules.Identity.Abstractions.UserMutationResult
+static Themia.Modules.Identity.Abstractions.UserMutationResult.Success() -> Themia.Modules.Identity.Abstractions.UserMutationResult
+static Themia.Modules.Identity.Abstractions.UserMutationResult.UserNotFound() -> Themia.Modules.Identity.Abstractions.UserMutationResult
