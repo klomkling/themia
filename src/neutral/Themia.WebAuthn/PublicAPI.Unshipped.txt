@@ -1,0 +1,70 @@
+#nullable enable
+Themia.WebAuthn.IWebAuthnChallengeStore
+Themia.WebAuthn.IWebAuthnChallengeStore.StoreAsync(string! challengeId, string! optionsJson, System.TimeSpan ttl, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+Themia.WebAuthn.IWebAuthnChallengeStore.TryConsumeAsync(string! challengeId, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<string?>
+Themia.WebAuthn.IWebAuthnService
+Themia.WebAuthn.IWebAuthnService.BeginAuthenticationAsync(System.Collections.Generic.IReadOnlyList<byte[]!>! allowedCredentialIds, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<Fido2NetLib.AssertionOptions!>
+Themia.WebAuthn.IWebAuthnService.BeginRegistrationAsync(byte[]! userId, string! userName, string! displayName, System.Collections.Generic.IReadOnlyList<byte[]!>! existingCredentialIds, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<Fido2NetLib.CredentialCreateOptions!>
+Themia.WebAuthn.IWebAuthnService.CompleteAuthenticationAsync(Fido2NetLib.AuthenticatorAssertionRawResponse! response, Themia.WebAuthn.StoredWebAuthnCredential! storedCredential, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<Themia.WebAuthn.WebAuthnAuthentication!>
+Themia.WebAuthn.IWebAuthnService.CompleteRegistrationAsync(Fido2NetLib.AuthenticatorAttestationRawResponse! response, System.Func<byte[]!, System.Threading.CancellationToken, System.Threading.Tasks.ValueTask<bool>>! isCredentialIdUnique, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<Themia.WebAuthn.WebAuthnRegistration!>
+Themia.WebAuthn.ServiceCollectionExtensions
+Themia.WebAuthn.SignCounterPolicy
+Themia.WebAuthn.StoredWebAuthnCredential
+Themia.WebAuthn.StoredWebAuthnCredential.CredentialId.get -> byte[]!
+Themia.WebAuthn.StoredWebAuthnCredential.CredentialId.init -> void
+Themia.WebAuthn.StoredWebAuthnCredential.PublicKey.get -> byte[]!
+Themia.WebAuthn.StoredWebAuthnCredential.PublicKey.init -> void
+Themia.WebAuthn.StoredWebAuthnCredential.SignCount.get -> uint
+Themia.WebAuthn.StoredWebAuthnCredential.SignCount.init -> void
+Themia.WebAuthn.StoredWebAuthnCredential.StoredWebAuthnCredential(byte[]! CredentialId, byte[]! PublicKey, uint SignCount, byte[]! UserHandle) -> void
+Themia.WebAuthn.StoredWebAuthnCredential.UserHandle.get -> byte[]!
+Themia.WebAuthn.StoredWebAuthnCredential.UserHandle.init -> void
+Themia.WebAuthn.WebAuthnAuthentication
+Themia.WebAuthn.WebAuthnAuthentication.Outcome.get -> Themia.WebAuthn.WebAuthnOutcome
+Themia.WebAuthn.WebAuthnAuthentication.Outcome.init -> void
+Themia.WebAuthn.WebAuthnAuthentication.SignCount.get -> uint
+Themia.WebAuthn.WebAuthnAuthentication.SignCount.init -> void
+Themia.WebAuthn.WebAuthnAuthentication.Succeeded.get -> bool
+Themia.WebAuthn.WebAuthnAuthentication.UserHandle.get -> byte[]?
+Themia.WebAuthn.WebAuthnAuthentication.UserHandle.init -> void
+Themia.WebAuthn.WebAuthnAuthentication.WebAuthnAuthentication(Themia.WebAuthn.WebAuthnOutcome Outcome, uint SignCount, byte[]? UserHandle) -> void
+Themia.WebAuthn.WebAuthnOptions
+Themia.WebAuthn.WebAuthnOptions.ChallengeTimeout.get -> System.TimeSpan
+Themia.WebAuthn.WebAuthnOptions.ChallengeTimeout.set -> void
+Themia.WebAuthn.WebAuthnOptions.Origins.get -> System.Collections.Generic.HashSet<string!>!
+Themia.WebAuthn.WebAuthnOptions.Origins.set -> void
+Themia.WebAuthn.WebAuthnOptions.RequireResidentKey.get -> bool
+Themia.WebAuthn.WebAuthnOptions.RequireResidentKey.set -> void
+Themia.WebAuthn.WebAuthnOptions.ServerDomain.get -> string!
+Themia.WebAuthn.WebAuthnOptions.ServerDomain.set -> void
+Themia.WebAuthn.WebAuthnOptions.ServerName.get -> string!
+Themia.WebAuthn.WebAuthnOptions.ServerName.set -> void
+Themia.WebAuthn.WebAuthnOptions.WebAuthnOptions() -> void
+Themia.WebAuthn.WebAuthnOutcome
+Themia.WebAuthn.WebAuthnOutcome.ChallengeNotFound = 1 -> Themia.WebAuthn.WebAuthnOutcome
+Themia.WebAuthn.WebAuthnOutcome.SignCounterRegressed = 2 -> Themia.WebAuthn.WebAuthnOutcome
+Themia.WebAuthn.WebAuthnOutcome.Valid = 0 -> Themia.WebAuthn.WebAuthnOutcome
+Themia.WebAuthn.WebAuthnOutcome.VerificationFailed = 3 -> Themia.WebAuthn.WebAuthnOutcome
+Themia.WebAuthn.WebAuthnRegistration
+Themia.WebAuthn.WebAuthnRegistration.AaGuid.get -> System.Guid
+Themia.WebAuthn.WebAuthnRegistration.AaGuid.init -> void
+Themia.WebAuthn.WebAuthnRegistration.CredentialId.get -> byte[]?
+Themia.WebAuthn.WebAuthnRegistration.CredentialId.init -> void
+Themia.WebAuthn.WebAuthnRegistration.IsBackedUp.get -> bool
+Themia.WebAuthn.WebAuthnRegistration.IsBackedUp.init -> void
+Themia.WebAuthn.WebAuthnRegistration.Outcome.get -> Themia.WebAuthn.WebAuthnOutcome
+Themia.WebAuthn.WebAuthnRegistration.Outcome.init -> void
+Themia.WebAuthn.WebAuthnRegistration.PublicKey.get -> byte[]?
+Themia.WebAuthn.WebAuthnRegistration.PublicKey.init -> void
+Themia.WebAuthn.WebAuthnRegistration.SignCount.get -> uint
+Themia.WebAuthn.WebAuthnRegistration.SignCount.init -> void
+Themia.WebAuthn.WebAuthnRegistration.Succeeded.get -> bool
+Themia.WebAuthn.WebAuthnRegistration.WebAuthnRegistration(Themia.WebAuthn.WebAuthnOutcome Outcome, byte[]? CredentialId, byte[]? PublicKey, uint SignCount, System.Guid AaGuid, bool IsBackedUp) -> void
+Themia.WebAuthn.WebAuthnService
+Themia.WebAuthn.WebAuthnService.BeginAuthenticationAsync(System.Collections.Generic.IReadOnlyList<byte[]!>! allowedCredentialIds, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<Fido2NetLib.AssertionOptions!>
+Themia.WebAuthn.WebAuthnService.BeginRegistrationAsync(byte[]! userId, string! userName, string! displayName, System.Collections.Generic.IReadOnlyList<byte[]!>! existingCredentialIds, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<Fido2NetLib.CredentialCreateOptions!>
+Themia.WebAuthn.WebAuthnService.CompleteAuthenticationAsync(Fido2NetLib.AuthenticatorAssertionRawResponse! response, Themia.WebAuthn.StoredWebAuthnCredential! storedCredential, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<Themia.WebAuthn.WebAuthnAuthentication!>
+Themia.WebAuthn.WebAuthnService.CompleteRegistrationAsync(Fido2NetLib.AuthenticatorAttestationRawResponse! response, System.Func<byte[]!, System.Threading.CancellationToken, System.Threading.Tasks.ValueTask<bool>>! isCredentialIdUnique, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<Themia.WebAuthn.WebAuthnRegistration!>
+Themia.WebAuthn.WebAuthnService.WebAuthnService(Fido2NetLib.IFido2! fido2, Themia.WebAuthn.IWebAuthnChallengeStore! challenges, Microsoft.Extensions.Options.IOptions<Themia.WebAuthn.WebAuthnOptions!>! options) -> void
+static Themia.WebAuthn.ServiceCollectionExtensions.AddThemiaWebAuthn<TChallengeStore>(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Themia.WebAuthn.WebAuthnOptions!>! configure) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static Themia.WebAuthn.SignCounterPolicy.IsAcceptable(uint storedSignCount, uint presentedSignCount) -> bool

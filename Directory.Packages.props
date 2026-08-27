@@ -106,6 +106,12 @@
     <PackageVersion Include="EFCore.NamingConventions" Version="10.0.1" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.9" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.9" />
+    <!-- WebAuthn / passkeys (coord: passkey work). MIT — verified on the PUBLISHED package, not just
+         the GitHub LICENSE file: licenseExpression=MIT on 4.0.1 and every 5.0.0-preview. Re-check on
+         bump; ImageSharp v4 kept an Apache-2.0 repo while the NuGet package went commercial (#0101).
+         4.0.1 is the latest STABLE; 5.0.0 is preview only and a neutral package two consumers adopt
+         should not pin a preview. It ships net8.0 assets only, which net10 consumes. -->
+    <PackageVersion Include="Fido2" Version="4.0.1" />
     <!-- Integration tests: real PostgreSQL via Testcontainers -->
     <PackageVersion Include="Testcontainers.PostgreSql" Version="4.13.0" />
     <!-- Exceptional dialects (0.3.0): MySQL + SqlServer drivers + FluentMigrator runners -->
