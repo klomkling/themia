@@ -145,9 +145,17 @@ public async ValueTask<string?> TryConsumeAsync(string challengeId, Cancellation
 // DELETE FROM webauthn_challenges WHERE id = @id AND expires_at > now() RETURNING options_json
 ```
 
+**On a store that does not expire on its own, the TTL must be a predicate in `TryConsumeAsync` — a
+background sweep is not enough.** Redis expires the key itself, so `GETDEL` cannot return a dead one.
+SQL expires nothing: `DELETE … WHERE id = @id RETURNING …` hands back a challenge from last week, the
+`ttl` argument silently becomes infinite, and the symptom is a *successful* sign-in against a stale
+ceremony. That is why `AND expires_at > now()` is inside the statement above, and not only in whatever
+job reclaims the rows. (Raised by ezy-assets on coord #0103, from a store of their own where the sweep
+is written, tested, and not scheduled — and expiry is correct anyway, because the predicate is in the
+consuming statement.)
+
 It must also be **shared across instances** — a process-local store means a ceremony begun on one
-instance cannot be completed on another — and entries must **expire**, since an abandoned ceremony is
-dead weight after `ChallengeTimeout`.
+instance cannot be completed on another.
 
 ## Passkeys or TOTP?
 
@@ -155,7 +163,7 @@ Both are in Themia and they are not alternatives to each other.
 
 | | `Themia.Totp` | `Themia.WebAuthn` |
 | --- | --- | --- |
-| role | second factor **beside** a password | replaces the password |
+| role | second factor **beside** a first one | replaces the first one |
 | what the server stores | the **same secret** the phone holds | only the **public key** |
 | your database leaks | working codes for every user | nothing usable |
 | phishing | a fake site relays the code in real time | impossible — bound to the origin |
@@ -167,6 +175,18 @@ it (knowledge/inherence) — which is why it replaces the password rather than j
 
 **If you are choosing one to build first, build passkeys.** They remove the phishing surface that TOTP
 cannot, and they remove a step from the user's flow rather than adding one.
+
+**Enrolling a passkey buys nothing while a weaker login method stays enabled on the same account.** An
+account's security is set by its weakest *enabled* method, not its strongest available one: leave SMS
+or mobile-OTP login switched on beside a passkey and the attacker simply takes that path. The
+deployment looks finished, the tests are green, and the phishing surface is exactly where it was.
+
+So enrolment is not "add a passkey" — it is "add a passkey **and** demote what it replaces", either
+turning the weaker method off for that account or reducing it to a recovery path that cannot mint a
+session on its own. If your login model cannot currently express that distinction, that modelling is
+part of the work, not a follow-up. (Raised by ezy-assets on coord #0103, where mobile OTP is a full
+first-class login method rather than a second factor — the row above assumes the thing being replaced
+is a password, and it is not always.)
 
 **Keep TOTP for what passkeys cannot do:** a user on a device with no platform authenticator, a shared
 or kiosk machine, step-up verification for a high-risk action, and as a recovery path when someone

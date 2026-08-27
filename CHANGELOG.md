@@ -44,7 +44,11 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
     not count, and rejecting that would lock out every such user on their second sign-in.
 
   There is no default challenge store and `AddThemiaWebAuthn<TChallengeStore>()` takes one as a
-  required type parameter, for the same reason as `AddThemiaTotp`.
+  required type parameter, for the same reason as `AddThemiaTotp`. **On a store that does not expire
+  on its own, the TTL must be a predicate inside `TryConsumeAsync` and not only in a sweep** — Redis
+  expires the key itself, SQL expires nothing, and `DELETE … WHERE id = @id RETURNING …` hands back a
+  challenge from last week while the `ttl` argument silently means nothing. Documented on the
+  interface, raised by ezy-assets on coord #0103.
 
   **Not included:** credential storage (the public key, its counter and the user it belongs to live in
   your users table), and attestation via the FIDO metadata service — a synced passkey cannot be
@@ -56,6 +60,8 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
   in real time. Passkeys still need a fallback, which is what TOTP remains good for.
 
 ## [0.19.0] - 2026-08-26
+
+### Added
 - **`IUserLifecycleHooks` — refuse or observe every change to a user's credential state**
   (`Themia.Modules.Identity`, coord #0099). `IAuthenticationHooks` covers the login lifecycle only, so
   an app holding a rule keyed on credential state — "this account must keep one usable way to sign in",
