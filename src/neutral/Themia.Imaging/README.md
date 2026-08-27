@@ -72,6 +72,7 @@ So the pixel count is read from the codec's header and checked **before anything
 ```csharp
 var info = codec.Info;                                  // dimensions, no pixels
 if (ExceedsPixelBudget(info.Width, info.Height, max))   // long arithmetic: 60000² overflows int
+    // (internal — the guard is not a knob, MaxPixels is)
     throw new ArgumentException($"Image dimensions {info.Width}x{info.Height} exceed …");
 ```
 
@@ -83,9 +84,15 @@ moved after the decode.
 Above the budget the image is refused outright rather than downscaled: a caller cannot tell a mistake
 from an attack, and silently accepting a 900 MP upload is the behaviour the guard exists to prevent.
 
-Below it, a large image is still never materialized at full resolution — the decode happens at the
+Below it, a **JPEG or WebP** is never materialized at full resolution — the decode happens at the
 largest power-of-two subsample whose long edge still clears `MaxEdge`, and the downscale trims from
 there. Quality is unaffected: the decode is always at least the target size before the final resize.
+
+**PNG is not subsampled, because Skia cannot** — `GetScaledDimensions` returns the full size for any
+scale, which this package's tests pin so the claim cannot drift back. For PNG the budget is the only
+bound, and at the default 100 MP that is a **~400 MB decode**. If your uploads accept PNG and your
+host is memory-constrained, set `MaxPixels` from the memory you are willing to spend rather than from
+the camera you expect.
 
 ## Orientation and metadata are opposite operations on the same field
 

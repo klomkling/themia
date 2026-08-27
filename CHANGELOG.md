@@ -58,6 +58,13 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
     of the eight (the eighth is the upright case, where it is a no-op).
   - **Never upscales.**
 
+  **Two limits stated rather than discovered later.** The subsample only applies to JPEG and WebP —
+  Skia cannot scale a PNG decode, so for PNG the budget is the only bound and the default 100 MP is a
+  ~400 MB decode; a test pins that so the claim cannot drift. And the decode targets **sRGB
+  explicitly**: omitting the destination colour space is not "keep the source's", it is "perform no
+  transform and write no profile", which lands a Display P3 photo — what an iPhone shoots by default —
+  as untagged, desaturated bytes (measured: `#ea3323` instead of `#ff0000`).
+
   **Managed `SkiaSharp` only.** Native assets are a host decision keyed to the RID the host runs on —
   `SkiaSharp.NativeAssets.Linux` in the container, `.macos` for local development — so shipping one
   RID's binaries from a neutral package would force them on every consumer. No engine split: there is

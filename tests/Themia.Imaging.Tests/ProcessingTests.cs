@@ -143,6 +143,20 @@ public sealed class ProcessingTests
         Assert.Equal(300, result.Width);
     }
 
+    [Fact]
+    public async Task A_cancelled_token_stops_the_work_rather_than_running_it_to_completion()
+    {
+        // Decode, orientation, downscale and encode are synchronous, so without explicit checks a
+        // request the client abandoned still burns a pooled thread to the end.
+        var processor = TestProcessor.Build();
+        await using var source = new MemoryStream(TestImages.Jpeg(2_000, 1_500));
+        using var cancelled = new CancellationTokenSource();
+        await cancelled.CancelAsync();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => processor.ProcessAsync(source, cancellationToken: cancelled.Token));
+    }
+
     private static SKEncodedImageFormat Expected(ImageOutputFormat format) => format switch
     {
         ImageOutputFormat.Jpeg => SKEncodedImageFormat.Jpeg,

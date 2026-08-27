@@ -6,9 +6,9 @@ namespace Themia.Imaging;
 /// <inheritdoc cref="IImageProcessor" />
 /// <remarks>
 /// Ported from ezy-assets' production <c>SkiaSharpImageProcessor</c> (coord #0101) rather than
-/// redesigned: the pre-decode budget read from the codec header, the power-of-two subsample so a large
-/// image never materializes at full resolution, the orientation matrix for all eight EXIF origins, and
-/// the disposal that checks <see cref="object.ReferenceEquals"/> before disposing an alias.
+/// redesigned: the pre-decode budget read from the codec header, the power-of-two subsample (JPEG and
+/// WebP only — Skia cannot subsample a PNG), the orientation matrix for all eight EXIF origins, and the
+/// disposal that checks <see cref="object.ReferenceEquals"/> before disposing an alias.
 /// <para>
 /// Stateless — register as a singleton.
 /// </para>
@@ -69,7 +69,17 @@ public sealed class SkiaImageProcessor : IImageProcessor
         // unaffected — the decode is always at least the target size before the final resize.
         var scale = SubsampleScale(Math.Max(info.Width, info.Height), effective.MaxEdge);
         var decodeDims = codec.GetScaledDimensions(scale);
-        var decodeInfo = new SKImageInfo(decodeDims.Width, decodeDims.Height, info.ColorType, info.AlphaType);
+
+        // sRGB as the destination colour space, explicitly. Omitting it does not mean "keep the
+        // source's" — it means the codec performs no colour transform and the encoder writes no ICC
+        // profile, so a wide-gamut source lands as untagged bytes every viewer then reads as sRGB.
+        // Measured on a Display P3 red: without this the output pixel is #ea3323, with it #ff0000.
+        // iPhones shoot Display P3 by default, so that is the common case, not the exotic one — and an
+        // untagged file carries nothing to recover the intent from.
+        var decodeInfo = new SKImageInfo(
+            decodeDims.Width, decodeDims.Height, info.ColorType, info.AlphaType, SKColorSpace.CreateSrgb());
+
+        cancellationToken.ThrowIfCancellationRequested();
         using var decoded = SKBitmap.Decode(codec, decodeInfo)
             ?? throw new ArgumentException("Could not decode image.", nameof(source));
 
@@ -83,7 +93,13 @@ public sealed class SkiaImageProcessor : IImageProcessor
             oriented = ApplyOrientation(decoded, codec.EncodedOrigin);
             scaled = Downscale(oriented, effective.MaxEdge);
 
-            using var image = SKImage.FromBitmap(scaled);
+            cancellationToken.ThrowIfCancellationRequested();
+
+            // Decode, orientation, downscale and encode are all synchronous, so the token is checked at
+            // the boundaries between them rather than plumbed through: a 100 MP image whose client has
+            // already gone away otherwise runs to completion on a pooled thread.
+            using var image = SKImage.FromBitmap(scaled)
+                ?? throw new InvalidOperationException("Could not read the scaled bitmap's pixels.");
             using var data = image.Encode(EncodedFormat(effective.Format), effective.Quality)
                 ?? throw new InvalidOperationException($"{effective.Format} encoding failed.");
 
@@ -110,7 +126,7 @@ public sealed class SkiaImageProcessor : IImageProcessor
     /// <param name="maxPixels">The budget.</param>
     /// <returns>Whether the image is over budget.</returns>
     /// <remarks><c>long</c> multiplication on purpose: 60000 × 60000 overflows <see cref="int"/> to a negative.</remarks>
-    public static bool ExceedsPixelBudget(int width, int height, long maxPixels) =>
+    internal static bool ExceedsPixelBudget(int width, int height, long maxPixels) =>
         (long)width * height > maxPixels;
 
     /// <summary>
@@ -121,7 +137,7 @@ public sealed class SkiaImageProcessor : IImageProcessor
     /// <param name="longestEdge">The image's longest edge.</param>
     /// <param name="maxEdge">The target longest edge.</param>
     /// <returns>The decode scale.</returns>
-    public static float SubsampleScale(int longestEdge, int maxEdge)
+    internal static float SubsampleScale(int longestEdge, int maxEdge)
     {
         var factor = 1;
         while (longestEdge / (factor * 2) >= maxEdge)
@@ -141,10 +157,14 @@ public sealed class SkiaImageProcessor : IImageProcessor
     /// <returns>An upright bitmap, which may be <paramref name="src"/> itself.</returns>
     /// <remarks>
     /// Dropping the metadata and honouring it are opposite operations on the same field, and shipping
-    /// one without the other publishes every portrait phone photo sideways. Public so a caller holding
-    /// its own decode can reuse it.
+    /// one without the other publishes every portrait phone photo sideways.
+    /// <para>
+    /// Internal, not public: it returns <paramref name="src"/> itself for an already-upright origin, so
+    /// a caller writing the obvious <c>using var upright = ApplyOrientation(src, origin);</c> would
+    /// dispose its own bitmap and carry on using it. Nobody asked for it as surface.
+    /// </para>
     /// </remarks>
-    public static SKBitmap ApplyOrientation(SKBitmap src, SKEncodedOrigin origin)
+    internal static SKBitmap ApplyOrientation(SKBitmap src, SKEncodedOrigin origin)
     {
         ArgumentNullException.ThrowIfNull(src);
 
@@ -179,7 +199,16 @@ public sealed class SkiaImageProcessor : IImageProcessor
         var height = Math.Max(1, (int)Math.Round(src.Height * scale));
 
         var dst = new SKBitmap(width, height, src.ColorType, src.AlphaType);
-        src.ScalePixels(dst, new SKSamplingOptions(SKFilterMode.Linear, SKMipmapMode.Linear));
+
+        // ScalePixels reports failure by returning false, and the usual cause is that `dst` could not
+        // allocate its pixels. Ignoring it hands the caller a blank image that encodes perfectly well.
+        if (!src.ScalePixels(dst, new SKSamplingOptions(SKFilterMode.Linear, SKMipmapMode.Linear)))
+        {
+            dst.Dispose();
+            throw new InvalidOperationException(
+                $"Could not scale the image to {width}x{height}; the destination pixels were not available.");
+        }
+
         return dst;
     }
 

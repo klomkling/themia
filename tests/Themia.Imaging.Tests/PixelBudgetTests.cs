@@ -93,6 +93,20 @@ public sealed class PixelBudgetTests
         Assert.Equal(expected, SkiaImageProcessor.ExceedsPixelBudget(width, height, 100_000_000));
     }
 
+    [Fact]
+    public void A_codec_that_cannot_subsample_decodes_at_full_size_whatever_scale_is_asked_for()
+    {
+        // Pins a limit of the strategy rather than the strategy. Skia supports scaled decode for JPEG
+        // and WebP only: a PNG returns its full dimensions for any scale, so "never materialized at
+        // full resolution" is true of JPEG and WebP and false of PNG. The budget is the only bound
+        // there — at the default 100 MP that is a ~400 MB decode.
+        using var png = SKCodec.Create(new MemoryStream(TestImages.Png(3_200, 1_600)));
+        using var jpeg = SKCodec.Create(new MemoryStream(TestImages.Jpeg(3_200, 1_600)));
+
+        Assert.Equal(new SKSizeI(3_200, 1_600), png!.GetScaledDimensions(0.5f));
+        Assert.Equal(new SKSizeI(1_600, 800), jpeg!.GetScaledDimensions(0.5f));
+    }
+
     [Theory]
     [InlineData(1_000, 1.0f)]    // already within the target: full decode
     [InlineData(3_000, 1.0f)]    // 3000/2 = 1500 < 1600: full decode

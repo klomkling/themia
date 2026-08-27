@@ -15,6 +15,40 @@ internal static class TestImages
     /// <summary>Third component, chosen to be a byte pattern that will not occur by chance.</summary>
     internal const uint GpsLatitudeSecondsNumerator = 567_800;
 
+    /// <summary>
+    /// A JPEG tagged Display P3 and filled with the most saturated red that gamut can express — the
+    /// colour space an iPhone shoots in by default.
+    /// </summary>
+    internal static byte[] WideGamutRedJpeg(int width, int height)
+    {
+        var p3 = SKColorSpace.CreateRgb(SKColorSpaceTransferFn.Srgb, SKColorSpaceXyz.DisplayP3);
+        var info = new SKImageInfo(width, height, SKColorType.Rgba8888, SKAlphaType.Premul, p3);
+
+        using var bitmap = new SKBitmap(info);
+        using (var canvas = new SKCanvas(bitmap))
+        {
+            canvas.Clear(SKColors.Red);
+        }
+
+        using var image = SKImage.FromBitmap(bitmap);
+        using var data = image.Encode(SKEncodedImageFormat.Jpeg, 95);
+        return data.ToArray();
+    }
+
+    /// <summary>A PNG of the given size, for the formats where a codec cannot subsample.</summary>
+    internal static byte[] Png(int width, int height)
+    {
+        using var bitmap = new SKBitmap(width, height);
+        using (var canvas = new SKCanvas(bitmap))
+        {
+            canvas.Clear(new SKColor(20, 120, 200));
+        }
+
+        using var image = SKImage.FromBitmap(bitmap);
+        using var data = image.Encode(SKEncodedImageFormat.Png, 100);
+        return data.ToArray();
+    }
+
     /// <summary>A JPEG with an asymmetric pattern, so an orientation transform is observable in the pixels.</summary>
     internal static byte[] Jpeg(int width, int height)
     {

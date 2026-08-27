@@ -31,6 +31,3 @@ Themia.Imaging.SkiaImageProcessor
 Themia.Imaging.SkiaImageProcessor.SkiaImageProcessor(Microsoft.Extensions.Options.IOptions<Themia.Imaging.ImageProcessingOptions!>! options) -> void
 Themia.Imaging.SkiaImageProcessor.ProcessAsync(System.IO.Stream! source, Themia.Imaging.ImageProcessingOptions? options = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Imaging.ProcessedImage!>!
 static Themia.Imaging.ServiceCollectionExtensions.AddThemiaImaging(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Themia.Imaging.ImageProcessingOptions!>? configure = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
-static Themia.Imaging.SkiaImageProcessor.ApplyOrientation(SkiaSharp.SKBitmap! src, SkiaSharp.SKEncodedOrigin origin) -> SkiaSharp.SKBitmap!
-static Themia.Imaging.SkiaImageProcessor.ExceedsPixelBudget(int width, int height, long maxPixels) -> bool
-static Themia.Imaging.SkiaImageProcessor.SubsampleScale(int longestEdge, int maxEdge) -> float

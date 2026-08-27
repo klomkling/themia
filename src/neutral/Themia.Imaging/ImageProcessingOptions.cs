@@ -41,6 +41,12 @@ public sealed class ImageProcessingOptions
     /// <para>
     /// 100 MP admits every mainstream phone camera (12–64 MP) while refusing the pathological case.
     /// </para>
+    /// <para>
+    /// It is also the <b>only</b> bound for a format the codec cannot subsample. Skia scales a decode
+    /// for JPEG and WebP; a PNG decodes at full size whatever scale is asked for, so at this default a
+    /// PNG within budget still costs about 400 MB. Set it from the memory you are willing to spend, not
+    /// from the camera you expect, if your uploads accept PNG.
+    /// </para>
     /// </remarks>
     public long MaxPixels { get; set; } = 100_000_000;
 
