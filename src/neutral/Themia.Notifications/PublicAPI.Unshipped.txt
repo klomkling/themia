@@ -25,6 +25,8 @@ Themia.Notifications.NotificationMessage.Body.get -> string?
 Themia.Notifications.NotificationMessage.Body.init -> void
 Themia.Notifications.NotificationMessage.Channel.get -> Themia.Notifications.NotificationChannel
 Themia.Notifications.NotificationMessage.Channel.init -> void
+Themia.Notifications.NotificationMessage.Headers.get -> System.Collections.Generic.IReadOnlyDictionary<string!, string!>?
+Themia.Notifications.NotificationMessage.Headers.init -> void
 Themia.Notifications.NotificationMessage.Metadata.get -> System.Collections.Generic.IReadOnlyDictionary<string!, string!>?
 Themia.Notifications.NotificationMessage.Metadata.init -> void
 Themia.Notifications.NotificationMessage.Model.get -> object?
