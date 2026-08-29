@@ -30,6 +30,14 @@ internal sealed class SmtpEmailSender(SmtpEmailOptions options, INotificationTem
         };
         mail.To.Add(message.Recipient);
 
+        // Verbatim: NotificationMessage validated these on assignment (no CR/LF, no reserved name), so
+        // there is nothing left to sanitise here and a second check would only drift from that one.
+        if (message.Headers is not null)
+        {
+            foreach (var (name, value) in message.Headers)
+                mail.Headers.Add(name, value);
+        }
+
         using var client = CreateClient();
         await client.SendMailAsync(mail, cancellationToken).ConfigureAwait(false);
         return NotificationResult.Success();

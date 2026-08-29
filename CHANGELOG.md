@@ -27,6 +27,50 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.21.2] - 2026-08-29
+
+### Added
+- **`NotificationMessage.Headers` — per-message headers on the email path** (coord #0104, propertiezy
+  filing). Optional, null by default, written verbatim onto the MIME message by `SmtpEmailSender`. The
+  motivating case is a directive that configuration cannot express because it varies per message rather
+  than per deployment: Amazon SES reads `X-SES-CONFIGURATION-SET` to decide which configuration set — and
+  therefore which reputation stream and event destination — a message belongs to. The alternative is a
+  default configuration set on the SES identity, which applies one to *every* message from the domain, so
+  transactional and marketing mail share a complaint rate and a campaign can take passcode delivery down
+  with it.
+
+  **Validated on assignment, not inside the SMTP sender.** A header carrying `\r\n` ends the header and
+  appends arbitrary headers — and after a blank line, an arbitrary body — so any consumer deriving a value
+  from user input turns this feature into a way to add `Bcc` recipients to someone else's mail. Validating
+  in `SmtpEmailSender` would mean the injection is caught only when SMTP happens to be the registered
+  provider: a dev box on the logger stub would accept the same payload silently, and the guard would hold
+  or not depending on deployment. Rejecting in the `Headers` init accessor makes it unreachable by *any*
+  sender. CR/LF is rejected rather than stripped, so the caller learns at the call site.
+
+  Also refused: the headers the sender writes itself — `To`, `From`, `Subject`, `Date`, `Message-ID`,
+  `MIME-Version`, `Content-Type`, `Content-Transfer-Encoding`. The request assumed one failure mode here
+  ("duplicating them produces messages some receivers reject"); probing `System.Net.Mail`'s actual pickup
+  output found **three**, all silent: the sender's value wins and the caller's is dropped (`To`, `From`,
+  `Subject`, `Date`, `MIME-Version`, `Content-Type`); the caller's value wins and replaces the generated
+  one (`Message-ID`); or both are written and the message carries two conflicting headers
+  (`Content-Transfer-Encoding`). Rejecting all eight is the only outcome that reports anything. Names must
+  be printable ASCII without `:` or whitespace (RFC 5322 field-name), which subsumes the blank-name and
+  CR/LF-in-name cases.
+
+  The dictionary is **copied** on assignment. `IReadOnlyDictionary<,>` is read-only through that interface
+  only — a caller holding the underlying `Dictionary<,>` could mutate it after the checks ran and walk an
+  injected value straight into the MIME message, which would have left the guard nominal rather than real.
+
+  Senders with no header concept (`LoggerEmailSender`, `LoggerSmsSender`, SMS/push providers) accept the
+  property and ignore it. A consumer sets it unconditionally, so throwing there would turn running without
+  a configured provider — a state Themia documents as supported — into a crash.
+
+  **Not covered: the outbox path.** `NotificationRequest` has no `Headers`, so a notification enqueued
+  through `Themia.Modules.Notifications` cannot carry one. That is a missing feature rather than a silent
+  drop — there is no property to set, so it does not compile rather than sending a header-less message —
+  and it needs an `outbox_messages` column plus a migration across three engines. File it if a consumer
+  needs headers on queued mail.
+
 ## [0.21.1] - 2026-08-29
 
 ### Fixed
