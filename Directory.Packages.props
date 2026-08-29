@@ -51,6 +51,14 @@
     <PackageVersion Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.9" />
     <PackageVersion Include="Microsoft.Extensions.Configuration.Binder" Version="10.0.9" />
     <PackageVersion Include="Microsoft.Extensions.Options" Version="10.0.9" />
+    <!-- Image codec for Themia.Imaging. SkiaSharp is MIT — verified on the PUBLISHED nuspec, not the
+         repo's LICENSE file. SixLabors.ImageSharp is the obvious first choice and the wrong one: v4
+         requires a paid licence for commercial use and fails the build (coord #0101, ezy-assets paid
+         for that discovery). Native assets are a HOST decision and are deliberately NOT referenced by
+         the package — see the Themia.Imaging README. -->
+    <PackageVersion Include="SkiaSharp" Version="4.151.1" />
+    <PackageVersion Include="SkiaSharp.NativeAssets.Linux" Version="4.151.1" />
+    <PackageVersion Include="SkiaSharp.NativeAssets.macos" Version="4.151.1" />
     <PackageVersion Include="Microsoft.Extensions.Logging" Version="10.0.9" />
     <PackageVersion Include="Microsoft.Extensions.Caching.Memory" Version="10.0.9" />
     <PackageVersion Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.9" />

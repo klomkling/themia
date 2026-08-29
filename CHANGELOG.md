@@ -27,6 +27,54 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.21.0] - 2026-08-27
+
+### Added
+- **`Themia.Imaging` — neutral image-processing core** (coord #0101, propertiezy filing, ezy-assets'
+  implementation). Downscale, bake in EXIF orientation, drop metadata, re-encode. Pure computation,
+  `net8.0;net10.0`. Ported from ezy-assets' production `SkiaSharpImageProcessor` rather than
+  redesigned — the pre-decode budget, the power-of-two subsample, the orientation matrix for all eight
+  origins, and the disposal that checks for aliases before disposing.
+
+  **The decompression-bomb guard is why it is a package.** An upload byte-limit bounds the *encoded*
+  size and says nothing about the decoded one: this package's own fixture is a **48-byte** PNG
+  declaring 12000×12000 that decodes to 144 MB, and at 30000×30000 it still costs nothing on the wire
+  and decodes to ~900 MB. An endpoint with a 10 MB limit accepts it, looks fully guarded, and OOMs the
+  box. The pixel count is read from the codec header and checked before anything is decoded.
+
+  Four properties propertiezy named as "each has a wrong answer that still returns a valid image", all
+  four now asserted — and three of them verified by breaking the implementation and watching the test
+  go red, not by reading it:
+
+  - **The budget is checked before the decode, not after.** A test asserting "a 12000×12000 PNG is
+    rejected" passes either way. The one here asserts it is rejected *without the process growing*, and
+    it is the only test in the suite that fails when the guard is moved after the decode.
+  - **Metadata is gone** — GPS included, which on a listing photo is the property's location and often
+    the seller's home.
+  - **Orientation is baked into the pixels, not dropped.** Stripping metadata and honouring it are
+    opposite operations on the same field. All eight EXIF origins, end to end, against JPEGs whose EXIF
+    segment the test suite writes by hand — SkiaSharp's encoder emits none, so a round-tripped fixture
+    can carry none and a suite built on one proves nothing. Dropping the orientation call fails seven
+    of the eight (the eighth is the upright case, where it is a no-op).
+  - **Never upscales.**
+
+  **Two limits stated rather than discovered later.** The subsample only applies to JPEG and WebP —
+  Skia cannot scale a PNG decode, so for PNG the budget is the only bound and the default 100 MP is a
+  ~400 MB decode; a test pins that so the claim cannot drift. And the decode targets **sRGB
+  explicitly**: omitting the destination colour space is not "keep the source's", it is "perform no
+  transform and write no profile", which lands a Display P3 photo — what an iPhone shoots by default —
+  as untagged, desaturated bytes (measured: `#ea3323` instead of `#ff0000`).
+
+  **Managed `SkiaSharp` only.** Native assets are a host decision keyed to the RID the host runs on —
+  `SkiaSharp.NativeAssets.Linux` in the container, `.macos` for local development — so shipping one
+  RID's binaries from a neutral package would force them on every consumer. No engine split: there is
+  one codec, not a choice of three.
+
+  **Licence, recorded in the README rather than a props comment:** SixLabors.ImageSharp v4 requires a
+  paid licence for commercial use and fails the build. SkiaSharp 4.151.1 is MIT — verified on the
+  *published* nuspec, not the repo's LICENSE file, because ImageSharp kept an Apache-2.0 repo while its
+  package went commercial.
+
 ## [0.20.0] - 2026-08-27
 
 ### Added
