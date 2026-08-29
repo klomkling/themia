@@ -23,7 +23,7 @@
       this value. Bump here to cut a release. Split per-package later only if
       release cadences genuinely diverge.
     -->
-    <Version>0.21.0</Version>
+    <Version>0.21.1</Version>
   </PropertyGroup>
 
   <PropertyGroup Label="Package metadata">
@@ -38,5 +38,26 @@
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <EmbedUntrackedSources>true</EmbedUntrackedSources>
   </PropertyGroup>
+
+  <!--
+    Pack a package's README.md into its nupkg so it renders on nuget.org.
+
+    Conditional on the file existing, because most packages do not have one yet and
+    PackageReadmeFile pointing at a missing file fails the pack with NU5039 rather than warning.
+    So this changes nothing for a project without a README and needs no per-project opt-in for one
+    that gains a README later.
+
+    Why it matters beyond tidiness: coord #0101 asked for the ImageSharp licence finding to live
+    somewhere a reader would actually meet it rather than in a props comment. It went into
+    Themia.Imaging's README — which was in the repo and NOT in the package, so nuget.org showed
+    nothing. A document nobody can reach is the same as no document.
+  -->
+  <PropertyGroup Condition="Exists('$(MSBuildProjectDirectory)/README.md')">
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+
+  <ItemGroup Condition="Exists('$(MSBuildProjectDirectory)/README.md')">
+    <None Include="README.md" Pack="true" PackagePath="/" Visible="false" />
+  </ItemGroup>
 
 </Project>

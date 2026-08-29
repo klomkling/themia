@@ -27,6 +27,21 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.21.1] - 2026-08-29
+
+### Fixed
+- **A package's `README.md` is now inside its nupkg**, so it renders on nuget.org. No Themia package
+  set `PackageReadmeFile`, so every README lived in the repository and nowhere a consumer browsing the
+  package would meet it — which defeated the point of coord #0101's request that the ImageSharp licence
+  finding go somewhere visible rather than into a props comment. Five packages carry a README today
+  (`Themia.Imaging`, `Themia.Totp`, `Themia.WebAuthn`, `Themia.PromptPay`, `Themia.Modules.Identity`)
+  and all five now ship it.
+
+  Conditional on the file existing rather than set for every project: `PackageReadmeFile` pointing at a
+  file that is not there **fails** the pack instead of warning, and 67 of the 72 packages have no README
+  yet. A package that gains one later needs no per-project opt-in. Verified by packing the whole
+  solution: 72 packages, 0 errors, README present in exactly those five.
+
 ## [0.21.0] - 2026-08-27
 
 ### Added
