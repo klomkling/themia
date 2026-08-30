@@ -27,6 +27,63 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.21.3] - 2026-08-30
+
+### Added
+- **`NotificationMessage.Cc` and `.Bcc`** — typed carbon-copy recipients (`IReadOnlyList<string>?`),
+  honoured by `SmtpEmailSender`. No `Bcc` header is written, so visible recipients cannot see the blind
+  copies.
+
+  These exist because `Metadata` promised them and never delivered (see below). They are **typed
+  properties rather than `Metadata["cc"]`** deliberately: a dictionary key that silently does nothing
+  when misspelled — `["CC"]`, `["c c"]` — is the same silent no-op being removed, at a smaller scale.
+  Wiring only the keys the old summary happened to name would also have left its *other* example
+  (`sender id`) silent, producing a dictionary where some keys work and some do not with nothing to
+  tell them apart.
+
+  Validated on assignment and copied, matching `Headers` (0.21.2): CR/LF is rejected at construction, so
+  address injection cannot depend on whether the host registered SMTP, and mutating the caller's
+  `List<string>` afterwards cannot smuggle an entry past the checks. Address **format** stays
+  `MailAddress`'s job — a malformed entry raises `FormatException` at send, which
+  `NotificationOutboxDispatcher` already maps to `DispatchResult.Permanent`, so it dead-letters on the
+  first attempt rather than burning the retry cap.
+
+  Pinned by test, because it is the difference between "bcc is hidden" and "bcc is hidden *on the
+  wire*": pickup-directory delivery names every envelope recipient in `X-Receiver`, so a `.eml` written
+  to disk **does** disclose the blind copies. A message handed to a real SMTP server does not.
+
+- **`NotificationMessage.PlainTextBody` — the text/plain alternative.** When set, `SmtpEmailSender` emits
+  `multipart/alternative` carrying both forms and the client picks. Previously the package could send
+  HTML **or** text per deployment (`SmtpEmailOptions.IsBodyHtml`) but never both, so an HTML mail had no
+  fallback for a text client and no text part for spam scoring to find — which matters most to a sender
+  that has just gone to the trouble of separating its reputation streams.
+
+  `text/plain` is emitted **before** `text/html`: RFC 2046 orders alternatives by *increasing*
+  preference, so the richest form goes last. Reversed, a client honouring the order shows plain text to
+  everyone.
+
+  Setting it **declares `Body` to be the HTML form and so ignores `IsBodyHtml`.** Honouring that flag
+  here would let one deployment-wide setting silently discard the alternative on precisely the hosts
+  likeliest to have set it wrong — a config value turning a per-message choice into a no-op is the shape
+  this release is removing, not adding. `Body` is also left unset on the `MailMessage`, because
+  `System.Net.Mail` writes it as a *third* part alongside the views.
+
+  Rendered through the template renderer on the same rule as `Subject` (when it contains `{{`). Both are
+  caller-written and both reach the recipient, so an unmerged token leaks either way — and it would leak
+  in the part HTML-capable clients never display, where nobody would notice.
+
+### Deprecated
+- **`NotificationMessage.Metadata` is `[Obsolete]`.** It shipped in the package's first release,
+  documented as *"Optional channel/provider metadata (e.g. cc, sender id)"*, and has been read by
+  **nothing** ever since — no sender, no dispatcher, no store, no test. Setting it has always been
+  silent, which is the failure class of coord #0057. Both uses its own summary named now have real
+  homes: the carbon copy is `Cc` / `Bcc`, a provider directive is `Headers`.
+
+  Obsoleted rather than removed, because it is shipped public surface. **Note for consumers building
+  with `TreatWarningsAsErrors`: setting `Metadata` now fails the build.** That is the intended signal —
+  the alternative is continuing to send into a no-op — but it is a build break, so it is called out
+  here rather than left to be discovered. Even `nameof(NotificationMessage.Metadata)` raises CS0618.
+
 ## [0.21.2] - 2026-08-29
 
 ### Added
