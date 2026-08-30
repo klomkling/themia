@@ -1,5 +1,7 @@
 using System.Net;
 using System.Net.Mail;
+using System.Net.Mime;
+using System.Text;
 
 namespace Themia.Notifications.Providers;
 
@@ -17,18 +19,52 @@ internal sealed class SmtpEmailSender(SmtpEmailOptions options, INotificationTem
             ? renderer.Render(message.Template, message.Model ?? new { })
             : string.Empty);
 
-        var subject = message.Subject is not null && message.Subject.Contains("{{", StringComparison.Ordinal)
-            ? renderer.Render(message.Subject, message.Model ?? new { })
-            : message.Subject ?? string.Empty;
+        var subject = Merge(message.Subject, message.Model) ?? string.Empty;
+        var plainText = Merge(message.PlainTextBody, message.Model);
 
         using var mail = new MailMessage
         {
             From = new MailAddress(options.FromAddress, options.FromDisplayName),
             Subject = subject,
-            Body = body,
-            IsBodyHtml = options.IsBodyHtml,
         };
         mail.To.Add(message.Recipient);
+
+        if (plainText is null)
+        {
+            mail.Body = body;
+            mail.IsBodyHtml = options.IsBodyHtml;
+        }
+        else
+        {
+            // multipart/alternative. Body stays unset: with it set, MailMessage emits a THIRD part —
+            // measured as text/plain; charset=us-ascii, inserted ahead of both views and carrying the HTML
+            // source as literal text — which is not what "here are two forms of one message" means.
+            //
+            // IsBodyHtml is deliberately not consulted. Supplying a text alternative declares Body to be
+            // the HTML form, so a deployment-wide flag cannot silently discard the alternative on the
+            // hosts most likely to have set it wrong.
+            //
+            // Order matters: RFC 2046 orders alternatives by INCREASING preference, so the richest form
+            // goes last. Reversed, a client honouring the order shows plain text to everyone.
+            mail.AlternateViews.Add(AlternateView.CreateAlternateViewFromString(
+                plainText, Encoding.UTF8, MediaTypeNames.Text.Plain));
+            mail.AlternateViews.Add(AlternateView.CreateAlternateViewFromString(
+                body, Encoding.UTF8, MediaTypeNames.Text.Html));
+        }
+
+        // Address format is MailAddress's job — a malformed entry throws FormatException, which the
+        // outbox dispatcher already treats as permanent. NotificationMessage has ruled out CR/LF.
+        if (message.Cc is not null)
+        {
+            foreach (var cc in message.Cc)
+                mail.CC.Add(cc);
+        }
+
+        if (message.Bcc is not null)
+        {
+            foreach (var bcc in message.Bcc)
+                mail.Bcc.Add(bcc);
+        }
 
         // Verbatim: NotificationMessage validated these on assignment (no CR/LF, no reserved name), so
         // there is nothing left to sanitise here and a second check would only drift from that one.
@@ -42,6 +78,14 @@ internal sealed class SmtpEmailSender(SmtpEmailOptions options, INotificationTem
         await client.SendMailAsync(mail, cancellationToken).ConfigureAwait(false);
         return NotificationResult.Success();
     }
+
+    // Renders only when the text actually carries a token, so a plain string is not paid for. Shared by
+    // the subject and the plain-text part: both are written by the caller and both reach the recipient,
+    // so an unmerged {{token}} leaks either way.
+    private string? Merge(string? text, object? model) =>
+        text is not null && text.Contains("{{", StringComparison.Ordinal)
+            ? renderer.Render(text, model ?? new { })
+            : text;
 
     private SmtpClient CreateClient()
     {

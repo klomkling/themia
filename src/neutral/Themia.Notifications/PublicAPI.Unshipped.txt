@@ -21,8 +21,12 @@ Themia.Notifications.NotificationChannel.InApp = 2 -> Themia.Notifications.Notif
 Themia.Notifications.NotificationChannel.Push = 3 -> Themia.Notifications.NotificationChannel
 Themia.Notifications.NotificationChannel.Sms = 1 -> Themia.Notifications.NotificationChannel
 Themia.Notifications.NotificationMessage
+Themia.Notifications.NotificationMessage.Bcc.get -> System.Collections.Generic.IReadOnlyList<string!>?
+Themia.Notifications.NotificationMessage.Bcc.init -> void
 Themia.Notifications.NotificationMessage.Body.get -> string?
 Themia.Notifications.NotificationMessage.Body.init -> void
+Themia.Notifications.NotificationMessage.Cc.get -> System.Collections.Generic.IReadOnlyList<string!>?
+Themia.Notifications.NotificationMessage.Cc.init -> void
 Themia.Notifications.NotificationMessage.Channel.get -> Themia.Notifications.NotificationChannel
 Themia.Notifications.NotificationMessage.Channel.init -> void
 Themia.Notifications.NotificationMessage.Headers.get -> System.Collections.Generic.IReadOnlyDictionary<string!, string!>?
@@ -32,6 +36,8 @@ Themia.Notifications.NotificationMessage.Metadata.init -> void
 Themia.Notifications.NotificationMessage.Model.get -> object?
 Themia.Notifications.NotificationMessage.Model.init -> void
 Themia.Notifications.NotificationMessage.NotificationMessage() -> void
+Themia.Notifications.NotificationMessage.PlainTextBody.get -> string?
+Themia.Notifications.NotificationMessage.PlainTextBody.init -> void
 Themia.Notifications.NotificationMessage.Recipient.get -> string!
 Themia.Notifications.NotificationMessage.Recipient.init -> void
 Themia.Notifications.NotificationMessage.Subject.get -> string?
