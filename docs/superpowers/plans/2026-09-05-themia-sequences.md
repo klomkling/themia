@@ -1543,6 +1543,65 @@ public abstract class SequenceConcurrencyTests
         => await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
             () => Provider().NextRangeAsync("DocNo:Range", 0));
 
+    // Re-seeding must NOT reset a live counter on ANY engine. Task 4 proved this on Postgres only; the
+    // MySQL (INSERT IGNORE) and SQL Server (INSERT ... WHERE NOT EXISTS) forms were checked as SQL
+    // STRINGS and never executed. The hazard is a redeploy reissuing every number already handed out.
+    [Fact]
+    public async Task ReSeeding_DoesNotResetALiveCounter()
+    {
+        var sut = Provider();
+        await sut.EnsureSequenceAsync("DocNo:ReSeed", startValue: 500);
+        Assert.Equal(500, await sut.NextAsync("DocNo:ReSeed"));
+
+        await sut.EnsureSequenceAsync("DocNo:ReSeed", startValue: 1);
+
+        Assert.Equal(501, await sut.NextAsync("DocNo:ReSeed"));
+    }
+
+    [Fact]
+    public async Task NextHostRange_ReturnsContiguousValues()
+    {
+        // The only Host method with no coverage anywhere else in the plan.
+        var sut = Provider();
+        await sut.EnsureHostSequenceAsync("DocNo:HostRange", startValue: 40);
+
+        Assert.Equal([40L, 41L, 42L], await sut.NextHostRangeAsync("DocNo:HostRange", 3));
+        Assert.Equal(43, await sut.NextHostAsync("DocNo:HostRange"));
+    }
+
+    [Fact]
+    public async Task ACustomDialect_IsUsedInsteadOfTheEngineFactory()
+    {
+        // Pins the seam ISequenceDialect was made public for. Without this, changing
+        // `options.Dialect ?? SequenceDialectFactory.For(options.Engine)` to ignore the override passes
+        // every other test in this plan -- the override would be decoration.
+        var probe = new RecordingDialect(SequenceDialectFactory.For(Engine));
+        var sut = new SequenceProvider(
+            new SequenceOptions { ConnectionString = ConnString, Engine = Engine, Dialect = probe },
+            new TenantContext(new TenantId("acme")));
+
+        await sut.EnsureSequenceAsync("DocNo:CustomDialect", startValue: 1);
+        Assert.Equal(1, await sut.NextAsync("DocNo:CustomDialect"));
+
+        Assert.True(probe.WasUsed, "the provider ignored options.Dialect and fell back to the factory");
+    }
+
+    /// <summary>Delegates to a real dialect but records that it was consulted.</summary>
+    private sealed class RecordingDialect(ISequenceDialect inner) : ISequenceDialect
+    {
+        public bool WasUsed { get; private set; }
+
+        public System.Data.Common.DbConnection CreateConnection(string connectionString)
+        {
+            WasUsed = true;
+            return inner.CreateConnection(connectionString);
+        }
+
+        public string SelectForUpdateSql => inner.SelectForUpdateSql;
+        public string UpdateNextValueSql => inner.UpdateNextValueSql;
+        public string InsertIfMissingSql => inner.InsertIfMissingSql;
+    }
+
     [Fact]
     public async Task AnExhaustedSequence_ThrowsInsteadOfWrappingNegative()
     {
@@ -1610,7 +1669,7 @@ public sealed class SqlServerSequenceConcurrencyTests : SequenceConcurrencyTests
 - [ ] **Step 2: Run test to verify it fails, then passes**
 
 Run: `dotnet test tests/Themia.Framework.Data.Sequences.IntegrationTests/Themia.Framework.Data.Sequences.IntegrationTests.csproj --filter SequenceConcurrencyTests`
-Expected: PASS, 12 tests (4 × 3 engines).
+Expected: PASS, 21 tests (7 × 3 engines).
 
 If the concurrency test fails on one engine only, the bug is in that dialect's `SelectForUpdateSql` — the
 row lock is missing or not held to commit. Do not add retries to make it pass.
