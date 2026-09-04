@@ -1025,7 +1025,12 @@ public sealed class SequenceProviderTests : IAsyncLifetime
     [InlineData("")]
     [InlineData(null)]
     public async Task Next_RejectsABlankKey(string? key)
-        => await Assert.ThrowsAsync<ArgumentException>(() => ProviderFor("acme").NextAsync(key!));
+        // ThrowsAnyAsync, not ThrowsAsync: ArgumentException.ThrowIfNullOrEmpty raises the
+        // ArgumentNullException SUBTYPE for null, which an exact-type assertion rejects. The subtype is
+        // the more informative outcome and the interface's documented ArgumentException contract already
+        // covers it, so the assertion widens rather than the guard narrowing. Same shape as
+        // tests/Themia.Modules.Pdf.Tests/PdfDocumentRendererTests.cs.
+        => await Assert.ThrowsAnyAsync<ArgumentException>(() => ProviderFor("acme").NextAsync(key!));
 }
 ```
 
