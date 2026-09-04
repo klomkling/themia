@@ -52,14 +52,14 @@ internal sealed class SequenceProvider : ISequenceProvider
     /// <inheritdoc />
     public Task<long> NextHostAsync(string sequenceKey, CancellationToken ct = default)
     {
-        RequireKey(sequenceKey);
+        ArgumentException.ThrowIfNullOrEmpty(sequenceKey);
         return AllocateAsync(HostTenant, sequenceKey, count: 1, ct).ContinueWithFirst();
     }
 
     /// <inheritdoc />
     public Task<IReadOnlyList<long>> NextHostRangeAsync(string sequenceKey, int count, CancellationToken ct = default)
     {
-        RequireKey(sequenceKey);
+        ArgumentException.ThrowIfNullOrEmpty(sequenceKey);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(count);
         return AllocateAsync(HostTenant, sequenceKey, count, ct);
     }
@@ -67,7 +67,7 @@ internal sealed class SequenceProvider : ISequenceProvider
     /// <inheritdoc />
     public Task EnsureHostSequenceAsync(string sequenceKey, long startValue = 1, CancellationToken ct = default)
     {
-        RequireKey(sequenceKey);
+        ArgumentException.ThrowIfNullOrEmpty(sequenceKey);
         return SeedAsync(HostTenant, sequenceKey, startValue, ct);
     }
 
@@ -81,24 +81,13 @@ internal sealed class SequenceProvider : ISequenceProvider
     /// </remarks>
     private string RequireTenant(string sequenceKey)
     {
-        RequireKey(sequenceKey);
+        ArgumentException.ThrowIfNullOrEmpty(sequenceKey);
 
         return tenantContext.CurrentTenantId?.Value
             ?? throw new InvalidOperationException(
                 $"Cannot allocate sequence '{sequenceKey}': there is no ambient tenant. Wrap the call in a "
                 + "tenant scope (background jobs must use BackgroundTenantScope.Begin), or call the Host "
                 + "overload if a host-level counter is what you meant.");
-    }
-
-    // ArgumentException.ThrowIfNullOrEmpty throws ArgumentNullException for a null argument — a subtype
-    // that fails an exact-type Assert.ThrowsAsync<ArgumentException>. The interface promises plain
-    // ArgumentException for "null or empty", so both cases are raised as the same, non-derived type here.
-    private static void RequireKey(string sequenceKey)
-    {
-        if (string.IsNullOrEmpty(sequenceKey))
-        {
-            throw new ArgumentException("Sequence key must not be null or empty.", nameof(sequenceKey));
-        }
     }
 
     private async Task<IReadOnlyList<long>> AllocateAsync(
