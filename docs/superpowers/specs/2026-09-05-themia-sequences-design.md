@@ -6,12 +6,21 @@ Realises: DECISION #2 / §F of `docs/themia-architecture-overview.md`, with thre
 
 ## Problem
 
-Two Idevs products are about to need allocated document numbers at the same time, for the same reason.
+Two Idevs products will both need allocated document numbers, for the same reason, and neither has a
+numbering mechanism today.
 
 Coord #0052 and #0055 settled that ezy-assets puts its `BillingDocument` **running number** in PromptPay
 `BillRef1`, and propertiezy does the same under biller suffix `02`. Both must issue Thai tax invoices —
 Sarawut confirmed on #0052 that VAT and the ใบกำกับภาษี are obligatory, not optional — and a tax invoice
-is numbered sequentially by law. Neither product has a numbering mechanism today.
+is numbered sequentially by law.
+
+**Not imminent, and worth stating plainly rather than overselling:** #0052 has been blocked for over a
+month on a bank visit nobody has made, and propertiezy's last note says it has no payment code at all and
+has deliberately not adopted `Themia.PromptPay` because there is no call site yet. The demand is real and
+committed on both sides; the deadline is not. This is being built now because the design is already
+settled (DECISION #2), because the `MAX()+1` analyzer and its code fix cannot be written until the
+provider exists, and because the alternative — each app writing its own — is two divergent
+implementations of a thing whose failure is silent.
 
 The failure mode of the obvious workaround is what makes this infrastructure rather than app code.
 `SELECT MAX(number) + 1` returns the same value to two concurrent callers, silently, until two tax
@@ -45,12 +54,22 @@ does not follow the older text:
 
 **`Themia.Framework.Data.Sequences`**, `net10.0`.
 
-**Framework layer, not neutral,** because the provider resolves `ITenantContext` **itself** rather than
-taking a tenant argument. A caller who forgets to pass the tenant would allocate from another tenant's
-counter — two tenants sharing an invoice number, silently. Isolation has to hold by construction, the
-same reasoning that put `Headers` validation on the type rather than in the SMTP sender (0.21.2). That
-choice couples the package to `Themia.Framework.Core.Abstractions.Tenancy`, which is framework, and
-settles the layer.
+**Framework layer, not neutral,** because the provider reads `ITenantContext`. That couples it to
+`Themia.Framework.Core.Abstractions.Tenancy`, which is framework, and settles the layer.
+
+**Reading the ambient tenant is not the same as trusting it.** `TenantContext.CurrentTenantId` is
+`TenantId?`, and background work only has a tenant if it opted in — `Themia.Modules.Export` wraps its
+jobs in `BackgroundTenantScope.Begin(tenantId)` for exactly that reason. Invoice generation is the
+canonical scheduler job, so "no ambient tenant" is a state this package will meet in production.
+
+Mapping that null quietly onto the host-level `''` row would mean a job that forgot the scope draws every
+tenant's invoice numbers from one shared counter, with no error anywhere. That is worse than a duplicate
+within one tenant, and `NotificationOutboxDispatcher.cs` already carries a forward-note warning about the
+identical shape — an ambient null tenant silently falling back to global config.
+
+So **null is not a value here**: `NextAsync` throws when `ITenantContext.HasTenant` is false. The
+host-level row is reachable only by asking for it (`NextHostAsync`). An unstated tenant is a bug, and it
+fails loudly at the call that made it.
 
 PowerACC is not a design driver (per `CLAUDE.md`); its Serenity `SqlSequenceProvider` stays where it is.
 
@@ -65,14 +84,26 @@ three ADO providers, engine selected at runtime.
 ```csharp
 public interface ISequenceProvider
 {
+    // Tenant-scoped. Throws InvalidOperationException when there is no ambient tenant.
     Task<long> NextAsync(string sequenceKey, CancellationToken ct = default);
     Task<IReadOnlyList<long>> NextRangeAsync(string sequenceKey, int count, CancellationToken ct = default);
     Task EnsureSequenceAsync(string sequenceKey, long startValue = 1, CancellationToken ct = default);
+
+    // Host-level (the '' row). Separate methods, never a null-tenant fallback, so a job that lost its
+    // BackgroundTenantScope fails instead of quietly sharing one counter across every tenant.
+    Task<long> NextHostAsync(string sequenceKey, CancellationToken ct = default);
+    Task<IReadOnlyList<long>> NextHostRangeAsync(string sequenceKey, int count, CancellationToken ct = default);
+    Task EnsureHostSequenceAsync(string sequenceKey, long startValue = 1, CancellationToken ct = default);
 }
 ```
 
-Unchanged from the port, minus the Serenity reference in its doc comment. Values are `long`; the caller
+The tenant-scoped three are the port's original signatures, minus the Serenity reference in the doc
+comment. The `Host` trio is new and is the correction described above. Values are `long`; the caller
 formats them.
+
+The exception when no tenant is ambient names the sequence key and says what to do — wrap the call in a
+tenant scope, or use the `Host` overload deliberately. A message that only says "no tenant" sends the
+reader to the wrong layer.
 
 `ISequenceDialect` is also public — one implementation per engine, holding the locking SELECT and the
 UPSERT. Public so an adopter on an unsupported engine can add one without forking the package, the same
@@ -94,6 +125,19 @@ services.AddThemiaSequences(o =>
 Normally the same connection string the app already gives the migration runner. It is a separate setting
 rather than an inferred one so that pointing sequences at a different database stays possible and
 visible.
+
+**The provider must not enlist in an ambient `System.Transactions` transaction.** Themia does not use
+`System.Transactions` today — the `TransactionScope` in `Themia.Framework.Data.Dapper` is Themia's own
+per-connection type, not the BCL one — so nothing in the framework triggers this. A *consumer* wrapping a
+call in `System.Transactions.TransactionScope` is another matter: ADO providers default to `Enlist=true`,
+the freshly opened connection would join that ambient transaction, and the allocation would roll back
+with it. The number is then reissued to the next caller, silently, which is the one outcome this package
+exists to prevent. The provider opens its connection with enlistment suppressed, and a test pins it.
+
+**Running the migration.** The package ships the FluentMigrator migration but does not run it. The
+consumer passes this assembly to `ThemiaMigrations.Run`, the same as every other Themia module — stated
+here because the provider throws on an unseeded key, and a missing table would otherwise surface as a
+confusing first-allocation failure rather than a missing migration.
 
 ### Semantics kept verbatim from the port
 
@@ -170,11 +214,20 @@ run against real engines.
 
 - **Concurrency, all three engines (Testcontainers).** N concurrent `NextAsync` calls on one key return N
   distinct values. This is the package.
-- **The separate-transaction semantic.** Allocate inside an outer transaction, roll the outer transaction
-  back, and assert the number was **not** returned to the pool — the next allocation moves on. A unit test
-  cannot reach this; it is the defining behaviour and it needs a real database.
-- **Tenant isolation.** Two tenants, same sequence key, independent counters. Plus: a host-level sequence
-  (`''`) and a tenant sequence with the same key do not collide.
+- **The separate-transaction semantic — and a test that can actually fail.** The obvious version
+  ("allocate inside an outer transaction, roll it back, assert the number was not reissued") **passes no
+  matter what the implementation does**: the provider holds its own connection, Themia's `ITransactionScope`
+  is a per-connection database transaction, and a rollback on a different connection cannot touch a
+  committed row. It would stay green against an implementation that had lost the semantic entirely.
+
+  So the suite pins the mechanism, not just the outcome: (a) a test that hands the provider the *ambient*
+  connection and asserts the rollback **does** lose the number — proving the check can go red; (b) the real
+  case, asserting the provider's connection is distinct from the unit of work's; (c) the same rollback
+  case under `System.Transactions.TransactionScope`, which fails unless enlistment is suppressed.
+- **Tenant isolation, and the missing-tenant case.** Two tenants, same sequence key, independent counters;
+  a host-level sequence (`''`) and a tenant sequence with the same key do not collide. Plus the one that
+  motivated the design change: with **no ambient tenant**, `NextAsync` throws and allocates nothing — it
+  must not fall through to the host row.
 - **Overflow.** A row seeded at `long.MaxValue` raises `InvalidOperationException` naming the key, rather
   than wrapping negative.
 - **Unseeded key throws**, and `EnsureSequenceAsync` on an existing row preserves `NextValue`.
