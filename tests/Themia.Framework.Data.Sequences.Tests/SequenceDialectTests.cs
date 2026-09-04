@@ -1,3 +1,9 @@
+using Microsoft.Data.SqlClient;
+
+using MySqlConnector;
+
+using Npgsql;
+
 using Themia.Framework.Data.Sequences;
 using Themia.Framework.Data.Sequences.Dialects;
 using Xunit;
@@ -55,6 +61,39 @@ public sealed class SequenceDialectTests
             Assert.Contains("@tenant", sql, StringComparison.Ordinal);
             Assert.Contains("@key", sql, StringComparison.Ordinal);
         }
+    }
+
+    // Enlistment suppression is the mechanism that prevents the caller's ambient System.Transactions rollback
+    // from taking the allocated sequence number back. Without it, the caller's rollback would cause the next
+    // caller to be handed the same number again — the duplicate this package exists to prevent.
+    [Fact]
+    public void PostgresDialect_SuppressesEnlistment()
+    {
+        var dialect = SequenceDialectFactory.For(SequenceEngine.Postgres);
+        using var connection = dialect.CreateConnection(ConnectionStringFor(SequenceEngine.Postgres));
+
+        var builder = new NpgsqlConnectionStringBuilder(connection.ConnectionString);
+        Assert.False(builder.Enlist);
+    }
+
+    [Fact]
+    public void MySqlDialect_SuppressesEnlistment()
+    {
+        var dialect = SequenceDialectFactory.For(SequenceEngine.MySql);
+        using var connection = dialect.CreateConnection(ConnectionStringFor(SequenceEngine.MySql));
+
+        var builder = new MySqlConnectionStringBuilder(connection.ConnectionString);
+        Assert.False(builder.AutoEnlist);
+    }
+
+    [Fact]
+    public void SqlServerDialect_SuppressesEnlistment()
+    {
+        var dialect = SequenceDialectFactory.For(SequenceEngine.SqlServer);
+        using var connection = dialect.CreateConnection(ConnectionStringFor(SequenceEngine.SqlServer));
+
+        var builder = new SqlConnectionStringBuilder(connection.ConnectionString);
+        Assert.False(builder.Enlist);
     }
 
     private static string ConnectionStringFor(SequenceEngine engine) => engine switch
