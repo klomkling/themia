@@ -1,4 +1,6 @@
 #nullable enable
+static Themia.Framework.Data.Sequences.Dialects.SequenceDialectFactory.For(Themia.Framework.Data.Sequences.SequenceEngine engine) -> Themia.Framework.Data.Sequences.ISequenceDialect!
+Themia.Framework.Data.Sequences.Dialects.SequenceDialectFactory
 Themia.Framework.Data.Sequences.ISequenceDialect
 Themia.Framework.Data.Sequences.ISequenceDialect.CreateConnection(string! connectionString) -> System.Data.Common.DbConnection!
 Themia.Framework.Data.Sequences.ISequenceDialect.InsertIfMissingSql.get -> string!
