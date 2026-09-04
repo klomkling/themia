@@ -906,10 +906,26 @@ override Themia.Framework.Data.Sequences.Migrations.SequencesSchemaMigration.Up(
 Run: `dotnet test tests/Themia.Framework.Data.Sequences.IntegrationTests/Themia.Framework.Data.Sequences.IntegrationTests.csproj`
 Expected: PASS, 3 tests.
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 7: Enrol the package in the cross-engine replay registry**
+
+`tests/Themia.Migrations.ReplayTests/MigrationReplayTests.cs` keeps an **exhaustive** `AssemblyNames`
+list, and its own comment says why: *"A migrating package missing from it is a package whose upgrade
+nobody tested — which is exactly how the collision this all came from went unnoticed."* That registry is
+the ONLY place replay-safety runs on SQL Server as well as PostgreSQL; this task's own tests are Postgres
+only, so without this the adopt-if-exists guard is unverified on two of the three supported engines.
+
+Add `"Themia.Framework.Data.Sequences"` to `AssemblyNames`, and add the matching `ProjectReference` to
+`tests/Themia.Migrations.ReplayTests/Themia.Migrations.ReplayTests.csproj` (its comment: *"a new
+migrating package that is not here is untested for replay"*).
+
+Run: `dotnet test tests/Themia.Migrations.ReplayTests/Themia.Migrations.ReplayTests.csproj`
+Expected: PASS, including `Applying_twice_is_safe` and `Each_assembly_records_in_its_own_ledger` for the
+new assembly on both engines.
+
+- [ ] **Step 8: Commit**
 
 ```bash
-git add src/framework/Themia.Framework.Data.Sequences tests/Themia.Framework.Data.Sequences.IntegrationTests Themia.sln
+git add src/framework/Themia.Framework.Data.Sequences tests/Themia.Framework.Data.Sequences.IntegrationTests tests/Themia.Migrations.ReplayTests Themia.sln
 git commit -m "feat(sequences): FluentMigrator schema, adopt-if-exists, composite primary key"
 ```
 
