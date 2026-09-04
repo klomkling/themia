@@ -23,6 +23,11 @@ internal sealed class NotificationDispatcher(
         var now = time.GetUtcNow();
         var tenant = tenantContext.CurrentTenantId;
 
+        // Serialized once, shared by every row this request produces. Null when nothing was set, so a
+        // request that ignores these options writes the row it wrote before the column existed.
+        var deliveryOptions = NotificationDeliveryOptions.Serialize(
+            request.Cc, request.Bcc, request.PlainTextBody, request.Headers);
+
         foreach (var channel in resolved.EnabledChannels)
         {
             if (channel == NotificationChannel.InApp)
@@ -55,6 +60,7 @@ internal sealed class NotificationDispatcher(
                 NextAttemptAt = request.ScheduledFor ?? now,
                 ScheduledFor = request.ScheduledFor,
                 CreatedAt = now,
+                DeliveryOptions = deliveryOptions,
             };
             message.SetId(Guid.NewGuid());
             await outbox.EnqueueAsync(message, ct).ConfigureAwait(false);

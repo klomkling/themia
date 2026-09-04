@@ -215,7 +215,8 @@ public sealed class OutboxRoundTripTests : IAsyncLifetime
         await DrainAsync(drainer);
     }
 
-    private async Task<Guid> EnqueueEmailAsync(ServiceProvider provider, string recipient, string subject, string body)
+    private async Task<Guid> EnqueueEmailAsync(
+        ServiceProvider provider, string recipient, string subject, string body, string? deliveryOptions = null)
     {
         await using var scope = provider.CreateAsyncScope();
         var store = scope.ServiceProvider.GetRequiredService<IOutboxStore>();
@@ -232,6 +233,7 @@ public sealed class OutboxRoundTripTests : IAsyncLifetime
             Attempts = 0,
             NextAttemptAt = now,
             CreatedAt = now,
+            DeliveryOptions = deliveryOptions,
         };
         message.SetId(Guid.CreateVersion7());
         await store.EnqueueAsync(message, CancellationToken.None);
@@ -316,5 +318,77 @@ public sealed class OutboxRoundTripTests : IAsyncLifetime
             Attempts++;
             throw toThrow;
         }
+    }
+
+    // --- delivery_options: the column has to survive a real round trip through the database, and the
+    // claim path has to map it to the right field. Unit tests cannot reach either: the dialect SQL and
+    // its positional tuple only run against a live engine.
+
+    [Fact]
+    public async Task Drain_carries_delivery_options_through_the_database_to_the_sender()
+    {
+        var recorder = new RecordingEmailSender(succeed: true);
+        await using var provider = BuildProvider(recorder);
+
+        var json = NotificationDeliveryOptions.Serialize(
+            cc: ["cc@example.com"],
+            bcc: ["bcc@example.com"],
+            plainTextBody: "plain\n\nbody",
+            headers: new Dictionary<string, string> { ["X-SES-CONFIGURATION-SET"] = "transactional" });
+
+        await EnqueueEmailAsync(provider, "to@example.com", "Hi", "<p>Body</p>", json);
+
+        Assert.Equal(1, await DrainAsync(CreateDrainer(provider)));
+
+        var sent = Assert.Single(recorder.Sent);
+
+        // Asserted field by field, not "the options arrived". Five nullable strings travel side by side
+        // through a hand-written RETURNING list and a positional tuple; cc landing in bcc would send the
+        // blind copies visibly, and every check that stopped at "options are present" would still pass.
+        Assert.Equal(["cc@example.com"], sent.Cc);
+        Assert.Equal(["bcc@example.com"], sent.Bcc);
+        Assert.Equal("plain\n\nbody", sent.PlainTextBody);
+        Assert.Equal("transactional", sent.Headers!["X-SES-CONFIGURATION-SET"]);
+
+        // The row's own columns are unaffected by the new one.
+        Assert.Equal("to@example.com", sent.Recipient);
+        Assert.Equal("Hi", sent.Subject);
+        Assert.Equal("<p>Body</p>", sent.Body);
+    }
+
+    [Fact]
+    public async Task Drain_without_delivery_options_sends_exactly_what_it_always_did()
+    {
+        var recorder = new RecordingEmailSender(succeed: true);
+        await using var provider = BuildProvider(recorder);
+
+        await EnqueueEmailAsync(provider, "to@example.com", "Hi", "Body");
+
+        Assert.Equal(1, await DrainAsync(CreateDrainer(provider)));
+
+        var sent = Assert.Single(recorder.Sent);
+        Assert.Null(sent.Cc);
+        Assert.Null(sent.Bcc);
+        Assert.Null(sent.PlainTextBody);
+        Assert.Null(sent.Headers);
+    }
+
+    [Fact]
+    public async Task Drain_dead_letters_a_row_whose_delivery_options_are_corrupt()
+    {
+        // A permanent condition: the row cannot repair itself, so it must dead-letter on the FIRST
+        // attempt rather than retry to the cap. Status 4 is Dead.
+        var recorder = new RecordingEmailSender(succeed: true);
+        await using var provider = BuildProvider(recorder);
+
+        var id = await EnqueueEmailAsync(provider, "to@example.com", "Hi", "Body", "{not json");
+
+        Assert.Equal(1, await DrainAsync(CreateDrainer(provider)));
+
+        Assert.Empty(recorder.Sent);   // never handed to the provider
+
+        var (status, attempts, _) = await ReadRowAsync(id);
+        Assert.Equal((int)OutboxStatus.Dead, status);
+        Assert.Equal(1, attempts);
     }
 }

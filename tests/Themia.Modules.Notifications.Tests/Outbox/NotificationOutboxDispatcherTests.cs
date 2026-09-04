@@ -99,4 +99,88 @@ public class NotificationOutboxDispatcherTests
         public Task<NotificationResult> SendAsync(NotificationMessage message, CancellationToken cancellationToken = default)
             => Task.FromResult(result);
     }
+
+    // --- delivery options rehydrated from the row (cc / bcc / plain-text alternative / headers) ---
+
+    [Fact]
+    public async Task DeliveryOptions_ReachTheSender()
+    {
+        var json = NotificationDeliveryOptions.Serialize(
+            ["cc@example.com"], ["bcc@example.com"], "plain",
+            new Dictionary<string, string> { ["X-SES-CONFIGURATION-SET"] = "transactional" });
+
+        var (result, seen) = await DispatchCapturing(Row() with { DeliveryOptions = json });
+
+        Assert.Equal(DispatchOutcome.Delivered, result.Outcome);
+        Assert.Equal(["cc@example.com"], seen!.Cc);
+        Assert.Equal(["bcc@example.com"], seen.Bcc);
+        Assert.Equal("plain", seen.PlainTextBody);
+        Assert.Equal("transactional", seen.Headers!["X-SES-CONFIGURATION-SET"]);
+        Assert.Equal("a@b.com", seen.Recipient);   // the row's own columns still win
+        Assert.Equal("hi", seen.Body);
+    }
+
+    [Fact]
+    public async Task NoDeliveryOptions_SendsExactlyWhatItAlwaysDid()
+    {
+        var (result, seen) = await DispatchCapturing(Row());
+
+        Assert.Equal(DispatchOutcome.Delivered, result.Outcome);
+        Assert.Null(seen!.Cc);
+        Assert.Null(seen.Bcc);
+        Assert.Null(seen.PlainTextBody);
+        Assert.Null(seen.Headers);
+    }
+
+    // A corrupt column is a PERMANENT condition: the row cannot repair itself between attempts, so
+    // retrying burns the attempt cap to reach the same dead-letter with five times the log noise. Same
+    // reasoning as NotConfigured above, and the same class of bug this whole file was written for.
+    [Fact]
+    public async Task CorruptDeliveryOptions_IsPermanent()
+    {
+        var (result, seen) = await DispatchCapturing(Row() with { DeliveryOptions = "{not json" });
+
+        Assert.Equal(DispatchOutcome.Permanent, result.Outcome);
+        Assert.Null(seen);   // nothing was handed to the provider
+    }
+
+    // A stored header carrying CR/LF — hand-edited, or written by something that bypassed
+    // NotificationMessage. Rehydration re-runs the same validation, so the injection cannot enter through
+    // the outbox either, and the row is dead-lettered rather than retried forever.
+    [Fact]
+    public async Task PoisonedHeaderInDeliveryOptions_IsPermanent_AndNeverReachesTheSender()
+    {
+        var row = Row() with { DeliveryOptions = """{"headers":{"X-Bad":"v\r\nBcc: attacker@example.com"}}""" };
+
+        var (result, seen) = await DispatchCapturing(row);
+
+        Assert.Equal(DispatchOutcome.Permanent, result.Outcome);
+        Assert.Null(seen);
+    }
+
+    private static async Task<(DispatchResult Result, NotificationMessage? Seen)> DispatchCapturing(ClaimedOutboxRow row)
+    {
+        var sender = new CapturingEmailSender();
+        var services = new ServiceCollection();
+        services.AddSingleton<IEmailSender>(sender);
+
+        await using var provider = services.BuildServiceProvider();
+        using var scope = provider.CreateScope();
+
+        var result = await new NotificationOutboxDispatcher()
+            .DispatchAsync(scope.ServiceProvider, row, CancellationToken.None);
+
+        return (result, sender.Seen);
+    }
+
+    private sealed class CapturingEmailSender : IEmailSender
+    {
+        public NotificationMessage? Seen { get; private set; }
+
+        public Task<NotificationResult> SendAsync(NotificationMessage message, CancellationToken cancellationToken = default)
+        {
+            Seen = message;
+            return Task.FromResult(NotificationResult.Success());
+        }
+    }
 }

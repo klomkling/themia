@@ -1,3 +1,5 @@
+using System.Text.Json;
+
 using Microsoft.Extensions.DependencyInjection;
 
 using Themia.Messaging.Outbox;
@@ -27,6 +29,11 @@ internal sealed class NotificationOutboxDispatcher : IOutboxDispatcher<ClaimedOu
                 Subject = row.Subject,
                 Body = row.Body, // already rendered at enqueue
             };
+
+            // Rehydrating re-runs NotificationMessage's own validation, so a header carrying CR/LF cannot
+            // enter through the outbox any more than through a direct send. Both failures it can raise are
+            // handled as permanent below.
+            message = NotificationDeliveryOptions.Deserialize(row.DeliveryOptions)?.ApplyTo(message) ?? message;
 
             // forward-note: per-tenant sender/provider-config resolution is deferred — v1 resolves the global
             // sender here. WHEN a tenant-aware sender is wired, this must set the ambient tenant for the
@@ -59,10 +66,19 @@ internal sealed class NotificationOutboxDispatcher : IOutboxDispatcher<ClaimedOu
         {
             throw; // host stop — not a delivery failure.
         }
-        catch (Exception ex) when (ex is FormatException or NotSupportedException)
+        catch (Exception ex) when (ex is FormatException or NotSupportedException or JsonException or ArgumentException)
         {
-            // A malformed address/body (FormatException) or an undeliverable channel routed to the outbox
-            // (NotSupportedException) is permanent — retrying cannot help, so dead-letter immediately.
+            // All permanent — the row cannot repair itself between attempts, so retrying burns the attempt
+            // cap to reach the same dead-letter with five times the log noise:
+            //   FormatException        a malformed address or body
+            //   NotSupportedException  an undeliverable channel routed to the outbox
+            //   JsonException          delivery_options holds text that is not valid JSON
+            //   ArgumentException      a stored option fails NotificationMessage's validation — a header
+            //                          carrying CR/LF, or a blank address
+            //
+            // The last two arrived with delivery_options. Leaving them out would not have failed a build
+            // or a test: they would simply escape this clause, and the drainer would retry a row whose
+            // content is fixed. That is exactly how NotConfigured was once mishandled.
             return DispatchResult.Permanent(ex.Message, ex);
         }
     }

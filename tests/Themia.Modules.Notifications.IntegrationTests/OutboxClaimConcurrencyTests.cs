@@ -130,6 +130,50 @@ public abstract class OutboxClaimConcurrencyTests
         Assert.Equal("recip-x@example.com", row.Recipient);
     }
 
+    [Fact]
+    public async Task Claimed_row_maps_delivery_options_to_the_right_field()
+    {
+        // Runs on ALL THREE engines, unlike the round-trip test, which is Postgres-only. Each dialect
+        // hand-writes its own column list and maps the result POSITIONALLY, so the column can be right on
+        // one engine and shifted on another. This caught SQL Server already: its OUTPUT clause reads from
+        // a CTE, so a column named only in OUTPUT fails at claim time.
+        //
+        // The value is deliberately distinct from every other string on the row — a transposition with
+        // subject, body or recipient shows up as the wrong text, not as a null.
+        var now = DateTimeOffset.UtcNow;
+        var id = Guid.NewGuid();
+        const string Options = """{"headers":{"X-Marker":"OPTS-x"}}""";
+
+        await InsertRowAsync(id, status: 0, nextAttemptAt: now, scheduledFor: null,
+            subject: "SUBJ-x", body: "BODY-x", recipient: "recip-x@example.com", deliveryOptions: Options);
+
+        await using var conn = Dialect.CreateConnection();
+        await conn.OpenAsync();
+        var claimed = await Dialect.ClaimAsync(conn, "drainer", now, now.AddMinutes(2), 10, default);
+
+        var row = Assert.Single(claimed, r => r.Id == id);
+        Assert.Equal(Options, row.DeliveryOptions);
+
+        // The neighbouring columns must be undisturbed: a shift moves two values, not one.
+        Assert.Equal("SUBJ-x", row.Subject);
+        Assert.Equal("BODY-x", row.Body);
+        Assert.Equal("recip-x@example.com", row.Recipient);
+    }
+
+    [Fact]
+    public async Task Claimed_row_without_delivery_options_reads_back_null()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var id = Guid.NewGuid();
+        await InsertRowAsync(id, status: 0, nextAttemptAt: now, scheduledFor: null);
+
+        await using var conn = Dialect.CreateConnection();
+        await conn.OpenAsync();
+        var claimed = await Dialect.ClaimAsync(conn, "drainer", now, now.AddMinutes(2), 10, default);
+
+        Assert.Null(Assert.Single(claimed, r => r.Id == id).DeliveryOptions);
+    }
+
     private async Task ResetClaimedToPendingAsync(DateTimeOffset now)
     {
         await using var conn = Dialect.CreateConnection();
@@ -151,17 +195,20 @@ public abstract class OutboxClaimConcurrencyTests
     private async Task InsertRowAsync(
         Guid id, int status, DateTimeOffset nextAttemptAt, DateTimeOffset? scheduledFor,
         string? leaseOwner = null, DateTimeOffset? leaseExpiresAt = null,
-        string? subject = null, string body = "hello", string recipient = "to@example.com")
+        string? subject = null, string body = "hello", string recipient = "to@example.com",
+        string? deliveryOptions = null)
     {
         await using var conn = Dialect.CreateConnection();
         await conn.OpenAsync();
         var sql = $"""
             INSERT INTO {OutboxTable}
             (id, tenant_id, channel, recipient, subject, body, status, attempts,
-             next_attempt_at, scheduled_for, lease_owner, lease_expires_at, created_at, sent_at, last_error)
+             next_attempt_at, scheduled_for, lease_owner, lease_expires_at, created_at, sent_at, last_error,
+             delivery_options)
             VALUES
             (@id, NULL, @channel, @recipient, @subject, @body, @status, 0,
-             @next, @scheduled, @owner, @exp, @created, NULL, NULL)
+             @next, @scheduled, @owner, @exp, @created, NULL, NULL,
+             @deliveryOptions)
             """;
         await conn.ExecuteAsync(sql, new
         {
@@ -176,6 +223,7 @@ public abstract class OutboxClaimConcurrencyTests
             owner = leaseOwner,
             exp = leaseExpiresAt,
             created = nextAttemptAt,
+            deliveryOptions,
         });
     }
 }

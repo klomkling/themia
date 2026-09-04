@@ -40,7 +40,7 @@ internal sealed class MySqlNotificationsDialect : INotificationsSqlDialect
         """;
 
     private const string SelectClaimedSql = """
-        SELECT id, tenant_id, channel, recipient, subject, body, attempts
+        SELECT id, tenant_id, channel, recipient, subject, body, attempts, delivery_options
         FROM outbox_messages
         WHERE id IN @ids
         """;
@@ -103,13 +103,13 @@ internal sealed class MySqlNotificationsDialect : INotificationsSqlDialect
         await connection.ExecuteAsync(new CommandDefinition(
             ClaimSql, new { owner = leaseOwner, exp = leaseExpiresAt, ids }, tx, cancellationToken: ct)).ConfigureAwait(false);
 
-        var rows = await connection.QueryAsync<(Guid, string?, int, string, string?, string, int)>(
+        var rows = await connection.QueryAsync<(Guid, string?, int, string, string?, string, int, string?)>(
             new CommandDefinition(SelectClaimedSql, new { ids }, tx, cancellationToken: ct)).ConfigureAwait(false);
 
         await tx.CommitAsync(ct).ConfigureAwait(false);
 
         return rows
-            .Select(r => new ClaimedOutboxRow(r.Item1, r.Item2, (NotificationChannel)r.Item3, r.Item4, r.Item5, r.Item6, r.Item7))
+            .Select(r => new ClaimedOutboxRow(r.Item1, r.Item2, (NotificationChannel)r.Item3, r.Item4, r.Item5, r.Item6, r.Item7, r.Item8))
             .ToList();
     }
 

@@ -18,8 +18,12 @@ internal sealed class SqlServerNotificationsDialect : INotificationsSqlDialect
     // the claim atomic and skip rows another drainer already locked.
     private const string ClaimSql = """
         WITH due AS (
+            -- Every column the OUTPUT clause names must be projected HERE too: OUTPUT reads from the
+            -- CTE, not from the base table, so a column added only to OUTPUT fails with "Invalid column
+            -- name" at claim time. SQL Server is the only engine with this two-place requirement —
+            -- Postgres uses UPDATE ... RETURNING and MySQL re-selects by id.
             SELECT TOP (@batch) id, tenant_id, channel, recipient, subject, body, attempts,
-                   status, lease_owner, lease_expires_at
+                   delivery_options, status, lease_owner, lease_expires_at
             FROM notifications.outbox_messages WITH (READPAST, UPDLOCK, ROWLOCK)
             WHERE next_attempt_at <= @now
               AND (scheduled_for IS NULL OR scheduled_for <= @now)
@@ -29,7 +33,7 @@ internal sealed class SqlServerNotificationsDialect : INotificationsSqlDialect
         UPDATE due
         SET status = 1, lease_owner = @owner, lease_expires_at = @exp
         OUTPUT inserted.id, inserted.tenant_id, inserted.channel, inserted.recipient,
-               inserted.subject, inserted.body, inserted.attempts
+               inserted.subject, inserted.body, inserted.attempts, inserted.delivery_options
         """;
 
     private readonly string connectionString;
@@ -46,13 +50,13 @@ internal sealed class SqlServerNotificationsDialect : INotificationsSqlDialect
         DbConnection connection, string leaseOwner, DateTimeOffset now, DateTimeOffset leaseExpiresAt,
         int batchSize, CancellationToken ct)
     {
-        var rows = await connection.QueryAsync<(Guid, string?, int, string, string?, string, int)>(
+        var rows = await connection.QueryAsync<(Guid, string?, int, string, string?, string, int, string?)>(
             new CommandDefinition(ClaimSql,
                 new { batch = batchSize, owner = leaseOwner, exp = leaseExpiresAt, now },
                 cancellationToken: ct));
 
         return rows
-            .Select(r => new ClaimedOutboxRow(r.Item1, r.Item2, (NotificationChannel)r.Item3, r.Item4, r.Item5, r.Item6, r.Item7))
+            .Select(r => new ClaimedOutboxRow(r.Item1, r.Item2, (NotificationChannel)r.Item3, r.Item4, r.Item5, r.Item6, r.Item7, r.Item8))
             .ToList();
     }
 

@@ -27,6 +27,42 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.21.4] - 2026-09-04
+
+### Added
+- **The outbox carries per-message email options.** `NotificationRequest` gains `Cc`, `Bcc`,
+  `PlainTextBody` and `Headers`, and `Themia.Modules.Notifications` persists them so a *queued* message
+  can use what 0.21.2/0.21.3 gave a *direct* send. Until now `NotificationRequest` had no such
+  properties, so mail enqueued through the module could not name its SES configuration set or carry a
+  text alternative — noted as a gap on coord #0104 when `Headers` shipped.
+
+  **One JSON column, `delivery_options`, not four typed ones.** The claim path in each engine dialect
+  maps its result with a *positional* tuple; four extra columns would put five consecutive `string?`
+  values side by side, where swapping `cc` and `bcc` compiles, passes any test that checks only "the
+  copies arrived", and sends the blind copies visibly. A JSON object names its fields, so that swap is
+  unrepresentable — and a fifth option later needs no migration. `NotificationDeliveryOptions` is the
+  only place the shape is known; the dialects carry an opaque string.
+
+  The column is `NULL` — not `"{}"` — when a message sets none of the four, so a request that ignores
+  this feature writes exactly the row it wrote before. `ClaimedOutboxRow`'s new parameter is optional
+  for the same reason.
+
+  Options ride every outbox row a request produces, including channels with no copy or header concept;
+  their senders ignore them, as `LoggerEmailSender` already does. In-app notifications are written
+  directly and never touch the outbox.
+
+### Fixed
+- **The outbox dispatcher now treats a corrupt or poisoned row as permanent, not transient.**
+  Rehydrating a row re-runs `NotificationMessage`'s validation, so a stored header carrying CR/LF cannot
+  enter through the outbox any more than through a direct send — but the two exceptions that check
+  raises, `JsonException` (the column is not valid JSON) and `ArgumentException` (a stored value fails
+  validation), were not in the dispatcher's permanent-failure clause. They would have escaped it, and
+  the drainer would have retried a row whose content is fixed, to the attempt cap, before dead-lettering
+  it anyway with five times the log noise.
+
+  Worth stating plainly because it is this codebase's recurring shape: omitting them would not have
+  failed a build or a test. It is the same mistake `NotConfigured` once made, in a new place.
+
 ## [0.21.3] - 2026-08-30
 
 ### Added

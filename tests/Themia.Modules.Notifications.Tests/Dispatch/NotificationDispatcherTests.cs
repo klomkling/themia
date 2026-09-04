@@ -267,4 +267,102 @@ public class NotificationDispatcherTests
 
         Assert.Empty(outbox.Enqueued);
     }
+
+    // --- delivery options (cc / bcc / plain-text alternative / headers) carried through the outbox ---
+
+    [Fact]
+    public async Task Dispatch_carries_delivery_options_onto_the_row()
+    {
+        var outbox = new RecordingOutboxStore();
+        var dispatcher = Build([NotificationChannel.Email], outbox, new RecordingInAppRepository(),
+            new RecordingRenderer(), DateTimeOffset.UnixEpoch);
+
+        await dispatcher.DispatchAsync(new NotificationRequest
+        {
+            UserId = "user-1",
+            Channels = [NotificationChannel.Email],
+            Recipients = new Dictionary<NotificationChannel, string> { [NotificationChannel.Email] = "to@example.com" },
+            Body = "<p>b</p>",
+            Cc = ["cc@example.com"],
+            Bcc = ["bcc@example.com"],
+            PlainTextBody = "plain body",
+            Headers = new Dictionary<string, string> { ["X-SES-CONFIGURATION-SET"] = "transactional" },
+        });
+
+        var options = NotificationDeliveryOptions.Deserialize(Assert.Single(outbox.Enqueued).DeliveryOptions)!;
+
+        Assert.Equal(["cc@example.com"], options.Cc);
+        Assert.Equal(["bcc@example.com"], options.Bcc);
+        Assert.Equal("plain body", options.PlainTextBody);
+        Assert.Equal("transactional", options.Headers!["X-SES-CONFIGURATION-SET"]);
+    }
+
+    [Fact]
+    public async Task Dispatch_without_delivery_options_leaves_the_column_null()
+    {
+        // The compatibility guarantee: a request setting none of the four produces exactly the row it
+        // produced before the column existed. NULL, not "{}".
+        var outbox = new RecordingOutboxStore();
+        var dispatcher = Build([NotificationChannel.Email], outbox, new RecordingInAppRepository(),
+            new RecordingRenderer(), DateTimeOffset.UnixEpoch);
+
+        await dispatcher.DispatchAsync(new NotificationRequest
+        {
+            UserId = "user-1",
+            Channels = [NotificationChannel.Email],
+            Recipients = new Dictionary<NotificationChannel, string> { [NotificationChannel.Email] = "to@example.com" },
+            Body = "b",
+        });
+
+        Assert.Null(Assert.Single(outbox.Enqueued).DeliveryOptions);
+    }
+
+    [Fact]
+    public async Task Dispatch_puts_delivery_options_on_every_outbox_row()
+    {
+        // One set of options fans out with the request. SMS has no copy or header concept and its sender
+        // ignores them, exactly as LoggerEmailSender does — carrying the same payload on every row keeps
+        // the dispatcher from having to know which channel cares.
+        var outbox = new RecordingOutboxStore();
+        var dispatcher = Build([NotificationChannel.Email, NotificationChannel.Sms], outbox,
+            new RecordingInAppRepository(), new RecordingRenderer(), DateTimeOffset.UnixEpoch);
+
+        await dispatcher.DispatchAsync(new NotificationRequest
+        {
+            UserId = "user-1",
+            Channels = [NotificationChannel.Email, NotificationChannel.Sms],
+            Recipients = new Dictionary<NotificationChannel, string>
+            {
+                [NotificationChannel.Email] = "to@example.com",
+                [NotificationChannel.Sms] = "+15551234567",
+            },
+            Body = "b",
+            Headers = new Dictionary<string, string> { ["X-Custom"] = "v" },
+        });
+
+        Assert.Equal(2, outbox.Enqueued.Count);
+        Assert.All(outbox.Enqueued, r =>
+            Assert.Equal("v", NotificationDeliveryOptions.Deserialize(r.DeliveryOptions)!.Headers!["X-Custom"]));
+    }
+
+    [Fact]
+    public async Task Dispatch_treats_empty_collections_as_unset()
+    {
+        var outbox = new RecordingOutboxStore();
+        var dispatcher = Build([NotificationChannel.Email], outbox, new RecordingInAppRepository(),
+            new RecordingRenderer(), DateTimeOffset.UnixEpoch);
+
+        await dispatcher.DispatchAsync(new NotificationRequest
+        {
+            UserId = "user-1",
+            Channels = [NotificationChannel.Email],
+            Recipients = new Dictionary<NotificationChannel, string> { [NotificationChannel.Email] = "to@example.com" },
+            Body = "b",
+            Cc = [],
+            Bcc = [],
+            Headers = new Dictionary<string, string>(),
+        });
+
+        Assert.Null(Assert.Single(outbox.Enqueued).DeliveryOptions);
+    }
 }

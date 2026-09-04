@@ -25,6 +25,7 @@ internal sealed class OutboxMessageConfiguration : IEntityTypeConfiguration<Outb
         b.Property(x => x.CreatedAt).HasColumnName("created_at");
         b.Property(x => x.SentAt).HasColumnName("sent_at");
         b.Property(x => x.LastError).HasColumnName("last_error");
+        b.Property(x => x.DeliveryOptions).HasColumnName("delivery_options");
         b.HasIndex(x => new { x.Status, x.NextAttemptAt }).HasDatabaseName("ix_outbox_claim");
     }
 }
