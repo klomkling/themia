@@ -28,4 +28,23 @@ public sealed class NotificationRequest
 
     /// <summary>Optional future-send time (outbox only).</summary>
     public DateTimeOffset? ScheduledFor { get; init; }
+
+    /// <summary>Carbon-copy recipients (email). Null by default.</summary>
+    /// <remarks>
+    /// Carried on every outbox row this request produces, including channels with no copy concept —
+    /// their senders ignore it, the same way <c>LoggerEmailSender</c> does. Validated when the row is
+    /// rehydrated into a <see cref="NotificationMessage"/>, not here, so one set of rules applies whether
+    /// a message is sent directly or queued.
+    /// </remarks>
+    public IReadOnlyList<string>? Cc { get; init; }
+
+    /// <summary>Blind-carbon-copy recipients (email). Null by default.</summary>
+    public IReadOnlyList<string>? Bcc { get; init; }
+
+    /// <summary>The text/plain alternative to an HTML <see cref="Body"/>, making the mail
+    /// <c>multipart/alternative</c>. Null by default.</summary>
+    public string? PlainTextBody { get; init; }
+
+    /// <summary>Extra per-message headers, e.g. <c>X-SES-CONFIGURATION-SET</c>. Null by default.</summary>
+    public IReadOnlyDictionary<string, string>? Headers { get; init; }
 }

@@ -25,7 +25,7 @@ internal sealed class PostgresNotificationsDialect : INotificationsSqlDialect
         UPDATE notifications.outbox_messages
         SET status = 1, lease_owner = @owner, lease_expires_at = @exp
         WHERE id = ANY(@ids)
-        RETURNING id, tenant_id, channel, recipient, subject, body, attempts
+        RETURNING id, tenant_id, channel, recipient, subject, body, attempts, delivery_options
         """;
 
     private readonly string connectionString;
@@ -53,14 +53,14 @@ internal sealed class PostgresNotificationsDialect : INotificationsSqlDialect
             return [];
         }
 
-        var rows = await connection.QueryAsync<(Guid, string?, int, string, string?, string, int)>(
+        var rows = await connection.QueryAsync<(Guid, string?, int, string, string?, string, int, string?)>(
             new CommandDefinition(ClaimSql,
                 new { owner = leaseOwner, exp = leaseExpiresAt, ids }, tx, cancellationToken: ct));
 
         await tx.CommitAsync(ct);
 
         return rows
-            .Select(r => new ClaimedOutboxRow(r.Item1, r.Item2, (NotificationChannel)r.Item3, r.Item4, r.Item5, r.Item6, r.Item7))
+            .Select(r => new ClaimedOutboxRow(r.Item1, r.Item2, (NotificationChannel)r.Item3, r.Item4, r.Item5, r.Item6, r.Item7, r.Item8))
             .ToList();
     }
 
