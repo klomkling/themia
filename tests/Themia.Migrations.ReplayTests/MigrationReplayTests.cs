@@ -54,6 +54,7 @@ public abstract class MigrationReplayTestsBase
         "Themia.Modules.Pdf",
         "Themia.Modules.Messaging",
         "Themia.Modules.Export",
+        "Themia.Framework.Data.Sequences",
     ];
 
     public static TheoryData<string> Assemblies()

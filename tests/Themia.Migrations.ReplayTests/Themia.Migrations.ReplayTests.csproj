@@ -32,5 +32,6 @@
     <ProjectReference Include="../../src/modules/Themia.Modules.Pdf/Themia.Modules.Pdf.csproj" />
     <ProjectReference Include="../../src/modules/Themia.Modules.Messaging/Themia.Modules.Messaging.csproj" />
     <ProjectReference Include="../../src/modules/Themia.Modules.Export/Themia.Modules.Export.csproj" />
+    <ProjectReference Include="../../src/framework/Themia.Framework.Data.Sequences/Themia.Framework.Data.Sequences.csproj" />
   </ItemGroup>
 </Project>
