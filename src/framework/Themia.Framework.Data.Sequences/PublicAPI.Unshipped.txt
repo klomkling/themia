@@ -1,6 +1,8 @@
 #nullable enable
+Microsoft.Extensions.DependencyInjection.SequenceServiceCollectionExtensions
 override Themia.Framework.Data.Sequences.Migrations.SequencesSchemaMigration.Down() -> void
 override Themia.Framework.Data.Sequences.Migrations.SequencesSchemaMigration.Up() -> void
+static Microsoft.Extensions.DependencyInjection.SequenceServiceCollectionExtensions.AddThemiaSequences(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Themia.Framework.Data.Sequences.SequenceOptions!>! configure) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
 static Themia.Framework.Data.Sequences.Dialects.SequenceDialectFactory.For(Themia.Framework.Data.Sequences.SequenceEngine engine) -> Themia.Framework.Data.Sequences.ISequenceDialect!
 Themia.Framework.Data.Sequences.Dialects.SequenceDialectFactory
 Themia.Framework.Data.Sequences.ISequenceDialect

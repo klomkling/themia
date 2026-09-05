@@ -281,7 +281,10 @@ adopter actually needs it.
 - **Phase 1 — Core cross-cutting:** Scheduling ✅, ExceptionLogging ✅, **Identity** ✅, Storage ✅
   (+ multi-DB SqlServer/MySql/Postgres baseline).
 - **Phase 2 — Productivity:** Notifications, Pdf, **Export** ✅.
-- **Phase 3 — Advanced:** Geo, AI, Audit; Sequences EF-port; SourceGenerator/analyzer merge.
+- **Phase 3 — Advanced:** Geo, AI, Audit; Sequences EF-port ✅ (shipped as
+  `Themia.Framework.Data.Sequences`, see `docs/superpowers/specs/2026-09-05-themia-sequences-design.md`
+  — §F below is superseded on three points, recorded in that spec);
+  SourceGenerator/analyzer merge.
 - **Ongoing — Strangler:** migrate Idevs.Net.CoreLib's Serenity-free infra into Themia per module.
 
 ## Specs index
