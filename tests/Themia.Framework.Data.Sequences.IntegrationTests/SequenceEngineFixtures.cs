@@ -93,6 +93,41 @@ public sealed class PostgresSequenceFixture : SequenceEngineFixture
     protected override async Task StopContainerAsync() => await container.DisposeAsync();
 }
 
+/// <summary>
+/// A PostgreSQL container used by <see cref="SequencesSchemaMigrationTests"/> ALONE.
+/// </summary>
+/// <remarks>
+/// Every other test class is safe to share a container because each test namespaces its own sequence
+/// keys. The migration tests are not: they mutate the schema and the per-assembly version ledger
+/// themselves — one deletes every ledger row and re-runs the migration to prove replay-safety — and no
+/// amount of key namespacing isolates that from a class reading the same tables.
+/// <para>
+/// Sharing appeared to work: <c>Up()</c> is idempotent behind its schema-exists guard,
+/// <c>ThemiaMigrations.Run</c> holds an exclusive advisory lock, and xUnit serialises classes within one
+/// collection, so three consecutive runs passed. That is an argument, not a guarantee — it rests on
+/// three separate mechanisms staying true, and shared-state failures are the ones a green run does not
+/// surface. One extra container is cheaper than the day spent diagnosing an ordering-dependent red in
+/// CI, so these tests get their own.
+/// </para>
+/// </remarks>
+public sealed class MigrationSequenceFixture : SequenceEngineFixture
+{
+    private readonly PostgreSqlContainer container = new PostgreSqlBuilder("postgres:16-alpine").Build();
+
+    /// <inheritdoc />
+    public override SequenceEngine Engine => SequenceEngine.Postgres;
+
+    /// <inheritdoc />
+    protected override async Task<string> StartContainerAsync()
+    {
+        await container.StartAsync();
+        return container.GetConnectionString();
+    }
+
+    /// <inheritdoc />
+    protected override async Task StopContainerAsync() => await container.DisposeAsync();
+}
+
 /// <summary>MySQL fixture: one <c>mysql:8.4</c> container shared by every MySQL test class in this
 /// project.</summary>
 public sealed class MySqlSequenceFixture : SequenceEngineFixture
@@ -145,6 +180,14 @@ public sealed class PostgresSequenceCollection : ICollectionFixture<PostgresSequ
 
 /// <summary>xUnit collection tying every MySQL test class in this project to one shared
 /// <see cref="MySqlSequenceFixture"/> container instance.</summary>
+/// <summary>Collection for the migration tests, isolated on their own container.</summary>
+[CollectionDefinition(Name)]
+public sealed class MigrationSequenceCollection : ICollectionFixture<MigrationSequenceFixture>
+{
+    /// <summary>The collection name test classes reference via <c>[Collection(Name)]</c>.</summary>
+    public const string Name = "themia-sequences-migration";
+}
+
 [CollectionDefinition(Name)]
 public sealed class MySqlSequenceCollection : ICollectionFixture<MySqlSequenceFixture>
 {

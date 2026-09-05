@@ -10,12 +10,12 @@ using Xunit;
 namespace Themia.Framework.Data.Sequences.IntegrationTests;
 
 [Trait("Category", "Integration")]
-[Collection(PostgresSequenceCollection.Name)]
-public sealed class SequencesSchemaMigrationTests(PostgresSequenceFixture fixture)
+[Collection(MigrationSequenceCollection.Name)]
+public sealed class SequencesSchemaMigrationTests(MigrationSequenceFixture fixture)
 {
-    // Shares the fixture's container rather than starting its own — see the reasoning for that in
-    // SequenceEngineFixtures.cs's remarks on this class. The fixture already ran the migration once in
-    // its own InitializeAsync; every test method here reruns it deliberately to test the migration itself.
+    // Its OWN container, not the shared PostgreSQL one. These tests mutate the schema and the version
+    // ledger — one wipes the ledger and re-runs the migration — which key namespacing cannot isolate from
+    // a class reading the same tables. See MigrationSequenceFixture's remarks.
     private string ConnString => fixture.ConnectionString;
 
     [Fact]
