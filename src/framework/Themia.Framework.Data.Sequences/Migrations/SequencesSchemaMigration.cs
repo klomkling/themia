@@ -1,5 +1,7 @@
 using FluentMigrator;
 
+using Themia.Framework.Core.Abstractions.Tenancy;
+
 namespace Themia.Framework.Data.Sequences.Migrations;
 
 /// <summary>Creates <c>themia_sequences</c>, the counter table behind <see cref="ISequenceProvider"/>.</summary>
@@ -16,6 +18,19 @@ public sealed class SequencesSchemaMigration : Migration
     /// <inheritdoc />
     public override void Up()
     {
+        // The unsupported-provider guard runs FIRST, before the adopt-if-exists check. Reversed, a run
+        // against an unsupported engine that happened to already have a themia_sequences table would
+        // return silently, the ledger would record the migration as applied, and this exception would
+        // never fire -- leaving the runtime to issue the wrong dialect's SQL instead of failing at
+        // migrate time, which is the whole point of the guard.
+        IfDatabase(p =>
+                !p.StartsWith("Postgres", StringComparison.OrdinalIgnoreCase) &&
+                !p.StartsWith("MySql", StringComparison.OrdinalIgnoreCase) &&
+                !p.StartsWith("SqlServer", StringComparison.OrdinalIgnoreCase))
+            .Delegate(() => throw new NotSupportedException(
+                "Themia sequences support only PostgreSQL, MySQL and SQL Server. The active database "
+                + "provider is not supported; add a migration branch for it."));
+
         // Adopt-if-exists, per coord #0078/#0085/#0096: the per-assembly version ledger starts empty on
         // every database that predates it, so this runs once against a table that may already be there.
         // An unguarded CREATE fails and crash-loops the host at boot.
@@ -23,12 +38,15 @@ public sealed class SequencesSchemaMigration : Migration
 
         IfDatabase("postgresql", "mysql", "sqlserver").Delegate(() =>
             Create.Table(TableName)
+                // Width bound to TenantId.MaxLength, not a bare literal: if the two ever drift apart,
+                // MySQL truncates tenant_id silently and two tenants share one counter -- the same hazard
+                // the sequence_key guard below exists to prevent.
                 // NOT NULL with '' for host-level: TenantId is nullable throughout Themia, but no engine
                 // permits a NULL column in a primary key. The alternative -- a surrogate key plus UNIQUE
                 // over a nullable column -- has engine-divergent NULL semantics (PostgreSQL admits many
                 // NULL rows, SQL Server one), which would silently allow two host-level rows for one key
                 // and therefore two allocators.
-                .WithColumn("tenant_id").AsString(100).NotNullable().WithDefaultValue(string.Empty)
+                .WithColumn("tenant_id").AsString(TenantId.MaxLength).NotNullable().WithDefaultValue(string.Empty)
                 // 100 must agree with SequenceProvider.MaxSequenceKeyLength, which is what actually
                 // rejects an over-length key on every engine instead of letting MySQL silently truncate it.
                 .WithColumn("sequence_key").AsString(SequenceProvider.MaxSequenceKeyLength).NotNullable()
@@ -38,13 +56,6 @@ public sealed class SequencesSchemaMigration : Migration
             Create.PrimaryKey("pk_themia_sequences").OnTable(TableName)
                 .Columns("tenant_id", "sequence_key"));
 
-        IfDatabase(p =>
-                !p.StartsWith("Postgres", StringComparison.OrdinalIgnoreCase) &&
-                !p.StartsWith("MySql", StringComparison.OrdinalIgnoreCase) &&
-                !p.StartsWith("SqlServer", StringComparison.OrdinalIgnoreCase))
-            .Delegate(() => throw new NotSupportedException(
-                "Themia sequences support only PostgreSQL, MySQL and SQL Server. The active database "
-                + "provider is not supported; add a migration branch for it."));
     }
 
     /// <inheritdoc />

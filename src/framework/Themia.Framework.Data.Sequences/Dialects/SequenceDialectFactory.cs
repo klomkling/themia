@@ -9,6 +9,10 @@ public static class SequenceDialectFactory
     /// <exception cref="NotSupportedException"><paramref name="engine"/> is not a supported engine.</exception>
     public static ISequenceDialect For(SequenceEngine engine) => engine switch
     {
+        SequenceEngine.Unspecified => throw new NotSupportedException(
+            "SequenceOptions.Engine was never set. Choose PostgreSQL, MySQL or SQL Server, or supply "
+            + "a custom ISequenceDialect."),
+
         SequenceEngine.Postgres => new PostgresSequenceDialect(),
         SequenceEngine.MySql => new MySqlSequenceDialect(),
         SequenceEngine.SqlServer => new SqlServerSequenceDialect(),

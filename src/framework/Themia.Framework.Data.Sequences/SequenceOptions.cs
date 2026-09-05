@@ -14,7 +14,8 @@ public sealed class SequenceOptions
     /// </remarks>
     public string ConnectionString { get; set; } = string.Empty;
 
-    /// <summary>The database engine. No default is assumed — an unset value fails validation.</summary>
+    /// <summary>The database engine. Leaving it unset is <see cref="SequenceEngine.Unspecified"/>, which
+    /// fails <see cref="Validate"/> — 0 is deliberately not a real engine.</summary>
     /// <remarks>Ignored when <see cref="Dialect"/> is set.</remarks>
     public SequenceEngine Engine { get; set; }
 
@@ -40,7 +41,7 @@ public sealed class SequenceOptions
         }
 
         // A custom dialect replaces the engine entirely, so the enum is not consulted in that case.
-        if (Dialect is null && !Enum.IsDefined(Engine))
+        if (Dialect is null && (Engine == SequenceEngine.Unspecified || !Enum.IsDefined(Engine)))
         {
             throw new InvalidOperationException(
                 $"SequenceOptions.Engine is not a supported engine ({(int)Engine}). Themia sequences "

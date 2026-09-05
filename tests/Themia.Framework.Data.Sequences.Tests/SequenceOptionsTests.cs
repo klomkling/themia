@@ -53,4 +53,17 @@ public sealed class SequenceOptionsTests
         public string UpdateNextValueSql => "UPDATE ... @tenant ... @key ... @val";
         public string InsertIfMissingSql => "INSERT ... @tenant ... @key ... @val";
     }
+
+    [Fact]
+    public void Validate_RejectsAnUnsetEngine()
+    {
+        // The whole point of validating at registration is that a misconfiguration stops the deployment
+        // rather than surfacing as a failed invoice hours later. An engine left unset must therefore be
+        // rejected -- and it is only rejectable if no real engine occupies 0, because Enum.IsDefined
+        // returns true for the default of any enum whose first member is 0.
+        var options = new SequenceOptions { ConnectionString = "Host=x" };   // Engine never assigned
+
+        var ex = Assert.Throws<InvalidOperationException>(options.Validate);
+        Assert.Contains("Engine", ex.Message, StringComparison.Ordinal);
+    }
 }

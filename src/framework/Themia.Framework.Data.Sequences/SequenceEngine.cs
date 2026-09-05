@@ -8,12 +8,25 @@ namespace Themia.Framework.Data.Sequences;
 /// </remarks>
 public enum SequenceEngine
 {
+    /// <summary>
+    /// Not configured. Exists so that leaving <see cref="SequenceOptions.Engine"/> unset is REJECTED at
+    /// registration rather than silently meaning PostgreSQL.
+    /// </summary>
+    /// <remarks>
+    /// <c>Enum.IsDefined</c> returns true for the default of any enum whose first member is 0, so an
+    /// engine at 0 makes "unset" indistinguishable from "explicitly chosen". An app on SQL Server that
+    /// set only the connection string would then pass startup validation and fail at the first
+    /// allocation, with the PostgreSQL driver parsing a SQL Server connection string — precisely the
+    /// deferred failure eager validation exists to prevent.
+    /// </remarks>
+    Unspecified = 0,
+
     /// <summary>PostgreSQL.</summary>
-    Postgres = 0,
+    Postgres = 1,
 
     /// <summary>MySQL 8.0.13 or later. MariaDB is not supported.</summary>
-    MySql = 1,
+    MySql = 2,
 
     /// <summary>Microsoft SQL Server.</summary>
-    SqlServer = 2,
+    SqlServer = 3,
 }

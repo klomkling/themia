@@ -22,11 +22,17 @@ public static class SequenceServiceCollectionExtensions
     /// between calls — it opens one per allocation, by design.
     /// </para>
     /// <para>
-    /// The container gets a frozen COPY of the configured options, not the instance <paramref
-    /// name="configure"/> populated. <see cref="SequenceOptions"/> is a mutable class with public
-    /// setters; registering the caller's own instance as a singleton would let anyone who later resolves
-    /// <see cref="SequenceOptions"/> from the container mutate it after startup — e.g. changing
-    /// <c>ConnectionString</c> without ever re-running <see cref="SequenceOptions.Validate"/>.
+    /// The container gets a COPY of the configured options, not the instance <paramref
+    /// name="configure"/> populated, so a reference the caller kept hold of cannot steer the container's
+    /// registration afterwards.
+    /// </para>
+    /// <para>
+    /// Be clear about what that does NOT buy: <see cref="SequenceOptions"/> is a mutable class with
+    /// public setters, so the copy is resolvable and mutable too. What makes runtime mutation harmless
+    /// is that <c>SequenceProvider</c> snapshots the connection string and the dialect together in its
+    /// constructor — an already-built provider is unaffected. A provider built LATER, in a new scope,
+    /// would pick up the mutated value, and <see cref="SequenceOptions.Validate"/> would not re-run. An
+    /// immutable holder type would close that; it is deliberately not done here.
     /// </para>
     /// </remarks>
     public static IServiceCollection AddThemiaSequences(

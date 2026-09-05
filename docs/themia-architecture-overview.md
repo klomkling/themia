@@ -297,6 +297,7 @@ adopter actually needs it.
 - ✅ `docs/superpowers/specs/2026-06-17-themia-storage-design.md` (Storage — 0.5.3) · `docs/superpowers/plans/2026-06-17-themia-storage-0.5.3.md`
 - ⬜ Phase 0 framework rename (`0.2.0`) — own spec when started
 - ✅ Export — `docs/superpowers/specs/2026-06-27-themia-modules-export-design.md` + `docs/superpowers/plans/2026-06-27-themia-modules-export.md` (async export module — 0.6.9)
+- ✅ Sequences — `docs/superpowers/specs/2026-09-05-themia-sequences-design.md` + `docs/superpowers/plans/2026-09-05-themia-sequences.md` (document numbering — 0.22.0; supersedes §F on three points, recorded in the spec)
 - ⬜ Storage, Notifications, Pdf, … (one spec each, this catalog as parent)
 
 ## Identity JWT slice (0.5.1 — 2026-06-15)
