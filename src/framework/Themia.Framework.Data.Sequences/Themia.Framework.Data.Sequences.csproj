@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <PackageId>Themia.Framework.Data.Sequences</PackageId>
+    <Description>Atomic, tenant-scoped document-number allocation for Themia. Allocates in its own transaction so the number survives the caller's rollback: gaps are normal, duplicates are not. PostgreSQL, MySQL and SQL Server; works with either data peer.</Description>
+    <PackageTags>themia;sequence;document-number;invoice;multi-tenancy</PackageTags>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Themia.Framework.Core/Themia.Framework.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Dapper" />
+    <PackageReference Include="FluentMigrator" />
+    <PackageReference Include="Npgsql" />
+    <PackageReference Include="MySqlConnector" />
+    <PackageReference Include="Microsoft.Data.SqlClient" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+    <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+  <ItemGroup>
+    <AdditionalFiles Include="PublicAPI.Shipped.txt" />
+    <AdditionalFiles Include="PublicAPI.Unshipped.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Themia.Framework.Data.Sequences.Tests" />
+    <InternalsVisibleTo Include="Themia.Framework.Data.Sequences.IntegrationTests" />
+  </ItemGroup>
+</Project>

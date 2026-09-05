@@ -27,6 +27,47 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.22.0] - 2026-09-05
+
+### Added
+- **`Themia.Framework.Data.Sequences` — atomic, tenant-scoped document numbering.** Realises DECISION #2,
+  porting the proven allocator from `Idevs.Net.CoreLib` and dropping its Serenity storage. Allocation runs
+  in its **own** transaction so the number survives the caller's rollback: gaps are normal, duplicates are
+  catastrophic. Both consumers need this for the PromptPay `BillRef1` running number and for Thai tax
+  invoices, which are numbered sequentially by law (coord #0052, #0055).
+
+  **One package, no engine split.** The allocator binds to no ORM — it needs a `DbConnection` and
+  per-engine locking SQL — so unlike Identity and Challenges there is nothing to split along. Engine is
+  chosen at runtime by an enum, following `Themia.Data.Migrations`.
+
+  **There is no null-tenant fallback, and that is the point.** `NextAsync` throws when there is no ambient
+  tenant; the host-level counter is reachable only through the explicit `Host` overloads. Background work
+  only has a tenant if it opted in (`BackgroundTenantScope.Begin`), and invoice generation is the
+  canonical scheduler job — mapping a missing tenant onto the host row would have let one lost scope draw
+  every tenant's numbers from a single shared counter, with nothing reporting it. `NotificationOutboxDispatcher`
+  already carries a forward-note about the identical shape.
+
+  `tenant_id` is `NOT NULL` with `''` for host-level, a correction to §F: no engine permits a NULL column
+  in a primary key, and the surrogate-key-plus-UNIQUE alternative has engine-divergent NULL semantics —
+  PostgreSQL admits many NULL rows where SQL Server admits one, which would mean two allocators for one
+  host sequence. `TenantId`'s constructor rejects whitespace, so no real tenant can collide with `''`.
+
+  Does **not** guarantee gapless numbering and cannot: the value is allocated before the caller commits.
+  Stated in the README because a regulator requiring an unbroken run needs a different mechanism.
+
+  **`sequenceKey` is now rejected outright past 100 characters**, on every engine, matching the
+  `sequence_key` column width. Without this, MySQL's seed insert (see below) was the only place that
+  would have silently truncated an over-length key into the wrong bucket; this guard closes it for
+  PostgreSQL and SQL Server too, before any SQL runs.
+
+### Fixed
+- **MySQL's `EnsureSequenceAsync` no longer uses `INSERT IGNORE`.** `IGNORE` downgrades a whole class of
+  errors to warnings — duplicate key, data truncation, `NULL` into a `NOT NULL` column, out-of-range —
+  regardless of `sql_mode`, not just the duplicate-key case the seed needs to swallow. Replaced with
+  `INSERT ... ON DUPLICATE KEY UPDATE next_value = next_value`, a genuine no-op on collision that leaves
+  truncation and `NOT NULL` protection intact. Same rationale already applied to `MySqlChallengeDialect`
+  and `MySqlInboxAdmission`.
+
 ## [0.21.4] - 2026-09-04
 
 ### Added

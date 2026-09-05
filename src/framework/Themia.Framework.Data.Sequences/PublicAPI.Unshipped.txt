@@ -1,0 +1,35 @@
+#nullable enable
+Microsoft.Extensions.DependencyInjection.SequenceServiceCollectionExtensions
+Themia.Framework.Data.Sequences.Dialects.SequenceDialectFactory
+Themia.Framework.Data.Sequences.ISequenceDialect
+Themia.Framework.Data.Sequences.ISequenceDialect.CreateConnection(string! connectionString) -> System.Data.Common.DbConnection!
+Themia.Framework.Data.Sequences.ISequenceDialect.InsertIfMissingSql.get -> string!
+Themia.Framework.Data.Sequences.ISequenceDialect.SelectForUpdateSql.get -> string!
+Themia.Framework.Data.Sequences.ISequenceDialect.UpdateNextValueSql.get -> string!
+Themia.Framework.Data.Sequences.ISequenceProvider
+Themia.Framework.Data.Sequences.ISequenceProvider.EnsureHostSequenceAsync(string! sequenceKey, long startValue = 1, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Framework.Data.Sequences.ISequenceProvider.EnsureSequenceAsync(string! sequenceKey, long startValue = 1, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Framework.Data.Sequences.ISequenceProvider.NextAsync(string! sequenceKey, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<long>!
+Themia.Framework.Data.Sequences.ISequenceProvider.NextHostAsync(string! sequenceKey, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<long>!
+Themia.Framework.Data.Sequences.ISequenceProvider.NextHostRangeAsync(string! sequenceKey, int count, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<long>!>!
+Themia.Framework.Data.Sequences.ISequenceProvider.NextRangeAsync(string! sequenceKey, int count, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<long>!>!
+Themia.Framework.Data.Sequences.Migrations.SequencesSchemaMigration
+Themia.Framework.Data.Sequences.Migrations.SequencesSchemaMigration.SequencesSchemaMigration() -> void
+Themia.Framework.Data.Sequences.SequenceEngine
+Themia.Framework.Data.Sequences.SequenceEngine.MySql = 2 -> Themia.Framework.Data.Sequences.SequenceEngine
+Themia.Framework.Data.Sequences.SequenceEngine.Postgres = 1 -> Themia.Framework.Data.Sequences.SequenceEngine
+Themia.Framework.Data.Sequences.SequenceEngine.SqlServer = 3 -> Themia.Framework.Data.Sequences.SequenceEngine
+Themia.Framework.Data.Sequences.SequenceEngine.Unspecified = 0 -> Themia.Framework.Data.Sequences.SequenceEngine
+Themia.Framework.Data.Sequences.SequenceOptions
+Themia.Framework.Data.Sequences.SequenceOptions.ConnectionString.get -> string!
+Themia.Framework.Data.Sequences.SequenceOptions.ConnectionString.set -> void
+Themia.Framework.Data.Sequences.SequenceOptions.Dialect.get -> Themia.Framework.Data.Sequences.ISequenceDialect?
+Themia.Framework.Data.Sequences.SequenceOptions.Dialect.set -> void
+Themia.Framework.Data.Sequences.SequenceOptions.Engine.get -> Themia.Framework.Data.Sequences.SequenceEngine
+Themia.Framework.Data.Sequences.SequenceOptions.Engine.set -> void
+Themia.Framework.Data.Sequences.SequenceOptions.SequenceOptions() -> void
+Themia.Framework.Data.Sequences.SequenceOptions.Validate() -> void
+override Themia.Framework.Data.Sequences.Migrations.SequencesSchemaMigration.Down() -> void
+override Themia.Framework.Data.Sequences.Migrations.SequencesSchemaMigration.Up() -> void
+static Microsoft.Extensions.DependencyInjection.SequenceServiceCollectionExtensions.AddThemiaSequences(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Themia.Framework.Data.Sequences.SequenceOptions!>! configure) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static Themia.Framework.Data.Sequences.Dialects.SequenceDialectFactory.For(Themia.Framework.Data.Sequences.SequenceEngine engine) -> Themia.Framework.Data.Sequences.ISequenceDialect!
