@@ -12,8 +12,6 @@ Ported from ezy-assets' production implementation (coord #0101) rather than rede
 ```xml
 <PackageReference Include="Themia.Imaging" Version="..." />
 
-<!-- The native codec for the RID YOU run on. See "Native assets" below. -->
-<PackageReference Include="SkiaSharp.NativeAssets.Linux" Version="4.151.1" />
 ```
 
 ```csharp
@@ -110,17 +108,25 @@ through it can never carry any, and a suite built on one proves nothing about ei
 
 ## Native assets
 
-**This package references managed `SkiaSharp` only.** The native codec is a **host** decision, keyed
-to the RID the host actually runs on:
+**This package ships the Linux native codec, and nothing else RID-specific.** Nothing to add on Linux
+or Windows; on a developer Mac, SkiaSharp supplies the macOS binaries itself.
 
 | where | add |
 | --- | --- |
-| Linux container | `SkiaSharp.NativeAssets.Linux` |
-| developer Mac | `SkiaSharp.NativeAssets.macos` |
+| Linux container | nothing — shipped with this package |
+| developer Mac | nothing — `SkiaSharp` carries the macOS binaries |
 | Windows | nothing — `SkiaSharp` carries the Windows binaries |
 
-Shipping one RID's binaries from a neutral package would force them on every consumer. The failure
-mode this avoids is the expensive one: works on a developer's Mac, fails in the container.
+**This reverses what versions up to 0.22.0 said**, and the reversal is worth understanding before you
+copy the old advice from somewhere. The original principle — a native codec is a host decision, so a
+neutral package should not force one RID's binaries on everyone — was already lost upstream: SkiaSharp
+declares `NativeAssets.macOS` and `.Win32` transitively for every modern target framework, roughly 83 MB
+a consumer receives without asking. Linux is the single RID it leaves opt-in.
+
+So the package was neutral about exactly one platform, and it was the platform every deployment runs.
+That produced the expensive failure precisely: a developer Mac worked, the package looked self-contained,
+and the container threw at the first decode (coord #0110). Shipping Linux too costs 55.7 MB on hosts that
+never run it and removes the footgun entirely.
 
 ## Why SkiaSharp and not ImageSharp
 
