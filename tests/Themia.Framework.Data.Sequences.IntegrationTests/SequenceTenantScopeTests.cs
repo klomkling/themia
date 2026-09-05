@@ -2,12 +2,8 @@ using Dapper;
 
 using Npgsql;
 
-using Testcontainers.PostgreSql;
-
-using Themia.Data.Migrations;
 using Themia.Framework.Core.Abstractions.Tenancy;
 using Themia.Framework.Data.Sequences;
-using Themia.Framework.Data.Sequences.Migrations;
 
 using Xunit;
 
@@ -19,30 +15,21 @@ namespace Themia.Framework.Data.Sequences.IntegrationTests;
 /// tenant's invoice numbers from one shared row, silently.
 /// </summary>
 [Trait("Category", "Integration")]
-public sealed class SequenceTenantScopeTests : IAsyncLifetime
+[Collection(PostgresSequenceCollection.Name)]
+public sealed class SequenceTenantScopeTests(PostgresSequenceFixture fixture)
 {
 
     // Every test method gets a fresh instance from xUnit, so this namespaces THIS test's keys and
-    // nothing else's. Tests that deliberately reuse one key within themselves (two tenants on the same
-    // key, host versus tenant) still see a single value. Without it the suite depends on a fresh
-    // container per test, which is the cost the repo's shared-fixture pattern exists to avoid.
+    // nothing else's, even though every class in PostgresSequenceCollection shares one container and one
+    // themia_sequences table. Tests that deliberately reuse one key within themselves (two tenants on the
+    // same key, host versus tenant) still see a single value.
     private readonly string keyNamespace = Guid.NewGuid().ToString("N");
 
     private string Key(string name) => $"DocNo:{keyNamespace}:{name}";
-    private readonly PostgreSqlContainer container = new PostgreSqlBuilder("postgres:16-alpine").Build();
-
-    public async Task InitializeAsync()
-    {
-        await container.StartAsync();
-        ThemiaMigrations.Run(MigrationEngine.Postgres, container.GetConnectionString(),
-            typeof(SequencesSchemaMigration).Assembly);
-    }
-
-    public async Task DisposeAsync() => await container.DisposeAsync();
 
     private ISequenceProvider ProviderFor(string? tenant) =>
         new SequenceProvider(
-            new SequenceOptions { ConnectionString = container.GetConnectionString(), Engine = SequenceEngine.Postgres },
+            new SequenceOptions { ConnectionString = fixture.ConnectionString, Engine = SequenceEngine.Postgres },
             new TenantContext(tenant is null ? null : new TenantId(tenant)));
 
     [Fact]
@@ -82,7 +69,7 @@ public sealed class SequenceTenantScopeTests : IAsyncLifetime
     {
         await ProviderFor(null).EnsureHostSequenceAsync(Key("HostOnly"), startValue: 7);
 
-        await using var conn = new NpgsqlConnection(container.GetConnectionString());
+        await using var conn = new NpgsqlConnection(fixture.ConnectionString);
         var tenantId = await conn.ExecuteScalarAsync<string>(
             "SELECT tenant_id FROM themia_sequences WHERE sequence_key = @key",
             new { key = Key("HostOnly") });

@@ -4,12 +4,8 @@ using Dapper;
 
 using Npgsql;
 
-using Testcontainers.PostgreSql;
-
-using Themia.Data.Migrations;
 using Themia.Framework.Core.Abstractions.Tenancy;
 using Themia.Framework.Data.Sequences;
-using Themia.Framework.Data.Sequences.Migrations;
 
 using Xunit;
 
@@ -28,30 +24,21 @@ namespace Themia.Framework.Data.Sequences.IntegrationTests;
 /// it proves the check can go red, then it asserts the real behaviour.
 /// </remarks>
 [Trait("Category", "Integration")]
-public sealed class SequenceTransactionIndependenceTests : IAsyncLifetime
+[Collection(PostgresSequenceCollection.Name)]
+public sealed class SequenceTransactionIndependenceTests(PostgresSequenceFixture fixture)
 {
 
     // Every test method gets a fresh instance from xUnit, so this namespaces THIS test's keys and
-    // nothing else's. Tests that deliberately reuse one key within themselves (two tenants on the same
-    // key, host versus tenant) still see a single value. Without it the suite depends on a fresh
-    // container per test, which is the cost the repo's shared-fixture pattern exists to avoid.
+    // nothing else's, even though every class in PostgresSequenceCollection shares one container and one
+    // themia_sequences table. Tests that deliberately reuse one key within themselves (two tenants on the
+    // same key, host versus tenant) still see a single value.
     private readonly string keyNamespace = Guid.NewGuid().ToString("N");
 
     private string Key(string name) => $"DocNo:{keyNamespace}:{name}";
-    private readonly PostgreSqlContainer container = new PostgreSqlBuilder("postgres:16-alpine").Build();
-
-    public async Task InitializeAsync()
-    {
-        await container.StartAsync();
-        ThemiaMigrations.Run(MigrationEngine.Postgres, container.GetConnectionString(),
-            typeof(SequencesSchemaMigration).Assembly);
-    }
-
-    public async Task DisposeAsync() => await container.DisposeAsync();
 
     private ISequenceProvider Provider() =>
         new SequenceProvider(
-            new SequenceOptions { ConnectionString = container.GetConnectionString(), Engine = SequenceEngine.Postgres },
+            new SequenceOptions { ConnectionString = fixture.ConnectionString, Engine = SequenceEngine.Postgres },
             new TenantContext(new TenantId("acme")));
 
     // CONTROL. Allocation done the WRONG way -- on the caller's own connection and transaction -- is
@@ -62,7 +49,7 @@ public sealed class SequenceTransactionIndependenceTests : IAsyncLifetime
     {
         await Provider().EnsureSequenceAsync(Key("Control"), startValue: 1);
 
-        await using var conn = new NpgsqlConnection(container.GetConnectionString());
+        await using var conn = new NpgsqlConnection(fixture.ConnectionString);
         await conn.OpenAsync();
         await using (var tx = await conn.BeginTransactionAsync())
         {
@@ -82,7 +69,7 @@ public sealed class SequenceTransactionIndependenceTests : IAsyncLifetime
     {
         await Provider().EnsureSequenceAsync(Key("Survives"), startValue: 1);
 
-        await using var conn = new NpgsqlConnection(container.GetConnectionString());
+        await using var conn = new NpgsqlConnection(fixture.ConnectionString);
         await conn.OpenAsync();
         long allocated;
         await using (var tx = await conn.BeginTransactionAsync())

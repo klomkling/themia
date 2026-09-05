@@ -1,12 +1,6 @@
-using Testcontainers.MsSql;
-using Testcontainers.MySql;
-using Testcontainers.PostgreSql;
-
-using Themia.Data.Migrations;
 using Themia.Framework.Core.Abstractions.Tenancy;
 using Themia.Framework.Data.Sequences;
 using Themia.Framework.Data.Sequences.Dialects;
-using Themia.Framework.Data.Sequences.Migrations;
 
 using Xunit;
 
@@ -20,9 +14,9 @@ public abstract class SequenceConcurrencyTests
 {
 
     // Every test method gets a fresh instance from xUnit, so this namespaces THIS test's keys and
-    // nothing else's. Tests that deliberately reuse one key within themselves (two tenants on the same
-    // key, host versus tenant) still see a single value. Without it the suite depends on a fresh
-    // container per test, which is the cost the repo's shared-fixture pattern exists to avoid.
+    // nothing else's, even though every class in the engine's collection shares one container and one
+    // themia_sequences table. Tests that deliberately reuse one key within themselves (two tenants on the
+    // same key, host versus tenant) still see a single value.
     private readonly string keyNamespace = Guid.NewGuid().ToString("N");
 
     private string Key(string name) => $"DocNo:{keyNamespace}:{name}";
@@ -161,53 +155,25 @@ public abstract class SequenceConcurrencyTests
 }
 
 [Trait("Category", "Integration")]
-public sealed class PostgresSequenceConcurrencyTests : SequenceConcurrencyTests, IAsyncLifetime
+[Collection(PostgresSequenceCollection.Name)]
+public sealed class PostgresSequenceConcurrencyTests(PostgresSequenceFixture fixture) : SequenceConcurrencyTests
 {
-    private readonly PostgreSqlContainer container = new PostgreSqlBuilder("postgres:16-alpine").Build();
-
-    protected override string ConnString => container.GetConnectionString();
+    protected override string ConnString => fixture.ConnectionString;
     protected override SequenceEngine Engine => SequenceEngine.Postgres;
-
-    public async Task InitializeAsync()
-    {
-        await container.StartAsync();
-        ThemiaMigrations.Run(MigrationEngine.Postgres, ConnString, typeof(SequencesSchemaMigration).Assembly);
-    }
-
-    public async Task DisposeAsync() => await container.DisposeAsync();
 }
 
 [Trait("Category", "Integration")]
-public sealed class MySqlSequenceConcurrencyTests : SequenceConcurrencyTests, IAsyncLifetime
+[Collection(MySqlSequenceCollection.Name)]
+public sealed class MySqlSequenceConcurrencyTests(MySqlSequenceFixture fixture) : SequenceConcurrencyTests
 {
-    private readonly MySqlContainer container = new MySqlBuilder("mysql:8.4").Build();
-
-    protected override string ConnString => container.GetConnectionString();
+    protected override string ConnString => fixture.ConnectionString;
     protected override SequenceEngine Engine => SequenceEngine.MySql;
-
-    public async Task InitializeAsync()
-    {
-        await container.StartAsync();
-        ThemiaMigrations.Run(MigrationEngine.MySql, ConnString, typeof(SequencesSchemaMigration).Assembly);
-    }
-
-    public async Task DisposeAsync() => await container.DisposeAsync();
 }
 
 [Trait("Category", "Integration")]
-public sealed class SqlServerSequenceConcurrencyTests : SequenceConcurrencyTests, IAsyncLifetime
+[Collection(SqlServerSequenceCollection.Name)]
+public sealed class SqlServerSequenceConcurrencyTests(SqlServerSequenceFixture fixture) : SequenceConcurrencyTests
 {
-    private readonly MsSqlContainer container =
-        new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-CU14-ubuntu-22.04").Build();
-
-    protected override string ConnString => container.GetConnectionString();
+    protected override string ConnString => fixture.ConnectionString;
     protected override SequenceEngine Engine => SequenceEngine.SqlServer;
-
-    public async Task InitializeAsync()
-    {
-        await container.StartAsync();
-        ThemiaMigrations.Run(MigrationEngine.SqlServer, ConnString, typeof(SequencesSchemaMigration).Assembly);
-    }
-
-    public async Task DisposeAsync() => await container.DisposeAsync();
 }
