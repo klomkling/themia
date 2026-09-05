@@ -29,7 +29,9 @@ public sealed class SequencesSchemaMigration : Migration
                 // NULL rows, SQL Server one), which would silently allow two host-level rows for one key
                 // and therefore two allocators.
                 .WithColumn("tenant_id").AsString(100).NotNullable().WithDefaultValue(string.Empty)
-                .WithColumn("sequence_key").AsString(100).NotNullable()
+                // 100 must agree with SequenceProvider.MaxSequenceKeyLength, which is what actually
+                // rejects an over-length key on every engine instead of letting MySQL silently truncate it.
+                .WithColumn("sequence_key").AsString(SequenceProvider.MaxSequenceKeyLength).NotNullable()
                 .WithColumn("next_value").AsInt64().NotNullable());
 
         IfDatabase("postgresql", "mysql", "sqlserver").Delegate(() =>

@@ -41,7 +41,7 @@ public sealed class SequenceDialectTests
     // see no row, both insert, the second gets a primary-key violation.
     [Theory]
     [InlineData(SequenceEngine.Postgres, "ON CONFLICT")]
-    [InlineData(SequenceEngine.MySql, "INSERT IGNORE")]
+    [InlineData(SequenceEngine.MySql, "ON DUPLICATE KEY UPDATE")]
     [InlineData(SequenceEngine.SqlServer, "WHERE NOT EXISTS")]
     public void InsertIfMissing_IsAtomic(SequenceEngine engine, string marker)
         => Assert.Contains(marker, SequenceDialectFactory.For(engine).InsertIfMissingSql, StringComparison.OrdinalIgnoreCase);

@@ -1,5 +1,3 @@
-using Dapper;
-
 using Testcontainers.MsSql;
 using Testcontainers.MySql;
 using Testcontainers.PostgreSql;
@@ -57,9 +55,24 @@ public abstract class SequenceConcurrencyTests
         => await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
             () => Provider().NextRangeAsync("DocNo:Range", 0));
 
+    // sequence_key is varchar(100)/nvarchar(100). MySQL's old INSERT IGNORE downgraded every error class —
+    // including a truncation error — to a warning, so an over-length key was silently truncated to fit
+    // instead of rejected: EnsureSequenceAsync seeds the wrong (truncated) bucket, and either the full key
+    // then reports "has not been seeded" or, worse, collides with an existing truncated key and absorbs
+    // its seed. All three engines must reject it outright — via SequenceProvider's own length guard,
+    // before the SQL ever runs — rather than truncate on MySQL alone.
+    [Fact]
+    public async Task EnsureSequence_RejectsAnOverLengthKeyRatherThanSilentlyTruncatingIt()
+    {
+        var overLengthKey = new string('x', 101);
+
+        await Assert.ThrowsAsync<ArgumentException>(
+            () => Provider().EnsureSequenceAsync(overLengthKey, startValue: 1));
+    }
+
     // Re-seeding must NOT reset a live counter on ANY engine. Task 4 proved this on Postgres only; the
-    // MySQL (INSERT IGNORE) and SQL Server (INSERT ... WHERE NOT EXISTS) forms were checked as SQL
-    // STRINGS and never executed. The hazard is a redeploy reissuing every number already handed out.
+    // MySQL (ON DUPLICATE KEY UPDATE) and SQL Server (INSERT ... WHERE NOT EXISTS) forms were checked as
+    // SQL STRINGS and never executed. The hazard is a redeploy reissuing every number already handed out.
     [Fact]
     public async Task ReSeeding_DoesNotResetALiveCounter()
     {

@@ -1,5 +1,4 @@
 using System.Data;
-using System.Data.Common;
 
 using Dapper;
 
@@ -18,7 +17,15 @@ internal sealed class SequenceProvider : ISequenceProvider
     /// whitespace, so no real tenant can ever collide with it.</summary>
     private const string HostTenant = "";
 
-    private readonly SequenceOptions options;
+    /// <summary>
+    /// The <c>sequence_key</c> column width. Must agree with <c>SequencesSchemaMigration</c>'s
+    /// <c>.AsString(SequenceProvider.MaxSequenceKeyLength)</c> — MySQL silently truncates an over-length
+    /// key to fit the column instead of erroring, so this guard is what actually rejects it, on every
+    /// engine, before it ever reaches the database.
+    /// </summary>
+    internal const int MaxSequenceKeyLength = 100;
+
+    private readonly string connectionString;
     private readonly ITenantContext tenantContext;
     private readonly ISequenceDialect dialect;
 
@@ -28,7 +35,11 @@ internal sealed class SequenceProvider : ISequenceProvider
         ArgumentNullException.ThrowIfNull(tenantContext);
         options.Validate();
 
-        this.options = options;
+        // Snapshotted together so the two can never drift apart: reading options.ConnectionString live on
+        // every call, while the dialect was snapshotted here, let a caller who mutates a shared
+        // SequenceOptions after construction run the OLD engine's dialect SQL against a NEW connection
+        // string.
+        connectionString = options.ConnectionString;
         this.tenantContext = tenantContext;
         dialect = options.Dialect ?? SequenceDialectFactory.For(options.Engine);
     }
@@ -41,8 +52,9 @@ internal sealed class SequenceProvider : ISequenceProvider
     /// <inheritdoc />
     public Task<IReadOnlyList<long>> NextRangeAsync(string sequenceKey, int count, CancellationToken ct = default)
     {
+        var tenant = RequireTenant(sequenceKey);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(count);
-        return AllocateAsync(RequireTenant(sequenceKey), sequenceKey, count, ct);
+        return AllocateAsync(tenant, sequenceKey, count, ct);
     }
 
     /// <inheritdoc />
@@ -52,14 +64,14 @@ internal sealed class SequenceProvider : ISequenceProvider
     /// <inheritdoc />
     public Task<long> NextHostAsync(string sequenceKey, CancellationToken ct = default)
     {
-        ArgumentException.ThrowIfNullOrEmpty(sequenceKey);
+        ValidateSequenceKey(sequenceKey);
         return AllocateAsync(HostTenant, sequenceKey, count: 1, ct).ContinueWithFirst();
     }
 
     /// <inheritdoc />
     public Task<IReadOnlyList<long>> NextHostRangeAsync(string sequenceKey, int count, CancellationToken ct = default)
     {
-        ArgumentException.ThrowIfNullOrEmpty(sequenceKey);
+        ValidateSequenceKey(sequenceKey);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(count);
         return AllocateAsync(HostTenant, sequenceKey, count, ct);
     }
@@ -67,7 +79,7 @@ internal sealed class SequenceProvider : ISequenceProvider
     /// <inheritdoc />
     public Task EnsureHostSequenceAsync(string sequenceKey, long startValue = 1, CancellationToken ct = default)
     {
-        ArgumentException.ThrowIfNullOrEmpty(sequenceKey);
+        ValidateSequenceKey(sequenceKey);
         return SeedAsync(HostTenant, sequenceKey, startValue, ct);
     }
 
@@ -81,7 +93,7 @@ internal sealed class SequenceProvider : ISequenceProvider
     /// </remarks>
     private string RequireTenant(string sequenceKey)
     {
-        ArgumentException.ThrowIfNullOrEmpty(sequenceKey);
+        ValidateSequenceKey(sequenceKey);
 
         return tenantContext.CurrentTenantId?.Value
             ?? throw new InvalidOperationException(
@@ -90,12 +102,30 @@ internal sealed class SequenceProvider : ISequenceProvider
                 + "overload if a host-level counter is what you meant.");
     }
 
+    /// <summary>
+    /// Rejects a null/empty key, or one exceeding <see cref="MaxSequenceKeyLength"/>, on every engine —
+    /// rather than letting MySQL alone silently truncate it into a different (and possibly colliding)
+    /// bucket.
+    /// </summary>
+    private static void ValidateSequenceKey(string sequenceKey)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(sequenceKey);
+
+        if (sequenceKey.Length > MaxSequenceKeyLength)
+        {
+            throw new ArgumentException(
+                $"sequenceKey is {sequenceKey.Length} characters long, exceeding the "
+                + $"{MaxSequenceKeyLength}-character column limit.",
+                nameof(sequenceKey));
+        }
+    }
+
     private async Task<IReadOnlyList<long>> AllocateAsync(
         string tenant, string sequenceKey, int count, CancellationToken ct)
     {
         // Its own connection and transaction. This is the package: the number must survive the caller's
         // rollback, and it cannot if it shares the caller's transaction.
-        await using var connection = dialect.CreateConnection(options.ConnectionString);
+        await using var connection = dialect.CreateConnection(connectionString);
         await connection.OpenAsync(ct).ConfigureAwait(false);
         await using var tx = await connection.BeginTransactionAsync(IsolationLevel.ReadCommitted, ct)
             .ConfigureAwait(false);
@@ -126,16 +156,23 @@ internal sealed class SequenceProvider : ISequenceProvider
             dialect.UpdateNextValueSql, new { tenant, key = sequenceKey, val = advanced }, tx,
             cancellationToken: ct)).ConfigureAwait(false);
 
-        await tx.CommitAsync(ct).ConfigureAwait(false);
-
+        // Allocated BEFORE the commit: NextRangeAsync(key, int.MaxValue) allocating this array after the
+        // commit would mean the advance is already durable when an OutOfMemoryException hits, so the
+        // range is spent and the caller never receives it. Allocating first lets that failure happen while
+        // the transaction can still be rolled back.
         var allocated = new long[count];
         for (var i = 0; i < count; i++) allocated[i] = first + i;
+
+        await tx.CommitAsync(ct).ConfigureAwait(false);
+
         return allocated;
     }
 
     private async Task SeedAsync(string tenant, string sequenceKey, long startValue, CancellationToken ct)
     {
-        await using var connection = dialect.CreateConnection(options.ConnectionString);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(startValue);
+
+        await using var connection = dialect.CreateConnection(connectionString);
         await connection.OpenAsync(ct).ConfigureAwait(false);
 
         await connection.ExecuteAsync(new CommandDefinition(

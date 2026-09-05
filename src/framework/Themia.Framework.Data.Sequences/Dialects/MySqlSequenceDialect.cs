@@ -28,6 +28,23 @@ internal sealed class MySqlSequenceDialect : ISequenceDialect
         "UPDATE themia_sequences SET next_value = @val WHERE tenant_id = @tenant AND sequence_key = @key";
 
     /// <inheritdoc />
+    /// <remarks>
+    /// Not <c>INSERT IGNORE</c> — rejected here for the same reason it was rejected in
+    /// <c>MySqlChallengeDialect</c> and <c>MySqlInboxAdmission</c>: <c>IGNORE</c> downgrades a whole class
+    /// of errors to warnings (duplicate key, data truncation, <c>NULL</c> into a <c>NOT NULL</c> column,
+    /// out-of-range values), regardless of <c>sql_mode</c> — not just the duplicate-key case this seed
+    /// needs to swallow. <c>sequence_key</c> is <c>varchar(100)</c> and nothing upstream of this dialect
+    /// enforced that length, so an over-length key would have been silently truncated into the wrong
+    /// bucket instead of rejected. <c>ON DUPLICATE KEY UPDATE next_value = next_value</c> is a genuine
+    /// no-op on collision (assigning a column its own value changes nothing) but fires only on the actual
+    /// duplicate-key violation, leaving truncation and NOT NULL protection intact.
+    /// <para>
+    /// The affected-row-count / <c>UseAffectedRows</c> trap <c>MySqlInboxAdmission</c> documents does not
+    /// apply here: <c>EnsureSequenceAsync</c> returns <see cref="System.Threading.Tasks.Task"/>, not a row
+    /// count, so there is nothing for that flag to make ambiguous.
+    /// </para>
+    /// </remarks>
     public string InsertIfMissingSql =>
-        "INSERT IGNORE INTO themia_sequences (tenant_id, sequence_key, next_value) VALUES (@tenant, @key, @val)";
+        "INSERT INTO themia_sequences (tenant_id, sequence_key, next_value) VALUES (@tenant, @key, @val) "
+        + "ON DUPLICATE KEY UPDATE next_value = next_value";
 }

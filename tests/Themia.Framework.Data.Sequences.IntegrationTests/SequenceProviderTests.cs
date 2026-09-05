@@ -31,11 +31,16 @@ public sealed class SequenceProviderTests : IAsyncLifetime
     [Fact]
     public async Task Next_ReturnsTheSeededStartValueThenAdvances()
     {
+        // Guid-suffixed key: this suite currently gets a fresh container per test method, but the key must
+        // not depend on that isolation — a later switch to a shared per-engine fixture (as in
+        // ChallengeEngineFixtures) must not turn a passing test red just because it shares a key with
+        // another test.
+        var key = $"DocNo:Invoice:{Guid.NewGuid()}";
         var sut = ProviderFor("acme");
-        await sut.EnsureSequenceAsync("DocNo:Invoice", startValue: 100);
+        await sut.EnsureSequenceAsync(key, startValue: 100);
 
-        Assert.Equal(100, await sut.NextAsync("DocNo:Invoice"));
-        Assert.Equal(101, await sut.NextAsync("DocNo:Invoice"));
+        Assert.Equal(100, await sut.NextAsync(key));
+        Assert.Equal(101, await sut.NextAsync(key));
     }
 
     [Fact]

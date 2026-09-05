@@ -25,7 +25,9 @@ public interface ISequenceProvider
     /// <param name="sequenceKey">Caller-defined key, conventionally colon-namespaced (<c>DocNo:Invoice:2026</c>).</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The allocated value.</returns>
-    /// <exception cref="ArgumentException"><paramref name="sequenceKey"/> is null or empty.</exception>
+    /// <exception cref="ArgumentException">
+    /// <paramref name="sequenceKey"/> is null, empty, or exceeds the 100-character column limit.
+    /// </exception>
     /// <exception cref="InvalidOperationException">
     /// There is no ambient tenant, or the sequence has not been seeded, or it is exhausted.
     /// </exception>
@@ -36,7 +38,9 @@ public interface ISequenceProvider
     /// <param name="count">How many values to allocate.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The allocated values in ascending order.</returns>
-    /// <exception cref="ArgumentException"><paramref name="sequenceKey"/> is null or empty.</exception>
+    /// <exception cref="ArgumentException">
+    /// <paramref name="sequenceKey"/> is null, empty, or exceeds the 100-character column limit.
+    /// </exception>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="count"/> is not positive.</exception>
     /// <exception cref="InvalidOperationException">No ambient tenant, not seeded, or exhausted.</exception>
     Task<IReadOnlyList<long>> NextRangeAsync(string sequenceKey, int count, CancellationToken ct = default);
@@ -45,7 +49,10 @@ public interface ISequenceProvider
     /// <param name="sequenceKey">The sequence key.</param>
     /// <param name="startValue">First value <see cref="NextAsync"/> returns. Ignored if the row exists.</param>
     /// <param name="ct">Cancellation token.</param>
-    /// <exception cref="ArgumentException"><paramref name="sequenceKey"/> is null or empty.</exception>
+    /// <exception cref="ArgumentException">
+    /// <paramref name="sequenceKey"/> is null, empty, or exceeds the 100-character column limit.
+    /// </exception>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="startValue"/> is not positive.</exception>
     /// <exception cref="InvalidOperationException">There is no ambient tenant.</exception>
     Task EnsureSequenceAsync(string sequenceKey, long startValue = 1, CancellationToken ct = default);
 
@@ -59,7 +66,9 @@ public interface ISequenceProvider
     /// its scope would otherwise draw every tenant's numbers from one shared counter with nothing
     /// reporting it. Host-level allocation has to be asked for.
     /// </remarks>
-    /// <exception cref="ArgumentException"><paramref name="sequenceKey"/> is null or empty.</exception>
+    /// <exception cref="ArgumentException">
+    /// <paramref name="sequenceKey"/> is null, empty, or exceeds the 100-character column limit.
+    /// </exception>
     /// <exception cref="InvalidOperationException">The sequence has not been seeded, or is exhausted.</exception>
     Task<long> NextHostAsync(string sequenceKey, CancellationToken ct = default);
 
@@ -68,7 +77,9 @@ public interface ISequenceProvider
     /// <param name="count">How many values to allocate.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The allocated values in ascending order.</returns>
-    /// <exception cref="ArgumentException"><paramref name="sequenceKey"/> is null or empty.</exception>
+    /// <exception cref="ArgumentException">
+    /// <paramref name="sequenceKey"/> is null, empty, or exceeds the 100-character column limit.
+    /// </exception>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="count"/> is not positive.</exception>
     /// <exception cref="InvalidOperationException">Not seeded, or exhausted.</exception>
     Task<IReadOnlyList<long>> NextHostRangeAsync(string sequenceKey, int count, CancellationToken ct = default);
@@ -77,6 +88,9 @@ public interface ISequenceProvider
     /// <param name="sequenceKey">The sequence key.</param>
     /// <param name="startValue">First value returned. Ignored if the row exists.</param>
     /// <param name="ct">Cancellation token.</param>
-    /// <exception cref="ArgumentException"><paramref name="sequenceKey"/> is null or empty.</exception>
+    /// <exception cref="ArgumentException">
+    /// <paramref name="sequenceKey"/> is null, empty, or exceeds the 100-character column limit.
+    /// </exception>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="startValue"/> is not positive.</exception>
     Task EnsureHostSequenceAsync(string sequenceKey, long startValue = 1, CancellationToken ct = default);
 }

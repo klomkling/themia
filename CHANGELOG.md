@@ -55,6 +55,19 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
   Does **not** guarantee gapless numbering and cannot: the value is allocated before the caller commits.
   Stated in the README because a regulator requiring an unbroken run needs a different mechanism.
 
+  **`sequenceKey` is now rejected outright past 100 characters**, on every engine, matching the
+  `sequence_key` column width. Without this, MySQL's seed insert (see below) was the only place that
+  would have silently truncated an over-length key into the wrong bucket; this guard closes it for
+  PostgreSQL and SQL Server too, before any SQL runs.
+
+### Fixed
+- **MySQL's `EnsureSequenceAsync` no longer uses `INSERT IGNORE`.** `IGNORE` downgrades a whole class of
+  errors to warnings — duplicate key, data truncation, `NULL` into a `NOT NULL` column, out-of-range —
+  regardless of `sql_mode`, not just the duplicate-key case the seed needs to swallow. Replaced with
+  `INSERT ... ON DUPLICATE KEY UPDATE next_value = next_value`, a genuine no-op on collision that leaves
+  truncation and `NOT NULL` protection intact. Same rationale already applied to `MySqlChallengeDialect`
+  and `MySqlInboxAdmission`.
+
 ## [0.21.4] - 2026-09-04
 
 ### Added
