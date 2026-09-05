@@ -1840,18 +1840,16 @@ tenant's numbers from one shared counter with nothing reporting it.
 Formatting (`INV-2026-00042`) is yours. The provider returns a `long`.
 ````
 
-Add to the csproj `PropertyGroup`:
+**Do NOT add `PackageReadmeFile` or a `None Include` to the csproj.** `Directory.Build.props` already
+packs any project's `README.md` unconditionally once the file exists on disk — a rule added after the
+0.21.1 incident, and guarded with `Condition="Exists(...)"` so it needs no per-project opt-in. Declaring
+it again in the csproj duplicates the `None` item and fails the pack with **NU5118 (duplicate file)**.
 
-```xml
-<PackageReadmeFile>README.md</PackageReadmeFile>
-```
+Writing the README is the whole step. Verify it actually lands in the package:
 
-and an item:
-
-```xml
-<ItemGroup>
-  <None Include="README.md" Pack="true" PackagePath="/" />
-</ItemGroup>
+```bash
+dotnet pack src/framework/Themia.Framework.Data.Sequences/Themia.Framework.Data.Sequences.csproj -c Release
+unzip -l src/framework/Themia.Framework.Data.Sequences/bin/Release/*.nupkg | grep README
 ```
 
 - [ ] **Step 6: Update the architecture overview**
