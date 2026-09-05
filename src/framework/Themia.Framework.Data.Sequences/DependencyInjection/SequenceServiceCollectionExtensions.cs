@@ -52,7 +52,33 @@ public static class SequenceServiceCollectionExtensions
             Dialect = options.Dialect,
         };
 
-        services.TryAddSingleton(frozen);
+        // TryAdd would DISCARD this registration if one already exists, silently. A host registering the
+        // main database and a module registering its own would then send every allocation to whichever
+        // ran first, while the loser's Validate() had passed and the code read as configured. An
+        // identical second registration is harmless and stays harmless; a CONFLICTING one is refused.
+        //
+        // The message deliberately does not quote either connection string: they carry credentials.
+        var existing = (SequenceOptions?)services
+            .FirstOrDefault(d => d.ServiceType == typeof(SequenceOptions))?.ImplementationInstance;
+
+        if (existing is not null)
+        {
+            if (existing.ConnectionString != frozen.ConnectionString
+                || existing.Engine != frozen.Engine
+                || !ReferenceEquals(existing.Dialect, frozen.Dialect))
+            {
+                throw new InvalidOperationException(
+                    "Themia sequences are already registered with a different configuration. "
+                    + "AddThemiaSequences can be called more than once only with identical options — "
+                    + "one allocator serves the whole application, and a second registration would "
+                    + "otherwise be discarded without warning, sending every allocation to whichever "
+                    + "call ran first.");
+            }
+
+            return services;   // identical: idempotent
+        }
+
+        services.AddSingleton(frozen);
         services.TryAddScoped<ISequenceProvider, SequenceProvider>();
         return services;
     }

@@ -30,6 +30,14 @@ namespace Themia.Framework.Data.Sequences.IntegrationTests;
 [Trait("Category", "Integration")]
 public sealed class SequenceTransactionIndependenceTests : IAsyncLifetime
 {
+
+    // Every test method gets a fresh instance from xUnit, so this namespaces THIS test's keys and
+    // nothing else's. Tests that deliberately reuse one key within themselves (two tenants on the same
+    // key, host versus tenant) still see a single value. Without it the suite depends on a fresh
+    // container per test, which is the cost the repo's shared-fixture pattern exists to avoid.
+    private readonly string keyNamespace = Guid.NewGuid().ToString("N");
+
+    private string Key(string name) => $"DocNo:{keyNamespace}:{name}";
     private readonly PostgreSqlContainer container = new PostgreSqlBuilder("postgres:16-alpine").Build();
 
     public async Task InitializeAsync()
@@ -52,7 +60,7 @@ public sealed class SequenceTransactionIndependenceTests : IAsyncLifetime
     [Fact]
     public async Task Control_AllocatingOnTheCallersTransaction_LosesTheNumberOnRollback()
     {
-        await Provider().EnsureSequenceAsync("DocNo:Control", startValue: 1);
+        await Provider().EnsureSequenceAsync(Key("Control"), startValue: 1);
 
         await using var conn = new NpgsqlConnection(container.GetConnectionString());
         await conn.OpenAsync();
@@ -60,32 +68,33 @@ public sealed class SequenceTransactionIndependenceTests : IAsyncLifetime
         {
             await conn.ExecuteAsync(
                 "UPDATE themia_sequences SET next_value = next_value + 1 "
-                + "WHERE tenant_id = 'acme' AND sequence_key = 'DocNo:Control'", transaction: tx);
+                + "WHERE tenant_id = 'acme' AND sequence_key = @key",
+                new { key = Key("Control") }, transaction: tx);
             await tx.RollbackAsync();
         }
 
         // Rolled back, so the counter never moved.
-        Assert.Equal(1, await Provider().NextAsync("DocNo:Control"));
+        Assert.Equal(1, await Provider().NextAsync(Key("Control")));
     }
 
     [Fact]
     public async Task AllocationSurvivesTheCallersRollback()
     {
-        await Provider().EnsureSequenceAsync("DocNo:Survives", startValue: 1);
+        await Provider().EnsureSequenceAsync(Key("Survives"), startValue: 1);
 
         await using var conn = new NpgsqlConnection(container.GetConnectionString());
         await conn.OpenAsync();
         long allocated;
         await using (var tx = await conn.BeginTransactionAsync())
         {
-            allocated = await Provider().NextAsync("DocNo:Survives");
+            allocated = await Provider().NextAsync(Key("Survives"));
             await tx.RollbackAsync();
         }
 
         Assert.Equal(1, allocated);
 
         // The number is gone for good -- a gap, which is the documented and intended outcome.
-        Assert.Equal(2, await Provider().NextAsync("DocNo:Survives"));
+        Assert.Equal(2, await Provider().NextAsync(Key("Survives")));
     }
 
     [Fact]
@@ -94,16 +103,16 @@ public sealed class SequenceTransactionIndependenceTests : IAsyncLifetime
         // ADO providers default to Enlist=true, so a connection opened inside a TransactionScope would
         // join it and the allocation would roll back with the scope -- reissuing the number to the next
         // caller, silently. The dialects suppress enlistment; this pins it.
-        await Provider().EnsureSequenceAsync("DocNo:Ambient", startValue: 1);
+        await Provider().EnsureSequenceAsync(Key("Ambient"), startValue: 1);
 
         long allocated;
         using (var scope = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled))
         {
-            allocated = await Provider().NextAsync("DocNo:Ambient");
+            allocated = await Provider().NextAsync(Key("Ambient"));
             // scope disposed without Complete() -> rollback
         }
 
         Assert.Equal(1, allocated);
-        Assert.Equal(2, await Provider().NextAsync("DocNo:Ambient"));
+        Assert.Equal(2, await Provider().NextAsync(Key("Ambient")));
     }
 }

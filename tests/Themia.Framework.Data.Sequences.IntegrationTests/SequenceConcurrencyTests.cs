@@ -18,6 +18,14 @@ namespace Themia.Framework.Data.Sequences.IntegrationTests;
 /// </summary>
 public abstract class SequenceConcurrencyTests
 {
+
+    // Every test method gets a fresh instance from xUnit, so this namespaces THIS test's keys and
+    // nothing else's. Tests that deliberately reuse one key within themselves (two tenants on the same
+    // key, host versus tenant) still see a single value. Without it the suite depends on a fresh
+    // container per test, which is the cost the repo's shared-fixture pattern exists to avoid.
+    private readonly string keyNamespace = Guid.NewGuid().ToString("N");
+
+    private string Key(string name) => $"DocNo:{keyNamespace}:{name}";
     protected abstract string ConnString { get; }
     protected abstract SequenceEngine Engine { get; }
 
@@ -29,10 +37,10 @@ public abstract class SequenceConcurrencyTests
     [Fact]
     public async Task Fifty_ConcurrentAllocations_AreAllDistinct()
     {
-        await Provider().EnsureSequenceAsync("DocNo:Concurrent", startValue: 1);
+        await Provider().EnsureSequenceAsync(Key("Concurrent"), startValue: 1);
 
         var values = await Task.WhenAll(Enumerable.Range(0, 50)
-            .Select(_ => Provider().NextAsync("DocNo:Concurrent")));
+            .Select(_ => Provider().NextAsync(Key("Concurrent"))));
 
         Assert.Equal(50, values.Distinct().Count());
         Assert.Equal(Enumerable.Range(1, 50).Select(i => (long)i).OrderBy(x => x), values.OrderBy(x => x));
@@ -42,18 +50,30 @@ public abstract class SequenceConcurrencyTests
     public async Task NextRange_ReturnsContiguousValuesAndAdvancesByCount()
     {
         var sut = Provider();
-        await sut.EnsureSequenceAsync("DocNo:Range", startValue: 10);
+        await sut.EnsureSequenceAsync(Key("Range"), startValue: 10);
 
-        var batch = await sut.NextRangeAsync("DocNo:Range", 5);
+        var batch = await sut.NextRangeAsync(Key("Range"), 5);
 
         Assert.Equal([10L, 11L, 12L, 13L, 14L], batch);
-        Assert.Equal(15, await sut.NextAsync("DocNo:Range"));
+        Assert.Equal(15, await sut.NextAsync(Key("Range")));
+    }
+
+    [Fact]
+    public async Task NextRange_RejectsAnAbsurdCount()
+    {
+        // Without an upper bound, NextRangeAsync(key, int.MaxValue) tries to allocate a 16 GB array and
+        // throws OutOfMemoryException part-way through a request. An argument that can never be served
+        // should be refused as an argument, up front, and named.
+        var ex = await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
+            () => Provider().NextRangeAsync(Key("Absurd"), int.MaxValue));
+
+        Assert.Contains("count", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
     public async Task NextRange_RejectsANonPositiveCount()
         => await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
-            () => Provider().NextRangeAsync("DocNo:Range", 0));
+            () => Provider().NextRangeAsync(Key("Range"), 0));
 
     // sequence_key is varchar(100)/nvarchar(100). MySQL's old INSERT IGNORE downgraded every error class —
     // including a truncation error — to a warning, so an over-length key was silently truncated to fit
@@ -77,12 +97,12 @@ public abstract class SequenceConcurrencyTests
     public async Task ReSeeding_DoesNotResetALiveCounter()
     {
         var sut = Provider();
-        await sut.EnsureSequenceAsync("DocNo:ReSeed", startValue: 500);
-        Assert.Equal(500, await sut.NextAsync("DocNo:ReSeed"));
+        await sut.EnsureSequenceAsync(Key("ReSeed"), startValue: 500);
+        Assert.Equal(500, await sut.NextAsync(Key("ReSeed")));
 
-        await sut.EnsureSequenceAsync("DocNo:ReSeed", startValue: 1);
+        await sut.EnsureSequenceAsync(Key("ReSeed"), startValue: 1);
 
-        Assert.Equal(501, await sut.NextAsync("DocNo:ReSeed"));
+        Assert.Equal(501, await sut.NextAsync(Key("ReSeed")));
     }
 
     [Fact]
@@ -90,10 +110,10 @@ public abstract class SequenceConcurrencyTests
     {
         // The only Host method with no coverage anywhere else in the plan.
         var sut = Provider();
-        await sut.EnsureHostSequenceAsync("DocNo:HostRange", startValue: 40);
+        await sut.EnsureHostSequenceAsync(Key("HostRange"), startValue: 40);
 
-        Assert.Equal([40L, 41L, 42L], await sut.NextHostRangeAsync("DocNo:HostRange", 3));
-        Assert.Equal(43, await sut.NextHostAsync("DocNo:HostRange"));
+        Assert.Equal([40L, 41L, 42L], await sut.NextHostRangeAsync(Key("HostRange"), 3));
+        Assert.Equal(43, await sut.NextHostAsync(Key("HostRange")));
     }
 
     [Fact]
@@ -107,8 +127,8 @@ public abstract class SequenceConcurrencyTests
             new SequenceOptions { ConnectionString = ConnString, Engine = Engine, Dialect = probe },
             new TenantContext(new TenantId("acme")));
 
-        await sut.EnsureSequenceAsync("DocNo:CustomDialect", startValue: 1);
-        Assert.Equal(1, await sut.NextAsync("DocNo:CustomDialect"));
+        await sut.EnsureSequenceAsync(Key("CustomDialect"), startValue: 1);
+        Assert.Equal(1, await sut.NextAsync(Key("CustomDialect")));
 
         Assert.True(probe.WasUsed, "the provider ignored options.Dialect and fell back to the factory");
     }
@@ -133,9 +153,9 @@ public abstract class SequenceConcurrencyTests
     public async Task AnExhaustedSequence_ThrowsInsteadOfWrappingNegative()
     {
         var sut = Provider();
-        await sut.EnsureSequenceAsync("DocNo:Exhausted", startValue: long.MaxValue);
+        await sut.EnsureSequenceAsync(Key("Exhausted"), startValue: long.MaxValue);
 
-        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => sut.NextAsync("DocNo:Exhausted"));
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => sut.NextAsync(Key("Exhausted")));
         Assert.Contains("exhausted", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 }

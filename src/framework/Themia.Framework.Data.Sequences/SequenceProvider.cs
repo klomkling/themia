@@ -25,6 +25,14 @@ internal sealed class SequenceProvider : ISequenceProvider
     /// </summary>
     internal const int MaxSequenceKeyLength = 100;
 
+    /// <summary>
+    /// Largest range a single <c>NextRangeAsync</c> call will serve. The returned array is materialised
+    /// in memory, so an unbounded count is an <see cref="OutOfMemoryException"/> part-way through a
+    /// request — 8 MB of longs is a generous ceiling for the bulk-import case this exists for, and a
+    /// caller needing more should allocate in batches rather than discover the limit as a crash.
+    /// </summary>
+    internal const int MaxRangeCount = 1_000_000;
+
     private readonly string connectionString;
     private readonly ITenantContext tenantContext;
     private readonly ISequenceDialect dialect;
@@ -54,6 +62,7 @@ internal sealed class SequenceProvider : ISequenceProvider
     {
         var tenant = RequireTenant(sequenceKey);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(count);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(count, MaxRangeCount);
         return AllocateAsync(tenant, sequenceKey, count, ct);
     }
 
@@ -73,6 +82,7 @@ internal sealed class SequenceProvider : ISequenceProvider
     {
         ValidateSequenceKey(sequenceKey);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(count);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(count, MaxRangeCount);
         return AllocateAsync(HostTenant, sequenceKey, count, ct);
     }
 

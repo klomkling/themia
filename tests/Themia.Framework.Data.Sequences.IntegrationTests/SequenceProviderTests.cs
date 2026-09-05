@@ -12,6 +12,14 @@ namespace Themia.Framework.Data.Sequences.IntegrationTests;
 [Trait("Category", "Integration")]
 public sealed class SequenceProviderTests : IAsyncLifetime
 {
+
+    // Every test method gets a fresh instance from xUnit, so this namespaces THIS test's keys and
+    // nothing else's. Tests that deliberately reuse one key within themselves (two tenants on the same
+    // key, host versus tenant) still see a single value. Without it the suite depends on a fresh
+    // container per test, which is the cost the repo's shared-fixture pattern exists to avoid.
+    private readonly string keyNamespace = Guid.NewGuid().ToString("N");
+
+    private string Key(string name) => $"DocNo:{keyNamespace}:{name}";
     private readonly PostgreSqlContainer container = new PostgreSqlBuilder("postgres:16-alpine").Build();
 
     public async Task InitializeAsync()
@@ -35,7 +43,7 @@ public sealed class SequenceProviderTests : IAsyncLifetime
         // not depend on that isolation — a later switch to a shared per-engine fixture (as in
         // ChallengeEngineFixtures) must not turn a passing test red just because it shares a key with
         // another test.
-        var key = $"DocNo:Invoice:{Guid.NewGuid()}";
+        var key = Key("Invoice");
         var sut = ProviderFor("acme");
         await sut.EnsureSequenceAsync(key, startValue: 100);
 
@@ -47,13 +55,13 @@ public sealed class SequenceProviderTests : IAsyncLifetime
     public async Task Ensure_IsIdempotentAndPreservesAnExistingCounter()
     {
         var sut = ProviderFor("acme");
-        await sut.EnsureSequenceAsync("DocNo:Order", startValue: 500);
-        Assert.Equal(500, await sut.NextAsync("DocNo:Order"));
+        await sut.EnsureSequenceAsync(Key("Order"), startValue: 500);
+        Assert.Equal(500, await sut.NextAsync(Key("Order")));
 
         // A second seed with a different start must NOT reset the counter, or a redeploy would reissue
         // every number already handed out.
-        await sut.EnsureSequenceAsync("DocNo:Order", startValue: 1);
-        Assert.Equal(501, await sut.NextAsync("DocNo:Order"));
+        await sut.EnsureSequenceAsync(Key("Order"), startValue: 1);
+        Assert.Equal(501, await sut.NextAsync(Key("Order")));
     }
 
     [Fact]
@@ -63,19 +71,19 @@ public sealed class SequenceProviderTests : IAsyncLifetime
         // counter, and two spellings would hand out the same numbers.
         var sut = ProviderFor("acme");
 
-        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => sut.NextAsync("DocNo:NeverSeeded"));
-        Assert.Contains("DocNo:NeverSeeded", ex.Message, StringComparison.Ordinal);
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => sut.NextAsync(Key("NeverSeeded")));
+        Assert.Contains(Key("NeverSeeded"), ex.Message, StringComparison.Ordinal);
     }
 
     [Fact]
     public async Task Tenants_DoNotShareACounter()
     {
-        await ProviderFor("acme").EnsureSequenceAsync("DocNo:Invoice", startValue: 1);
-        await ProviderFor("globex").EnsureSequenceAsync("DocNo:Invoice", startValue: 1);
+        await ProviderFor("acme").EnsureSequenceAsync(Key("Invoice"), startValue: 1);
+        await ProviderFor("globex").EnsureSequenceAsync(Key("Invoice"), startValue: 1);
 
-        Assert.Equal(1, await ProviderFor("acme").NextAsync("DocNo:Invoice"));
-        Assert.Equal(2, await ProviderFor("acme").NextAsync("DocNo:Invoice"));
-        Assert.Equal(1, await ProviderFor("globex").NextAsync("DocNo:Invoice"));
+        Assert.Equal(1, await ProviderFor("acme").NextAsync(Key("Invoice")));
+        Assert.Equal(2, await ProviderFor("acme").NextAsync(Key("Invoice")));
+        Assert.Equal(1, await ProviderFor("globex").NextAsync(Key("Invoice")));
     }
 
     [Theory]
