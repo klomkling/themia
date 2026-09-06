@@ -27,6 +27,20 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+### Security
+
+- **`Themia.Exceptional.AspNetCore` — the dashboard stylesheet was served without authorization, and no
+  dashboard response was marked uncacheable.** `GET {mount}/dashboard.css` returned `200` with content
+  while every sibling route returned the route-hiding `404`, so an unauthenticated request confirmed the
+  dashboard's mount point. Separately, `PreventCaching` was applied only to rendered HTML, so a shared
+  proxy or CDN could store an authorized response and serve it to an unauthenticated caller — with
+  `Authorize` never running — and could serve a cached deny-`404` back to a legitimate administrator.
+  The stylesheet now passes the same `Authorize` gate (denying with a bare `404`, never `OnDenied`, which
+  would redirect a subresource request to a login page), every response including the deny path carries
+  `no-store` plus `Vary: Cookie, Authorization`, and the headers are reapplied after `Response.Clear()` in
+  the `OnDenied`-throws fallback. No exception data was exposed; the disclosure was of the mount point.
+  Found while building the audit dashboard from this package as a template.
+
 ## [0.22.1] - 2026-09-06
 
 ### Fixed
