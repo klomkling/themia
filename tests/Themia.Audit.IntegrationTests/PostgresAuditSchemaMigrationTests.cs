@@ -2,9 +2,9 @@ using Themia.Data.Migrations;
 
 using Xunit;
 
-namespace Themia.Audit.Migration.Tests;
+namespace Themia.Audit.IntegrationTests;
 
 [Trait("Category", "Integration")]
-[Collection(PostgresAuditMigrationCollection.Name)]
-public sealed class PostgresAuditSchemaMigrationTests(PostgresAuditMigrationFixture fixture)
+[Collection(PostgresAuditStoreCollection.Name)]
+public sealed class PostgresAuditSchemaMigrationTests(PostgresAuditStoreFixture fixture)
     : AuditSchemaMigrationTestsBase(MigrationEngine.Postgres, fixture.Dialect, fixture.ConnectionString);

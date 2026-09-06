@@ -1,13 +1,21 @@
 using Xunit;
 
-namespace Themia.Audit.Integration.Tests;
+namespace Themia.Audit.IntegrationTests;
 
 /// <summary>
 /// Engine-agnostic store round-trip assertions, run once per engine by a thin subclass bound to that
-/// engine's dedicated container (see <see cref="AuditStoreFixture"/>).
+/// engine's shared container (see <see cref="AuditStoreFixture"/>).
 /// </summary>
 public abstract class AuditStoreTestsBase(IAuditStore store, IAuditDialect dialect, string connectionString)
 {
+    // xUnit constructs a fresh instance of this class per test method, so this Guid is a genuine
+    // per-test-method namespace: it keeps every row a test writes invisible to filtered queries run by
+    // every other test method sharing this engine's one container/table. No test in this class (or its
+    // subclasses' migration siblings) may assert a total row count — only counts scoped by this TenantId.
+    private readonly Guid testNamespace = Guid.NewGuid();
+
+    private string TenantId => $"t-{testNamespace:N}";
+
     [Fact]
     public async Task Every_field_lands_in_its_own_column()
     {
@@ -18,7 +26,7 @@ public abstract class AuditStoreTestsBase(IAuditStore store, IAuditDialect diale
             EventType = "EVT",
             Category = AuditCategory.Activity,
             Outcome = AuditOutcome.Failure,
-            TenantId = "tenant-A",
+            TenantId = TenantId,
             ActorId = "actor-1",
             ActorName = "actor-name-2",
             EntityType = "entity-type-3",
@@ -35,7 +43,7 @@ public abstract class AuditStoreTestsBase(IAuditStore store, IAuditDialect diale
         var read = await store.GetAsync(entry.EventUid, conn, default);
 
         Assert.NotNull(read);
-        Assert.Equal("tenant-A", read.TenantId);
+        Assert.Equal(TenantId, read.TenantId);
         Assert.Equal(AuditCategory.Activity, read.Category);
         Assert.Equal("EVT", read.EventType);
         Assert.Equal(AuditOutcome.Failure, read.Outcome);
@@ -74,18 +82,17 @@ public abstract class AuditStoreTestsBase(IAuditStore store, IAuditDialect diale
     [Fact]
     public async Task Paging_is_stable_when_rows_share_a_timestamp()
     {
-        // Scoped to a per-test tenant id so this class's rows never mix with another test method's
-        // rows in the same shared container/table.
-        var tenantId = $"paging-{Guid.NewGuid():N}";
+        // Scoped to this instance's TenantId so this method's rows never mix with another test method's
+        // rows in the same shared container/table — never assert a total row count across the table.
         var at = DateTimeOffset.UtcNow;
 
         await using var conn = await OpenConnectionAsync();
         for (var i = 0; i < 10; i++)
         {
-            await store.WriteAsync(Valid() with { TenantId = tenantId, OccurredAt = at }, conn, null, default);
+            await store.WriteAsync(Valid() with { OccurredAt = at }, conn, null, default);
         }
 
-        var query = new AuditQuery { TenantId = tenantId, Page = 1, PageSize = 5 };
+        var query = new AuditQuery { TenantId = TenantId, Page = 1, PageSize = 5 };
         var p1 = await store.QueryAsync(query, conn, default);
         var p2 = await store.QueryAsync(query with { Page = 2 }, conn, default);
 
@@ -107,13 +114,15 @@ public abstract class AuditStoreTestsBase(IAuditStore store, IAuditDialect diale
     [Fact]
     public async Task PurgeAsync_deletes_only_rows_older_than_the_cutoff()
     {
-        var tenantId = $"purge-{Guid.NewGuid():N}";
+        // occurred_at values 30 days apart and a 1-day cutoff: every other test method in this project
+        // writes with OccurredAt = DateTimeOffset.UtcNow, so this purge (table-wide, not tenant-scoped —
+        // see IAuditDialect.PurgeSql) cannot delete rows another test wrote.
         var old = DateTimeOffset.UtcNow.AddDays(-30);
         var recent = DateTimeOffset.UtcNow;
 
         await using var conn = await OpenConnectionAsync();
-        var oldEntry = Valid() with { TenantId = tenantId, OccurredAt = old };
-        var recentEntry = Valid() with { TenantId = tenantId, OccurredAt = recent };
+        var oldEntry = Valid() with { OccurredAt = old };
+        var recentEntry = Valid() with { OccurredAt = recent };
         await store.WriteAsync(oldEntry, conn, null, default);
         await store.WriteAsync(recentEntry, conn, null, default);
 
@@ -130,11 +139,12 @@ public abstract class AuditStoreTestsBase(IAuditStore store, IAuditDialect diale
         return conn;
     }
 
-    private static AuditEntry Valid() => new()
+    private AuditEntry Valid() => new()
     {
         EventType = "EVT",
         Category = AuditCategory.Activity,
         Outcome = AuditOutcome.Success,
         OccurredAt = DateTimeOffset.UtcNow,
+        TenantId = TenantId,
     };
 }

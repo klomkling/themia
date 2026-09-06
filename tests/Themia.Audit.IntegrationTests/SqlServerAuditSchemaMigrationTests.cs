@@ -2,9 +2,9 @@ using Themia.Data.Migrations;
 
 using Xunit;
 
-namespace Themia.Audit.Migration.Tests;
+namespace Themia.Audit.IntegrationTests;
 
 [Trait("Category", "Integration")]
-[Collection(SqlServerAuditMigrationCollection.Name)]
-public sealed class SqlServerAuditSchemaMigrationTests(SqlServerAuditMigrationFixture fixture)
+[Collection(SqlServerAuditStoreCollection.Name)]
+public sealed class SqlServerAuditSchemaMigrationTests(SqlServerAuditStoreFixture fixture)
     : AuditSchemaMigrationTestsBase(MigrationEngine.SqlServer, fixture.Dialect, fixture.ConnectionString);

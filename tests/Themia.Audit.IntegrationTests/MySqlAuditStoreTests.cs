@@ -1,6 +1,6 @@
 using Xunit;
 
-namespace Themia.Audit.Integration.Tests;
+namespace Themia.Audit.IntegrationTests;
 
 [Trait("Category", "Integration")]
 [Collection(MySqlAuditStoreCollection.Name)]
