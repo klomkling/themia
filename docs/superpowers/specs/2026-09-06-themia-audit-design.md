@@ -525,6 +525,19 @@ documented.
 `AuditEvent.Metadata` is already `IReadOnlyDictionary<string, string>`, so the adapter (§13) passes it
 straight through.
 
+**Matching is by substring, case-insensitively, not by exact name.** An exact lookup shipped in the first
+implementation and the review caught it: `newPassword`, `currentPassword`, `client_secret` and `id_token`
+all passed through unredacted while the API was called `AddPattern` and documented as "matches". Real
+payloads use those names constantly, so redaction looked configured and did not fire. Under-redaction is
+a security failure and over-redaction is a usability cost, so the rule leans to safety — a field named
+`tokenCount` is redacted too, and that is the intended trade.
+
+A payload that is already a `string` is **rejected**. `JsonSerializer.Serialize` turns it into a JSON
+string literal, so the redactor sees a bare string root with no properties and returns it verbatim — an
+adopter who serialized their own payload first got zero redaction. That is the one hole the
+"callers never supply a JSON string" invariant existed to close, and it needed a guard rather than a
+comment.
+
 Default deny-list, matched case-insensitively against JSON property names at any depth:
 
 ```
@@ -575,7 +588,7 @@ The neutral store cannot filter: it has no `ITenantContext` — that type lives 
 | --- | --- |
 | `IAuditStore.QueryAsync` (neutral) | only what `AuditQuery` carries. Unfiltered by default, **by design**. |
 | `ITenantAuditReader` (module) | pre-seeds `TenantId` from `ITenantContext`; cannot be asked for another tenant's rows |
-| the dashboard (§13) | neither — scoping is the adopter's, through `Authorize` |
+| the dashboard (§13) | the adopter's `ScopeQuery` hook. **Not `Authorize`** — see §13 |
 
 `ITenantAuditReader` is the analogue of `ITenantQueryFactory.For<T>()` in DECISION #6: the safe path is
 the one with the predicate already applied, and the raw one stays available and conspicuous.
@@ -807,10 +820,25 @@ The dashboard has no unit of work, so it opens its own connection through
 adopter's transaction; a read must not be able to hold a lock on the audit table while a business
 transaction is open.
 
-**Tenant scoping is the adopter's job, through `Authorize`.** The dashboard does not resolve a tenant
-from `ITenantContext` — it is mounted by the host, and a host admin viewing all tenants and a tenant
-admin viewing their own are both legitimate. The `Authorize` XML doc states this explicitly, because the
-failure mode of assuming otherwise is one tenant reading another's audit trail.
+**Tenant scoping is the adopter's job, through a dedicated `ScopeQuery` hook — not through `Authorize`.**
+
+An earlier revision of this spec said `Authorize`. That was wrong, and the whole-branch review caught it:
+`Authorize` returns `bool`. It can admit or refuse a request; it **cannot narrow a query**. With scoping
+resting on it, a viewer authorized for one tenant read another tenant's audit trail by editing `?tenant=`
+in the URL — and the dashboard's own test asserted that as intended behaviour. A hook that can only say
+yes or no was never capable of the job this spec assigned it.
+
+```csharp
+public Func<HttpContext, AuditQuery, AuditQuery>? ScopeQuery { get; set; }
+```
+
+It runs **after** `Authorize` and rewrites the query, so a hook that pins `TenantId` cannot be overridden
+from the query string. `null` keeps the unscoped behaviour, which is correct for a single-tenant host and
+for a host admin console — but it is now an explicit choice rather than the only available one.
+
+The dashboard still does not resolve a tenant from `ITenantContext`: it is mounted by the host, and a
+host admin viewing every tenant and a tenant admin viewing their own are both legitimate. The package
+cannot know which it is serving; `ScopeQuery` is how the host says.
 
 ---
 
@@ -840,6 +868,13 @@ Required:
 
 - Round-trip insert/read on each engine, including every nullable column left null.
 - `tenant_id NULL` round-trips as `null`, not `""`.
+- **`occurred_at` round-trips to the same instant, sub-second precision included, on every engine.**
+  This is not routine coverage. It is the only column whose type diverges per engine (`DATETIME(6)` on
+  MySQL against `timestamptz`/`datetime2`), the first version of the transposition test skipped it, and
+  adding it exposed live data corruption: MySQL returns a `DateTime` with `Kind=Unspecified`, and .NET's
+  explicit `DateTime` → `DateTimeOffset` conversion reads `Unspecified` as **local** time, stamping every
+  row with whatever UTC offset the reading process happened to run at. Fixed with a Dapper type handler.
+  A test named for totality that covers 12 of 15 columns is how that survived to a final review.
 - **Column-transposition guard.** Every dialect maps its row positionally, and five consecutive nullable
   strings (`actor_id`, `actor_name`, `entity_type`, `entity_id`, `reason`) make a swap invisible. Assert
   each field carries a **distinct** value and lands in its own column. This is the defect that shipped in
@@ -897,7 +932,14 @@ Required:
 **Dashboard:**
 
 - `Authorize = null` returns 404 for every route, including detail with a valid id.
-- An `Authorize` that throws returns 404, never 500 and never content.
+- An `Authorize` that throws returns 404, never 500 and never content. Assert against a string that is
+  genuinely present in a successful render — one absent from both the page and the empty 404 passes even
+  on a total leak.
+- `ScopeQuery` pinning a tenant cannot be overridden by `?tenant=` in the URL.
+- An `OnDenied` that writes and *then* throws still ends in the 404, not a 500 from `Response.Clear()`.
+- Cache headers on **every** exit, the authorized-but-not-found 404 included, and `Vary` is appended
+  rather than assigned — assigning it drops the `Accept-Encoding` that response compression set, which
+  makes a compressed and an uncompressed body interchangeable in a shared cache.
 - `ShowData = false` omits the `data` field from the rendered detail page — assert the payload string is
   absent from the response body, not that a flag was read.
 - `pageSize` above `MaxPageSize` is clamped, not honoured.
