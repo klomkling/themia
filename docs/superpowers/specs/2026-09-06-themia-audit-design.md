@@ -816,9 +816,25 @@ failure mode of assuming otherwise is one tenant reading another's audit trail.
 
 ## 14. Testing
 
-**Neutral core, all three engines, Testcontainers.** Following `SequencesSchemaMigrationTests`, split
-onto its own container after the `0.22.0` review: migration tests get one container, behaviour tests
-share another. That suite went from 43 containers to 4; do not regress it.
+**Neutral core, all three engines, Testcontainers. One container per engine, shared by every test class
+in the project — including the migration class.**
+
+This corrects a claim earlier revisions of this spec carried: that `SequencesSchemaMigrationTests` was
+given its own container in the `0.22.0` review. It was not. `SequenceEngineFixtures.cs:25-36` says the
+opposite in as many words — the migration class *"still joins `PostgresSequenceCollection` rather than
+getting a dedicated container, deliberately"* — and lists why that is safe:
+
+1. `Up()` guards its `CREATE TABLE` with `Schema.Table(...).Exists()`, so a rerun against an
+   already-migrated table only rewrites the ledger row and never touches the data;
+2. `ThemiaMigrations.Run` takes an exclusive advisory lock for the whole run, so no concurrent migration
+   can interleave;
+3. xUnit never runs two classes from the same collection concurrently, so nothing else is querying that
+   connection while the ledger row is briefly deleted.
+
+*"Sharing it is what gets this project to exactly three containers total."* Audit's migration passes all
+three conditions, so it shares too. The figure to hold is **three containers, one per engine**, not a
+separate migration container — and CI runs on a shared four-core box (coord #0109), so the count is not
+cosmetic.
 
 Required:
 

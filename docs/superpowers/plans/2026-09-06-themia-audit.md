@@ -66,8 +66,8 @@ src/modules/Themia.Modules.Audit/
   AuditModule.cs  AuditModuleOptions.cs
   DependencyInjection/AuditModuleServiceCollectionExtensions.cs
 tests/Themia.Audit.Tests/                    # unit: model, redaction, enrichment, layering
-tests/Themia.Audit.Integration.Tests/        # 3 engines: store, dialects
-tests/Themia.Audit.Migration.Tests/          # 3 engines: schema, own containers (spec §14)
+tests/Themia.Audit.IntegrationTests/         # 3 engines: store, dialects AND schema — one shared
+                                             # container per engine, migration class included
 tests/Themia.Audit.AspNetCore.Tests/         # dashboard
 tests/Themia.Modules.Audit.Tests/            # policy, tenant reader, observer, DI graph
 ```
@@ -271,8 +271,13 @@ git commit -m "feat(audit): audit entry model, length validation and JSON redact
 - Produces: `IAuditStore` (`WriteAsync -> long`, `QueryAsync`, `GetAsync(Guid)`, `PurgeAsync`),
   `IAuditDialect` (`CreateConnection`, `InsertSql`, `SelectPageSql`, `CountSql`, `PurgeSql`).
 
-**Container discipline:** migration tests get their **own** container per engine; store tests share a
-second. The `0.22.0` review cut that suite from 43 containers to 4 — do not regress it.
+**Container discipline: ONE container per engine, shared by every test class including the migration
+class — three containers total, in a single integration test project.**
+
+Copy `tests/Themia.Framework.Data.Sequences.IntegrationTests/SequenceEngineFixtures.cs`, whose XML doc
+states the reasoning at `:25-36`. Do not give the migration tests a separate container: `Up()` is guarded
+by `Schema.Table(...).Exists()`, `ThemiaMigrations.Run` holds an exclusive advisory lock, and xUnit never
+runs two classes from one collection concurrently. CI shares a four-core box (coord #0109).
 
 - [ ] **Step 1: Write the failing migration test**
 
