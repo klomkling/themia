@@ -102,6 +102,12 @@ internal sealed class FakeRefreshTokenService : IRefreshTokenService
     /// cannot turn a refresh rejection into a 500.</summary>
     public bool ThrowOnResolveOwner { get; set; }
 
+    /// <summary>When set, <see cref="ResolveOwnerAsync"/> throws <see cref="OperationCanceledException"/>
+    /// instead — the shape a client disconnect during logout actually takes. Kept distinct from
+    /// <see cref="ThrowOnResolveOwner"/> because <c>AuthenticationFlow.TryResolveOwnerAsync</c>
+    /// deliberately does NOT swallow this exception type (see its own remarks).</summary>
+    public bool CancelOnResolveOwner { get; set; }
+
     public Task<RefreshIssue> IssueAsync(Guid userId, CancellationToken cancellationToken = default)
     {
         IssueCalls++;
@@ -114,6 +120,10 @@ internal sealed class FakeRefreshTokenService : IRefreshTokenService
     public Task<Guid?> ResolveOwnerAsync(string rawToken, CancellationToken cancellationToken = default)
     {
         ResolveOwnerCalls++;
+        if (CancelOnResolveOwner)
+        {
+            throw new OperationCanceledException("owner lookup cancelled");
+        }
         if (ThrowOnResolveOwner)
         {
             throw new InvalidOperationException("owner lookup failure");

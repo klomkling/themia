@@ -118,4 +118,17 @@ public sealed class AuthenticationFlowRefreshTests
         await Build(refresh, new RecordingHooks()).LogoutAsync("token", allSessions: false);
         Assert.Equal(1, refresh.RevokeCalls);
     }
+
+    [Fact]
+    public async Task Logout_still_revokes_when_owner_resolution_is_cancelled()
+    {
+        // Cancellation is the most likely failure on a logout: a client that POSTs /logout and
+        // immediately navigates away or backgrounds the app. TryResolveOwnerAsync deliberately does not
+        // swallow OperationCanceledException, so revocation must happen BEFORE attribution is attempted
+        // — otherwise the refresh token stays valid even though the client asked to log out.
+        var refresh = new FakeRefreshTokenService { CancelOnResolveOwner = true };
+        await Assert.ThrowsAsync<OperationCanceledException>(
+            () => Build(refresh, new RecordingHooks()).LogoutAsync("token", allSessions: false));
+        Assert.Equal(1, refresh.RevokeCalls);
+    }
 }

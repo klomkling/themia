@@ -312,12 +312,15 @@ public sealed class AuthenticationFlow : IAuthenticationFlow
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(refreshToken);
 
-        // Resolved BEFORE revocation so the audit trail can attribute the logout to a user even though
-        // revocation itself does not return one. Routed through TryResolveOwnerAsync: losing attribution
-        // is acceptable, but a transient failure here must never skip revocation — logout must always
-        // revoke the session.
-        var userId = await TryResolveOwnerAsync(refreshToken, cancellationToken).ConfigureAwait(false);
+        // Revoked BEFORE attribution is resolved: TryResolveOwnerAsync only swallows exceptions that are
+        // NOT OperationCanceledException (see its own remarks), so a client that POSTs /logout and
+        // immediately disconnects — the most likely failure on a logout — would otherwise propagate an
+        // OperationCanceledException out of a resolve-then-revoke ordering and skip RevokeAsync entirely,
+        // leaving the refresh token valid. RevokeAsync looks the token up by hash and only stamps
+        // RevokedAt (see RefreshTokenService) — the row is never deleted — so the owner is still
+        // resolvable afterward and attribution is not lost by reordering.
         await refreshTokens.RevokeAsync(refreshToken, allSessions, cancellationToken).ConfigureAwait(false);
+        var userId = await TryResolveOwnerAsync(refreshToken, cancellationToken).ConfigureAwait(false);
         logger.LogInformation("Logout for refresh token (allSessions={AllSessions}).", allSessions);
         await hooks.OnLogoutAsync(new LogoutContext(userId, allSessions), cancellationToken).ConfigureAwait(false);
         await RaiseAsync((o, ct) => o.OnLogoutAsync(userId, allSessions, ct), cancellationToken).ConfigureAwait(false);
