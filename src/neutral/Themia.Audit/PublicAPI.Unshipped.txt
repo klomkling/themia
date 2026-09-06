@@ -1,0 +1,95 @@
+#nullable enable
+Themia.Audit.AuditCategory
+Themia.Audit.AuditCategory.Activity = 1 -> Themia.Audit.AuditCategory
+Themia.Audit.AuditCategory.Authentication = 2 -> Themia.Audit.AuditCategory
+Themia.Audit.AuditCategory.Unspecified = 0 -> Themia.Audit.AuditCategory
+Themia.Audit.AuditCategory.UserLifecycle = 3 -> Themia.Audit.AuditCategory
+Themia.Audit.AuditEngine
+Themia.Audit.AuditEngine.MySql = 3 -> Themia.Audit.AuditEngine
+Themia.Audit.AuditEngine.Postgres = 1 -> Themia.Audit.AuditEngine
+Themia.Audit.AuditEngine.SqlServer = 2 -> Themia.Audit.AuditEngine
+Themia.Audit.AuditEngine.Unspecified = 0 -> Themia.Audit.AuditEngine
+Themia.Audit.AuditEntry
+Themia.Audit.AuditEntry.ActorId.get -> string?
+Themia.Audit.AuditEntry.ActorId.init -> void
+Themia.Audit.AuditEntry.ActorName.get -> string?
+Themia.Audit.AuditEntry.ActorName.init -> void
+Themia.Audit.AuditEntry.Category.get -> Themia.Audit.AuditCategory
+Themia.Audit.AuditEntry.Category.init -> void
+Themia.Audit.AuditEntry.CorrelationId.get -> string?
+Themia.Audit.AuditEntry.CorrelationId.init -> void
+Themia.Audit.AuditEntry.Data.get -> string?
+Themia.Audit.AuditEntry.EntityId.get -> string?
+Themia.Audit.AuditEntry.EntityId.init -> void
+Themia.Audit.AuditEntry.EntityType.get -> string?
+Themia.Audit.AuditEntry.EntityType.init -> void
+Themia.Audit.AuditEntry.EventType.get -> string!
+Themia.Audit.AuditEntry.EventType.init -> void
+Themia.Audit.AuditEntry.EventUid.get -> System.Guid
+Themia.Audit.AuditEntry.EventUid.init -> void
+Themia.Audit.AuditEntry.IpAddress.get -> string?
+Themia.Audit.AuditEntry.IpAddress.init -> void
+Themia.Audit.AuditEntry.Normalize() -> Themia.Audit.AuditEntry!
+Themia.Audit.AuditEntry.OccurredAt.get -> System.DateTimeOffset
+Themia.Audit.AuditEntry.OccurredAt.init -> void
+Themia.Audit.AuditEntry.Outcome.get -> Themia.Audit.AuditOutcome
+Themia.Audit.AuditEntry.Outcome.init -> void
+Themia.Audit.AuditEntry.Reason.get -> string?
+Themia.Audit.AuditEntry.Reason.init -> void
+Themia.Audit.AuditEntry.TenantId.get -> string?
+Themia.Audit.AuditEntry.TenantId.init -> void
+Themia.Audit.AuditEntry.UserAgent.get -> string?
+Themia.Audit.AuditEntry.UserAgent.init -> void
+Themia.Audit.AuditEntry.Validate() -> void
+Themia.Audit.AuditOutcome
+Themia.Audit.AuditOutcome.Denied = 3 -> Themia.Audit.AuditOutcome
+Themia.Audit.AuditOutcome.Failure = 2 -> Themia.Audit.AuditOutcome
+Themia.Audit.AuditOutcome.Success = 1 -> Themia.Audit.AuditOutcome
+Themia.Audit.AuditOutcome.Unspecified = 0 -> Themia.Audit.AuditOutcome
+Themia.Audit.AuditQuery
+Themia.Audit.AuditQuery.ActorId.get -> string?
+Themia.Audit.AuditQuery.ActorId.init -> void
+Themia.Audit.AuditQuery.Category.get -> Themia.Audit.AuditCategory?
+Themia.Audit.AuditQuery.Category.init -> void
+Themia.Audit.AuditQuery.EntityId.get -> string?
+Themia.Audit.AuditQuery.EntityId.init -> void
+Themia.Audit.AuditQuery.EntityType.get -> string?
+Themia.Audit.AuditQuery.EntityType.init -> void
+Themia.Audit.AuditQuery.From.get -> System.DateTimeOffset?
+Themia.Audit.AuditQuery.From.init -> void
+Themia.Audit.AuditQuery.HostLevelOnly.get -> bool
+Themia.Audit.AuditQuery.HostLevelOnly.init -> void
+Themia.Audit.AuditQuery.Outcome.get -> Themia.Audit.AuditOutcome?
+Themia.Audit.AuditQuery.Outcome.init -> void
+Themia.Audit.AuditQuery.Page.get -> int
+Themia.Audit.AuditQuery.Page.init -> void
+Themia.Audit.AuditQuery.PageSize.get -> int
+Themia.Audit.AuditQuery.PageSize.init -> void
+Themia.Audit.AuditQuery.TenantId.get -> string?
+Themia.Audit.AuditQuery.TenantId.init -> void
+Themia.Audit.AuditQuery.To.get -> System.DateTimeOffset?
+Themia.Audit.AuditQuery.To.init -> void
+Themia.Audit.PagedResult<T>
+Themia.Audit.PagedResult<T>.Items.get -> System.Collections.Generic.IReadOnlyList<T>!
+Themia.Audit.PagedResult<T>.Items.init -> void
+Themia.Audit.PagedResult<T>.PagedResult() -> void
+Themia.Audit.PagedResult<T>.Total.get -> int
+Themia.Audit.PagedResult<T>.Total.init -> void
+Themia.Audit.Redaction.AuditRedactionOptions
+Themia.Audit.Redaction.AuditRedactionOptions.AddPattern(string! pattern) -> void
+Themia.Audit.Redaction.AuditRedactionOptions.AuditRedactionOptions() -> void
+Themia.Audit.Redaction.AuditRedactionOptions.Patterns.get -> System.Collections.Generic.IReadOnlyCollection<string!>!
+Themia.Audit.Redaction.AuditRedactor
+Themia.Audit.Redaction.AuditRedactor.AuditRedactor(Themia.Audit.Redaction.AuditRedactionOptions! options) -> void
+Themia.Audit.Redaction.AuditRedactor.Redact(string! json) -> string!
+Themia.Audit.Redaction.IAuditRedactor
+Themia.Audit.Redaction.IAuditRedactor.Redact(string! json) -> string!
+const Themia.Audit.AuditEntry.MaxActorIdLength = 256 -> int
+const Themia.Audit.AuditEntry.MaxActorNameLength = 256 -> int
+const Themia.Audit.AuditEntry.MaxCorrelationIdLength = 128 -> int
+const Themia.Audit.AuditEntry.MaxEntityIdLength = 256 -> int
+const Themia.Audit.AuditEntry.MaxEntityTypeLength = 256 -> int
+const Themia.Audit.AuditEntry.MaxEventTypeLength = 100 -> int
+const Themia.Audit.AuditEntry.MaxIpAddressLength = 64 -> int
+const Themia.Audit.AuditEntry.MaxReasonLength = 256 -> int
+const Themia.Audit.AuditEntry.MaxUserAgentLength = 512 -> int
