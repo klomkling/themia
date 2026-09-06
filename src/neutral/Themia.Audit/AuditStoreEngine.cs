@@ -58,7 +58,14 @@ public sealed class AuditStoreEngine : IAuditStore
         var page = Math.Max(1, query.Page);
         var pageSize = Math.Clamp(query.PageSize, 1, 1000);
         var args = ToFilterParameters(query);
-        args.Add("Skip", (page - 1) * pageSize);
+
+        // Computed in `long`: `page` is clamped only at 1, not at any upper bound, so `(page - 1) *
+        // pageSize` in `int` arithmetic overflows past ~2.147B and wraps negative for a large page/
+        // pageSize combination, which every engine rejects as an invalid OFFSET/LIMIT. The `long` result
+        // can never itself be negative here (page - 1 >= 0, pageSize >= 1), but it is clamped at zero
+        // anyway so the intent reads at the call site rather than relying on that invariant silently.
+        var skip = Math.Max(0L, (long)(page - 1) * pageSize);
+        args.Add("Skip", skip);
         args.Add("Take", pageSize);
 
         var rows = (await connection.QueryAsync<AuditEntryRow>(new CommandDefinition(

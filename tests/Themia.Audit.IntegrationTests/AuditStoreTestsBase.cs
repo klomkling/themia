@@ -58,6 +58,21 @@ public abstract class AuditStoreTestsBase(IAuditStore store, IAuditDialect diale
     }
 
     [Fact]
+    public async Task A_very_large_page_number_does_not_overflow_into_a_negative_offset()
+    {
+        // (page - 1) * pageSize computed in `int` overflows past ~2.147B and wraps negative, which every
+        // engine rejects as an invalid OFFSET/LIMIT. FakeAuditStore (Themia.Audit.AspNetCore.Tests) feeds
+        // the same arithmetic into LINQ's Skip, which silently clamps a negative to zero, so it cannot
+        // reproduce this — this must run against a real engine.
+        var query = new AuditQuery { TenantId = TenantId, Page = 3_000_000, PageSize = 1000 };
+
+        await using var conn = await OpenConnectionAsync();
+        var result = await store.QueryAsync(query, conn, default);
+
+        Assert.Empty(result.Items);
+    }
+
+    [Fact]
     public async Task Null_tenant_round_trips_as_null_not_empty_string()
     {
         var entry = Valid() with { TenantId = null };
