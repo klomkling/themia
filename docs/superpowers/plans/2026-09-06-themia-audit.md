@@ -40,7 +40,7 @@ every "why"; this plan carries the "what". Where they disagree, the spec wins.
 
 ```
 src/neutral/Themia.Audit/
-  AuditCategory.cs  AuditOutcome.cs  AuditEngine.cs  AuditTransactionPolicy.cs
+  AuditCategory.cs  AuditOutcome.cs  AuditEngine.cs
   AuditEntry.cs                      # record + length constants
   AuditQuery.cs   PagedResult.cs
   IAuditRecorder.cs  AuditRecorder.cs
@@ -60,7 +60,8 @@ src/framework/Themia.Framework.Data.EFCore/Connections/EfAmbientConnectionAccess
 src/framework/Themia.Framework.Data.Dapper/Connections/DapperAmbientConnectionAccessor.cs
 src/modules/Themia.Modules.Identity.Abstractions/Authentication/IIdentityEventObserver.cs
 src/modules/Themia.Modules.Audit/
-  TransactionalAuditRecorder.cs  ITenantAuditReader.cs  TenantAuditReader.cs
+  AuditTransactionPolicy.cs      TransactionalAuditRecorder.cs
+  ITenantAuditReader.cs          TenantAuditReader.cs
   AuditLogServiceAdapter.cs      AuditingIdentityObserver.cs
   AuditModule.cs  AuditModuleOptions.cs
   DependencyInjection/AuditModuleServiceCollectionExtensions.cs
@@ -259,7 +260,7 @@ second. The `0.22.0` review cut that suite from 43 containers to 4 — do not re
 [Fact]
 public async Task Creates_the_same_unqualified_table_on_every_engine()
 {
-    await ThemiaMigrations.RunAsync(Engine, ConnectionString, typeof(AuditSchemaMigration).Assembly);
+    ThemiaMigrations.Run(Engine, ConnectionString, typeof(AuditSchemaMigration).Assembly);
     await using var conn = Dialect.CreateConnection(ConnectionString);
     await conn.OpenAsync();
     // Unqualified on purpose: InSchema is dropped on MySQL and the name would then differ per engine.
@@ -270,8 +271,9 @@ public async Task Creates_the_same_unqualified_table_on_every_engine()
 [Fact]
 public async Task Up_is_replay_safe()
 {
-    await ThemiaMigrations.RunAsync(Engine, ConnectionString, typeof(AuditSchemaMigration).Assembly);
-    await ThemiaMigrations.RunAsync(Engine, ConnectionString, typeof(AuditSchemaMigration).Assembly);
+    // FluentMigrator's runner is synchronous; there is no RunAsync.
+    ThemiaMigrations.Run(Engine, ConnectionString, typeof(AuditSchemaMigration).Assembly);
+    ThemiaMigrations.Run(Engine, ConnectionString, typeof(AuditSchemaMigration).Assembly);
 }
 ```
 
@@ -442,7 +444,43 @@ public void AddThemiaAudit_rejects_an_unset_engine()
 
 - [ ] **Step 8: Run — expect PASS**
 
-- [ ] **Step 9: Commit**
+- [ ] **Step 9: Write the failing enrichment tests**
+
+```csharp
+[Fact]
+public void Reads_the_caller_address_and_user_agent_from_the_current_request()
+{
+    var ctx = new DefaultHttpContext();
+    ctx.Connection.RemoteIpAddress = IPAddress.Parse("203.0.113.7");
+    ctx.Request.Headers.UserAgent = "test-agent/1.0";
+    var enriched = new AuditHttpEnricher(Accessor(ctx)).Enrich(Valid());
+    Assert.Equal("203.0.113.7", enriched.IpAddress);
+    Assert.Equal("test-agent/1.0", enriched.UserAgent);
+}
+
+[Fact]
+public void Records_nulls_outside_a_request_rather_than_throwing()
+{
+    // A Quartz worker host has no HttpContext. Nulls are the correct answer, not an error (spec §10f).
+    var enriched = new AuditHttpEnricher(Accessor(null)).Enrich(Valid());
+    Assert.Null(enriched.IpAddress);
+    Assert.Null(enriched.UserAgent);
+}
+
+[Fact]
+public void Does_not_overwrite_values_the_caller_already_supplied()
+    => Assert.Equal("10.1.1.1",
+        new AuditHttpEnricher(Accessor(WithIp("203.0.113.7"))).Enrich(Valid() with { IpAddress = "10.1.1.1" }).IpAddress);
+```
+
+- [ ] **Step 10: Run to verify failure**
+
+- [ ] **Step 11: Implement `AuditHttpEnricher`** over `IHttpContextAccessor`, following
+      `Themia.Exceptional`'s `Serilog/HttpContextEnricher.cs`. A null `HttpContext` yields nulls.
+
+- [ ] **Step 12: Run — expect PASS**
+
+- [ ] **Step 13: Commit**
 
 ```bash
 git commit -am "feat(audit): recorder with payload serialization, HTTP enrichment and AddThemiaAudit"
