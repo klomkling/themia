@@ -2,6 +2,20 @@
 Themia.Modules.Audit.AuditLogServiceAdapter
 Themia.Modules.Audit.AuditLogServiceAdapter.AuditLogServiceAdapter(Themia.Audit.IAuditRecorder! recorder) -> void
 Themia.Modules.Audit.AuditLogServiceAdapter.WriteAsync(Themia.Services.Abstractions.AuditEvent! auditEvent, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Modules.Audit.AuditingIdentityObserver
+Themia.Modules.Audit.AuditingIdentityObserver.AuditingIdentityObserver(Themia.Audit.IAuditRecorder! recorder, Themia.Audit.Http.AuditHttpEnricher! enricher) -> void
+Themia.Modules.Audit.AuditingIdentityObserver.OnExternalLoginDeniedAsync(string! provider, string? denialReason, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Modules.Audit.AuditingIdentityObserver.OnExternalLoginFailedAsync(string! provider, Themia.Modules.Identity.Abstractions.Authentication.ExternalLoginOutcome reason, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Modules.Audit.AuditingIdentityObserver.OnExternalLoginSucceededAsync(System.Guid userId, string! provider, bool wasCreated, bool wasLinked, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Modules.Audit.AuditingIdentityObserver.OnLockedOutAsync(System.Guid userId, System.DateTimeOffset lockoutEnd, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Modules.Audit.AuditingIdentityObserver.OnLoginDeniedAsync(string! userName, string? denialReason, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Modules.Audit.AuditingIdentityObserver.OnLoginFailedAsync(string! userName, Themia.Modules.Identity.Abstractions.Authentication.LoginFailureReason reason, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Modules.Audit.AuditingIdentityObserver.OnLoginSucceededAsync(System.Guid userId, string! userName, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Modules.Audit.AuditingIdentityObserver.OnLogoutAsync(System.Guid? userId, bool allSessions, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Modules.Audit.AuditingIdentityObserver.OnRefreshDeniedAsync(string? userName, string? denialReason, bool rotationCommitted, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Modules.Audit.AuditingIdentityObserver.OnRefreshFailedAsync(System.Guid? userId, Themia.Modules.Identity.Abstractions.Authentication.RefreshOutcome outcome, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Modules.Audit.AuditingIdentityObserver.OnRefreshSucceededAsync(System.Guid userId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Modules.Audit.AuditingIdentityObserver.OnUserMutatedAsync(System.Guid userId, Themia.Modules.Identity.Abstractions.UserMutation mutation, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
 Themia.Modules.Audit.AuditModule
 Themia.Modules.Audit.AuditModule.AuditModule() -> void
 override Themia.Modules.Audit.AuditModule.Descriptor.get -> Themia.Framework.Core.Modules.ModuleDescriptor!
@@ -16,6 +30,7 @@ Themia.Modules.Audit.AuditTransactionPolicy.Never = 3 -> Themia.Modules.Audit.Au
 Themia.Modules.Audit.AuditTransactionPolicy.RequireTransaction = 1 -> Themia.Modules.Audit.AuditTransactionPolicy
 Themia.Modules.Audit.AuditTransactionPolicy.Unspecified = 0 -> Themia.Modules.Audit.AuditTransactionPolicy
 Themia.Modules.Audit.DependencyInjection.AuditModuleServiceCollectionExtensions
+static Themia.Modules.Audit.DependencyInjection.AuditModuleServiceCollectionExtensions.AddThemiaAuditIdentityObserver(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
 static Themia.Modules.Audit.DependencyInjection.AuditModuleServiceCollectionExtensions.AddThemiaAuditModule(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Themia.Modules.Audit.AuditModuleOptions!>? configure = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
 Themia.Modules.Audit.ITenantAuditReader
 Themia.Modules.Audit.ITenantAuditReader.QueryAsync(Themia.Audit.AuditQuery! query, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<Themia.Audit.PagedResult<Themia.Audit.AuditEntry!>!>!

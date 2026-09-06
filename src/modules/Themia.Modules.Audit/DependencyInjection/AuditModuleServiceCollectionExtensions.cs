@@ -5,6 +5,7 @@ using Themia.Audit;
 using Themia.Audit.Redaction;
 using Themia.Framework.Core.Abstractions.Tenancy;
 using Themia.Framework.Data.Abstractions.Connections;
+using Themia.Modules.Identity.Abstractions.Authentication;
 using Themia.Services.Abstractions;
 
 namespace Themia.Modules.Audit.DependencyInjection;
@@ -91,6 +92,34 @@ public static class AuditModuleServiceCollectionExtensions
             sp.GetRequiredService<ITenantContext>()));
 
         services.AddScoped<IAuditLogService, AuditLogServiceAdapter>();
+
+        return services;
+    }
+
+    /// <summary>
+    /// Registers <see cref="AuditingIdentityObserver"/> into the <see cref="IIdentityEventObserver"/>
+    /// fan-out (design §10/§11), so every Identity authentication and user-lifecycle event is audited.
+    /// </summary>
+    /// <remarks>
+    /// <b>A separate call from <see cref="AddThemiaAuditModule"/>.</b> A host without Identity must never
+    /// be made to reference this method, and a host with Identity that does not want auth auditing should
+    /// not have to opt out of something that turned itself on.
+    /// <para>
+    /// <b>Uses <c>AddScoped</c>, never <c>TryAdd</c>.</b> <see cref="IIdentityEventObserver"/> is resolved
+    /// as <see cref="IEnumerable{T}"/> — a fan-out seam, not a single-owner one — so <c>TryAdd</c> would
+    /// silently drop this observer whenever an adopter had already registered one of their own. That
+    /// silent loss is the exact defect <see cref="IIdentityEventObserver"/> exists to correct for
+    /// <c>IAuthenticationHooks</c> and <c>IUserLifecycleHooks</c>; repeating it here would defeat the
+    /// point.
+    /// </para>
+    /// </remarks>
+    /// <param name="services">The service collection.</param>
+    /// <returns>The same <paramref name="services"/> for chaining.</returns>
+    public static IServiceCollection AddThemiaAuditIdentityObserver(this IServiceCollection services)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+
+        services.AddScoped<IIdentityEventObserver, AuditingIdentityObserver>();
 
         return services;
     }
