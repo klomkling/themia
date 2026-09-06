@@ -34,11 +34,13 @@ public class AuditServiceCollectionExtensionsTests
     }
 
     [Fact]
-    public void AddThemiaAudit_rejects_an_unset_engine()
+    public void AddThemiaAudit_rejects_an_unset_engine_via_options_validation_when_migration_is_deferred()
     {
         var services = new ServiceCollection();
 
-        // Must not throw here — only IOptions<AuditOptions>.Value throws (ValidateOnStart, design §11).
+        // runMigration: false is what makes this purely an options-validation test: with runMigration
+        // left at its default, AddThemiaAudit itself now throws immediately (see the test below) rather
+        // than deferring to IOptions<AuditOptions>.Value.
         services.AddThemiaAudit(o => { o.ConnectionString = "fake"; /* Engine left Unspecified */ }, runMigration: false);
 
         using var provider = services.BuildServiceProvider();
@@ -46,7 +48,7 @@ public class AuditServiceCollectionExtensionsTests
     }
 
     [Fact]
-    public void AddThemiaAudit_rejects_an_empty_connection_string()
+    public void AddThemiaAudit_rejects_an_empty_connection_string_via_options_validation_when_migration_is_deferred()
     {
         var services = new ServiceCollection();
 
@@ -85,6 +87,30 @@ public class AuditServiceCollectionExtensionsTests
         }));
 
         Assert.Contains("PostgreSQL", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AddThemiaAudit_with_runMigration_true_throws_immediately_when_engine_is_unset()
+    {
+        var services = new ServiceCollection();
+
+        // No ValidateOnStart/host involved: asking for a migration and silently not getting one would
+        // otherwise surface only as a "table does not exist" error at the first audit write.
+        var ex = Assert.Throws<InvalidOperationException>(() => services.AddThemiaAudit(
+            o => { o.ConnectionString = "fake"; /* Engine left Unspecified */ }, runMigration: true));
+
+        Assert.Contains(nameof(AuditOptions.Engine), ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AddThemiaAudit_with_runMigration_true_throws_immediately_when_connection_string_is_empty()
+    {
+        var services = new ServiceCollection();
+
+        var ex = Assert.Throws<InvalidOperationException>(() => services.AddThemiaAudit(
+            o => o.Engine = AuditEngine.Postgres, runMigration: true));
+
+        Assert.Contains(nameof(AuditOptions.ConnectionString), ex.Message, StringComparison.Ordinal);
     }
 
     private sealed class FakeStore : IAuditStore

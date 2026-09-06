@@ -23,16 +23,24 @@ public static class AuditServiceCollectionExtensions
     /// <remarks>
     /// Runs the FluentMigrator schema migration itself (unless <paramref name="runMigration"/> is
     /// <see langword="false"/>), so a consumer using <c>Themia.Audit</c> with no module layer still gets a
-    /// table (design §11) — mirroring <c>Themia.Exceptional</c>'s <c>ServiceCollectionExtensions</c>. The
-    /// migration runs only when <see cref="AuditOptions.Engine"/> and
-    /// <see cref="AuditOptions.ConnectionString"/> are already valid; an invalid configuration is left to
-    /// surface through the standard <see cref="IOptions{TOptions}"/> validation the next time
-    /// <c>IOptions&lt;AuditOptions&gt;.Value</c> is read, rather than failing this call with a different
-    /// exception shape.
+    /// table (design §11) — mirroring <c>Themia.Exceptional</c>'s <c>ServiceCollectionExtensions</c>.
+    /// When <paramref name="runMigration"/> is <see langword="true"/> (the default), <see cref="AuditOptions.Engine"/>
+    /// and <see cref="AuditOptions.ConnectionString"/> are checked immediately and this call throws
+    /// <see cref="InvalidOperationException"/>, naming the missing setting, when either is invalid —
+    /// asking for a migration and silently not getting one would surface, at best, as a "table does not
+    /// exist" error at the first audit write, which is worse than failing here. Pass
+    /// <paramref name="runMigration"/>: <see langword="false"/> to defer schema creation and rely on
+    /// <c>ValidateOnStart</c> instead. <paramref name="configure"/> is invoked twice — once to check the
+    /// options ahead of the migration, once by the options system — so it must be a pure assignment of
+    /// properties, with no side effects.
     /// </remarks>
     /// <param name="services">The service collection.</param>
-    /// <param name="configure">Required options callback.</param>
+    /// <param name="configure">Required options callback. Invoked more than once; must be pure.</param>
     /// <param name="runMigration">When <see langword="true"/> (default), applies the schema migration immediately.</param>
+    /// <exception cref="InvalidOperationException">
+    /// <paramref name="runMigration"/> is <see langword="true"/> and <see cref="AuditOptions.Engine"/> or
+    /// <see cref="AuditOptions.ConnectionString"/> is invalid.
+    /// </exception>
     public static IServiceCollection AddThemiaAudit(
         this IServiceCollection services, Action<AuditOptions> configure, bool runMigration = true)
     {
@@ -67,10 +75,24 @@ public static class AuditServiceCollectionExtensions
         {
             var probe = new AuditOptions();
             configure(probe);
-            if (HasValidEngine(probe) && HasConnectionString(probe))
+
+            if (!HasValidEngine(probe))
             {
-                ThemiaMigrations.Run(ToMigrationEngine(probe.Engine), probe.ConnectionString, typeof(AuditSchemaMigration).Assembly);
+                throw new InvalidOperationException(
+                    "AddThemiaAudit was called with runMigration: true, but AuditOptions.Engine is not "
+                    + "set to a supported, non-default AuditEngine value. Set Engine in the configure "
+                    + "callback, or pass runMigration: false to defer schema creation.");
             }
+
+            if (!HasConnectionString(probe))
+            {
+                throw new InvalidOperationException(
+                    "AddThemiaAudit was called with runMigration: true, but AuditOptions.ConnectionString "
+                    + "is empty. Set ConnectionString in the configure callback, or pass "
+                    + "runMigration: false to defer schema creation.");
+            }
+
+            ThemiaMigrations.Run(ToMigrationEngine(probe.Engine), probe.ConnectionString, typeof(AuditSchemaMigration).Assembly);
         }
 
         return services;
