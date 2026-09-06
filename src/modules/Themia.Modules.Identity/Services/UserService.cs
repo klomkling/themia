@@ -1,7 +1,9 @@
+using Microsoft.Extensions.Logging;
 using Themia.Framework.Data.Abstractions.Filtering;
 using Themia.Framework.Data.Abstractions.Repositories;
 using Themia.Framework.Data.Abstractions.UnitOfWork;
 using Themia.Modules.Identity.Abstractions;
+using Themia.Modules.Identity.Abstractions.Authentication;
 using Themia.Modules.Identity.Abstractions.Entities;
 using Themia.Modules.Identity.Specifications;
 
@@ -18,6 +20,8 @@ public sealed class UserService : IUserService
     private readonly IDataFilterScope filterScope;
     private readonly IPhoneNumberNormalizer phoneNormalizer;
     private readonly IUserLifecycleHooks hooks;
+    private readonly IIdentityEventObserver[] observers;
+    private readonly ILogger<UserService> logger;
 
     /// <summary>Creates the service.</summary>
     public UserService(
@@ -28,7 +32,9 @@ public sealed class UserService : IUserService
         IdentityModuleOptions options,
         IDataFilterScope filterScope,
         IPhoneNumberNormalizer phoneNormalizer,
-        IUserLifecycleHooks hooks)
+        IUserLifecycleHooks hooks,
+        IEnumerable<IIdentityEventObserver> observers,
+        ILogger<UserService> logger)
     {
         ArgumentNullException.ThrowIfNull(users);
         ArgumentNullException.ThrowIfNull(unitOfWork);
@@ -38,6 +44,8 @@ public sealed class UserService : IUserService
         ArgumentNullException.ThrowIfNull(filterScope);
         ArgumentNullException.ThrowIfNull(phoneNormalizer);
         ArgumentNullException.ThrowIfNull(hooks);
+        ArgumentNullException.ThrowIfNull(observers);
+        ArgumentNullException.ThrowIfNull(logger);
         this.users = users;
         this.unitOfWork = unitOfWork;
         this.passwordHasher = passwordHasher;
@@ -46,6 +54,48 @@ public sealed class UserService : IUserService
         this.filterScope = filterScope;
         this.phoneNormalizer = phoneNormalizer;
         this.hooks = hooks;
+        this.observers = observers as IIdentityEventObserver[] ?? observers.ToArray();
+        this.logger = logger;
+    }
+
+    /// <summary>
+    /// Back-compatible overload matching the pre-<see cref="IIdentityEventObserver"/> signature. Forwards
+    /// with an empty observer collection and a null logger, so a manually constructed instance — e.g. in
+    /// an adopter's own test — keeps compiling and behaves exactly as before. DI resolves the greediest
+    /// constructor it can satisfy, and both new parameters are always resolvable (an empty
+    /// <see cref="IEnumerable{T}"/>, and logging via <c>AddLogging</c>), so a live app always picks the
+    /// constructor above.
+    /// </summary>
+    public UserService(
+        IRepository<User, Guid> users,
+        IUnitOfWork unitOfWork,
+        IPasswordHasher passwordHasher,
+        TimeProvider timeProvider,
+        IdentityModuleOptions options,
+        IDataFilterScope filterScope,
+        IPhoneNumberNormalizer phoneNormalizer,
+        IUserLifecycleHooks hooks)
+        : this(users, unitOfWork, passwordHasher, timeProvider, options, filterScope, phoneNormalizer, hooks,
+              Array.Empty<IIdentityEventObserver>(), Microsoft.Extensions.Logging.Abstractions.NullLogger<UserService>.Instance)
+    {
+    }
+
+    /// <summary>Invokes <paramref name="invoke"/> against every registered observer. A throwing observer
+    /// must not change the flow it observes, so each invocation is individually caught and logged at
+    /// <c>Error</c>; a cancellation request still propagates.</summary>
+    private async ValueTask RaiseAsync(Func<IIdentityEventObserver, CancellationToken, Task> invoke, CancellationToken cancellationToken)
+    {
+        foreach (var observer in observers)
+        {
+            try
+            {
+                await invoke(observer, cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                logger.LogError(ex, "Identity event observer {ObserverType} threw and was swallowed.", observer.GetType());
+            }
+        }
     }
 
     /// <inheritdoc />
@@ -234,6 +284,7 @@ public sealed class UserService : IUserService
         users.Update(user);
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         await hooks.OnUserMutatedAsync(userId, UserMutation.Email, cancellationToken).ConfigureAwait(false);
+        await RaiseAsync((o, ct) => o.OnUserMutatedAsync(userId, UserMutation.Email, ct), cancellationToken).ConfigureAwait(false);
         return UserMutationResult.Success();
     }
 
@@ -256,6 +307,7 @@ public sealed class UserService : IUserService
         users.Update(user);
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         await hooks.OnUserMutatedAsync(userId, UserMutation.EmailConfirmation, cancellationToken).ConfigureAwait(false);
+        await RaiseAsync((o, ct) => o.OnUserMutatedAsync(userId, UserMutation.EmailConfirmation, ct), cancellationToken).ConfigureAwait(false);
         return UserMutationResult.Success();
     }
 
@@ -295,6 +347,7 @@ public sealed class UserService : IUserService
         users.Update(user);
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         await hooks.OnUserMutatedAsync(userId, UserMutation.Phone, cancellationToken).ConfigureAwait(false);
+        await RaiseAsync((o, ct) => o.OnUserMutatedAsync(userId, UserMutation.Phone, ct), cancellationToken).ConfigureAwait(false);
         return UserMutationResult.Success();
     }
 
@@ -317,6 +370,7 @@ public sealed class UserService : IUserService
         users.Update(user);
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         await hooks.OnUserMutatedAsync(userId, UserMutation.PhoneConfirmation, cancellationToken).ConfigureAwait(false);
+        await RaiseAsync((o, ct) => o.OnUserMutatedAsync(userId, UserMutation.PhoneConfirmation, ct), cancellationToken).ConfigureAwait(false);
         return UserMutationResult.Success();
     }
 
@@ -341,6 +395,7 @@ public sealed class UserService : IUserService
         users.Update(user);
         await IdentityScope.SaveScopedAsync(unitOfWork, filterScope, user.TenantId is null, cancellationToken).ConfigureAwait(false);
         await hooks.OnUserMutatedAsync(userId, UserMutation.Password, cancellationToken).ConfigureAwait(false);
+        await RaiseAsync((o, ct) => o.OnUserMutatedAsync(userId, UserMutation.Password, ct), cancellationToken).ConfigureAwait(false);
         return UserMutationResult.Success();
     }
 
@@ -369,13 +424,22 @@ public sealed class UserService : IUserService
             if (user.LockoutEnabled)
             {
                 user.AccessFailedCount++;
+                var justLockedOut = false;
                 if (user.AccessFailedCount >= options.MaxFailedAccessAttempts)
                 {
                     user.LockoutEnd = now.Add(options.LockoutDuration);
                     user.AccessFailedCount = 0;
+                    justLockedOut = true;
                 }
                 users.Update(user);
                 await IdentityScope.SaveScopedAsync(unitOfWork, filterScope, user.TenantId is null, cancellationToken).ConfigureAwait(false);
+
+                // No notification existed here before: an observer could previously only infer a lockout
+                // from the NEXT login attempt returning LockedOut — a different event at a different time.
+                if (justLockedOut)
+                {
+                    await RaiseAsync((o, ct) => o.OnLockedOutAsync(user.Id, user.LockoutEnd!.Value, ct), cancellationToken).ConfigureAwait(false);
+                }
             }
             return PasswordVerificationResult.Failed;
         }
@@ -422,6 +486,7 @@ public sealed class UserService : IUserService
         users.Update(user);
         await IdentityScope.SaveScopedAsync(unitOfWork, filterScope, user.TenantId is null, cancellationToken).ConfigureAwait(false);
         await hooks.OnUserMutatedAsync(userId, UserMutation.Active, cancellationToken).ConfigureAwait(false);
+        await RaiseAsync((o, ct) => o.OnUserMutatedAsync(userId, UserMutation.Active, ct), cancellationToken).ConfigureAwait(false);
         return UserMutationResult.Success();
     }
 
@@ -443,6 +508,7 @@ public sealed class UserService : IUserService
         users.Remove(user);
         await IdentityScope.SaveScopedAsync(unitOfWork, filterScope, user.TenantId is null, cancellationToken).ConfigureAwait(false);
         await hooks.OnUserMutatedAsync(userId, UserMutation.Deleted, cancellationToken).ConfigureAwait(false);
+        await RaiseAsync((o, ct) => o.OnUserMutatedAsync(userId, UserMutation.Deleted, ct), cancellationToken).ConfigureAwait(false);
         return UserMutationResult.Success();
     }
 }

@@ -90,6 +90,10 @@ internal sealed class FakeRefreshTokenService : IRefreshTokenService
     public int RevokeCalls { get; private set; }
     public bool LastRevokeAllForUser { get; private set; }
 
+    /// <summary>Returned by <see cref="ResolveOwnerAsync"/>. Null by default, matching the interface's
+    /// default (an unresolvable token).</summary>
+    public Guid? OwnerId { get; set; }
+
     public Task<RefreshIssue> IssueAsync(Guid userId, CancellationToken cancellationToken = default)
     {
         IssueCalls++;
@@ -98,6 +102,9 @@ internal sealed class FakeRefreshTokenService : IRefreshTokenService
 
     public Task<RefreshValidationResult> ValidateAndRotateAsync(string rawToken, CancellationToken cancellationToken = default) =>
         Task.FromResult(RotateResult);
+
+    public Task<Guid?> ResolveOwnerAsync(string rawToken, CancellationToken cancellationToken = default) =>
+        Task.FromResult(OwnerId);
 
     public Task RevokeAsync(string rawToken, bool allForUser, CancellationToken cancellationToken = default)
     {
@@ -162,4 +169,94 @@ internal sealed class RecordingHooks : Themia.Modules.Identity.AspNetCore.Authen
         if (DenyRefreshSucceeded) context.Deny("blocked-after-refresh");
         return Task.CompletedTask;
     }
+}
+
+/// <summary>Records every <see cref="IIdentityEventObserver"/> invocation by method name, plus the last
+/// arguments seen for each — enough for the coverage theory (which event fired) and the targeted
+/// assertions (rotationCommitted, wasCreated/wasLinked, userId).</summary>
+internal sealed class RecordingObserver : IIdentityEventObserver
+{
+    public List<string> Calls { get; } = [];
+
+    public (string? UserName, string? DenialReason, bool RotationCommitted)? LastRefreshDenied { get; private set; }
+    public (Guid? UserId, RefreshOutcome Outcome)? LastRefreshFailed { get; private set; }
+    public (Guid? UserId, bool AllSessions)? LastLogout { get; private set; }
+    public (Guid UserId, UserMutation Mutation)? LastUserMutated { get; private set; }
+    public (Guid UserId, DateTimeOffset LockoutEnd)? LastLockedOut { get; private set; }
+
+    public Task OnLoginSucceededAsync(Guid userId, string userName, CancellationToken cancellationToken = default)
+    {
+        Calls.Add(nameof(OnLoginSucceededAsync));
+        return Task.CompletedTask;
+    }
+
+    public Task OnLoginFailedAsync(string userName, LoginFailureReason reason, CancellationToken cancellationToken = default)
+    {
+        Calls.Add(nameof(OnLoginFailedAsync));
+        return Task.CompletedTask;
+    }
+
+    public Task OnLoginDeniedAsync(string userName, string? denialReason, CancellationToken cancellationToken = default)
+    {
+        Calls.Add(nameof(OnLoginDeniedAsync));
+        return Task.CompletedTask;
+    }
+
+    public Task OnRefreshSucceededAsync(Guid userId, CancellationToken cancellationToken = default)
+    {
+        Calls.Add(nameof(OnRefreshSucceededAsync));
+        return Task.CompletedTask;
+    }
+
+    public Task OnRefreshDeniedAsync(string? userName, string? denialReason, bool rotationCommitted, CancellationToken cancellationToken = default)
+    {
+        Calls.Add(nameof(OnRefreshDeniedAsync));
+        LastRefreshDenied = (userName, denialReason, rotationCommitted);
+        return Task.CompletedTask;
+    }
+
+    public Task OnRefreshFailedAsync(Guid? userId, RefreshOutcome outcome, CancellationToken cancellationToken = default)
+    {
+        Calls.Add(nameof(OnRefreshFailedAsync));
+        LastRefreshFailed = (userId, outcome);
+        return Task.CompletedTask;
+    }
+
+    public Task OnLogoutAsync(Guid? userId, bool allSessions, CancellationToken cancellationToken = default)
+    {
+        Calls.Add(nameof(OnLogoutAsync));
+        LastLogout = (userId, allSessions);
+        return Task.CompletedTask;
+    }
+
+    public Task OnLockedOutAsync(Guid userId, DateTimeOffset lockoutEnd, CancellationToken cancellationToken = default)
+    {
+        Calls.Add(nameof(OnLockedOutAsync));
+        LastLockedOut = (userId, lockoutEnd);
+        return Task.CompletedTask;
+    }
+
+    public Task OnUserMutatedAsync(Guid userId, UserMutation mutation, CancellationToken cancellationToken = default)
+    {
+        Calls.Add(nameof(OnUserMutatedAsync));
+        LastUserMutated = (userId, mutation);
+        return Task.CompletedTask;
+    }
+}
+
+/// <summary>An observer where every method throws, to prove a throwing observer cannot change the flow it
+/// observes.</summary>
+internal sealed class ThrowingObserver : IIdentityEventObserver
+{
+    private static Task Throw() => throw new InvalidOperationException("observer failure");
+
+    public Task OnLoginSucceededAsync(Guid userId, string userName, CancellationToken cancellationToken = default) => Throw();
+    public Task OnLoginFailedAsync(string userName, LoginFailureReason reason, CancellationToken cancellationToken = default) => Throw();
+    public Task OnLoginDeniedAsync(string userName, string? denialReason, CancellationToken cancellationToken = default) => Throw();
+    public Task OnRefreshSucceededAsync(Guid userId, CancellationToken cancellationToken = default) => Throw();
+    public Task OnRefreshDeniedAsync(string? userName, string? denialReason, bool rotationCommitted, CancellationToken cancellationToken = default) => Throw();
+    public Task OnRefreshFailedAsync(Guid? userId, RefreshOutcome outcome, CancellationToken cancellationToken = default) => Throw();
+    public Task OnLogoutAsync(Guid? userId, bool allSessions, CancellationToken cancellationToken = default) => Throw();
+    public Task OnLockedOutAsync(Guid userId, DateTimeOffset lockoutEnd, CancellationToken cancellationToken = default) => Throw();
+    public Task OnUserMutatedAsync(Guid userId, UserMutation mutation, CancellationToken cancellationToken = default) => Throw();
 }

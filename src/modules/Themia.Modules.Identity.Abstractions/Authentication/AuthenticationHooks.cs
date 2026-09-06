@@ -104,6 +104,17 @@ public sealed class LogoutContext(bool allSessions)
 {
     /// <summary>Whether all sessions were revoked.</summary>
     public bool AllSessions { get; } = allSessions;
+
+    /// <summary>The id of the user whose refresh token was revoked, resolved before revocation; or
+    /// <see langword="null"/> when the presented token did not resolve to a user in scope (revocation of
+    /// an unknown or already-revoked token is still idempotent and still runs).</summary>
+    public Guid? UserId { get; }
+
+    /// <summary>Creates the context with a resolved user id.</summary>
+    /// <param name="userId">The resolved user id, or null when it did not resolve.</param>
+    /// <param name="allSessions">Whether all sessions were revoked.</param>
+    public LogoutContext(Guid? userId, bool allSessions)
+        : this(allSessions) => UserId = userId;
 }
 
 /// <summary>Before/after extension points the default <see cref="IAuthenticationFlow"/> invokes. The

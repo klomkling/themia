@@ -22,6 +22,7 @@ internal sealed class ExternalAuthenticationFlow : IExternalAuthenticationFlow
     private readonly IAccessTokenService accessTokens;
     private readonly IRefreshTokenService refreshTokens;
     private readonly IExternalAuthenticationHooks hooks;
+    private readonly IIdentityEventObserver[] observers;
     private readonly TimeProvider timeProvider;
     private readonly ILogger<ExternalAuthenticationFlow> logger;
 
@@ -33,6 +34,7 @@ internal sealed class ExternalAuthenticationFlow : IExternalAuthenticationFlow
         IAccessTokenService accessTokens,
         IRefreshTokenService refreshTokens,
         IExternalAuthenticationHooks hooks,
+        IEnumerable<IIdentityEventObserver> observers,
         TimeProvider timeProvider,
         ILogger<ExternalAuthenticationFlow> logger)
     {
@@ -42,6 +44,7 @@ internal sealed class ExternalAuthenticationFlow : IExternalAuthenticationFlow
         ArgumentNullException.ThrowIfNull(accessTokens);
         ArgumentNullException.ThrowIfNull(refreshTokens);
         ArgumentNullException.ThrowIfNull(hooks);
+        ArgumentNullException.ThrowIfNull(observers);
         ArgumentNullException.ThrowIfNull(timeProvider);
         ArgumentNullException.ThrowIfNull(logger);
         this.registry = registry;
@@ -50,8 +53,48 @@ internal sealed class ExternalAuthenticationFlow : IExternalAuthenticationFlow
         this.accessTokens = accessTokens;
         this.refreshTokens = refreshTokens;
         this.hooks = hooks;
+        this.observers = observers as IIdentityEventObserver[] ?? observers.ToArray();
         this.timeProvider = timeProvider;
         this.logger = logger;
+    }
+
+    /// <summary>
+    /// Back-compatible overload matching the pre-<see cref="IIdentityEventObserver"/> signature. Forwards
+    /// with an empty observer collection, so a manually constructed instance — e.g. in this assembly's own
+    /// tests, which see this internal type via <c>InternalsVisibleTo</c> — keeps compiling. DI resolves
+    /// the greediest constructor it can satisfy, and <see cref="IEnumerable{T}"/> is always resolvable, so
+    /// a live app always picks the constructor above and observes any registered observers.
+    /// </summary>
+    public ExternalAuthenticationFlow(
+        IExternalAuthProviderRegistry registry,
+        IExternalLoginService externalLogins,
+        IClaimsPrincipalFactory principalFactory,
+        IAccessTokenService accessTokens,
+        IRefreshTokenService refreshTokens,
+        IExternalAuthenticationHooks hooks,
+        TimeProvider timeProvider,
+        ILogger<ExternalAuthenticationFlow> logger)
+        : this(registry, externalLogins, principalFactory, accessTokens, refreshTokens, hooks,
+              Array.Empty<IIdentityEventObserver>(), timeProvider, logger)
+    {
+    }
+
+    /// <summary>Invokes <paramref name="invoke"/> against every registered observer. A throwing observer
+    /// must not change the flow it observes, so each invocation is individually caught and logged at
+    /// <c>Error</c>; a cancellation request still propagates.</summary>
+    private async Task RaiseAsync(Func<IIdentityEventObserver, CancellationToken, Task> invoke, CancellationToken cancellationToken)
+    {
+        foreach (var observer in observers)
+        {
+            try
+            {
+                await invoke(observer, cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                logger.LogError(ex, "Identity event observer {ObserverType} threw and was swallowed.", observer.GetType());
+            }
+        }
     }
 
     /// <inheritdoc />
@@ -103,6 +146,9 @@ internal sealed class ExternalAuthenticationFlow : IExternalAuthenticationFlow
             .IssueAsync(principalFactory, accessTokens, refreshTokens, timeProvider, resolution.User, AuthenticationType, cancellationToken)
             .ConfigureAwait(false);
         logger.LogInformation("User {UserId} authenticated via external provider {Provider}.", resolution.User.Id, provider);
+        await RaiseAsync(
+            (o, ct) => o.OnExternalLoginSucceededAsync(resolution.User.Id, provider, resolution.WasCreated, resolution.WasLinked, ct),
+            cancellationToken).ConfigureAwait(false);
         return ExternalLoginFlowResult.Success(tokens, resolution.WasCreated, resolution.WasLinked);
     }
 
@@ -118,6 +164,19 @@ internal sealed class ExternalAuthenticationFlow : IExternalAuthenticationFlow
         }
 
         await hooks.OnExternalLoginFailedAsync(new ExternalLoginFailedContext(provider, reason), cancellationToken).ConfigureAwait(false);
+
+        // A hook denial is a distinct event from every other failure reason (provider not found, provider
+        // rejected, or a resolved account being inactive/locked out) — it is the adopter's own policy
+        // refusing the attempt, so it gets its own observer method.
+        if (reason == ExternalLoginOutcome.Denied)
+        {
+            await RaiseAsync((o, ct) => o.OnExternalLoginDeniedAsync(provider, denialReason, ct), cancellationToken).ConfigureAwait(false);
+        }
+        else
+        {
+            await RaiseAsync((o, ct) => o.OnExternalLoginFailedAsync(provider, reason, ct), cancellationToken).ConfigureAwait(false);
+        }
+
         return result;
     }
 
