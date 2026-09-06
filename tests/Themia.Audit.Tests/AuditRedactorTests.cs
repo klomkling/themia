@@ -78,22 +78,23 @@ public class AuditRedactorTests
         => Assert.Throws<ArgumentNullException>(() => new AuditRedactor(null!));
 
     [Fact]
-    public void IsSensitive_matches_case_insensitively_while_Patterns_Contains_does_not()
+    public void IsSensitive_matches_regardless_of_case()
     {
         var options = new AuditRedactionOptions();
 
         Assert.True(options.IsSensitive("PASSWORD"));
         Assert.True(options.IsSensitive("Password"));
+        Assert.True(options.IsSensitive("password"));
+    }
 
-        // Documents the trap Patterns exists to warn against: it returns a snapshot array, so
-        // `options.Patterns.Contains(...)` binds to LINQ's Enumerable.Contains against a plain
-        // Array, which compares ordinally and misses the case-insensitive match that IsSensitive
-        // (and the redactor) guarantee. Captured to a local first: xUnit's own Assert.DoesNotContain
-        // special-cases ICollection<T> the same way LINQ's Contains does, which for a HashSet-backed
-        // collection would use its custom comparer and mask the very trap this test locks down —
-        // matching that would silently stop testing what it claims to.
-        var linqContainsResult = options.Patterns.Contains("PASSWORD");
-        Assert.False(linqContainsResult);
+    [Fact]
+    public void IsSensitive_still_reports_a_default_pattern_after_a_custom_pattern_is_added()
+    {
+        var options = new AuditRedactionOptions();
+        options.AddPattern("internal_ref");
+
+        Assert.True(options.IsSensitive("internal_ref"));
+        Assert.True(options.IsSensitive("password"));
     }
 
     [Theory]

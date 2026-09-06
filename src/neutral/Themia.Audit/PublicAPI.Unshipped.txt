@@ -79,7 +79,6 @@ Themia.Audit.Redaction.AuditRedactionOptions
 Themia.Audit.Redaction.AuditRedactionOptions.AddPattern(string! pattern) -> void
 Themia.Audit.Redaction.AuditRedactionOptions.AuditRedactionOptions() -> void
 Themia.Audit.Redaction.AuditRedactionOptions.IsSensitive(string! propertyName) -> bool
-Themia.Audit.Redaction.AuditRedactionOptions.Patterns.get -> System.Collections.Generic.IReadOnlyCollection<string!>!
 Themia.Audit.Redaction.AuditRedactor
 Themia.Audit.Redaction.AuditRedactor.AuditRedactor(Themia.Audit.Redaction.AuditRedactionOptions! options) -> void
 Themia.Audit.Redaction.AuditRedactor.Redact(string! json) -> string!

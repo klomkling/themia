@@ -17,20 +17,6 @@ public sealed class AuditRedactionOptions
 
     private readonly HashSet<string> patterns = new(DefaultPatterns, StringComparer.OrdinalIgnoreCase);
 
-    /// <summary>The property-name patterns currently treated as sensitive, matched case-insensitively.</summary>
-    /// <remarks>
-    /// For enumeration and diagnostics only — do not test membership with <c>Patterns.Contains(...)</c>.
-    /// This returns a snapshot array, not the backing set, so that call binds to LINQ's
-    /// <see cref="Enumerable.Contains{TSource}(IEnumerable{TSource}, TSource)"/> against a plain
-    /// <see cref="Array"/>, which compares ordinally and ignores the case-insensitive comparer this
-    /// type matches with internally. Use <see cref="IsSensitive"/> instead, which is guaranteed to
-    /// match the same way <see cref="AuditRedactor"/> does — exposing the live set here would let
-    /// <c>Contains</c> appear to work only because <see cref="HashSet{T}"/> happens to special-case
-    /// <see cref="System.Collections.Generic.ICollection{T}.Contains(T)"/> through its own comparer, an
-    /// accident of the backing type that <see cref="IsSensitive"/> does not depend on.
-    /// </remarks>
-    public IReadOnlyCollection<string> Patterns => patterns.ToArray();
-
     /// <summary>Adds a property-name pattern to redact, in addition to the defaults.</summary>
     /// <param name="pattern">The property name to treat as sensitive. Matched case-insensitively.</param>
     /// <exception cref="ArgumentException"><paramref name="pattern"/> is null, empty, or whitespace.</exception>
@@ -41,10 +27,14 @@ public sealed class AuditRedactionOptions
     }
 
     /// <summary>
-    /// The supported way to test whether a JSON property name is treated as sensitive — matched the same
-    /// way <see cref="AuditRedactor"/> matches it: case-insensitively, regardless of how the pattern was
-    /// registered.
+    /// The supported way to test whether a JSON property name is treated as sensitive.
     /// </summary>
+    /// <remarks>
+    /// Matching is case-insensitive: <c>"PASSWORD"</c>, <c>"Password"</c> and <c>"password"</c> all
+    /// match. The default deny-list cannot be removed — only added to via <see cref="AddPattern"/> — so
+    /// this always returns <see langword="true"/> for a default pattern regardless of what else has been
+    /// registered.
+    /// </remarks>
     /// <param name="propertyName">A JSON property name.</param>
     /// <returns><see langword="true"/> if <paramref name="propertyName"/> matches a configured pattern.</returns>
     public bool IsSensitive(string propertyName) => patterns.Contains(propertyName);
