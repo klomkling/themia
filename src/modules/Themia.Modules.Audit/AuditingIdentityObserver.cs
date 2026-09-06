@@ -7,7 +7,7 @@ namespace Themia.Modules.Audit;
 
 /// <summary>
 /// Turns every <see cref="IIdentityEventObserver"/> event into an <see cref="AuditEntry"/> (design §10):
-/// every one of the twelve methods is implemented, not a chosen few, so an audit trail that covers
+/// every one of the thirteen methods is implemented, not a chosen few, so an audit trail that covers
 /// password login while a Google sign-in leaves no trace never ships. Registered through
 /// <c>AddThemiaAuditIdentityObserver</c>, a separate opt-in call (design §11) so a host without Identity
 /// never has to reference this type.
@@ -177,6 +177,18 @@ public sealed class AuditingIdentityObserver : IIdentityEventObserver
             Outcome = AuditOutcome.Success,
             EventType = "USER_MUTATED",
             ActorId = userId.ToString(),
+        }, payload: new { mutation = mutation.ToString() }, cancellationToken);
+
+    /// <inheritdoc />
+    public Task OnUserMutationRefusedAsync(
+        Guid userId, UserMutation mutation, string reason, CancellationToken cancellationToken = default) =>
+        RecordAsync(new AuditEntry
+        {
+            Category = AuditCategory.UserLifecycle,
+            Outcome = AuditOutcome.Denied,
+            EventType = "USER_MUTATION_REFUSED",
+            ActorId = userId.ToString(),
+            Reason = reason,
         }, payload: new { mutation = mutation.ToString() }, cancellationToken);
 
     // The single write path every mapped event funnels through: enrich with IP/user-agent (nothing else

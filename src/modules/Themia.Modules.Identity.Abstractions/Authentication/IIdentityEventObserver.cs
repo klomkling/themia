@@ -152,4 +152,16 @@ public interface IIdentityEventObserver
     /// <param name="cancellationToken">A cancellation token.</param>
     Task OnUserMutatedAsync(Guid userId, UserMutation mutation, CancellationToken cancellationToken = default) =>
         Task.CompletedTask;
+
+    /// <summary>Raised when a proposed mutation was refused by the adopter's own
+    /// <see cref="IUserLifecycleHooks"/> and nothing was applied or saved. The analogue of
+    /// <see cref="OnLoginDeniedAsync"/> for the mutation seam: without this, a refused mutation — an
+    /// administrator's own attempt included — leaves no trace at all.</summary>
+    /// <param name="userId">The user the mutation targeted.</param>
+    /// <param name="mutation">What was attempted.</param>
+    /// <param name="reason">The hook's refusal reason.</param>
+    /// <param name="cancellationToken">A cancellation token.</param>
+    Task OnUserMutationRefusedAsync(
+        Guid userId, UserMutation mutation, string reason, CancellationToken cancellationToken = default) =>
+        Task.CompletedTask;
 }

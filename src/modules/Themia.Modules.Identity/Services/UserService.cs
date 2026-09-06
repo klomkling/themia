@@ -135,6 +135,8 @@ public sealed class UserService : IUserService
 
         await users.AddAsync(user, cancellationToken).ConfigureAwait(false);
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        await hooks.OnUserMutatedAsync(user.Id, UserMutation.Created, cancellationToken).ConfigureAwait(false);
+        await RaiseAsync((o, ct) => o.OnUserMutatedAsync(user.Id, UserMutation.Created, ct), cancellationToken).ConfigureAwait(false);
         return UserCreationResult.Success(user.Id);
     }
 
@@ -173,6 +175,8 @@ public sealed class UserService : IUserService
 
         await users.AddAsync(user, cancellationToken).ConfigureAwait(false);
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        await hooks.OnUserMutatedAsync(user.Id, UserMutation.Created, cancellationToken).ConfigureAwait(false);
+        await RaiseAsync((o, ct) => o.OnUserMutatedAsync(user.Id, UserMutation.Created, ct), cancellationToken).ConfigureAwait(false);
         return UserCreationResult.Success(user.Id);
     }
 
@@ -262,6 +266,7 @@ public sealed class UserService : IUserService
         var decision = await hooks.OnBeforeSetEmailAsync(userId, email, cancellationToken).ConfigureAwait(false);
         if (!decision.IsAllowed)
         {
+            await RaiseAsync((o, ct) => o.OnUserMutationRefusedAsync(userId, UserMutation.Email, decision.Reason!, ct), cancellationToken).ConfigureAwait(false);
             return UserMutationResult.Refused(decision.Reason!);
         }
 
@@ -303,6 +308,7 @@ public sealed class UserService : IUserService
         var decision = await hooks.OnBeforeConfirmEmailAsync(userId, cancellationToken).ConfigureAwait(false);
         if (!decision.IsAllowed)
         {
+            await RaiseAsync((o, ct) => o.OnUserMutationRefusedAsync(userId, UserMutation.EmailConfirmation, decision.Reason!, ct), cancellationToken).ConfigureAwait(false);
             return UserMutationResult.Refused(decision.Reason!);
         }
 
@@ -326,6 +332,7 @@ public sealed class UserService : IUserService
         var decision = await hooks.OnBeforeSetPhoneNumberAsync(userId, phoneNumber, cancellationToken).ConfigureAwait(false);
         if (!decision.IsAllowed)
         {
+            await RaiseAsync((o, ct) => o.OnUserMutationRefusedAsync(userId, UserMutation.Phone, decision.Reason!, ct), cancellationToken).ConfigureAwait(false);
             return UserMutationResult.Refused(decision.Reason!);
         }
 
@@ -366,6 +373,7 @@ public sealed class UserService : IUserService
         var decision = await hooks.OnBeforeConfirmPhoneNumberAsync(userId, cancellationToken).ConfigureAwait(false);
         if (!decision.IsAllowed)
         {
+            await RaiseAsync((o, ct) => o.OnUserMutationRefusedAsync(userId, UserMutation.PhoneConfirmation, decision.Reason!, ct), cancellationToken).ConfigureAwait(false);
             return UserMutationResult.Refused(decision.Reason!);
         }
 
@@ -390,6 +398,7 @@ public sealed class UserService : IUserService
         var decision = await hooks.OnBeforeSetPasswordAsync(userId, cancellationToken).ConfigureAwait(false);
         if (!decision.IsAllowed)
         {
+            await RaiseAsync((o, ct) => o.OnUserMutationRefusedAsync(userId, UserMutation.Password, decision.Reason!, ct), cancellationToken).ConfigureAwait(false);
             return UserMutationResult.Refused(decision.Reason!);
         }
 
@@ -482,6 +491,7 @@ public sealed class UserService : IUserService
         var decision = await hooks.OnBeforeSetActiveAsync(userId, isActive, cancellationToken).ConfigureAwait(false);
         if (!decision.IsAllowed)
         {
+            await RaiseAsync((o, ct) => o.OnUserMutationRefusedAsync(userId, UserMutation.Active, decision.Reason!, ct), cancellationToken).ConfigureAwait(false);
             return UserMutationResult.Refused(decision.Reason!);
         }
 
@@ -505,6 +515,7 @@ public sealed class UserService : IUserService
         var decision = await hooks.OnBeforeDeleteAsync(userId, cancellationToken).ConfigureAwait(false);
         if (!decision.IsAllowed)
         {
+            await RaiseAsync((o, ct) => o.OnUserMutationRefusedAsync(userId, UserMutation.Deleted, decision.Reason!, ct), cancellationToken).ConfigureAwait(false);
             return UserMutationResult.Refused(decision.Reason!);
         }
 

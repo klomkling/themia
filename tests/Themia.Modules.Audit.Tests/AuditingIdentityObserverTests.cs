@@ -221,4 +221,18 @@ public class AuditingIdentityObserverTests
         Assert.Contains("Password", entry.Data!, StringComparison.Ordinal);
         Assert.Contains("Email", entry.Data!, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public async Task User_mutation_refused_records_the_reason_and_the_user_lifecycle_category()
+    {
+        await Observer.OnUserMutationRefusedAsync(UserId, UserMutation.Deleted, "last admin", default);
+
+        var entry = Store.LastWritten!;
+        Assert.Equal("USER_MUTATION_REFUSED", entry.EventType);
+        Assert.Equal(AuditCategory.UserLifecycle, entry.Category);
+        Assert.Equal(AuditOutcome.Denied, entry.Outcome);
+        Assert.Equal(UserId.ToString(), entry.ActorId);
+        Assert.Equal("last admin", entry.Reason);
+        Assert.Contains("Deleted", entry.Data!, StringComparison.Ordinal);
+    }
 }

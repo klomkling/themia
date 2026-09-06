@@ -16,6 +16,7 @@ Themia.Modules.Audit.AuditingIdentityObserver.OnRefreshDeniedAsync(string? userN
 Themia.Modules.Audit.AuditingIdentityObserver.OnRefreshFailedAsync(System.Guid? userId, Themia.Modules.Identity.Abstractions.Authentication.RefreshOutcome outcome, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
 Themia.Modules.Audit.AuditingIdentityObserver.OnRefreshSucceededAsync(System.Guid userId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
 Themia.Modules.Audit.AuditingIdentityObserver.OnUserMutatedAsync(System.Guid userId, Themia.Modules.Identity.Abstractions.UserMutation mutation, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Modules.Audit.AuditingIdentityObserver.OnUserMutationRefusedAsync(System.Guid userId, Themia.Modules.Identity.Abstractions.UserMutation mutation, string! reason, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
 Themia.Modules.Audit.AuditModule
 Themia.Modules.Audit.AuditModule.AuditModule() -> void
 override Themia.Modules.Audit.AuditModule.Descriptor.get -> Themia.Framework.Core.Modules.ModuleDescriptor!

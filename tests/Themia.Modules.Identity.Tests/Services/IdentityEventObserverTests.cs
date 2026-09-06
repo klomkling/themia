@@ -90,6 +90,84 @@ public sealed class IdentityEventObserverTests
     }
 
     [Fact]
+    public async Task CreateAsync_raises_OnUserMutated_with_Created()
+    {
+        var created = await sut.CreateAsync("frank", "pw");
+
+        Assert.Contains((created.UserId!.Value, UserMutation.Created), observer.Mutations);
+    }
+
+    [Fact]
+    public async Task CreateExternalUserAsync_raises_OnUserMutated_with_Created()
+    {
+        var created = await sut.CreateExternalUserAsync("gina", "gina@example.com", emailVerified: true);
+
+        Assert.Contains((created.UserId!.Value, UserMutation.Created), observer.Mutations);
+    }
+
+    [Theory]
+    [InlineData(nameof(UserService.SetEmailAsync))]
+    [InlineData(nameof(UserService.ConfirmEmailAsync))]
+    [InlineData(nameof(UserService.SetPhoneNumberAsync))]
+    [InlineData(nameof(UserService.ConfirmPhoneNumberAsync))]
+    [InlineData(nameof(UserService.SetPasswordAsync))]
+    [InlineData(nameof(UserService.SetActiveAsync))]
+    [InlineData(nameof(UserService.DeleteAsync))]
+    public async Task A_refused_mutation_raises_OnUserMutationRefused(string method)
+    {
+        const string reason = "no";
+        hooks.RefuseSetEmail = reason;
+        hooks.RefuseConfirmEmail = reason;
+        hooks.RefuseSetPhoneNumber = reason;
+        hooks.RefuseConfirmPhoneNumber = reason;
+        hooks.RefuseSetPassword = reason;
+        hooks.RefuseSetActive = reason;
+        hooks.RefuseDelete = reason;
+
+        var created = await sut.CreateAsync("refuse-" + method.ToLowerInvariant(), "pw");
+        var userId = created.UserId!.Value;
+        var user = Assert.Single(store, u => u.Id == userId);
+        user.NormalizedEmail = "REFUSE@EXAMPLE.COM";
+        user.NormalizedPhoneNumber = "0800000000";
+
+        var expectedMutation = await InvokeRefusableAsync(method, userId);
+
+        Assert.Contains(nameof(IIdentityEventObserver.OnUserMutationRefusedAsync), observer.Calls);
+        Assert.Contains((userId, expectedMutation, reason), observer.Refusals);
+        Assert.DoesNotContain((userId, expectedMutation), observer.Mutations);
+    }
+
+    private async Task<UserMutation> InvokeRefusableAsync(string method, Guid userId)
+    {
+        switch (method)
+        {
+            case nameof(UserService.SetEmailAsync):
+                await sut.SetEmailAsync(userId, "new@example.com");
+                return UserMutation.Email;
+            case nameof(UserService.ConfirmEmailAsync):
+                await sut.ConfirmEmailAsync(userId);
+                return UserMutation.EmailConfirmation;
+            case nameof(UserService.SetPhoneNumberAsync):
+                await sut.SetPhoneNumberAsync(userId, "+66822223333");
+                return UserMutation.Phone;
+            case nameof(UserService.ConfirmPhoneNumberAsync):
+                await sut.ConfirmPhoneNumberAsync(userId);
+                return UserMutation.PhoneConfirmation;
+            case nameof(UserService.SetPasswordAsync):
+                await sut.SetPasswordAsync(userId, "new-pw");
+                return UserMutation.Password;
+            case nameof(UserService.SetActiveAsync):
+                await sut.SetActiveAsync(userId, false);
+                return UserMutation.Active;
+            case nameof(UserService.DeleteAsync):
+                await sut.DeleteAsync(userId);
+                return UserMutation.Deleted;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(method), method, "Unhandled mutation method.");
+        }
+    }
+
+    [Fact]
     public async Task SetEmailAsync_raises_OnUserMutated_with_Email()
     {
         var created = await sut.CreateAsync("nia", "pw");

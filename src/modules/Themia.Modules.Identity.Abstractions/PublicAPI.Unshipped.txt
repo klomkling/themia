@@ -270,6 +270,7 @@ Themia.Modules.Identity.Abstractions.IUserLifecycleHooks.OnBeforeSetPhoneNumberA
 Themia.Modules.Identity.Abstractions.IUserLifecycleHooks.OnUserMutatedAsync(System.Guid userId, Themia.Modules.Identity.Abstractions.UserMutation mutation, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
 Themia.Modules.Identity.Abstractions.UserMutation
 Themia.Modules.Identity.Abstractions.UserMutation.Active = 32 -> Themia.Modules.Identity.Abstractions.UserMutation
+Themia.Modules.Identity.Abstractions.UserMutation.Created = 128 -> Themia.Modules.Identity.Abstractions.UserMutation
 Themia.Modules.Identity.Abstractions.UserMutation.Deleted = 64 -> Themia.Modules.Identity.Abstractions.UserMutation
 Themia.Modules.Identity.Abstractions.UserMutation.Email = 2 -> Themia.Modules.Identity.Abstractions.UserMutation
 Themia.Modules.Identity.Abstractions.UserMutation.EmailConfirmation = 4 -> Themia.Modules.Identity.Abstractions.UserMutation
@@ -310,6 +311,7 @@ Themia.Modules.Identity.Abstractions.Authentication.IIdentityEventObserver.OnRef
 Themia.Modules.Identity.Abstractions.Authentication.IIdentityEventObserver.OnLogoutAsync(System.Guid? userId, bool allSessions, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
 Themia.Modules.Identity.Abstractions.Authentication.IIdentityEventObserver.OnLockedOutAsync(System.Guid userId, System.DateTimeOffset lockoutEnd, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
 Themia.Modules.Identity.Abstractions.Authentication.IIdentityEventObserver.OnUserMutatedAsync(System.Guid userId, Themia.Modules.Identity.Abstractions.UserMutation mutation, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Modules.Identity.Abstractions.Authentication.IIdentityEventObserver.OnUserMutationRefusedAsync(System.Guid userId, Themia.Modules.Identity.Abstractions.UserMutation mutation, string! reason, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
 Themia.Modules.Identity.Abstractions.Authentication.LogoutContext.LogoutContext(System.Guid? userId, bool allSessions) -> void
 Themia.Modules.Identity.Abstractions.Authentication.LogoutContext.UserId.get -> System.Guid?
 Themia.Modules.Identity.Abstractions.Authentication.IRefreshTokenService.ResolveOwnerAsync(string! rawToken, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Guid?>!

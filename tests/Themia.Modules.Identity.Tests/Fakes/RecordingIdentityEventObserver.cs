@@ -14,6 +14,8 @@ internal sealed class RecordingIdentityEventObserver : IIdentityEventObserver
 
     public List<(Guid UserId, UserMutation Mutation)> Mutations { get; } = [];
 
+    public List<(Guid UserId, UserMutation Mutation, string Reason)> Refusals { get; } = [];
+
     public Task OnLockedOutAsync(Guid userId, DateTimeOffset lockoutEnd, CancellationToken cancellationToken = default)
     {
         Calls.Add(nameof(OnLockedOutAsync));
@@ -27,6 +29,14 @@ internal sealed class RecordingIdentityEventObserver : IIdentityEventObserver
         Mutations.Add((userId, mutation));
         return Task.CompletedTask;
     }
+
+    public Task OnUserMutationRefusedAsync(
+        Guid userId, UserMutation mutation, string reason, CancellationToken cancellationToken = default)
+    {
+        Calls.Add(nameof(OnUserMutationRefusedAsync));
+        Refusals.Add((userId, mutation, reason));
+        return Task.CompletedTask;
+    }
 }
 
 /// <summary>An observer where every method throws, to prove a throwing observer cannot change the result
@@ -37,4 +47,5 @@ internal sealed class ThrowingIdentityEventObserver : IIdentityEventObserver
 
     public Task OnLockedOutAsync(Guid userId, DateTimeOffset lockoutEnd, CancellationToken cancellationToken = default) => Throw();
     public Task OnUserMutatedAsync(Guid userId, UserMutation mutation, CancellationToken cancellationToken = default) => Throw();
+    public Task OnUserMutationRefusedAsync(Guid userId, UserMutation mutation, string reason, CancellationToken cancellationToken = default) => Throw();
 }
