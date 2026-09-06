@@ -1,3 +1,5 @@
+using Themia.Audit.Redaction;
+
 using Xunit;
 
 namespace Themia.Audit.IntegrationTests;
@@ -21,6 +23,12 @@ public abstract class AuditStoreTestsBase(IAuditStore store, IAuditDialect diale
     {
         // Distinct values per field: five consecutive nullable strings make a transposition invisible,
         // which is the defect that shipped in 0.21.4's outbox dialects.
+        //
+        // OccurredAt is microsecond-aligned (not DateTimeOffset.UtcNow), because its column type diverges
+        // per engine (DATETIME(6) on MySQL vs. datetimeoffset/timestamptz elsewhere) and is the most
+        // likely field to round-trip wrongly — asserting equality to tick precision would fail on the
+        // engine(s) that only store microseconds even when the mapping is correct.
+        var occurredAt = new DateTimeOffset(2026, 6, 10, 9, 8, 7, TimeSpan.Zero).AddTicks(6_543_210);
         var entry = new AuditEntry
         {
             EventType = "EVT",
@@ -35,7 +43,7 @@ public abstract class AuditStoreTestsBase(IAuditStore store, IAuditDialect diale
             CorrelationId = "corr-6",
             IpAddress = "10.0.0.1",
             UserAgent = "agent-7",
-            OccurredAt = DateTimeOffset.UtcNow,
+            OccurredAt = occurredAt,
         };
 
         await using var conn = await OpenConnectionAsync();
@@ -55,6 +63,36 @@ public abstract class AuditStoreTestsBase(IAuditStore store, IAuditDialect diale
         Assert.Equal("corr-6", read.CorrelationId);
         Assert.Equal("10.0.0.1", read.IpAddress);
         Assert.Equal("agent-7", read.UserAgent);
+
+        Assert.Equal(TimeSpan.Zero, read.OccurredAt.Offset);
+        var deltaTicks = Math.Abs((read.OccurredAt.UtcDateTime - occurredAt.UtcDateTime).Ticks);
+        Assert.True(deltaTicks <= TimeSpan.TicksPerMicrosecond,
+            $"OccurredAt round-trip lost precision: expected ~{occurredAt.UtcDateTime:O}, got {read.OccurredAt.UtcDateTime:O}");
+    }
+
+    [Fact]
+    public async Task Redacted_payload_round_trips_through_AuditRecorder()
+    {
+        // AuditEntry.Data is `internal init` — a caller outside the Themia.Audit assembly (this test
+        // project included) can never set it directly, by design (§8's "callers never supply a JSON
+        // string" invariant). Writing through AuditRecorder, rather than widening InternalsVisibleTo,
+        // exercises the real path every adopter uses and proves the redacted payload round-trips as valid
+        // JSON on this engine. AuditRecorder's own dialect/options are unused by RecordOnAsync (it writes
+        // on the connection it is given), so placeholders satisfy its non-null constructor checks.
+        var redactor = new AuditRedactor(new AuditRedactionOptions());
+        var recorder = new AuditRecorder(store, redactor, TimeProvider.System, dialect, new AuditOptions());
+
+        var entry = Valid();
+        var payload = new { userId = 42, password = "hunter2" };
+
+        await using var conn = await OpenConnectionAsync();
+        var eventUid = await recorder.RecordOnAsync(entry, payload, conn, transaction: null, default);
+        var read = await store.GetAsync(eventUid, conn, default);
+
+        Assert.NotNull(read);
+        Assert.NotNull(read.Data);
+        Assert.Contains("\"userId\":42", read.Data, StringComparison.Ordinal);
+        Assert.DoesNotContain("hunter2", read.Data, StringComparison.Ordinal);
     }
 
     [Fact]
