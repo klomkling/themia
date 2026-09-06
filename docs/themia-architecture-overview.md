@@ -121,7 +121,15 @@ you the target: `neutral/` = net8.0;net10.0, everything else = net10.0 (tooling 
 | `Themia.Modules.Export` | — (new; no prior source) | ✅ **built** (0.6.9 — tenant-aware async export module: `IExportDefinition<TParams>` keyed definitions; on-demand + cron Quartz jobs; Storage delivery via signed link; completion/failure Notifications; 7-day retention cleanup; opt-in `BypassSoftDeleteFilter` for full-data exports; FM schema, PostgreSQL+SQL Server+MySQL) |
 | `Themia.Modules.Geo` | ezy-assets `ProjectGeocodingService` | ⬜ later |
 | `Themia.Modules.AI` | ezy-assets `GeminiAICaption`/`FallbackTextTranslation` | ⬜ later |
-| `Themia.Modules.Audit` | ezy-assets `AuditLogRepository` + Zenity audit | ⬜ later |
+| `Themia.Modules.Audit` (+ `Themia.Audit`, `.PostgreSql/.SqlServer/.MySql`, `.AspNetCore`) | **new** — the listed sources turned out to describe something else (see below) | ✅ **built** (0.23.0 — append-only activity + authentication event log; unqualified `themia_audit_events` on all three engines; unconditional redaction; `RequireTransaction` for activity events on EF and Dapper alike; `IIdentityEventObserver` audits all twelve Identity events; fail-closed read-only dashboard. Entity change log deferred to 0.24.0) |
+
+> **The `Themia.Modules.Audit` sources listed here were wrong, and the correction is worth keeping.**
+> ezy-assets' `AuditLogRepository` has `OldValue`/`NewValue` `jsonb` columns, so it reads like an entity
+> change log. All 46 of its call sites are hand-written, `Action` is a business verb
+> (`PROPOSAL_INTEREST_SUBMITTED`), and `OldValue` holds a hand-picked field subset, never a computed row
+> diff — it is an **activity log with two columns named old/new**. `AuditEvent` in `Themia.Services` has
+> no old/new fields at all. The entity change log most people mean by "audit" existed in neither source
+> and is being built from scratch in `0.24.0`.
 
 ## C. Mediator pipeline behaviors → `Themia.Mediator`
 
@@ -281,7 +289,9 @@ adopter actually needs it.
 - **Phase 1 — Core cross-cutting:** Scheduling ✅, ExceptionLogging ✅, **Identity** ✅, Storage ✅
   (+ multi-DB SqlServer/MySql/Postgres baseline).
 - **Phase 2 — Productivity:** Notifications, Pdf, **Export** ✅.
-- **Phase 3 — Advanced:** Geo, AI, Audit; Sequences EF-port ✅ (shipped as
+- **Phase 3 — Advanced:** Geo, AI, **Audit** ✅ (0.23.0 —
+  `docs/superpowers/specs/2026-09-06-themia-audit-design.md`; entity change log deferred to 0.24.0);
+  Sequences EF-port ✅ (shipped as
   `Themia.Framework.Data.Sequences`, see `docs/superpowers/specs/2026-09-05-themia-sequences-design.md`
   — §F below is superseded on three points, recorded in that spec);
   SourceGenerator/analyzer merge.
@@ -297,6 +307,7 @@ adopter actually needs it.
 - ✅ `docs/superpowers/specs/2026-06-17-themia-storage-design.md` (Storage — 0.5.3) · `docs/superpowers/plans/2026-06-17-themia-storage-0.5.3.md`
 - ⬜ Phase 0 framework rename (`0.2.0`) — own spec when started
 - ✅ Export — `docs/superpowers/specs/2026-06-27-themia-modules-export-design.md` + `docs/superpowers/plans/2026-06-27-themia-modules-export.md` (async export module — 0.6.9)
+- ✅ Audit — `docs/superpowers/specs/2026-09-06-themia-audit-design.md` + `docs/superpowers/plans/2026-09-06-themia-audit.md` (activity + authentication event log — 0.23.0; entity change log scoped for 0.24.0 in §15)
 - ✅ Sequences — `docs/superpowers/specs/2026-09-05-themia-sequences-design.md` + `docs/superpowers/plans/2026-09-05-themia-sequences.md` (document numbering — 0.22.0; supersedes §F on three points, recorded in the spec)
 - ⬜ Storage, Notifications, Pdf, … (one spec each, this catalog as parent)
 

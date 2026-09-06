@@ -27,6 +27,43 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.23.0] - 2026-09-06
+
+### Added
+
+- **`Themia.Audit`** (`net8.0;net10.0`) — framework-neutral append-only audit event log: `AuditEntry`
+  with length and enum validation, unconditional JSON redaction, a Dapper store behind
+  `IAuditDialect`, and the FluentMigrator schema. `AddThemiaAudit` runs the migration itself, so the
+  package works without the module layer.
+- **`Themia.Audit.PostgreSql` / `.SqlServer` / `.MySql`** — per-engine dialects. One table,
+  `themia_audit_events`, unqualified and identical on all three.
+- **`Themia.Audit.AspNetCore`** — mountable read-only dashboard with a fail-closed `Authorize`
+  predicate. `ShowData` defaults to `false`, unlike the exceptions dashboard's `ShowRequestBody`:
+  redaction filters by field *name*, so a secret in an unnamed field would otherwise reach the page.
+- **`Themia.Modules.Audit`** (`net10.0`) — tenant resolution, transaction enlistment,
+  `ITenantAuditReader`, and `AuditingIdentityObserver`. `AddThemiaAuditIdentityObserver` records all
+  twelve Identity authentication events with no changes at the adopter's call sites.
+- **`IIdentityEventObserver`** in `Themia.Modules.Identity.Abstractions` — a fan-out observation seam
+  (`IEnumerable<T>`, every method a default no-op) covering password login, external login, all five
+  refresh outcomes, logout, lockout and user mutation. `IAuthenticationHooks`,
+  `IExternalAuthenticationHooks` and `IUserLifecycleHooks` are unchanged and keep `Deny()`; they are
+  single-registration policy seams and cannot also fan out.
+- **`IAmbientConnectionAccessor`** in `Themia.Framework.Data.Abstractions`, implemented in
+  `.EFCore` and `.Dapper` — exposes an open unit of work's connection and transaction to code outside
+  the data layer without it touching a raw connection.
+- `LogoutContext.UserId` and `IRefreshTokenService.ResolveOwnerAsync` (default-null, so existing
+  implementations are unaffected) — together these attribute a logout, and a detected refresh-token
+  reuse, to the owning account.
+
+  **Three seams that had shipped with zero implementations now have one**: `IAuditLogService` and
+  `AuditEvent` (`0.2.0`), `IAuthenticationHooks` (`0.5.1`), and
+  `IUserLifecycleHooks.OnUserMutatedAsync` (`0.20.0`).
+
+  This release does **not** include an entity change log — per-row `CREATE`/`UPDATE`/`DELETE` with
+  field-level old→new values. That is a different record shape and the only part that hits the
+  EF/Dapper change-tracking fork; it is scoped for `0.24.0` in
+  `docs/superpowers/specs/2026-09-06-themia-audit-design.md` §15.
+
 ### Security
 
 - **`Themia.Exceptional.AspNetCore` — the dashboard stylesheet was served without authorization, and no
