@@ -214,6 +214,17 @@ public class AuditDashboardTests
     }
 
     [Fact]
+    public async Task Denied_stylesheet_is_not_cacheable()
+    {
+        // A shared cache serving this 404 back to an authorized admin would leave the dashboard unstyled;
+        // no-store must accompany the deny status, not just the status code.
+        var client = await ServerAsync(new FakeAuditStore(Sample()), configure: null);
+        var res = await client.GetAsync("/audit/dashboard.css");
+        Assert.Equal(HttpStatusCode.NotFound, res.StatusCode);
+        Assert.True(res.Headers.CacheControl!.NoStore);
+    }
+
+    [Fact]
     public async Task Authorized_stylesheet_returns_200_css()
     {
         var client = await ServerAsync(new FakeAuditStore(Sample()), o => o.Authorize = _ => Task.FromResult(true));
@@ -221,6 +232,26 @@ public class AuditDashboardTests
         Assert.Equal(HttpStatusCode.OK, res.StatusCode);
         Assert.StartsWith("text/css", res.Content.Headers.ContentType!.MediaType);
         Assert.Contains("{", await res.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Authorized_stylesheet_is_not_cacheable()
+    {
+        // A shared cache serving this 200 back to an unauthenticated prober would confirm the mount path
+        // exists without Authorize ever running — the exact hole the route-hiding 404 exists to close.
+        var client = await ServerAsync(new FakeAuditStore(Sample()), o => o.Authorize = _ => Task.FromResult(true));
+        var res = await client.GetAsync("/audit/dashboard.css");
+        Assert.Equal(HttpStatusCode.OK, res.StatusCode);
+        Assert.True(res.Headers.CacheControl!.NoStore);
+    }
+
+    [Fact]
+    public async Task Denied_list_is_not_cacheable()
+    {
+        var client = await ServerAsync(new FakeAuditStore(Sample()), configure: null);
+        var res = await client.GetAsync("/audit");
+        Assert.Equal(HttpStatusCode.NotFound, res.StatusCode);
+        Assert.True(res.Headers.CacheControl!.NoStore);
     }
 
     [Fact]

@@ -98,10 +98,12 @@ public static class AuditDashboardEndpoints
     {
         if (!await AuthorizedAsync(ctx, options).ConfigureAwait(false))
         {
+            PreventCaching(ctx.Response);
             ctx.Response.StatusCode = StatusCodes.Status404NotFound;
             return;
         }
 
+        PreventCaching(ctx.Response);
         ctx.Response.ContentType = "text/css; charset=utf-8";
         await ctx.Response.WriteAsync(DashboardCss.Content).ConfigureAwait(false);
     }
@@ -111,6 +113,10 @@ public static class AuditDashboardEndpoints
     // must never be able to serve the dashboard.
     private static async Task DenyAsync(HttpContext ctx, AuditDashboardOptions options)
     {
+        // Set before OnDenied runs, not after, so a hook that owns the response (e.g. a login redirect)
+        // is free to override these headers with its own caching policy if it needs to.
+        PreventCaching(ctx.Response);
+
         if (options.OnDenied is not null)
         {
             try
@@ -123,20 +129,31 @@ public static class AuditDashboardEndpoints
                 ctx.RequestServices.GetService<ILoggerFactory>()?
                     .CreateLogger(LoggerCategory)
                     .LogError(ex, "Audit dashboard OnDenied hook threw; falling back to the deny status.");
+                // Response.Clear() wipes headers along with the body/status, including the PreventCaching
+                // call above — reapply it so a broken hook can't leave the fallback 404 cacheable either.
                 ctx.Response.Clear();
+                PreventCaching(ctx.Response);
             }
         }
 
         ctx.Response.StatusCode = StatusCodes.Status404NotFound;
     }
 
-    // A gated page must not be cacheable: without no-store the browser can re-display the rendered
-    // dashboard after the session expires (the back/forward cache serves it from memory without ever
-    // contacting the server, so Authorize never runs). no-store also disables bfcache in Chrome/Firefox.
+    // A gated response must not be cacheable, for two distinct reasons. First, the browser's own
+    // back/forward cache: without no-store, a browser can re-display the rendered dashboard after the
+    // session expires, served from memory without ever contacting the server, so Authorize never runs
+    // (no-store also disables bfcache in Chrome/Firefox). Second, and separately, a SHARED cache (a
+    // corporate proxy, a CDN, any intermediary): the response genuinely varies by who is asking and says
+    // nothing about it, so such a cache is entitled to reuse one response for every caller — an
+    // authorized 200 served back to an unauthenticated prober defeats Authorize without the predicate
+    // ever running, and the inverse (an unauthenticated 404 served back to an authorized admin) breaks
+    // the dashboard for them. This applies to every response this dashboard writes, not just the HTML
+    // pages — a future reader must not "optimize" the stylesheet route back to a long max-age.
     private static void PreventCaching(HttpResponse response)
     {
         response.Headers.CacheControl = "no-store, no-cache, must-revalidate";
         response.Headers.Pragma = "no-cache";
+        response.Headers.Vary = "Cookie, Authorization";
     }
 
     private static async Task<bool> AuthorizedAsync(HttpContext ctx, AuditDashboardOptions options)
