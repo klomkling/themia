@@ -455,13 +455,28 @@ public async Task AddThemiaAudit_creates_the_table_with_no_module_registered()
     Assert.Equal(0, await conn.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM themia_audit_events"));
 }
 
+// runMigration: false on purpose. Options validation and migration execution are orthogonal;
+// conflating them forces AddThemiaAudit to tolerate invalid options, which is how a requested
+// migration ends up silently not running.
 [Fact]
 public void AddThemiaAudit_rejects_an_unset_engine()
 {
     var services = new ServiceCollection();
-    services.AddThemiaAudit(o => { o.ConnectionString = Cs; /* Engine left Unspecified */ });
+    services.AddThemiaAudit(o => { o.ConnectionString = Cs; /* Engine left Unspecified */ },
+                            runMigration: false);
     Assert.Throws<OptionsValidationException>(() => services.BuildServiceProvider()
         .GetRequiredService<IOptions<AuditOptions>>().Value);
+}
+
+[Fact]
+public void AddThemiaAudit_throws_immediately_when_asked_to_migrate_without_an_engine()
+{
+    // ValidateOnStart never fires under a bare BuildServiceProvider(), so skipping the migration here
+    // would surface only as "table does not exist" at the first audit write, in production.
+    // Assert the message: naming the missing setting IS the fix.
+    var ex = Assert.Throws<InvalidOperationException>(() => new ServiceCollection()
+        .AddThemiaAudit(o => { o.ConnectionString = Cs; }, runMigration: true));
+    Assert.Contains(nameof(AuditOptions.Engine), ex.Message, StringComparison.Ordinal);
 }
 ```
 
