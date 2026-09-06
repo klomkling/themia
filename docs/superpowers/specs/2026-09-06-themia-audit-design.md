@@ -76,7 +76,7 @@ Legs 3 and 4 share **one record shape** — "who did what, when, with what outco
 who calls. One table, one write path.
 
 Leg 2 needs a **second shape**: one event owning N field-change rows. It is also the only leg that hits
-the EF/Dapper parity fork (§14), because EF's `ChangeTracker` holds original values and Dapper has no
+the EF/Dapper parity fork (§15), because EF's `ChangeTracker` holds original values and Dapper has no
 change tracker at all. Isolating it means release 1 settles nothing it would have to revisit.
 
 ### Non-goals
@@ -103,7 +103,7 @@ Themia.Audit                net8.0;net10.0   record model, IAuditRecorder + Audi
 Themia.Audit.PostgreSql     net8.0;net10.0   dialect
 Themia.Audit.SqlServer      net8.0;net10.0   dialect
 Themia.Audit.MySql          net8.0;net10.0   dialect
-Themia.Audit.AspNetCore     net8.0;net10.0   mountable read-only dashboard (§12)
+Themia.Audit.AspNetCore     net8.0;net10.0   mountable read-only dashboard (§13)
 Themia.Modules.Audit        net10.0          IThemiaModule, TransactionalAuditRecorder, tenant
                                              resolution, IAuditLogService impl, Identity observer
 ```
@@ -113,6 +113,9 @@ carries `<FrameworkReference Include="Microsoft.AspNetCore.App" />` and ships
 `Middleware/RequestBodyLoggingMiddleware.cs` and `Serilog/HttpContextEnricher.cs` in the neutral core.
 `Themia.Audit` does the same for IP / user-agent capture, so a web host gets enrichment without the
 module layer and a worker host simply reads nulls.
+
+`Themia.Audit` references `Themia.Data.Migrations`, as `Themia.Exceptional` does, so it can run its own
+schema without the module layer (§11).
 
 **`Themia.Audit` must not reference any `Themia.Framework.*` package.** Asserted by a test, not left to
 convention.
@@ -125,7 +128,7 @@ convention.
 
 | field | type | notes |
 | --- | --- | --- |
-| `Id` | `Guid` | client-generated, so the caller holds it before commit |
+| `EventUid` | `Guid` | client-generated public identifier; the database key is a separate `bigint` (§5) |
 | `TenantId` | `string?` | `null` = host-level (§9) |
 | `Category` | `AuditCategory` | `Unspecified = 0`, `Activity`, `Authentication`, `UserLifecycle`. Release 2 adds `EntityChange`. |
 | `EventType` | `string` | `PROPOSAL_ACCEPTED`, `LOGIN_FAILED`, `PASSWORD_CHANGED` |
@@ -139,7 +142,7 @@ convention.
 | `UserAgent` | `string?` | truncated to 512 |
 | `CorrelationId` | `string?` | |
 | `Reason` | `string?` | the internal reason — `LoginFailureReason`, `DenialReason` |
-| `Data` | `string?` | JSON, **already redacted** (§8) |
+| `Data` | `string?` | JSON, **set by the recorder from a payload object, already redacted** (§8) — never assigned by a caller |
 
 ### `AuditEngine`
 
@@ -151,7 +154,7 @@ engine passed validation and a doc comment claiming otherwise was false.
 
 `ActorId`, `EntityId`, and `EntityType` are **nullable here and non-nullable on
 `Themia.Framework.Services.AuditEvent`**. That older record cannot express a failed login for an
-identifier matching no user. `AuditEvent` is not changed; see §11.
+identifier matching no user. `AuditEvent` is not changed; see §12.
 
 ---
 
@@ -173,7 +176,8 @@ The `themia_` prefix is deliberate: this table shares a namespace with the adopt
 `audit_events` is a name an application plausibly already owns.
 
 ```
-id               guid                    PK
+id               bigint identity         PK (clustered)
+event_uid        guid                    NOT NULL, UNIQUE
 tenant_id        varchar(100)            NULL
 category         smallint                NOT NULL
 event_type       varchar(100)            NOT NULL
@@ -234,7 +238,7 @@ not named by the adopter, and a clipped user-agent is still the same event.
 
 ### Index budget
 
-Each index exists for a query in §6 or §12. An index with no query behind it is write cost for nothing.
+Each index exists for a query in §6 or §13. An index with no query behind it is write cost for nothing.
 
 | index | serves |
 | --- | --- |
@@ -253,7 +257,62 @@ cannot be used. An index whose stated purpose is a query that never matches it i
 the 900-byte clustered/legacy limit. **These columns cannot be widened past 256 without re-checking that
 budget**, and none of them may be moved into a clustered key.
 
-**Append-only.** The store exposes insert, query, and `PurgeAsync`. No update, no delete-by-id.
+### Why the key is a `bigint`, not the `Guid`
+
+`ExceptionLogMigration.cs:48-49` — the sibling this design follows — uses
+`.WithColumn("Id").AsInt64().PrimaryKey().Identity()` plus a separate `Guid` column under a unique index,
+and audit does the same for the same reason.
+
+FluentMigrator's `.PrimaryKey()` produces a **clustered** primary key on SQL Server. A random `Guid` key
+scatters inserts across the whole B-tree, so an append-only table page-splits on essentially every write —
+and this table has no size ceiling, since retention defaults to keep-forever (§2).
+
+An earlier draft used a client-generated `Guid` PK justified as "the caller holds it before commit". That
+is not load-bearing: neither leg reads the id back, and release 2's child rows are inserted inside the same
+transaction, where the returned identity is available. `themia_audit_changes` therefore keys on the
+`bigint`.
+
+`event_uid` is what the dashboard's detail route uses — a sequential `bigint` in a URL invites walking the
+table by hand.
+
+### `IAuditStore`
+
+Append-only: insert, read, purge. **No update, no delete-by-id.** Every method takes its connection, per
+decision 4.
+
+```csharp
+public interface IAuditStore
+{
+    Task<long> WriteAsync(AuditEntry entry, DbConnection connection, DbTransaction? transaction, CancellationToken ct);
+
+    Task<PagedResult<AuditEntry>> QueryAsync(AuditQuery query, DbConnection connection, CancellationToken ct);
+
+    Task<AuditEntry?> GetAsync(Guid eventUid, DbConnection connection, CancellationToken ct);
+
+    /// Deletes every row older than <paramref name="olderThan"/> in ONE statement.
+    /// On a table that has never been purged this can be very large: unlike Themia.Exceptional —
+    /// whose Exceptions table is bounded by DuplicateCount dedup — audit never collapses rows and
+    /// defaults to keep-forever, so a first purge after a year of traffic holds a long lock.
+    /// Purge in date slices on a big table rather than in one call.
+    Task<int> PurgeAsync(DateTimeOffset olderThan, DbConnection connection, CancellationToken ct);
+}
+```
+
+`WriteAsync` returns the generated `bigint`; nothing in release 1 uses it, and release 2's change rows do.
+
+### `IAuditRecorder`
+
+The write surface adopters actually use. Two implementations (§7); one interface.
+
+```csharp
+public interface IAuditRecorder
+{
+    /// The payload is serialized by the recorder — callers never supply a JSON string (§8).
+    ValueTask<Guid> RecordAsync(AuditEntry entry, object? payload = null, CancellationToken ct = default);
+}
+```
+
+Returns the `EventUid`, which the caller holds without a round-trip.
 
 ### `IAuditDialect`
 
@@ -295,7 +354,7 @@ source of a connection at all.
 
 ## 6. Query API
 
-Defined here because §5's indexes and §12's dashboard both depend on it; leaving it to the implementer
+Defined here because §5's indexes and §13's dashboard both depend on it; leaving it to the implementer
 would let the two drift.
 
 ```csharp
@@ -447,6 +506,25 @@ entry to `IAuditStore`. Every leg reaches `IAuditStore` through it: leg 3 via
 `TransactionalAuditRecorder`, leg 4 and the `IAuditLogService` adapter directly. Redaction deliberately
 does not live in the outer transactional recorder, which leg 4 bypasses.
 
+### `Data` is never a string the caller supplies
+
+`IAuditRecorder.RecordAsync` takes an **object** and serializes it with `System.Text.Json` itself. There
+is no code path by which an adopter hands over a raw `Data` string.
+
+This is the fix for a hole the previous revision opened. Loosening `data` to text on every engine (§5) was
+correct — it stops a malformed payload from failing the adopter's transaction on two engines out of three
+— but redaction walks *JSON property names*, so a payload that does not parse could not be walked and
+**nothing would be redacted**. The `jsonb`/`JSON` columns had at least guaranteed parseable input on two
+engines; removing them removed that guarantee with them.
+
+Serializing inside the recorder keeps all three properties at once: the column is text, so no engine
+validates and none can roll back a business write; `data` is nonetheless well-formed JSON **by
+construction**; and the redactor always has something it can walk. The invariant is structural, not
+documented.
+
+`AuditEvent.Metadata` is already `IReadOnlyDictionary<string, string>`, so the adapter (§13) passes it
+straight through.
+
 Default deny-list, matched case-insensitively against JSON property names at any depth:
 
 ```
@@ -481,6 +559,29 @@ over `tenant_id`, so a real `NULL` carries no engine-divergent NULL semantics.
 
 The module resolves the tenant from `ITenantContext` when present and writes `null` when not. **The
 recorder never invents a tenant.**
+
+### Reads are not tenant-filtered, and that is a decision
+
+Writes resolve a tenant; `IAuditStore.QueryAsync` applies **no tenant predicate unless `AuditQuery` names
+one**. That asymmetry is deliberate and has to be stated, because in this codebase the default runs the
+other way: both data layers filter by tenant by construction, and THEMIA103 exists to stop code slipping
+around it. A read surface that fails open is a real divergence, and an undiscussed one reads as covered
+when it is not.
+
+The neutral store cannot filter: it has no `ITenantContext` — that type lives in the framework, which
+`Themia.Audit` may not reference (§3). So the split is:
+
+| surface | tenant predicate |
+| --- | --- |
+| `IAuditStore.QueryAsync` (neutral) | only what `AuditQuery` carries. Unfiltered by default, **by design**. |
+| `ITenantAuditReader` (module) | pre-seeds `TenantId` from `ITenantContext`; cannot be asked for another tenant's rows |
+| the dashboard (§13) | neither — scoping is the adopter's, through `Authorize` |
+
+`ITenantAuditReader` is the analogue of `ITenantQueryFactory.For<T>()` in DECISION #6: the safe path is
+the one with the predicate already applied, and the raw one stays available and conspicuous.
+
+Adopter code should use `ITenantAuditReader`. `IAuditStore.QueryAsync`'s XML doc says outright that it
+returns rows across every tenant.
 
 ---
 
@@ -617,7 +718,41 @@ correct, not an error.
 
 ---
 
-## 11. `IAuditLogService` — the adapter
+## 11. Configuration and DI
+
+```csharp
+services.AddThemiaAudit(
+    o =>
+    {
+        o.ConnectionString = cfg.GetConnectionString("Default")!;
+        o.Engine           = AuditEngine.Postgres;   // Unspecified = 0 is rejected
+        o.Redaction.AddPattern("internal_ref");
+    },
+    runMigration: true);                             // default
+
+services.AddThemiaAuditIdentityObserver();           // opt-in: leg 4
+```
+
+- `AddThemiaAudit` registers the store, dialect, both recorders (§7), the redactor, and
+  `IAuditLogService`.
+- **The Identity observer is a separate call.** A host without Identity must not be made to reference it,
+  and a host that has Identity but does not want auth auditing should not have to opt out of something
+  that turned itself on.
+- `AuditEngine` is validated with `Enum.IsDefined`, so `Unspecified` fails at startup rather than
+  selecting a dialect by accident. Options are validated with `ValidateOnStart`.
+
+**`AddThemiaAudit` runs the schema migration — not `AuditModule`.** §7 explicitly supports a consumer
+using `Themia.Audit` plus a dialect with no module at all; if only the module ran the migration, that
+consumer would get a working recorder and no table. `Themia.Exceptional` puts the runner in the neutral
+core for exactly this reason (`ServiceCollectionExtensions.cs:74`:
+`ThemiaMigrations.Run(engine, connectionString, typeof(ExceptionLogMigration).Assembly)`), and references
+`Themia.Data.Migrations` from its csproj. `Themia.Audit` does both.
+
+`AuditModule : ThemiaModuleBase` asserts the schema is present and does **not** re-run it.
+
+---
+
+## 12. `IAuditLogService` — the adapter
 
 `Themia.Framework.Services.AuditEvent` stays exactly as shipped. `Themia.Modules.Audit` implements
 `IAuditLogService` by mapping onto `AuditEntry`:
@@ -644,7 +779,7 @@ overlap is documented rather than two rival APIs.
 
 ---
 
-## 12. Dashboard — `Themia.Audit.AspNetCore`
+## 13. Dashboard — `Themia.Audit.AspNetCore`
 
 Modelled on `Themia.Exceptional.AspNetCore`: a mountable, self-rendered, read-only UI over
 `IAuditStore`, with no external asset dependencies.
@@ -679,7 +814,7 @@ failure mode of assuming otherwise is one tenant reading another's audit trail.
 
 ---
 
-## 13. Testing
+## 14. Testing
 
 **Neutral core, all three engines, Testcontainers.** Following `SequencesSchemaMigrationTests`, split
 onto its own container after the `0.22.0` review: migration tests get one container, behaviour tests
@@ -704,8 +839,12 @@ Required:
 - **Length limits reject, and reject on every engine.** An over-length `event_type` throws on all three —
   in particular on MySQL, where the failure mode without validation is a silent truncation, not an error.
   `user_agent` over 512 is truncated and written, not rejected.
-- A non-JSON `data` payload round-trips unchanged on all three engines. This is the assertion that stops
-  someone "improving" the column back to `jsonb`.
+- A payload the caller passes as a plain object round-trips as valid JSON on all three engines. This is
+  the assertion that stops someone "improving" the column back to `jsonb`.
+- **A payload whose secret sits in a non-dictionary shape is still redacted** — nested objects, arrays of
+  objects, and a deeply nested match. Redaction over a flat one-level object proves only the easy case.
+- `WriteAsync` returns a monotonically increasing `id` across successive inserts on every engine, and
+  `GetAsync(eventUid)` finds the row — the identity/uid split works both ways.
 - Paging is stable across pages when many rows share one `occurred_at` — the §6 `id` tiebreak.
 
 **Module:**
@@ -738,13 +877,28 @@ Required:
 - `ShowData = false` omits the `data` field from the rendered detail page — assert the payload string is
   absent from the response body, not that a flag was read.
 - `pageSize` above `MaxPageSize` is clamped, not honoured.
+- The detail route addresses rows by `event_uid`; a sequential `id` in the URL does not resolve.
+
+**Tenant reads:**
+
+- `ITenantAuditReader` returns only the ambient tenant's rows, and returns none when asked for a
+  different tenant — assert on a database holding rows for two tenants plus host-level rows.
+- `IAuditStore.QueryAsync` with an empty `AuditQuery` returns rows from **both** tenants. This asserts
+  the documented fail-open behaviour rather than leaving it to be discovered.
+
+**Migration ownership:**
+
+- `AddThemiaAudit(runMigration: true)` with no module registered creates the table — the neutral-only
+  consumer path.
+- `AddThemiaAudit(runMigration: false)` does not, and `AuditModule` then fails with a message naming the
+  missing table rather than a raw SQL error.
 
 **PublicAPI:** every new public member enters `PublicAPI.Unshipped.txt`. A clean `--no-incremental`
 build must report no `RS0016`.
 
 ---
 
-## 14. Release 2 — entity change log (`0.24.0`, specced separately)
+## 15. Release 2 — entity change log (`0.24.0`, specced separately)
 
 Recorded so release 1 is not designed in a way that blocks it.
 
@@ -770,7 +924,7 @@ decision rather than a silent gap. **The choice belongs to release 2's spec and 
 
 ---
 
-## 15. Decisions — do not relitigate
+## 16. Decisions — do not relitigate
 
 1. Three legs; legs 3+4 in `0.23.0`, leg 2 in `0.24.0`.
 2. **`themia_audit_events` is unqualified on every engine. Never `InSchema(...)`.**
@@ -782,15 +936,22 @@ decision rather than a silent gap. **The choice belongs to release 2's spec and 
 4b. Two recorders: neutral `AuditRecorder` (validate + redact + store) wrapped by
    `TransactionalAuditRecorder` in the module. Redaction lives in the **inner** one, so leg 4 cannot
    bypass it.
+4c. `id` is a `bigint identity` clustered PK; `event_uid` is the public `Guid` under a unique index —
+   following `ExceptionLogMigration`. A random Guid clustered key page-splits an append-only table.
 5. `IAmbientConnectionAccessor` lives in `Themia.Framework.Data.Abstractions`, implemented per data
    layer — inside THEMIA103's exemption, so no analyzer rule is weakened.
 6. The EF-tracked-entity alternative is rejected: it would force `Themia.Audit` onto every EF adopter.
 7. Redaction is unconditional, on the inner recorder, deny-list additive-only.
 7b. `data` is `AsString(int.MaxValue)` on every engine — never `jsonb`/`JSON`. Adopter-supplied payload
    must not be able to fail the transaction it describes, on any subset of engines.
+7d. `IAuditRecorder.RecordAsync` takes an **object** and serializes it. No caller supplies a `Data`
+   string, so "well-formed JSON" holds by construction and the redactor always has parseable input.
 7c. Bounded columns have constants on `AuditEntry` bound to the migration. Adopter-named fields are
    **rejected** when over-length; framework-captured ones are truncated.
 8. `TenantId` is nullable; `null` is host-level; the recorder never invents a tenant.
+8b. **Reads are unfiltered in the neutral store by design** (it cannot see `ITenantContext`).
+   `ITenantAuditReader` in the module is the tenant-scoped path; the dashboard scopes through
+   `Authorize`.
 9. `AuditEvent` is not modified. `IAuditLogService` is an adapter over `IAuditRecorder`.
 10. `IIdentityEventObserver` is a new fan-out seam; `IAuthenticationHooks` and
     `IExternalAuthenticationHooks` stay single-registration and keep `Deny()`.
@@ -800,4 +961,6 @@ decision rather than a silent gap. **The choice belongs to release 2's spec and 
 12. The dashboard is read-only and fail-closed. `ShowData` defaults to `false`.
 13. `Themia.Audit` references no `Themia.Framework.*` package; asserted by a test. ASP.NET is permitted
     in the neutral core, as in `Themia.Exceptional`.
-14. No retention job and no Serenity adapter in `0.23.0`.
+14. `AddThemiaAudit` runs the schema migration, not `AuditModule` — a neutral-only consumer must still
+    get a table.
+15. No retention job and no Serenity adapter in `0.23.0`.
