@@ -58,13 +58,17 @@ public sealed class AuditRecorder : IAuditRecorder
     /// <param name="entry">The event to record.</param>
     /// <param name="payload">
     /// An optional payload object, serialized and redacted before storage; <see langword="null"/> leaves
-    /// <see cref="AuditEntry.Data"/> <see langword="null"/>.
+    /// <see cref="AuditEntry.Data"/> <see langword="null"/>. Must not itself be a <see cref="string"/> —
+    /// a pre-serialized JSON string has no property names for redaction to walk.
     /// </param>
     /// <param name="connection">The connection to write on. Must already be open.</param>
     /// <param name="transaction">The transaction to enlist in, or <see langword="null"/> to write unenlisted.</param>
     /// <param name="cancellationToken">Cancels the write.</param>
     /// <returns>The recorded entry's <see cref="AuditEntry.EventUid"/>.</returns>
-    /// <exception cref="ArgumentException"><paramref name="entry"/> fails <see cref="AuditEntry.Validate"/>.</exception>
+    /// <exception cref="ArgumentException">
+    /// <paramref name="entry"/> fails <see cref="AuditEntry.Validate"/>, or <paramref name="payload"/> is a
+    /// <see cref="string"/>.
+    /// </exception>
     public ValueTask<Guid> RecordOnAsync(AuditEntry entry, object? payload, DbConnection connection, DbTransaction? transaction, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(connection);
@@ -85,6 +89,23 @@ public sealed class AuditRecorder : IAuditRecorder
 
         stamped.Validate();
         var normalized = stamped.Normalize();
+
+        // A string payload is rejected, not serialized: JsonSerializer.Serialize on a string produces a
+        // JSON string LITERAL (e.g. "\"already json\""), so AuditRedactor sees a bare-string root with no
+        // property names to walk and returns it verbatim — the exact "callers never supply a JSON string"
+        // hole this invariant exists to close (see AuditRedactorTests, bare-string-root case). A caller
+        // who already serialized their own payload is the natural way to hit this, and every field in it
+        // ships unredacted. Other primitives (bool/number/Guid/etc.) are not rejected: they have no named
+        // fields either, but they also cannot carry a secret under a field name, so there is nothing for
+        // redaction to miss.
+        if (payload is string)
+        {
+            throw new ArgumentException(
+                "payload must not be a string. Pass the object itself so the recorder can serialize it — "
+                + "a pre-serialized JSON string round-trips as an opaque string literal that redaction "
+                + "cannot walk, so any secret in it would be stored unredacted.",
+                nameof(payload));
+        }
 
         var data = payload is null ? null : redactor.Redact(JsonSerializer.Serialize(payload));
         var withData = normalized with { Data = data };

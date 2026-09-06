@@ -24,6 +24,23 @@ public class AuditRecorderTests
     }
 
     [Fact]
+    public async Task Rejects_a_string_payload()
+    {
+        // JsonSerializer.Serialize on a string produces a JSON string LITERAL, so AuditRedactor sees a
+        // bare-string root with no property names to walk and would return it verbatim (see
+        // AuditRedactorTests' bare-string-root case) — an adopter who pre-serializes their own payload
+        // would otherwise get zero redaction with no error to signal it.
+        var store = new CapturingStore();
+        var recorder = CreateRecorder(store);
+
+        var exception = await Assert.ThrowsAsync<ArgumentException>(
+            () => recorder.RecordAsync(Valid(), """{"password":"hunter2"}""").AsTask());
+
+        Assert.Equal("payload", exception.ParamName);
+        Assert.Null(store.Last);
+    }
+
+    [Fact]
     public async Task Null_payload_leaves_data_null()
     {
         var store = new CapturingStore();

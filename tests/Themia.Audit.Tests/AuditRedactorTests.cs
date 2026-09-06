@@ -109,4 +109,18 @@ public class AuditRedactorTests
         var exception = Record.Exception(() => Redactor.Redact(json));
         Assert.Null(exception);
     }
+
+    [Fact]
+    public void Bare_string_root_passes_through_unchanged_which_is_why_AuditRecorder_rejects_string_payloads()
+    {
+        // A bare-string JSON root has no property name for IsSensitive to see, so a secret inside it is
+        // never touched — this is the exact hole AuditRecorder.RecordCoreAsync closes by rejecting a
+        // `string` payload outright (see AuditRecorderTests.Rejects_a_string_payload) rather than letting
+        // it reach this redactor at all.
+        const string json = "\"hunter2\"";
+
+        var result = Redactor.Redact(json);
+
+        Assert.Equal(json, result);
+    }
 }

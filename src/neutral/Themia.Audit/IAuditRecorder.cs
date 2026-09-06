@@ -17,10 +17,14 @@ public interface IAuditRecorder
     /// <param name="payload">
     /// An optional payload object, serialized with <see cref="System.Text.Json.JsonSerializer"/> and
     /// redacted before storage. <see langword="null"/> leaves <see cref="AuditEntry.Data"/>
-    /// <see langword="null"/> rather than storing an empty JSON object.
+    /// <see langword="null"/> rather than storing an empty JSON object. Must not itself be a
+    /// <see cref="string"/> — a pre-serialized JSON string has no property names for redaction to walk.
     /// </param>
     /// <param name="cancellationToken">Cancels the write.</param>
     /// <returns>The recorded entry's <see cref="AuditEntry.EventUid"/>.</returns>
-    /// <exception cref="ArgumentException"><paramref name="entry"/> fails <see cref="AuditEntry.Validate"/>.</exception>
+    /// <exception cref="ArgumentException">
+    /// <paramref name="entry"/> fails <see cref="AuditEntry.Validate"/>, or <paramref name="payload"/> is a
+    /// <see cref="string"/>.
+    /// </exception>
     ValueTask<Guid> RecordAsync(AuditEntry entry, object? payload = null, CancellationToken cancellationToken = default);
 }
