@@ -1,0 +1,27 @@
+#nullable enable
+Themia.Modules.Audit.AuditLogServiceAdapter
+Themia.Modules.Audit.AuditLogServiceAdapter.AuditLogServiceAdapter(Themia.Audit.IAuditRecorder! recorder) -> void
+Themia.Modules.Audit.AuditLogServiceAdapter.WriteAsync(Themia.Services.Abstractions.AuditEvent! auditEvent, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Modules.Audit.AuditModule
+Themia.Modules.Audit.AuditModule.AuditModule() -> void
+override Themia.Modules.Audit.AuditModule.Descriptor.get -> Themia.Framework.Core.Modules.ModuleDescriptor!
+override Themia.Modules.Audit.AuditModule.InitializeAsync(System.IServiceProvider! serviceProvider, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+Themia.Modules.Audit.AuditModuleOptions
+Themia.Modules.Audit.AuditModuleOptions.ActivityPolicy.get -> Themia.Modules.Audit.AuditTransactionPolicy
+Themia.Modules.Audit.AuditModuleOptions.ActivityPolicy.set -> void
+Themia.Modules.Audit.AuditModuleOptions.AuditModuleOptions() -> void
+Themia.Modules.Audit.AuditTransactionPolicy
+Themia.Modules.Audit.AuditTransactionPolicy.JoinIfPresent = 2 -> Themia.Modules.Audit.AuditTransactionPolicy
+Themia.Modules.Audit.AuditTransactionPolicy.Never = 3 -> Themia.Modules.Audit.AuditTransactionPolicy
+Themia.Modules.Audit.AuditTransactionPolicy.RequireTransaction = 1 -> Themia.Modules.Audit.AuditTransactionPolicy
+Themia.Modules.Audit.AuditTransactionPolicy.Unspecified = 0 -> Themia.Modules.Audit.AuditTransactionPolicy
+Themia.Modules.Audit.DependencyInjection.AuditModuleServiceCollectionExtensions
+static Themia.Modules.Audit.DependencyInjection.AuditModuleServiceCollectionExtensions.AddThemiaAuditModule(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Themia.Modules.Audit.AuditModuleOptions!>? configure = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+Themia.Modules.Audit.ITenantAuditReader
+Themia.Modules.Audit.ITenantAuditReader.QueryAsync(Themia.Audit.AuditQuery! query, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<Themia.Audit.PagedResult<Themia.Audit.AuditEntry!>!>!
+Themia.Modules.Audit.TenantAuditReader
+Themia.Modules.Audit.TenantAuditReader.QueryAsync(Themia.Audit.AuditQuery! query, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<Themia.Audit.PagedResult<Themia.Audit.AuditEntry!>!>!
+Themia.Modules.Audit.TenantAuditReader.TenantAuditReader(Themia.Audit.IAuditStore! store, Themia.Audit.IAuditDialect! dialect, Themia.Audit.AuditOptions! options, Themia.Framework.Core.Abstractions.Tenancy.ITenantContext! tenantContext) -> void
+Themia.Modules.Audit.TransactionalAuditRecorder
+Themia.Modules.Audit.TransactionalAuditRecorder.RecordAsync(Themia.Audit.AuditEntry! entry, object? payload = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<System.Guid>
+Themia.Modules.Audit.TransactionalAuditRecorder.TransactionalAuditRecorder(Themia.Audit.AuditRecorder! inner, Themia.Framework.Data.Abstractions.Connections.IAmbientConnectionAccessor! connectionAccessor, Themia.Framework.Core.Abstractions.Tenancy.ITenantContext! tenantContext, Themia.Modules.Audit.AuditModuleOptions! options) -> void
