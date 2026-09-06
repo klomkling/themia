@@ -123,4 +123,45 @@ public class AuditRedactorTests
 
         Assert.Equal(json, result);
     }
+
+    [Theory]
+    [InlineData("newPassword")]
+    [InlineData("currentPassword")]
+    [InlineData("client_secret")]
+    [InlineData("id_token")]
+    [InlineData("access_token_hash")]
+    public void Redacts_a_default_pattern_embedded_in_a_longer_property_name(string propertyName)
+    {
+        var json = $$"""{"{{propertyName}}":"SECRET"}""";
+
+        var result = Redactor.Redact(json);
+
+        Assert.DoesNotContain("SECRET", result, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("newPassword")]
+    [InlineData("currentPassword")]
+    [InlineData("client_secret")]
+    [InlineData("id_token")]
+    [InlineData("access_token_hash")]
+    public void IsSensitive_matches_a_pattern_embedded_in_a_longer_property_name(string propertyName)
+    {
+        var options = new AuditRedactionOptions();
+
+        Assert.True(options.IsSensitive(propertyName));
+    }
+
+    [Theory]
+    [InlineData("tokenCount")]
+    [InlineData("passwordChangedAt")]
+    public void IsSensitive_also_flags_a_name_that_merely_contains_a_pattern(string propertyName)
+    {
+        // Pinning the deliberate trade-off: substring matching redacts these too, even though neither
+        // name carries a secret by itself. Under-redaction (the previous exact-match behaviour, which let
+        // "newPassword" and "client_secret" through untouched) is treated as the worse failure.
+        var options = new AuditRedactionOptions();
+
+        Assert.True(options.IsSensitive(propertyName));
+    }
 }

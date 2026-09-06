@@ -30,12 +30,34 @@ public sealed class AuditRedactionOptions
     /// The supported way to test whether a JSON property name is treated as sensitive.
     /// </summary>
     /// <remarks>
-    /// Matching is case-insensitive: <c>"PASSWORD"</c>, <c>"Password"</c> and <c>"password"</c> all
-    /// match. The default deny-list cannot be removed — only added to via <see cref="AddPattern"/> — so
-    /// this always returns <see langword="true"/> for a default pattern regardless of what else has been
-    /// registered.
+    /// Matching is <b>substring</b>, case-insensitive: a pattern matches if it occurs anywhere in
+    /// <paramref name="propertyName"/>, not only as a full match. <c>"password"</c> therefore also
+    /// matches <c>"newPassword"</c>, <c>"currentPassword"</c>, and <c>"passwordChangedAt"</c>;
+    /// <c>"secret"</c> also matches <c>"client_secret"</c>; <c>"token"</c> also matches
+    /// <c>"id_token"</c>, <c>"access_token_hash"</c>, and <c>"tokenCount"</c>. This is a deliberate choice: under-redaction
+    /// is a security failure (a secret ships in the clear), over-redaction is a usability cost (a
+    /// harmless field like <c>tokenCount</c> shows <c>"[redacted]"</c>) — the exact-match behaviour this
+    /// replaced let real field names such as <c>newPassword</c> and <c>client_secret</c> pass through
+    /// unredacted, which is the failure mode this method exists to prevent. The default deny-list cannot
+    /// be removed — only added to via <see cref="AddPattern"/> — so this always returns
+    /// <see langword="true"/> for a default pattern (or a superstring of one) regardless of what else has
+    /// been registered.
     /// </remarks>
     /// <param name="propertyName">A JSON property name.</param>
-    /// <returns><see langword="true"/> if <paramref name="propertyName"/> matches a configured pattern.</returns>
-    public bool IsSensitive(string propertyName) => patterns.Contains(propertyName);
+    /// <returns>
+    /// <see langword="true"/> if <paramref name="propertyName"/> contains a configured pattern as a
+    /// substring.
+    /// </returns>
+    public bool IsSensitive(string propertyName)
+    {
+        foreach (var pattern in patterns)
+        {
+            if (propertyName.Contains(pattern, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 }
