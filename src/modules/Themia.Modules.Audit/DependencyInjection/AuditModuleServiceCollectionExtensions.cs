@@ -91,7 +91,9 @@ public static class AuditModuleServiceCollectionExtensions
             sp.GetRequiredService<IOptions<AuditOptions>>().Value,
             sp.GetRequiredService<ITenantContext>()));
 
-        services.AddScoped<IAuditLogService, AuditLogServiceAdapter>();
+        // TryAdd: IAuditLogService is a single-owner seam (unlike IIdentityEventObserver below), so a
+        // repeated AddThemiaAuditModule call must not register a second one.
+        services.TryAddScoped<IAuditLogService, AuditLogServiceAdapter>();
 
         return services;
     }

@@ -1,8 +1,10 @@
 using Microsoft.Extensions.DependencyInjection;
 using Themia.Audit;
 using Themia.Audit.DependencyInjection;
+using Themia.Framework.Core.Abstractions.Tenancy;
 using Themia.Framework.Data.Abstractions.Connections;
 using Themia.Modules.Audit.DependencyInjection;
+using Themia.Services.Abstractions;
 using Xunit;
 
 namespace Themia.Modules.Audit.Tests;
@@ -79,6 +81,26 @@ public class AuditModuleRegistrationOrderingTests
         var recorders = scope.ServiceProvider.GetServices<IAuditRecorder>().ToList();
         Assert.Single(recorders);
         Assert.IsType<TransactionalAuditRecorder>(recorders[0]);
+    }
+
+    // AddThemiaAuditModule registers more than IAuditRecorder: ITenantContext, ITenantAuditReader and
+    // IAuditLogService are every bit as single-owner, and a plain Add on any of them would silently
+    // double-register on a repeated call — the earlier version of this test asserted only the recorder
+    // and missed exactly that on IAuditLogService (a plain AddScoped).
+    [Fact]
+    public void Calling_AddThemiaAuditModule_twice_leaves_exactly_one_registration_of_every_service_it_registers()
+    {
+        var services = BuildWithFakes();
+        services.AddThemiaAuditModule();
+        services.AddThemiaAuditModule();
+
+        using var provider = services.BuildServiceProvider();
+        using var scope = provider.CreateScope();
+
+        Assert.Single(scope.ServiceProvider.GetServices<IAuditRecorder>());
+        Assert.Single(scope.ServiceProvider.GetServices<ITenantContext>());
+        Assert.Single(scope.ServiceProvider.GetServices<ITenantAuditReader>());
+        Assert.Single(scope.ServiceProvider.GetServices<IAuditLogService>());
     }
 
     [Fact]
