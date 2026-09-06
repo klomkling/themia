@@ -20,13 +20,16 @@ public sealed class AuditRedactionOptions
     /// <summary>The property-name patterns currently treated as sensitive, matched case-insensitively.</summary>
     /// <remarks>
     /// For enumeration and diagnostics only — do not test membership with <c>Patterns.Contains(...)</c>.
-    /// <see cref="IReadOnlyCollection{T}"/> has no <c>Contains</c> of its own, so that call binds to
-    /// LINQ's <see cref="Enumerable.Contains{TSource}(IEnumerable{TSource}, TSource)"/>, which compares
-    /// ordinally and ignores the case-insensitive comparer backing this set. Use
-    /// <see cref="IsSensitive"/> instead, which is guaranteed to match the same way
-    /// <see cref="AuditRedactor"/> does.
+    /// This returns a snapshot array, not the backing set, so that call binds to LINQ's
+    /// <see cref="Enumerable.Contains{TSource}(IEnumerable{TSource}, TSource)"/> against a plain
+    /// <see cref="Array"/>, which compares ordinally and ignores the case-insensitive comparer this
+    /// type matches with internally. Use <see cref="IsSensitive"/> instead, which is guaranteed to
+    /// match the same way <see cref="AuditRedactor"/> does — exposing the live set here would let
+    /// <c>Contains</c> appear to work only because <see cref="HashSet{T}"/> happens to special-case
+    /// <see cref="System.Collections.Generic.ICollection{T}.Contains(T)"/> through its own comparer, an
+    /// accident of the backing type that <see cref="IsSensitive"/> does not depend on.
     /// </remarks>
-    public IReadOnlyCollection<string> Patterns => patterns;
+    public IReadOnlyCollection<string> Patterns => patterns.ToArray();
 
     /// <summary>Adds a property-name pattern to redact, in addition to the defaults.</summary>
     /// <param name="pattern">The property name to treat as sensitive. Matched case-insensitively.</param>

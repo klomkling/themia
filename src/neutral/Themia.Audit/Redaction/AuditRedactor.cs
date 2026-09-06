@@ -47,7 +47,7 @@ public sealed class AuditRedactor : IAuditRedactor
                 foreach (var property in element.EnumerateObject())
                 {
                     writer.WritePropertyName(property.Name);
-                    if (options.Matches(property.Name))
+                    if (options.IsSensitive(property.Name))
                     {
                         writer.WriteStringValue(RedactedValue);
                     }
