@@ -310,8 +310,10 @@ public sealed class AuthenticationFlow : IAuthenticationFlow
         ArgumentException.ThrowIfNullOrWhiteSpace(refreshToken);
 
         // Resolved BEFORE revocation so the audit trail can attribute the logout to a user even though
-        // revocation itself does not return one.
-        var userId = await refreshTokens.ResolveOwnerAsync(refreshToken, cancellationToken).ConfigureAwait(false);
+        // revocation itself does not return one. Routed through TryResolveOwnerAsync: losing attribution
+        // is acceptable, but a transient failure here must never skip revocation — logout must always
+        // revoke the session.
+        var userId = await TryResolveOwnerAsync(refreshToken, cancellationToken).ConfigureAwait(false);
         await refreshTokens.RevokeAsync(refreshToken, allSessions, cancellationToken).ConfigureAwait(false);
         logger.LogInformation("Logout for refresh token (allSessions={AllSessions}).", allSessions);
         await hooks.OnLogoutAsync(new LogoutContext(userId, allSessions), cancellationToken).ConfigureAwait(false);

@@ -108,4 +108,14 @@ public sealed class AuthenticationFlowRefreshTests
         await Build(refresh, new RecordingHooks()).LogoutAsync("token", allSessions: true);
         Assert.True(refresh.LastRevokeAllForUser);
     }
+
+    [Fact]
+    public async Task Logout_still_revokes_when_owner_resolution_throws()
+    {
+        // A transient failure resolving the owner (for audit attribution) must not skip revocation —
+        // logout must always revoke the session, even without attribution.
+        var refresh = new FakeRefreshTokenService { ThrowOnResolveOwner = true };
+        await Build(refresh, new RecordingHooks()).LogoutAsync("token", allSessions: false);
+        Assert.Equal(1, refresh.RevokeCalls);
+    }
 }
