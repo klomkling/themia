@@ -54,11 +54,7 @@ public static class AuditDashboardEndpoints
             HandleListAsync(ctx, store, dialect, auditOptions.Value, options, path, ct));
         group.MapGet("{eventUid:guid}", (Guid eventUid, HttpContext ctx, IAuditStore store, IAuditDialect dialect, IOptions<AuditOptions> auditOptions, CancellationToken ct) =>
             HandleDetailAsync(ctx, store, dialect, auditOptions.Value, options, path, eventUid, ct));
-        group.MapGet("dashboard.css", (HttpContext ctx) =>
-        {
-            ctx.Response.ContentType = "text/css; charset=utf-8";
-            return ctx.Response.WriteAsync(DashboardCss.Content);
-        });
+        group.MapGet("dashboard.css", (HttpContext ctx) => HandleCssAsync(ctx, options));
 
         return group;
     }
@@ -91,6 +87,23 @@ public static class AuditDashboardEndpoints
 
         var chrome = new DashboardChrome(options.Title, path, options.CustomStyleSheet, options.CustomFavicon, options.HeadHtml, options.BodyStartHtml, options.Heading);
         await WriteHtmlAsync(ctx, DashboardHtml.Detail(chrome, entry, options.ShowData), ct).ConfigureAwait(false);
+    }
+
+    // Gated like the list/detail routes: an unauthenticated 200 here would confirm the mount path even
+    // though no audit data leaks (the 404 on the other two routes exists precisely to conceal that a
+    // dashboard is mounted at all). OnDenied is deliberately NOT invoked on denial — it typically redirects
+    // to the host's login page, and redirecting a stylesheet request means the browser fetches HTML where
+    // it expected CSS. OnDenied is for navigations; a subresource just 404s.
+    private static async Task HandleCssAsync(HttpContext ctx, AuditDashboardOptions options)
+    {
+        if (!await AuthorizedAsync(ctx, options).ConfigureAwait(false))
+        {
+            ctx.Response.StatusCode = StatusCodes.Status404NotFound;
+            return;
+        }
+
+        ctx.Response.ContentType = "text/css; charset=utf-8";
+        await ctx.Response.WriteAsync(DashboardCss.Content).ConfigureAwait(false);
     }
 
     // The single deny path. OnDenied owns the response when set (typically a redirect to the host's login);

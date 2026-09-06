@@ -203,6 +203,27 @@ public class AuditDashboardTests
     }
 
     [Fact]
+    public async Task Null_authorize_denies_the_stylesheet()
+    {
+        // The stylesheet must be gated like the list/detail routes: an unauthenticated 200 here would
+        // confirm the mount path exists, which the route-hiding 404 exists to conceal.
+        var client = await ServerAsync(new FakeAuditStore(Sample()), configure: null);
+        var res = await client.GetAsync("/audit/dashboard.css");
+        Assert.Equal(HttpStatusCode.NotFound, res.StatusCode);
+        Assert.DoesNotContain("{", await res.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Authorized_stylesheet_returns_200_css()
+    {
+        var client = await ServerAsync(new FakeAuditStore(Sample()), o => o.Authorize = _ => Task.FromResult(true));
+        var res = await client.GetAsync("/audit/dashboard.css");
+        Assert.Equal(HttpStatusCode.OK, res.StatusCode);
+        Assert.StartsWith("text/css", res.Content.Headers.ContentType!.MediaType);
+        Assert.Contains("{", await res.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void MapThemiaAuditDashboard_rejects_invalid_paging()
     {
         using var host = new HostBuilder()
