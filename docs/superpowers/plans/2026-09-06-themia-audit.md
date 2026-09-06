@@ -288,9 +288,14 @@ public async Task Creates_the_same_unqualified_table_on_every_engine()
     ThemiaMigrations.Run(Engine, ConnectionString, typeof(AuditSchemaMigration).Assembly);
     await using var conn = Dialect.CreateConnection(ConnectionString);
     await conn.OpenAsync();
+    // Assert the SHAPE, never that the table is empty. The container is shared with the store tests,
+    // so a row-count assertion here is order-dependent and would force a second container per engine.
     // Unqualified on purpose: InSchema is dropped on MySQL and the name would then differ per engine.
-    var count = await conn.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM themia_audit_events");
-    Assert.Equal(0, count);
+    var columns = await ColumnNamesAsync(conn, "themia_audit_events");
+    Assert.Contains("event_uid", columns);
+    Assert.Contains("tenant_id", columns);
+    Assert.Contains("occurred_at", columns);
+    Assert.Contains("data", columns);
 }
 
 [Fact]
