@@ -1,0 +1,10 @@
+#nullable enable
+Themia.Audit.SqlServer.ServiceCollectionExtensions
+Themia.Audit.SqlServer.SqlServerAuditDialect
+Themia.Audit.SqlServer.SqlServerAuditDialect.CountSql.get -> string!
+Themia.Audit.SqlServer.SqlServerAuditDialect.CreateConnection(string! connectionString) -> System.Data.Common.DbConnection!
+Themia.Audit.SqlServer.SqlServerAuditDialect.InsertSql.get -> string!
+Themia.Audit.SqlServer.SqlServerAuditDialect.PurgeSql.get -> string!
+Themia.Audit.SqlServer.SqlServerAuditDialect.SelectPageSql.get -> string!
+Themia.Audit.SqlServer.SqlServerAuditDialect.SqlServerAuditDialect() -> void
+static Themia.Audit.SqlServer.ServiceCollectionExtensions.AddThemiaAuditSqlServer(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!

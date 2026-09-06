@@ -1,14 +1,16 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <!-- Neutral cross-framework package: MUST include net8.0 (cross-framework reuse). -->
     <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
-    <PackageId>Themia.Audit</PackageId>
-    <Description>Framework-neutral audit event log core: an immutable audit entry record, length/enum validation, and JSON redaction of sensitive payload fields.</Description>
-    <PackageTags>themia;audit;logging;compliance</PackageTags>
+    <PackageId>Themia.Audit.SqlServer</PackageId>
+    <Description>SQL Server dialect (Microsoft.Data.SqlClient) for Themia.Audit.</Description>
+    <PackageTags>themia;audit;sqlserver</PackageTags>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Dapper" />
-    <PackageReference Include="FluentMigrator" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+    <PackageReference Include="Microsoft.Data.SqlClient" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Themia.Audit/Themia.Audit.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers">
