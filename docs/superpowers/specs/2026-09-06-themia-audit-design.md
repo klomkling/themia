@@ -97,14 +97,15 @@ Follows the `Themia.Exceptional` family — an append-only store with one schema
 behind a dialect strategy, plus a separate mountable dashboard package.
 
 ```
-Themia.Audit                net8.0;net10.0   record model, IAuditStore, Dapper store, IAuditDialect,
-                                             redaction, HTTP enrichment, schema migration
+Themia.Audit                net8.0;net10.0   record model, IAuditRecorder + AuditRecorder, IAuditStore,
+                                             Dapper store, IAuditDialect, redaction, HTTP enrichment,
+                                             schema migration
 Themia.Audit.PostgreSql     net8.0;net10.0   dialect
 Themia.Audit.SqlServer      net8.0;net10.0   dialect
 Themia.Audit.MySql          net8.0;net10.0   dialect
 Themia.Audit.AspNetCore     net8.0;net10.0   mountable read-only dashboard (§12)
-Themia.Modules.Audit        net10.0          IThemiaModule, tenant resolution, IAuditLogService impl,
-                                             Identity observer, ambient-transaction enlistment
+Themia.Modules.Audit        net10.0          IThemiaModule, TransactionalAuditRecorder, tenant
+                                             resolution, IAuditLogService impl, Identity observer
 ```
 
 **"Neutral" means no `Themia.Framework.*` dependency — not "no ASP.NET".** `Themia.Exceptional` itself
@@ -172,28 +173,64 @@ The `themia_` prefix is deliberate: this table shares a namespace with the adopt
 `audit_events` is a name an application plausibly already owns.
 
 ```
-id               guid           PK
-tenant_id        varchar(100)   NULL
-category         smallint       NOT NULL
-event_type       varchar(100)   NOT NULL
-outcome          smallint       NOT NULL
-actor_id         varchar(256)   NULL
-actor_name       varchar(256)   NULL
-entity_type      varchar(256)   NULL
-entity_id        varchar(256)   NULL
-occurred_at      <per-engine>   NOT NULL
-ip_address       varchar(64)    NULL
-user_agent       varchar(512)   NULL
-correlation_id   varchar(128)   NULL
-reason           varchar(256)   NULL
-data             <per-engine>   NULL
+id               guid                    PK
+tenant_id        varchar(100)            NULL
+category         smallint                NOT NULL
+event_type       varchar(100)            NOT NULL
+outcome          smallint                NOT NULL
+actor_id         varchar(256)            NULL
+actor_name       varchar(256)            NULL
+entity_type      varchar(256)            NULL
+entity_id        varchar(256)            NULL
+occurred_at      <per-engine>            NOT NULL
+ip_address       varchar(64)             NULL
+user_agent       varchar(512)            NULL
+correlation_id   varchar(128)            NULL
+reason           varchar(256)            NULL
+data             AsString(int.MaxValue)  NULL
 ```
 
-- `occurred_at`: `timestamptz` (Postgres) / `datetime2` (SQL Server) / `DATETIME(6)` (MySQL), matching
-  `ExceptionLogMigration`.
-- `data`: `jsonb` (Postgres) / `nvarchar(max)` (SQL Server) / `JSON` (MySQL). **The Postgres dialect must
-  cast on insert — `CAST(@data AS jsonb)`** — as ezy-assets' `AuditLogRepository` does; a dialect that
-  omits the cast fails at insert, not at build.
+`occurred_at`: `timestamptz` (Postgres) / `datetime2` (SQL Server) / `DATETIME(6)` (MySQL), matching
+`ExceptionLogMigration`.
+
+### `data` is text on every engine, not `jsonb`
+
+An earlier draft used `jsonb` (Postgres) / `JSON` (MySQL) / `nvarchar(max)` (SQL Server). **Postgres and
+MySQL validate JSON on insert; SQL Server does not.** `data` holds a payload the *adopter* supplies, so a
+caller passing a non-JSON string succeeds on SQL Server and throws on the other two — and because leg 3
+runs inside the caller's transaction (§7), that throw **rolls back the adopter's business write**. A
+malformed audit payload must never be able to fail the operation it describes, and it must not do so on
+two engines out of three.
+
+`Themia.Exceptional` stores its equivalent adopter-supplied payload as `AsString(int.MaxValue)` on every
+engine (`ExceptionLogMigration.cs:55`). Audit follows it. ezy-assets could use `jsonb` because all 46 of
+its call sites serialize before writing; a framework accepting a string from anyone has no such
+guarantee.
+
+If JSON querying is wanted later, it arrives as a per-engine generated column — a separate decision with
+its own migration, not a constraint smuggled into the storage type.
+
+### Length limits are validated, not left to the engine
+
+Every bounded column has a public constant on `AuditEntry`, bound to the migration column, exactly as
+`SequenceProvider.MaxSequenceKeyLength = 100` is bound to `themia_sequences.sequence_key`:
+
+```
+MaxEventTypeLength     = 100     MaxActorIdLength      = 256
+MaxActorNameLength     = 256     MaxEntityTypeLength   = 256
+MaxEntityIdLength      = 256     MaxReasonLength       = 256
+MaxCorrelationIdLength = 128     MaxIpAddressLength    = 64
+MaxUserAgentLength     = 512
+```
+
+Without this the two outcomes are both wrong: MySQL in non-strict mode **truncates silently**, so an
+over-length `event_type` becomes a *different* event that queries then miscount; every other engine
+throws, which under §7's atomicity rolls back the adopter's business transaction.
+
+**Adopter-named fields are rejected, never truncated** — `event_type`, `actor_id`, `entity_type`,
+`entity_id`. Truncating them merges two distinct events into one and the audit trail then asserts
+something false. `user_agent` and `ip_address` are truncated instead: they are captured by the framework,
+not named by the adopter, and a clipped user-agent is still the same event.
 
 ### Index budget
 
@@ -201,10 +238,14 @@ Each index exists for a query in §6 or §12. An index with no query behind it i
 
 | index | serves |
 | --- | --- |
-| `(tenant_id, occurred_at DESC)` | the tenant timeline — dashboard default list |
+| `(tenant_id, occurred_at DESC)` | the tenant timeline — any query filtering `TenantId` |
 | `(actor_id, occurred_at DESC)` | "everything this user did" |
 | `(entity_type, entity_id, occurred_at DESC)` | "history of this record" |
-| `(occurred_at)` | the purge scan |
+| `(occurred_at)` | the purge scan, **and the dashboard's unfiltered default list** |
+
+The unfiltered list is deliberately served by `(occurred_at)`, not by the tenant index: §6's
+`TenantId = null` means *no filter*, so there is no leading-column predicate and the composite index
+cannot be used. An index whose stated purpose is a query that never matches it is write cost for nothing.
 
 **Key-size ceiling, stated because Challenges was bitten by the unstated one.** The widest index is
 `(entity_type, entity_id, occurred_at)`: on SQL Server `nvarchar(256)` = 512 bytes each, plus
@@ -213,6 +254,29 @@ the 900-byte clustered/legacy limit. **These columns cannot be widened past 256 
 budget**, and none of them may be moved into a clustered key.
 
 **Append-only.** The store exposes insert, query, and `PurgeAsync`. No update, no delete-by-id.
+
+### `IAuditDialect`
+
+Public, so an adopter on an engine Themia does not ship can supply one without forking — the same seam as
+`IExceptionalSqlDialect` and `ISequenceDialect`.
+
+```csharp
+public interface IAuditDialect
+{
+    /// Opens a NEW, unopened connection. Used by every caller that has no ambient
+    /// transaction to join: leg 4, the dashboard, and PurgeAsync.
+    DbConnection CreateConnection(string connectionString);
+
+    string InsertSql { get; }       // named parameters, one per column in §5
+    string SelectPageSql { get; }   // §6 filters, ORDER BY occurred_at DESC, id DESC, engine paging
+    string CountSql { get; }        // same predicate as SelectPageSql, no paging
+    string PurgeSql { get; }        // DELETE WHERE occurred_at < @olderThan
+}
+```
+
+`CreateConnection` is on the dialect and not on the store because §7 makes the store connectionless.
+Removing it entirely — as an earlier draft did — left leg 4, the dashboard, and the purge with no stated
+source of a connection at all.
 
 ### Migration
 
@@ -308,8 +372,8 @@ contains **43** `SaveChangesAsync` call sites against **4** `ExecuteInTransactio
 | `Activity` | `RequireTransaction` (default, configurable) | the guarantee is real or its absence is loud |
 | `Authentication`, `UserLifecycle` | `Never`, not configurable | a failed login has no transaction to join, and must be recorded even when the surrounding request fails |
 
-Under `RequireTransaction` with no ambient transaction, the recorder throws, and the message names
-`IUnitOfWork.ExecuteInTransactionAsync` as the fix. This is not a Themia limitation being surfaced — a
+Under `RequireTransaction` with no ambient transaction, `TransactionalAuditRecorder` throws, and the
+message names `IUnitOfWork.ExecuteInTransactionAsync` as the fix. This is not a Themia limitation being surfaced — a
 business write and its audit row cannot be atomic without a transaction on any database. Making the app
 say so is the honest form.
 
@@ -321,6 +385,31 @@ connection.
 carries it. It gives a stronger guarantee on the default path with no new abstraction, but the entity
 would have to be mapped in `ThemiaDbContext.OnModelCreating`, forcing `Themia.Audit` onto **every** EF
 adopter whether or not they use auditing. Rejected on that cost, not on the mechanism.
+
+### Two recorders, one interface — and why
+
+`IAmbientConnectionAccessor` lives in `Themia.Framework.Data.Abstractions`, and `Themia.Audit` may not
+reference any `Themia.Framework.*` package (§3, asserted by a test). A single recorder cannot be both
+neutral and transaction-aware. An earlier draft claimed one — "every leg goes through the recorder" in §8
+and "the recorder throws" here — which cannot be built as written.
+
+Split, with the seam named rather than left to the implementer:
+
+| type | package | does |
+| --- | --- | --- |
+| `AuditRecorder` | `Themia.Audit` (neutral) | validates lengths and enums, **redacts**, writes through `IAuditStore` on a connection handed to it. Knows nothing about transactions. |
+| `TransactionalAuditRecorder` | `Themia.Modules.Audit` | implements the same `IAuditRecorder`, resolves the ambient connection, enforces `AuditTransactionPolicy`, delegates to `AuditRecorder`. |
+
+DI registers `TransactionalAuditRecorder` as `IAuditRecorder`; `AuditRecorder` is its dependency, not a
+second registration. Consumers see one interface.
+
+**Redaction stays on the single write path** because it lives in the *inner* recorder: every route to
+`IAuditStore` that this design creates — leg 3, leg 4, the module adapter — passes through
+`AuditRecorder`. Putting redaction in the outer type instead would leave leg 4 (which bypasses the
+transaction logic) unredacted, which is precisely the split-path failure §8 exists to prevent.
+
+A neutral consumer using `Themia.Audit` alone gets `AuditRecorder` — validation and redaction intact,
+transaction policy absent, because there is no unit of work to enlist in.
 
 ### The ambient-connection seam
 
@@ -353,8 +442,10 @@ returns, because it would let a caller believe it had enlisted when it had not.
 **Unconditional, on the single write path.** Not an option, not a helper the caller may forget, not a
 policy object defaulting to permissive.
 
-`AuditRecorder.RecordAsync` redacts `Data` before handing the entry to `IAuditStore`. Every leg goes
-through the recorder.
+`AuditRecorder.RecordAsync` — the **inner**, neutral recorder (§7) — redacts `Data` before handing the
+entry to `IAuditStore`. Every leg reaches `IAuditStore` through it: leg 3 via
+`TransactionalAuditRecorder`, leg 4 and the `IAuditLogService` adapter directly. Redaction deliberately
+does not live in the outer transactional recorder, which leg 4 bypasses.
 
 Default deny-list, matched case-insensitively against JSON property names at any depth:
 
@@ -423,12 +514,23 @@ observers gets today's behaviour exactly.
 itself: *"A seam covering three of seven paths reads as covering all seven."*
 
 ```
+// password login
 OnLoginSucceededAsync(userId, userName)
 OnLoginFailedAsync(userName, LoginFailureReason)
 OnLoginDeniedAsync(userName, denialReason)
-OnLogoutAsync(userId, allSessions)
+
+// external login — Google / LINE (§10b)
+OnExternalLoginSucceededAsync(userId, provider, wasCreated, wasLinked)
+OnExternalLoginFailedAsync(provider, ExternalLoginOutcome)
+OnExternalLoginDeniedAsync(provider, denialReason)
+
+// refresh — all five outcomes (§10c)
 OnRefreshSucceededAsync(userId)
-OnRefreshDeniedAsync(userId?, denialReason)
+OnRefreshDeniedAsync(userName?, denialReason, bool rotationCommitted)
+OnRefreshFailedAsync(userId?, RefreshOutcome)
+
+// session and account
+OnLogoutAsync(userId, allSessions)
 OnLockedOutAsync(userId, lockoutEnd)
 OnUserMutatedAsync(userId, UserMutation)
 ```
@@ -438,7 +540,60 @@ catch, log at Error, and continue. A failed audit write must never turn a succes
 and must never turn a *failed* login into a different status code, which would leak the failure reason
 the uniform 401 exists to hide.
 
-### 10b. `LogoutContext` has no user identity
+### 10b. External login is a whole shipped flow with no audit
+
+`Themia.Modules.Identity.ExternalAuth.AspNetCore` has shipped Google and LINE sign-in since `0.5.2`. It
+has its own hook interface, invoked at three points:
+
+```
+ExternalAuthenticationFlow.cs:68   OnBeforeExternalLoginAsync
+ExternalAuthenticationFlow.cs:92   OnExternalLoginSucceededAsync
+ExternalAuthenticationFlow.cs:120  OnExternalLoginFailedAsync
+```
+
+It carries the same single-registration defect as §10a —
+`ExternalAuthBuilder.cs:34`: `services.TryAddScoped<IExternalAuthenticationHooks, ExternalAuthenticationHooksBase>()`.
+
+An earlier draft of this spec covered password login only. The result would have been an audit trail that
+*looks* complete — every password event present — while a user signing in with Google left no trace at
+all. That is the failure §10a quotes `IUserLifecycleHooks` against: *"A seam covering three of seven paths
+reads as covering all seven."*
+
+`ExternalLoginSucceededContext(User user, bool wasCreated, bool wasLinked)` carries the two events a
+security review most needs: an account **auto-created** from a provider identity, and an existing account
+**linked** to a new provider. Account takeover through provider linking is a real attack; it must be in
+the log.
+
+`ExternalLoginOutcome.AccountInactive`'s own doc comment closes the argument — *"the distinct value exists
+only so audit sees the reason"* — a fourth seam built for a consumer that was never written.
+
+`ExternalAuthenticationFlow` invokes the observers at the same three points, exactly as
+`AuthenticationFlow` does.
+
+### 10c. Refresh has five outcomes; the hooks see two
+
+Traced through `AuthenticationFlow.RefreshAsync` (`AuthenticationFlow.cs:178-227`):
+
+| outcome | line | hook today |
+| --- | --- | --- |
+| denied by hook, **before** rotation | 186 | `OnBeforeRefreshAsync` |
+| `RefreshOutcome.ReuseDetected` | ~195 | **none** |
+| `RefreshOutcome.Invalid` | ~196 | **none** |
+| account inactive or locked out | 207 | **none** — logged only |
+| denied by hook, **after** rotation committed | 221 | `OnRefreshSucceededAsync` + `IsDenied` |
+
+**`ReuseDetected` is the most security-relevant event in the whole flow** — a rotated refresh token
+presented twice is the textbook signature of token theft — and nothing observes it. `OnRefreshFailedAsync`
+covers the three unobserved outcomes.
+
+The two hook denials are **not** one event: the first happens before any state changes; the second happens
+after the rotation has already persisted, so a valid successor token exists that the client never
+received (`RefreshSucceededContext`'s own doc says the rotation is not rolled back). `OnRefreshDeniedAsync`
+carries `rotationCommitted` so the log distinguishes "nothing happened" from "the token was rotated and
+the holder does not know". An investigator reading a bare `REFRESH_DENIED` cannot tell which, and the two
+call for opposite responses.
+
+### 10d. `LogoutContext` has no user identity
 
 ```csharp
 public sealed class LogoutContext(bool allSessions)
@@ -448,13 +603,13 @@ An audit row can say a logout happened but not whose. `OnLogoutAsync` carries th
 the refresh token before revocation. `LogoutContext` gains a nullable `UserId` for symmetry — additive,
 and only Identity constructs it.
 
-### 10c. Lockout raises no event
+### 10e. Lockout raises no event
 
 `UserService.cs:371-375` sets `LockoutEnd` and resets `AccessFailedCount` with no notification. Today an
 observer can only infer it from the *next* login attempt returning `LoginFailureReason.LockedOut` — a
 different event at a different time. `OnLockedOutAsync` fires where the lockout is applied.
 
-### 10d. IP and user-agent
+### 10f. IP and user-agent
 
 Not an Identity defect and no Identity change. `Themia.Audit` reads them from `IHttpContextAccessor`
 directly, as `Themia.Exceptional`'s `HttpContextEnricher` does. A non-web host records nulls, which is
@@ -512,6 +667,11 @@ carries, so an adopter who has mounted one dashboard already knows this one:
 
 Routes: list (filters from §6's `AuditQuery`) and detail by `id`. No mutation endpoint of any kind.
 
+The dashboard has no unit of work, so it opens its own connection through
+`IAuditDialect.CreateConnection` — the same path as leg 4 and `PurgeAsync`. It never participates in an
+adopter's transaction; a read must not be able to hold a lock on the audit table while a business
+transaction is open.
+
 **Tenant scoping is the adopter's job, through `Authorize`.** The dashboard does not resolve a tenant
 from `ITenantContext` — it is mounted by the host, and a host admin viewing all tenants and a tenant
 admin viewing their own are both legitimate. The `Authorize` XML doc states this explicitly, because the
@@ -541,6 +701,11 @@ Required:
 - **Redaction proven able to fail:** remove redaction, observe the secret in the row, restore. A
   redaction test over a payload containing no secret proves nothing.
 - Enum validation rejects `Unspecified` and out-of-range values.
+- **Length limits reject, and reject on every engine.** An over-length `event_type` throws on all three —
+  in particular on MySQL, where the failure mode without validation is a silent truncation, not an error.
+  `user_agent` over 512 is truncated and written, not rejected.
+- A non-JSON `data` payload round-trips unchanged on all three engines. This is the assertion that stops
+  someone "improving" the column back to `jsonb`.
 - Paging is stable across pages when many rows share one `occurred_at` — the §6 `id` tiebreak.
 
 **Module:**
@@ -557,7 +722,14 @@ Required:
   container. `0.19.0`'s notification-provider defect passed unit tests and failed on the real default
   graph.
 - Registering the Identity observer alongside an adopter's own `IAuthenticationHooks` leaves **both**
-  running. This is §10a's defect; it needs a test, not just a design.
+  running — and the same test for `IExternalAuthenticationHooks`. This is §10a's defect; it needs a test,
+  not just a design.
+- **Every Identity path that can produce an event produces one.** One test per row of §10b's and §10c's
+  tables, plus password login and lockout: external login succeeded / failed / denied, refresh
+  `ReuseDetected` / `Invalid` / inactive-account / denied-before / denied-after. A partial sweep here
+  recreates exactly the gap this revision exists to close.
+- `OnRefreshDeniedAsync` reports `rotationCommitted = false` for the pre-rotation denial and `true` for the
+  post-rotation one. Asserting only that the event fired would pass with the flag inverted.
 
 **Dashboard:**
 
@@ -605,14 +777,25 @@ decision rather than a silent gap. **The choice belongs to release 2's spec and 
 3. Leg 3 defaults to `RequireTransaction` and **throws** when none is open. No silent degradation.
    Leg 4 is `Never` and not configurable.
 4. `IAuditStore` never opens connections; the caller supplies one. One method, no mode flag.
+   `IAuditDialect.CreateConnection` is where every non-transactional caller gets one — leg 4, the
+   dashboard, `PurgeAsync`.
+4b. Two recorders: neutral `AuditRecorder` (validate + redact + store) wrapped by
+   `TransactionalAuditRecorder` in the module. Redaction lives in the **inner** one, so leg 4 cannot
+   bypass it.
 5. `IAmbientConnectionAccessor` lives in `Themia.Framework.Data.Abstractions`, implemented per data
    layer — inside THEMIA103's exemption, so no analyzer rule is weakened.
 6. The EF-tracked-entity alternative is rejected: it would force `Themia.Audit` onto every EF adopter.
-7. Redaction is unconditional, on the recorder, deny-list additive-only.
+7. Redaction is unconditional, on the inner recorder, deny-list additive-only.
+7b. `data` is `AsString(int.MaxValue)` on every engine — never `jsonb`/`JSON`. Adopter-supplied payload
+   must not be able to fail the transaction it describes, on any subset of engines.
+7c. Bounded columns have constants on `AuditEntry` bound to the migration. Adopter-named fields are
+   **rejected** when over-length; framework-captured ones are truncated.
 8. `TenantId` is nullable; `null` is host-level; the recorder never invents a tenant.
 9. `AuditEvent` is not modified. `IAuditLogService` is an adapter over `IAuditRecorder`.
-10. `IIdentityEventObserver` is a new fan-out seam; `IAuthenticationHooks` stays single-registration and
-    keeps `Deny()`.
+10. `IIdentityEventObserver` is a new fan-out seam; `IAuthenticationHooks` and
+    `IExternalAuthenticationHooks` stay single-registration and keep `Deny()`.
+10b. Leg 4 covers **every** authentication path Identity ships: password, external (Google/LINE), all
+    five refresh outcomes, logout, lockout, and user mutation. Not a subset.
 11. All enums reserve `0` for `Unspecified`, validated with `Enum.IsDefined`.
 12. The dashboard is read-only and fail-closed. `ShowData` defaults to `false`.
 13. `Themia.Audit` references no `Themia.Framework.*` package; asserted by a test. ASP.NET is permitted
