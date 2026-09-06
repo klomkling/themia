@@ -42,6 +42,15 @@ public class TenantAuditReaderTests
     }
 
     [Fact]
+    public async Task TenantAuditReader_throws_when_no_ambient_tenant_instead_of_reading_every_tenant()
+    {
+        var store = SeededStore();
+        var reader = CreateReader(store, tenantId: null);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => reader.QueryAsync(new AuditQuery(), default));
+    }
+
+    [Fact]
     public async Task Raw_store_query_crosses_tenants_by_design()
     {
         // Documents the fail-open neutral surface (design §9) rather than leaving it to be discovered:

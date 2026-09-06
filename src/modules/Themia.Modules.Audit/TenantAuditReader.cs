@@ -36,9 +36,21 @@ public sealed class TenantAuditReader : ITenantAuditReader
     {
         ArgumentNullException.ThrowIfNull(query);
 
+        if (tenantContext.CurrentTenantId is null)
+        {
+            // A null tenant is "no filter" to AuditQuery/IAuditStore.QueryAsync (design §9), which would
+            // make this tenant-scoped reader fail open to every tenant's rows the moment there is no
+            // ambient tenant — the default DI state for any host without tenant infrastructure. A caller
+            // reaching for ITenantAuditReader has stated an intent this class cannot honour without one.
+            throw new InvalidOperationException(
+                $"{nameof(ITenantAuditReader)} requires an ambient tenant and cannot be used to read across " +
+                $"tenants. Use {nameof(IAuditStore)}.{nameof(IAuditStore.QueryAsync)} directly for the " +
+                "deliberate cross-tenant/host-level path.");
+        }
+
         // Overrides whatever the caller supplied — a query cannot be satisfied for another tenant, even
         // when it explicitly names one (design §9).
-        var scoped = query with { TenantId = tenantContext.CurrentTenantId?.Value };
+        var scoped = query with { TenantId = tenantContext.CurrentTenantId.Value.Value };
 
         await using var connection = dialect.CreateConnection(options.ConnectionString);
         await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
