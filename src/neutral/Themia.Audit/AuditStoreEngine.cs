@@ -11,21 +11,6 @@ namespace Themia.Audit;
 /// </summary>
 public sealed class AuditStoreEngine : IAuditStore
 {
-    // Registered once, process-wide, the first time this engine is touched. Without it, reading
-    // occurred_at back on MySQL corrupts the instant: MySqlConnector returns DATETIME(6) as a
-    // Kind=Unspecified DateTime, and the .NET explicit DateTime -> DateTimeOffset conversion operator
-    // treats an Unspecified Kind as LOCAL time, stamping the row with whatever UTC offset the process
-    // happens to be running under instead of zero. PostgreSQL (Npgsql, timestamptz) and SQL Server
-    // (datetimeoffset) are unaffected by this handler: Parse below passes an already-correct
-    // DateTimeOffset straight through, and re-labelling an already-Kind=Utc DateTime as UTC is a no-op —
-    // so this is safe to register even though all three engines share one Dapper-global type registry in
-    // this project's tests. SetValue is an unmodified passthrough: writes already round-trip correctly
-    // on every engine without a handler, so this only changes how a value already in hand is *read*.
-    static AuditStoreEngine()
-    {
-        SqlMapper.AddTypeHandler(new OccurredAtTypeHandler());
-    }
-
     // Portable on every engine: event_uid carries a unique index (see AuditSchemaMigration), so no
     // LIMIT/TOP is needed to guarantee at most one row, and plain column names need no engine-specific
     // quoting. Kept out of IAuditDialect because it needs no per-engine variation.
@@ -170,7 +155,7 @@ public sealed class AuditStoreEngine : IAuditStore
         ActorName = row.ActorName,
         EntityType = row.EntityType,
         EntityId = row.EntityId,
-        OccurredAt = row.OccurredAt,
+        OccurredAt = ConvertOccurredAt(row.OccurredAt),
         IpAddress = row.IpAddress,
         UserAgent = row.UserAgent,
         CorrelationId = row.CorrelationId,
@@ -208,7 +193,11 @@ public sealed class AuditStoreEngine : IAuditStore
 
         public string? EntityId { get; set; }
 
-        public DateTimeOffset OccurredAt { get; set; }
+        // Deliberately `object`, not `DateTimeOffset` — see ConvertOccurredAt for why. Dapper assigns the
+        // reader's boxed raw value here untouched (no ITypeHandler lookup applies to an `object`-typed
+        // member), so this store's own conversion, not a Dapper-global one, is the only place a
+        // MySqlConnector DATETIME(6) value is ever coerced.
+        public object OccurredAt { get; set; } = default!;
 
         public string? IpAddress { get; set; }
 
@@ -221,19 +210,22 @@ public sealed class AuditStoreEngine : IAuditStore
         public string? Data { get; set; }
     }
 
-    // See the static constructor above for why this exists.
-    private sealed class OccurredAtTypeHandler : SqlMapper.TypeHandler<DateTimeOffset>
+    // Converts the raw occurred_at value read back from AuditEntryRow (see its OccurredAt property).
+    // Without this, reading occurred_at back on MySQL corrupts the instant: MySqlConnector returns
+    // DATETIME(6) as a Kind=Unspecified DateTime, and the .NET explicit DateTime -> DateTimeOffset
+    // conversion operator treats an Unspecified Kind as LOCAL time, stamping the row with whatever UTC
+    // offset the process happens to be running under instead of zero. PostgreSQL (Npgsql, timestamptz)
+    // and SQL Server (datetimeoffset) are unaffected: the DateTimeOffset branch below passes an
+    // already-correct value straight through, and re-labelling an already-Kind=Utc DateTime as UTC is a
+    // no-op. Scoped to this store's own column mapping (see AuditEntryRow.OccurredAt) rather than a
+    // Dapper-global SqlMapper.AddTypeHandler<DateTimeOffset>, which would silently reinterpret every
+    // Kind=Unspecified DateTimeOffset materialization anywhere else in the same process — including an
+    // adopter's own Dapper repositories that genuinely store local time.
+    private static DateTimeOffset ConvertOccurredAt(object value) => value switch
     {
-        public override DateTimeOffset Parse(object value) => value switch
-        {
-            DateTimeOffset dto => dto,
-            DateTime dt => new DateTimeOffset(DateTime.SpecifyKind(dt, DateTimeKind.Utc)),
-            _ => throw new InvalidCastException(
-                $"Cannot convert '{value?.GetType().Name ?? "null"}' to {nameof(DateTimeOffset)}."),
-        };
-
-        // Unmodified passthrough: every engine already accepts a DateTimeOffset parameter correctly
-        // without a handler, so writing is left exactly as Dapper's own default would do it.
-        public override void SetValue(IDbDataParameter parameter, DateTimeOffset value) => parameter.Value = value;
-    }
+        DateTimeOffset dto => dto,
+        DateTime dt => new DateTimeOffset(DateTime.SpecifyKind(dt, DateTimeKind.Utc)),
+        _ => throw new InvalidCastException(
+            $"Cannot convert '{value?.GetType().Name ?? "null"}' to {nameof(DateTimeOffset)}."),
+    };
 }
