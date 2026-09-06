@@ -1,0 +1,27 @@
+#nullable enable
+Themia.Audit.AspNetCore.AuditDashboardEndpoints
+Themia.Audit.AspNetCore.AuditDashboardOptions
+Themia.Audit.AspNetCore.AuditDashboardOptions.AuditDashboardOptions() -> void
+Themia.Audit.AspNetCore.AuditDashboardOptions.Authorize.get -> System.Func<Microsoft.AspNetCore.Http.HttpContext!, System.Threading.Tasks.Task<bool>!>?
+Themia.Audit.AspNetCore.AuditDashboardOptions.Authorize.set -> void
+Themia.Audit.AspNetCore.AuditDashboardOptions.BodyStartHtml.get -> string!
+Themia.Audit.AspNetCore.AuditDashboardOptions.BodyStartHtml.set -> void
+Themia.Audit.AspNetCore.AuditDashboardOptions.CustomFavicon.get -> string!
+Themia.Audit.AspNetCore.AuditDashboardOptions.CustomFavicon.set -> void
+Themia.Audit.AspNetCore.AuditDashboardOptions.CustomStyleSheet.get -> string!
+Themia.Audit.AspNetCore.AuditDashboardOptions.CustomStyleSheet.set -> void
+Themia.Audit.AspNetCore.AuditDashboardOptions.DefaultPageSize.get -> int
+Themia.Audit.AspNetCore.AuditDashboardOptions.DefaultPageSize.set -> void
+Themia.Audit.AspNetCore.AuditDashboardOptions.Heading.get -> string!
+Themia.Audit.AspNetCore.AuditDashboardOptions.Heading.set -> void
+Themia.Audit.AspNetCore.AuditDashboardOptions.HeadHtml.get -> string!
+Themia.Audit.AspNetCore.AuditDashboardOptions.HeadHtml.set -> void
+Themia.Audit.AspNetCore.AuditDashboardOptions.MaxPageSize.get -> int
+Themia.Audit.AspNetCore.AuditDashboardOptions.MaxPageSize.set -> void
+Themia.Audit.AspNetCore.AuditDashboardOptions.OnDenied.get -> System.Func<Microsoft.AspNetCore.Http.HttpContext!, System.Threading.Tasks.Task!>?
+Themia.Audit.AspNetCore.AuditDashboardOptions.OnDenied.set -> void
+Themia.Audit.AspNetCore.AuditDashboardOptions.ShowData.get -> bool
+Themia.Audit.AspNetCore.AuditDashboardOptions.ShowData.set -> void
+Themia.Audit.AspNetCore.AuditDashboardOptions.Title.get -> string!
+Themia.Audit.AspNetCore.AuditDashboardOptions.Title.set -> void
+static Themia.Audit.AspNetCore.AuditDashboardEndpoints.MapThemiaAuditDashboard(this Microsoft.AspNetCore.Routing.IEndpointRouteBuilder! endpoints, string! path = "/audit", System.Action<Themia.Audit.AspNetCore.AuditDashboardOptions!>? configure = null) -> Microsoft.AspNetCore.Routing.RouteGroupBuilder!
