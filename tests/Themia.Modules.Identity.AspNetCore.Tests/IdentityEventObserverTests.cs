@@ -300,4 +300,16 @@ public sealed class IdentityEventObserverTests
         await flow.LogoutAsync("token", allSessions: false);
         Assert.Equal(1, refresh.RevokeCalls);
     }
+
+    [Fact]
+    public async Task An_observer_throwing_OperationCanceledException_does_not_fail_an_already_succeeded_login()
+    {
+        // A client disconnect mid-observer-write must not take down a login that already succeeded and
+        // issued tokens — the caller is not waiting on the observer.
+        var withObserver = Build(PasswordVerificationResult.Success, NewUser(), new ThrowingObserver { ThrowOperationCanceled = true });
+
+        var result = await withObserver.Flow.LoginAsync("alice", "pw");
+
+        Assert.True(result.Succeeded);
+    }
 }

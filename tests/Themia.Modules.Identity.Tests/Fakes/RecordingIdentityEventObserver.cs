@@ -43,7 +43,20 @@ internal sealed class RecordingIdentityEventObserver : IIdentityEventObserver
 /// of the operation it observes.</summary>
 internal sealed class ThrowingIdentityEventObserver : IIdentityEventObserver
 {
-    private static Task Throw() => throw new InvalidOperationException("observer failure");
+    /// <summary>When set, every method throws <see cref="OperationCanceledException"/> instead of
+    /// <see cref="InvalidOperationException"/> — proving the fan-out swallows a cancelled observer write
+    /// exactly like any other observer failure, rather than letting it fault an already-decided outcome.</summary>
+    public bool ThrowOperationCanceled { get; set; }
+
+    private Task Throw()
+    {
+        if (ThrowOperationCanceled)
+        {
+            throw new OperationCanceledException("observer cancelled");
+        }
+
+        throw new InvalidOperationException("observer failure");
+    }
 
     public Task OnLockedOutAsync(Guid userId, DateTimeOffset lockoutEnd, CancellationToken cancellationToken = default) => Throw();
     public Task OnUserMutatedAsync(Guid userId, UserMutation mutation, CancellationToken cancellationToken = default) => Throw();

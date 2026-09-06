@@ -79,7 +79,10 @@ public sealed class AuthenticationFlow : IAuthenticationFlow
 
     /// <summary>Invokes <paramref name="invoke"/> against every registered observer. A throwing observer
     /// must not change the flow it observes, so each invocation is individually caught and logged at
-    /// <c>Error</c>; a cancellation request still propagates.</summary>
+    /// <c>Error</c> — including <see cref="OperationCanceledException"/>. By the time this runs, the
+    /// flow's own outcome (success or failure) is already decided; an observer's own database write
+    /// throwing OCE because the client disconnected must not turn that into an unhandled exception. The
+    /// caller is not waiting on the observer, so there is nothing for the cancellation to usefully abort.</summary>
     private async Task RaiseAsync(Func<IIdentityEventObserver, CancellationToken, Task> invoke, CancellationToken cancellationToken)
     {
         foreach (var observer in observers)
@@ -88,7 +91,7 @@ public sealed class AuthenticationFlow : IAuthenticationFlow
             {
                 await invoke(observer, cancellationToken).ConfigureAwait(false);
             }
-            catch (Exception ex) when (ex is not OperationCanceledException)
+            catch (Exception ex)
             {
                 logger.LogError(ex, "Identity event observer {ObserverType} threw and was swallowed.", observer.GetType());
             }

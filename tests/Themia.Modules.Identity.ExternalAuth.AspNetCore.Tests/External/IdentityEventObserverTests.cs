@@ -145,6 +145,18 @@ public sealed class IdentityEventObserverTests
         Assert.Equal(without.Outcome, with.Outcome);
         Assert.False(with.Succeeded);
     }
+
+    [Fact]
+    public async Task An_observer_throwing_OperationCanceledException_does_not_fail_an_already_succeeded_external_login()
+    {
+        var withObserver = Build(
+            new FakeExternalAuthProvider { Result = ExternalAuthResult.Success(Identity()) },
+            extraObservers: [new ThrowingObserver { ThrowOperationCanceled = true }]);
+
+        var result = await withObserver.Flow.AuthenticateAsync(Provider, Request());
+
+        Assert.True(result.Succeeded);
+    }
 }
 
 // FakeProviderRegistry, FakeExternalAuthProvider, FakeExternalLoginService and RecordingExternalHooks are
@@ -176,7 +188,20 @@ internal sealed class RecordingObserver : IIdentityEventObserver
 
 internal sealed class ThrowingObserver : IIdentityEventObserver
 {
-    private static Task Throw() => throw new InvalidOperationException("observer failure");
+    /// <summary>When set, every method throws <see cref="OperationCanceledException"/> instead of
+    /// <see cref="InvalidOperationException"/> — proving the fan-out swallows a cancelled observer write
+    /// exactly like any other observer failure, rather than letting it fault an already-decided outcome.</summary>
+    public bool ThrowOperationCanceled { get; set; }
+
+    private Task Throw()
+    {
+        if (ThrowOperationCanceled)
+        {
+            throw new OperationCanceledException("observer cancelled");
+        }
+
+        throw new InvalidOperationException("observer failure");
+    }
 
     public Task OnExternalLoginSucceededAsync(Guid userId, string provider, bool wasCreated, bool wasLinked, CancellationToken cancellationToken = default) => Throw();
     public Task OnExternalLoginFailedAsync(string provider, ExternalLoginOutcome reason, CancellationToken cancellationToken = default) => Throw();

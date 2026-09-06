@@ -240,4 +240,17 @@ public sealed class IdentityEventObserverTests
 
         Assert.True(result.Succeeded);
     }
+
+    [Fact]
+    public async Task An_observer_throwing_OperationCanceledException_does_not_fail_an_already_applied_mutation()
+    {
+        // A client disconnect mid-observer-write must not take down a mutation that already saved — the
+        // caller is not waiting on the observer.
+        var throwingSut = Build(new ThrowingIdentityEventObserver { ThrowOperationCanceled = true });
+        var created = await throwingSut.CreateAsync("sana", "pw");
+
+        var result = await throwingSut.SetPasswordAsync(created.UserId!.Value, "new-pw");
+
+        Assert.True(result.Succeeded);
+    }
 }
