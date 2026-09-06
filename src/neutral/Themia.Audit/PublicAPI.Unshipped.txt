@@ -114,3 +114,21 @@ Themia.Audit.Migrations.AuditSchemaMigration
 Themia.Audit.Migrations.AuditSchemaMigration.AuditSchemaMigration() -> void
 override Themia.Audit.Migrations.AuditSchemaMigration.Down() -> void
 override Themia.Audit.Migrations.AuditSchemaMigration.Up() -> void
+Themia.Audit.AuditOptions
+Themia.Audit.AuditOptions.AuditOptions() -> void
+Themia.Audit.AuditOptions.ConnectionString.get -> string!
+Themia.Audit.AuditOptions.ConnectionString.set -> void
+Themia.Audit.AuditOptions.Engine.get -> Themia.Audit.AuditEngine
+Themia.Audit.AuditOptions.Engine.set -> void
+Themia.Audit.AuditOptions.Redaction.get -> Themia.Audit.Redaction.AuditRedactionOptions!
+Themia.Audit.IAuditRecorder
+Themia.Audit.IAuditRecorder.RecordAsync(Themia.Audit.AuditEntry! entry, object? payload = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<System.Guid>
+Themia.Audit.AuditRecorder
+Themia.Audit.AuditRecorder.AuditRecorder(Themia.Audit.IAuditStore! store, Themia.Audit.Redaction.IAuditRedactor! redactor, System.TimeProvider! timeProvider, Themia.Audit.IAuditDialect! dialect, Themia.Audit.AuditOptions! options) -> void
+Themia.Audit.AuditRecorder.RecordAsync(Themia.Audit.AuditEntry! entry, object? payload = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<System.Guid>
+Themia.Audit.AuditRecorder.RecordOnAsync(Themia.Audit.AuditEntry! entry, object? payload, System.Data.Common.DbConnection! connection, System.Data.Common.DbTransaction? transaction, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask<System.Guid>
+Themia.Audit.Http.AuditHttpEnricher
+Themia.Audit.Http.AuditHttpEnricher.AuditHttpEnricher(Microsoft.AspNetCore.Http.IHttpContextAccessor! accessor) -> void
+Themia.Audit.Http.AuditHttpEnricher.Enrich(Themia.Audit.AuditEntry! entry) -> Themia.Audit.AuditEntry!
+Themia.Audit.DependencyInjection.AuditServiceCollectionExtensions
+static Themia.Audit.DependencyInjection.AuditServiceCollectionExtensions.AddThemiaAudit(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Themia.Audit.AuditOptions!>! configure, bool runMigration = true) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
