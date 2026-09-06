@@ -778,7 +778,7 @@ git commit -am "feat(identity): IIdentityEventObserver fan-out seam across every
 
 **Interfaces:**
 - Consumes: `IAuditRecorder`, `IAuditStore` (Tasks 1-3), `IAmbientConnectionAccessor` (Task 5),
-  `IAuditLogService`/`AuditEvent` (`Themia.Framework.Services`), `ITenantContext`.
+  `IAuditLogService`/`AuditEvent` (`Themia.Services`), `ITenantContext`.
 - Produces: `AddThemiaAuditModule(...)`, `ITenantAuditReader`, `AuditTransactionPolicy`.
 
 - [ ] **Step 1: Write the failing policy tests**

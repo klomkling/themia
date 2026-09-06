@@ -16,7 +16,7 @@ audit consumer that was never written.
 
 | seam | package | shipped | consumers |
 | --- | --- | --- | --- |
-| `IAuditLogService` + `AuditEvent` | `Themia.Framework.Services` | `0.2.0` | none |
+| `IAuditLogService` + `AuditEvent` | `Themia.Services` | `0.2.0` | none |
 | `IAuthenticationHooks` (6 methods, doc'd *"for audit"*) | `Themia.Modules.Identity.Abstractions` | `0.5.1` | none |
 | `IUserLifecycleHooks.OnUserMutatedAsync` | `Themia.Modules.Identity.Abstractions` | `0.20.0` | none |
 
@@ -54,7 +54,7 @@ Read directly, it is **not** an entity change log:
 - `OldValue` — set at roughly half the sites — holds a hand-picked field subset
   (`new { status = oldStatus }`), never a computed row diff.
 
-It is an **activity log with two columns named old/new**. `AuditEvent` in `Themia.Framework.Services`
+It is an **activity log with two columns named old/new**. `AuditEvent` in `Themia.Services`
 has no old/new fields at all, so it is unambiguously an activity log too.
 
 The **entity change log** — what most people mean by "audit" — exists in neither source. It is built
@@ -153,7 +153,7 @@ Direct lesson from `SequenceEngine.Postgres = 0` in `0.22.0`: `default` was a va
 engine passed validation and a doc comment claiming otherwise was false.
 
 `ActorId`, `EntityId`, and `EntityType` are **nullable here and non-nullable on
-`Themia.Framework.Services.AuditEvent`**. That older record cannot express a failed login for an
+`Themia.Services.AuditEvent`**. That older record cannot express a failed login for an
 identifier matching no user. `AuditEvent` is not changed; see §12.
 
 ---
@@ -754,7 +754,7 @@ core for exactly this reason (`ServiceCollectionExtensions.cs:74`:
 
 ## 12. `IAuditLogService` — the adapter
 
-`Themia.Framework.Services.AuditEvent` stays exactly as shipped. `Themia.Modules.Audit` implements
+`Themia.Services.AuditEvent` stays exactly as shipped. `Themia.Modules.Audit` implements
 `IAuditLogService` by mapping onto `AuditEntry`:
 
 ```
@@ -768,7 +768,7 @@ AuditEvent.Metadata      → AuditEntry.Data   (JSON, redacted)
                          → Category = Activity, Outcome = Success
 ```
 
-**Why not widen `AuditEvent` instead:** it lives in `Themia.Framework.Services` (framework) and
+**Why not widen `AuditEvent` instead:** it lives in `Themia.Services` (framework) and
 `AuditEntry` lives in `Themia.Audit` (neutral). A neutral core cannot reference a framework package. The
 adapter is what the layering requires — and the dead seam becomes live with no change to a shipped
 public API.
