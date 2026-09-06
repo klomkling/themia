@@ -21,12 +21,30 @@ public abstract class AuditSchemaMigrationTestsBase(MigrationEngine engine, IAud
     {
         // Column presence, not COUNT(*): this table is shared with store tests that may already have
         // written rows by the time this runs, so an emptiness assertion would be order-dependent.
+        //
+        // The table_schema predicate is load-bearing, not tidiness. information_schema.columns spans
+        // every schema in the current PostgreSQL database and every database on a MySQL server, so an
+        // unfiltered lookup would still find themia_audit_events if the migration had put it somewhere
+        // else entirely — which is precisely the failure this test exists to catch. The table is
+        // unqualified on every engine by design (see AuditSchemaMigration), and proving that requires
+        // asserting WHERE it landed, not merely that something by that name exists.
         await using var conn = dialect.CreateConnection(connectionString);
         await conn.OpenAsync();
+        var currentSchema = engine switch
+        {
+            MigrationEngine.Postgres => "current_schema()",
+            MigrationEngine.MySql => "DATABASE()",
+            MigrationEngine.SqlServer => "SCHEMA_NAME()",
+            _ => throw new NotSupportedException($"No current-schema expression for {engine}."),
+        };
         var columns = (await conn.QueryAsync<string>(
-                "SELECT column_name FROM information_schema.columns WHERE table_name = 'themia_audit_events'"))
+                "SELECT column_name FROM information_schema.columns "
+                + "WHERE table_name = 'themia_audit_events' "
+                + $"AND table_schema = {currentSchema}"))
             .Select(c => c.ToLowerInvariant())
             .ToHashSet();
+
+        Assert.NotEmpty(columns);
 
         foreach (var column in new[] { "event_uid", "tenant_id", "occurred_at", "data" })
         {

@@ -848,7 +848,15 @@ Required:
 - Table name is unqualified and **identical on all three engines** — the §5 blocker, asserted rather than
   reviewed.
 - Migration replay: `Up()` twice, second is a no-op; and against a pre-existing table.
-- Unsupported provider throws at migrate time.
+- Table name is unqualified **and lands in the connection's own schema/database** on every engine —
+  the `information_schema` lookup filters on `table_schema`, because an unfiltered one spans every
+  schema in a PostgreSQL database and every database on a MySQL server, and would therefore still pass
+  if the migration had put the table somewhere else.
+- ~~Unsupported provider throws at migrate time.~~ **Not testable through the sanctioned entry point:**
+  `MigrationEngine` enumerates only Postgres, MySql and SqlServer, so `ThemiaMigrations.Run` cannot be
+  handed an unsupported provider, and no package in this repo tests its equivalent guard. The guard
+  stays in `AuditSchemaMigration` — it protects anyone driving the assembly through FluentMigrator
+  directly — but this spec no longer claims a test for it.
 - **Redaction proven able to fail:** remove redaction, observe the secret in the row, restore. A
   redaction test over a payload containing no secret proves nothing.
 - Enum validation rejects `Unspecified` and out-of-range values.
