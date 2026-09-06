@@ -64,10 +64,22 @@ public sealed record AuditEntry
     /// <summary>The time the event was captured, not the time it was persisted.</summary>
     public DateTimeOffset OccurredAt { get; init; }
 
-    /// <summary>The caller's IP address, captured by the framework. Truncated, not rejected, by <see cref="Normalize"/>.</summary>
+    /// <summary>
+    /// The caller's IP address. Populated automatically only for Identity events recorded through
+    /// <c>Themia.Modules.Audit</c>'s <c>AuditingIdentityObserver</c>, which applies
+    /// <c>Themia.Audit.Http.AuditHttpEnricher</c> before recording; for any other write path (a direct
+    /// <see cref="IAuditRecorder"/> call, or the <c>IAuditLogService</c> adapter), supplying it is the
+    /// caller's responsibility. Truncated, not rejected, by <see cref="Normalize"/>.
+    /// </summary>
     public string? IpAddress { get; init; }
 
-    /// <summary>The caller's user agent, captured by the framework. Truncated, not rejected, by <see cref="Normalize"/>.</summary>
+    /// <summary>
+    /// The caller's user agent. Populated automatically only for Identity events recorded through
+    /// <c>Themia.Modules.Audit</c>'s <c>AuditingIdentityObserver</c>, which applies
+    /// <c>Themia.Audit.Http.AuditHttpEnricher</c> before recording; for any other write path (a direct
+    /// <see cref="IAuditRecorder"/> call, or the <c>IAuditLogService</c> adapter), supplying it is the
+    /// caller's responsibility. Truncated, not rejected, by <see cref="Normalize"/>.
+    /// </summary>
     public string? UserAgent { get; init; }
 
     /// <summary>An identifier correlating this event with others from the same request or operation.</summary>
@@ -109,10 +121,13 @@ public sealed record AuditEntry
     }
 
     /// <summary>
-    /// Returns a copy with framework-captured fields (<see cref="UserAgent"/>, <see cref="IpAddress"/>)
+    /// Returns a copy with the caller-address fields (<see cref="UserAgent"/>, <see cref="IpAddress"/>)
     /// clipped to their column width. Unlike <see cref="Validate"/>, these are truncated rather than
-    /// rejected: they are captured by the framework, not named by the adopter, so a clipped value is
-    /// still the same event.
+    /// rejected: unlike <see cref="EventType"/>/<see cref="ActorId"/>/<see cref="EntityId"/> and the
+    /// other adopter-named fields, <see cref="UserAgent"/> and <see cref="IpAddress"/> are supplementary
+    /// context rather than part of what identifies the event — that holds whether they were filled by
+    /// <c>AuditHttpEnricher</c> or supplied directly by a caller — so a clipped value is still the same
+    /// event.
     /// </summary>
     /// <returns>A copy of this entry with <see cref="UserAgent"/> and <see cref="IpAddress"/> clipped.</returns>
     public AuditEntry Normalize() => this with
