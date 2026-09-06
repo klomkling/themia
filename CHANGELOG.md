@@ -27,6 +27,39 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.22.1] - 2026-09-06
+
+### Fixed
+- **`Themia.Imaging` crashed at the first decode in a Linux container** (coord #0110, propertiezy
+  filing). The package now ships `SkiaSharp.NativeAssets.Linux`, so it works everywhere out of the box.
+
+  Two separate defects were in play, and only fixing both closes it.
+
+  **The nuspec lied.** The csproj referenced managed `SkiaSharp` only, and the README said so — yet the
+  packed nuspec carried `SkiaSharp.NativeAssets.macos` as a direct dependency. SkiaSharp declares those
+  natives transitively for every modern target framework, and this repo enables
+  `CentralPackageTransitivePinningEnabled`, which promotes a pinned transitive into a direct dependency
+  of the produced package. `SkiaSharp.NativeAssets.Linux` had a `PackageVersion` entry that nothing
+  referenced, so it was never pinned and never shipped. Now suppressed with `PrivateAssets="all"`.
+
+  **Suppressing it would not have been enough** — and this is the part worth reading, because the first
+  fix looked complete. A consumer restoring the package still receives macOS and Win32 natives *from
+  SkiaSharp itself*: roughly 83 MB nobody asked for. So a developer's Mac still worked, the package still
+  looked self-contained, and the container still threw. Verified by restoring a fresh consumer project
+  against the corrected package and reading its assets file, not by reasoning about it.
+
+  **So the "native codec is a host decision" principle is reversed**, deliberately. It was already lost
+  upstream: SkiaSharp forces two of the three platforms on everyone and leaves opt-in exactly one —
+  Linux, the platform every deployment runs. Being neutral about that one platform bought nothing and
+  cost a production crash that no developer machine could reproduce. Linux natives add 55.7 MB for hosts
+  that never run Linux; that is the price of the footgun going away. The README's guidance is rewritten,
+  including why the old advice is no longer correct.
+
+  Pinned by `ImagingPackTests`, which runs a real `dotnet pack` and asserts the nuspec's dependency list
+  exactly, plus a separate assertion that no macOS or Win32 native package appears in *our* declaration —
+  so a future re-promotion by transitive pinning fails with the disease named rather than as a generic
+  "the list changed". Verified able to fail.
+
 ## [0.22.0] - 2026-09-05
 
 ### Added

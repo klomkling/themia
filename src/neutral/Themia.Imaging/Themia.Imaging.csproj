@@ -7,11 +7,21 @@
     <!-- Version is inherited from Directory.Build.props (shared). Do not set it here. -->
   </PropertyGroup>
   <ItemGroup>
-    <!-- Managed SkiaSharp ONLY. Native assets are a host decision keyed to the RID the host runs on,
-         not a property of this code: a consumer adds SkiaSharp.NativeAssets.Linux in the container and
-         .macos on a developer Mac. Referencing them here would force one RID's binaries on every
-         consumer. See the README. -->
+    <!-- SkiaSharp's managed assembly plus the Linux native codec.
+
+         The package used to ship managed SkiaSharp only, on the principle that a native codec is a host
+         decision. That principle turned out to be already lost upstream and to cost us the one platform
+         that matters: SkiaSharp itself declares NativeAssets.macOS and .Win32 transitively for every
+         modern TFM — 83 MB a consumer receives without asking — while Linux is opt-in. So the "neutral"
+         package was neutral about exactly one RID, and it was the RID every deployment runs. A developer
+         Mac worked, the package looked self-contained, and the container threw at the first decode
+         (coord #0110). Linux is now supplied too, so it works everywhere out of the box.
+
+         macos is referenced with PrivateAssets=all purely to stop transitive pinning promoting it into
+         our nuspec as a DIRECT dependency; consumers still receive it from SkiaSharp itself. -->
     <PackageReference Include="SkiaSharp" />
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux" />
+    <PackageReference Include="SkiaSharp.NativeAssets.macos" PrivateAssets="all" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
     <PackageReference Include="Microsoft.Extensions.Options" />
   </ItemGroup>
