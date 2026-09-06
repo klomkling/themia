@@ -55,6 +55,13 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
   implementations are unaffected) — together these attribute a logout, and a detected refresh-token
   reuse, to the owning account.
 
+- `AuditDashboardOptions.ScopeQuery` — a `Func<HttpContext, AuditQuery, AuditQuery>` that rewrites the
+  query after authorization, so a host can pin the dashboard to one tenant. `Authorize` returns `bool`
+  and can only admit or refuse a request; without this hook a viewer could read another tenant's rows by
+  editing `?tenant=` in the URL.
+- `IIdentityEventObserver.OnUserMutationRefusedAsync` and `UserMutation.Created` — account creation and
+  refused mutations previously raised nothing, so an administrator creating an account left no audit row.
+
   **Three seams that had shipped with zero implementations now have one**: `IAuditLogService` and
   `AuditEvent` (`0.2.0`), `IAuthenticationHooks` (`0.5.1`), and
   `IUserLifecycleHooks.OnUserMutatedAsync` (`0.20.0`).
@@ -64,8 +71,30 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
   EF/Dapper change-tracking fork; it is scoped for `0.24.0` in
   `docs/superpowers/specs/2026-09-06-themia-audit-design.md` §15.
 
+### Fixed
+
+- **`Themia.Audit` — `occurred_at` was corrupted on MySQL by the reading process's UTC offset.** MySQL
+  returns `DATETIME(6)` as a `DateTime` with `Kind=Unspecified`, and .NET's explicit
+  `DateTime` → `DateTimeOffset` conversion treats `Unspecified` as local time. Every row read on a
+  non-UTC host carried a shifted timestamp. Fixed with a Dapper type handler; writes are unaffected and
+  PostgreSQL and SQL Server were never affected. Found by widening a round-trip test that had covered 12
+  of 15 columns while being named for all of them.
+
 ### Security
 
+- **`Themia.Audit` — redaction matched property names exactly rather than by substring, and a
+  pre-serialized `string` payload skipped it entirely.** `newPassword`, `currentPassword`,
+  `client_secret` and `id_token` were written unredacted while the API was named `AddPattern` and
+  documented as matching. Matching is now substring-based and case-insensitive, and a `string` payload is
+  rejected — `JsonSerializer.Serialize` turns one into a JSON string literal, which the redactor walks as
+  a bare root with no properties.
+- **`Themia.Modules.Audit` — `ITenantAuditReader` fell back to an unfiltered, cross-tenant read** when no
+  tenant was ambient, because `TenantId = null` means "no filter" in `AuditQuery`. That is the default
+  state for any host without tenant infrastructure. It now throws and points at `IAuditStore.QueryAsync`
+  as the deliberate cross-tenant path.
+- **`Themia.Modules.Identity.AspNetCore` — logout stopped revoking the session** when the new owner
+  lookup threw, returning 500 with the session still live. The lookup is now failure-tolerant, matching
+  the refresh path.
 - **`Themia.Exceptional.AspNetCore` — the dashboard stylesheet was served without authorization, and no
   dashboard response was marked uncacheable.** `GET {mount}/dashboard.css` returned `200` with content
   while every sibling route returned the route-hiding `404`, so an unauthenticated request confirmed the
