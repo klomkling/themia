@@ -18,6 +18,14 @@ public sealed class AuditRedactionOptions
     private readonly HashSet<string> patterns = new(DefaultPatterns, StringComparer.OrdinalIgnoreCase);
 
     /// <summary>The property-name patterns currently treated as sensitive, matched case-insensitively.</summary>
+    /// <remarks>
+    /// For enumeration and diagnostics only — do not test membership with <c>Patterns.Contains(...)</c>.
+    /// <see cref="IReadOnlyCollection{T}"/> has no <c>Contains</c> of its own, so that call binds to
+    /// LINQ's <see cref="Enumerable.Contains{TSource}(IEnumerable{TSource}, TSource)"/>, which compares
+    /// ordinally and ignores the case-insensitive comparer backing this set. Use
+    /// <see cref="IsSensitive"/> instead, which is guaranteed to match the same way
+    /// <see cref="AuditRedactor"/> does.
+    /// </remarks>
     public IReadOnlyCollection<string> Patterns => patterns;
 
     /// <summary>Adds a property-name pattern to redact, in addition to the defaults.</summary>
@@ -29,7 +37,12 @@ public sealed class AuditRedactionOptions
         patterns.Add(pattern);
     }
 
-    /// <summary>Returns whether <paramref name="propertyName"/> matches a configured pattern.</summary>
+    /// <summary>
+    /// The supported way to test whether a JSON property name is treated as sensitive — matched the same
+    /// way <see cref="AuditRedactor"/> matches it: case-insensitively, regardless of how the pattern was
+    /// registered.
+    /// </summary>
     /// <param name="propertyName">A JSON property name.</param>
-    internal bool Matches(string propertyName) => patterns.Contains(propertyName);
+    /// <returns><see langword="true"/> if <paramref name="propertyName"/> matches a configured pattern.</returns>
+    public bool IsSensitive(string propertyName) => patterns.Contains(propertyName);
 }

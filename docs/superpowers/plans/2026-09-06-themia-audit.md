@@ -174,18 +174,38 @@ enforced by the compiler, not a doc comment (spec §8).
 - [ ] **Step 5: Write the failing redaction tests**
 
 ```csharp
+// Each case asserts against ITS OWN secret. Asserting all four on every case makes three of the
+// four assertions vacuous per case — they check a substring the input never contained.
 [Theory]
-[InlineData("""{"password":"hunter2"}""")]
-[InlineData("""{"outer":{"apiKey":"abc"}}""")]                       // nested object
-[InlineData("""{"items":[{"token":"t1"},{"token":"t2"}]}""")]        // array of objects
-[InlineData("""{"a":{"b":{"c":{"ssn":"123-45-6789"}}}}""")]          // deep
-public void Redacts_secrets_at_any_depth(string json)
+[InlineData("""{"password":"SEC-1"}""", "SEC-1")]
+[InlineData("""{"outer":{"apiKey":"SEC-2"}}""", "SEC-2")]                  // nested object
+[InlineData("""{"a":{"b":{"c":{"ssn":"SEC-3"}}}}""", "SEC-3")]            // deep
+public void Redacts_a_secret_at_any_depth(string json, string secret)
 {
     var result = new AuditRedactor(new AuditRedactionOptions()).Redact(json);
-    Assert.DoesNotContain("hunter2", result, StringComparison.Ordinal);
-    Assert.DoesNotContain("abc", result, StringComparison.Ordinal);
-    Assert.DoesNotContain("t1", result, StringComparison.Ordinal);
-    Assert.DoesNotContain("123-45-6789", result, StringComparison.Ordinal);
+    Assert.DoesNotContain(secret, result, StringComparison.Ordinal);
+    // Presence matters as much as absence: a redactor that dropped the property entirely would
+    // pass an absence-only test while losing the fact that a password field was there at all.
+    Assert.Contains("[redacted]", result, StringComparison.Ordinal);
+}
+
+[Fact]
+public void Redacts_every_element_of_an_array_not_only_the_first()
+{
+    var result = new AuditRedactor(new AuditRedactionOptions())
+        .Redact("""{"items":[{"token":"SEC-A"},{"token":"SEC-B"},{"token":"SEC-C"}]}""");
+    Assert.DoesNotContain("SEC-A", result, StringComparison.Ordinal);
+    Assert.DoesNotContain("SEC-B", result, StringComparison.Ordinal);
+    Assert.DoesNotContain("SEC-C", result, StringComparison.Ordinal);
+}
+
+[Fact]
+public void Survives_shapes_the_recorder_can_hand_it()
+{
+    // The recorder serializes arbitrary payload objects, so all of these are reachable inputs.
+    var r = new AuditRedactor(new AuditRedactionOptions());
+    foreach (var json in new[] { """{"a":null}""", "{}", """[1,2,3]""", "\"bare\"", "42" })
+        _ = r.Redact(json);   // must not throw
 }
 
 [Fact]
