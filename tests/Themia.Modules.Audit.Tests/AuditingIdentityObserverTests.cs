@@ -1,3 +1,4 @@
+using System.Net;
 using Microsoft.AspNetCore.Http;
 using Themia.Audit;
 using Themia.Audit.Http;
@@ -11,6 +12,8 @@ namespace Themia.Modules.Audit.Tests;
 public class AuditingIdentityObserverTests
 {
     private static readonly Guid UserId = Guid.Parse("11111111-1111-1111-1111-111111111111");
+    private const string CallerIp = "203.0.113.7";
+    private const string CallerUserAgent = "ThemiaAuditTests/1.0";
 
     // A real AuditRecorder over a fake store, not FakeAuditRecorder: the payload-in-Data assertions
     // below need the real serialize-then-redact path, not just the raw payload object.
@@ -27,7 +30,15 @@ public class AuditingIdentityObserverTests
             new FakeAuditDialect(),
             new AuditOptions { ConnectionString = "fake", Engine = AuditEngine.Postgres });
 
-        Observer = new AuditingIdentityObserver(recorder, new AuditHttpEnricher(new HttpContextAccessor()));
+        // A real HttpContext with a remote address and User-Agent header — not the parameterless
+        // HttpContextAccessor, whose HttpContext is always null and makes AuditHttpEnricher.Enrich a
+        // no-op, leaving IpAddress/UserAgent unasserted by every test in this file.
+        var httpContext = new DefaultHttpContext();
+        httpContext.Connection.RemoteIpAddress = IPAddress.Parse(CallerIp);
+        httpContext.Request.Headers.UserAgent = CallerUserAgent;
+        var accessor = new HttpContextAccessor { HttpContext = httpContext };
+
+        Observer = new AuditingIdentityObserver(recorder, new AuditHttpEnricher(accessor));
     }
 
     [Fact]
@@ -41,6 +52,16 @@ public class AuditingIdentityObserverTests
         Assert.Equal(AuditOutcome.Success, entry.Outcome);
         Assert.Equal(UserId.ToString(), entry.ActorId);
         Assert.Null(entry.Reason);
+    }
+
+    [Fact]
+    public async Task Login_failed_records_the_callers_ip_address_and_user_agent()
+    {
+        await Observer.OnLoginFailedAsync("someone", LoginFailureReason.WrongPassword, default);
+
+        var entry = Store.LastWritten!;
+        Assert.Equal(CallerIp, entry.IpAddress);
+        Assert.Equal(CallerUserAgent, entry.UserAgent);
     }
 
     [Fact]

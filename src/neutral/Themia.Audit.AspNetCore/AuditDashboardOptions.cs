@@ -7,13 +7,29 @@ public sealed class AuditDashboardOptions
 {
     /// <summary>Gate run for every dashboard request. When <c>null</c>, all requests are denied
     /// (fail-closed) — the dashboard cannot be served without an explicit predicate.
-    /// <para><strong>Tenant scoping is the adopter's job, done here.</strong> The dashboard does not
-    /// resolve a tenant from <c>ITenantContext</c> — it is mounted by the host, and a host admin viewing
-    /// every tenant's events and a tenant admin viewing only their own are both legitimate uses this
-    /// predicate must distinguish. Assuming otherwise is how one tenant ends up reading another's audit
-    /// trail: scope the query (or reject the request) here, not by trusting an ambient tenant resolver
-    /// the dashboard never consults.</para></summary>
+    /// <para><strong>This predicate cannot scope the query.</strong> It returns <c>bool</c> — it can only
+    /// allow or deny the whole request, never narrow which rows a request may see. A viewer authorized
+    /// for tenant A can still read tenant B's events by editing the <c>?tenant=</c> query string, because
+    /// the parsed <see cref="AuditQuery.TenantId"/> comes straight from the request. Use
+    /// <see cref="ScopeQuery"/> — run after this predicate allows the request — to rewrite the query
+    /// instead.</para></summary>
     public Func<HttpContext, Task<bool>>? Authorize { get; set; }
+
+    /// <summary>Runs after <see cref="Authorize"/> allows a request, to rewrite the parsed
+    /// <see cref="AuditQuery"/> before it reaches <see cref="IAuditStore.QueryAsync"/> — the dashboard's
+    /// tenant-scoping hook. The dashboard does not resolve a tenant from <c>ITenantContext</c> itself (it
+    /// is mounted by the host, and a host admin viewing every tenant and a tenant admin viewing only their
+    /// own are both legitimate), so an adopter who must confine a viewer to one tenant does it here:
+    /// <code>
+    /// options.ScopeQuery = (ctx, query) => query with { TenantId = ctx.User.FindFirst("tenant")?.Value };
+    /// </code>
+    /// The rewrite runs after the query string is parsed, so anything this hook sets on the returned
+    /// <see cref="AuditQuery"/> is the one actually executed — a caller-supplied <c>?tenant=</c> (or any
+    /// other filter) cannot override it. <c>null</c> (the default) keeps today's behaviour: the query
+    /// runs exactly as parsed from the request, unfiltered by tenant unless the caller happens to supply
+    /// one. Applies to the list route only — the detail route resolves a single row by <c>event_uid</c>
+    /// and carries no <see cref="AuditQuery"/> to rewrite.</summary>
+    public Func<HttpContext, AuditQuery, AuditQuery>? ScopeQuery { get; set; }
 
     /// <summary>Runs when <see cref="Authorize"/> denies a request, instead of returning the bare 404.
     /// Use it to bounce an expired session to the host app's login page — otherwise a timed-out admin lands

@@ -31,6 +31,34 @@ public class AuditModuleTests
     }
 
     [Fact]
+    public async Task InitializeAsync_surfaces_the_real_cause_for_a_non_missing_table_failure()
+    {
+        // A permission error, a timeout, or bad credentials also throws a DbException from QueryAsync —
+        // but is not "the table is missing". The wrapped message must carry the real cause so an operator
+        // does not go hunting for a table that is already there, and the original exception must survive
+        // as InnerException.
+        const string underlyingMessage = "permission denied for relation themia_audit_events";
+        var store = new FakeAuditStore { FailWith = new FakeDbException(underlyingMessage) };
+
+        var services = new ServiceCollection();
+        services.AddSingleton<IAuditStore>(store);
+        services.AddSingleton<IAuditDialect, FakeAuditDialect>();
+        services.AddThemiaAudit(o =>
+        {
+            o.ConnectionString = "fake";
+            o.Engine = AuditEngine.Postgres;
+        }, runMigration: false);
+        await using var provider = services.BuildServiceProvider();
+
+        var module = new AuditModule();
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => module.InitializeAsync(provider).AsTask());
+        Assert.Contains(underlyingMessage, ex.Message, StringComparison.Ordinal);
+        Assert.IsType<FakeDbException>(ex.InnerException);
+        Assert.Equal(underlyingMessage, ex.InnerException!.Message);
+    }
+
+    [Fact]
     public void Descriptor_names_the_module()
     {
         Assert.Equal("Themia.Audit", new AuditModule().Descriptor.Name);

@@ -1,4 +1,6 @@
 #nullable enable
+Themia.Audit.AspNetCore.AuditDashboardOptions.ScopeQuery.get -> System.Func<Microsoft.AspNetCore.Http.HttpContext!, Themia.Audit.AuditQuery!, Themia.Audit.AuditQuery!>?
+Themia.Audit.AspNetCore.AuditDashboardOptions.ScopeQuery.set -> void
 Themia.Audit.AspNetCore.AuditDashboardEndpoints
 Themia.Audit.AspNetCore.AuditDashboardOptions
 Themia.Audit.AspNetCore.AuditDashboardOptions.AuditDashboardOptions() -> void

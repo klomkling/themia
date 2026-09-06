@@ -66,6 +66,11 @@ public static class AuditDashboardEndpoints
         if (!await AuthorizedAsync(ctx, options).ConfigureAwait(false)) { await DenyAsync(ctx, options).ConfigureAwait(false); return; }
 
         var query = BuildQuery(ctx.Request.Query, options);
+        if (options.ScopeQuery is not null)
+        {
+            query = options.ScopeQuery(ctx, query);
+        }
+
         await using var connection = dialect.CreateConnection(auditOptions.ConnectionString);
         await connection.OpenAsync(ct).ConfigureAwait(false);
         var result = await store.QueryAsync(query, connection, ct).ConfigureAwait(false);
@@ -83,7 +88,7 @@ public static class AuditDashboardEndpoints
         await using var connection = dialect.CreateConnection(auditOptions.ConnectionString);
         await connection.OpenAsync(ct).ConfigureAwait(false);
         var entry = await store.GetAsync(eventUid, connection, ct).ConfigureAwait(false);
-        if (entry is null) { ctx.Response.StatusCode = StatusCodes.Status404NotFound; return; }
+        if (entry is null) { PreventCaching(ctx.Response); ctx.Response.StatusCode = StatusCodes.Status404NotFound; return; }
 
         var chrome = new DashboardChrome(options.Title, path, options.CustomStyleSheet, options.CustomFavicon, options.HeadHtml, options.BodyStartHtml, options.Heading);
         await WriteHtmlAsync(ctx, DashboardHtml.Detail(chrome, entry, options.ShowData), ct).ConfigureAwait(false);
@@ -129,6 +134,16 @@ public static class AuditDashboardEndpoints
                 ctx.RequestServices.GetService<ILoggerFactory>()?
                     .CreateLogger(LoggerCategory)
                     .LogError(ex, "Audit dashboard OnDenied hook threw; falling back to the deny status.");
+
+                if (ctx.Response.HasStarted)
+                {
+                    // The hook already wrote to the response before throwing. Response.Clear() itself
+                    // throws once the response has started, so calling it here would only replace one
+                    // unhandled exception with another — there is nothing left to clear or salvage, so
+                    // let the connection end as-is.
+                    return;
+                }
+
                 // Response.Clear() wipes headers along with the body/status, including the PreventCaching
                 // call above — reapply it so a broken hook can't leave the fallback 404 cacheable either.
                 ctx.Response.Clear();
@@ -153,7 +168,10 @@ public static class AuditDashboardEndpoints
     {
         response.Headers.CacheControl = "no-store, no-cache, must-revalidate";
         response.Headers.Pragma = "no-cache";
-        response.Headers.Vary = "Cookie, Authorization";
+        // Append, not assign: assigning would replace a Vary entry a middleware upstream of this endpoint
+        // already set (e.g. response compression's "Accept-Encoding"), making a compressed and an
+        // uncompressed response interchangeable in a shared cache.
+        response.Headers.AppendCommaSeparatedValues("Vary", "Cookie", "Authorization");
     }
 
     private static async Task<bool> AuthorizedAsync(HttpContext ctx, AuditDashboardOptions options)

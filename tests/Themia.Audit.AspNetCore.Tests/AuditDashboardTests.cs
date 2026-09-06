@@ -71,7 +71,11 @@ public class AuditDashboardTests
         var client = await ServerAsync(new FakeAuditStore(Sample()), o => o.Authorize = _ => throw new InvalidOperationException());
         var res = await client.GetAsync("/audit");
         Assert.Equal(HttpStatusCode.NotFound, res.StatusCode);
-        Assert.DoesNotContain("themia", await res.Content.ReadAsStringAsync(), StringComparison.OrdinalIgnoreCase);
+        // "themia" appears in neither a successful render nor the empty 404 body, so asserting its
+        // absence proves nothing — a complete leak of the row below would pass it too. Assert the
+        // absence of the actual event data instead: present on a genuine 200 (Authorized_list_returns_200_with_rows),
+        // and this is exactly what must never reach an unauthorized caller.
+        Assert.DoesNotContain("PROPOSAL_ACCEPTED", await res.Content.ReadAsStringAsync(), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -160,6 +164,27 @@ public class AuditDashboardTests
     }
 
     [Fact]
+    public async Task Denied_when_on_denied_throws_after_writing_does_not_throw_from_the_request()
+    {
+        // A hook that has already written to the response before throwing leaves nothing for the fallback
+        // to clear or salvage: HttpResponse.Clear() itself throws once the response has started, so the
+        // deny path must not call it — doing so would turn one exception into a worse, unhandled one.
+        var client = await ServerAsync(new FakeAuditStore(Sample()), o =>
+        {
+            o.Authorize = _ => Task.FromResult(false);
+            o.OnDenied = async ctx =>
+            {
+                await ctx.Response.WriteAsync("partial");
+                throw new InvalidOperationException("boom after the response started");
+            };
+        });
+
+        // Must complete without an unhandled exception escaping the request.
+        var res = await client.GetAsync("/audit");
+        Assert.NotNull(res);
+    }
+
+    [Fact]
     public async Task Unknown_event_uid_does_not_invoke_on_denied()
     {
         // A missing entry is a genuine 404, not an authorization denial.
@@ -177,17 +202,21 @@ public class AuditDashboardTests
     }
 
     [Fact]
-    public async Task Authorize_cancelled_does_not_mask_as_404()
+    public async Task Authorize_cancelled_does_not_mask_as_404_or_leak_the_dashboard()
     {
         var client = await ServerAsync(new FakeAuditStore(Sample()), o => o.Authorize = _ => throw new OperationCanceledException());
         try
         {
             var res = await client.GetAsync("/audit");
-            Assert.NotEqual(HttpStatusCode.NotFound, res.StatusCode);
+            // NotEqual(NotFound) alone passes just as well on a 200 that serves the whole dashboard to an
+            // unauthorized caller — that is not "not masked as a deny", it is a worse failure. Pin down
+            // that no successful, data-bearing response comes back either.
+            Assert.NotEqual(HttpStatusCode.OK, res.StatusCode);
+            Assert.DoesNotContain("PROPOSAL_ACCEPTED", await res.Content.ReadAsStringAsync(), StringComparison.Ordinal);
         }
         catch (OperationCanceledException)
         {
-            // Propagated as cancellation — correct; not swallowed into a deny.
+            // Propagated as cancellation — correct; not swallowed into a deny or an allow.
         }
     }
 
@@ -252,6 +281,72 @@ public class AuditDashboardTests
         var res = await client.GetAsync("/audit");
         Assert.Equal(HttpStatusCode.NotFound, res.StatusCode);
         Assert.True(res.Headers.CacheControl!.NoStore);
+    }
+
+    [Fact]
+    public async Task Authorized_detail_is_not_cacheable_and_varies()
+    {
+        var client = await ServerAsync(new FakeAuditStore(Sample()), o => o.Authorize = _ => Task.FromResult(true));
+        var res = await client.GetAsync($"/audit/{ExistingUid}");
+
+        Assert.Equal(HttpStatusCode.OK, res.StatusCode);
+        Assert.True(res.Headers.CacheControl!.NoStore);
+        var vary = res.Headers.Vary.ToString();
+        Assert.Contains("Cookie", vary);
+        Assert.Contains("Authorization", vary);
+    }
+
+    [Fact]
+    public async Task Detail_unknown_event_uid_404_is_not_cacheable_and_varies()
+    {
+        // An authorized-but-not-found 404 is heuristically cacheable under RFC 9111 §4.2.2 — without
+        // no-store a shared proxy can pin "no such event" and keep serving it after the row exists.
+        var client = await ServerAsync(new FakeAuditStore(Sample()), o => o.Authorize = _ => Task.FromResult(true));
+        var res = await client.GetAsync($"/audit/{Guid.NewGuid()}");
+
+        Assert.Equal(HttpStatusCode.NotFound, res.StatusCode);
+        Assert.True(res.Headers.CacheControl!.NoStore);
+        var vary = res.Headers.Vary.ToString();
+        Assert.Contains("Cookie", vary);
+        Assert.Contains("Authorization", vary);
+    }
+
+    [Fact]
+    public async Task PreventCaching_appends_to_an_existing_vary_header_instead_of_replacing_it()
+    {
+        // Simulates a middleware upstream of the dashboard (e.g. response compression) that already set
+        // its own Vary entry. Assigning (rather than appending) would wipe it out, making a compressed and
+        // an uncompressed response interchangeable in a shared cache.
+        var host = await new HostBuilder()
+            .ConfigureWebHost(web =>
+            {
+                web.UseTestServer();
+                web.ConfigureServices(s =>
+                {
+                    s.AddRouting();
+                    s.AddSingleton<IAuditStore>(new FakeAuditStore(Sample()));
+                    s.AddSingleton<IAuditDialect>(new FakeAuditDialect());
+                    s.Configure<AuditOptions>(o => o.ConnectionString = "fake-connection-string");
+                });
+                web.Configure(app =>
+                {
+                    app.Use(async (ctx, next) =>
+                    {
+                        ctx.Response.Headers.Append("Vary", "Accept-Encoding");
+                        await next();
+                    });
+                    app.UseRouting();
+                    app.UseEndpoints(e => e.MapThemiaAuditDashboard("/audit", o => o.Authorize = _ => Task.FromResult(true)));
+                });
+            })
+            .StartAsync();
+
+        var res = await host.GetTestClient().GetAsync("/audit");
+
+        var vary = res.Headers.Vary.ToString();
+        Assert.Contains("Accept-Encoding", vary);
+        Assert.Contains("Cookie", vary);
+        Assert.Contains("Authorization", vary);
     }
 
     [Fact]
@@ -344,6 +439,51 @@ public class AuditDashboardTests
         Assert.Equal("42", store.LastQuery.EntityId);
         Assert.Equal(2, store.LastQuery.Page);
         Assert.Equal(100, store.LastQuery.PageSize);
+    }
+
+    [Fact]
+    public async Task Without_a_scope_hook_the_query_string_tenant_flows_unscoped()
+    {
+        // Documents today's default rather than leaving it incidental: with no ScopeQuery configured, a
+        // caller who passes Authorize can read any tenant simply by editing ?tenant= — Authorize only
+        // decides yes/no, it cannot narrow a query.
+        var store = new FakeAuditStore(Sample());
+        var client = await ServerAsync(store, o => o.Authorize = _ => Task.FromResult(true));
+
+        await client.GetAsync("/audit?tenant=someone-elses-tenant");
+
+        Assert.Equal("someone-elses-tenant", store.LastQuery!.TenantId);
+    }
+
+    [Fact]
+    public async Task ScopeQuery_runs_after_authorize_and_is_honoured()
+    {
+        var store = new FakeAuditStore(Sample());
+        var client = await ServerAsync(store, o =>
+        {
+            o.Authorize = _ => Task.FromResult(true);
+            o.ScopeQuery = (_, query) => query with { TenantId = "tenant-a" };
+        });
+
+        await client.GetAsync("/audit");
+
+        Assert.Equal("tenant-a", store.LastQuery!.TenantId);
+    }
+
+    [Fact]
+    public async Task ScopeQuery_fixed_tenant_cannot_be_overridden_from_the_query_string()
+    {
+        var store = new FakeAuditStore(Sample());
+        var client = await ServerAsync(store, o =>
+        {
+            o.Authorize = _ => Task.FromResult(true);
+            o.ScopeQuery = (_, query) => query with { TenantId = "tenant-a" };
+        });
+
+        // A viewer scoped to tenant-a tries to read tenant-b's rows by editing the URL.
+        await client.GetAsync("/audit?tenant=tenant-b");
+
+        Assert.Equal("tenant-a", store.LastQuery!.TenantId);
     }
 
     [Fact]

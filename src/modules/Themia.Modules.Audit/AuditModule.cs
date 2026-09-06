@@ -56,10 +56,14 @@ public sealed class AuditModule : ThemiaModuleBase
         }
         catch (DbException ex)
         {
+            // Missing table is the common case, but this catch also fires on a permission error, a
+            // timeout, or bad credentials — for which "the table must exist" sends an operator hunting
+            // for a table that is already there. Keep the original exception as InnerException and fold
+            // its message in, so the real cause survives instead of being asserted over.
             throw new InvalidOperationException(
-                "Themia.Modules.Audit requires the 'themia_audit_events' table to already exist. Call " +
-                "AddThemiaAudit(...) with runMigration: true (the default), or run the Themia.Audit " +
-                "schema migration yourself, before starting this module.", ex);
+                "Themia.Modules.Audit could not read 'themia_audit_events'. If the table does not exist yet, " +
+                "call AddThemiaAudit(...) with runMigration: true (the default), or run the Themia.Audit " +
+                $"schema migration yourself, before starting this module. Underlying error: {ex.Message}", ex);
         }
     }
 }
