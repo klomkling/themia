@@ -101,6 +101,22 @@ public sealed class IdentityEventObserverTests
     }
 
     [Fact]
+    public async Task Refresh_reuse_detected_attributes_the_event_to_the_owning_account()
+    {
+        // ReuseDetected is the single most actionable event in this flow — an operator needs the account,
+        // not "some token was replayed", to revoke sessions right now.
+        var ownerId = Guid.NewGuid();
+        var (flow, _, refresh, _, observer) = Build(PasswordVerificationResult.Success, null);
+        refresh.RotateResult = RefreshValidationResult.ReuseDetected();
+        refresh.OwnerId = ownerId;
+
+        await flow.RefreshAsync("token");
+
+        Assert.Equal(1, refresh.ResolveOwnerCalls);
+        Assert.Equal(ownerId, observer.LastRefreshFailed!.Value.UserId);
+    }
+
+    [Fact]
     public async Task Refresh_invalid_raises_OnRefreshFailed()
     {
         var (flow, _, refresh, _, observer) = Build(PasswordVerificationResult.Success, null);
@@ -108,6 +124,36 @@ public sealed class IdentityEventObserverTests
         await flow.RefreshAsync("token");
         Assert.Contains(nameof(IIdentityEventObserver.OnRefreshFailedAsync), observer.Calls);
         Assert.Equal(RefreshOutcome.Invalid, observer.LastRefreshFailed!.Value.Outcome);
+    }
+
+    [Fact]
+    public async Task Refresh_reuse_detected_survives_a_failed_owner_lookup()
+    {
+        // Losing attribution is acceptable; turning a refresh rejection into a 500 is not.
+        var (flow, _, refresh, _, observer) = Build(PasswordVerificationResult.Success, null);
+        refresh.RotateResult = RefreshValidationResult.ReuseDetected();
+        refresh.ThrowOnResolveOwner = true;
+
+        var result = await flow.RefreshAsync("token");
+
+        Assert.Equal(RefreshRotationOutcome.ReuseDetected, result.Outcome);
+        Assert.Null(observer.LastRefreshFailed!.Value.UserId);
+    }
+
+    [Fact]
+    public async Task Refresh_invalid_passes_a_null_owner_and_never_looks_one_up()
+    {
+        // Guards against someone later "simplifying" the two paths into one: Invalid has no owner by
+        // construction, and resolving one here would run a pointless lookup on every bad token an
+        // attacker sprays at the endpoint.
+        var (flow, _, refresh, _, observer) = Build(PasswordVerificationResult.Success, null);
+        refresh.RotateResult = RefreshValidationResult.Invalid();
+        refresh.OwnerId = Guid.NewGuid(); // even if a lookup WOULD resolve something, it must not run
+
+        await flow.RefreshAsync("token");
+
+        Assert.Equal(0, refresh.ResolveOwnerCalls);
+        Assert.Null(observer.LastRefreshFailed!.Value.UserId);
     }
 
     [Fact]

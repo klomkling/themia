@@ -94,6 +94,14 @@ internal sealed class FakeRefreshTokenService : IRefreshTokenService
     /// default (an unresolvable token).</summary>
     public Guid? OwnerId { get; set; }
 
+    /// <summary>How many times <see cref="ResolveOwnerAsync"/> was called — lets a test prove the
+    /// Invalid path does NOT pay for an owner lookup (only ReuseDetected should).</summary>
+    public int ResolveOwnerCalls { get; private set; }
+
+    /// <summary>When set, <see cref="ResolveOwnerAsync"/> throws — proves a failed attribution lookup
+    /// cannot turn a refresh rejection into a 500.</summary>
+    public bool ThrowOnResolveOwner { get; set; }
+
     public Task<RefreshIssue> IssueAsync(Guid userId, CancellationToken cancellationToken = default)
     {
         IssueCalls++;
@@ -103,8 +111,15 @@ internal sealed class FakeRefreshTokenService : IRefreshTokenService
     public Task<RefreshValidationResult> ValidateAndRotateAsync(string rawToken, CancellationToken cancellationToken = default) =>
         Task.FromResult(RotateResult);
 
-    public Task<Guid?> ResolveOwnerAsync(string rawToken, CancellationToken cancellationToken = default) =>
-        Task.FromResult(OwnerId);
+    public Task<Guid?> ResolveOwnerAsync(string rawToken, CancellationToken cancellationToken = default)
+    {
+        ResolveOwnerCalls++;
+        if (ThrowOnResolveOwner)
+        {
+            throw new InvalidOperationException("owner lookup failure");
+        }
+        return Task.FromResult(OwnerId);
+    }
 
     public Task RevokeAsync(string rawToken, bool allForUser, CancellationToken cancellationToken = default)
     {

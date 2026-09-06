@@ -95,6 +95,22 @@ public sealed class AuthenticationFlow : IAuthenticationFlow
         }
     }
 
+    /// <summary>Resolves a reused refresh token's owner for audit attribution. A failure here must not
+    /// turn a refresh rejection into a 500 — losing attribution is acceptable, breaking the flow is
+    /// not — so any exception is logged at <c>Error</c> and swallowed to <see langword="null"/>.</summary>
+    private async Task<Guid?> TryResolveOwnerAsync(string rawToken, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await refreshTokens.ResolveOwnerAsync(rawToken, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogError(ex, "Failed to resolve the owner of a reused refresh token for audit attribution.");
+            return null;
+        }
+    }
+
     /// <inheritdoc />
     public async Task<LoginResult> LoginAsync(string identifier, string password, CancellationToken cancellationToken = default)
     {
@@ -236,10 +252,17 @@ public sealed class AuthenticationFlow : IAuthenticationFlow
         var rotation = await refreshTokens.ValidateAndRotateAsync(refreshToken, cancellationToken).ConfigureAwait(false);
         if (!rotation.TryGetSuccess(out var user, out var replacement))
         {
-            // ReuseDetected — a rotated refresh token presented twice — is the textbook signature of
-            // refresh-token theft, and Invalid covers everything else (unknown/expired/out-of-scope). No
-            // user is resolved on either path, so the observer sees a null id.
-            await RaiseAsync((o, ct) => o.OnRefreshFailedAsync(null, rotation.Outcome, ct), cancellationToken).ConfigureAwait(false);
+            // ReuseDetected — a rotated refresh token presented twice — is the single most actionable
+            // event in this flow: "account X's token was replayed" tells an operator to revoke that
+            // account's sessions right now, where "some token was replayed" tells them nothing (there is
+            // no other join key on an audit row for this event). The presented token's row still exists
+            // (rotation stamps ConsumedAt/RevokedAt on it rather than deleting it), so it resolves.
+            // Invalid has no owner by construction — an unknown/expired/out-of-scope token — and is left
+            // null rather than paying for a lookup on every bad token an attacker sprays at the endpoint.
+            var reuseUserId = rotation.Outcome == RefreshOutcome.ReuseDetected
+                ? await TryResolveOwnerAsync(refreshToken, cancellationToken).ConfigureAwait(false)
+                : null;
+            await RaiseAsync((o, ct) => o.OnRefreshFailedAsync(reuseUserId, rotation.Outcome, ct), cancellationToken).ConfigureAwait(false);
             return rotation.Outcome switch
             {
                 RefreshOutcome.ReuseDetected => RefreshRotationResult.ReuseDetected(),

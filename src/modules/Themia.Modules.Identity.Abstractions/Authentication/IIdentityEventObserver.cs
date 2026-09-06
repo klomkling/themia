@@ -114,8 +114,14 @@ public interface IIdentityEventObserver
     /// <summary>Raised on a refresh failure that was not a hook denial: an invalid/expired/out-of-scope
     /// token, a detected reuse of an already-rotated token (the textbook signature of refresh-token
     /// theft), or a resolved account that is inactive or locked out.</summary>
-    /// <param name="userId">The token's owning user id, when it was resolved before the failure (null for
-    /// an unknown, expired, or out-of-scope token).</param>
+    /// <param name="userId">
+    /// The token's owning user id, when it is resolvable. Populated for
+    /// <see cref="RefreshOutcome.ReuseDetected"/> — a rotated token replayed is the single most
+    /// actionable event in this flow, and without the account an audit row has no other way to say whose
+    /// session to revoke — and for the inactive/locked-out account case (also reported as
+    /// <see cref="RefreshOutcome.Invalid"/>). <see langword="null"/> only for an unknown, expired, or
+    /// out-of-scope token, which has no owner by construction.
+    /// </param>
     /// <param name="outcome">The real internal outcome.</param>
     /// <param name="cancellationToken">A cancellation token.</param>
     Task OnRefreshFailedAsync(Guid? userId, RefreshOutcome outcome, CancellationToken cancellationToken = default) =>
