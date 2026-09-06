@@ -34,7 +34,7 @@ public sealed class UserService : IUserService
         IPhoneNumberNormalizer phoneNormalizer,
         IUserLifecycleHooks hooks,
         IEnumerable<IIdentityEventObserver> observers,
-        ILogger<UserService> logger)
+        ILogger<UserService>? logger = null)
     {
         ArgumentNullException.ThrowIfNull(users);
         ArgumentNullException.ThrowIfNull(unitOfWork);
@@ -45,7 +45,6 @@ public sealed class UserService : IUserService
         ArgumentNullException.ThrowIfNull(phoneNormalizer);
         ArgumentNullException.ThrowIfNull(hooks);
         ArgumentNullException.ThrowIfNull(observers);
-        ArgumentNullException.ThrowIfNull(logger);
         this.users = users;
         this.unitOfWork = unitOfWork;
         this.passwordHasher = passwordHasher;
@@ -55,7 +54,11 @@ public sealed class UserService : IUserService
         this.phoneNormalizer = phoneNormalizer;
         this.hooks = hooks;
         this.observers = observers as IIdentityEventObserver[] ?? observers.ToArray();
-        this.logger = logger;
+        // Defaults to NullLogger rather than requiring ILogger<UserService> to be registered: in a host
+        // that never called AddLogging, Microsoft DI would otherwise silently fall back to the 8-parameter
+        // back-compat constructor below, and every OnUserMutatedAsync event would disappear with no error.
+        // A default parameter keeps this constructor always resolvable, so it is always the one DI picks.
+        this.logger = logger ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<UserService>.Instance;
     }
 
     /// <summary>
