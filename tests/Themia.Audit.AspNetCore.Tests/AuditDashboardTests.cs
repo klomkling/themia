@@ -487,6 +487,40 @@ public class AuditDashboardTests
     }
 
     [Fact]
+    public async Task ScopeQuery_allows_the_detail_route_when_the_row_matches()
+    {
+        var entry = Sample() with { TenantId = "tenant-a" };
+        var client = await ServerAsync(new FakeAuditStore(entry), o =>
+        {
+            o.Authorize = _ => Task.FromResult(true);
+            o.ScopeQuery = (_, query) => query with { TenantId = "tenant-a" };
+        });
+
+        var res = await client.GetAsync($"/audit/{ExistingUid}");
+
+        Assert.Equal(HttpStatusCode.OK, res.StatusCode);
+        Assert.Contains("PROPOSAL_ACCEPTED", await res.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
+    public async Task ScopeQuery_hides_the_detail_route_for_a_row_outside_the_scope()
+    {
+        // A viewer scoped to tenant-a must not be able to read tenant-b's row just by knowing (or
+        // guessing) its event_uid — the same isolation ScopeQuery already gives the list route.
+        var entry = Sample() with { TenantId = "tenant-b" };
+        var client = await ServerAsync(new FakeAuditStore(entry), o =>
+        {
+            o.Authorize = _ => Task.FromResult(true);
+            o.ScopeQuery = (_, query) => query with { TenantId = "tenant-a" };
+        });
+
+        var res = await client.GetAsync($"/audit/{ExistingUid}");
+
+        Assert.Equal(HttpStatusCode.NotFound, res.StatusCode);
+        Assert.DoesNotContain("PROPOSAL_ACCEPTED", await res.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task List_clamps_page_and_page_size_up_to_minimum()
     {
         var store = new FakeAuditStore(Sample());
