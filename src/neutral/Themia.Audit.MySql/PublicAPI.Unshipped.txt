@@ -1,5 +1,7 @@
 #nullable enable
+static Themia.Audit.MySql.ServiceCollectionExtensions.AddThemiaAuditMySql(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
 Themia.Audit.MySql.MySqlAuditDialect
+Themia.Audit.MySql.MySqlAuditDialect.BindEventUid(System.Guid value) -> object!
 Themia.Audit.MySql.MySqlAuditDialect.CountSql.get -> string!
 Themia.Audit.MySql.MySqlAuditDialect.CreateConnection(string! connectionString) -> System.Data.Common.DbConnection!
 Themia.Audit.MySql.MySqlAuditDialect.InsertSql.get -> string!
@@ -7,4 +9,3 @@ Themia.Audit.MySql.MySqlAuditDialect.MySqlAuditDialect() -> void
 Themia.Audit.MySql.MySqlAuditDialect.PurgeSql.get -> string!
 Themia.Audit.MySql.MySqlAuditDialect.SelectPageSql.get -> string!
 Themia.Audit.MySql.ServiceCollectionExtensions
-static Themia.Audit.MySql.ServiceCollectionExtensions.AddThemiaAuditMySql(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!

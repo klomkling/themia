@@ -30,6 +30,46 @@ internal static class DashboardHtml
 {
     internal static string Enc(string? value) => WebUtility.HtmlEncode(value ?? string.Empty);
 
+    /// <summary>
+    /// Builds a pager link that carries every active filter, not just the page cursor.
+    /// </summary>
+    /// <remarks>
+    /// Emitting only <c>?page=</c> and <c>?pageSize=</c> dropped the filters on every Prev/Next click:
+    /// a viewer who filtered by actor and clicked Next landed on page two of the <b>unfiltered</b> list,
+    /// while the "N total" they had just read was counted for the filtered one. The two disagreeing on
+    /// the same screen is what makes it a correctness bug rather than a nuisance — the page looks like a
+    /// continuation of the search and is not.
+    /// <para>
+    /// Values are URL-encoded for the query string and then HTML-encoded for the attribute; both are
+    /// required, and neither substitutes for the other.
+    /// </para>
+    /// </remarks>
+    private static string PageLink(string path, AuditQuery query, int page)
+    {
+        var sb = new StringBuilder(path).Append("?page=").Append(page)
+            .Append("&pageSize=").Append(query.PageSize);
+
+        Add(sb, "tenant", query.TenantId);
+        if (query.HostLevelOnly) sb.Append("&hostOnly=true");
+        Add(sb, "actor", query.ActorId);
+        Add(sb, "entityType", query.EntityType);
+        Add(sb, "entityId", query.EntityId);
+        Add(sb, "category", query.Category?.ToString());
+        Add(sb, "outcome", query.Outcome?.ToString());
+        Add(sb, "from", query.From?.ToString("O", CultureInfo.InvariantCulture));
+        Add(sb, "to", query.To?.ToString("O", CultureInfo.InvariantCulture));
+
+        return Enc(sb.ToString());
+
+        static void Add(StringBuilder sb, string name, string? value)
+        {
+            if (!string.IsNullOrEmpty(value))
+            {
+                sb.Append('&').Append(name).Append('=').Append(Uri.EscapeDataString(value));
+            }
+        }
+    }
+
     internal static string Page(DashboardChrome chrome, string body)
     {
         var sb = new StringBuilder();
@@ -145,14 +185,12 @@ internal static class DashboardHtml
         sb.Append("<nav class=\"pager\">");
         if (hasPrev)
         {
-            sb.Append("<a href=\"").Append(Enc(chrome.Path)).Append("?page=").Append(query.Page - 1)
-              .Append("&amp;pageSize=").Append(query.PageSize).Append("\">Prev</a> ");
+            sb.Append("<a href=\"").Append(PageLink(chrome.Path, query, query.Page - 1)).Append("\">Prev</a> ");
         }
         sb.Append("Page ").Append(query.Page).Append(" (").Append(total).Append(" total) ");
         if (hasNext)
         {
-            sb.Append("<a href=\"").Append(Enc(chrome.Path)).Append("?page=").Append(query.Page + 1)
-              .Append("&amp;pageSize=").Append(query.PageSize).Append("\">Next</a>");
+            sb.Append("<a href=\"").Append(PageLink(chrome.Path, query, query.Page + 1)).Append("\">Next</a>");
         }
         sb.Append("</nav>");
 

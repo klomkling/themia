@@ -231,10 +231,26 @@ Without this the two outcomes are both wrong: MySQL in non-strict mode **truncat
 over-length `event_type` becomes a *different* event that queries then miscount; every other engine
 throws, which under §7's atomicity rolls back the adopter's business transaction.
 
-**Adopter-named fields are rejected, never truncated** — `event_type`, `actor_id`, `entity_type`,
-`entity_id`. Truncating them merges two distinct events into one and the audit trail then asserts
-something false. `user_agent` and `ip_address` are truncated instead: they are captured by the framework,
-not named by the adopter, and a clipped user-agent is still the same event.
+**The axis is trusted versus untrusted origin, not who named the field.** An earlier revision of this
+spec drew the line at "adopter-named versus framework-captured", rejecting the first group and truncating
+the second, justified by "truncating merges two distinct events into one". A second independent review
+found the counter-example that reasoning missed.
+
+`ActorName` on a failed login carries the **raw, client-supplied identifier**. `LoginAsync` bounds it only
+with `ThrowIfNullOrWhiteSpace`, so an attacker brute-forcing with a 300-character username made
+`Validate()` throw, the observer wrapper swallowed it, and **no `LOGIN_FAILED` row was written at all**.
+Padding the username switched off the audit trail for the attack. `EntityId` on an external-login failure
+had the same shape, carrying a route value.
+
+Losing an event entirely is strictly worse than merging two, so:
+
+| origin | rule | fields |
+| --- | --- | --- |
+| untrusted — arrives from a client | **clip**, with a visible truncation marker so a reader can tell a clipped value from a genuine one | the failed-login `ActorName`; the external-login-failure `EntityId`; `user_agent`; `ip_address` |
+| trusted — supplied by application code | **reject** | `event_type`, `correlation_id`, and identifiers resolved from application data |
+
+Rejection stays for the trusted group because there an over-length value is a programming error worth
+surfacing at the call site, and no attacker can trigger it.
 
 ### Index budget
 

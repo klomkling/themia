@@ -487,6 +487,40 @@ public class AuditDashboardTests
     }
 
     [Fact]
+    public async Task ScopeQuery_allows_the_detail_route_when_the_row_matches()
+    {
+        var entry = Sample() with { TenantId = "tenant-a" };
+        var client = await ServerAsync(new FakeAuditStore(entry), o =>
+        {
+            o.Authorize = _ => Task.FromResult(true);
+            o.ScopeQuery = (_, query) => query with { TenantId = "tenant-a" };
+        });
+
+        var res = await client.GetAsync($"/audit/{ExistingUid}");
+
+        Assert.Equal(HttpStatusCode.OK, res.StatusCode);
+        Assert.Contains("PROPOSAL_ACCEPTED", await res.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
+    public async Task ScopeQuery_hides_the_detail_route_for_a_row_outside_the_scope()
+    {
+        // A viewer scoped to tenant-a must not be able to read tenant-b's row just by knowing (or
+        // guessing) its event_uid — the same isolation ScopeQuery already gives the list route.
+        var entry = Sample() with { TenantId = "tenant-b" };
+        var client = await ServerAsync(new FakeAuditStore(entry), o =>
+        {
+            o.Authorize = _ => Task.FromResult(true);
+            o.ScopeQuery = (_, query) => query with { TenantId = "tenant-a" };
+        });
+
+        var res = await client.GetAsync($"/audit/{ExistingUid}");
+
+        Assert.Equal(HttpStatusCode.NotFound, res.StatusCode);
+        Assert.DoesNotContain("PROPOSAL_ACCEPTED", await res.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task List_clamps_page_and_page_size_up_to_minimum()
     {
         var store = new FakeAuditStore(Sample());
@@ -550,5 +584,55 @@ public class AuditDashboardTests
         var body = await (await client.GetAsync("/audit")).Content.ReadAsStringAsync();
         Assert.Contains("href=\"/app/theme.css\"", body);
         Assert.Contains("href=\"/app/fav.ico\"", body);
+    }
+    // The pager used to emit only ?page= and ?pageSize=, so Prev/Next silently dropped every filter: the
+    // viewer landed on page two of the UNFILTERED list while the "N total" they had just read was counted
+    // for the filtered one. Two numbers disagreeing on one screen is what makes this a correctness bug.
+    [Fact]
+    public async Task Pager_links_carry_every_active_filter()
+    {
+        // Seeded to MATCH every filter below — otherwise the fake returns nothing, there is no second
+        // page, and the test would pass by rendering no pager at all.
+        var matching = Enumerable.Range(0, 40)
+            .Select(_ => Sample() with { TenantId = "t1", EntityType = "Deal", EntityId = "42" })
+            .ToArray();
+        var client = await ServerAsync(new FakeAuditStore(matching), o => o.Authorize = _ => Task.FromResult(true));
+
+        var html = await client.GetStringAsync(
+            "/audit?tenant=t1&actor=user-1&entityType=Deal&entityId=42&category=Activity&outcome=Success&pageSize=5");
+
+        var next = NextHref(html);
+        Assert.Contains("page=2", next, StringComparison.Ordinal);
+        Assert.Contains("pageSize=5", next, StringComparison.Ordinal);
+        Assert.Contains("tenant=t1", next, StringComparison.Ordinal);
+        Assert.Contains("actor=user-1", next, StringComparison.Ordinal);
+        Assert.Contains("entityType=Deal", next, StringComparison.Ordinal);
+        Assert.Contains("entityId=42", next, StringComparison.Ordinal);
+        Assert.Contains("category=Activity", next, StringComparison.Ordinal);
+        Assert.Contains("outcome=Success", next, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Pager_links_url_encode_filter_values()
+    {
+        var matching = Enumerable.Range(0, 40)
+            .Select(_ => Sample() with { ActorId = "a b&c" })
+            .ToArray();
+        var client = await ServerAsync(new FakeAuditStore(matching), o => o.Authorize = _ => Task.FromResult(true));
+
+        var html = await client.GetStringAsync("/audit?actor=a%20b%26c&pageSize=5");
+
+        // Encoded for the query string, then HTML-encoded for the attribute. A raw & would end the
+        // parameter and silently truncate the filter on the next click.
+        Assert.Contains("actor=a%20b%26c", NextHref(html), StringComparison.Ordinal);
+    }
+
+    private static string NextHref(string html)
+    {
+        var marker = "\">Next</a>";
+        var end = html.IndexOf(marker, StringComparison.Ordinal);
+        Assert.True(end > 0, "the list did not render a Next link");
+        var start = html.LastIndexOf("href=\"", end, StringComparison.Ordinal) + 6;
+        return html[start..end];
     }
 }

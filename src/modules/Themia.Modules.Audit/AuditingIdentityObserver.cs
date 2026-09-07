@@ -22,6 +22,10 @@ namespace Themia.Modules.Audit;
 /// </remarks>
 public sealed class AuditingIdentityObserver : IIdentityEventObserver
 {
+    // Appended when a client-supplied field is clipped below, so a reader can tell a truncated
+    // identifier from a genuine one that happens to end mid-word.
+    private const string TruncationMarker = "…[truncated]";
+
     private readonly IAuditRecorder recorder;
     private readonly AuditHttpEnricher enricher;
 
@@ -52,24 +56,33 @@ public sealed class AuditingIdentityObserver : IIdentityEventObserver
         }, payload: null, cancellationToken);
 
     /// <inheritdoc />
+    /// <remarks><paramref name="userName"/> is the raw, client-supplied login identifier — untrusted
+    /// origin, unbounded length (<c>AuthenticationFlow.LoginAsync</c> only checks
+    /// <c>ThrowIfNullOrWhiteSpace</c>). Clipped, not passed through: a caller padding a brute-force
+    /// attempt past <see cref="AuditEntry.MaxActorNameLength"/> must not be able to make
+    /// <see cref="AuditEntry.Validate"/> throw and silently delete this row — that would let the
+    /// caller turn off their own audit trail. See <see cref="ClipUntrusted"/>.</remarks>
     public Task OnLoginFailedAsync(string userName, LoginFailureReason reason, CancellationToken cancellationToken = default) =>
         RecordAsync(new AuditEntry
         {
             Category = AuditCategory.Authentication,
             Outcome = AuditOutcome.Failure,
             EventType = "LOGIN_FAILED",
-            ActorName = userName,
+            ActorName = ClipUntrusted(userName, AuditEntry.MaxActorNameLength),
             Reason = reason.ToString(),
         }, payload: null, cancellationToken);
 
     /// <inheritdoc />
+    /// <remarks><paramref name="userName"/> is the raw, client-supplied login identifier — same
+    /// untrusted-origin, unbounded-length shape as <see cref="OnLoginFailedAsync"/>; clipped for the
+    /// same reason.</remarks>
     public Task OnLoginDeniedAsync(string userName, string? denialReason, CancellationToken cancellationToken = default) =>
         RecordAsync(new AuditEntry
         {
             Category = AuditCategory.Authentication,
             Outcome = AuditOutcome.Denied,
             EventType = "LOGIN_DENIED",
-            ActorName = userName,
+            ActorName = ClipUntrusted(userName, AuditEntry.MaxActorNameLength),
             Reason = denialReason,
         }, payload: null, cancellationToken);
 
@@ -87,6 +100,11 @@ public sealed class AuditingIdentityObserver : IIdentityEventObserver
         }, payload: new { wasCreated, wasLinked }, cancellationToken);
 
     /// <inheritdoc />
+    /// <remarks><paramref name="provider"/> here comes straight from the <c>{provider}</c> route value
+    /// of the external-login endpoint — untrusted origin, unbounded length — unlike the same parameter
+    /// on <see cref="OnExternalLoginSucceededAsync"/>, which is only reached after the provider registry
+    /// resolved it to a known, bounded name. Clipped for the same reason as
+    /// <see cref="OnLoginFailedAsync"/>.</remarks>
     public Task OnExternalLoginFailedAsync(string provider, ExternalLoginOutcome reason, CancellationToken cancellationToken = default) =>
         RecordAsync(new AuditEntry
         {
@@ -94,11 +112,13 @@ public sealed class AuditingIdentityObserver : IIdentityEventObserver
             Outcome = AuditOutcome.Failure,
             EventType = "EXTERNAL_LOGIN_FAILED",
             EntityType = "Provider",
-            EntityId = provider,
+            EntityId = ClipUntrusted(provider, AuditEntry.MaxEntityIdLength),
             Reason = reason.ToString(),
         }, payload: null, cancellationToken);
 
     /// <inheritdoc />
+    /// <remarks>Same untrusted-origin, unbounded-length shape as <see cref="OnExternalLoginFailedAsync"/>;
+    /// clipped for the same reason.</remarks>
     public Task OnExternalLoginDeniedAsync(string provider, string? denialReason, CancellationToken cancellationToken = default) =>
         RecordAsync(new AuditEntry
         {
@@ -106,7 +126,7 @@ public sealed class AuditingIdentityObserver : IIdentityEventObserver
             Outcome = AuditOutcome.Denied,
             EventType = "EXTERNAL_LOGIN_DENIED",
             EntityType = "Provider",
-            EntityId = provider,
+            EntityId = ClipUntrusted(provider, AuditEntry.MaxEntityIdLength),
             Reason = denialReason,
         }, payload: null, cancellationToken);
 
@@ -196,4 +216,25 @@ public sealed class AuditingIdentityObserver : IIdentityEventObserver
     // — TransactionalAuditRecorder owns both.
     private Task RecordAsync(AuditEntry entry, object? payload, CancellationToken cancellationToken) =>
         recorder.RecordAsync(enricher.Enrich(entry), payload, cancellationToken).AsTask();
+
+    /// <summary>
+    /// Clips a client-supplied value to <paramref name="maxLength"/> instead of letting
+    /// <see cref="AuditEntry.Validate"/> reject it. <see cref="AuditEntry.Validate"/>'s reject-on-overflow
+    /// behaviour is correct for a value the application itself names and supplies, where an over-length
+    /// value is a programming error worth surfacing; it is wrong for a value an unauthenticated caller
+    /// controls, where rejecting the entire entry destroys the audit row instead of merely losing detail —
+    /// strictly worse, since it lets that caller erase the very attempt being recorded. The marker is
+    /// appended within <paramref name="maxLength"/>, never past it, so the stored value still fits the
+    /// column <see cref="AuditEntry.Validate"/> guards.
+    /// </summary>
+    private static string? ClipUntrusted(string? value, int maxLength)
+    {
+        if (value is null || value.Length <= maxLength)
+        {
+            return value;
+        }
+
+        var keep = Math.Max(0, maxLength - TruncationMarker.Length);
+        return string.Concat(value.AsSpan(0, keep), TruncationMarker);
+    }
 }

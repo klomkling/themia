@@ -1,4 +1,5 @@
 #nullable enable
+static Themia.Audit.PostgreSql.ServiceCollectionExtensions.AddThemiaAuditPostgreSql(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
 Themia.Audit.PostgreSql.PostgresAuditDialect
 Themia.Audit.PostgreSql.PostgresAuditDialect.CountSql.get -> string!
 Themia.Audit.PostgreSql.PostgresAuditDialect.CreateConnection(string! connectionString) -> System.Data.Common.DbConnection!
@@ -7,4 +8,3 @@ Themia.Audit.PostgreSql.PostgresAuditDialect.PostgresAuditDialect() -> void
 Themia.Audit.PostgreSql.PostgresAuditDialect.PurgeSql.get -> string!
 Themia.Audit.PostgreSql.PostgresAuditDialect.SelectPageSql.get -> string!
 Themia.Audit.PostgreSql.ServiceCollectionExtensions
-static Themia.Audit.PostgreSql.ServiceCollectionExtensions.AddThemiaAuditPostgreSql(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!

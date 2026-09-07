@@ -50,8 +50,22 @@ internal sealed class FakeAuditStore : IAuditStore
         return Task.FromResult(new PagedResult<AuditEntry> { Items = list, Total = list.Count });
     }
 
-    public Task<AuditEntry?> GetAsync(Guid eventUid, DbConnection connection, CancellationToken cancellationToken) =>
-        throw new NotSupportedException();
+    /// <summary>
+    /// Honours <see cref="FailWith"/> because <c>AuditModule</c>'s schema probe reaches the store through
+    /// here: it uses <c>GetAsync(Guid.Empty)</c>, one indexed lookup that reads no rows, rather than
+    /// <c>QueryAsync</c>, whose second statement is an unpredicated <c>COUNT(*)</c> — a full scan of an
+    /// append-only table on every host start.
+    /// </summary>
+    public Task<AuditEntry?> GetAsync(Guid eventUid, DbConnection connection, CancellationToken cancellationToken)
+    {
+        LastGetEventUid = eventUid;
+        if (FailWith is not null) throw FailWith;
+
+        return Task.FromResult(entries.FirstOrDefault(e => e.EventUid == eventUid));
+    }
+
+    /// <summary>The identifier the last <see cref="GetAsync"/> looked up.</summary>
+    public Guid? LastGetEventUid { get; private set; }
 
     public Task<int> PurgeAsync(DateTimeOffset olderThan, DbConnection connection, CancellationToken cancellationToken) =>
         throw new NotSupportedException();

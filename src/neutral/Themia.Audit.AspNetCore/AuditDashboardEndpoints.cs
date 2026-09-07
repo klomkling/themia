@@ -88,11 +88,40 @@ public static class AuditDashboardEndpoints
         await using var connection = dialect.CreateConnection(auditOptions.ConnectionString);
         await connection.OpenAsync(ct).ConfigureAwait(false);
         var entry = await store.GetAsync(eventUid, connection, ct).ConfigureAwait(false);
-        if (entry is null) { PreventCaching(ctx.Response); ctx.Response.StatusCode = StatusCodes.Status404NotFound; return; }
+
+        // Applied here too, not just on the list route: without it, a viewer scoped by ScopeQuery to one
+        // tenant could still read every other tenant's row by guessing/observing an event_uid (they leak
+        // through API responses, logs and correlation ids) — reproducing the exact hole ScopeQuery exists
+        // to close, one route over. Built from an empty query (this route parses no query string of its
+        // own) so ScopeQuery sees only what it itself constrains, then checked against the fetched row.
+        var scope = options.ScopeQuery?.Invoke(ctx, new AuditQuery());
+        if (entry is null || (scope is not null && !SatisfiesScope(scope, entry)))
+        {
+            // Same route-hiding 404 as an unknown uid — a caller scoped away from a real row must not be
+            // able to distinguish "wrong tenant" from "no such event".
+            PreventCaching(ctx.Response);
+            ctx.Response.StatusCode = StatusCodes.Status404NotFound;
+            return;
+        }
 
         var chrome = new DashboardChrome(options.Title, path, options.CustomStyleSheet, options.CustomFavicon, options.HeadHtml, options.BodyStartHtml, options.Heading);
         await WriteHtmlAsync(ctx, DashboardHtml.Detail(chrome, entry, options.ShowData), ct).ConfigureAwait(false);
     }
+
+    // Mirrors the predicate every IAuditDialect.SelectPageSql applies (each filter set on `scope` ANDed
+    // together), so a row that would never appear on the list route cannot be reached by guessing its
+    // detail URL either. Every field left unset on `scope` (the common case: only TenantId) imposes no
+    // constraint, matching AuditQuery's own "empty query returns every row visible to the caller" contract.
+    private static bool SatisfiesScope(AuditQuery scope, AuditEntry entry) =>
+        (scope.TenantId is null || string.Equals(scope.TenantId, entry.TenantId, StringComparison.Ordinal))
+        && (!scope.HostLevelOnly || entry.TenantId is null)
+        && (scope.ActorId is null || string.Equals(scope.ActorId, entry.ActorId, StringComparison.Ordinal))
+        && (scope.EntityType is null || string.Equals(scope.EntityType, entry.EntityType, StringComparison.Ordinal))
+        && (scope.EntityId is null || string.Equals(scope.EntityId, entry.EntityId, StringComparison.Ordinal))
+        && (scope.Category is null || scope.Category == entry.Category)
+        && (scope.Outcome is null || scope.Outcome == entry.Outcome)
+        && (scope.From is null || entry.OccurredAt >= scope.From)
+        && (scope.To is null || entry.OccurredAt <= scope.To);
 
     // Gated like the list/detail routes: an unauthenticated 200 here would confirm the mount path even
     // though no audit data leaks (the 404 on the other two routes exists precisely to conceal that a

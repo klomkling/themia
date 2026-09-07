@@ -133,6 +133,65 @@ public class AuditingIdentityObserverTests
         Assert.Equal("risk-score", entry.Reason);
     }
 
+    // ---- Untrusted-input clipping: an over-long CLIENT-SUPPLIED identifier must be clipped, not
+    // rejected. AuditEntry.Validate() rejects an over-length adopter-named field outright, which is
+    // correct for a value application code supplies — but userName/provider here are unbounded,
+    // attacker-controlled strings, and letting Validate() throw would make AuthenticationFlow.RaiseAsync's
+    // catch-all swallow the exception, silently deleting the audit row. Padding a brute-force attempt past
+    // the column width must not let an attacker turn off their own audit trail. ----
+
+    [Fact]
+    public async Task Login_failed_with_an_over_long_username_is_clipped_not_rejected()
+    {
+        var overLong = new string('a', AuditEntry.MaxActorNameLength + 50);
+
+        await Observer.OnLoginFailedAsync(overLong, LoginFailureReason.WrongPassword, default);
+
+        var entry = Store.LastWritten!;
+        Assert.NotNull(entry.ActorName);
+        Assert.True(entry.ActorName!.Length <= AuditEntry.MaxActorNameLength);
+        Assert.EndsWith("…[truncated]", entry.ActorName, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Login_denied_with_an_over_long_username_is_clipped_not_rejected()
+    {
+        var overLong = new string('b', AuditEntry.MaxActorNameLength + 50);
+
+        await Observer.OnLoginDeniedAsync(overLong, "blocked-country", default);
+
+        var entry = Store.LastWritten!;
+        Assert.NotNull(entry.ActorName);
+        Assert.True(entry.ActorName!.Length <= AuditEntry.MaxActorNameLength);
+        Assert.EndsWith("…[truncated]", entry.ActorName, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task External_login_failed_with_an_over_long_provider_is_clipped_not_rejected()
+    {
+        var overLong = new string('c', AuditEntry.MaxEntityIdLength + 50);
+
+        await Observer.OnExternalLoginFailedAsync(overLong, ExternalLoginOutcome.ProviderRejected, default);
+
+        var entry = Store.LastWritten!;
+        Assert.NotNull(entry.EntityId);
+        Assert.True(entry.EntityId!.Length <= AuditEntry.MaxEntityIdLength);
+        Assert.EndsWith("…[truncated]", entry.EntityId, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task External_login_denied_with_an_over_long_provider_is_clipped_not_rejected()
+    {
+        var overLong = new string('d', AuditEntry.MaxEntityIdLength + 50);
+
+        await Observer.OnExternalLoginDeniedAsync(overLong, "risk-score", default);
+
+        var entry = Store.LastWritten!;
+        Assert.NotNull(entry.EntityId);
+        Assert.True(entry.EntityId!.Length <= AuditEntry.MaxEntityIdLength);
+        Assert.EndsWith("…[truncated]", entry.EntityId, StringComparison.Ordinal);
+    }
+
     [Fact]
     public async Task Refresh_succeeded_records_the_user()
     {

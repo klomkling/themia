@@ -1,4 +1,16 @@
 #nullable enable
+const Themia.Audit.AuditEntry.MaxActorIdLength = 256 -> int
+const Themia.Audit.AuditEntry.MaxActorNameLength = 256 -> int
+const Themia.Audit.AuditEntry.MaxCorrelationIdLength = 128 -> int
+const Themia.Audit.AuditEntry.MaxEntityIdLength = 256 -> int
+const Themia.Audit.AuditEntry.MaxEntityTypeLength = 256 -> int
+const Themia.Audit.AuditEntry.MaxEventTypeLength = 100 -> int
+const Themia.Audit.AuditEntry.MaxIpAddressLength = 64 -> int
+const Themia.Audit.AuditEntry.MaxReasonLength = 256 -> int
+const Themia.Audit.AuditEntry.MaxUserAgentLength = 512 -> int
+override Themia.Audit.Migrations.AuditSchemaMigration.Down() -> void
+override Themia.Audit.Migrations.AuditSchemaMigration.Up() -> void
+static Themia.Audit.DependencyInjection.AuditServiceCollectionExtensions.AddThemiaAudit(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Themia.Audit.AuditOptions!>! configure, bool runMigration = true) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
 Themia.Audit.AuditCategory
 Themia.Audit.AuditCategory.Activity = 1 -> Themia.Audit.AuditCategory
 Themia.Audit.AuditCategory.Authentication = 2 -> Themia.Audit.AuditCategory
@@ -41,6 +53,13 @@ Themia.Audit.AuditEntry.TenantId.init -> void
 Themia.Audit.AuditEntry.UserAgent.get -> string?
 Themia.Audit.AuditEntry.UserAgent.init -> void
 Themia.Audit.AuditEntry.Validate() -> void
+Themia.Audit.AuditOptions
+Themia.Audit.AuditOptions.AuditOptions() -> void
+Themia.Audit.AuditOptions.ConnectionString.get -> string!
+Themia.Audit.AuditOptions.ConnectionString.set -> void
+Themia.Audit.AuditOptions.Engine.get -> Themia.Audit.AuditEngine
+Themia.Audit.AuditOptions.Engine.set -> void
+Themia.Audit.AuditOptions.Redaction.get -> Themia.Audit.Redaction.AuditRedactionOptions!
 Themia.Audit.AuditOutcome
 Themia.Audit.AuditOutcome.Denied = 3 -> Themia.Audit.AuditOutcome
 Themia.Audit.AuditOutcome.Failure = 2 -> Themia.Audit.AuditOutcome
@@ -69,6 +88,36 @@ Themia.Audit.AuditQuery.TenantId.get -> string?
 Themia.Audit.AuditQuery.TenantId.init -> void
 Themia.Audit.AuditQuery.To.get -> System.DateTimeOffset?
 Themia.Audit.AuditQuery.To.init -> void
+Themia.Audit.AuditRecorder
+Themia.Audit.AuditRecorder.AuditRecorder(Themia.Audit.IAuditStore! store, Themia.Audit.Redaction.IAuditRedactor! redactor, System.TimeProvider! timeProvider, Themia.Audit.IAuditDialect! dialect, Themia.Audit.AuditOptions! options) -> void
+Themia.Audit.AuditRecorder.RecordAsync(Themia.Audit.AuditEntry! entry, object? payload = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<System.Guid>
+Themia.Audit.AuditRecorder.RecordOnAsync(Themia.Audit.AuditEntry! entry, object? payload, System.Data.Common.DbConnection! connection, System.Data.Common.DbTransaction? transaction, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask<System.Guid>
+Themia.Audit.AuditStoreEngine
+Themia.Audit.AuditStoreEngine.AuditStoreEngine(Themia.Audit.IAuditDialect! dialect) -> void
+Themia.Audit.AuditStoreEngine.GetAsync(System.Guid eventUid, System.Data.Common.DbConnection! connection, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<Themia.Audit.AuditEntry?>!
+Themia.Audit.AuditStoreEngine.PurgeAsync(System.DateTimeOffset olderThan, System.Data.Common.DbConnection! connection, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<int>!
+Themia.Audit.AuditStoreEngine.QueryAsync(Themia.Audit.AuditQuery! query, System.Data.Common.DbConnection! connection, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<Themia.Audit.PagedResult<Themia.Audit.AuditEntry!>!>!
+Themia.Audit.AuditStoreEngine.WriteAsync(Themia.Audit.AuditEntry! entry, System.Data.Common.DbConnection! connection, System.Data.Common.DbTransaction? transaction, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<long>!
+Themia.Audit.DependencyInjection.AuditServiceCollectionExtensions
+Themia.Audit.Http.AuditHttpEnricher
+Themia.Audit.Http.AuditHttpEnricher.AuditHttpEnricher(Microsoft.AspNetCore.Http.IHttpContextAccessor! accessor) -> void
+Themia.Audit.Http.AuditHttpEnricher.Enrich(Themia.Audit.AuditEntry! entry) -> Themia.Audit.AuditEntry!
+Themia.Audit.IAuditDialect
+Themia.Audit.IAuditDialect.BindEventUid(System.Guid value) -> object!
+Themia.Audit.IAuditDialect.CountSql.get -> string!
+Themia.Audit.IAuditDialect.CreateConnection(string! connectionString) -> System.Data.Common.DbConnection!
+Themia.Audit.IAuditDialect.InsertSql.get -> string!
+Themia.Audit.IAuditDialect.PurgeSql.get -> string!
+Themia.Audit.IAuditDialect.SelectPageSql.get -> string!
+Themia.Audit.IAuditRecorder
+Themia.Audit.IAuditRecorder.RecordAsync(Themia.Audit.AuditEntry! entry, object? payload = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<System.Guid>
+Themia.Audit.IAuditStore
+Themia.Audit.IAuditStore.GetAsync(System.Guid eventUid, System.Data.Common.DbConnection! connection, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<Themia.Audit.AuditEntry?>!
+Themia.Audit.IAuditStore.PurgeAsync(System.DateTimeOffset olderThan, System.Data.Common.DbConnection! connection, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<int>!
+Themia.Audit.IAuditStore.QueryAsync(Themia.Audit.AuditQuery! query, System.Data.Common.DbConnection! connection, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<Themia.Audit.PagedResult<Themia.Audit.AuditEntry!>!>!
+Themia.Audit.IAuditStore.WriteAsync(Themia.Audit.AuditEntry! entry, System.Data.Common.DbConnection! connection, System.Data.Common.DbTransaction? transaction, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<long>!
+Themia.Audit.Migrations.AuditSchemaMigration
+Themia.Audit.Migrations.AuditSchemaMigration.AuditSchemaMigration() -> void
 Themia.Audit.PagedResult<T>
 Themia.Audit.PagedResult<T>.Items.get -> System.Collections.Generic.IReadOnlyList<T>!
 Themia.Audit.PagedResult<T>.Items.init -> void
@@ -84,51 +133,3 @@ Themia.Audit.Redaction.AuditRedactor.AuditRedactor(Themia.Audit.Redaction.AuditR
 Themia.Audit.Redaction.AuditRedactor.Redact(string! json) -> string!
 Themia.Audit.Redaction.IAuditRedactor
 Themia.Audit.Redaction.IAuditRedactor.Redact(string! json) -> string!
-const Themia.Audit.AuditEntry.MaxActorIdLength = 256 -> int
-const Themia.Audit.AuditEntry.MaxActorNameLength = 256 -> int
-const Themia.Audit.AuditEntry.MaxCorrelationIdLength = 128 -> int
-const Themia.Audit.AuditEntry.MaxEntityIdLength = 256 -> int
-const Themia.Audit.AuditEntry.MaxEntityTypeLength = 256 -> int
-const Themia.Audit.AuditEntry.MaxEventTypeLength = 100 -> int
-const Themia.Audit.AuditEntry.MaxIpAddressLength = 64 -> int
-const Themia.Audit.AuditEntry.MaxReasonLength = 256 -> int
-const Themia.Audit.AuditEntry.MaxUserAgentLength = 512 -> int
-Themia.Audit.AuditStoreEngine
-Themia.Audit.AuditStoreEngine.AuditStoreEngine(Themia.Audit.IAuditDialect! dialect) -> void
-Themia.Audit.AuditStoreEngine.GetAsync(System.Guid eventUid, System.Data.Common.DbConnection! connection, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<Themia.Audit.AuditEntry?>!
-Themia.Audit.AuditStoreEngine.PurgeAsync(System.DateTimeOffset olderThan, System.Data.Common.DbConnection! connection, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<int>!
-Themia.Audit.AuditStoreEngine.QueryAsync(Themia.Audit.AuditQuery! query, System.Data.Common.DbConnection! connection, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<Themia.Audit.PagedResult<Themia.Audit.AuditEntry!>!>!
-Themia.Audit.AuditStoreEngine.WriteAsync(Themia.Audit.AuditEntry! entry, System.Data.Common.DbConnection! connection, System.Data.Common.DbTransaction? transaction, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<long>!
-Themia.Audit.IAuditDialect
-Themia.Audit.IAuditDialect.CountSql.get -> string!
-Themia.Audit.IAuditDialect.CreateConnection(string! connectionString) -> System.Data.Common.DbConnection!
-Themia.Audit.IAuditDialect.InsertSql.get -> string!
-Themia.Audit.IAuditDialect.PurgeSql.get -> string!
-Themia.Audit.IAuditDialect.SelectPageSql.get -> string!
-Themia.Audit.IAuditStore
-Themia.Audit.IAuditStore.GetAsync(System.Guid eventUid, System.Data.Common.DbConnection! connection, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<Themia.Audit.AuditEntry?>!
-Themia.Audit.IAuditStore.PurgeAsync(System.DateTimeOffset olderThan, System.Data.Common.DbConnection! connection, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<int>!
-Themia.Audit.IAuditStore.QueryAsync(Themia.Audit.AuditQuery! query, System.Data.Common.DbConnection! connection, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<Themia.Audit.PagedResult<Themia.Audit.AuditEntry!>!>!
-Themia.Audit.IAuditStore.WriteAsync(Themia.Audit.AuditEntry! entry, System.Data.Common.DbConnection! connection, System.Data.Common.DbTransaction? transaction, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<long>!
-Themia.Audit.Migrations.AuditSchemaMigration
-Themia.Audit.Migrations.AuditSchemaMigration.AuditSchemaMigration() -> void
-override Themia.Audit.Migrations.AuditSchemaMigration.Down() -> void
-override Themia.Audit.Migrations.AuditSchemaMigration.Up() -> void
-Themia.Audit.AuditOptions
-Themia.Audit.AuditOptions.AuditOptions() -> void
-Themia.Audit.AuditOptions.ConnectionString.get -> string!
-Themia.Audit.AuditOptions.ConnectionString.set -> void
-Themia.Audit.AuditOptions.Engine.get -> Themia.Audit.AuditEngine
-Themia.Audit.AuditOptions.Engine.set -> void
-Themia.Audit.AuditOptions.Redaction.get -> Themia.Audit.Redaction.AuditRedactionOptions!
-Themia.Audit.IAuditRecorder
-Themia.Audit.IAuditRecorder.RecordAsync(Themia.Audit.AuditEntry! entry, object? payload = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<System.Guid>
-Themia.Audit.AuditRecorder
-Themia.Audit.AuditRecorder.AuditRecorder(Themia.Audit.IAuditStore! store, Themia.Audit.Redaction.IAuditRedactor! redactor, System.TimeProvider! timeProvider, Themia.Audit.IAuditDialect! dialect, Themia.Audit.AuditOptions! options) -> void
-Themia.Audit.AuditRecorder.RecordAsync(Themia.Audit.AuditEntry! entry, object? payload = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<System.Guid>
-Themia.Audit.AuditRecorder.RecordOnAsync(Themia.Audit.AuditEntry! entry, object? payload, System.Data.Common.DbConnection! connection, System.Data.Common.DbTransaction? transaction, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask<System.Guid>
-Themia.Audit.Http.AuditHttpEnricher
-Themia.Audit.Http.AuditHttpEnricher.AuditHttpEnricher(Microsoft.AspNetCore.Http.IHttpContextAccessor! accessor) -> void
-Themia.Audit.Http.AuditHttpEnricher.Enrich(Themia.Audit.AuditEntry! entry) -> Themia.Audit.AuditEntry!
-Themia.Audit.DependencyInjection.AuditServiceCollectionExtensions
-static Themia.Audit.DependencyInjection.AuditServiceCollectionExtensions.AddThemiaAudit(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Themia.Audit.AuditOptions!>! configure, bool runMigration = true) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!

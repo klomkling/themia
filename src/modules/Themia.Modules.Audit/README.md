@@ -63,6 +63,21 @@ otherwise invisible.
 
 Works identically on EF Core and Dapper; both legs are covered by the same tests.
 
+## The audit table must live in the adopter's own database
+
+Under `RequireTransaction` — the default for activity events — the row is written on **the caller's
+connection**, against the unqualified table name `themia_audit_events`. `AuditOptions.ConnectionString` is
+used only by the migration, the dashboard, `ITenantAuditReader` and the `Never` policy.
+
+Pointing `ConnectionString` at a separate audit database therefore creates the table there while activity
+writes go to the application's database and fail with a missing-table error on the first attempt. Nothing
+detects the mismatch at startup — the two connections are opened by different components at different
+times, and a connection string does not say which database a unit of work will later use.
+
+A separate audit database works only with `AuditTransactionPolicy.Never` for every category, which trades
+away the atomicity guarantee this module exists to provide: an activity row then survives a rolled-back
+business write and records something that did not happen.
+
 ## Reading
 
 `ITenantAuditReader` pre-seeds the ambient tenant and **overrides** an `AuditQuery` that names a

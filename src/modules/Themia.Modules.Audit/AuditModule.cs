@@ -42,8 +42,13 @@ public sealed class AuditModule : ThemiaModuleBase
         await AssertSchemaExistsAsync(store, dialect, options.ConnectionString, cancellationToken).ConfigureAwait(false);
     }
 
-    // A trivial, one-row-capped read is the lightest probe that fails the same way a real audit write
-    // would if the table were missing — no raw SQL text of our own, and no dependency on FluentMigrator.
+    // GetAsync, not QueryAsync. QueryAsync issues TWO statements — the page select AND the dialect's
+    // CountSql, which carries no predicate at all. On an append-only table whose retention defaults to
+    // keep-forever, that is a full scan on every host start and every pod restart, so the probe meant to
+    // be the cheapest thing in the boot path was the most expensive. GetAsync(Guid.Empty) is one indexed
+    // lookup against ux_themia_audit_events_event_uid that matches nothing and reads no rows, and still
+    // fails exactly the way a real audit write would if the table were missing — no raw SQL text of our
+    // own, and no dependency on FluentMigrator.
     private static async Task AssertSchemaExistsAsync(
         IAuditStore store, IAuditDialect dialect, string connectionString, CancellationToken cancellationToken)
     {
@@ -52,7 +57,7 @@ public sealed class AuditModule : ThemiaModuleBase
 
         try
         {
-            await store.QueryAsync(new AuditQuery { PageSize = 1 }, connection, cancellationToken).ConfigureAwait(false);
+            await store.GetAsync(Guid.Empty, connection, cancellationToken).ConfigureAwait(false);
         }
         catch (DbException ex)
         {

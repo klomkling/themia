@@ -478,4 +478,47 @@ public class ExceptionalDashboardTests
         }
         Assert.True(found, $"Expected ArgumentOutOfRangeException in the chain, got: {ex}");
     }
+    // The pager emitted only ?page= and ?pageSize=, so Prev/Next dropped the search and every filter:
+    // the viewer landed on page two of the UNFILTERED list while the "N total" just above it had been
+    // counted for the filtered one.
+    [Fact]
+    public async Task Pager_links_carry_the_search_and_filters()
+    {
+        var client = await ServerAsync(
+            new FakeExceptionStore(Enumerable.Range(0, 40).Select(_ => Sample()).ToArray()),
+            o => o.Authorize = _ => Task.FromResult(true));
+
+        var html = await client.GetStringAsync(
+            "/exceptions?q=timeout&app=Contoso&tenant=t1&includeDeleted=true&pageSize=5");
+
+        var next = NextHref(html);
+        Assert.Contains("page=2", next, StringComparison.Ordinal);
+        Assert.Contains("pageSize=5", next, StringComparison.Ordinal);
+        Assert.Contains("q=timeout", next, StringComparison.Ordinal);
+        Assert.Contains("app=Contoso", next, StringComparison.Ordinal);
+        Assert.Contains("tenant=t1", next, StringComparison.Ordinal);
+        Assert.Contains("includeDeleted=true", next, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Pager_links_url_encode_filter_values()
+    {
+        var client = await ServerAsync(
+            new FakeExceptionStore(Enumerable.Range(0, 40).Select(_ => Sample()).ToArray()),
+            o => o.Authorize = _ => Task.FromResult(true));
+
+        var html = await client.GetStringAsync("/exceptions?q=a%20b%26c&pageSize=5");
+
+        // A raw & would terminate the parameter and silently truncate the search on the next click.
+        Assert.Contains("q=a%20b%26c", NextHref(html), StringComparison.Ordinal);
+    }
+
+    private static string NextHref(string html)
+    {
+        var marker = "\">Next</a>";
+        var end = html.IndexOf(marker, StringComparison.Ordinal);
+        Assert.True(end > 0, "the list did not render a Next link");
+        var start = html.LastIndexOf("href=\"", end, StringComparison.Ordinal) + 6;
+        return html[start..end];
+    }
 }

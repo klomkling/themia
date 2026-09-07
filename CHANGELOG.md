@@ -27,6 +27,65 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.23.1] - 2026-09-08
+
+Follow-up to `0.23.0`. Every fix carries a test proven to fail without it.
+
+**`0.23.0` shipped without four fixes that its own final review had already identified** — they were
+committed locally but never reached the branch before it merged. Those four are in this release, alongside
+four further findings from a second independent review. An adopter on `0.23.0` should treat the security
+items below as present in that version.
+
+### Security
+
+- **An over-long login identifier silently deleted the audit row.** `ActorName` on a failed login carries
+  the raw, client-supplied identifier, and `AuditEntry.Validate()` *rejected* anything over 256 characters.
+  Brute-forcing with a padded username made validation throw, the observer wrapper swallowed it, and no
+  `LOGIN_FAILED` row was written at all — an attacker could switch off the audit trail for their own
+  attack. Values of untrusted origin are now clipped, with a visible truncation marker; rejection is kept
+  for values application code supplies, where an over-length value is a programming error nobody external
+  can trigger.
+- **The dashboard's detail route ignored `ScopeQuery`.** An adopter who followed that hook's own
+  documentation to pin a viewer to one tenant still exposed every other tenant's rows — actor, IP,
+  user-agent and `data` — to anyone holding an `event_uid`, and uids leak through API responses, logs and
+  correlation ids.
+- **Logout stopped revoking the session when it was cancelled.** The owner lookup added for audit
+  attribution ran before revocation and let `OperationCanceledException` propagate, so a client that posted
+  `/logout` and immediately navigated away kept a valid refresh token. Cancellation is the most likely
+  failure on that path.
+
+### Fixed
+
+- **`Themia.Audit.MySql` — an audit row written inside the caller's transaction stored `event_uid` in the
+  caller's `GuidFormat`, not the column's.** `MySqlAuditDialect.CreateConnection` pins `GuidFormat=Char36`
+  to match `event_uid CHAR(36)`, but under `AuditTransactionPolicy.RequireTransaction` — the default for
+  activity events — the write runs on the application's own connection, which never passes through it. An
+  adopter whose connection string sets `GuidFormat=Binary16` or `OldGuids=true` wrote sixteen raw bytes
+  into that column, after which every lookup by `AuditEntry.EventUid` matched nothing and the dashboard's
+  detail route was dead for those rows. `IAuditDialect.BindEventUid` (a default interface method, so
+  existing custom dialects are unaffected) now makes the stored representation a property of the dialect
+  rather than of whoever opened the connection.
+- **Both dashboards' pager links dropped every active filter.** Prev/Next emitted only `page` and
+  `pageSize`, so a viewer who filtered and clicked Next landed on page two of the *unfiltered* list while
+  the "N total" above it had been counted for the filtered one. Applies to `Themia.Audit.AspNetCore` and
+  the shipped `Themia.Exceptional.AspNetCore`.
+
+### Changed
+
+- **The `occurred_at` Dapper type handler is no longer registered process-wide.** `0.23.0` fixed a real
+  MySQL bug by calling `SqlMapper.AddTypeHandler` in a static constructor, which mutates Dapper's **global**
+  registry: from then on every `DateTimeOffset` materialisation anywhere in the host — including the
+  adopter's own queries — went through it, silently relabelling a `Kind=Unspecified` value read from a
+  local-time column as UTC. The conversion is now scoped to the audit store's own row mapping.
+- **`AuditModule`'s boot-time schema probe no longer scans the table.** It used `QueryAsync`, whose second
+  statement is an unpredicated `COUNT(*)` — a full scan of an append-only, keep-forever table on every host
+  start and every pod restart. It now uses `GetAsync(Guid.Empty)`, one indexed lookup that reads no rows.
+- `AuditOptions.ConnectionString` and the `Themia.Modules.Audit` README now state that the audit table must
+  live in the same database the unit of work writes to. Under `RequireTransaction` the row is written on
+  the caller's connection against an unqualified table name, so pointing this at a separate audit database
+  creates the table in one place and writes to another. Nothing can detect the mismatch at startup.
+
+
 ## [0.23.0] - 2026-09-06
 
 ### Added
@@ -76,9 +135,14 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 - **`Themia.Audit` — `occurred_at` was corrupted on MySQL by the reading process's UTC offset.** MySQL
   returns `DATETIME(6)` as a `DateTime` with `Kind=Unspecified`, and .NET's explicit
   `DateTime` → `DateTimeOffset` conversion treats `Unspecified` as local time. Every row read on a
-  non-UTC host carried a shifted timestamp. Fixed with a Dapper type handler; writes are unaffected and
-  PostgreSQL and SQL Server were never affected. Found by widening a round-trip test that had covered 12
-  of 15 columns while being named for all of them.
+  non-UTC host carried a shifted timestamp. The first fix registered a Dapper `ITypeHandler` in
+  `AuditStoreEngine`'s static constructor, which mutates Dapper's **process-wide** type-handler registry
+  — every other `DateTimeOffset` materialization in the host (an adopter's own Dapper repositories
+  included) would then be silently reinterpreted too. Rescoped to `AuditStoreEngine`'s own column
+  mapping instead: the row DTO reads `occurred_at` as `object`, and this store converts it itself, so no
+  other code in the process is affected. Writes are unaffected and PostgreSQL and SQL Server were never
+  affected. Found by widening a round-trip test that had covered 12 of 15 columns while being named for
+  all of them.
 
 ### Security
 
@@ -92,9 +156,12 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
   tenant was ambient, because `TenantId = null` means "no filter" in `AuditQuery`. That is the default
   state for any host without tenant infrastructure. It now throws and points at `IAuditStore.QueryAsync`
   as the deliberate cross-tenant path.
-- **`Themia.Modules.Identity.AspNetCore` — logout stopped revoking the session** when the new owner
-  lookup threw, returning 500 with the session still live. The lookup is now failure-tolerant, matching
-  the refresh path.
+- **`Themia.Modules.Identity.AspNetCore` — logout could skip revocation entirely.** The first fix made
+  the owner lookup failure-tolerant, but resolved the owner *before* revoking and only swallowed
+  exceptions other than `OperationCanceledException` — so a client that POSTs `/logout` and immediately
+  disconnects (the most likely failure on a logout) still propagated past the lookup and skipped
+  `RevokeAsync`, leaving the refresh token valid. Revocation now runs first; attribution is resolved
+  afterward (the token row is only marked revoked, not deleted, so the owner is still resolvable).
 - **`Themia.Exceptional.AspNetCore` — the dashboard stylesheet was served without authorization, and no
   dashboard response was marked uncacheable.** `GET {mount}/dashboard.css` returned `200` with content
   while every sibling route returned the route-hiding `404`, so an unauthenticated request confirmed the
@@ -106,6 +173,25 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
   `no-store` plus `Vary: Cookie, Authorization`, and the headers are reapplied after `Response.Clear()` in
   the `OnDenied`-throws fallback. No exception data was exposed; the disclosure was of the mount point.
   Found while building the audit dashboard from this package as a template.
+- **`Themia.Modules.Audit` — an over-long login identifier silently deleted its own audit row.**
+  `AuditingIdentityObserver` mapped the raw, client-supplied identifier straight into `ActorName`
+  (`OnLoginFailedAsync`/`OnLoginDeniedAsync`) or `EntityId` (`OnExternalLoginFailedAsync`/
+  `OnExternalLoginDeniedAsync`, from the external-login route's `{provider}` segment), and
+  `AuditEntry.Validate()` rejects anything over its column width. `LoginAsync` never bounds the
+  identifier's length, so a caller padding a brute-force attempt past 256 characters made `Validate()`
+  throw, which `AuthenticationFlow.RaiseAsync`'s catch-all swallowed — no `LOGIN_FAILED` row was ever
+  written, letting an attacker turn off the audit trail for their own attack. The design rule behind this
+  (adopter-named fields are rejected on overflow) was wrong for these four fields: they carry **untrusted**
+  input, where rejecting loses the event entirely — strictly worse than truncating. These four call sites
+  now clip to the column width and mark the clip (`…[truncated]`) before the entry is built; rejection is
+  kept for the fields application code itself supplies, where an over-length value is a programming error.
+- **`Themia.Audit.AspNetCore` — `AuditDashboardOptions.ScopeQuery` did not apply to the detail route.**
+  It was added so a host could pin a viewer to one tenant, but only `HandleListAsync` applied it —
+  `HandleDetailAsync` fetched any row by `event_uid` regardless of scope, so a viewer scoped to one
+  tenant could still read every other tenant's row (actor, IP, user-agent, `Data`) by requesting its
+  `event_uid` directly; uids leak through API responses, logs and correlation ids. The detail route now
+  runs `ScopeQuery` against an empty query and checks the fetched row against every filter it sets,
+  returning the same route-hiding `404` on a mismatch as an unknown `event_uid`.
 
 ## [0.22.1] - 2026-09-06
 

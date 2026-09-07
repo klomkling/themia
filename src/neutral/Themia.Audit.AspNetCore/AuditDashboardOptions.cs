@@ -27,8 +27,13 @@ public sealed class AuditDashboardOptions
     /// <see cref="AuditQuery"/> is the one actually executed — a caller-supplied <c>?tenant=</c> (or any
     /// other filter) cannot override it. <c>null</c> (the default) keeps today's behaviour: the query
     /// runs exactly as parsed from the request, unfiltered by tenant unless the caller happens to supply
-    /// one. Applies to the list route only — the detail route resolves a single row by <c>event_uid</c>
-    /// and carries no <see cref="AuditQuery"/> to rewrite.</summary>
+    /// one.
+    /// <para>Also applied to the detail route, which carries no query string of its own to rewrite: this
+    /// hook is invoked there against an empty <see cref="AuditQuery"/>, and the fetched row must satisfy
+    /// every filter the hook sets (e.g. its <see cref="AuditQuery.TenantId"/>) or the route responds 404 —
+    /// the same route-hiding response as an unknown <c>event_uid</c>. Without this, a viewer scoped to one
+    /// tenant on the list route could still read any other tenant's row by requesting its
+    /// <c>event_uid</c> directly.</para></summary>
     public Func<HttpContext, AuditQuery, AuditQuery>? ScopeQuery { get; set; }
 
     /// <summary>Runs when <see cref="Authorize"/> denies a request, instead of returning the bare 404.
