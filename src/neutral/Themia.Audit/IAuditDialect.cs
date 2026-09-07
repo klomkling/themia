@@ -36,4 +36,27 @@ public interface IAuditDialect
 
     /// <summary>Deletes every row with <c>occurred_at &lt; @OlderThan</c>.</summary>
     string PurgeSql { get; }
+
+    /// <summary>
+    /// Converts <paramref name="value"/> into the parameter value this engine's <c>event_uid</c> column
+    /// stores, independently of the connection it is bound on.
+    /// </summary>
+    /// <param name="value">The identifier to bind.</param>
+    /// <returns>The value to pass as the <c>@EventUid</c> parameter.</returns>
+    /// <remarks>
+    /// <c>CreateConnection</c> pins MySQL's <c>GuidFormat</c>, but the writes that join a caller's unit of
+    /// work never go through it — they run on the application's own connection
+    /// (<c>AuditTransactionPolicy.RequireTransaction</c> is the default for activity events). An adopter
+    /// whose MySQL connection string sets <c>GuidFormat=Binary16</c> or <c>OldGuids=true</c> would
+    /// otherwise send 16 raw bytes into a <c>CHAR(36)</c> column, and every later lookup by
+    /// <see cref="AuditEntry.EventUid"/> would match nothing. Formatting here makes the stored
+    /// representation a property of the dialect rather than of whoever opened the connection.
+    /// <para>
+    /// Defaulted rather than abstract: this interface is a published extension seam — an adopter on an
+    /// engine Themia does not ship supplies their own — so adding a required member would break every
+    /// existing implementation. The default suits any engine with a native UUID type; override it where
+    /// the column is textual, as MySQL's <c>CHAR(36)</c> is.
+    /// </para>
+    /// </remarks>
+    object BindEventUid(Guid value) => value;
 }

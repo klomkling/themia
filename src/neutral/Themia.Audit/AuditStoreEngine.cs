@@ -87,7 +87,7 @@ public sealed class AuditStoreEngine : IAuditStore
         ArgumentNullException.ThrowIfNull(connection);
 
         var row = await connection.QuerySingleOrDefaultAsync<AuditEntryRow>(new CommandDefinition(
-            GetByEventUidSql, new { EventUid = eventUid }, cancellationToken: cancellationToken));
+            GetByEventUidSql, new { EventUid = dialect.BindEventUid(eventUid) }, cancellationToken: cancellationToken));
 
         return row is null ? null : ToEntry(row);
     }
@@ -101,10 +101,10 @@ public sealed class AuditStoreEngine : IAuditStore
             dialect.PurgeSql, new { OlderThan = olderThan }, cancellationToken: cancellationToken));
     }
 
-    private static DynamicParameters ToInsertParameters(AuditEntry entry)
+    private DynamicParameters ToInsertParameters(AuditEntry entry)
     {
         var p = new DynamicParameters();
-        p.Add("EventUid", entry.EventUid);
+        p.Add("EventUid", dialect.BindEventUid(entry.EventUid));
         p.Add("TenantId", entry.TenantId);
         p.Add("Category", (short)entry.Category);
         p.Add("EventType", entry.EventType);

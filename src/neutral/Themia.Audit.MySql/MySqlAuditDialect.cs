@@ -68,5 +68,11 @@ public sealed class MySqlAuditDialect : IAuditDialect
         """;
 
     /// <inheritdoc />
+    /// <remarks>Formatted as the 36-character "D" form the <c>CHAR(36)</c> column stores, so a write that
+    /// joins a caller's unit of work is unaffected by that connection's <c>GuidFormat</c>/<c>OldGuids</c>
+    /// settings — <c>CreateConnection</c>'s pin does not reach those writes.</remarks>
+    public object BindEventUid(Guid value) => value.ToString("D");
+
+    /// <inheritdoc />
     public string PurgeSql => "DELETE FROM themia_audit_events WHERE occurred_at < @OlderThan;";
 }
