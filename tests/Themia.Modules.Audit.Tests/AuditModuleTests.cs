@@ -82,4 +82,26 @@ public class AuditModuleTests
         }, runMigration: false);
         return services;
     }
+    // Pins the probe to a lookup that reads no rows. QueryAsync issues a second statement — the dialect's
+    // CountSql, which has no predicate — so probing through it meant a full scan of an append-only,
+    // keep-forever table on every host start and every pod restart.
+    [Fact]
+    public async Task InitializeAsync_probes_with_a_row_free_lookup_not_a_count()
+    {
+        var store = new FakeAuditStore();
+        var services = new ServiceCollection();
+        services.AddSingleton<IAuditStore>(store);
+        services.AddSingleton<IAuditDialect, FakeAuditDialect>();
+        services.AddThemiaAudit(o =>
+        {
+            o.ConnectionString = "fake";
+            o.Engine = AuditEngine.Postgres;
+        }, runMigration: false);
+        await using var provider = services.BuildServiceProvider();
+
+        await new AuditModule().InitializeAsync(provider);
+
+        Assert.Equal(Guid.Empty, store.LastGetEventUid);
+        Assert.Null(store.LastQuery);
+    }
 }
