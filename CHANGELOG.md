@@ -27,6 +27,65 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.23.1] - 2026-09-08
+
+Follow-up to `0.23.0`. Every fix carries a test proven to fail without it.
+
+**`0.23.0` shipped without four fixes that its own final review had already identified** — they were
+committed locally but never reached the branch before it merged. Those four are in this release, alongside
+four further findings from a second independent review. An adopter on `0.23.0` should treat the security
+items below as present in that version.
+
+### Security
+
+- **An over-long login identifier silently deleted the audit row.** `ActorName` on a failed login carries
+  the raw, client-supplied identifier, and `AuditEntry.Validate()` *rejected* anything over 256 characters.
+  Brute-forcing with a padded username made validation throw, the observer wrapper swallowed it, and no
+  `LOGIN_FAILED` row was written at all — an attacker could switch off the audit trail for their own
+  attack. Values of untrusted origin are now clipped, with a visible truncation marker; rejection is kept
+  for values application code supplies, where an over-length value is a programming error nobody external
+  can trigger.
+- **The dashboard's detail route ignored `ScopeQuery`.** An adopter who followed that hook's own
+  documentation to pin a viewer to one tenant still exposed every other tenant's rows — actor, IP,
+  user-agent and `data` — to anyone holding an `event_uid`, and uids leak through API responses, logs and
+  correlation ids.
+- **Logout stopped revoking the session when it was cancelled.** The owner lookup added for audit
+  attribution ran before revocation and let `OperationCanceledException` propagate, so a client that posted
+  `/logout` and immediately navigated away kept a valid refresh token. Cancellation is the most likely
+  failure on that path.
+
+### Fixed
+
+- **`Themia.Audit.MySql` — an audit row written inside the caller's transaction stored `event_uid` in the
+  caller's `GuidFormat`, not the column's.** `MySqlAuditDialect.CreateConnection` pins `GuidFormat=Char36`
+  to match `event_uid CHAR(36)`, but under `AuditTransactionPolicy.RequireTransaction` — the default for
+  activity events — the write runs on the application's own connection, which never passes through it. An
+  adopter whose connection string sets `GuidFormat=Binary16` or `OldGuids=true` wrote sixteen raw bytes
+  into that column, after which every lookup by `AuditEntry.EventUid` matched nothing and the dashboard's
+  detail route was dead for those rows. `IAuditDialect.BindEventUid` (a default interface method, so
+  existing custom dialects are unaffected) now makes the stored representation a property of the dialect
+  rather than of whoever opened the connection.
+- **Both dashboards' pager links dropped every active filter.** Prev/Next emitted only `page` and
+  `pageSize`, so a viewer who filtered and clicked Next landed on page two of the *unfiltered* list while
+  the "N total" above it had been counted for the filtered one. Applies to `Themia.Audit.AspNetCore` and
+  the shipped `Themia.Exceptional.AspNetCore`.
+
+### Changed
+
+- **The `occurred_at` Dapper type handler is no longer registered process-wide.** `0.23.0` fixed a real
+  MySQL bug by calling `SqlMapper.AddTypeHandler` in a static constructor, which mutates Dapper's **global**
+  registry: from then on every `DateTimeOffset` materialisation anywhere in the host — including the
+  adopter's own queries — went through it, silently relabelling a `Kind=Unspecified` value read from a
+  local-time column as UTC. The conversion is now scoped to the audit store's own row mapping.
+- **`AuditModule`'s boot-time schema probe no longer scans the table.** It used `QueryAsync`, whose second
+  statement is an unpredicated `COUNT(*)` — a full scan of an append-only, keep-forever table on every host
+  start and every pod restart. It now uses `GetAsync(Guid.Empty)`, one indexed lookup that reads no rows.
+- `AuditOptions.ConnectionString` and the `Themia.Modules.Audit` README now state that the audit table must
+  live in the same database the unit of work writes to. Under `RequireTransaction` the row is written on
+  the caller's connection against an unqualified table name, so pointing this at a separate audit database
+  creates the table in one place and writes to another. Nothing can detect the mismatch at startup.
+
+
 ## [0.23.0] - 2026-09-06
 
 ### Added

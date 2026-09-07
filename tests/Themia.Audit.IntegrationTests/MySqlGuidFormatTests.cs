@@ -62,9 +62,18 @@ public sealed class MySqlGuidFormatTests(MySqlAuditStoreFixture fixture)
         Assert.NotNull(found);
         Assert.Equal(entry.EventUid, found!.EventUid);
 
-        // And the column really holds the 36-character form, not a binary blob rendered as text.
+        // And the column really holds the 36-character form, not sixteen raw bytes.
+        //
+        // CONCAT, not a bare SELECT of the column: this connection has GuidFormat=Char36 pinned, so the
+        // driver maps CHAR(36) straight to a Guid and asking Dapper for a string throws
+        // ("Object must implement IConvertible"). Concatenating produces a computed VARCHAR the driver
+        // does not recognise as a Guid column, which is what lets us see the stored bytes as text.
+        //
+        // Without this assertion the test would pass even if writes and reads agreed on the WRONG
+        // representation — the round-trip alone cannot tell a correct encoding from a consistently
+        // incorrect one.
         var stored = await reader.ExecuteScalarAsync<string>(
-            "SELECT event_uid FROM themia_audit_events WHERE tenant_id = @Tenant",
+            "SELECT CONCAT(event_uid, '') FROM themia_audit_events WHERE tenant_id = @Tenant",
             new { Tenant = entry.TenantId });
         Assert.Equal(entry.EventUid.ToString("D"), stored);
     }
