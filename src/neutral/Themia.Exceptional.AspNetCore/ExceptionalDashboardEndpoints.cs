@@ -45,11 +45,7 @@ public static class ExceptionalDashboardEndpoints
         var group = endpoints.MapGroup(path);
         group.MapGet("", (HttpContext ctx, IExceptionStore store, CancellationToken ct) => HandleListAsync(ctx, store, options, path, ct));
         group.MapGet("{guid:guid}", (Guid guid, HttpContext ctx, IExceptionStore store, CancellationToken ct) => HandleDetailAsync(ctx, store, options, path, guid, ct));
-        group.MapGet("dashboard.css", (HttpContext ctx) =>
-        {
-            ctx.Response.ContentType = "text/css; charset=utf-8";
-            return ctx.Response.WriteAsync(DashboardCss.Content);
-        });
+        group.MapGet("dashboard.css", (HttpContext ctx) => HandleCssAsync(ctx, options));
 
         if (options.EnableActions)
         {
@@ -80,7 +76,7 @@ public static class ExceptionalDashboardEndpoints
         if (!await AuthorizedAsync(ctx, options).ConfigureAwait(false)) { await DenyAsync(ctx, options).ConfigureAwait(false); return; }
 
         var entry = await store.GetAsync(guid, ct).ConfigureAwait(false);
-        if (entry is null) { ctx.Response.StatusCode = StatusCodes.Status404NotFound; return; }
+        if (entry is null) { PreventCaching(ctx.Response); ctx.Response.StatusCode = StatusCodes.Status404NotFound; return; }
 
         var token = options.EnableActions ? IssueCsrf(ctx) : null;
         var chrome = new DashboardChrome(options.Title, path, options.CustomStyleSheet, options.CustomFavicon, options.HeadHtml, options.BodyStartHtml, options.Heading);
@@ -142,11 +138,36 @@ public static class ExceptionalDashboardEndpoints
         return token;
     }
 
+    // The stylesheet is gated exactly like the pages. Serving it unauthenticated returns 200 for a path
+    // whose siblings return 404, which confirms the dashboard's mount point to anyone who asks — the very
+    // thing OnDenied's own remarks call out the route-hiding 404 as protecting.
+    //
+    // A denial here is a bare 404 and never runs OnDenied: that hook typically redirects to the host's
+    // login page, and a redirect on a subresource makes the browser fetch HTML where it asked for CSS.
+    // OnDenied is for navigations.
+    private static async Task HandleCssAsync(HttpContext ctx, ExceptionalDashboardOptions options)
+    {
+        if (!await AuthorizedAsync(ctx, options).ConfigureAwait(false))
+        {
+            PreventCaching(ctx.Response);
+            ctx.Response.StatusCode = StatusCodes.Status404NotFound;
+            return;
+        }
+
+        PreventCaching(ctx.Response);
+        ctx.Response.ContentType = "text/css; charset=utf-8";
+        await ctx.Response.WriteAsync(DashboardCss.Content).ConfigureAwait(false);
+    }
+
     // The single deny path. OnDenied owns the response when set (typically a redirect to the host's login);
     // otherwise, and whenever it throws, the request fails closed with the route-hiding 404 — a broken hook
     // must never be able to serve the dashboard.
     private static async Task DenyAsync(HttpContext ctx, ExceptionalDashboardOptions options)
     {
+        // Set before OnDenied runs so the hook can override the headers when it owns the response, and so
+        // the fallback 404 below is never cacheable.
+        PreventCaching(ctx.Response);
+
         if (options.OnDenied is not null)
         {
             try
@@ -159,20 +180,45 @@ public static class ExceptionalDashboardEndpoints
                 ctx.RequestServices.GetService<ILoggerFactory>()?
                     .CreateLogger("Themia.Exceptional.AspNetCore")
                     .LogError(ex, "Exceptions dashboard OnDenied hook threw; falling back to the deny status.");
+
+                if (ctx.Response.HasStarted)
+                {
+                    // The hook already wrote to the response before throwing. Response.Clear() itself
+                    // throws once the response has started, so calling it here would only replace one
+                    // unhandled exception with another — there is nothing left to clear or salvage, so
+                    // let the connection end as-is.
+                    return;
+                }
+
                 ctx.Response.Clear();
+
+                // Response.Clear() drops headers along with the body, taking the PreventCaching call above
+                // with it. Without this the fallback 404 is cacheable again.
+                PreventCaching(ctx.Response);
             }
         }
 
         ctx.Response.StatusCode = StatusCodes.Status404NotFound;
     }
 
-    // A gated page must not be cacheable: without no-store the browser can re-display the rendered
-    // dashboard after the session expires (the back/forward cache serves it from memory without ever
-    // contacting the server, so Authorize never runs). no-store also disables bfcache in Chrome/Firefox.
+    // A gated response must not be cacheable, for two separate reasons.
+    //
+    // Private cache: without no-store the browser can re-display the rendered dashboard after the session
+    // expires — the back/forward cache serves it from memory without ever contacting the server, so
+    // Authorize never runs. no-store also disables bfcache in Chrome/Firefox.
+    //
+    // Shared cache: a proxy or CDN that stored an authorized 200 can serve it to an unauthenticated caller,
+    // which defeats Authorize without the predicate running at all. Gating a route at the origin while
+    // leaving its response cacheable only moves the disclosure one layer out. Vary states what the response
+    // actually depends on, for caches that honour it but not no-store.
     private static void PreventCaching(HttpResponse response)
     {
         response.Headers.CacheControl = "no-store, no-cache, must-revalidate";
         response.Headers.Pragma = "no-cache";
+        // Append, not assign: assigning would replace a Vary entry a middleware upstream of this endpoint
+        // already set (e.g. response compression's "Accept-Encoding"), making a compressed and an
+        // uncompressed response interchangeable in a shared cache.
+        response.Headers.AppendCommaSeparatedValues("Vary", "Cookie", "Authorization");
     }
 
     private static async Task<bool> AuthorizedAsync(HttpContext ctx, ExceptionalDashboardOptions options)

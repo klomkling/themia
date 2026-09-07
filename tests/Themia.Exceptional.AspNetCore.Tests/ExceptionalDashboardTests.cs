@@ -291,6 +291,57 @@ public class ExceptionalDashboardTests
     }
 
     [Fact]
+    public async Task Detail_UnknownGuid_404_IsNotCacheableAndVaries()
+    {
+        // An authorized-but-not-found 404 is heuristically cacheable under RFC 9111 §4.2.2 — without
+        // no-store a shared proxy can pin "no such exception" and keep serving it after the row exists.
+        var client = await ServerAsync(new FakeExceptionStore(Sample()), o => o.Authorize = _ => Task.FromResult(true));
+        var res = await client.GetAsync($"/exceptions/{Guid.NewGuid()}");
+
+        Assert.Equal(HttpStatusCode.NotFound, res.StatusCode);
+        Assert.True(res.Headers.CacheControl!.NoStore);
+        var vary = res.Headers.Vary.ToString();
+        Assert.Contains("Cookie", vary);
+        Assert.Contains("Authorization", vary);
+    }
+
+    [Fact]
+    public async Task PreventCaching_AppendsToAnExistingVaryHeaderInsteadOfReplacingIt()
+    {
+        // Simulates a middleware upstream of the dashboard (e.g. response compression) that already set
+        // its own Vary entry. Assigning (rather than appending) would wipe it out, making a compressed and
+        // an uncompressed response interchangeable in a shared cache.
+        var host = await new HostBuilder()
+            .ConfigureWebHost(web =>
+            {
+                web.UseTestServer();
+                web.ConfigureServices(s =>
+                {
+                    s.AddRouting();
+                    s.AddSingleton<IExceptionStore>(new FakeExceptionStore(Sample()));
+                });
+                web.Configure(app =>
+                {
+                    app.Use(async (ctx, next) =>
+                    {
+                        ctx.Response.Headers.Append("Vary", "Accept-Encoding");
+                        await next();
+                    });
+                    app.UseRouting();
+                    app.UseEndpoints(e => e.MapThemiaExceptional("/exceptions", o => o.Authorize = _ => Task.FromResult(true)));
+                });
+            })
+            .StartAsync();
+
+        var res = await host.GetTestClient().GetAsync("/exceptions");
+
+        var vary = res.Headers.Vary.ToString();
+        Assert.Contains("Accept-Encoding", vary);
+        Assert.Contains("Cookie", vary);
+        Assert.Contains("Authorization", vary);
+    }
+
+    [Fact]
     public async Task Denied_InvokesOnDenied_InsteadOfBare404()
     {
         // Lets the host bounce an expired session to its login page instead of leaving the admin on a blank
@@ -335,6 +386,27 @@ public class ExceptionalDashboardTests
         var res = await client.GetAsync("/exceptions");
 
         Assert.Equal(HttpStatusCode.NotFound, res.StatusCode);
+    }
+
+    [Fact]
+    public async Task Denied_WhenOnDeniedThrowsAfterWriting_DoesNotThrowFromTheRequest()
+    {
+        // A hook that has already written to the response before throwing leaves nothing for the fallback
+        // to clear or salvage: HttpResponse.Clear() itself throws once the response has started, so the
+        // deny path must not call it — doing so would turn one exception into a worse, unhandled one.
+        var client = await ServerAsync(new FakeExceptionStore(Sample()), o =>
+        {
+            o.Authorize = _ => Task.FromResult(false);
+            o.OnDenied = async ctx =>
+            {
+                await ctx.Response.WriteAsync("partial");
+                throw new InvalidOperationException("boom after the response started");
+            };
+        });
+
+        // Must complete without an unhandled exception escaping the request.
+        var res = await client.GetAsync("/exceptions");
+        Assert.NotNull(res);
     }
 
     [Fact]

@@ -126,6 +126,22 @@ public sealed class RefreshTokenService : IRefreshTokenService
     }
 
     /// <inheritdoc />
+    public async Task<Guid?> ResolveOwnerAsync(string rawToken, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(rawToken);
+
+        var hash = TokenHasher.Hash(rawToken);
+        var match = await tokens.FirstOrDefaultAsync(new RefreshTokenByHashSpec(hash), cancellationToken).ConfigureAwait(false);
+        if (match is null)
+        {
+            return null;
+        }
+
+        var user = await IdentityScope.ResolveUserAsync(users, match.UserId, cancellationToken).ConfigureAwait(false);
+        return user?.Id;
+    }
+
+    /// <inheritdoc />
     public async Task RevokeAsync(string rawToken, bool allForUser, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(rawToken);

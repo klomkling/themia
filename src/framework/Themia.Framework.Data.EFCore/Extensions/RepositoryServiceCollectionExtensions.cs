@@ -1,9 +1,11 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Themia.Framework.Data.Abstractions.Connections;
 using Themia.Framework.Data.Abstractions.Exceptions;
 using Themia.Framework.Data.Abstractions.Filtering;
 using Themia.Framework.Data.Abstractions.Repositories;
 using Themia.Framework.Data.Abstractions.UnitOfWork;
+using Themia.Framework.Data.EFCore.Connections;
 using Themia.Framework.Data.EFCore.Repositories;
 using Themia.Framework.Data.EFCore.UnitOfWork;
 
@@ -25,6 +27,7 @@ public static class RepositoryServiceCollectionExtensions
         services.AddScoped(typeof(IReadRepository<,>), typeof(EfReadRepository<,>));
         services.AddScoped(typeof(IRepository<,>), typeof(EfRepository<,>));
         services.AddScoped<IUnitOfWork, EfUnitOfWork>();
+        services.AddScoped<IAmbientConnectionAccessor, EfAmbientConnectionAccessor>();
         return services;
     }
 }

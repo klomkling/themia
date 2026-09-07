@@ -20,6 +20,7 @@ public sealed class AuthenticationFlow : IAuthenticationFlow
     private readonly IRefreshTokenService refreshTokens;
     private readonly IPasswordHasher passwordHasher;
     private readonly IAuthenticationHooks hooks;
+    private readonly IIdentityEventObserver[] observers;
     private readonly TimeProvider timeProvider;
     private readonly ILogger<AuthenticationFlow> logger;
 
@@ -31,6 +32,7 @@ public sealed class AuthenticationFlow : IAuthenticationFlow
         IRefreshTokenService refreshTokens,
         IPasswordHasher passwordHasher,
         IAuthenticationHooks hooks,
+        IEnumerable<IIdentityEventObserver> observers,
         TimeProvider timeProvider,
         ILogger<AuthenticationFlow> logger)
     {
@@ -40,6 +42,7 @@ public sealed class AuthenticationFlow : IAuthenticationFlow
         ArgumentNullException.ThrowIfNull(refreshTokens);
         ArgumentNullException.ThrowIfNull(passwordHasher);
         ArgumentNullException.ThrowIfNull(hooks);
+        ArgumentNullException.ThrowIfNull(observers);
         ArgumentNullException.ThrowIfNull(timeProvider);
         ArgumentNullException.ThrowIfNull(logger);
         this.users = users;
@@ -48,8 +51,67 @@ public sealed class AuthenticationFlow : IAuthenticationFlow
         this.refreshTokens = refreshTokens;
         this.passwordHasher = passwordHasher;
         this.hooks = hooks;
+        this.observers = observers as IIdentityEventObserver[] ?? observers.ToArray();
         this.timeProvider = timeProvider;
         this.logger = logger;
+    }
+
+    /// <summary>
+    /// Back-compatible overload matching the pre-<see cref="IIdentityEventObserver"/> signature. Forwards
+    /// with an empty observer collection, so a manually constructed instance — e.g. in an adopter's own
+    /// test — keeps compiling and behaves exactly as before. DI resolves the greediest constructor it can
+    /// satisfy, and <see cref="IEnumerable{T}"/> is always resolvable (empty when nothing is registered),
+    /// so a live app always picks the constructor above and observes any registered observers.
+    /// </summary>
+    public AuthenticationFlow(
+        IUserService users,
+        IClaimsPrincipalFactory principalFactory,
+        IAccessTokenService accessTokens,
+        IRefreshTokenService refreshTokens,
+        IPasswordHasher passwordHasher,
+        IAuthenticationHooks hooks,
+        TimeProvider timeProvider,
+        ILogger<AuthenticationFlow> logger)
+        : this(users, principalFactory, accessTokens, refreshTokens, passwordHasher, hooks,
+              Array.Empty<IIdentityEventObserver>(), timeProvider, logger)
+    {
+    }
+
+    /// <summary>Invokes <paramref name="invoke"/> against every registered observer. A throwing observer
+    /// must not change the flow it observes, so each invocation is individually caught and logged at
+    /// <c>Error</c> — including <see cref="OperationCanceledException"/>. By the time this runs, the
+    /// flow's own outcome (success or failure) is already decided; an observer's own database write
+    /// throwing OCE because the client disconnected must not turn that into an unhandled exception. The
+    /// caller is not waiting on the observer, so there is nothing for the cancellation to usefully abort.</summary>
+    private async Task RaiseAsync(Func<IIdentityEventObserver, CancellationToken, Task> invoke, CancellationToken cancellationToken)
+    {
+        foreach (var observer in observers)
+        {
+            try
+            {
+                await invoke(observer, cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Identity event observer {ObserverType} threw and was swallowed.", observer.GetType());
+            }
+        }
+    }
+
+    /// <summary>Resolves a reused refresh token's owner for audit attribution. A failure here must not
+    /// turn a refresh rejection into a 500 — losing attribution is acceptable, breaking the flow is
+    /// not — so any exception is logged at <c>Error</c> and swallowed to <see langword="null"/>.</summary>
+    private async Task<Guid?> TryResolveOwnerAsync(string rawToken, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await refreshTokens.ResolveOwnerAsync(rawToken, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogError(ex, "Failed to resolve the owner of a reused refresh token for audit attribution.");
+            return null;
+        }
     }
 
     /// <inheritdoc />
@@ -107,6 +169,7 @@ public sealed class AuthenticationFlow : IAuthenticationFlow
 
         var tokens = await IssueAsync(resolved, cancellationToken).ConfigureAwait(false);
         logger.LogInformation("User {UserId} authenticated via password.", resolved.Id);
+        await RaiseAsync((o, ct) => o.OnLoginSucceededAsync(resolved.Id, resolved.UserName, ct), cancellationToken).ConfigureAwait(false);
         return LoginResult.Success(tokens);
     }
 
@@ -184,12 +247,25 @@ public sealed class AuthenticationFlow : IAuthenticationFlow
         if (before.IsDenied)
         {
             logger.LogWarning("Refresh denied by hook: {DenialReason}.", before.DenialReason);
+            // Pre-rotation: no state has changed and no user has been resolved yet.
+            await RaiseAsync((o, ct) => o.OnRefreshDeniedAsync(null, before.DenialReason, rotationCommitted: false, ct), cancellationToken).ConfigureAwait(false);
             return RefreshRotationResult.Denied();
         }
 
         var rotation = await refreshTokens.ValidateAndRotateAsync(refreshToken, cancellationToken).ConfigureAwait(false);
         if (!rotation.TryGetSuccess(out var user, out var replacement))
         {
+            // ReuseDetected — a rotated refresh token presented twice — is the single most actionable
+            // event in this flow: "account X's token was replayed" tells an operator to revoke that
+            // account's sessions right now, where "some token was replayed" tells them nothing (there is
+            // no other join key on an audit row for this event). The presented token's row still exists
+            // (rotation stamps ConsumedAt/RevokedAt on it rather than deleting it), so it resolves.
+            // Invalid has no owner by construction — an unknown/expired/out-of-scope token — and is left
+            // null rather than paying for a lookup on every bad token an attacker sprays at the endpoint.
+            var reuseUserId = rotation.Outcome == RefreshOutcome.ReuseDetected
+                ? await TryResolveOwnerAsync(refreshToken, cancellationToken).ConfigureAwait(false)
+                : null;
+            await RaiseAsync((o, ct) => o.OnRefreshFailedAsync(reuseUserId, rotation.Outcome, ct), cancellationToken).ConfigureAwait(false);
             return rotation.Outcome switch
             {
                 RefreshOutcome.ReuseDetected => RefreshRotationResult.ReuseDetected(),
@@ -205,6 +281,7 @@ public sealed class AuthenticationFlow : IAuthenticationFlow
         if (!user.IsActive || user.IsLockedOut(timeProvider.GetUtcNow()))
         {
             logger.LogWarning("Refresh rejected for user {UserId}: account inactive or locked out.", user.Id);
+            await RaiseAsync((o, ct) => o.OnRefreshFailedAsync(user.Id, RefreshOutcome.Invalid, ct), cancellationToken).ConfigureAwait(false);
             return RefreshRotationResult.Invalid();
         }
 
@@ -219,10 +296,14 @@ public sealed class AuthenticationFlow : IAuthenticationFlow
         if (refreshSucceeded.IsDenied)
         {
             logger.LogWarning("Refresh denied by hook: {DenialReason}.", refreshSucceeded.DenialReason);
+            // Post-rotation: a valid successor token now exists that the client never received. Carrying
+            // rotationCommitted:true lets an investigator tell this apart from the pre-rotation deny above.
+            await RaiseAsync((o, ct) => o.OnRefreshDeniedAsync(user.UserName, refreshSucceeded.DenialReason, rotationCommitted: true, ct), cancellationToken).ConfigureAwait(false);
             return RefreshRotationResult.Denied();
         }
 
         logger.LogInformation("Access token refreshed for user {UserId}.", user.Id);
+        await RaiseAsync((o, ct) => o.OnRefreshSucceededAsync(user.Id, ct), cancellationToken).ConfigureAwait(false);
         return RefreshRotationResult.Success(tokens);
     }
 
@@ -230,9 +311,16 @@ public sealed class AuthenticationFlow : IAuthenticationFlow
     public async Task LogoutAsync(string refreshToken, bool allSessions, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(refreshToken);
+
+        // Resolved BEFORE revocation so the audit trail can attribute the logout to a user even though
+        // revocation itself does not return one. Routed through TryResolveOwnerAsync: losing attribution
+        // is acceptable, but a transient failure here must never skip revocation — logout must always
+        // revoke the session.
+        var userId = await TryResolveOwnerAsync(refreshToken, cancellationToken).ConfigureAwait(false);
         await refreshTokens.RevokeAsync(refreshToken, allSessions, cancellationToken).ConfigureAwait(false);
         logger.LogInformation("Logout for refresh token (allSessions={AllSessions}).", allSessions);
-        await hooks.OnLogoutAsync(new LogoutContext(allSessions), cancellationToken).ConfigureAwait(false);
+        await hooks.OnLogoutAsync(new LogoutContext(userId, allSessions), cancellationToken).ConfigureAwait(false);
+        await RaiseAsync((o, ct) => o.OnLogoutAsync(userId, allSessions, ct), cancellationToken).ConfigureAwait(false);
     }
 
     private Task<AuthTokens> IssueAsync(User user, CancellationToken cancellationToken) =>
@@ -259,6 +347,18 @@ public sealed class AuthenticationFlow : IAuthenticationFlow
         // documented place to build lockout, alerting or abuse detection — all of which need the real
         // value. The masking above is about what leaves the process in a log line.
         await hooks.OnLoginFailedAsync(new LoginFailedContext(identifier, reason), cancellationToken).ConfigureAwait(false);
+
+        // A hook denial is a distinct event from every other failure reason — it is the adopter's own
+        // policy refusing the attempt, not a bad credential — so it gets its own observer method.
+        if (reason == LoginFailureReason.Denied)
+        {
+            await RaiseAsync((o, ct) => o.OnLoginDeniedAsync(identifier, denialReason, ct), cancellationToken).ConfigureAwait(false);
+        }
+        else
+        {
+            await RaiseAsync((o, ct) => o.OnLoginFailedAsync(identifier, reason, ct), cancellationToken).ConfigureAwait(false);
+        }
+
         return result;
     }
 

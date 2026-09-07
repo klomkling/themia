@@ -1,12 +1,14 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Themia.Framework.Data.Abstractions.Auditing;
+using Themia.Framework.Data.Abstractions.Connections;
 using Themia.Framework.Data.Abstractions.Exceptions;
 using Themia.Framework.Data.Abstractions.Filtering;
 using Themia.Framework.Data.Abstractions.Repositories;
 using Themia.Framework.Data.Abstractions.UnitOfWork;
 using Themia.Framework.Data.Dapper.Auditing;
 using Themia.Framework.Data.Dapper.Connection;
+using Themia.Framework.Data.Dapper.Connections;
 using Themia.Framework.Data.Dapper.Mapping;
 using Themia.Framework.Data.Dapper.Repositories;
 using Themia.Framework.Data.Dapper.Tenancy;
@@ -54,6 +56,7 @@ public static class DapperDataServiceCollectionExtensions
         services.AddScoped<DapperUnitOfWork>();
         services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<DapperUnitOfWork>());
         services.AddScoped<IPendingOperationSink>(sp => sp.GetRequiredService<DapperUnitOfWork>());
+        services.AddScoped<IAmbientConnectionAccessor, DapperAmbientConnectionAccessor>();
         services.AddScoped(typeof(IReadRepository<,>), typeof(DapperReadRepository<,>));
         services.AddScoped(typeof(IRepository<,>), typeof(DapperRepository<,>));
         return services;

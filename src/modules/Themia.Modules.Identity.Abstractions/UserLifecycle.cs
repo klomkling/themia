@@ -118,4 +118,7 @@ public enum UserMutation
 
     /// <summary>The user was deleted.</summary>
     Deleted = 64,
+
+    /// <summary>The user was created.</summary>
+    Created = 128,
 }

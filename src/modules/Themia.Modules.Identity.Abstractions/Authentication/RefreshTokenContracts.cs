@@ -85,4 +85,17 @@ public interface IRefreshTokenService
     /// <param name="allForUser">When true, revoke every non-expired token for the owner.</param>
     /// <param name="cancellationToken">A cancellation token.</param>
     Task RevokeAsync(string rawToken, bool allForUser, CancellationToken cancellationToken = default);
+
+    /// <summary>Resolves the id of the user who owns a presented raw token, without consuming, rotating,
+    /// or revoking it. Used to attribute an audit event (e.g. logout) to a user before the token is
+    /// acted upon.</summary>
+    /// <param name="rawToken">The presented raw refresh token.</param>
+    /// <param name="cancellationToken">A cancellation token.</param>
+    /// <returns>The owning user's id, or <see langword="null"/> when the token does not resolve to a
+    /// user in scope.</returns>
+    /// <remarks>Default implementation returns <see langword="null"/>, so an existing custom
+    /// <see cref="IRefreshTokenService"/> implementation keeps compiling without change — it simply
+    /// does not attribute a user id to <see cref="LogoutContext"/> until it implements this method.</remarks>
+    Task<Guid?> ResolveOwnerAsync(string rawToken, CancellationToken cancellationToken = default) =>
+        Task.FromResult<Guid?>(null);
 }
