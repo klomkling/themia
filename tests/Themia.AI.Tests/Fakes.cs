@@ -114,4 +114,69 @@ internal static class Build
 
         return serviceProvider;
     }
+
+    /// <summary>
+    /// Builds a container wired the same way as <see cref="Graph"/>, but resolves the real
+    /// <see cref="IAiCompletionClient"/> (the Task 4 dispatcher) instead of <see cref="RecordingClient"/>,
+    /// so a test can exercise retry, failover and the total budget end to end.
+    /// </summary>
+    /// <param name="providers">
+    /// The providers to register, in failover order. Each entry gets its own synthetic key
+    /// (<c>"provider-0"</c>, <c>"provider-1"</c>, …) independent of <see cref="IAiCompletionProvider.Key"/>,
+    /// so a test can pass two <see cref="FakeProvider"/>s that share the same default
+    /// <see cref="AiProviderKeys.Gemini"/> key — as most of these tests do — without them colliding as one
+    /// registration. <see cref="AiOptions.Failover"/> is set to those synthetic keys, in the given order.
+    /// Defaults to a single <see cref="FakeProvider"/> when none are given.
+    /// </param>
+    /// <param name="options">Applied after a baseline built from <paramref name="providers"/>' synthetic keys.</param>
+    /// <param name="providerOptions">
+    /// Applied, per registered provider, after a baseline of <c>"completion-model"</c> /
+    /// <c>"translation-model"</c> and a 1-second timeout — distinct model names so a test can assert which
+    /// one the dispatcher resolved. The 1-second baseline (rather than <see cref="Graph"/>'s 10) keeps
+    /// <c>MaxRetriesPerProvider &#215; Timeout</c> inside a small overridden <see cref="AiOptions.TotalBudget"/>
+    /// without every budget test having to restate the provider timeout too.
+    /// </param>
+    internal static IAiCompletionClient Client(
+        Action<AiOptions>? options = null,
+        Action<AiProviderOptions>? providerOptions = null,
+        params IAiCompletionProvider[] providers)
+    {
+        var services = new ServiceCollection();
+        var registered = providers.Length == 0 ? [new FakeProvider()] : providers;
+        var keys = registered.Select((_, i) => $"provider-{i}").ToArray();
+
+        services.AddThemiaAi(o =>
+        {
+            o.Failover = keys;
+            options?.Invoke(o);
+        });
+
+        for (var i = 0; i < registered.Length; i++)
+        {
+            services.AddSingleton<IAiCompletionProvider>(new KeyedProvider(registered[i], keys[i]));
+            services.Configure<AiProviderOptions>(keys[i], po =>
+            {
+                po.CompletionModel = "completion-model";
+                po.TranslationModel = "translation-model";
+                po.Timeout = TimeSpan.FromSeconds(1);
+            });
+
+            if (providerOptions is not null)
+            {
+                services.Configure(keys[i], providerOptions);
+            }
+        }
+
+        return services.BuildServiceProvider().GetRequiredService<IAiCompletionClient>();
+    }
+
+    /// <summary>Delegates to <paramref name="inner"/> but reports <paramref name="key"/>, so tests can register the same underlying <see cref="FakeProvider"/> more than once under distinct failover positions.</summary>
+    private sealed class KeyedProvider(IAiCompletionProvider inner, string key) : IAiCompletionProvider
+    {
+        public string Key { get; } = key;
+
+        public Task<AiCompletion> CompleteAsync(
+            string model, AiPrompt prompt, TimeSpan timeout, CancellationToken cancellationToken = default)
+            => inner.CompleteAsync(model, prompt, timeout, cancellationToken);
+    }
 }
