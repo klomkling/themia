@@ -1,0 +1,29 @@
+// Derived from the production parser in
+// ezy-assets/src/EzyAssets.Infrastructure/Geo/ProjectGeocodingService.TryGeocodeAsync (reads `status`
+// as a string compared to "OK"; `results` as a JSON array checked for non-zero length; and
+// results[0].geometry.location.{lat,lng}), cross-checked against Google's published Geocoding API
+// response format — NOT captured from a live call. If a later real capture's shape differs from this
+// one (e.g. a field the production parser assumes is present is actually absent), that is a finding
+// about the shipped ezy-assets service too, since it reads the same path.
+{
+  "results": [
+    {
+      "address_components": [
+        { "long_name": "Bangkok", "short_name": "Bangkok", "types": ["locality", "political"] },
+        { "long_name": "Thailand", "short_name": "TH", "types": ["country", "political"] }
+      ],
+      "formatted_address": "Bangkok, Thailand",
+      "geometry": {
+        "location": { "lat": 13.7563309, "lng": 100.5017651 },
+        "location_type": "APPROXIMATE",
+        "viewport": {
+          "northeast": { "lat": 13.955, "lng": 100.9377 },
+          "southwest": { "lat": 13.4941, "lng": 100.3277 }
+        }
+      },
+      "place_id": "ChIJ82ENKDJgHTERIEjiXbIAAQI",
+      "types": ["locality", "political"]
+    }
+  ],
+  "status": "OK"
+}

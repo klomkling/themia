@@ -1,0 +1,10 @@
+// UNPROVEN: from docs, not captured. Deliberately exhausting a real Google Geocoding quota to obtain
+// this fixture is not reasonable, so this body is copied from Google's published status documentation
+// rather than a live response. If a later real capture's `status` string differs from
+// "OVER_QUERY_LIMIT", that is a finding about the shipped ezy-assets ProjectGeocodingService.cs too —
+// its TryGeocodeAsync compares against the same literal.
+{
+  "error_message": "You have exceeded your daily request quota for this API.",
+  "results": [],
+  "status": "OVER_QUERY_LIMIT"
+}

@@ -1,0 +1,11 @@
+// Derived from the production parser in
+// ezy-assets/src/EzyAssets.Infrastructure/Geo/ProjectGeocodingService.TryGeocodeAsync (reads `status`
+// as a string and compares it case-insensitively; a non-"OK" status short-circuits before `results` is
+// inspected further), cross-checked against Google's published Geocoding API response format —
+// NOT captured from a live call. If a later real capture's `status` string differs from "ZERO_RESULTS",
+// that is a finding about the shipped ezy-assets service too, since it compares against the same
+// literal.
+{
+  "results": [],
+  "status": "ZERO_RESULTS"
+}
