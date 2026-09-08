@@ -197,23 +197,43 @@ per-minute; neither is true here.
 Maps Google's `status` field onto `GeocodeOutcome`: `OVER_QUERY_LIMIT` → `ProviderLimit`, `ZERO_RESULTS`
 → `NotFound`, `OK` → `Found`, everything else → `ProviderError`.
 
-### The API key is in the query string, and `IHttpClientFactory` logs the URL by itself
+### The API key is in the query string, and the protection is a package default we do not own
 
-Google's Geocoding API takes the key as a query parameter; there is no header form. So the key is in
-every request URI.
+Google's Geocoding API takes the key as a query parameter. **Verified: there is no header form** —
+sending `X-Goog-Api-Key` with no `key` parameter returns `REQUEST_DENIED` with *"You must use an API key
+to authenticate each request"*, identical to sending nothing. So the key is in every request URI and
+cannot be moved out of it.
 
-**Writing no log statement of our own is not sufficient.** `AddHttpClient` attaches
-`LoggingHttpMessageHandler`, which logs `Sending HTTP request GET {uri}` at Information under the
-`System.Net.Http.HttpClient.*` category. An implementer who follows a "do not log the URL" instruction
-to the letter still ships a key into the host's logs, because the handler that logs it is one nobody
-wrote.
+**An earlier revision of this spec said `AddHttpClient`'s `LoggingHttpMessageHandler` therefore leaks the
+key into the host's logs. That is wrong on this package version, and the implementer refuted it by
+decompiling rather than by trusting a passing test.** `LoggingHttpMessageHandler` calls
+`LogHelper.LogRequestStart`, which formats the URI through `System.Net.Http.UriRedactionHelper.
+GetRedactedUriString`; that strips everything after `?`, so the logged line reads
+`GET https://maps.googleapis.com/maps/api/geocode/json?*`. Confirmed live against the same code path.
 
-So the registration must suppress or redact that handler's output — `RemoveAllLoggers()` on the client
-builder, or a replacement handler that strips the `key` parameter before logging.
+Two things follow, and the second is why the registration still suppresses logging.
 
-**The test must assert against the `System.Net.Http.HttpClient` log category, not only our own logger.**
-A test that captures just `ILogger<GoogleGeocodingProvider>` passes with the key being logged by the
-handler beside it, which is the failure this is guarding.
+**It follows the package version, not the target framework.** The `net8.0` and `net10.0` libraries of
+`Microsoft.Extensions.Http` 10.0.9 are identical here. A consumer pinning an older
+`Microsoft.Extensions.Http` does not get this.
+
+**It is switchable process-wide.** `DOTNET_SYSTEM_NET_HTTP_DISABLEURIREDACTION=true`, or the matching
+`AppContext` switch, turns redaction off for the whole process. That is a plausible operator action:
+someone debugging an unrelated HTTP problem flips it to see full URIs, gets what they wanted, and
+silently begins writing this key into the host's logs with no reason to connect the two.
+
+So `AddThemiaGeoGoogle` calls `RemoveAllLoggers()` on **this named client only**. A secret that stays out
+of the logs only while a global switch keeps its default is not adequately protected when the alternative
+costs one line, and the cost is local: the framework's request lines for the geocoding client, which the
+provider's own logging replaces.
+
+**Two tests, and the second is what makes the first mean anything.** One asserts the key never reaches
+any log — capturing **every** category, not just `ILogger<GoogleGeocodingProvider>`, since the handler
+that would log the URI is one nobody wrote. That test passes with `RemoveAllLoggers()` deleted, because
+the package default still covers it. So a second test flips the redaction switch off, registers the
+client **without** the suppression, and asserts the key **does** appear — showing exactly what protects
+it and exactly what removes that protection. The switch is reset in a `finally`; leaking a process-wide
+switch into the rest of the suite would be its own defect.
 
 ---
 
