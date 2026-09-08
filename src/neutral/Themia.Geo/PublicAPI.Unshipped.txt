@@ -1,0 +1,16 @@
+#nullable enable
+Themia.Geo.GeoBounds
+Themia.Geo.GeoBounds.Contains(Themia.Geo.GeoPoint point) -> bool
+Themia.Geo.GeoBounds.GeoBounds() -> void
+Themia.Geo.GeoBounds.NorthEast.get -> Themia.Geo.GeoPoint
+Themia.Geo.GeoBounds.SouthWest.get -> Themia.Geo.GeoPoint
+Themia.Geo.GeoDistance
+Themia.Geo.GeoPoint
+Themia.Geo.GeoPoint.GeoPoint() -> void
+Themia.Geo.GeoPoint.GeoPoint(double latitude, double longitude) -> void
+Themia.Geo.GeoPoint.Latitude.get -> double
+Themia.Geo.GeoPoint.Longitude.get -> double
+static Themia.Geo.GeoBounds.AroundMetres(Themia.Geo.GeoPoint centre, double metres) -> Themia.Geo.GeoBounds
+static Themia.Geo.GeoDistance.EquirectangularMetres(Themia.Geo.GeoPoint a, Themia.Geo.GeoPoint b) -> double
+static Themia.Geo.GeoDistance.HaversineMetres(Themia.Geo.GeoPoint a, Themia.Geo.GeoPoint b) -> double
+static Themia.Geo.GeoPoint.TryCreate(double latitude, double longitude, out Themia.Geo.GeoPoint point) -> bool
