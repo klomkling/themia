@@ -34,6 +34,9 @@ Themia.AI.AiPrompt.Temperature.get -> double?
 Themia.AI.AiPrompt.Temperature.init -> void
 Themia.AI.AiPrompt.User.get -> string!
 Themia.AI.AiPrompt.User.init -> void
+Themia.AI.AiTextMasker
+Themia.AI.AiTextMasker.AiTextMasker() -> void
+Themia.AI.AiTextMasker.Mask(string! text, System.Collections.Generic.IEnumerable<string!>! valuesToMask) -> Themia.AI.MaskedText!
 Themia.AI.AiUsage
 Themia.AI.AiUsage.AiUsage(int InputTokens, int OutputTokens) -> void
 Themia.AI.AiUsage.InputTokens.get -> int
@@ -45,3 +48,12 @@ Themia.AI.IAiCompletionClient.CompleteAsync(Themia.AI.AiOperation operation, The
 Themia.AI.IAiCompletionProvider
 Themia.AI.IAiCompletionProvider.CompleteAsync(string! model, Themia.AI.AiPrompt! prompt, System.TimeSpan timeout, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.AI.AiCompletion!>!
 Themia.AI.IAiCompletionProvider.Key.get -> string!
+Themia.AI.IAiTextMasker
+Themia.AI.IAiTextMasker.Mask(string! text, System.Collections.Generic.IEnumerable<string!>! valuesToMask) -> Themia.AI.MaskedText!
+Themia.AI.MaskedText
+Themia.AI.MaskedText.MaskedText(string! Text, System.Collections.Generic.IReadOnlyDictionary<string!, string!>! Tokens) -> void
+Themia.AI.MaskedText.Restore(string! modelOutput) -> string!
+Themia.AI.MaskedText.Text.get -> string!
+Themia.AI.MaskedText.Text.init -> void
+Themia.AI.MaskedText.Tokens.get -> System.Collections.Generic.IReadOnlyDictionary<string!, string!>!
+Themia.AI.MaskedText.Tokens.init -> void
