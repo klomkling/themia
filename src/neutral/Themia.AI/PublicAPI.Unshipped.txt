@@ -1,0 +1,47 @@
+#nullable enable
+const Themia.AI.AiProviderKeys.Gemini = "gemini" -> string!
+const Themia.AI.AiProviderKeys.OpenAiCompatible = "openai-compatible" -> string!
+Themia.AI.AiCompletion
+Themia.AI.AiCompletion.AiCompletion(Themia.AI.AiOutcome Outcome, string? Text, Themia.AI.AiUsage? Usage, string? Model, string? ProviderStatus) -> void
+Themia.AI.AiCompletion.Model.get -> string?
+Themia.AI.AiCompletion.Model.init -> void
+Themia.AI.AiCompletion.Outcome.get -> Themia.AI.AiOutcome
+Themia.AI.AiCompletion.Outcome.init -> void
+Themia.AI.AiCompletion.ProviderStatus.get -> string?
+Themia.AI.AiCompletion.ProviderStatus.init -> void
+Themia.AI.AiCompletion.Text.get -> string?
+Themia.AI.AiCompletion.Text.init -> void
+Themia.AI.AiCompletion.Usage.get -> Themia.AI.AiUsage?
+Themia.AI.AiCompletion.Usage.init -> void
+Themia.AI.AiOperation
+Themia.AI.AiOperation.Completion = 1 -> Themia.AI.AiOperation
+Themia.AI.AiOperation.Translation = 2 -> Themia.AI.AiOperation
+Themia.AI.AiOperation.Unspecified = 0 -> Themia.AI.AiOperation
+Themia.AI.AiOutcome
+Themia.AI.AiOutcome.Completed = 1 -> Themia.AI.AiOutcome
+Themia.AI.AiOutcome.Filtered = 3 -> Themia.AI.AiOutcome
+Themia.AI.AiOutcome.ProviderError = 5 -> Themia.AI.AiOutcome
+Themia.AI.AiOutcome.ProviderLimit = 4 -> Themia.AI.AiOutcome
+Themia.AI.AiOutcome.Truncated = 2 -> Themia.AI.AiOutcome
+Themia.AI.AiOutcome.Unspecified = 0 -> Themia.AI.AiOutcome
+Themia.AI.AiProviderKeys
+Themia.AI.AiPrompt
+Themia.AI.AiPrompt.MaxOutputTokens.get -> int?
+Themia.AI.AiPrompt.MaxOutputTokens.init -> void
+Themia.AI.AiPrompt.System.get -> string?
+Themia.AI.AiPrompt.System.init -> void
+Themia.AI.AiPrompt.Temperature.get -> double?
+Themia.AI.AiPrompt.Temperature.init -> void
+Themia.AI.AiPrompt.User.get -> string!
+Themia.AI.AiPrompt.User.init -> void
+Themia.AI.AiUsage
+Themia.AI.AiUsage.AiUsage(int InputTokens, int OutputTokens) -> void
+Themia.AI.AiUsage.InputTokens.get -> int
+Themia.AI.AiUsage.InputTokens.init -> void
+Themia.AI.AiUsage.OutputTokens.get -> int
+Themia.AI.AiUsage.OutputTokens.init -> void
+Themia.AI.IAiCompletionClient
+Themia.AI.IAiCompletionClient.CompleteAsync(Themia.AI.AiOperation operation, Themia.AI.AiPrompt! prompt, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.AI.AiCompletion!>!
+Themia.AI.IAiCompletionProvider
+Themia.AI.IAiCompletionProvider.CompleteAsync(string! model, Themia.AI.AiPrompt! prompt, System.TimeSpan timeout, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.AI.AiCompletion!>!
+Themia.AI.IAiCompletionProvider.Key.get -> string!
