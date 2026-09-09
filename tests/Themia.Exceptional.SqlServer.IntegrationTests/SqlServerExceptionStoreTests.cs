@@ -1,34 +1,19 @@
-using Testcontainers.MsSql;
-using Themia.Data.Migrations;
-using Themia.Exceptional;
 using Themia.Exceptional.Conformance;
-using Themia.Exceptional.Migrations;
-using Themia.Exceptional.SqlServer;
+
 using Xunit;
 
 namespace Themia.Exceptional.SqlServer.IntegrationTests;
 
+[Collection(SqlServerExceptionalCollection.Name)]
 [Trait("Category", "Integration")]
-public class SqlServerExceptionStoreTests : ExceptionStoreConformanceTests, IAsyncLifetime
+public class SqlServerExceptionStoreTests(SqlServerExceptionalFixture fixture) : ExceptionStoreConformanceTests
 {
-    // MsSqlBuilder 4.12.0: parameterless ctor is [Obsolete] as error — must pass image explicitly.
-    // Pinned (not :2022-latest) for reproducible CI; this is Testcontainers.MsSql 4.12.0's default image.
     // No GuidFormat quirk — uniqueidentifier round-trips natively through Microsoft.Data.SqlClient.
-    private readonly MsSqlContainer container =
-        new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-CU14-ubuntu-22.04").Build();
-
-    private string ConnString => container.GetConnectionString();
-    private ExceptionStoreEngine Engine => new(new SqlServerExceptionalDialect(ConnString), new ExceptionalOptions { ApplicationName = "App" });
+    private ExceptionStoreEngine Engine => new(new SqlServerExceptionalDialect(fixture.ConnectionString), new ExceptionalOptions { ApplicationName = "App" });
 
     protected override IExceptionStore Store => Engine;
 
-    public async Task InitializeAsync()
-    {
-        await container.StartAsync();
-        ThemiaMigrations.Run(MigrationEngine.SqlServer, ConnString, typeof(ExceptionLogMigration).Assembly);
-    }
-
-    public async Task DisposeAsync() => await container.DisposeAsync();
+    protected override Task ResetStoreAsync() => fixture.ResetAsync();
 
     // Engine-specific: datetime2 preserves sub-millisecond ticks — unique to SQL Server.
     [Fact]
