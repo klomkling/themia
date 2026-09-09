@@ -13,5 +13,20 @@
          another manifest — verify-coverage.sh fails CI otherwise. -->
     <PackageReference Remove="Microsoft.CodeAnalysis.CSharp" />
     <PackageReference Remove="Microsoft.CodeAnalysis.Analyzers" />
+
+    <!-- EXPERIMENT (revert or generalise after the next Dependabot run).
+         Measured on run #1564515664: of twelve groups, only `aspnetcore` and `roslyn` did any work —
+         and those are exactly the two whose patterns match a package named LITERALLY in these
+         manifests (Microsoft.AspNetCore.TestHost here, the two Microsoft.CodeAnalysis.* in
+         Manifest.Tooling.csproj). Every other group started and finished in 7-8s with no
+         "Finding updated version" line at all.
+         The suspicion is that Dependabot does not evaluate the @(PackageVersion) item transform
+         above, so it sees three direct dependencies rather than ~78, and groups only act on direct
+         dependencies. verify-coverage.sh cannot see this: it asks `dotnet msbuild -getItem`, which
+         DOES expand the transform, so the guard passes while Dependabot is looking at three packages.
+         Testcontainers is named explicitly here as the test. It has an update available
+         (4.13.0 -> 4.15.0) and its group carries no update-type restriction, so if the suspicion
+         holds, the next run opens a testcontainers PR and the fix is to generate every name. -->
+    <PackageReference Include="Testcontainers" />
   </ItemGroup>
 </Project>
