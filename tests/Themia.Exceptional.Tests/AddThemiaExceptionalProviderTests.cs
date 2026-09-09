@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Themia.Data.Migrations;
+using Themia.Data.Migrations.PostgreSql;
 using Themia.Exceptional;
 using Themia.Exceptional.Serilog;
 using Xunit;
@@ -55,5 +56,34 @@ public class AddThemiaExceptionalProviderTests
 
         Assert.Contains("PostgreSQL", ex.Message);
         Assert.NotNull(ex.InnerException);
+    }
+
+    [Fact]
+    public void RunMigration_BeforeEngineIsRegistered_ThrowsNamingThePackage()
+    {
+        // Unlike the seven Themia.Modules.* and Themia.Scheduling (which migrate later, from
+        // InitializeAsync), this call migrates synchronously, right here, when runMigration is true. A
+        // custom IExceptionalSqlDialect has no engine package of its own to carry the adapter, so for
+        // this path — and only this path — AddThemiaDataMigrationsPostgreSql() must run BEFORE this call,
+        // not merely before the host finishes building its container (spec §6).
+        MigrationEngineRegistry.Reset();
+        try
+        {
+            var services = new ServiceCollection();
+
+            var ex = Assert.Throws<InvalidOperationException>(() => services.AddThemiaExceptionalProvider(
+                dialect: new SqliteExceptionalDialect("Data Source=:memory:"),
+                configure: o => o.ApplicationName = "App",
+                engine: MigrationEngine.Postgres,
+                connectionString: "Host=localhost;Database=x",
+                runMigration: true));
+
+            Assert.Contains("Themia.Data.Migrations.PostgreSql", ex.Message, StringComparison.Ordinal);
+            Assert.Contains("AddThemiaDataMigrationsPostgreSql", ex.Message, StringComparison.Ordinal);
+        }
+        finally
+        {
+            MigrationEngineRegistry.Add(PostgresMigrationEngine.Adapter);
+        }
     }
 }

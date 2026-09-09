@@ -34,6 +34,15 @@ public static class ServiceCollectionExtensions
     /// <paramref name="runMigration"/> is <see langword="false"/>) runs the FluentMigrator schema migration
     /// immediately so the <c>Exceptions</c> table exists.
     /// </summary>
+    /// <remarks>
+    /// A custom <paramref name="dialect"/> has no engine package (e.g. <c>Themia.Exceptional.PostgreSql</c>)
+    /// to carry its <c>IMigrationEngineAdapter</c>, so the caller must register one directly — for example
+    /// <c>services.AddThemiaDataMigrationsPostgreSql()</c> — before calling this method when
+    /// <paramref name="runMigration"/> is <see langword="true"/>. Unlike a Themia module, which migrates
+    /// later from its own initialization step and so tolerates the adapter being registered anywhere
+    /// earlier in startup, this call migrates synchronously right here — the registration must precede
+    /// it, not merely precede the host finishing its container build.
+    /// </remarks>
     /// <param name="services">The service collection.</param>
     /// <param name="dialect">The provider dialect (already carries its connection string).</param>
     /// <param name="configure">Required options callback; <see cref="ExceptionalOptions.ApplicationName"/> is validated at startup.</param>

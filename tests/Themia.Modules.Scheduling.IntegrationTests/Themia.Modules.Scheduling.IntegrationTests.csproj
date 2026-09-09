@@ -22,5 +22,10 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/modules/Themia.Modules.Scheduling/Themia.Modules.Scheduling.csproj" />
+    <!-- SchedulingModule migrates via SchedulingSchema.Migrate, which dispatches on MigrationEngine
+         through the registry (spec §6) — these fixtures run against both real engines, so both adapters
+         must be registered. -->
+    <ProjectReference Include="../../src/neutral/Themia.Data.Migrations.PostgreSql/Themia.Data.Migrations.PostgreSql.csproj" />
+    <ProjectReference Include="../../src/neutral/Themia.Data.Migrations.SqlServer/Themia.Data.Migrations.SqlServer.csproj" />
   </ItemGroup>
 </Project>

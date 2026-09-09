@@ -22,5 +22,10 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/neutral/Themia.Exceptional/Themia.Exceptional.csproj" />
+    <!-- AddThemiaExceptionalProviderTests exercises AddThemiaExceptionalProvider's custom-dialect path
+         with MigrationEngine.Postgres, which has no engine package of its own to carry the adapter (spec
+         §5.3) — this project registers Postgres itself, the way an adopter with a custom
+         IExceptionalSqlDialect would via AddThemiaDataMigrationsPostgreSql(). -->
+    <ProjectReference Include="../../src/neutral/Themia.Data.Migrations.PostgreSql/Themia.Data.Migrations.PostgreSql.csproj" />
   </ItemGroup>
 </Project>
