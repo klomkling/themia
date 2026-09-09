@@ -3,9 +3,6 @@ using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.DependencyInjection;
 using MySqlConnector;
 using Npgsql;
-using Testcontainers.MsSql;
-using Testcontainers.MySql;
-using Testcontainers.PostgreSql;
 using Themia.AspNetCore.DataProtection.MySql;
 using Themia.AspNetCore.DataProtection.PostgreSql;
 using Themia.AspNetCore.DataProtection.SqlServer;
@@ -18,7 +15,7 @@ namespace Themia.AspNetCore.DataProtection.IntegrationTests;
 /// exists to prevent: with per-instance filesystem keys, the moment a request lands on a different instance
 /// than the one that issued a cookie, unprotect fails.
 /// </summary>
-public abstract class DataProtectionKeyStoreTestsBase
+public abstract class DataProtectionKeyStoreTestsBase : IAsyncLifetime
 {
     private const string ApplicationName = "themia-dp-test";
 
@@ -38,6 +35,16 @@ public abstract class DataProtectionKeyStoreTestsBase
 
     /// <summary>An INSERT that deliberately omits <c>created_at</c>.</summary>
     protected abstract string InsertWithoutCreatedAtSql { get; }
+
+    /// <summary>
+    /// Deletes every row from <c>data_protection_keys</c> before each test — needed now that this class's
+    /// tests share one container/database across the whole assembly instead of xUnit starting a fresh one
+    /// per test. Replaces the isolation that used to come for free from a brand-new database per test.
+    /// </summary>
+    public Task InitializeAsync() => ExecuteAsync("DELETE FROM data_protection_keys");
+
+    /// <inheritdoc />
+    public Task DisposeAsync() => Task.CompletedTask;
 
     [Fact]
     public async Task Insert_WithoutCreatedAt_Succeeds()
@@ -112,12 +119,11 @@ public abstract class DataProtectionKeyStoreTestsBase
         provider.GetRequiredService<IDataProtectionProvider>().CreateProtector("themia-tests");
 }
 
+[Collection(PostgresDataProtectionCollection.Name)]
 [Trait("Category", "Integration")]
-public class DataProtectionKeyStorePostgresTests : DataProtectionKeyStoreTestsBase, IAsyncLifetime
+public class DataProtectionKeyStorePostgresTests(PostgresDataProtectionFixture fixture) : DataProtectionKeyStoreTestsBase
 {
-    private readonly PostgreSqlContainer container = new PostgreSqlBuilder("postgres:16-alpine").Build();
-
-    protected override string ConnectionString => container.GetConnectionString();
+    protected override string ConnectionString => fixture.ConnectionString;
 
     protected override IDataProtectionBuilder PersistKeys(IDataProtectionBuilder builder) =>
         builder.PersistKeysToThemiaPostgres(ConnectionString);
@@ -151,18 +157,13 @@ public class DataProtectionKeyStorePostgresTests : DataProtectionKeyStoreTestsBa
 
     protected override string InsertWithoutCreatedAtSql =>
         "INSERT INTO data_protection_keys (friendly_name, xml) VALUES ('no-created-at', '<key/>')";
-
-    public async Task InitializeAsync() => await container.StartAsync();
-
-    public async Task DisposeAsync() => await container.DisposeAsync();
 }
 
+[Collection(MySqlDataProtectionCollection.Name)]
 [Trait("Category", "Integration")]
-public class DataProtectionKeyStoreMySqlTests : DataProtectionKeyStoreTestsBase, IAsyncLifetime
+public class DataProtectionKeyStoreMySqlTests(MySqlDataProtectionFixture fixture) : DataProtectionKeyStoreTestsBase
 {
-    private readonly MySqlContainer container = new MySqlBuilder("mysql:8.4").Build();
-
-    protected override string ConnectionString => container.GetConnectionString();
+    protected override string ConnectionString => fixture.ConnectionString;
 
     protected override IDataProtectionBuilder PersistKeys(IDataProtectionBuilder builder) =>
         builder.PersistKeysToThemiaMySql(ConnectionString);
@@ -196,19 +197,13 @@ public class DataProtectionKeyStoreMySqlTests : DataProtectionKeyStoreTestsBase,
 
     protected override string InsertWithoutCreatedAtSql =>
         "INSERT INTO data_protection_keys (friendly_name, `xml`) VALUES ('no-created-at', '<key/>')";
-
-    public async Task InitializeAsync() => await container.StartAsync();
-
-    public async Task DisposeAsync() => await container.DisposeAsync();
 }
 
+[Collection(SqlServerDataProtectionCollection.Name)]
 [Trait("Category", "Integration")]
-public class DataProtectionKeyStoreSqlServerTests : DataProtectionKeyStoreTestsBase, IAsyncLifetime
+public class DataProtectionKeyStoreSqlServerTests(SqlServerDataProtectionFixture fixture) : DataProtectionKeyStoreTestsBase
 {
-    private readonly MsSqlContainer container =
-        new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-CU14-ubuntu-22.04").Build();
-
-    protected override string ConnectionString => container.GetConnectionString();
+    protected override string ConnectionString => fixture.ConnectionString;
 
     protected override IDataProtectionBuilder PersistKeys(IDataProtectionBuilder builder) =>
         builder.PersistKeysToThemiaSqlServer(ConnectionString);
@@ -242,8 +237,4 @@ public class DataProtectionKeyStoreSqlServerTests : DataProtectionKeyStoreTestsB
 
     protected override string InsertWithoutCreatedAtSql =>
         "INSERT INTO [data_protection_keys] ([friendly_name], [xml]) VALUES ('no-created-at', '<key/>')";
-
-    public async Task InitializeAsync() => await container.StartAsync();
-
-    public async Task DisposeAsync() => await container.DisposeAsync();
 }

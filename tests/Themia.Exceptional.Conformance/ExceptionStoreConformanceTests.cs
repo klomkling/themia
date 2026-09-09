@@ -8,10 +8,24 @@ namespace Themia.Exceptional.Conformance;
 /// test class derives from this and supplies a <see cref="Store"/> backed by a live, migrated container,
 /// so the shared CRUD/rollup/soft-delete/protect/purge behaviors are asserted identically on every engine.
 /// </summary>
-public abstract class ExceptionStoreConformanceTests
+public abstract class ExceptionStoreConformanceTests : IAsyncLifetime
 {
     /// <summary>A store backed by a live, migrated database for the engine under test.</summary>
     protected abstract IExceptionStore Store { get; }
+
+    /// <summary>
+    /// Deletes every row from the engine's <c>Exceptions</c> table so each test starts from an empty table.
+    /// Needed now that the concrete engine test class shares one container/database across the whole
+    /// assembly instead of xUnit starting a fresh one per test — this replaces the isolation that used to
+    /// come for free from a brand-new database per test.
+    /// </summary>
+    protected abstract Task ResetStoreAsync();
+
+    /// <inheritdoc />
+    public Task InitializeAsync() => ResetStoreAsync();
+
+    /// <inheritdoc />
+    public Task DisposeAsync() => Task.CompletedTask;
 
     protected static ExceptionEntry NewEntry(string hash = "h1")
     {
