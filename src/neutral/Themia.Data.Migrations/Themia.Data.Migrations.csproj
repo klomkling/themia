@@ -7,21 +7,24 @@
     <!-- Version is inherited from Directory.Build.props (shared). Do not set it here. -->
   </PropertyGroup>
   <ItemGroup>
+    <!-- No runner, no ADO driver, no JWT stack: FluentMigrator.Runner.{Postgres,MySql,SqlServer}, Npgsql,
+         MySqlConnector and Microsoft.Data.SqlClient moved to Themia.Data.Migrations.{PostgreSql,MySql,SqlServer}
+         behind IMigrationEngineAdapter. See docs/superpowers/specs/2026-09-09-data-migrations-engine-split.md. -->
     <PackageReference Include="FluentMigrator" />
-    <PackageReference Include="FluentMigrator.Runner.Postgres" />
-    <PackageReference Include="FluentMigrator.Runner.MySql" />
-    <PackageReference Include="FluentMigrator.Runner.SqlServer" />
+    <!-- FluentMigrator.Runner.Core, NOT the FluentMigrator.Runner meta-package: the meta-package depends on
+         every provider (Db2/Oracle/Hana/…), which is exactly what the split exists to avoid. Runner.Core is
+         the provider-agnostic half (AddFluentMigratorCore, IMigrationRunnerBuilder, IMigrationRunner) that
+         each Themia.Data.Migrations.{Engine} package's own provider package (Runner.Postgres etc.) depends on. -->
+    <PackageReference Include="FluentMigrator.Runner.Core" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
-    <!-- Drivers for the boot lock's dedicated connection. Referenced explicitly rather than relied on
-         transitively through the FluentMigrator.Runner.* packages above. -->
-    <PackageReference Include="Npgsql" />
-    <PackageReference Include="MySqlConnector" />
-    <PackageReference Include="Microsoft.Data.SqlClient" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="Themia.Data.Migrations.Tests" />
     <InternalsVisibleTo Include="Themia.Data.Migrations.IntegrationTests" />
+    <InternalsVisibleTo Include="Themia.Data.Migrations.PostgreSql" />
+    <InternalsVisibleTo Include="Themia.Data.Migrations.MySql" />
+    <InternalsVisibleTo Include="Themia.Data.Migrations.SqlServer" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers">

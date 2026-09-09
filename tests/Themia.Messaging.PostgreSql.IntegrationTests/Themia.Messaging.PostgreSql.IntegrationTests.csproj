@@ -25,4 +25,7 @@
     <ProjectReference Include="../../src/neutral/Themia.Data.Migrations/Themia.Data.Migrations.csproj" />
     <ProjectReference Include="../../src/modules/Themia.Modules.Messaging/Themia.Modules.Messaging.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/neutral/Themia.Data.Migrations.PostgreSql/Themia.Data.Migrations.PostgreSql.csproj" />
+  </ItemGroup>
 </Project>

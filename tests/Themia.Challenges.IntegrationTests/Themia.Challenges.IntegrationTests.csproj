@@ -32,4 +32,9 @@
     <ProjectReference Include="../../src/neutral/Themia.Challenges.MySql/Themia.Challenges.MySql.csproj" />
     <ProjectReference Include="../../src/neutral/Themia.Challenges.SqlServer/Themia.Challenges.SqlServer.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/neutral/Themia.Data.Migrations.PostgreSql/Themia.Data.Migrations.PostgreSql.csproj" />
+    <ProjectReference Include="../../src/neutral/Themia.Data.Migrations.MySql/Themia.Data.Migrations.MySql.csproj" />
+    <ProjectReference Include="../../src/neutral/Themia.Data.Migrations.SqlServer/Themia.Data.Migrations.SqlServer.csproj" />
+  </ItemGroup>
 </Project>

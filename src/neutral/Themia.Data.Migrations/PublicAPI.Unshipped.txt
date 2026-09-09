@@ -1,8 +1,19 @@
 #nullable enable
+Themia.Data.Migrations.IMigrationEngineAdapter
+Themia.Data.Migrations.IMigrationEngineAdapter.ConfigureRunner(FluentMigrator.Runner.IMigrationRunnerBuilder! builder) -> void
+Themia.Data.Migrations.IMigrationEngineAdapter.CreateUnpooledConnection(string! connectionString) -> System.Data.Common.DbConnection!
+Themia.Data.Migrations.IMigrationEngineAdapter.DisplayName.get -> string!
+Themia.Data.Migrations.IMigrationEngineAdapter.Engine.get -> Themia.Data.Migrations.MigrationEngine
+Themia.Data.Migrations.IMigrationEngineAdapter.ReleaseLock(System.Data.Common.DbConnection! connection, string! scope) -> void
+Themia.Data.Migrations.IMigrationEngineAdapter.TryAcquireLock(System.Data.Common.DbConnection! connection, string! scope, System.TimeSpan timeout) -> bool
 Themia.Data.Migrations.MigrationEngine
 Themia.Data.Migrations.MigrationEngine.MySql = 1 -> Themia.Data.Migrations.MigrationEngine
 Themia.Data.Migrations.MigrationEngine.Postgres = 0 -> Themia.Data.Migrations.MigrationEngine
 Themia.Data.Migrations.MigrationEngine.SqlServer = 2 -> Themia.Data.Migrations.MigrationEngine
+Themia.Data.Migrations.MigrationEngineRegistry
+static Themia.Data.Migrations.MigrationEngineRegistry.Add(Themia.Data.Migrations.IMigrationEngineAdapter! adapter) -> void
+static Themia.Data.Migrations.MigrationEngineRegistry.Reset() -> void
+static Themia.Data.Migrations.MigrationEngineRegistry.Resolve(Themia.Data.Migrations.MigrationEngine engine) -> Themia.Data.Migrations.IMigrationEngineAdapter!
 Themia.Data.Migrations.ThemiaMigrationOptions
 Themia.Data.Migrations.ThemiaMigrationOptions.LockTimeout.get -> System.TimeSpan
 Themia.Data.Migrations.ThemiaMigrationOptions.LockTimeout.init -> void
@@ -11,6 +22,8 @@ Themia.Data.Migrations.ThemiaMigrationOptions.Logger.init -> void
 Themia.Data.Migrations.ThemiaMigrationOptions.ThemiaMigrationOptions() -> void
 Themia.Data.Migrations.ThemiaMigrations
 static Themia.Data.Migrations.ThemiaMigrationOptions.DefaultLockTimeout.get -> System.TimeSpan
+static Themia.Data.Migrations.ThemiaMigrations.Run(Themia.Data.Migrations.IMigrationEngineAdapter! adapter, string! connectionString, Themia.Data.Migrations.ThemiaMigrationOptions? options, System.Reflection.Assembly![]! migrationAssemblies) -> void
+static Themia.Data.Migrations.ThemiaMigrations.Run(Themia.Data.Migrations.IMigrationEngineAdapter! adapter, string! connectionString, params System.Reflection.Assembly![]! migrationAssemblies) -> void
 static Themia.Data.Migrations.ThemiaMigrations.Run(Themia.Data.Migrations.MigrationEngine engine, string! connectionString, Themia.Data.Migrations.ThemiaMigrationOptions? options, System.Reflection.Assembly![]! migrationAssemblies) -> void
 static Themia.Data.Migrations.ThemiaMigrations.Run(Themia.Data.Migrations.MigrationEngine engine, string! connectionString, params System.Reflection.Assembly![]! migrationAssemblies) -> void
 Themia.Data.Migrations.ThemiaVersionTable

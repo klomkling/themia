@@ -1,11 +1,17 @@
 using System.Reflection;
 using Themia.Data.Migrations;
+using Themia.Data.Migrations.PostgreSql;
 using Xunit;
 
 namespace Themia.Data.Migrations.Tests;
 
 public class ThemiaMigrationsGuardTests
 {
+    // These tests drive MigrationEngine.Postgres through Run's guard clauses only — no DB connection is
+    // ever opened — but resolving the engine still needs an adapter registered. MigrationEngineRegistry.Add
+    // is idempotent, so registering unconditionally here is safe regardless of test run order.
+    static ThemiaMigrationsGuardTests() => MigrationEngineRegistry.Add(PostgresMigrationEngine.Adapter);
+
     // The Themia.Data.Migrations runner package is a migration-free assembly by design (it contains no
     // [Migration] types and never will), so it is a robust fixture for the "no migrations" guard — unlike
     // the test assembly, which now carries deliberate [Migration] fixtures (see DuplicateVersionMigrations).
