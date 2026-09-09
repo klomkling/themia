@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <!-- Neutral cross-framework package: MUST include net8.0 (cross-framework reuse). -->
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <PackageId>Themia.AI.AspNetCore</PackageId>
+    <Description>Themia.AI ASP.NET Core probe — a mountable endpoint an adopter mounts in their own app to verify their own AI provider configuration works, with a no-cost configuration report and a single-call probe, both fail-closed behind an Authorize hook. Themia never holds a key and ships no deployable of its own.</Description>
+    <PackageTags>themia;ai;probe;aspnetcore;diagnostics</PackageTags>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Themia.AI/Themia.AI.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <AdditionalFiles Include="PublicAPI.Shipped.txt" />
+    <AdditionalFiles Include="PublicAPI.Unshipped.txt" />
+  </ItemGroup>
+</Project>
