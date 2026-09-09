@@ -4,6 +4,7 @@ using Npgsql;
 using Themia.Challenges;
 using Themia.Challenges.Migrations;
 using Themia.Data.Migrations;
+using Themia.Data.Migrations.PostgreSql;
 using Themia.Data.Probes;
 
 namespace Themia.Challenges.PostgreSql;
@@ -24,7 +25,7 @@ public static class ServiceCollectionExtensions
 
         services.TryAddSingleton<IChallengeDialect>(new PostgresChallengeDialect(connectionString));
 
-        ThemiaMigrations.Run(MigrationEngine.Postgres, connectionString, typeof(ChallengeSchemaMigration).Assembly);
+        ThemiaMigrations.Run(PostgresMigrationEngine.Adapter, connectionString, typeof(ChallengeSchemaMigration).Assembly);
 
         // Both tables are created unqualified on every engine (see ChallengeSchemaMigration), so both
         // follow search_path at runtime while the migration writes them to public.

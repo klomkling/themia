@@ -1,7 +1,9 @@
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
+using Themia.AspNetCore.DataProtection.Migrations;
 using Themia.Data.Migrations;
+using Themia.Data.Migrations.PostgreSql;
 using Themia.Data.Probes;
 
 namespace Themia.AspNetCore.DataProtection.PostgreSql;
@@ -23,6 +25,12 @@ public static class DataProtectionBuilderExtensions
     /// <strong>unencrypted</strong> — see
     /// <see cref="Themia.AspNetCore.DataProtection.DataProtectionBuilderExtensions.PersistKeysToThemia"/> for
     /// both, including why <c>SetApplicationName</c> is not an isolation boundary.</para>
+    /// <para>
+    /// The migration runs here, against <see cref="PostgresMigrationEngine.Adapter"/> directly, rather than
+    /// inside the shared <c>PersistKeysToThemia</c> (called below with <c>runMigration: false</c>) — this
+    /// engine package already knows its engine at compile time, so it does not need
+    /// <c>MigrationEngineRegistry</c> to resolve one (design spec §5.3).
+    /// </para>
     /// </remarks>
     /// <param name="builder">The Data Protection builder.</param>
     /// <param name="connectionString">PostgreSQL connection string.</param>
@@ -45,8 +53,11 @@ public static class DataProtectionBuilderExtensions
             new PostgresDataProtectionKeyDialect(connectionString),
             MigrationEngine.Postgres,
             connectionString,
-            runMigration,
+            runMigration: false,
             migrationOptions);
+
+        if (runMigration)
+            ThemiaMigrations.Run(PostgresMigrationEngine.Adapter, connectionString, migrationOptions, [typeof(DataProtectionKeysMigration).Assembly]);
 
         // Boot-time check: the migration writes public.data_protection_keys, but this store reads
         // unqualified and follows search_path. A mismatch otherwise surfaces on the first protector,
