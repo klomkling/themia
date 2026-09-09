@@ -23,10 +23,6 @@ public sealed class GoogleGeocodingProvider(
 
     private static readonly Uri GeocodeEndpoint = new("https://maps.googleapis.com/maps/api/geocode/json");
 
-    // Fixture files carry a header comment recording their provenance (captured vs. derived vs.
-    // unproven) — see tests/Themia.Geo.Google.Tests/Fixtures. Comment handling must be enabled so a
-    // real Google response (which never has one) still parses the same way a fixture does.
-    private static readonly JsonDocumentOptions ParseOptions = new() { CommentHandling = JsonCommentHandling.Skip };
 
     /// <inheritdoc />
     public async Task<GeocodeResult> GeocodeAsync(
@@ -46,7 +42,7 @@ public sealed class GoogleGeocodingProvider(
         var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
         await using (stream.ConfigureAwait(false))
         {
-            using var document = await JsonDocument.ParseAsync(stream, ParseOptions, cancellationToken).ConfigureAwait(false);
+            using var document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken).ConfigureAwait(false);
             return MapResponse(document.RootElement);
         }
     }

@@ -1,8 +1,3 @@
-// Captured 2026-09-07 via:
-//   curl "https://maps.googleapis.com/maps/api/geocode/json?address=Bangkok&key=INVALID_KEY_FOR_FIXTURE_CAPTURE"
-// A genuine live-captured Google response — no valid API key was needed or used, since a deliberately
-// invalid key reliably produces REQUEST_DENIED. This is a real call to the real endpoint, not a
-// hand-written payload.
 {
    "error_message" : "The provided API key is invalid. ",
    "results" : [],

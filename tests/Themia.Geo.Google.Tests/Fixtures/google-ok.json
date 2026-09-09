@@ -1,10 +1,3 @@
-// Derived from the production parser in
-// ezy-assets/src/EzyAssets.Infrastructure/Geo/ProjectGeocodingService.TryGeocodeAsync (reads `status`
-// as a string compared to "OK"; `results` as a JSON array checked for non-zero length; and
-// results[0].geometry.location.{lat,lng}), cross-checked against Google's published Geocoding API
-// response format — NOT captured from a live call. If a later real capture's shape differs from this
-// one (e.g. a field the production parser assumes is present is actually absent), that is a finding
-// about the shipped ezy-assets service too, since it reads the same path.
 {
   "results": [
     {
