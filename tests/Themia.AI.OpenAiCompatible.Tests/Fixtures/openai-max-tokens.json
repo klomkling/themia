@@ -1,0 +1,25 @@
+{
+  "id": "chatcmpl-382",
+  "object": "chat.completion",
+  "created": 1788923149,
+  "model": "qwen2.5-coder:32b",
+  "system_fingerprint": "fp_ollama",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "The ocean,"
+      },
+      "finish_reason": "length"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 37,
+    "prompt_tokens_details": {
+      "cached_tokens": 24
+    },
+    "completion_tokens": 3,
+    "total_tokens": 40
+  }
+}

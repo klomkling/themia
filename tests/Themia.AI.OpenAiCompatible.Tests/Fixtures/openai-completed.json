@@ -1,0 +1,25 @@
+{
+  "id": "chatcmpl-236",
+  "object": "chat.completion",
+  "created": 1788923144,
+  "model": "qwen2.5-coder:32b",
+  "system_fingerprint": "fp_ollama",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "Hello."
+      },
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 36,
+    "prompt_tokens_details": {
+      "cached_tokens": 0
+    },
+    "completion_tokens": 3,
+    "total_tokens": 39
+  }
+}
