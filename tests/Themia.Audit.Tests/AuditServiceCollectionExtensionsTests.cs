@@ -75,18 +75,24 @@ public class AuditServiceCollectionExtensionsTests
     }
 
     [Fact]
-    public void AddThemiaAudit_with_default_runMigration_surfaces_a_migration_failure()
+    public void AddThemiaAudit_with_default_runMigration_defers_the_migration_attempt_until_a_provider_package_completes_the_handshake()
     {
         var services = new ServiceCollection();
 
-        // Malformed connection string fails fast at parse time — no network I/O, deterministic.
-        var ex = Assert.Throws<InvalidOperationException>(() => services.AddThemiaAudit(o =>
+        // AddThemiaAudit no longer migrates by itself (design §5.2): it records the runMigration
+        // handshake's intent half and returns, regardless of how bad the connection string is, because
+        // the adapter half — supplied by AddThemiaAudit{Engine} — has not arrived yet. This project
+        // references no provider package (see the class remarks), so there is nothing here to complete
+        // the pair; the "migration actually runs, and surfaces a failure" case is covered cross-package in
+        // Themia.Audit.IntegrationTests.AuditMigrationHandshakeTests, where a real AddThemiaAuditPostgreSql
+        // call is available to complete it.
+        var exception = Record.Exception(() => services.AddThemiaAudit(o =>
         {
             o.ConnectionString = "this is not a connection string";
             o.Engine = AuditEngine.Postgres;
         }));
 
-        Assert.Contains("PostgreSQL", ex.Message, StringComparison.Ordinal);
+        Assert.Null(exception);
     }
 
     [Fact]

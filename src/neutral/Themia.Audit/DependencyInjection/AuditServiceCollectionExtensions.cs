@@ -2,9 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using Themia.Audit.Http;
-using Themia.Audit.Migrations;
 using Themia.Audit.Redaction;
-using Themia.Data.Migrations;
 
 namespace Themia.Audit.DependencyInjection;
 
@@ -21,9 +19,13 @@ public static class AuditServiceCollectionExtensions
     /// <see cref="IAuditDialect"/> and <see cref="IAuditStore"/> the recorder registered here depends on.
     /// </summary>
     /// <remarks>
-    /// Runs the FluentMigrator schema migration itself (unless <paramref name="runMigration"/> is
+    /// Runs the FluentMigrator schema migration (unless <paramref name="runMigration"/> is
     /// <see langword="false"/>), so a consumer using <c>Themia.Audit</c> with no module layer still gets a
-    /// table (design §11) — mirroring <c>Themia.Exceptional</c>'s <c>ServiceCollectionExtensions</c>.
+    /// table (design §11) — mirroring <c>Themia.Exceptional</c>'s <c>ServiceCollectionExtensions</c>. The
+    /// migration itself does not run here: this call records the migration intent through
+    /// <see cref="AuditMigrationHandshake"/>, and whichever of this call or the matching
+    /// <c>AddThemiaAudit{Engine}</c> call completes second actually runs it (design §5.2) — the pair is
+    /// order-free, so both the published call order and its reverse migrate exactly once.
     /// When <paramref name="runMigration"/> is <see langword="true"/> (the default), <see cref="AuditOptions.Engine"/>
     /// and <see cref="AuditOptions.ConnectionString"/> are checked immediately and this call throws
     /// <see cref="InvalidOperationException"/>, naming the missing setting, when either is invalid —
@@ -92,7 +94,14 @@ public static class AuditServiceCollectionExtensions
                     + "runMigration: false to defer schema creation.");
             }
 
-            ThemiaMigrations.Run(ToMigrationEngine(probe.Engine), probe.ConnectionString, typeof(AuditSchemaMigration).Assembly);
+            AuditMigrationHandshake.RecordIntent(services, runMigration: true, probe.ConnectionString);
+        }
+        else
+        {
+            // Still records intent — with RunMigration: false — so the handshake has both halves to
+            // consume once the matching AddThemiaAudit{Engine} call arrives, in either order, and never
+            // runs the migration nobody asked for. The connection string is never read in this branch.
+            AuditMigrationHandshake.RecordIntent(services, runMigration: false, connectionString: string.Empty);
         }
 
         return services;
@@ -103,12 +112,4 @@ public static class AuditServiceCollectionExtensions
 
     private static bool HasConnectionString(AuditOptions options) =>
         !string.IsNullOrWhiteSpace(options.ConnectionString);
-
-    private static MigrationEngine ToMigrationEngine(AuditEngine engine) => engine switch
-    {
-        AuditEngine.Postgres => MigrationEngine.Postgres,
-        AuditEngine.SqlServer => MigrationEngine.SqlServer,
-        AuditEngine.MySql => MigrationEngine.MySql,
-        _ => throw new ArgumentOutOfRangeException(nameof(engine), engine, "Unknown AuditEngine value."),
-    };
 }
