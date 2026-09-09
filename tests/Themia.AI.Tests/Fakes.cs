@@ -1,7 +1,9 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Themia.AI;
 using Themia.AI.DependencyInjection;
+using Themia.AI.Internal;
 
 namespace Themia.AI.Tests;
 
@@ -48,6 +50,18 @@ internal sealed class RecordingClient : IAiCompletionClient
         Calls++;
         return Task.FromResult(new AiCompletion(AiOutcome.Completed, "", null, "m", null));
     }
+}
+
+/// <summary>
+/// Always returns the same <see cref="AiCompletion"/>, ignoring the request. For tests exercising the
+/// <see cref="AiOutcome"/> → <see cref="TranslationOutcome"/> mapping (Task 7), where only the outcome
+/// matters and not what was asked of the client.
+/// </summary>
+internal sealed class StubCompletionClient(AiOutcome outcome, string? text = null) : IAiCompletionClient
+{
+    public Task<AiCompletion> CompleteAsync(
+        AiOperation operation, AiPrompt prompt, CancellationToken cancellationToken = default)
+        => Task.FromResult(new AiCompletion(outcome, text, null, "stub-model", null));
 }
 
 internal static class Build
@@ -169,6 +183,21 @@ internal static class Build
 
         return services.BuildServiceProvider().GetRequiredService<IAiCompletionClient>();
     }
+
+    /// <summary>
+    /// Builds a <see cref="TranslationService"/> whose <see cref="IAiCompletionClient"/> always returns
+    /// <paramref name="outcome"/> with <paramref name="text"/>, for tests exercising the
+    /// <c>AiOutcome</c> → <c>TranslationOutcome</c> mapping (Task 7).
+    /// </summary>
+    internal static ITextTranslationService Service(AiOutcome outcome, string? text = null)
+        => Service(new StubCompletionClient(outcome, text));
+
+    /// <summary>
+    /// Builds a <see cref="TranslationService"/> wrapping <paramref name="client"/> directly, for tests
+    /// asserting whether or how the client was called (Task 7) — e.g. with a <see cref="RecordingClient"/>.
+    /// </summary>
+    internal static ITextTranslationService Service(IAiCompletionClient client)
+        => new TranslationService(client, NullLogger<TranslationService>.Instance);
 
     /// <summary>Delegates to <paramref name="inner"/> but reports <paramref name="key"/>, so tests can register the same underlying <see cref="FakeProvider"/> more than once under distinct failover positions.</summary>
     private sealed class KeyedProvider(IAiCompletionProvider inner, string key) : IAiCompletionProvider
