@@ -70,6 +70,8 @@ Themia.AI.IAiCompletionProvider.CompleteAsync(string! model, Themia.AI.AiPrompt!
 Themia.AI.IAiCompletionProvider.Key.get -> string!
 Themia.AI.IAiTextMasker
 Themia.AI.IAiTextMasker.Mask(string! text, System.Collections.Generic.IEnumerable<string!>! valuesToMask) -> Themia.AI.MaskedText!
+Themia.AI.ITextTranslationService
+Themia.AI.ITextTranslationService.TranslateAsync(string! text, string! sourceLanguage, string! targetLanguage, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.AI.TranslationResult!>!
 Themia.AI.MaskedText
 Themia.AI.MaskedText.MaskedText(string! Text, System.Collections.Generic.IReadOnlyDictionary<string!, string!>! Tokens) -> void
 Themia.AI.MaskedText.Restore(string! modelOutput) -> string!
@@ -77,3 +79,15 @@ Themia.AI.MaskedText.Text.get -> string!
 Themia.AI.MaskedText.Text.init -> void
 Themia.AI.MaskedText.Tokens.get -> System.Collections.Generic.IReadOnlyDictionary<string!, string!>!
 Themia.AI.MaskedText.Tokens.init -> void
+Themia.AI.TranslationOutcome
+Themia.AI.TranslationOutcome.Incomplete = 3 -> Themia.AI.TranslationOutcome
+Themia.AI.TranslationOutcome.SameLanguage = 2 -> Themia.AI.TranslationOutcome
+Themia.AI.TranslationOutcome.Translated = 1 -> Themia.AI.TranslationOutcome
+Themia.AI.TranslationOutcome.Unavailable = 4 -> Themia.AI.TranslationOutcome
+Themia.AI.TranslationOutcome.Unspecified = 0 -> Themia.AI.TranslationOutcome
+Themia.AI.TranslationResult
+Themia.AI.TranslationResult.Outcome.get -> Themia.AI.TranslationOutcome
+Themia.AI.TranslationResult.Outcome.init -> void
+Themia.AI.TranslationResult.Text.get -> string?
+Themia.AI.TranslationResult.Text.init -> void
+Themia.AI.TranslationResult.TranslationResult(Themia.AI.TranslationOutcome Outcome, string? Text) -> void

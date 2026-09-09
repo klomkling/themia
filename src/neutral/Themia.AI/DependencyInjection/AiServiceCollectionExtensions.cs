@@ -9,17 +9,28 @@ namespace Themia.AI.DependencyInjection;
 
 /// <summary>
 /// Registers <see cref="AiOptions"/> (validated with <c>ValidateOnStart</c> against the whole provider
-/// &#215; operation matrix, design §6) and the <see cref="IAiCompletionClient"/> dispatcher that resolves
-/// models, retries, fails over and bounds every call to <see cref="AiOptions.TotalBudget"/>.
+/// &#215; operation matrix, design §6), the <see cref="IAiCompletionClient"/> dispatcher that resolves
+/// models, retries, fails over and bounds every call to <see cref="AiOptions.TotalBudget"/>, the default
+/// <see cref="IAiTextMasker"/>, and <see cref="ITextTranslationService"/>.
 /// </summary>
 /// <remarks>
-/// Does not register a masker or a translation service — those are added to this same method by a later
-/// task. A provider package (e.g. a future <c>AddThemiaAiGemini</c>) registers its own
-/// <see cref="IAiCompletionProvider"/> and a named <see cref="AiProviderOptions"/> alongside this call.
+/// A provider package (e.g. <c>AddThemiaAiGemini</c>, <c>AddThemiaAiOpenAiCompatible</c>) registers its
+/// own <see cref="IAiCompletionProvider"/> and a named <see cref="AiProviderOptions"/> alongside this
+/// call — this method knows nothing about any specific provider.
 /// </remarks>
 public static class AiServiceCollectionExtensions
 {
-    /// <summary>Registers <see cref="AiOptions"/> with <c>ValidateOnStart</c>, and the failover dispatcher as <see cref="IAiCompletionClient"/>.</summary>
+    /// <summary>
+    /// Registers <see cref="AiOptions"/> with <c>ValidateOnStart</c>, the failover dispatcher as
+    /// <see cref="IAiCompletionClient"/>, the default <see cref="IAiTextMasker"/>, and
+    /// <see cref="ITextTranslationService"/>.
+    /// </summary>
+    /// <remarks>
+    /// Every registration here uses <c>TryAdd*</c>, so a caller's own registration of any of these
+    /// services — made before or after this call — wins, and calling <c>AddThemiaAi</c> more than once
+    /// (e.g. from two modules that both depend on it) is a no-op the second time rather than a duplicate
+    /// registration.
+    /// </remarks>
     /// <param name="services">The service collection.</param>
     /// <param name="configure">Sets <see cref="AiOptions.Failover"/> and the rest of the shared settings.</param>
     /// <returns>The service collection for chaining.</returns>
@@ -51,6 +62,16 @@ public static class AiServiceCollectionExtensions
                 sp.GetRequiredService<IOptions<AiOptions>>(),
                 sp.GetRequiredService<IOptionsMonitor<AiProviderOptions>>(),
                 logger);
+        });
+
+        services.TryAddSingleton<IAiTextMasker, AiTextMasker>();
+
+        services.TryAddSingleton<ITextTranslationService>(sp =>
+        {
+            var logger = sp.GetService<ILogger<TranslationService>>()
+                ?? NullLogger<TranslationService>.Instance;
+
+            return new TranslationService(sp.GetRequiredService<IAiCompletionClient>(), logger);
         });
 
         return services;

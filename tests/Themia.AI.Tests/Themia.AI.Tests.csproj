@@ -20,5 +20,9 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/neutral/Themia.AI/Themia.AI.csproj" />
+    <!-- Needed only by LayeringTests' real-DI-graph test (Task 8 Step 2), which wires the actual default
+         graph AddThemiaAiGemini + AddThemiaAi builds — a 0.19.0 defect passed its unit tests and failed
+         only on that real graph. -->
+    <ProjectReference Include="../../src/neutral/Themia.AI.Gemini/Themia.AI.Gemini.csproj" />
   </ItemGroup>
 </Project>

@@ -27,6 +27,123 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.24.0] - 2026-09-09
+
+### Added
+
+- **`Themia.Geo`** (`net8.0;net10.0`) — neutral coordinate primitives: a validated lat/lng point
+  (`GeoPoint`), two great-circle distance formulas (`GeoDistance.HaversineMetres` /
+  `.EquirectangularMetres`, both sphere-based, neither ellipsoid-corrected), a metres-radius bounding
+  box for SQL prefiltering (`GeoBounds.AroundMetres`), and the `IGeocodingProvider` contract a
+  provider package implements. Pure computation — no HTTP, no credentials, no database, no framework
+  dependency. **There is no `AddThemiaGeo`, deliberately**: `GeoPoint`, `GeoDistance` and `GeoBounds`
+  are a struct and two static classes with nothing to register, and `IGeocodingProvider` is registered
+  by the provider package that implements it instead. `Themia.Geo` also deliberately contains **no POI
+  store, no gazetteer and no name-matching/transliteration** — both consumer apps asked explicitly not
+  to ship these (coord #0115); each already has its own POI data in a shape the other's does not share,
+  and Thai name matching (`Lat Phrao` vs `Ladprao`, abbreviation marks, mixed transliteration/translation
+  columns) is unsolved app-side data, not shared geometry. See `src/neutral/Themia.Geo/README.md` for
+  the full list of what was considered and rejected.
+- **`Themia.Geo.Google`** (`net8.0;net10.0`) — `GoogleGeocodingProvider`, an `IGeocodingProvider` over
+  the Google Geocoding API. `AddThemiaGeoGoogle` registers it. Maps Google's `status` field to
+  `GeocodeOutcome`, distinguishing `ProviderLimit` (quota — stop, do not retry the batch) from
+  `ProviderError` (transport/unexpected — a retry may work); there is no failover between providers
+  here, unlike `Themia.AI` — geocoding runs in a background backfill a caller can simply stop and
+  resume. The API key travels as a `key` query parameter (Google's endpoint has no header form), so
+  `IHttpClientFactory`'s default request-URI logging is suppressed for this named client.
+- **`Themia.AI`** (`net8.0;net10.0`) — framework-neutral AI completion contracts and dispatch:
+  `IAiCompletionClient` (the one write surface an app calls: `CompleteAsync(AiOperation, AiPrompt, ct)`),
+  the `IAiCompletionProvider` seam a provider package implements, `AiPrompt`/`AiCompletion`/`AiUsage`,
+  and the five-outcome `AiOutcome` (`Completed`/`Truncated`/`Filtered`/`ProviderLimit`/`ProviderError`,
+  plus a reserved `Unspecified = 0` a real call never returns)
+  that lets a caller retry, fail over, or fall back correctly instead of collapsing every failure into
+  one exception. `AddThemiaAi` registers the dispatcher (`FailoverCompletionClient`) as
+  `IAiCompletionClient`: it resolves the configured model per provider per `AiOperation`, retries
+  `ProviderError` with backoff up to `AiOptions.MaxRetriesPerProvider`, fails over to the next
+  `AiOptions.Failover` entry on `ProviderLimit` and on exhausted `ProviderError` (never on `Filtered` —
+  a safety refusal is about the content, not the provider), and bounds every retry and failover for one
+  call to `AiOptions.TotalBudget` (default 45s). `ValidateOnStart` validates the whole provider ×
+  operation matrix, not each setting alone — a `Failover` entry with no `TranslationModel` configured
+  is a defect that works for months and fails the first time that provider is asked to translate.
+  Running with an empty `Failover` fails startup unless `AiOptions.AllowNoProvider` is set, so "no
+  provider configured" and "provider package forgotten" are distinguishable at startup rather than both
+  silently answering `Unavailable`. Also ships `IAiTextMasker`/`AiTextMasker` (reversible, collision-safe
+  `<x id="n"/>`-token masking, registered as defence in depth — the app still decides which fields are
+  sent at all) and `ITextTranslationService`/`TranslationService`, the one typed operation built on
+  `IAiCompletionClient`: `TranslateAsync` returns a `TranslationResult` whose `TranslationOutcome`
+  (`Translated`/`SameLanguage`/`Incomplete`/`Unavailable`) a caller must read before storing `Text` —
+  only `Translated` and `SameLanguage` are safe to persist; `Incomplete` (a `Truncated` completion, text
+  present but cut mid-sentence) and `Unavailable` (`Text == null`) are not. **There is no
+  `Themia.Modules.AI`, deliberately** — no tenant-scoped state, no schema, no `IThemiaModule`; see
+  `src/neutral/Themia.AI/README.md`.
+- **`Themia.AI.Gemini`** (`net8.0;net10.0`) — `GeminiCompletionProvider`, an `IAiCompletionProvider`
+  over Google's Gemini `generateContent` REST API. `AddThemiaAiGemini` registers it and bridges
+  `GeminiOptions` into a named `AiProviderOptions` keyed `AiProviderKeys.Gemini`. Maps HTTP status
+  (`429` → `ProviderLimit`, other non-2xx → `ProviderError`) and `finishReason` (`STOP` → `Completed`,
+  `MAX_TOKENS` → `Truncated`, `SAFETY`/`RECITATION`/`BLOCKLIST`/`PROHIBITED_CONTENT`/`SPII` →
+  `Filtered`) onto `AiOutcome`, and reads `usageMetadata` on every response that carries it, including
+  a filtered one — a refused call still consumed and is billed for its input tokens.
+- **`Themia.AI.OpenAiCompatible`** (`net8.0;net10.0`) — `OpenAiCompatibleCompletionProvider`, one
+  `IAiCompletionProvider` implementation of the OpenAI chat-completions shape that reaches OpenAI,
+  Ollama, Groq, Cerebras, LM Studio and vLLM by changing `BaseUrl` — the direct answer to a workload
+  that is bursty at publish time, where per-call price matters more than a monthly floor.
+  `AddThemiaAiOpenAiCompatible` registers it and bridges `OpenAiCompatibleOptions` into a named
+  `AiProviderOptions` keyed `AiProviderKeys.OpenAiCompatible`, and refuses to start if an API key is
+  configured against a plaintext, non-loopback `BaseUrl` (the key would be readable on the wire).
+  Maps `finish_reason` (`stop` → `Completed`, `length` → `Truncated`, `content_filter` → `Filtered`)
+  and HTTP status (`429` → `ProviderLimit`, other non-2xx → `ProviderError`) onto `AiOutcome`, and
+  reads `usage.prompt_tokens` / `completion_tokens`.
+- **`Themia.AI.AspNetCore`** (`net8.0;net10.0`) — `MapThemiaAiProbe`, a mountable endpoint an adopter
+  mounts in **their own** app to verify, against their own deployed configuration, that their AI
+  provider setup actually works. **Themia never holds a key and ships no deployable of its own** — the
+  probe reads whatever the adopter configured through `AddThemiaAi` / `AddThemiaAiGemini` /
+  `AddThemiaAiOpenAiCompatible`, and it references `Themia.AI` only, never a provider package, so it
+  works with whichever providers the adopter registered. Two routes, split by cost: `GET {path}` is a
+  no-cost configuration report — which provider keys are registered, the `Failover` order, and per
+  entry whether a matching provider is registered plus its `CompletionModel`/`TranslationModel`/
+  `Timeout` — and makes no provider call; `POST {path}` makes exactly one real call through
+  `IAiCompletionClient` and reports the `AiOutcome`, the model that answered, `AiUsage`, elapsed
+  time, and the provider's `ProviderStatus` (truncated) — which is what separates the failures that all
+  report `ProviderError`: `HTTP 401` (wrong key), `HTTP 429` (quota), `provider timeout`, `total budget
+  exhausted`, `no provider was tried`. **Fail-closed on both routes**, exactly like `Themia.Audit.AspNetCore`'s dashboard: no
+  `AiProbeOptions.Authorize` predicate (or one that throws) denies every request with a route-hiding
+  404, logged at mount time. No API key can appear in a response: the `GET` report never reads a
+  provider's own options type (it cannot — no `ProjectReference` to one). `ProviderStatus` is truncated
+  rather than dropped, and that truncation bounds response size rather than redacting: a provider that
+  writes a secret into its own diagnostic string has already handed it to the adopter's logs before this
+  endpoint sees it. The caller may pick
+  only which of the adopter's two configured models answers (`AiOperation.Completion` or
+  `.Translation`, via an optional JSON body) — never a model or endpoint of their own choosing — and the
+  probe prompt is capped at `AiProbeEndpoints.MaxPromptLength` (500 characters) and rejected with 400
+  before any provider call, so a probe endpoint sitting behind the adopter's own auth cannot become a
+  free, per-call-billed AI proxy.
+
+**The `GeminiAICaptionService` and `FallbackTextTranslationService` this replaces were both
+placeholders, not a working baseline.** ezy-assets' caption service concatenates request fields with
+emoji into a `StringBuilder`, with its own code comment admitting it "simulates AI by formatting the
+context"; its translation service returns the input text unchanged on every call. Neither repo makes a
+real call to any AI provider. So `Themia.AI` is not an upgrade — it is the first real implementation
+either consumer has had, and the typed `TranslationResult`/`TranslationOutcome` shape exists
+specifically because the placeholder's `Task<string>` signature could not distinguish "translated" from
+"handed you back what you gave me", which let a caller store Thai text into a row labelled `en-US`.
+
+> **Fixture provenance, and an open release gate.**
+> **`Themia.AI.Gemini`'s test fixtures are docs-derived, not captured**: no Gemini API key was available
+> in this environment, so every fixture (`gemini-completed`, `gemini-error`, `gemini-filtered`,
+> `gemini-max-tokens`, `gemini-rate-limited`) was built from Google's published Generative Language REST
+> reference rather than a real response, and each is marked `UNPROVEN: from docs, not captured` in
+> `tests/Themia.AI.Gemini.Tests/Fixtures/PROVENANCE.md`. If a real capture's shape ever differs from a
+> fixture's assumption, that is a finding about `GeminiCompletionProvider`'s parser, not about the test.
+> **A live smoke call against the real Gemini endpoint, with a real API key, is an open release gate for
+> this package** and has not been done.
+>
+> `Themia.AI.OpenAiCompatible`'s fixtures are a mix: `openai-completed` and `openai-max-tokens` are
+> **real captures** against a local Ollama instance (`qwen2.5-coder:32b`), byte-for-byte except for
+> re-indentation; `openai-filtered`, `openai-rate-limited` and `openai-error` are docs-derived, because
+> Ollama has no content filter, no rate limiter, and no on-demand 5xx to capture against. See
+> `tests/Themia.AI.OpenAiCompatible.Tests/Fixtures/PROVENANCE.md` for the exact request/response used
+> for each capture.
+
 ## [0.23.1] - 2026-09-08
 
 Follow-up to `0.23.0`. Every fix carries a test proven to fail without it.
