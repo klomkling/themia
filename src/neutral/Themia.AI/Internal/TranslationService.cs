@@ -6,7 +6,9 @@ namespace Themia.AI.Internal;
 /// The <see cref="ITextTranslationService"/> that <c>AddThemiaAi</c> registers. Short-circuits blank
 /// input and same-language requests without calling a provider, otherwise builds an <see cref="AiPrompt"/>
 /// and dispatches through <see cref="IAiCompletionClient"/> for <see cref="AiOperation.Translation"/>,
-/// mapping the result per design §4's table. Language codes are passed to the provider exactly as given
+/// mapping the result per design §4's table — with a success outcome that carried no text mapped to
+/// <see cref="TranslationOutcome.Unavailable"/>, because <see cref="TranslationResult"/> promises a
+/// non-null <see cref="TranslationResult.Text"/> on every other member. Language codes are passed to the provider exactly as given
 /// — this class holds no list of supported languages and normalises nothing.
 /// </summary>
 internal sealed class TranslationService(IAiCompletionClient client, ILogger<TranslationService> logger)
@@ -47,14 +49,26 @@ internal sealed class TranslationService(IAiCompletionClient client, ILogger<Tra
     {
         switch (completion.Outcome)
         {
-            case AiOutcome.Completed:
+            case AiOutcome.Completed when !string.IsNullOrEmpty(completion.Text):
                 return new TranslationResult(TranslationOutcome.Translated, completion.Text);
 
             // Truncated carries non-empty Text, so the reflexive mapping is Translated — that stores a
             // sentence that stops mid-word under a label that says it is finished. It gets a member of
             // its own instead.
-            case AiOutcome.Truncated:
+            case AiOutcome.Truncated when !string.IsNullOrEmpty(completion.Text):
                 return new TranslationResult(TranslationOutcome.Incomplete, completion.Text);
+
+            // A success outcome with no text: a Gemini STOP candidate whose parts are empty or absent, an
+            // OpenAI-compatible choice whose content is "". TranslationResult's own contract says Text is
+            // null only for Unavailable, so passing that through would hand a caller who did exactly what
+            // the design asks — read the outcome, then store Text — a null to write into a NOT NULL
+            // column. There is no text to report, which is what Unavailable means.
+            case AiOutcome.Completed:
+            case AiOutcome.Truncated:
+                logger.LogWarning(
+                    "Translation from {SourceLanguage} to {TargetLanguage} reported {Outcome} with no text; reporting Unavailable.",
+                    sourceLanguage, targetLanguage, completion.Outcome);
+                return new TranslationResult(TranslationOutcome.Unavailable, null);
 
             case AiOutcome.Filtered:
             case AiOutcome.ProviderLimit:

@@ -60,6 +60,9 @@ public enum TranslationOutcome
     /// <summary>Text exists and is cut mid-sentence at the output length limit. DO NOT store.</summary>
     Incomplete,
 
-    /// <summary>No provider, or the provider failed. <see cref="TranslationResult.Text"/> is null.</summary>
+    /// <summary>
+    /// No provider, the provider failed, or it reported success with no text at all.
+    /// <see cref="TranslationResult.Text"/> is null.
+    /// </summary>
     Unavailable,
 }

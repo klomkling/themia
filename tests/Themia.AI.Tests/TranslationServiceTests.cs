@@ -15,8 +15,42 @@ public class TranslationServiceTests
     [InlineData(AiOutcome.ProviderError, TranslationOutcome.Unavailable)]
     public async Task Maps_every_completion_outcome(AiOutcome completion, TranslationOutcome expected)
     {
-        var result = await Service(completion).TranslateAsync("สวัสดี", "th-TH", "en-US", default);
+        // Text is supplied on every row: the two success rows now mean "succeeded AND carried text",
+        // which is the only shape that maps to Translated or Incomplete.
+        var result = await Service(completion, text: "Hello").TranslateAsync("สวัสดี", "th-TH", "en-US", default);
         Assert.Equal(expected, result.Outcome);
+    }
+
+    // The hole in TranslationResult's own contract, which says Text is null only for Unavailable. Both
+    // providers can return a success outcome with nothing in it — a Gemini STOP candidate whose parts are
+    // empty or absent, an OpenAI-compatible choice whose content is "" — and that arrived as
+    // Translated/Incomplete with a null Text. A caller doing exactly what the design asks (read the
+    // outcome, then store Text) writes a NULL or throws.
+    [Theory]
+    [InlineData(AiOutcome.Completed, null)]
+    [InlineData(AiOutcome.Completed, "")]
+    [InlineData(AiOutcome.Truncated, null)]
+    [InlineData(AiOutcome.Truncated, "")]
+    public async Task A_success_outcome_with_no_text_is_unavailable(AiOutcome completion, string? text)
+    {
+        var result = await Service(completion, text).TranslateAsync("สวัสดี", "th-TH", "en-US", default);
+
+        Assert.Equal(TranslationOutcome.Unavailable, result.Outcome);
+        Assert.Null(result.Text);
+    }
+
+    // The contract stated as one assertion, over every outcome the service can produce: an outcome other
+    // than Unavailable always carries text a caller can store.
+    [Theory]
+    [InlineData(AiOutcome.Completed, "Hello")]
+    [InlineData(AiOutcome.Truncated, "Hello, this stops mid-w")]
+    [InlineData(AiOutcome.Completed, null)]
+    [InlineData(AiOutcome.ProviderError, "partial output from a failed call")]
+    public async Task Text_is_null_only_when_the_outcome_is_unavailable(AiOutcome completion, string? text)
+    {
+        var result = await Service(completion, text).TranslateAsync("สวัสดี", "th-TH", "en-US", default);
+
+        Assert.Equal(result.Text is null, result.Outcome == TranslationOutcome.Unavailable);
     }
 
     // The row a reflexive implementation gets wrong: Truncated carries non-empty text, so mapping it to

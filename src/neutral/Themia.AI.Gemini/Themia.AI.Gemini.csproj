@@ -3,7 +3,7 @@
     <!-- Neutral cross-framework package: MUST include net8.0 (cross-framework reuse). -->
     <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
     <PackageId>Themia.AI.Gemini</PackageId>
-    <Description>Google Gemini provider for Themia.AI's IAiCompletionProvider. Maps Gemini's finishReason and HTTP status onto AiOutcome, reads usageMetadata on every response that carries it, and suppresses IHttpClientFactory's default request-URI logging, because the API key travels as a query parameter with no header form this package uses.</Description>
+    <Description>Google Gemini provider for Themia.AI's IAiCompletionProvider. Maps Gemini's finishReason and HTTP status onto AiOutcome, reads usageMetadata on every response that carries it, and sends the API key as an x-goog-api-key header rather than a query parameter, so it is never part of a request URI; IHttpClientFactory's default request logging is suppressed for this client as defence in depth.</Description>
     <!-- Version is inherited from Directory.Build.props (shared). Do not set it here. -->
   </PropertyGroup>
   <ItemGroup>
