@@ -1,0 +1,29 @@
+<Project>
+
+  <!--
+    Build-time backstop for the migration-engine split
+    (docs/superpowers/specs/2026-09-09-data-migrations-engine-split.md §7). Themia.Data.Migrations
+    ships no ADO driver and no FluentMigrator runner provider on its own — an adopter must also
+    reference exactly one of Themia.Data.Migrations.{PostgreSql,MySql,SqlServer}. Missing that
+    reference was previously only a RUNTIME error (ThemiaMigrations.Run throws naming the missing
+    package); coord #0085 is the precedent for discovering that as a production boot loop after the
+    last good deploy artifact was already gone. This target makes the same defect a BUILD error.
+
+    buildTransitive/, NOT build/: a real adopter references an engine-consuming package (e.g.
+    Themia.Audit), not Themia.Data.Migrations directly. NuGet auto-imports `build/{id}.targets` only
+    for DIRECT PackageReferences; `buildTransitive/` is the asset location NuGet defines for exactly
+    the transitive case. In `build/` this target would silently never run for any real adopter.
+
+    OutputType == 'Exe': twenty-plus Themia libraries reference the core and must stay
+    engine-agnostic. Verified with `dotnet msbuild -getProperty:OutputType` that both Themia.Audit
+    and Themia.Audit.Tests report "Library" — so neither the libraries nor the test suite trips this
+    check, only an application that actually runs migrations.
+  -->
+
+  <Target Name="ThemiaCheckMigrationEngine" BeforeTargets="Build"
+          Condition="'$(OutputType)' == 'Exe' AND '$(ThemiaMigrationEngineSelected)' != 'true'">
+    <Error Code="THEMIA2001"
+           Text="Themia.Data.Migrations requires an engine package. Add a PackageReference to one of Themia.Data.Migrations.PostgreSql, .MySql or .SqlServer." />
+  </Target>
+
+</Project>

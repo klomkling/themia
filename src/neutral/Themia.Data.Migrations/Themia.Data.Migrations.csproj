@@ -27,6 +27,11 @@
     <InternalsVisibleTo Include="Themia.Data.Migrations.SqlServer" />
   </ItemGroup>
   <ItemGroup>
+    <!-- Build-time enforcement (spec §7): errors THEMIA2001 when an Exe consumer never brought in an
+         engine package. buildTransitive/, not build/ — see the .targets file for why. -->
+    <None Include="buildTransitive/Themia.Data.Migrations.targets" Pack="true" PackagePath="buildTransitive" />
+  </ItemGroup>
+  <ItemGroup>
     <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
