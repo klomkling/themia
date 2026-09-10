@@ -27,6 +27,42 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+### Changed
+- **(breaking) `Themia.Data.Migrations` no longer carries any database driver or engine-specific
+  FluentMigrator runner** (coord #0116, #0117). Three new packages —
+  `Themia.Data.Migrations.PostgreSql`, `Themia.Data.Migrations.MySql`,
+  `Themia.Data.Migrations.SqlServer` — each carry exactly one engine's `FluentMigrator.Runner.*` and
+  ADO driver behind an `IMigrationEngineAdapter` seam; the core keeps only the provider-agnostic
+  `FluentMigrator` + `FluentMigrator.Runner.Core`. Measured from the packed nuspec (not promised): the
+  core now resolves to `FluentMigrator`, `FluentMigrator.Runner.Core`, and six
+  `Microsoft.Extensions.*` packages that `CentralPackageTransitivePinningEnabled` promotes from those
+  two — **no `Npgsql`, `MySqlConnector`, or `Microsoft.Data.SqlClient`**, and a packaging test now pins
+  this so the defect cannot come back silently. See [MIGRATION.md](MIGRATION.md#unreleased).
+
+  **Four families need no source change** — `Themia.Audit`, `Themia.Exceptional` (through its engine
+  package), `Themia.Challenges`, `Themia.AspNetCore.DataProtection` — because each already routes
+  through an engine-specific entry point (`AddThemiaAuditPostgreSql`, `AddThemiaExceptionalPostgres`,
+  …) that now carries the adapter too; upgrading is a package-reference change only.
+
+  **`Themia.Scheduling`, all seven `Themia.Modules.*` (including Messaging), and the custom-dialect
+  `AddThemiaExceptionalProvider` path need one new line** — `AddThemiaDataMigrations{PostgreSql,MySql,
+  SqlServer}()` — because they resolve their engine adapter through a runtime registry rather than a
+  compile-time call. An app that upgrades and adds nothing gets `THEMIA2001` at build if it is an
+  `Exe`, and otherwise a runtime error naming the package to add.
+
+  **Not gone everywhere:** `FluentMigrator.Runner.SqlServer` declares `Microsoft.Data.SqlClient`
+  itself, so `Themia.Data.Migrations.SqlServer` still carries `Microsoft.IdentityModel.*` and
+  `Azure.Identity` unavoidably — only PostgreSQL and MySQL adopters shed the JWT stack. It was never
+  audit-specific: `Themia.Exceptional` (since 0.8.x) and `Themia.AspNetCore.DataProtection` carry the
+  identical dependency set today, through the same `Themia.Data.Migrations` reference.
+
+### Fixed
+- **`Themia.Audit/README.md` undercommunicated its own read surface** (coord #0116, #0117): two
+  independent consumers read it and both concluded reads were tenant-locked. `IAuditStore.QueryAsync`
+  is defined in `Themia.Audit` itself, not in `Themia.Modules.Audit`; `AuditQuery.TenantId = null`
+  means *no filter* (every tenant's rows plus host-level rows), and `AuditQuery.HostLevelOnly = true`
+  is the single-org case. No behaviour changed — the README now says so explicitly.
+
 ## [0.23.1] - 2026-09-08
 
 Follow-up to `0.23.0`. Every fix carries a test proven to fail without it.
