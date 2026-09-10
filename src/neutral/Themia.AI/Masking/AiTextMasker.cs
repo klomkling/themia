@@ -11,6 +11,10 @@ namespace Themia.AI;
 /// </remarks>
 public sealed class AiTextMasker : IAiTextMasker
 {
+    // The highest id a token already in the source is allowed to push the counter to. Half of int.MaxValue
+    // leaves over a billion ids before the counter could wrap, which no single string can consume.
+    private const int MaxScannedTokenId = int.MaxValue / 2;
+
     /// <inheritdoc/>
     /// <remarks>
     /// Scans <paramref name="text"/> for token-shaped substrings first and numbers new tokens from
@@ -29,7 +33,13 @@ public sealed class AiTextMasker : IAiTextMasker
             return new MaskedText(text, new Dictionary<string, string>(StringComparer.Ordinal));
 
         var nextId = NextAvailableTokenId(text);
-        var valuePattern = new Regex(string.Join('|', values.Select(Regex.Escape)));
+
+        // Longest first. .NET alternation takes the FIRST alternative that matches at a position, not
+        // the longest, so ["สมชาย", "สมชาย ใจดี"] in that order masks the given name and sends the
+        // family name to the provider in clear — for an API whose whole job is keeping those values out
+        // of the request, the worst way to fail. Ordering by length makes the longer value win wherever
+        // two candidates start at the same place, whatever order the caller listed them in.
+        var valuePattern = new Regex(string.Join('|', values.OrderByDescending(value => value.Length).Select(Regex.Escape)));
 
         var tokens = new Dictionary<string, string>(StringComparer.Ordinal);
         var maskedText = valuePattern.Replace(text, match =>
@@ -47,7 +57,17 @@ public sealed class AiTextMasker : IAiTextMasker
         var maxId = 0;
         foreach (Match match in MaskToken.Pattern.Matches(text))
         {
-            var id = int.Parse(match.Groups[1].Value);
+            // The ids come out of untrusted text and (\d+) bounds neither their length nor their value.
+            // int.Parse threw OverflowException out of Mask on <x id="99999999999999999999"/>, and
+            // <x id="2147483647"/> was worse than a throw: maxId + 1 wrapped to int.MinValue, the
+            // generated tokens read <x id="-2147483648"/>, MaskToken.Pattern could not match them, and
+            // Restore left the token in place — the user shown a placeholder where their own data should
+            // be, with nothing raised anywhere. An id at or above the ceiling is skipped instead: it
+            // cannot collide with a generated one, because reaching it would take more replacements than
+            // a string has positions.
+            if (!int.TryParse(match.Groups[1].Value, out var id) || id > MaxScannedTokenId)
+                continue;
+
             if (id > maxId)
                 maxId = id;
         }

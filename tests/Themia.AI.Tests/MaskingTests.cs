@@ -34,6 +34,42 @@ public class MaskingTests
         Assert.Throws<InvalidOperationException>(() => masked.Restore($"{token} and again {token}"));
     }
 
+    // The failure that matters most for an API whose job is masking: .NET alternation takes the FIRST
+    // alternative that matches at a position, not the longest, so listing the given name before the full
+    // name masked "สมชาย" and sent " ใจดี" — the family name, the PII — to the provider in clear. The
+    // caller did nothing wrong; they listed both values.
+    [Fact]
+    public void The_longest_matching_value_is_masked_not_the_first_listed()
+    {
+        var masked = Masker.Mask("ติดต่อ สมชาย ใจดี", ["สมชาย", "สมชาย ใจดี"]);
+
+        Assert.DoesNotContain("ใจดี", masked.Text, StringComparison.Ordinal);
+        Assert.Equal("ติดต่อ สมชาย ใจดี", masked.Restore(masked.Text));
+    }
+
+    // The token id is captured from untrusted text by (\d+), which bounds neither its length nor its
+    // value. This threw OverflowException straight out of Mask.
+    [Fact]
+    public void An_id_too_large_for_an_int_does_not_throw()
+    {
+        var masked = Masker.Mask("""<x id="99999999999999999999"/> and NAME""", ["NAME"]);
+
+        Assert.Equal("""<x id="99999999999999999999"/> and NAME""", masked.Restore(masked.Text));
+    }
+
+    // Worse than the throw above, because nothing was raised at all: int.MaxValue parsed, maxId + 1
+    // wrapped to int.MinValue, the generated token read <x id="-2147483648"/>, MaskToken.Pattern could
+    // not match it, and Restore left the token sitting in the output — the user shown a placeholder in
+    // place of their own data, silently.
+    [Fact]
+    public void An_id_of_int_max_does_not_silently_drop_the_masked_value()
+    {
+        var masked = Masker.Mask("""<x id="2147483647"/> and NAME""", ["NAME"]);
+
+        Assert.DoesNotContain("NAME", masked.Text, StringComparison.Ordinal);   // it really was masked
+        Assert.Equal("""<x id="2147483647"/> and NAME""", masked.Restore(masked.Text));
+    }
+
     // The text being masked is untrusted by construction. A listing description containing a literal token
     // would otherwise collide, Restore would see it twice and throw, and ONE LINE in a description would
     // make that listing permanently untranslatable — a denial an ordinary user can trigger.
