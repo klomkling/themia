@@ -1,0 +1,20 @@
+#nullable enable
+Themia.AI.OpenAiCompatible.DependencyInjection.AiOpenAiCompatibleServiceCollectionExtensions
+Themia.AI.OpenAiCompatible.OpenAiCompatibleCompletionProvider
+Themia.AI.OpenAiCompatible.OpenAiCompatibleCompletionProvider.CompleteAsync(string! model, Themia.AI.AiPrompt! prompt, System.TimeSpan timeout, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.AI.AiCompletion!>!
+Themia.AI.OpenAiCompatible.OpenAiCompatibleCompletionProvider.Key.get -> string!
+Themia.AI.OpenAiCompatible.OpenAiCompatibleCompletionProvider.OpenAiCompatibleCompletionProvider(System.Net.Http.IHttpClientFactory! httpClientFactory, Microsoft.Extensions.Options.IOptions<Themia.AI.OpenAiCompatible.OpenAiCompatibleOptions!>! openAiCompatibleOptions) -> void
+Themia.AI.OpenAiCompatible.OpenAiCompatibleOptions
+Themia.AI.OpenAiCompatible.OpenAiCompatibleOptions.ApiKey.get -> string!
+Themia.AI.OpenAiCompatible.OpenAiCompatibleOptions.ApiKey.set -> void
+Themia.AI.OpenAiCompatible.OpenAiCompatibleOptions.BaseUrl.get -> System.Uri?
+Themia.AI.OpenAiCompatible.OpenAiCompatibleOptions.BaseUrl.set -> void
+Themia.AI.OpenAiCompatible.OpenAiCompatibleOptions.CompletionModel.get -> string!
+Themia.AI.OpenAiCompatible.OpenAiCompatibleOptions.CompletionModel.set -> void
+Themia.AI.OpenAiCompatible.OpenAiCompatibleOptions.OpenAiCompatibleOptions() -> void
+Themia.AI.OpenAiCompatible.OpenAiCompatibleOptions.Timeout.get -> System.TimeSpan
+Themia.AI.OpenAiCompatible.OpenAiCompatibleOptions.Timeout.set -> void
+Themia.AI.OpenAiCompatible.OpenAiCompatibleOptions.TranslationModel.get -> string!
+Themia.AI.OpenAiCompatible.OpenAiCompatibleOptions.TranslationModel.set -> void
+const Themia.AI.OpenAiCompatible.OpenAiCompatibleCompletionProvider.HttpClientName = "Themia.AI.OpenAiCompatible" -> string!
+static Themia.AI.OpenAiCompatible.DependencyInjection.AiOpenAiCompatibleServiceCollectionExtensions.AddThemiaAiOpenAiCompatible(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Themia.AI.OpenAiCompatible.OpenAiCompatibleOptions!>! configure) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!

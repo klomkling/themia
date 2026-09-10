@@ -1,0 +1,93 @@
+#nullable enable
+const Themia.AI.AiProviderKeys.Gemini = "gemini" -> string!
+const Themia.AI.AiProviderKeys.OpenAiCompatible = "openai-compatible" -> string!
+static Themia.AI.DependencyInjection.AiServiceCollectionExtensions.AddThemiaAi(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Themia.AI.AiOptions!>! configure) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+Themia.AI.AiCompletion
+Themia.AI.AiCompletion.AiCompletion(Themia.AI.AiOutcome Outcome, string? Text, Themia.AI.AiUsage? Usage, string? Model, string? ProviderStatus) -> void
+Themia.AI.AiCompletion.Model.get -> string?
+Themia.AI.AiCompletion.Model.init -> void
+Themia.AI.AiCompletion.Outcome.get -> Themia.AI.AiOutcome
+Themia.AI.AiCompletion.Outcome.init -> void
+Themia.AI.AiCompletion.ProviderStatus.get -> string?
+Themia.AI.AiCompletion.ProviderStatus.init -> void
+Themia.AI.AiCompletion.Text.get -> string?
+Themia.AI.AiCompletion.Text.init -> void
+Themia.AI.AiCompletion.Usage.get -> Themia.AI.AiUsage?
+Themia.AI.AiCompletion.Usage.init -> void
+Themia.AI.AiOperation
+Themia.AI.AiOperation.Completion = 1 -> Themia.AI.AiOperation
+Themia.AI.AiOperation.Translation = 2 -> Themia.AI.AiOperation
+Themia.AI.AiOperation.Unspecified = 0 -> Themia.AI.AiOperation
+Themia.AI.AiOptions
+Themia.AI.AiOptions.AiOptions() -> void
+Themia.AI.AiOptions.AllowNoProvider.get -> bool
+Themia.AI.AiOptions.AllowNoProvider.set -> void
+Themia.AI.AiOptions.Failover.get -> string![]!
+Themia.AI.AiOptions.Failover.set -> void
+Themia.AI.AiOptions.MaxRetriesPerProvider.get -> int
+Themia.AI.AiOptions.MaxRetriesPerProvider.set -> void
+Themia.AI.AiOptions.TotalBudget.get -> System.TimeSpan
+Themia.AI.AiOptions.TotalBudget.set -> void
+Themia.AI.AiOutcome
+Themia.AI.AiOutcome.Completed = 1 -> Themia.AI.AiOutcome
+Themia.AI.AiOutcome.Filtered = 3 -> Themia.AI.AiOutcome
+Themia.AI.AiOutcome.ProviderError = 5 -> Themia.AI.AiOutcome
+Themia.AI.AiOutcome.ProviderLimit = 4 -> Themia.AI.AiOutcome
+Themia.AI.AiOutcome.Truncated = 2 -> Themia.AI.AiOutcome
+Themia.AI.AiOutcome.Unspecified = 0 -> Themia.AI.AiOutcome
+Themia.AI.AiProviderKeys
+Themia.AI.AiProviderOptions
+Themia.AI.AiProviderOptions.AiProviderOptions() -> void
+Themia.AI.AiProviderOptions.CompletionModel.get -> string!
+Themia.AI.AiProviderOptions.CompletionModel.set -> void
+Themia.AI.AiProviderOptions.Timeout.get -> System.TimeSpan
+Themia.AI.AiProviderOptions.Timeout.set -> void
+Themia.AI.AiProviderOptions.TranslationModel.get -> string!
+Themia.AI.AiProviderOptions.TranslationModel.set -> void
+Themia.AI.AiPrompt
+Themia.AI.AiPrompt.MaxOutputTokens.get -> int?
+Themia.AI.AiPrompt.MaxOutputTokens.init -> void
+Themia.AI.AiPrompt.System.get -> string?
+Themia.AI.AiPrompt.System.init -> void
+Themia.AI.AiPrompt.Temperature.get -> double?
+Themia.AI.AiPrompt.Temperature.init -> void
+Themia.AI.AiPrompt.User.get -> string!
+Themia.AI.AiPrompt.User.init -> void
+Themia.AI.AiTextMasker
+Themia.AI.AiTextMasker.AiTextMasker() -> void
+Themia.AI.AiTextMasker.Mask(string! text, System.Collections.Generic.IEnumerable<string!>! valuesToMask) -> Themia.AI.MaskedText!
+Themia.AI.AiUsage
+Themia.AI.AiUsage.AiUsage(int InputTokens, int OutputTokens) -> void
+Themia.AI.AiUsage.InputTokens.get -> int
+Themia.AI.AiUsage.InputTokens.init -> void
+Themia.AI.AiUsage.OutputTokens.get -> int
+Themia.AI.AiUsage.OutputTokens.init -> void
+Themia.AI.DependencyInjection.AiServiceCollectionExtensions
+Themia.AI.IAiCompletionClient
+Themia.AI.IAiCompletionClient.CompleteAsync(Themia.AI.AiOperation operation, Themia.AI.AiPrompt! prompt, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.AI.AiCompletion!>!
+Themia.AI.IAiCompletionProvider
+Themia.AI.IAiCompletionProvider.CompleteAsync(string! model, Themia.AI.AiPrompt! prompt, System.TimeSpan timeout, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.AI.AiCompletion!>!
+Themia.AI.IAiCompletionProvider.Key.get -> string!
+Themia.AI.IAiTextMasker
+Themia.AI.IAiTextMasker.Mask(string! text, System.Collections.Generic.IEnumerable<string!>! valuesToMask) -> Themia.AI.MaskedText!
+Themia.AI.ITextTranslationService
+Themia.AI.ITextTranslationService.TranslateAsync(string! text, string! sourceLanguage, string! targetLanguage, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.AI.TranslationResult!>!
+Themia.AI.MaskedText
+Themia.AI.MaskedText.MaskedText(string! Text, System.Collections.Generic.IReadOnlyDictionary<string!, string!>! Tokens) -> void
+Themia.AI.MaskedText.Restore(string! modelOutput) -> string!
+Themia.AI.MaskedText.Text.get -> string!
+Themia.AI.MaskedText.Text.init -> void
+Themia.AI.MaskedText.Tokens.get -> System.Collections.Generic.IReadOnlyDictionary<string!, string!>!
+Themia.AI.MaskedText.Tokens.init -> void
+Themia.AI.TranslationOutcome
+Themia.AI.TranslationOutcome.Incomplete = 3 -> Themia.AI.TranslationOutcome
+Themia.AI.TranslationOutcome.SameLanguage = 2 -> Themia.AI.TranslationOutcome
+Themia.AI.TranslationOutcome.Translated = 1 -> Themia.AI.TranslationOutcome
+Themia.AI.TranslationOutcome.Unavailable = 4 -> Themia.AI.TranslationOutcome
+Themia.AI.TranslationOutcome.Unspecified = 0 -> Themia.AI.TranslationOutcome
+Themia.AI.TranslationResult
+Themia.AI.TranslationResult.Outcome.get -> Themia.AI.TranslationOutcome
+Themia.AI.TranslationResult.Outcome.init -> void
+Themia.AI.TranslationResult.Text.get -> string?
+Themia.AI.TranslationResult.Text.init -> void
+Themia.AI.TranslationResult.TranslationResult(Themia.AI.TranslationOutcome Outcome, string? Text) -> void
