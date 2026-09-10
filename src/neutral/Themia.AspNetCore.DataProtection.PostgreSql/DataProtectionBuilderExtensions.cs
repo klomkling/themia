@@ -56,6 +56,10 @@ public static class DataProtectionBuilderExtensions
             runMigration: false,
             migrationOptions);
 
+        // Register on use, so an adopter who calls only engine-specific methods still has the enum path
+        // (a module, SchedulingSchema.Migrate) resolvable — see MigrationEngineRegistry.Add (coord #0126).
+        MigrationEngineRegistry.Add(PostgresMigrationEngine.Adapter);
+
         if (runMigration)
             ThemiaMigrations.Run(PostgresMigrationEngine.Adapter, connectionString, migrationOptions, [typeof(DataProtectionKeysMigration).Assembly]);
 

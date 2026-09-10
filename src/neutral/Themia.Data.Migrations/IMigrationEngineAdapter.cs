@@ -33,6 +33,29 @@ public interface IMigrationEngineAdapter
     DbConnection CreateUnpooledConnection(string connectionString);
 
     /// <summary>
+    /// Opens an ordinary <b>pooled</b> connection for this engine — the general-purpose factory a package
+    /// that needs a <see cref="DbConnection"/> for the engine it was handed should route through, instead
+    /// of naming a driver type of its own.
+    /// </summary>
+    /// <remarks>
+    /// Deliberately separate from <see cref="CreateUnpooledConnection"/> rather than a reuse of it. That
+    /// one disables pooling because the migration lock is held for the whole migration; a caller doing
+    /// ordinary short-lived work — a Quartz ADO job store, an execution-history writer — must not inherit
+    /// that, or every one of its connections would pay a fresh handshake and never return to the pool.
+    /// <para>
+    /// The reason this exists at all: a package that constructed <c>new NpgsqlConnection(…)</c> /
+    /// <c>new SqlConnection(…)</c> behind a <c>switch</c> on <see cref="MigrationEngine"/> had to declare
+    /// every driver it might switch to, which put <c>Microsoft.Data.SqlClient</c> (and with it
+    /// <c>Microsoft.IdentityModel.*</c> and <c>Azure.Identity</c>) into PostgreSQL-only adopters' images
+    /// — coord #0126. Routing through the adapter means only the one engine package the adopter chose
+    /// carries a driver.
+    /// </para>
+    /// </remarks>
+    /// <param name="connectionString">The connection string to open.</param>
+    /// <returns>An unopened, pooled connection.</returns>
+    DbConnection CreateConnection(string connectionString);
+
+    /// <summary>
     /// Attempts to acquire this engine's session-level advisory lock, scoped to <paramref name="scope"/>,
     /// waiting up to <paramref name="timeout"/>.
     /// </summary>

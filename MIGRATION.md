@@ -10,6 +10,50 @@ with the *why* and concrete upgrade steps.
 - Each entry states: **What changed**, **Why**, and **How to upgrade** (before → after).
 - Non-breaking changes are *not* listed here — see the CHANGELOG.
 
+## Unreleased
+
+### `IMigrationEngineAdapter.CreateConnection` (breaking for third-party adapters)
+
+**What changed:** `IMigrationEngineAdapter` has a new member:
+
+```csharp
+DbConnection CreateConnection(string connectionString);
+```
+
+**Why:** `Themia.Scheduling` built its execution-history connections from a `switch` on
+`MigrationEngine` that constructed `NpgsqlConnection` / `SqlConnection` itself, which forced the
+package to declare **both** drivers — so a PostgreSQL-only adopter still took
+`Microsoft.Data.SqlClient` and, with it, `Microsoft.IdentityModel.*` and `Azure.Identity` (coord
+#0126). Routing through the adapter means only the single engine package an adopter chose carries a
+driver. It is a *pooled* connection, distinct from `CreateUnpooledConnection`: that one exists for the
+migration lock, which is held for an entire migration, and a Quartz ADO job store must not inherit
+that.
+
+**How to upgrade:** nothing to do if you use Themia's own adapters — the three in-box implementations
+are updated. If you implement `IMigrationEngineAdapter` yourself, add the member; for every engine
+Themia supports the body is the plain constructor:
+
+```csharp
+public DbConnection CreateConnection(string connectionString) => new NpgsqlConnection(connectionString);
+```
+
+### Engine-specific calls now populate `MigrationEngineRegistry`
+
+**What changed:** behaviour only, and strictly additive. `AddThemiaExceptional{Engine}`,
+`AddThemiaAudit{Engine}`, `AddThemiaChallenges{Engine}` and `PersistKeysToThemia{Engine}` now also call
+`MigrationEngineRegistry.Add(...)` for their engine.
+
+**Why:** those calls knew their engine at compile time and skipped the registry on purpose, which left
+an adopter who used *only* engine-specific calls with an empty registry — and then anything resolving
+the same engine by enum (`SchedulingSchema.Migrate`, any `Themia.Modules.*` constructor) threw
+`InvalidOperationException: … no adapter is registered` at startup, after a clean build. `THEMIA2001`
+could not catch it, because the engine package **was** referenced (see the note under 0.25.0).
+
+**How to upgrade:** nothing required. If you added `AddThemiaDataMigrations{Engine}()` only to satisfy
+that error, you may now drop it *provided* you make at least one engine-specific call — but keeping it
+is harmless and still correct, and it remains **required** if you use `Themia.Scheduling` or a module
+without any engine-specific package.
+
 ## 0.25.0
 
 ### `Themia.Data.Migrations` split by engine
@@ -73,11 +117,19 @@ services.AddThemiaDataMigrationsPostgreSql();
 services.AddThemiaExceptionalProvider(myDialect, configure, MigrationEngine.Postgres, connectionString, runMigration: true);
 ```
 
-**If you upgrade and add nothing:** an app whose `OutputType` is `Exe` fails at build with
-`THEMIA2001`, naming the missing engine package. A library or test project that never reaches an
-`Exe`'s build gets a runtime `InvalidOperationException` the first time `ThemiaMigrations.Run` (or a
-module's migration step) resolves an engine with nothing registered, naming the same package and the
+**If you upgrade and add nothing:** an app whose `OutputType` is `Exe` and which references **no**
+engine package at all fails at build with `THEMIA2001`, naming the packages to choose from. Otherwise
+you get a runtime `InvalidOperationException` the first time `ThemiaMigrations.Run` (or a module's
+migration step) resolves an engine with nothing registered, naming the package and the
 `AddThemiaDataMigrations{Engine}()` call to add.
+
+**What `THEMIA2001` does and does not cover.** It checks for the engine **package**, not for the
+`AddThemiaDataMigrations{Engine}()` **call**. It is an MSBuild target, and a guard that lives in the
+build cannot see a call site the build never reaches — MSBuild sees your `PackageReference` graph, not
+your C#. So an app that references an engine package (directly, or transitively through
+`Themia.Exceptional.PostgreSql`, `Themia.Audit.SqlServer`, …) and never makes the call builds clean and
+still fails at boot. That gap is closed from the next release onward — every engine-specific entry point
+now registers its adapter as a side effect — but on 0.25.0 exactly, make the call.
 
 **Not fixed by this change:** `Themia.Data.Migrations.SqlServer` still carries
 `Microsoft.IdentityModel.*` and `Azure.Identity` — `FluentMigrator.Runner.SqlServer` declares

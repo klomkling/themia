@@ -1,6 +1,7 @@
 #nullable enable
 Themia.Data.Migrations.IMigrationEngineAdapter
 Themia.Data.Migrations.IMigrationEngineAdapter.ConfigureRunner(FluentMigrator.Runner.IMigrationRunnerBuilder! builder) -> void
+Themia.Data.Migrations.IMigrationEngineAdapter.CreateConnection(string! connectionString) -> System.Data.Common.DbConnection!
 Themia.Data.Migrations.IMigrationEngineAdapter.CreateUnpooledConnection(string! connectionString) -> System.Data.Common.DbConnection!
 Themia.Data.Migrations.IMigrationEngineAdapter.DisplayName.get -> string!
 Themia.Data.Migrations.IMigrationEngineAdapter.Engine.get -> Themia.Data.Migrations.MigrationEngine

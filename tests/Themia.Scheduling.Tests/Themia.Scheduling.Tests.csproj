@@ -17,5 +17,8 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/neutral/Themia.Scheduling/Themia.Scheduling.csproj" />
+    <!-- ConnectionFactoryTests needs a real IMigrationEngineAdapter to resolve, and this is also the
+         reference an adopter must add now that Themia.Scheduling itself carries no ADO driver. -->
+    <ProjectReference Include="../../src/neutral/Themia.Data.Migrations.PostgreSql/Themia.Data.Migrations.PostgreSql.csproj" />
   </ItemGroup>
 </Project>

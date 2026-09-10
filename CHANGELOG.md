@@ -27,6 +27,49 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+### Changed
+- **(breaking) `IMigrationEngineAdapter` gained `CreateConnection(string)`** — a pooled, general-purpose
+  connection factory alongside the existing `CreateUnpooledConnection`. Deliberately a second method
+  rather than a reuse of the first: the unpooled one exists because the migration lock is held for a
+  whole migration, and a Quartz ADO job store doing short-lived work must not inherit that. **Breaking
+  for anyone implementing `IMigrationEngineAdapter` outside Themia** — the three in-box adapters are
+  updated. See [MIGRATION.md](MIGRATION.md#unreleased).
+
+### Fixed
+- **`Themia.Exceptional` and `Themia.Scheduling` still shipped a database driver, so the JWT stack
+  never left ezy-assets' production image** (coord #0126). The 0.25.0 engine split fixed the
+  *transitive* path through `Themia.Data.Migrations`; these two declared drivers **themselves** and so
+  were never on it. `Themia.Exceptional` referenced `Microsoft.Data.SqlClient` (with a
+  `VersionOverride`) while naming no provider type in any of its own `.cs` files — a dead reference,
+  now deleted. `Themia.Scheduling` referenced `Npgsql` **and** `Microsoft.Data.SqlClient` to feed a
+  `switch` on `MigrationEngine` that constructed `NpgsqlConnection`/`SqlConnection` directly; that
+  factory now routes through the adapter seam, so only the one `Themia.Data.Migrations.{Engine}`
+  package an adopter chose carries a driver. Measured from the packed nuspecs, both packages shed
+  `Microsoft.Data.SqlClient` and the five `Microsoft.IdentityModel.*` / `System.IdentityModel.Tokens.Jwt`
+  dependencies it promotes; `Themia.Exceptional.AspNetCore`, which had no driver of its own and
+  inherited `Themia.Exceptional`'s, sheds them too. The packaging test that pins
+  `Themia.Data.Migrations` now pins these two as well — nothing pinned them before, which is why the
+  class came back at all. **Scheduling still supports PostgreSQL and SQL Server only**; that is
+  unchanged.
+
+- **A migration could fail at boot with "no adapter is registered" in an app that plainly referenced
+  the engine package** (coord #0126). Every engine-specific entry point — `AddThemiaExceptional{Engine}`,
+  `AddThemiaAudit{Engine}`, `AddThemiaChallenges{Engine}`, `PersistKeysToThemia{Engine}` — held its
+  adapter at compile time and passed it straight to `ThemiaMigrations.Run`, deliberately never touching
+  `MigrationEngineRegistry`. An adopter who called only those methods therefore had an **empty
+  registry**, and any code resolving the same engine *by enum* — `SchedulingSchema.Migrate`, every
+  `Themia.Modules.*` constructor — threw at startup: a crash loop on a version bump, with a clean build
+  behind it. Each of those entry points now also calls `MigrationEngineRegistry.Add(...)`, which is
+  idempotent, so the enum path resolves as a side effect of any engine-specific call. This does **not**
+  remove `AddThemiaDataMigrations{Engine}()`: it stays required for an adopter using `Themia.Scheduling`
+  or a module with no engine package at all, and for them `THEMIA2001` genuinely fires.
+
+### Documentation
+- **`THEMIA2001` was described as catching a missing registration; it catches a missing engine
+  package.** The guard is an MSBuild target keyed on `OutputType == 'Exe'` and the absence of any
+  `Themia.Data.Migrations.{Engine}` reference — a guard that lives in the build cannot see a call site
+  the build never reaches. MIGRATION.md and the 0.25.0 entry above now say which of the two it is.
+
 ## [0.25.0] - 2026-09-10
 
 ### Changed
@@ -50,7 +93,11 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
   `AddThemiaExceptionalProvider` path need one new line** — `AddThemiaDataMigrations{PostgreSql,MySql,
   SqlServer}()` — because they resolve their engine adapter through a runtime registry rather than a
   compile-time call. An app that upgrades and adds nothing gets `THEMIA2001` at build if it is an
-  `Exe`, and otherwise a runtime error naming the package to add.
+  `Exe` **that references no engine package at all**, and otherwise a runtime error naming the package
+  to add. `THEMIA2001` checks for the engine **package**, never for the
+  `AddThemiaDataMigrations{Engine}()` **call** — an MSBuild target sees the `PackageReference` graph,
+  not the C#, so an app that has the package and skips the call builds clean and fails at boot. See the
+  `Unreleased` entry, which closes that gap.
 
   **Not gone everywhere:** `FluentMigrator.Runner.SqlServer` declares `Microsoft.Data.SqlClient`
   itself, so `Themia.Data.Migrations.SqlServer` still carries `Microsoft.IdentityModel.*` and

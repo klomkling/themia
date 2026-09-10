@@ -53,6 +53,10 @@ public static class DataProtectionBuilderExtensions
             runMigration: false,
             migrationOptions);
 
+        // Register on use, so an adopter who calls only engine-specific methods still has the enum path
+        // (a module, SchedulingSchema.Migrate) resolvable — see MigrationEngineRegistry.Add (coord #0126).
+        MigrationEngineRegistry.Add(MySqlMigrationEngine.Adapter);
+
         if (runMigration)
             ThemiaMigrations.Run(MySqlMigrationEngine.Adapter, connectionString, migrationOptions, [typeof(DataProtectionKeysMigration).Assembly]);
 

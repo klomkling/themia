@@ -30,6 +30,9 @@ public sealed class PostgresMigrationEngineAdapter : IMigrationEngineAdapter
         new NpgsqlConnection(new NpgsqlConnectionStringBuilder(connectionString) { Pooling = false }.ConnectionString);
 
     /// <inheritdoc />
+    public DbConnection CreateConnection(string connectionString) => new NpgsqlConnection(connectionString);
+
+    /// <inheritdoc />
     public bool TryAcquireLock(DbConnection connection, string scope, TimeSpan timeout, out Exception? timeoutCause)
     {
         timeoutCause = null;
