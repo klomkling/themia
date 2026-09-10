@@ -188,6 +188,34 @@ jobs:
         # the part most likely to silently break in a future packaging change.
         run: bash eng/verify-analyzer-flow.sh
 
+  migrations-engine-guard:
+    name: Migrations engine guard (adopter smoke test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v6
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', '**/Directory.Packages.props') }}
+          restore-keys: ${{ runner.os }}-nuget-
+
+      - name: Verify the build-time migration-engine guard flows to adopters
+        # Packs Themia.Data.Migrations + its PostgreSql engine + Themia.Audit + Themia.Audit.PostgreSql
+        # to a local feed, then builds two throwaway Exe consumers that only reference Themia.Audit /
+        # Themia.Audit.PostgreSql (never the core directly) — proving THEMIA2001 fires transitively with
+        # no engine package and stays silent once one is referenced. A unit test cannot see this: the
+        # guard lives in a buildTransitive/ MSBuild asset only NuGet's restore/import pipeline wires up.
+        run: bash eng/verify-migrations-engine-guard.sh
+
   request-copilot-review:
     name: Request Copilot Review
     # Request a Copilot review on open/reopen/ready AND on every new push (synchronize), so each

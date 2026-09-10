@@ -22,4 +22,7 @@
     <ProjectReference Include="../../src/neutral/Themia.Exceptional.SqlServer/Themia.Exceptional.SqlServer.csproj" />
     <ProjectReference Include="../Themia.Exceptional.Conformance/Themia.Exceptional.Conformance.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/neutral/Themia.Data.Migrations.SqlServer/Themia.Data.Migrations.SqlServer.csproj" />
+  </ItemGroup>
 </Project>

@@ -2,9 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using Themia.Audit.Http;
-using Themia.Audit.Migrations;
 using Themia.Audit.Redaction;
-using Themia.Data.Migrations;
 
 namespace Themia.Audit.DependencyInjection;
 
@@ -21,14 +19,22 @@ public static class AuditServiceCollectionExtensions
     /// <see cref="IAuditDialect"/> and <see cref="IAuditStore"/> the recorder registered here depends on.
     /// </summary>
     /// <remarks>
-    /// Runs the FluentMigrator schema migration itself (unless <paramref name="runMigration"/> is
+    /// Runs the FluentMigrator schema migration (unless <paramref name="runMigration"/> is
     /// <see langword="false"/>), so a consumer using <c>Themia.Audit</c> with no module layer still gets a
-    /// table (design §11) — mirroring <c>Themia.Exceptional</c>'s <c>ServiceCollectionExtensions</c>.
+    /// table (design §11) — mirroring <c>Themia.Exceptional</c>'s <c>ServiceCollectionExtensions</c>. The
+    /// migration itself does not run here: this call records the migration intent through
+    /// <see cref="AuditMigrationHandshake"/>, and whichever of this call or the matching
+    /// <c>AddThemiaAudit{Engine}</c> call completes second actually runs it (design §5.2) — the pair is
+    /// order-free, so both the published call order and its reverse migrate exactly once.
     /// When <paramref name="runMigration"/> is <see langword="true"/> (the default), <see cref="AuditOptions.Engine"/>
     /// and <see cref="AuditOptions.ConnectionString"/> are checked immediately and this call throws
     /// <see cref="InvalidOperationException"/>, naming the missing setting, when either is invalid —
     /// asking for a migration and silently not getting one would surface, at best, as a "table does not
-    /// exist" error at the first audit write, which is worse than failing here. Pass
+    /// exist" error at the first audit write, which is worse than failing here. The same reasoning covers
+    /// the other way the migration can fail to happen: if no <c>AddThemiaAudit{Engine}</c> call ever
+    /// completes the handshake — the shape an adopter with their own <see cref="IAuditDialect"/> and
+    /// <see cref="IAuditStore"/> falls into — an options validation fails the host at startup naming the
+    /// call to add, rather than letting the missing table surface at the first write. Pass
     /// <paramref name="runMigration"/>: <see langword="false"/> to defer schema creation and rely on
     /// <c>ValidateOnStart</c> instead. <paramref name="configure"/> is invoked twice — once to check the
     /// options ahead of the migration, once by the options system — so it must be a pure assignment of
@@ -92,7 +98,30 @@ public static class AuditServiceCollectionExtensions
                     + "runMigration: false to defer schema creation.");
             }
 
-            ThemiaMigrations.Run(ToMigrationEngine(probe.Engine), probe.ConnectionString, typeof(AuditSchemaMigration).Assembly);
+            AuditMigrationHandshake.RecordIntent(services, runMigration: true, probe.ConnectionString);
+
+            // The handshake means this call alone cannot create the table any more: an adopter using the
+            // neutral core with their OWN IAuditDialect/IAuditStore never calls an AddThemiaAudit{Engine},
+            // so the adapter half never arrives and the requested migration silently does not happen —
+            // surfacing much later as `relation "audit_log" does not exist` at the first write. Validation,
+            // not a registration-time throw: whether the adapter arrives is only knowable once registration
+            // is over, and AddThemiaAudit's options are already ValidateOnStart'd, so this fails the host at
+            // startup naming the exact call to add.
+            services.AddOptions<AuditOptions>()
+                .Validate(
+                    _ => !AuditMigrationHandshake.IsMigrationPending(services),
+                    "AddThemiaAudit was called with runMigration: true, but no AddThemiaAuditPostgreSql() / "
+                    + "AddThemiaAuditMySql() / AddThemiaAuditSqlServer() call supplied the migration engine, "
+                    + "so the audit schema was never created. Add the call for your engine to the same "
+                    + "IServiceCollection, or pass runMigration: false if you create the audit table "
+                    + "yourself.");
+        }
+        else
+        {
+            // Still records intent — with RunMigration: false — so the handshake has both halves to
+            // consume once the matching AddThemiaAudit{Engine} call arrives, in either order, and never
+            // runs the migration nobody asked for. The connection string is never read in this branch.
+            AuditMigrationHandshake.RecordIntent(services, runMigration: false, connectionString: string.Empty);
         }
 
         return services;
@@ -103,12 +132,4 @@ public static class AuditServiceCollectionExtensions
 
     private static bool HasConnectionString(AuditOptions options) =>
         !string.IsNullOrWhiteSpace(options.ConnectionString);
-
-    private static MigrationEngine ToMigrationEngine(AuditEngine engine) => engine switch
-    {
-        AuditEngine.Postgres => MigrationEngine.Postgres,
-        AuditEngine.SqlServer => MigrationEngine.SqlServer,
-        AuditEngine.MySql => MigrationEngine.MySql,
-        _ => throw new ArgumentOutOfRangeException(nameof(engine), engine, "Unknown AuditEngine value."),
-    };
 }

@@ -76,7 +76,11 @@
     <PackageVersion Include="FluentMigrator" Version="8.0.1" />
     <!-- Reference only the provider runners Themia supports (PostgreSQL/MySQL/SQL Server) instead of the
          FluentMigrator.Runner meta-package: it drags in unused providers (Db2/Oracle/Hana/…), and the
-         x64-only IBM.Data.Db2.dll forces ReSharper/Rider to launch tests as x64 (broken on Apple Silicon). -->
+         x64-only IBM.Data.Db2.dll forces ReSharper/Rider to launch tests as x64 (broken on Apple Silicon).
+         Runner.Core is the provider-agnostic half of that meta-package (AddFluentMigratorCore,
+         IMigrationRunnerBuilder) and carries none of the unused providers, so Themia.Data.Migrations
+         references it directly instead. -->
+    <PackageVersion Include="FluentMigrator.Runner.Core" Version="8.0.1" />
     <PackageVersion Include="FluentMigrator.Runner.Postgres" Version="8.0.1" />
     <PackageVersion Include="FluentMigrator.Runner.MySql" Version="8.0.1" />
     <PackageVersion Include="FluentMigrator.Runner.SqlServer" Version="8.0.1" />

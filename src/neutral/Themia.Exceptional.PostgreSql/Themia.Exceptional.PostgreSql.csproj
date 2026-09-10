@@ -11,6 +11,7 @@
   <ItemGroup>
     <ProjectReference Include="../Themia.Exceptional/Themia.Exceptional.csproj" />
     <ProjectReference Include="../Themia.Data.Migrations/Themia.Data.Migrations.csproj" />
+    <ProjectReference Include="../Themia.Data.Migrations.PostgreSql/Themia.Data.Migrations.PostgreSql.csproj" />
     <ProjectReference Include="../Themia.Data.Probes/Themia.Data.Probes.csproj" />
   </ItemGroup>
   <ItemGroup>

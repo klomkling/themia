@@ -10,6 +10,94 @@ with the *why* and concrete upgrade steps.
 - Each entry states: **What changed**, **Why**, and **How to upgrade** (before → after).
 - Non-breaking changes are *not* listed here — see the CHANGELOG.
 
+## 0.25.0
+
+### `Themia.Data.Migrations` split by engine
+
+**What changed:** `Themia.Data.Migrations` no longer bundles a FluentMigrator runner or ADO driver for
+every engine. Each engine now lives in its own package —
+`Themia.Data.Migrations.{PostgreSql,MySql,SqlServer}` — carrying that engine's
+`FluentMigrator.Runner.*`, its driver, and an `IMigrationEngineAdapter` implementation. The core keeps
+only `FluentMigrator` and `FluentMigrator.Runner.Core`.
+
+**Why:** the pre-split core measured at fifteen nuspec dependencies — three runners and three ADO
+drivers (`Npgsql`, `MySqlConnector`, `Microsoft.Data.SqlClient`) a given deployment mostly does not
+use, dragged in by a `ProjectReference` and flattened into every consumer's restore graph (coord
+#0116, #0117). `Themia.Data.Migrations`'s resolved dependency set is now pinned by a packaging test
+that fails the moment any of those three drivers returns by any path.
+
+**How to upgrade** depends on which family you use:
+
+**No source change *if you already make the engine-specific call*** — `Themia.Audit`,
+`Themia.Exceptional` (through its engine package,
+`AddThemiaExceptionalPostgres`/`…MySql`/`…SqlServer`), `Themia.Challenges`, and
+`Themia.AspNetCore.DataProtection`. Each of these families has an engine-specific call
+(`AddThemiaAuditPostgreSql()`, `PersistKeysToThemiaPostgres(…)`, …) that knows its engine at compile
+time; that call now also registers the adapter. If you make it, `Program.cs` is untouched, the
+documented call order still works, and `runMigration: false` still means no migration — a
+package-reference bump only. Add the matching `Themia.Data.Migrations.{PostgreSql,MySql,SqlServer}`
+package reference (it usually arrives transitively through the engine package you already reference)
+and rebuild.
+
+**But `AddThemiaAudit(runMigration: true)` now needs `AddThemiaAudit{Engine}()` to migrate at all.**
+Before this change `AddThemiaAudit` applied the migration on its own. It now only records the request,
+and the migration runs when `AddThemiaAuditPostgreSql()` / `…MySql()` / `…SqlServer()` supplies the
+engine on the same `IServiceCollection` (either call order works). An adopter using the neutral
+`Themia.Audit` with their **own** `IAuditDialect`/`IAuditStore` — a custom dialect, SQLite — previously
+got the table from `AddThemiaAudit` alone and would now get nothing. That case is not left silent: the
+requested-but-unpaired migration fails `AuditOptions` validation at startup, naming the call to add. To
+upgrade, either add the `AddThemiaAudit{Engine}()` call for your engine, or pass `runMigration: false`
+if you create the audit table yourself.
+
+**One new line** — `Themia.Scheduling`, all seven `Themia.Modules.*` (`Export`, `Identity.Dapper`,
+`Identity.EFCore`, `Messaging`, `Notifications`, `Pdf`, `Storage`), and any caller of the
+custom-dialect `AddThemiaExceptionalProvider(...)` overload (an adopter supplying their own
+`IExceptionalSqlDialect` rather than going through an engine package). These resolve their engine
+through a runtime registry — the migration engine is a config-bound `MigrationEngine` enum value, not
+known at compile time — so add:
+
+```csharp
+services.AddThemiaDataMigrationsPostgreSql();   // or …MySql() / …SqlServer(), matching your engine
+```
+
+**Position matters in exactly one of these cases.** The seven modules migrate from
+`IThemiaModule.InitializeAsync`, which runs after the container is built, so
+`AddThemiaDataMigrations{Engine}()` may go anywhere in `Startup`/`Program.cs`. `Themia.Scheduling`
+follows the same rule. The **custom-dialect `AddThemiaExceptionalProvider` path is the exception**: it
+migrates synchronously during registration, so there `AddThemiaDataMigrations{Engine}()` must be
+called *before* `AddThemiaExceptionalProvider(...)`, not merely before the host starts:
+
+```csharp
+// custom-dialect Exceptional — order required
+services.AddThemiaDataMigrationsPostgreSql();
+services.AddThemiaExceptionalProvider(myDialect, configure, MigrationEngine.Postgres, connectionString, runMigration: true);
+```
+
+**If you upgrade and add nothing:** an app whose `OutputType` is `Exe` fails at build with
+`THEMIA2001`, naming the missing engine package. A library or test project that never reaches an
+`Exe`'s build gets a runtime `InvalidOperationException` the first time `ThemiaMigrations.Run` (or a
+module's migration step) resolves an engine with nothing registered, naming the same package and the
+`AddThemiaDataMigrations{Engine}()` call to add.
+
+**Not fixed by this change:** `Themia.Data.Migrations.SqlServer` still carries
+`Microsoft.IdentityModel.*` and `Azure.Identity` — `FluentMigrator.Runner.SqlServer` declares
+`Microsoft.Data.SqlClient` itself, which brings the JWT/Azure stack with it regardless of anything
+Themia does. Only PostgreSQL and MySQL adopters shed it.
+
+### `Themia.Audit/README.md`: the read surface was never tenant-locked
+
+**What changed:** documentation only — no API or behaviour changed. `Themia.Audit/README.md` now
+states plainly that `IAuditStore.QueryAsync` is defined in `Themia.Audit` itself (not in
+`Themia.Modules.Audit`), and spells out `AuditQuery`'s two independent tenant knobs:
+`AuditQuery.TenantId = null` (the default) means *no filter* — every tenant's rows plus host-level
+rows — and `AuditQuery.HostLevelOnly = true` is the single-org case (only rows with a `null` stored
+`TenantId`).
+
+**Why:** two independent consumers (coord #0116, #0117) read the previous text and both concluded the
+read surface was tenant-locked to the ambient tenant, and treated that as a blocker. It never was —
+`ITenantAuditReader` (`Themia.Modules.Audit`) is a convenience wrapper over `QueryAsync`, not a gate in
+front of it. Nothing to upgrade; re-read the README if you hit the same conclusion.
+
 ## 0.19.0
 
 ### `IUserService` mutations return `UserMutationResult`

@@ -34,4 +34,9 @@
     <ProjectReference Include="../../src/framework/Themia.Framework.Data.Dapper.PostgreSql/Themia.Framework.Data.Dapper.PostgreSql.csproj" />
     <ProjectReference Include="../../src/framework/Themia.MultiTenancy/Themia.MultiTenancy.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/neutral/Themia.Data.Migrations.PostgreSql/Themia.Data.Migrations.PostgreSql.csproj" />
+    <ProjectReference Include="../../src/neutral/Themia.Data.Migrations.SqlServer/Themia.Data.Migrations.SqlServer.csproj" />
+    <ProjectReference Include="../../src/neutral/Themia.Data.Migrations.MySql/Themia.Data.Migrations.MySql.csproj" />
+  </ItemGroup>
 </Project>

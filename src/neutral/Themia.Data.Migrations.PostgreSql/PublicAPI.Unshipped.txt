@@ -1,0 +1,12 @@
+#nullable enable
+Themia.Data.Migrations.PostgreSql.PostgresMigrationEngine
+Themia.Data.Migrations.PostgreSql.PostgresMigrationEngineAdapter
+Themia.Data.Migrations.PostgreSql.PostgresMigrationEngineAdapter.ConfigureRunner(FluentMigrator.Runner.IMigrationRunnerBuilder! builder) -> void
+Themia.Data.Migrations.PostgreSql.PostgresMigrationEngineAdapter.CreateUnpooledConnection(string! connectionString) -> System.Data.Common.DbConnection!
+Themia.Data.Migrations.PostgreSql.PostgresMigrationEngineAdapter.DisplayName.get -> string!
+Themia.Data.Migrations.PostgreSql.PostgresMigrationEngineAdapter.Engine.get -> Themia.Data.Migrations.MigrationEngine
+Themia.Data.Migrations.PostgreSql.PostgresMigrationEngineAdapter.PostgresMigrationEngineAdapter() -> void
+Themia.Data.Migrations.PostgreSql.PostgresMigrationEngineAdapter.ReleaseLock(System.Data.Common.DbConnection! connection, string! scope) -> void
+Themia.Data.Migrations.PostgreSql.PostgresMigrationEngineAdapter.TryAcquireLock(System.Data.Common.DbConnection! connection, string! scope, System.TimeSpan timeout, out System.Exception? timeoutCause) -> bool
+static Themia.Data.Migrations.PostgreSql.PostgresMigrationEngine.AddThemiaDataMigrationsPostgreSql(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static Themia.Data.Migrations.PostgreSql.PostgresMigrationEngine.Adapter.get -> Themia.Data.Migrations.IMigrationEngineAdapter!

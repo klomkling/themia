@@ -27,6 +27,13 @@
     <PackageReference Include="Testcontainers.MsSql" />
   </ItemGroup>
   <ItemGroup>
+    <!-- The collection fixture migrates through ThemiaMigrations.Run(MigrationEngine, ...), the enum
+         overload, so this assembly must register the adapters itself — see EngineRegistration.cs. -->
+    <ProjectReference Include="../../src/neutral/Themia.Data.Migrations.PostgreSql/Themia.Data.Migrations.PostgreSql.csproj" />
+    <ProjectReference Include="../../src/neutral/Themia.Data.Migrations.MySql/Themia.Data.Migrations.MySql.csproj" />
+    <ProjectReference Include="../../src/neutral/Themia.Data.Migrations.SqlServer/Themia.Data.Migrations.SqlServer.csproj" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="../../src/neutral/Themia.AspNetCore.DataProtection.PostgreSql/Themia.AspNetCore.DataProtection.PostgreSql.csproj" />
     <ProjectReference Include="../../src/neutral/Themia.AspNetCore.DataProtection.MySql/Themia.AspNetCore.DataProtection.MySql.csproj" />
     <ProjectReference Include="../../src/neutral/Themia.AspNetCore.DataProtection.SqlServer/Themia.AspNetCore.DataProtection.SqlServer.csproj" />

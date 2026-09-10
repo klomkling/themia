@@ -60,21 +60,60 @@ public static class ThemiaMigrations
     /// Deliberately not <c>params</c>: with it, a three-argument call whose last argument is <c>null</c> would
     /// be ambiguous between this overload and the <c>params</c> one. Pass a collection expression —
     /// <c>Run(engine, cs, options, [typeof(X).Assembly])</c>.
+    /// <para>
+    /// Resolves <paramref name="engine"/> to an <see cref="IMigrationEngineAdapter"/> through
+    /// <see cref="MigrationEngineRegistry"/> and delegates to the <c>Run(IMigrationEngineAdapter, …)</c>
+    /// overload. Throws naming the missing package when no adapter is registered for
+    /// <paramref name="engine"/>.
+    /// </para>
     /// </remarks>
     public static void Run(
         MigrationEngine engine,
         string connectionString,
         ThemiaMigrationOptions? options,
+        Assembly[] migrationAssemblies) =>
+        Run(MigrationEngineRegistry.Resolve(engine), connectionString, options, migrationAssemblies);
+
+    /// <inheritdoc cref="Run(MigrationEngine, string, Assembly[])"/>
+    /// <param name="adapter">
+    /// The engine adapter to migrate with — for callers that already hold one (the four families with an
+    /// engine-specific entry point) rather than resolving through <see cref="MigrationEngineRegistry"/>.
+    /// </param>
+    /// <param name="connectionString">Connection string for the migration runner. Required.</param>
+    /// <param name="migrationAssemblies">
+    /// One or more assemblies scanned for <c>[Migration]</c> types. At least one is required, and the
+    /// supplied set must contain at least one migration — passing assemblies with no <c>[Migration]</c>
+    /// types is rejected rather than silently applying nothing.
+    /// </param>
+    public static void Run(IMigrationEngineAdapter adapter, string connectionString, params Assembly[] migrationAssemblies) =>
+        Run(adapter, connectionString, options: null, migrationAssemblies);
+
+    /// <inheritdoc cref="Run(IMigrationEngineAdapter, string, Assembly[])"/>
+    /// <param name="adapter">
+    /// The engine adapter to migrate with — for callers that already hold one (the four families with an
+    /// engine-specific entry point) rather than resolving through <see cref="MigrationEngineRegistry"/>.
+    /// </param>
+    /// <param name="connectionString">Connection string for the migration runner. Required.</param>
+    /// <param name="options">
+    /// Migration-lock settings (wait timeout and a logger for lock diagnostics). Pass <see langword="null"/>
+    /// for the defaults.
+    /// </param>
+    /// <param name="migrationAssemblies">
+    /// One or more assemblies scanned for <c>[Migration]</c> types. At least one is required, and the
+    /// supplied set must contain at least one migration — passing assemblies with no <c>[Migration]</c>
+    /// types is rejected rather than silently applying nothing.
+    /// </param>
+    public static void Run(
+        IMigrationEngineAdapter adapter,
+        string connectionString,
+        ThemiaMigrationOptions? options,
         Assembly[] migrationAssemblies)
     {
+        ArgumentNullException.ThrowIfNull(adapter);
         ArgumentException.ThrowIfNullOrWhiteSpace(connectionString);
         ArgumentNullException.ThrowIfNull(migrationAssemblies);
         if (migrationAssemblies.Length == 0)
             throw new ArgumentException("At least one migration assembly is required.", nameof(migrationAssemblies));
-
-        // One source of truth for per-engine knowledge (processor + display name). Resolved up front so an
-        // unknown engine fails as a clean guard before any infrastructure is built.
-        var (addProcessor, displayName) = Describe(engine);
 
         // Every assembly is version-checked BEFORE any of them is applied: a mixed set must fail without
         // having half-migrated the database, and this costs two reflection reads with no connection open.
@@ -90,23 +129,21 @@ public static class ThemiaMigrations
         // what keeps the multi-assembly overload from quietly reintroducing the shared ledger.
         foreach (var migrationAssembly in migrationAssemblies)
         {
-            RunAssembly(engine, connectionString, options, addProcessor, displayName, migrationAssembly);
+            RunAssembly(adapter, connectionString, options, migrationAssembly);
         }
     }
 
     private static void RunAssembly(
-        MigrationEngine engine,
+        IMigrationEngineAdapter adapter,
         string connectionString,
         ThemiaMigrationOptions? options,
-        Action<IMigrationRunnerBuilder> addProcessor,
-        string displayName,
         Assembly migrationAssembly)
     {
         var provider = new ServiceCollection()
             .AddFluentMigratorCore()
             .ConfigureRunner(rb =>
             {
-                addProcessor(rb);
+                adapter.ConfigureRunner(rb);
                 rb.WithGlobalConnectionString(connectionString)
                   .ScanIn(migrationAssembly).For.Migrations();
             })
@@ -120,7 +157,7 @@ public static class ThemiaMigrations
         var bodyFaulted = true;
         try
         {
-            RunCore(scope.ServiceProvider, engine, connectionString, options, displayName, migrationAssembly);
+            RunCore(scope.ServiceProvider, adapter, connectionString, options, migrationAssembly);
             bodyFaulted = false;
         }
         finally
@@ -192,10 +229,9 @@ public static class ThemiaMigrations
 
     private static void RunCore(
         IServiceProvider serviceProvider,
-        MigrationEngine engine,
+        IMigrationEngineAdapter adapter,
         string connectionString,
         ThemiaMigrationOptions? options,
-        string displayName,
         Assembly migrationAssembly)
     {
 
@@ -217,7 +253,7 @@ public static class ThemiaMigrations
             // Duplicate version numbers and other discovery failures are real migration errors — surface
             // them through a wrap (not raw), with a message that fits the load stage rather than DDL/permissions.
             throw new InvalidOperationException(
-                $"Themia.Data.Migrations: failed to load migrations for {displayName}. " +
+                $"Themia.Data.Migrations: failed to load migrations for {adapter.DisplayName}. " +
                 "The supplied migration assemblies could not be enumerated (e.g. duplicate migration version numbers).", ex);
         }
 
@@ -233,29 +269,21 @@ public static class ThemiaMigrations
         {
             // Serialized across instances: N of them booting at once would otherwise all see the same
             // migration pending and apply it concurrently (see MigrationLock).
-            MigrationLock.RunExclusive(engine, connectionString, options ?? new ThemiaMigrationOptions(), runner.MigrateUp);
+            MigrationLock.RunExclusive(adapter, connectionString, options ?? new ThemiaMigrationOptions(), runner.MigrateUp);
         }
         catch (MigrationLockException ex)
         {
             // Kept separate from the DDL wrap below: a lock failure never reached a migration, so pointing the
             // operator at DDL permissions would send them auditing grants for an outage that has another cause.
             throw new InvalidOperationException(
-                $"Themia.Data.Migrations: could not take the migration lock for {displayName}, so no " +
+                $"Themia.Data.Migrations: could not take the migration lock for {adapter.DisplayName}, so no " +
                 "migrations were applied. See the inner exception for the lock failure.", ex);
         }
         catch (Exception ex)
         {
             throw new InvalidOperationException(
-                $"Themia.Data.Migrations: failed to apply migrations against {displayName}. " +
+                $"Themia.Data.Migrations: failed to apply migrations against {adapter.DisplayName}. " +
                 "Verify the connection string and that the principal has DDL permissions.", ex);
         }
     }
-
-    private static (Action<IMigrationRunnerBuilder> AddProcessor, string DisplayName) Describe(MigrationEngine engine) => engine switch
-    {
-        MigrationEngine.Postgres => (rb => rb.AddPostgres(), "PostgreSQL"),
-        MigrationEngine.MySql => (rb => rb.AddMySql8(), "MySQL"),
-        MigrationEngine.SqlServer => (rb => rb.AddSqlServer(), "SQL Server"),
-        _ => throw new ArgumentOutOfRangeException(nameof(engine), engine, "Unknown migration engine."),
-    };
 }

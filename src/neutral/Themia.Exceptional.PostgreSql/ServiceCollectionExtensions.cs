@@ -1,8 +1,10 @@
 using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
 using Themia.Data.Migrations;
+using Themia.Data.Migrations.PostgreSql;
 using Themia.Data.Probes;
 using Themia.Exceptional;
+using Themia.Exceptional.Migrations;
 
 namespace Themia.Exceptional.PostgreSql;
 
@@ -12,6 +14,11 @@ public static class ServiceCollectionExtensions
     /// <summary>
     /// Registers the PostgreSQL exception store: dialect, engine, options, and runs the
     /// FluentMigrator schema migration immediately so the <c>Exceptions</c> table exists.
+    /// <para>
+    /// The migration runs here, against <see cref="PostgresMigrationEngine.Adapter"/> directly, rather than
+    /// inside <c>AddThemiaExceptionalProvider</c> — this engine package already knows its engine at compile
+    /// time, so it does not need <c>MigrationEngineRegistry</c> to resolve one (design spec §5.3).
+    /// </para>
     /// <para>
     /// Also registers <see cref="Themia.Exceptional.Serilog.ExceptionalSerilogSink"/> and
     /// <see cref="Themia.Exceptional.Serilog.HttpContextEnricher"/>
@@ -40,7 +47,12 @@ public static class ServiceCollectionExtensions
             dialect: new PostgresExceptionalDialect(connectionString),
             configure: configure,
             engine: MigrationEngine.Postgres,
-            connectionString: connectionString);
+            connectionString: connectionString,
+            runMigration: false);
+
+        // Migrates here, against the adapter directly, instead of inside AddThemiaExceptionalProvider —
+        // see the remarks above.
+        ThemiaMigrations.Run(PostgresMigrationEngine.Adapter, connectionString, typeof(ExceptionLogMigration).Assembly);
 
         // "Exceptions" is created quoted, so it must be probed quoted -- an unquoted probe folds to
         // lower case and would report a table that exists as missing.

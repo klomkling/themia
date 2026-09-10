@@ -75,18 +75,24 @@ public class AuditServiceCollectionExtensionsTests
     }
 
     [Fact]
-    public void AddThemiaAudit_with_default_runMigration_surfaces_a_migration_failure()
+    public void AddThemiaAudit_with_default_runMigration_defers_the_migration_attempt_until_a_provider_package_completes_the_handshake()
     {
         var services = new ServiceCollection();
 
-        // Malformed connection string fails fast at parse time — no network I/O, deterministic.
-        var ex = Assert.Throws<InvalidOperationException>(() => services.AddThemiaAudit(o =>
+        // AddThemiaAudit no longer migrates by itself (design §5.2): it records the runMigration
+        // handshake's intent half and returns, regardless of how bad the connection string is, because
+        // the adapter half — supplied by AddThemiaAudit{Engine} — has not arrived yet. This project
+        // references no provider package (see the class remarks), so there is nothing here to complete
+        // the pair; the "migration actually runs, and surfaces a failure" case is covered cross-package in
+        // Themia.Audit.IntegrationTests.AuditMigrationHandshakeTests, where a real AddThemiaAuditPostgreSql
+        // call is available to complete it.
+        var exception = Record.Exception(() => services.AddThemiaAudit(o =>
         {
             o.ConnectionString = "this is not a connection string";
             o.Engine = AuditEngine.Postgres;
         }));
 
-        Assert.Contains("PostgreSQL", ex.Message, StringComparison.Ordinal);
+        Assert.Null(exception);
     }
 
     [Fact]
@@ -111,6 +117,49 @@ public class AuditServiceCollectionExtensionsTests
             o => o.Engine = AuditEngine.Postgres, runMigration: true));
 
         Assert.Contains(nameof(AuditOptions.ConnectionString), ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AddThemiaAudit_with_runMigration_true_and_no_engine_package_fails_at_startup()
+    {
+        var services = new ServiceCollection();
+
+        // The adopter shape the handshake made silent: the neutral core with a hand-supplied
+        // IAuditDialect/IAuditStore (a custom dialect, SQLite, …) and therefore no AddThemiaAudit{Engine}
+        // call to carry the adapter. Before the handshake this call migrated immediately; after it, the
+        // requested migration simply never happens. This project references no provider package, so it is
+        // exactly that adopter — and startup must say so rather than leaving the missing table to surface
+        // as `relation "audit_log" does not exist` at the first audit write.
+        services.AddThemiaAudit(o =>
+        {
+            o.ConnectionString = "Host=localhost;Database=x";
+            o.Engine = AuditEngine.Postgres;
+        });
+
+        using var provider = services.BuildServiceProvider();
+
+        // What ValidateOnStart runs against in a real host; resolving .Value is the same validation path.
+        var ex = Assert.Throws<OptionsValidationException>(() => provider.GetRequiredService<IOptions<AuditOptions>>().Value);
+        Assert.Contains("AddThemiaAuditPostgreSql", ex.Message, StringComparison.Ordinal);
+        Assert.Contains("runMigration: false", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AddThemiaAudit_with_runMigration_false_does_not_fail_at_startup_for_a_missing_engine()
+    {
+        var services = new ServiceCollection();
+
+        // The other half of the check above: an adopter who declined the migration has nothing pending, so
+        // the same missing engine package must NOT fail their startup.
+        services.AddThemiaAudit(o =>
+        {
+            o.ConnectionString = "Host=localhost;Database=x";
+            o.Engine = AuditEngine.Postgres;
+        }, runMigration: false);
+
+        using var provider = services.BuildServiceProvider();
+
+        Assert.Equal(AuditEngine.Postgres, provider.GetRequiredService<IOptions<AuditOptions>>().Value.Engine);
     }
 
     private sealed class FakeStore : IAuditStore

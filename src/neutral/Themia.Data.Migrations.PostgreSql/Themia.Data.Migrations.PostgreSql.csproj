@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <!-- Neutral cross-framework package: MUST include net8.0 (cross-framework reuse). -->
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <PackageId>Themia.Data.Migrations.PostgreSql</PackageId>
+    <Description>PostgreSQL migration engine adapter for Themia.Data.Migrations: FluentMigrator's Postgres runner, Npgsql, and the pg_advisory_lock boot lock.</Description>
+    <PackageTags>themia;migrations;postgresql</PackageTags>
+    <!-- Version is inherited from Directory.Build.props (shared). Do not set it here. -->
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="FluentMigrator.Runner.Postgres" />
+    <PackageReference Include="Npgsql" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Themia.Data.Migrations/Themia.Data.Migrations.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Sets ThemiaMigrationEngineSelected for the core's build-time guard (spec §7). -->
+    <None Include="buildTransitive/Themia.Data.Migrations.PostgreSql.props" Pack="true" PackagePath="buildTransitive" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+  <ItemGroup>
+    <AdditionalFiles Include="PublicAPI.Shipped.txt" />
+    <AdditionalFiles Include="PublicAPI.Unshipped.txt" />
+  </ItemGroup>
+</Project>

@@ -38,6 +38,14 @@ layer. Pass `runMigration: false` to defer it. Calling it with `runMigration: tr
 migration that silently does not run would surface much later as a missing-table error at the first
 write.
 
+**The migration needs both calls.** `AddThemiaAudit` records the request; the matching
+`AddThemiaAudit{Engine}()` supplies the engine, and whichever of the two runs second applies the
+migration. Order between them does not matter, but *both* are required: if you use this core with your
+own `IAuditDialect`/`IAuditStore` and never call one of `AddThemiaAuditPostgreSql()` /
+`AddThemiaAuditMySql()` / `AddThemiaAuditSqlServer()`, the requested migration cannot run, and startup
+fails with an options-validation error naming the call to add. Pass `runMigration: false` if you create
+the audit table yourself.
+
 ## Recording an event
 
 ```csharp
@@ -97,19 +105,38 @@ migration. Fields an adopter names — `EventType`, `ActorId`, `EntityType`, `En
 events into one. Fields the framework captures — `UserAgent`, `IpAddress` — are truncated, because a
 clipped user-agent is still the same event.
 
-## Reads are not tenant-filtered
+## Reads: the query surface lives here, not in the module
 
-`IAuditStore.QueryAsync` applies **no tenant predicate** unless `AuditQuery` carries one. This package
-is framework-neutral and cannot see `ITenantContext`.
+**`IAuditStore.QueryAsync` is defined and implemented in `Themia.Audit` (this package) — not in
+`Themia.Modules.Audit`.** You can query without taking the module at all: construct an `AuditQuery`
+and call `QueryAsync` against any `IAuditStore` your engine package registers.
 
-If you are multi-tenant, use `ITenantAuditReader` from `Themia.Modules.Audit`, which pre-seeds the
-ambient tenant and cannot be asked for another tenant's rows.
+`QueryAsync` applies **no tenant predicate unless `AuditQuery` asks for one**, because this package is
+framework-neutral and cannot see `ITenantContext`. `AuditQuery` has two independent knobs for this,
+not one:
+
+- **`AuditQuery.TenantId = null`** (the default) means **no filter** — rows for every tenant *and*
+  every host-level row (see below) come back. This is not "tenant-locked"; it is the widest read the
+  store can do.
+- **`AuditQuery.TenantId = "<id>"`** narrows to that one tenant's rows only.
+- **`AuditQuery.HostLevelOnly = true`** narrows to rows where the stored `AuditEntry.TenantId IS NULL`
+  — the single-org case, where every row belongs to "the org" and there is no per-tenant filter to
+  apply in the first place.
+
+If you are multi-tenant and want the ambient tenant applied for you, `ITenantAuditReader` from
+`Themia.Modules.Audit` sets `AuditQuery.TenantId` to the caller's tenant and refuses to be asked for
+another tenant's rows. That module wrapper is a convenience over `QueryAsync`, not a gate in front of
+it — nothing about `Themia.Audit` on its own restricts which tenant's rows a caller can read.
 
 ## Tenant semantics
 
-`TenantId` is nullable and `null` means **host-level**, not "unknown". A failed login for an
-identifier matching no user genuinely has no tenant, and is exactly the row a security review wants.
-Nothing in this package invents a tenant.
+On the *written* row, `AuditEntry.TenantId` is nullable and `null` means **host-level**, not
+"unknown". A failed login for an identifier matching no user genuinely has no tenant, and is exactly
+the row a security review wants. Nothing in this package invents a tenant.
+
+This is the same nullable `TenantId` shape as the query filter above, but a different property on a
+different type: `AuditEntry.TenantId` is what got recorded; `AuditQuery.TenantId` (and
+`HostLevelOnly`) is how you filter it back out.
 
 ## Retention
 

@@ -11,6 +11,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../Themia.Audit/Themia.Audit.csproj" />
+    <ProjectReference Include="../Themia.Data.Migrations.SqlServer/Themia.Data.Migrations.SqlServer.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers">

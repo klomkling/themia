@@ -1,11 +1,34 @@
 using System.Reflection;
 using Themia.Data.Migrations;
+using Themia.Data.Migrations.MySql;
+using Themia.Data.Migrations.PostgreSql;
 using Xunit;
 
 namespace Themia.Data.Migrations.Tests;
 
+/// <summary>
+/// Every test class that reads or mutates <see cref="MigrationEngineRegistry"/> belongs here.
+/// <see cref="MigrationEngineRegistry"/> is process-wide static state, and the guard tests below clear it
+/// mid-run; xUnit runs test classes in different collections in parallel within an assembly, so without
+/// this pinning a future class that resolved through the registry would intermittently observe an empty
+/// one. Tests inside a single class never run concurrently, so membership of this collection is the whole
+/// guarantee — it is structural rather than "no other class happens to use the registry today".
+/// </summary>
+[CollectionDefinition(Name, DisableParallelization = true)]
+public sealed class MigrationEngineRegistryCollection
+{
+    /// <summary>The collection name, referenced by <see cref="CollectionAttribute"/> on member classes.</summary>
+    public const string Name = "MigrationEngineRegistry";
+}
+
+[Collection(MigrationEngineRegistryCollection.Name)]
 public class ThemiaMigrationsGuardTests
 {
+    // These tests drive MigrationEngine.Postgres through Run's guard clauses only — no DB connection is
+    // ever opened — but resolving the engine still needs an adapter registered. MigrationEngineRegistry.Add
+    // is idempotent, so registering unconditionally here is safe regardless of test run order.
+    static ThemiaMigrationsGuardTests() => MigrationEngineRegistry.Add(PostgresMigrationEngine.Adapter);
+
     // The Themia.Data.Migrations runner package is a migration-free assembly by design (it contains no
     // [Migration] types and never will), so it is a robust fixture for the "no migrations" guard — unlike
     // the test assembly, which now carries deliberate [Migration] fixtures (see DuplicateVersionMigrations).
@@ -61,5 +84,91 @@ public class ThemiaMigrationsGuardTests
             () => ThemiaMigrations.Run(MigrationEngine.Postgres, "Host=localhost;Database=x", typeof(ThemiaMigrationsGuardTests).Assembly));
 
         Assert.NotNull(ex.InnerException);
+    }
+
+    // Task 4 (registry group): one "nothing registered" test per engine, and each one states what keeps
+    // its engine unregistered at the moment it runs.
+    //
+    //   Postgres  — the static constructor above registers it for every other test in this class, so this
+    //               test clears the registry and restores it in a finally.
+    //   MySql     — this project DOES reference Themia.Data.Migrations.MySql, and the sibling
+    //               Run_ResolvesTheLateRegisteredAdapter… test below registers the MySql adapter. That test
+    //               unregisters it again in its own finally, and tests within one class never run
+    //               concurrently, so MySql is unregistered whichever order xunit picks for the two.
+    //   SqlServer — nothing in this assembly can register it: there is no reference to
+    //               Themia.Data.Migrations.SqlServer, so SqlServerMigrationEngine.Adapter is unreachable
+    //               from here.
+    //
+    // Across classes the guarantee is MigrationEngineRegistryCollection: this class is pinned into a
+    // non-parallel collection, so no other class in the assembly can be resolving through the registry
+    // while these tests clear it.
+    [Fact]
+    public void Run_ThrowsNamingPostgreSqlPackage_WhenAdapterNotRegistered()
+    {
+        MigrationEngineRegistry.Reset();
+        try
+        {
+            var ex = Assert.Throws<InvalidOperationException>(
+                () => ThemiaMigrations.Run(MigrationEngine.Postgres, "Host=localhost;Database=x", NoMigrationAssembly));
+
+            Assert.Contains("Themia.Data.Migrations.PostgreSql", ex.Message, StringComparison.Ordinal);
+            Assert.Contains("AddThemiaDataMigrationsPostgreSql", ex.Message, StringComparison.Ordinal);
+        }
+        finally
+        {
+            MigrationEngineRegistry.Add(PostgresMigrationEngine.Adapter);
+        }
+    }
+
+    [Fact]
+    public void Run_ThrowsNamingMySqlPackage_WhenAdapterNotRegistered()
+    {
+        var ex = Assert.Throws<InvalidOperationException>(
+            () => ThemiaMigrations.Run(MigrationEngine.MySql, "Server=localhost;Database=x", NoMigrationAssembly));
+
+        Assert.Contains("Themia.Data.Migrations.MySql", ex.Message, StringComparison.Ordinal);
+        Assert.Contains("AddThemiaDataMigrationsMySql", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Run_ThrowsNamingSqlServerPackage_WhenAdapterNotRegistered()
+    {
+        var ex = Assert.Throws<InvalidOperationException>(
+            () => ThemiaMigrations.Run(MigrationEngine.SqlServer, "Server=localhost;Database=x", NoMigrationAssembly));
+
+        Assert.Contains("Themia.Data.Migrations.SqlServer", ex.Message, StringComparison.Ordinal);
+        Assert.Contains("AddThemiaDataMigrationsSqlServer", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Run_ResolvesTheLateRegisteredAdapter_RegardlessOfOtherStartupStepsInBetween()
+    {
+        // Proves spec §6's "position-independent in startup" claim for the registry group. Every
+        // Themia.Modules.* constructor and SchedulingSchema.Migrate migrate from InitializeAsync, a phase
+        // that runs strictly after ConfigureServices (StorageModule.cs:40-52), so
+        // AddThemiaDataMigrationsMySql() may be called anywhere in an adopter's startup — even after
+        // unrelated registrations — as long as it precedes the Run call the module eventually makes.
+        try
+        {
+            var unrelatedStartupStepsRan = new List<string> { "AddDbContext", "AddQuartz" }; // stand-ins for
+            // other ConfigureServices work that runs before the adapter is registered
+            Assert.Equal(2, unrelatedStartupStepsRan.Count);
+
+            MigrationEngineRegistry.Add(MySqlMigrationEngine.Adapter); // registered late; still resolves
+
+            // With the adapter now resolvable, Run reaches its next guard (no [Migration] types in this
+            // assembly) instead of the "no adapter is registered" failure — proof the late registration
+            // took effect regardless of what ran before it.
+            var ex = Assert.Throws<ArgumentException>(
+                () => ThemiaMigrations.Run(MigrationEngine.MySql, "Server=localhost;Database=x", NoMigrationAssembly));
+            Assert.DoesNotContain("no adapter is registered", ex.Message, StringComparison.Ordinal);
+        }
+        finally
+        {
+            // MySql must go back to unregistered so Run_ThrowsNamingMySqlPackage_WhenAdapterNotRegistered
+            // stays valid no matter which order xunit picks for these two tests.
+            MigrationEngineRegistry.Reset();
+            MigrationEngineRegistry.Add(PostgresMigrationEngine.Adapter);
+        }
     }
 }

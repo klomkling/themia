@@ -1,0 +1,12 @@
+#nullable enable
+Themia.Data.Migrations.MySql.MySqlMigrationEngine
+Themia.Data.Migrations.MySql.MySqlMigrationEngineAdapter
+Themia.Data.Migrations.MySql.MySqlMigrationEngineAdapter.ConfigureRunner(FluentMigrator.Runner.IMigrationRunnerBuilder! builder) -> void
+Themia.Data.Migrations.MySql.MySqlMigrationEngineAdapter.CreateUnpooledConnection(string! connectionString) -> System.Data.Common.DbConnection!
+Themia.Data.Migrations.MySql.MySqlMigrationEngineAdapter.DisplayName.get -> string!
+Themia.Data.Migrations.MySql.MySqlMigrationEngineAdapter.Engine.get -> Themia.Data.Migrations.MigrationEngine
+Themia.Data.Migrations.MySql.MySqlMigrationEngineAdapter.MySqlMigrationEngineAdapter() -> void
+Themia.Data.Migrations.MySql.MySqlMigrationEngineAdapter.ReleaseLock(System.Data.Common.DbConnection! connection, string! scope) -> void
+Themia.Data.Migrations.MySql.MySqlMigrationEngineAdapter.TryAcquireLock(System.Data.Common.DbConnection! connection, string! scope, System.TimeSpan timeout, out System.Exception? timeoutCause) -> bool
+static Themia.Data.Migrations.MySql.MySqlMigrationEngine.AddThemiaDataMigrationsMySql(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static Themia.Data.Migrations.MySql.MySqlMigrationEngine.Adapter.get -> Themia.Data.Migrations.IMigrationEngineAdapter!

@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.DataProtection;
+using Themia.AspNetCore.DataProtection.Migrations;
 using Themia.Data.Migrations;
+using Themia.Data.Migrations.SqlServer;
 
 namespace Themia.AspNetCore.DataProtection.SqlServer;
 
@@ -29,6 +31,12 @@ public static class DataProtectionBuilderExtensions
     /// instance can boot at once — the migration runs during service registration, before the host has built
     /// any logging provider.
     /// </param>
+    /// <remarks>
+    /// The migration runs here, against <see cref="SqlServerMigrationEngine.Adapter"/> directly, rather than
+    /// inside the shared <c>PersistKeysToThemia</c> (called below with <c>runMigration: false</c>) — this
+    /// engine package already knows its engine at compile time, so it does not need
+    /// <c>MigrationEngineRegistry</c> to resolve one (design spec §5.3).
+    /// </remarks>
     public static IDataProtectionBuilder PersistKeysToThemiaSqlServer(
         this IDataProtectionBuilder builder,
         string connectionString,
@@ -38,11 +46,16 @@ public static class DataProtectionBuilderExtensions
         ArgumentNullException.ThrowIfNull(builder);
         ArgumentException.ThrowIfNullOrWhiteSpace(connectionString);
 
-        return builder.PersistKeysToThemia(
+        var result = builder.PersistKeysToThemia(
             new SqlServerDataProtectionKeyDialect(connectionString),
             MigrationEngine.SqlServer,
             connectionString,
-            runMigration,
+            runMigration: false,
             migrationOptions);
+
+        if (runMigration)
+            ThemiaMigrations.Run(SqlServerMigrationEngine.Adapter, connectionString, migrationOptions, [typeof(DataProtectionKeysMigration).Assembly]);
+
+        return result;
     }
 }

@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Themia.Challenges;
 using Themia.Challenges.Migrations;
 using Themia.Data.Migrations;
+using Themia.Data.Migrations.SqlServer;
 
 namespace Themia.Challenges.SqlServer;
 
@@ -22,7 +23,7 @@ public static class ServiceCollectionExtensions
 
         services.TryAddSingleton<IChallengeDialect>(new SqlServerChallengeDialect(connectionString));
 
-        ThemiaMigrations.Run(MigrationEngine.SqlServer, connectionString, typeof(ChallengeSchemaMigration).Assembly);
+        ThemiaMigrations.Run(SqlServerMigrationEngine.Adapter, connectionString, typeof(ChallengeSchemaMigration).Assembly);
 
         return services;
     }

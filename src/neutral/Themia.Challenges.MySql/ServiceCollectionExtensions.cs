@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Themia.Challenges;
 using Themia.Challenges.Migrations;
 using Themia.Data.Migrations;
+using Themia.Data.Migrations.MySql;
 
 namespace Themia.Challenges.MySql;
 
@@ -34,7 +35,7 @@ public static class ServiceCollectionExtensions
         services.TryAddSingleton<IChallengeDialect>(sp =>
             new MySqlChallengeDialect(connectionString, sp.GetService<ILoggerFactory>() ?? NullLoggerFactory.Instance));
 
-        ThemiaMigrations.Run(MigrationEngine.MySql, connectionString, typeof(ChallengeSchemaMigration).Assembly);
+        ThemiaMigrations.Run(MySqlMigrationEngine.Adapter, connectionString, typeof(ChallengeSchemaMigration).Assembly);
 
         return services;
     }

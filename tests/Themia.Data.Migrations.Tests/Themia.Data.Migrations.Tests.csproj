@@ -22,6 +22,14 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/neutral/Themia.Data.Migrations/Themia.Data.Migrations.csproj" />
+    <!-- The guard tests resolve MigrationEngine.Postgres through the registry, and
+         StorageMigrationOrderTests calls rb.AddPostgres() directly — both need the Postgres engine
+         package now that the core no longer carries FluentMigrator.Runner.Postgres. -->
+    <ProjectReference Include="../../src/neutral/Themia.Data.Migrations.PostgreSql/Themia.Data.Migrations.PostgreSql.csproj" />
+    <!-- The registry-group order tests exercise MigrationEngine.MySql, which nothing else in this
+         project registers — that lets them prove "registered late still resolves" without touching the
+         Postgres adapter the guard tests above keep registered throughout the run. -->
+    <ProjectReference Include="../../src/neutral/Themia.Data.Migrations.MySql/Themia.Data.Migrations.MySql.csproj" />
   </ItemGroup>
   <!-- Themia.Modules.Storage is a net10.0-only framework module (see Directory.Build.props policy), so it
        is only referenceable from the net10.0 leg of this net8.0;net10.0 test project. StorageMigrationOrderTests
