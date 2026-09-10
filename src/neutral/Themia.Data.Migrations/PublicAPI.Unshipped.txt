@@ -5,7 +5,7 @@ Themia.Data.Migrations.IMigrationEngineAdapter.CreateUnpooledConnection(string! 
 Themia.Data.Migrations.IMigrationEngineAdapter.DisplayName.get -> string!
 Themia.Data.Migrations.IMigrationEngineAdapter.Engine.get -> Themia.Data.Migrations.MigrationEngine
 Themia.Data.Migrations.IMigrationEngineAdapter.ReleaseLock(System.Data.Common.DbConnection! connection, string! scope) -> void
-Themia.Data.Migrations.IMigrationEngineAdapter.TryAcquireLock(System.Data.Common.DbConnection! connection, string! scope, System.TimeSpan timeout) -> bool
+Themia.Data.Migrations.IMigrationEngineAdapter.TryAcquireLock(System.Data.Common.DbConnection! connection, string! scope, System.TimeSpan timeout, out System.Exception? timeoutCause) -> bool
 Themia.Data.Migrations.MigrationEngine
 Themia.Data.Migrations.MigrationEngine.MySql = 1 -> Themia.Data.Migrations.MigrationEngine
 Themia.Data.Migrations.MigrationEngine.Postgres = 0 -> Themia.Data.Migrations.MigrationEngine

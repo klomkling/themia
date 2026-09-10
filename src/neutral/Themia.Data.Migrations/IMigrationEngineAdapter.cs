@@ -39,8 +39,16 @@ public interface IMigrationEngineAdapter
     /// <param name="connection">The open, unpooled connection returned by <see cref="CreateUnpooledConnection"/>.</param>
     /// <param name="scope">The lock's identity — see <see cref="MigrationLock"/>.</param>
     /// <param name="timeout">How long to wait for the lock before giving up.</param>
+    /// <param name="timeoutCause">
+    /// When the wait timed out, the engine exception that reported it — PostgreSQL cancels the waiting
+    /// statement and raises <c>57014</c>, so the <c>PostgresException</c> carrying that SQLSTATE lands here.
+    /// <see langword="null"/> when the engine reports a timeout as an ordinary return value instead
+    /// (MySQL's <c>GET_LOCK</c> returning 0, SQL Server's <c>sp_getapplock</c> returning -1). Attached as the
+    /// inner exception of the resulting <c>MigrationLockException</c>, which is what lets an operator tell a
+    /// server-enforced lock timeout apart from the driver severing the command.
+    /// </param>
     /// <returns><see langword="true"/> if the lock was granted; <see langword="false"/> if the wait timed out.</returns>
-    bool TryAcquireLock(DbConnection connection, string scope, TimeSpan timeout);
+    bool TryAcquireLock(DbConnection connection, string scope, TimeSpan timeout, out Exception? timeoutCause);
 
     /// <summary>
     /// Releases the advisory lock previously acquired for <paramref name="scope"/> on

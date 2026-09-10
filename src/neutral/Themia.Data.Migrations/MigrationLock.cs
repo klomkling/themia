@@ -135,9 +135,10 @@ internal static class MigrationLock
             scope, timeout);
 
         bool acquired;
+        Exception? timeoutCause;
         try
         {
-            acquired = adapter.TryAcquireLock(connection, scope, timeout);
+            acquired = adapter.TryAcquireLock(connection, scope, timeout, out timeoutCause);
         }
         catch (MigrationLockException)
         {
@@ -151,14 +152,20 @@ internal static class MigrationLock
 
         if (!acquired)
         {
-            throw TimedOut(scope, timeout);
+            throw TimedOut(scope, timeout, timeoutCause);
         }
     }
 
-    private static MigrationLockException TimedOut(string scope, TimeSpan timeout) =>
+    /// <summary>
+    /// The timeout-specific failure, distinct from the generic "failed to acquire" wrap above. Operators are
+    /// taught to look for this wording, and <paramref name="inner"/> is what proves the *server* enforced the
+    /// wait (PostgreSQL's 57014) rather than the driver's command timeout severing it — the difference that
+    /// tells a contended boot apart from a lock whose wait bound was never actually applied.
+    /// </summary>
+    private static MigrationLockException TimedOut(string scope, TimeSpan timeout, Exception? inner) =>
         new($"Themia.Data.Migrations: timed out after {timeout} waiting for the migration lock for scope " +
             $"'{scope}'. Another instance is most likely still migrating, or is holding the lock without " +
-            "making progress.");
+            "making progress.", inner);
 
     /// <summary>
     /// Releases the lock without ever letting a release failure escape — this runs on both the success path

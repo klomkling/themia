@@ -7,6 +7,6 @@ Themia.Data.Migrations.SqlServer.SqlServerMigrationEngineAdapter.DisplayName.get
 Themia.Data.Migrations.SqlServer.SqlServerMigrationEngineAdapter.Engine.get -> Themia.Data.Migrations.MigrationEngine
 Themia.Data.Migrations.SqlServer.SqlServerMigrationEngineAdapter.ReleaseLock(System.Data.Common.DbConnection! connection, string! scope) -> void
 Themia.Data.Migrations.SqlServer.SqlServerMigrationEngineAdapter.SqlServerMigrationEngineAdapter() -> void
-Themia.Data.Migrations.SqlServer.SqlServerMigrationEngineAdapter.TryAcquireLock(System.Data.Common.DbConnection! connection, string! scope, System.TimeSpan timeout) -> bool
+Themia.Data.Migrations.SqlServer.SqlServerMigrationEngineAdapter.TryAcquireLock(System.Data.Common.DbConnection! connection, string! scope, System.TimeSpan timeout, out System.Exception? timeoutCause) -> bool
 static Themia.Data.Migrations.SqlServer.SqlServerMigrationEngine.AddThemiaDataMigrationsSqlServer(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
 static Themia.Data.Migrations.SqlServer.SqlServerMigrationEngine.Adapter.get -> Themia.Data.Migrations.IMigrationEngineAdapter!

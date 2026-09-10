@@ -30,8 +30,9 @@ public sealed class PostgresMigrationEngineAdapter : IMigrationEngineAdapter
         new NpgsqlConnection(new NpgsqlConnectionStringBuilder(connectionString) { Pooling = false }.ConnectionString);
 
     /// <inheritdoc />
-    public bool TryAcquireLock(DbConnection connection, string scope, TimeSpan timeout)
+    public bool TryAcquireLock(DbConnection connection, string scope, TimeSpan timeout, out Exception? timeoutCause)
     {
+        timeoutCause = null;
         // Advisory locks are keyed by a bare bigint and are CLUSTER-global rather than database-scoped, so
         // the database name is folded into the key: two Themia apps sharing one PostgreSQL cluster must
         // not serialize against each other.
@@ -41,7 +42,7 @@ public sealed class PostgresMigrationEngineAdapter : IMigrationEngineAdapter
         // the command.
         using var command = MigrationLock.CreateWaitingCommand(
             connection,
-            "SELECT pg_advisory_lock(@key)",
+            $"SET statement_timeout = {(int)timeout.TotalMilliseconds}; SELECT pg_advisory_lock(@key)",
             timeout);
         MigrationLock.AddParameter(command, "key", MigrationLock.NumericKey(scope));
         try
@@ -51,6 +52,11 @@ public sealed class PostgresMigrationEngineAdapter : IMigrationEngineAdapter
         }
         catch (PostgresException ex) when (ex.SqlState == QueryCanceled)
         {
+            // Handed back rather than swallowed: 57014 is the only positive evidence that the SET
+            // statement_timeout above is what ended the wait. Without it a caller cannot tell this apart
+            // from Npgsql's own CommandTimeout severing the command, which is exactly the regression the
+            // prefix's loss caused once already.
+            timeoutCause = ex;
             return false;
         }
     }

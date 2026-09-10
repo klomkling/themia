@@ -31,8 +31,11 @@ public sealed class MySqlMigrationEngineAdapter : IMigrationEngineAdapter
         new MySqlConnection(new MySqlConnectionStringBuilder(connectionString) { Pooling = false }.ConnectionString);
 
     /// <inheritdoc />
-    public bool TryAcquireLock(DbConnection connection, string scope, TimeSpan timeout)
+    public bool TryAcquireLock(DbConnection connection, string scope, TimeSpan timeout, out Exception? timeoutCause)
     {
+        // GET_LOCK reports a lapsed wait as an ordinary 0, never as an exception, so there is no engine
+        // exception to hand back.
+        timeoutCause = null;
         // GET_LOCK is likewise server-global, and its name is capped at 64 characters, so the scope is
         // hashed rather than embedded verbatim. The timeout is a positive number of seconds: a NEGATIVE
         // timeout means "wait forever" on MySQL 8 but is not portable to MariaDB, which this engine also

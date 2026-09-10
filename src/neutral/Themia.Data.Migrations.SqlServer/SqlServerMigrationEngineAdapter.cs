@@ -28,8 +28,11 @@ public sealed class SqlServerMigrationEngineAdapter : IMigrationEngineAdapter
         new SqlConnection(new SqlConnectionStringBuilder(connectionString) { Pooling = false }.ConnectionString);
 
     /// <inheritdoc />
-    public bool TryAcquireLock(DbConnection connection, string scope, TimeSpan timeout)
+    public bool TryAcquireLock(DbConnection connection, string scope, TimeSpan timeout, out Exception? timeoutCause)
     {
+        // sp_getapplock reports a lapsed wait as return code -1, never as an exception, so there is no
+        // engine exception to hand back.
+        timeoutCause = null;
         // sp_getapplock is already database-scoped, so its resource name needs no database qualifier.
         // 'Session' ownership outlives the per-migration transactions the runner opens. Return codes:
         // 0/1 granted, -1 timeout, -2 cancelled, -3 deadlock victim, -999 parameter error.

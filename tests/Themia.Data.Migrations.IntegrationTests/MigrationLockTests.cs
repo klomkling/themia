@@ -34,13 +34,18 @@ public abstract class MigrationLockTestsBase
     /// test pass with the lock acquisition removed entirely. Calibrating instead means the assertion stays
     /// meaningful on any engine and any CI hardware, and the timing run also warms the DNS cache.
     /// </remarks>
-    private TimeSpan MeasureBlockedWindow()
+    private TimeSpan MeasureBlockedWindow() =>
+        TimeSpan.FromMilliseconds(Math.Max(3_000, MeasureUncontendedRun().TotalMilliseconds * 5));
+
+    /// <summary>
+    /// One full uncontended <c>RunExclusive</c> — connect, acquire, release — so timing assertions can be
+    /// expressed relative to this engine's own round trip on this machine rather than a fixed constant.
+    /// </summary>
+    private TimeSpan MeasureUncontendedRun()
     {
         var started = Stopwatch.StartNew();
         MigrationLock.RunExclusive(Engine, ConnectionString, Options, () => { });
-        var uncontended = started.Elapsed;
-
-        return TimeSpan.FromMilliseconds(Math.Max(3_000, uncontended.TotalMilliseconds * 5));
+        return started.Elapsed;
     }
 
     protected abstract MigrationEngine Engine { get; }
@@ -51,6 +56,14 @@ public abstract class MigrationLockTestsBase
     protected abstract string ConnectionStringFor(string database);
 
     protected abstract Task CreateDatabaseAsync(string database);
+
+    /// <summary>
+    /// Asserts what this engine attaches as the timeout's inner exception. This is the only per-engine part
+    /// of <see cref="RunExclusive_ShouldReportATimeout_WhenTheLockIsHeldPastTheLockTimeout"/>, and on
+    /// PostgreSQL it is the assertion with teeth — see that test's remarks.
+    /// </summary>
+    /// <param name="cause">The <c>MigrationLockException</c>'s inner exception.</param>
+    protected abstract void AssertServerEnforcedTheWait(Exception? cause);
 
     [Fact]
     public async Task RunExclusive_ShouldBlockASecondCaller_UntilTheFirstReleases()
@@ -132,6 +145,77 @@ public abstract class MigrationLockTestsBase
     }
 
     /// <summary>
+    /// A caller that waits out its <see cref="ThemiaMigrationOptions.LockTimeout"/> must give up with the
+    /// TIMEOUT-specific error, in roughly the timeout, with the engine's own timeout evidence preserved.
+    /// </summary>
+    /// <remarks>
+    /// Nothing else covers lock EXPIRY: the other tests here use a five-minute timeout precisely so it never
+    /// fires. That gap let the PostgreSQL adapter lose the <c>SET statement_timeout = …;</c> prefix in front
+    /// of <c>pg_advisory_lock</c> without a single test noticing. Losing it removes the server-side wait
+    /// bound, so no 57014 is ever raised, <c>TryAcquireLock</c> never returns false, and the wait instead
+    /// degrades to Npgsql's <c>CommandTimeout</c> (LockTimeout + 30s) — a different exception type that
+    /// arrives through the generic "failed to acquire the migration lock" wrap rather than the "timed out
+    /// after {timeout}" one operators are taught to look for.
+    /// <para>
+    /// Three assertions are what make that regression class visible again: the message must be the
+    /// timeout-specific one and not the generic wrap; the elapsed time must sit far below the driver's
+    /// fallback; and <see cref="AssertServerEnforcedTheWait"/> must find the engine's own timeout evidence
+    /// (on PostgreSQL, a <c>PostgresException</c> whose SQLSTATE is 57014 — the only positive proof that
+    /// <c>statement_timeout</c>, not the driver, ended the wait).
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public async Task RunExclusive_ShouldReportATimeout_WhenTheLockIsHeldPastTheLockTimeout()
+    {
+        // Calibrated, and taken before the lock is held so it measures the uncontended path.
+        var uncontended = MeasureUncontendedRun();
+
+        var firstHoldsLock = new TaskCompletionSource();
+        var firstMayRelease = new TaskCompletionSource();
+
+        var first = RunOnDedicatedThread(() => MigrationLock.RunExclusive(Engine, ConnectionString, Options, () =>
+        {
+            firstHoldsLock.SetResult();
+            firstMayRelease.Task.Wait();
+        }));
+
+        await firstHoldsLock.Task;
+
+        var migrated = false;
+        MigrationLockException? failure = null;
+        var started = Stopwatch.StartNew();
+        var second = RunOnDedicatedThread(() => failure = Assert.Throws<MigrationLockException>(
+            () => MigrationLock.RunExclusive(
+                Engine, ConnectionString, ExpiringOptions, () => migrated = true)));
+
+        // No Task.WhenAny guard needed: the waiter is bounded on both sides — by the server at
+        // ExpiryTimeout and, if that bound is missing, by the driver at ExpiryTimeout + 30s — so it cannot
+        // hang here, and letting it run to completion is what makes the elapsed measurement meaningful.
+        await second;
+        var elapsed = started.Elapsed;
+
+        firstMayRelease.SetResult();
+        await first;
+
+        Assert.NotNull(failure);
+        Assert.False(migrated, "the migration body ran even though the lock was never granted");
+
+        Assert.Contains("timed out after", failure!.Message, StringComparison.Ordinal);
+        Assert.Contains(ExpiryTimeout.ToString(), failure.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("failed to acquire", failure.Message, StringComparison.Ordinal);
+
+        // Well under the driver fallback (ExpiryTimeout + MigrationLock's 30s command-timeout grace), and
+        // scaled off this engine's own round trip so a slow container start cannot make it flaky.
+        var driverFallbackFloor = ExpiryTimeout + TimeSpan.FromSeconds(30);
+        var bound = ExpiryTimeout + TimeSpan.FromMilliseconds(
+            Math.Min(15_000, Math.Max(5_000, uncontended.TotalMilliseconds * 3)));
+        Assert.True(bound < driverFallbackFloor, $"the bound ({bound}) must stay below the driver fallback ({driverFallbackFloor})");
+        Assert.InRange(elapsed, TimeSpan.FromSeconds(1), bound);
+
+        AssertServerEnforcedTheWait(failure.InnerException);
+    }
+
+    /// <summary>
     /// Lock waits block a whole thread, and these tests deliberately park one for the duration. Dedicated
     /// threads keep them off the thread pool, so pool starvation cannot masquerade as "blocked on the lock".
     /// </summary>
@@ -160,6 +244,14 @@ public abstract class MigrationLockTestsBase
     /// and throws instead of staying blocked as the test intends.
     /// </summary>
     private static ThemiaMigrationOptions Options => new() { LockTimeout = TimeSpan.FromMinutes(5) };
+
+    /// <summary>
+    /// The one place a SHORT timeout is wanted: long enough that a granted lock is never mistaken for a
+    /// timeout, short enough that the whole expiry costs seconds per engine.
+    /// </summary>
+    private static readonly TimeSpan ExpiryTimeout = TimeSpan.FromSeconds(2);
+
+    private static ThemiaMigrationOptions ExpiringOptions => new() { LockTimeout = ExpiryTimeout };
 }
 
 [Trait("Category", "Integration")]
@@ -173,6 +265,20 @@ public class MigrationLockPostgresTests : MigrationLockTestsBase, IAsyncLifetime
 
     protected override string ConnectionStringFor(string database) =>
         new NpgsqlConnectionStringBuilder(ConnectionString) { Database = database }.ConnectionString;
+
+    /// <summary>
+    /// PostgreSQL is the engine where this assertion has teeth. <c>pg_advisory_lock</c> takes no timeout
+    /// argument and <c>lock_timeout</c> does not apply to advisory locks, so the ONLY server-side wait bound
+    /// is the <c>SET statement_timeout = …;</c> the adapter prefixes onto the acquire statement — and
+    /// SQLSTATE 57014 (<c>query_canceled</c>) is the only positive evidence it was applied. A driver-level
+    /// command timeout surfaces as a different exception type entirely, so asserting the type AND the
+    /// SQLSTATE is what tells the two apart.
+    /// </summary>
+    protected override void AssertServerEnforcedTheWait(Exception? cause)
+    {
+        var postgres = Assert.IsType<PostgresException>(cause);
+        Assert.Equal("57014", postgres.SqlState);
+    }
 
     protected override async Task CreateDatabaseAsync(string database)
     {
@@ -201,6 +307,14 @@ public class MigrationLockMySqlTests : MigrationLockTestsBase, IAsyncLifetime
 
     protected override string ConnectionStringFor(string database) =>
         new MySqlConnectionStringBuilder(ConnectionString) { Database = database }.ConnectionString;
+
+    /// <summary>
+    /// <c>GET_LOCK(name, timeout)</c> carries its own wait bound and reports a lapsed wait as the value 0,
+    /// not as an error, so there is no engine exception to attach. Null is therefore the correct — and
+    /// asserted — outcome: a non-null cause here would mean the wait ended by some other route (the driver
+    /// severing the command), which is the failure this test exists to catch.
+    /// </summary>
+    protected override void AssertServerEnforcedTheWait(Exception? cause) => Assert.Null(cause);
 
     protected override async Task CreateDatabaseAsync(string database)
     {
@@ -235,6 +349,14 @@ public class MigrationLockMariaDbTests : MigrationLockTestsBase, IAsyncLifetime
     protected override string ConnectionStringFor(string database) =>
         new MySqlConnectionStringBuilder(ConnectionString) { Database = database }.ConnectionString;
 
+    /// <summary>
+    /// <c>GET_LOCK(name, timeout)</c> carries its own wait bound and reports a lapsed wait as the value 0,
+    /// not as an error, so there is no engine exception to attach. Null is therefore the correct — and
+    /// asserted — outcome: a non-null cause here would mean the wait ended by some other route (the driver
+    /// severing the command), which is the failure this test exists to catch.
+    /// </summary>
+    protected override void AssertServerEnforcedTheWait(Exception? cause) => Assert.Null(cause);
+
     protected override async Task CreateDatabaseAsync(string database)
     {
         await using var connection = new MySqlConnection(ConnectionString);
@@ -261,6 +383,14 @@ public class MigrationLockSqlServerTests : MigrationLockTestsBase, IAsyncLifetim
 
     protected override string ConnectionStringFor(string database) =>
         new SqlConnectionStringBuilder(ConnectionString) { InitialCatalog = database }.ConnectionString;
+
+    /// <summary>
+    /// <c>sp_getapplock</c> carries its own <c>@LockTimeout</c> and reports a lapsed wait as return code -1,
+    /// not as an error, so there is no engine exception to attach. Null is therefore the correct — and
+    /// asserted — outcome: a non-null cause here would mean the wait ended by some other route (the driver
+    /// severing the command), which is the failure this test exists to catch.
+    /// </summary>
+    protected override void AssertServerEnforcedTheWait(Exception? cause) => Assert.Null(cause);
 
     protected override async Task CreateDatabaseAsync(string database)
     {

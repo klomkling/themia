@@ -7,6 +7,6 @@ Themia.Data.Migrations.PostgreSql.PostgresMigrationEngineAdapter.DisplayName.get
 Themia.Data.Migrations.PostgreSql.PostgresMigrationEngineAdapter.Engine.get -> Themia.Data.Migrations.MigrationEngine
 Themia.Data.Migrations.PostgreSql.PostgresMigrationEngineAdapter.PostgresMigrationEngineAdapter() -> void
 Themia.Data.Migrations.PostgreSql.PostgresMigrationEngineAdapter.ReleaseLock(System.Data.Common.DbConnection! connection, string! scope) -> void
-Themia.Data.Migrations.PostgreSql.PostgresMigrationEngineAdapter.TryAcquireLock(System.Data.Common.DbConnection! connection, string! scope, System.TimeSpan timeout) -> bool
+Themia.Data.Migrations.PostgreSql.PostgresMigrationEngineAdapter.TryAcquireLock(System.Data.Common.DbConnection! connection, string! scope, System.TimeSpan timeout, out System.Exception? timeoutCause) -> bool
 static Themia.Data.Migrations.PostgreSql.PostgresMigrationEngine.AddThemiaDataMigrationsPostgreSql(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
 static Themia.Data.Migrations.PostgreSql.PostgresMigrationEngine.Adapter.get -> Themia.Data.Migrations.IMigrationEngineAdapter!
