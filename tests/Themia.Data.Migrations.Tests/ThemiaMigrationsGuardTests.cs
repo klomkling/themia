@@ -6,6 +6,22 @@ using Xunit;
 
 namespace Themia.Data.Migrations.Tests;
 
+/// <summary>
+/// Every test class that reads or mutates <see cref="MigrationEngineRegistry"/> belongs here.
+/// <see cref="MigrationEngineRegistry"/> is process-wide static state, and the guard tests below clear it
+/// mid-run; xUnit runs test classes in different collections in parallel within an assembly, so without
+/// this pinning a future class that resolved through the registry would intermittently observe an empty
+/// one. Tests inside a single class never run concurrently, so membership of this collection is the whole
+/// guarantee — it is structural rather than "no other class happens to use the registry today".
+/// </summary>
+[CollectionDefinition(Name, DisableParallelization = true)]
+public sealed class MigrationEngineRegistryCollection
+{
+    /// <summary>The collection name, referenced by <see cref="CollectionAttribute"/> on member classes.</summary>
+    public const string Name = "MigrationEngineRegistry";
+}
+
+[Collection(MigrationEngineRegistryCollection.Name)]
 public class ThemiaMigrationsGuardTests
 {
     // These tests drive MigrationEngine.Postgres through Run's guard clauses only — no DB connection is
@@ -70,10 +86,22 @@ public class ThemiaMigrationsGuardTests
         Assert.NotNull(ex.InnerException);
     }
 
-    // Task 4 (registry group): one "nothing registered" test per engine. Postgres needs Reset()/restore
-    // because the static constructor above registers it unconditionally for every other test in this
-    // class; MySql and SqlServer need neither — this project references only the Postgres engine
-    // package, so nothing anywhere in this assembly ever registers them.
+    // Task 4 (registry group): one "nothing registered" test per engine, and each one states what keeps
+    // its engine unregistered at the moment it runs.
+    //
+    //   Postgres  — the static constructor above registers it for every other test in this class, so this
+    //               test clears the registry and restores it in a finally.
+    //   MySql     — this project DOES reference Themia.Data.Migrations.MySql, and the sibling
+    //               Run_ResolvesTheLateRegisteredAdapter… test below registers the MySql adapter. That test
+    //               unregisters it again in its own finally, and tests within one class never run
+    //               concurrently, so MySql is unregistered whichever order xunit picks for the two.
+    //   SqlServer — nothing in this assembly can register it: there is no reference to
+    //               Themia.Data.Migrations.SqlServer, so SqlServerMigrationEngine.Adapter is unreachable
+    //               from here.
+    //
+    // Across classes the guarantee is MigrationEngineRegistryCollection: this class is pinned into a
+    // non-parallel collection, so no other class in the assembly can be resolving through the registry
+    // while these tests clear it.
     [Fact]
     public void Run_ThrowsNamingPostgreSqlPackage_WhenAdapterNotRegistered()
     {

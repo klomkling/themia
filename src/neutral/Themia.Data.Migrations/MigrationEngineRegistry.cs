@@ -34,10 +34,15 @@ public static class MigrationEngineRegistry
     }
 
     /// <summary>
-    /// Removes every registered adapter. Test-only: production startup code has no reason to call this,
-    /// since registration is meant to accumulate as packages are added, never to be undone.
+    /// Removes every registered adapter. Test-only, and deliberately <see langword="internal"/>: it mutates
+    /// process-wide state, so exposing it publicly would put a hatch in the shipped surface that an
+    /// application could use to unregister engines mid-run. Production startup has no reason to call it —
+    /// registration accumulates as packages are added and is never undone. Reachable from the test
+    /// assemblies named by <c>InternalsVisibleTo</c> in the csproj, which pin every class that calls it into
+    /// a single non-parallel xUnit collection so no other class can resolve through the registry while it is
+    /// cleared.
     /// </summary>
-    public static void Reset() => Adapters.Clear();
+    internal static void Reset() => Adapters.Clear();
 
     /// <summary>
     /// Resolves the adapter registered for <paramref name="engine"/>.

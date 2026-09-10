@@ -12,7 +12,6 @@ Themia.Data.Migrations.MigrationEngine.Postgres = 0 -> Themia.Data.Migrations.Mi
 Themia.Data.Migrations.MigrationEngine.SqlServer = 2 -> Themia.Data.Migrations.MigrationEngine
 Themia.Data.Migrations.MigrationEngineRegistry
 static Themia.Data.Migrations.MigrationEngineRegistry.Add(Themia.Data.Migrations.IMigrationEngineAdapter! adapter) -> void
-static Themia.Data.Migrations.MigrationEngineRegistry.Reset() -> void
 static Themia.Data.Migrations.MigrationEngineRegistry.Resolve(Themia.Data.Migrations.MigrationEngine engine) -> Themia.Data.Migrations.IMigrationEngineAdapter!
 Themia.Data.Migrations.ThemiaMigrationOptions
 Themia.Data.Migrations.ThemiaMigrationOptions.LockTimeout.get -> System.TimeSpan

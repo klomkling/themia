@@ -7,6 +7,23 @@ using Xunit;
 
 namespace Themia.Exceptional.Tests;
 
+/// <summary>
+/// Every test class in this assembly that reads or mutates <see cref="MigrationEngineRegistry"/> belongs
+/// here. The registry is process-wide static state and
+/// <see cref="AddThemiaExceptionalProviderTests.RunMigration_BeforeEngineIsRegistered_ThrowsNamingThePackage"/>
+/// clears it mid-run; xUnit runs classes in different collections in parallel within an assembly, so
+/// without this pinning a future class that resolved through the registry would intermittently observe an
+/// empty one. Tests inside a single class never run concurrently, so membership here is the whole
+/// guarantee.
+/// </summary>
+[CollectionDefinition(Name, DisableParallelization = true)]
+public sealed class MigrationEngineRegistryCollection
+{
+    /// <summary>The collection name, referenced by <see cref="CollectionAttribute"/> on member classes.</summary>
+    public const string Name = "MigrationEngineRegistry";
+}
+
+[Collection(MigrationEngineRegistryCollection.Name)]
 public class AddThemiaExceptionalProviderTests
 {
     [Fact]
