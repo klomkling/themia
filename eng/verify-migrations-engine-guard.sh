@@ -15,6 +15,10 @@
 #      cannot reach. Build must fail with THEMIA2001.
 #   4. End-to-end, with an engine: a throwaway Exe project references Themia.Audit.PostgreSql ONLY,
 #      which pulls in Themia.Data.Migrations.PostgreSql transitively. Build must succeed.
+#   5. End-to-end, test project without an engine: a throwaway project that is an Exe AND sets
+#      IsTestProject (the shape xUnit v3 and MSTest 3 produce — v3's migration guide requires
+#      OutputType=Exe) references Themia.Audit ONLY. Build must SUCCEED: a test project never runs
+#      migrations, so THEMIA2001 must not fire on it.
 #
 # Run from anywhere (resolves the repo root from its own location). Not part of `dotnet test
 # Themia.sln` — it shells out to `dotnet pack`/`dotnet restore`/`dotnet build` several times over, which
@@ -57,20 +61,27 @@ for nupkg in "$CORE_NUPKG" "$PG_NUPKG" "$AUDIT_NUPKG" "$AUDIT_PG_NUPKG"; do
 done
 
 echo "==> Structural checks (buildTransitive/, not build/)..."
-unzip -l "$CORE_NUPKG" | grep -q "buildTransitive/Themia.Data.Migrations.targets" \
+# Listings are captured ONCE and matched with here-strings, never `unzip -l … | grep -q …`. Under
+# `set -o pipefail` that pipeline is a coin flip: `grep -q` exits on the first match and closes the pipe,
+# `unzip` takes SIGPIPE, and the pipeline reports the SIGPIPE — so a package that DOES contain the asset
+# intermittently fails the check. Measured at roughly one run in eight here before the change.
+CORE_LISTING="$(unzip -l "$CORE_NUPKG")"
+PG_LISTING="$(unzip -l "$PG_NUPKG")"
+grep -q "buildTransitive/Themia.Data.Migrations.targets" <<< "$CORE_LISTING" \
   || { echo "ERROR: Themia.Data.Migrations.targets missing from buildTransitive/ in $CORE_NUPKG"; exit 1; }
-if unzip -l "$CORE_NUPKG" | grep -qE '^\s*[0-9]+\s+\S+\s+\S+\s+build/Themia\.Data\.Migrations\.targets$'; then
+if grep -qE '^\s*[0-9]+\s+\S+\s+\S+\s+build/Themia\.Data\.Migrations\.targets$' <<< "$CORE_LISTING"; then
   echo "ERROR: Themia.Data.Migrations.targets ALSO shipped from build/ — build/ assets are only imported"
   echo "       for direct PackageReferences, so this alone would not fix the transitive case, but its"
   echo "       presence signals the packaging authored it in the wrong (or an extra) location."
   exit 1
 fi
-unzip -l "$PG_NUPKG" | grep -q "buildTransitive/Themia.Data.Migrations.PostgreSql.props" \
+grep -q "buildTransitive/Themia.Data.Migrations.PostgreSql.props" <<< "$PG_LISTING" \
   || { echo "ERROR: Themia.Data.Migrations.PostgreSql.props missing from buildTransitive/ in $PG_NUPKG"; exit 1; }
 echo "  OK: both build assets are packed under buildTransitive/."
 
+# make_consumer <dir> <package-id> [extra-properties-xml]
 make_consumer() {
-  local dir="$1" package_ref="$2"
+  local dir="$1" package_ref="$2" extra_properties="${3:-}"
   mkdir -p "$dir"
   cat > "$dir/nuget.config" <<EOF
 <?xml version="1.0" encoding="utf-8"?>
@@ -93,6 +104,7 @@ EOF
     <OutputType>Exe</OutputType>
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
+    $extra_properties
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="$package_ref" Version="$VERSION" />
@@ -142,4 +154,27 @@ if grep -q "THEMIA2001" "$WITH_LOG"; then
 fi
 echo "  OK: build succeeded, no THEMIA2001."
 
-echo "==> PASS: THEMIA2001 fires transitively with no engine package, and is silent once one is referenced."
+echo "==> Test project without an engine: throwaway Exe with IsTestProject=true referencing Themia.Audit only..."
+# The shape xUnit v3 and MSTest 3 produce. Before the IsTestProject term was added to the guard's
+# condition, this build failed with THEMIA2001 — an adopter's test suite broken by a package it only
+# references, never migrates with.
+TESTPROJ="$WORK/test-project-no-engine"
+make_consumer "$TESTPROJ" "Themia.Audit" "<IsTestProject>true</IsTestProject>"
+TESTPROJ_LOG="$WORK/test-project-no-engine-build.log"
+set +e
+dotnet build "$TESTPROJ/consumer.csproj" --configuration Release 2>&1 | tee "$TESTPROJ_LOG"
+testproj_rc=${PIPESTATUS[0]}
+set -e
+if grep -q "THEMIA2001" "$TESTPROJ_LOG"; then
+  echo "ERROR: THEMIA2001 fired on an Exe TEST project (IsTestProject=true) that never runs migrations."
+  echo "       xUnit v3 and MSTest 3 test projects are executables, so this would break an adopter's"
+  echo "       test suite merely for referencing Themia.Audit."
+  exit 1
+fi
+if [ "$testproj_rc" -ne 0 ]; then
+  echo "ERROR: the Exe test project failed to build (exit $testproj_rc) for some other reason — see log above."
+  exit 1
+fi
+echo "  OK: build succeeded, no THEMIA2001."
+
+echo "==> PASS: THEMIA2001 fires transitively with no engine package, is silent once one is referenced, and never fires on a test project."

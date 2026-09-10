@@ -14,14 +14,27 @@
     for DIRECT PackageReferences; `buildTransitive/` is the asset location NuGet defines for exactly
     the transitive case. In `build/` this target would silently never run for any real adopter.
 
-    OutputType == 'Exe': twenty-plus Themia libraries reference the core and must stay
-    engine-agnostic. Verified with `dotnet msbuild -getProperty:OutputType` that both Themia.Audit
-    and Themia.Audit.Tests report "Library" — so neither the libraries nor the test suite trips this
-    check, only an application that actually runs migrations.
+    OutputType == 'Exe' selects applications: twenty-plus Themia libraries reference the core and must
+    stay engine-agnostic.
+
+    IsTestProject != 'true' is NOT redundant with it. Themia's own suite is xUnit v2, whose projects are
+    libraries, but a MODERN test project is an Exe: xUnit v3's migration guide instructs "change
+    OutputType from Library to Exe" because v3 test projects are self-executing, and MSTest 3 /
+    Microsoft.Testing.Platform runners do the same. Without this term an adopter's xUnit v3 test project
+    that merely references Themia.Audit would fail to build with THEMIA2001 despite never running a
+    migration. Microsoft.NET.Test.Sdk.props sets IsTestProject unconditionally, so any project using the
+    standard test SDK is covered; a runner-only project that sets neither can opt out explicitly with
+    ThemiaSkipMigrationEngineCheck.
+
+    Target conditions are evaluated when the target would run — after every import — so it does not
+    matter that the test SDK sets IsTestProject in a .props file imported later than this one.
   -->
 
   <Target Name="ThemiaCheckMigrationEngine" BeforeTargets="Build"
-          Condition="'$(OutputType)' == 'Exe' AND '$(ThemiaMigrationEngineSelected)' != 'true'">
+          Condition="'$(OutputType)' == 'Exe'
+                     AND '$(IsTestProject)' != 'true'
+                     AND '$(ThemiaSkipMigrationEngineCheck)' != 'true'
+                     AND '$(ThemiaMigrationEngineSelected)' != 'true'">
     <Error Code="THEMIA2001"
            Text="Themia.Data.Migrations requires an engine package. Add a PackageReference to one of Themia.Data.Migrations.PostgreSql, .MySql or .SqlServer." />
   </Target>
