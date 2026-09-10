@@ -38,6 +38,14 @@ layer. Pass `runMigration: false` to defer it. Calling it with `runMigration: tr
 migration that silently does not run would surface much later as a missing-table error at the first
 write.
 
+**The migration needs both calls.** `AddThemiaAudit` records the request; the matching
+`AddThemiaAudit{Engine}()` supplies the engine, and whichever of the two runs second applies the
+migration. Order between them does not matter, but *both* are required: if you use this core with your
+own `IAuditDialect`/`IAuditStore` and never call one of `AddThemiaAuditPostgreSql()` /
+`AddThemiaAuditMySql()` / `AddThemiaAuditSqlServer()`, the requested migration cannot run, and startup
+fails with an options-validation error naming the call to add. Pass `runMigration: false` if you create
+the audit table yourself.
+
 ## Recording an event
 
 ```csharp

@@ -30,7 +30,11 @@ public static class AuditServiceCollectionExtensions
     /// and <see cref="AuditOptions.ConnectionString"/> are checked immediately and this call throws
     /// <see cref="InvalidOperationException"/>, naming the missing setting, when either is invalid —
     /// asking for a migration and silently not getting one would surface, at best, as a "table does not
-    /// exist" error at the first audit write, which is worse than failing here. Pass
+    /// exist" error at the first audit write, which is worse than failing here. The same reasoning covers
+    /// the other way the migration can fail to happen: if no <c>AddThemiaAudit{Engine}</c> call ever
+    /// completes the handshake — the shape an adopter with their own <see cref="IAuditDialect"/> and
+    /// <see cref="IAuditStore"/> falls into — an options validation fails the host at startup naming the
+    /// call to add, rather than letting the missing table surface at the first write. Pass
     /// <paramref name="runMigration"/>: <see langword="false"/> to defer schema creation and rely on
     /// <c>ValidateOnStart</c> instead. <paramref name="configure"/> is invoked twice — once to check the
     /// options ahead of the migration, once by the options system — so it must be a pure assignment of
@@ -95,6 +99,22 @@ public static class AuditServiceCollectionExtensions
             }
 
             AuditMigrationHandshake.RecordIntent(services, runMigration: true, probe.ConnectionString);
+
+            // The handshake means this call alone cannot create the table any more: an adopter using the
+            // neutral core with their OWN IAuditDialect/IAuditStore never calls an AddThemiaAudit{Engine},
+            // so the adapter half never arrives and the requested migration silently does not happen —
+            // surfacing much later as `relation "audit_log" does not exist` at the first write. Validation,
+            // not a registration-time throw: whether the adapter arrives is only knowable once registration
+            // is over, and AddThemiaAudit's options are already ValidateOnStart'd, so this fails the host at
+            // startup naming the exact call to add.
+            services.AddOptions<AuditOptions>()
+                .Validate(
+                    _ => !AuditMigrationHandshake.IsMigrationPending(services),
+                    "AddThemiaAudit was called with runMigration: true, but no AddThemiaAuditPostgreSql() / "
+                    + "AddThemiaAuditMySql() / AddThemiaAuditSqlServer() call supplied the migration engine, "
+                    + "so the audit schema was never created. Add the call for your engine to the same "
+                    + "IServiceCollection, or pass runMigration: false if you create the audit table "
+                    + "yourself.");
         }
         else
         {

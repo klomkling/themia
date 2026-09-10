@@ -170,6 +170,22 @@ The handshake state is per-`IServiceCollection` and consumed at registration tim
 single-threaded by convention. **A test must cover both orders and both flag values** — four cases, and
 the reverse-order one is the case no existing test exercises.
 
+**Two rules the handshake needs beyond those four cases**, both because splitting one eager call into two
+recorded halves creates states the eager version could not reach:
+
+- **A recorded `runMigration: true` is never downgraded.** Recording the intent last-wins would let a
+  later `AddThemiaAudit(cfg, runMigration: false)` cancel a migration an earlier call asked for — which
+  the pre-handshake code could not do, since the first call had already migrated. `runMigration`
+  accumulates with OR, and a completed pair is marked so a redundant later call cannot start a second
+  attempt.
+- **An intent that never meets an adapter must not be silent.** An adopter using the neutral core with
+  their own `IAuditDialect`/`IAuditStore` calls `AddThemiaAudit` and no `AddThemiaAudit{Engine}`; they
+  used to get the table and would now get nothing, no throw and no log — the #0085 shape again, surfacing
+  as `relation "audit_log" does not exist` at the first write. `AddThemiaAudit` therefore registers an
+  `AuditOptions` validation that fails at startup when an intent with `runMigration: true` was never
+  paired, naming the call to add. §5.3's "none" for `Themia.Audit` holds for adopters who use an engine
+  package; this adopter costs one new line like the modules do.
+
 ### 5.3 Per family
 
 | family | engine-specific entry point | adopter change |

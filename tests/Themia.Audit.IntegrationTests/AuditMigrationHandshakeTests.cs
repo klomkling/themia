@@ -60,6 +60,77 @@ public sealed class AuditMigrationHandshakeTests
     }
 
     [Fact]
+    public void A_second_call_with_runMigration_false_does_not_cancel_an_earlier_true()
+    {
+        var services = new ServiceCollection();
+
+        services.AddThemiaAudit(o =>
+        {
+            o.ConnectionString = MalformedConnectionString;
+            o.Engine = AuditEngine.Postgres;
+        });
+
+        // The intent is recorded per IServiceCollection, so a later call could overwrite it. It must not:
+        // last-wins would let this second call's runMigration cancel a migration the first call asked for,
+        // and the schema would silently never be created. An extra migration is idempotent; a skipped one
+        // is a missing table at the first write.
+        services.AddThemiaAudit(o =>
+        {
+            o.ConnectionString = MalformedConnectionString;
+            o.Engine = AuditEngine.Postgres;
+        }, runMigration: false);
+
+        // Completing the pair must still trigger the (failing, by design) migration attempt.
+        var ex = Assert.Throws<InvalidOperationException>(() => services.AddThemiaAuditPostgreSql());
+        Assert.Contains("PostgreSQL", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_second_call_with_runMigration_true_after_a_false_one_migrates()
+    {
+        var services = new ServiceCollection();
+
+        services.AddThemiaAudit(o =>
+        {
+            o.ConnectionString = MalformedConnectionString;
+            o.Engine = AuditEngine.Postgres;
+        }, runMigration: false);
+
+        // The opposite order of the test above. Recording true after false must take effect, so that the
+        // rule is "a requested migration wins", not merely "the first call wins".
+        services.AddThemiaAudit(o =>
+        {
+            o.ConnectionString = MalformedConnectionString;
+            o.Engine = AuditEngine.Postgres;
+        });
+
+        var ex = Assert.Throws<InvalidOperationException>(() => services.AddThemiaAuditPostgreSql());
+        Assert.Contains("PostgreSQL", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_redundant_call_after_the_pair_completed_does_not_migrate_again()
+    {
+        var services = new ServiceCollection();
+
+        services.AddThemiaAudit(o =>
+        {
+            o.ConnectionString = MalformedConnectionString;
+            o.Engine = AuditEngine.Postgres;
+        });
+        Assert.Throws<InvalidOperationException>(() => services.AddThemiaAuditPostgreSql());
+
+        // The pair is consumed, so neither half may start a second attempt — otherwise the "never
+        // downgrade a recorded true" rule above would turn every redundant registration into fresh DDL.
+        Assert.Null(Record.Exception(() => services.AddThemiaAudit(o =>
+        {
+            o.ConnectionString = MalformedConnectionString;
+            o.Engine = AuditEngine.Postgres;
+        })));
+        Assert.Null(Record.Exception(() => services.AddThemiaAuditPostgreSql()));
+    }
+
+    [Fact]
     public void Core_first_then_engine_with_runMigration_false_produces_no_ddl()
     {
         var services = new ServiceCollection();

@@ -119,6 +119,49 @@ public class AuditServiceCollectionExtensionsTests
         Assert.Contains(nameof(AuditOptions.ConnectionString), ex.Message, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void AddThemiaAudit_with_runMigration_true_and_no_engine_package_fails_at_startup()
+    {
+        var services = new ServiceCollection();
+
+        // The adopter shape the handshake made silent: the neutral core with a hand-supplied
+        // IAuditDialect/IAuditStore (a custom dialect, SQLite, …) and therefore no AddThemiaAudit{Engine}
+        // call to carry the adapter. Before the handshake this call migrated immediately; after it, the
+        // requested migration simply never happens. This project references no provider package, so it is
+        // exactly that adopter — and startup must say so rather than leaving the missing table to surface
+        // as `relation "audit_log" does not exist` at the first audit write.
+        services.AddThemiaAudit(o =>
+        {
+            o.ConnectionString = "Host=localhost;Database=x";
+            o.Engine = AuditEngine.Postgres;
+        });
+
+        using var provider = services.BuildServiceProvider();
+
+        // What ValidateOnStart runs against in a real host; resolving .Value is the same validation path.
+        var ex = Assert.Throws<OptionsValidationException>(() => provider.GetRequiredService<IOptions<AuditOptions>>().Value);
+        Assert.Contains("AddThemiaAuditPostgreSql", ex.Message, StringComparison.Ordinal);
+        Assert.Contains("runMigration: false", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AddThemiaAudit_with_runMigration_false_does_not_fail_at_startup_for_a_missing_engine()
+    {
+        var services = new ServiceCollection();
+
+        // The other half of the check above: an adopter who declined the migration has nothing pending, so
+        // the same missing engine package must NOT fail their startup.
+        services.AddThemiaAudit(o =>
+        {
+            o.ConnectionString = "Host=localhost;Database=x";
+            o.Engine = AuditEngine.Postgres;
+        }, runMigration: false);
+
+        using var provider = services.BuildServiceProvider();
+
+        Assert.Equal(AuditEngine.Postgres, provider.GetRequiredService<IOptions<AuditOptions>>().Value.Engine);
+    }
+
     private sealed class FakeStore : IAuditStore
     {
         public Task<long> WriteAsync(AuditEntry entry, DbConnection connection, DbTransaction? transaction, CancellationToken cancellationToken) =>

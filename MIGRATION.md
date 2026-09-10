@@ -28,14 +28,26 @@ that fails the moment any of those three drivers returns by any path.
 
 **How to upgrade** depends on which family you use:
 
-**No source change** — `Themia.Audit`, `Themia.Exceptional` (through its engine package,
+**No source change *if you already make the engine-specific call*** — `Themia.Audit`,
+`Themia.Exceptional` (through its engine package,
 `AddThemiaExceptionalPostgres`/`…MySql`/`…SqlServer`), `Themia.Challenges`, and
-`Themia.AspNetCore.DataProtection`. Each already requires an engine-specific call
+`Themia.AspNetCore.DataProtection`. Each of these families has an engine-specific call
 (`AddThemiaAuditPostgreSql()`, `PersistKeysToThemiaPostgres(…)`, …) that knows its engine at compile
-time; that call now also registers the adapter. `Program.cs` is untouched, the documented call order
-still works, and `runMigration: false` still means no migration — this is a package-reference bump
-only. Add the matching `Themia.Data.Migrations.{PostgreSql,MySql,SqlServer}` package reference (it
-usually arrives transitively through the engine package you already reference) and rebuild.
+time; that call now also registers the adapter. If you make it, `Program.cs` is untouched, the
+documented call order still works, and `runMigration: false` still means no migration — a
+package-reference bump only. Add the matching `Themia.Data.Migrations.{PostgreSql,MySql,SqlServer}`
+package reference (it usually arrives transitively through the engine package you already reference)
+and rebuild.
+
+**But `AddThemiaAudit(runMigration: true)` now needs `AddThemiaAudit{Engine}()` to migrate at all.**
+Before this change `AddThemiaAudit` applied the migration on its own. It now only records the request,
+and the migration runs when `AddThemiaAuditPostgreSql()` / `…MySql()` / `…SqlServer()` supplies the
+engine on the same `IServiceCollection` (either call order works). An adopter using the neutral
+`Themia.Audit` with their **own** `IAuditDialect`/`IAuditStore` — a custom dialect, SQLite — previously
+got the table from `AddThemiaAudit` alone and would now get nothing. That case is not left silent: the
+requested-but-unpaired migration fails `AuditOptions` validation at startup, naming the call to add. To
+upgrade, either add the `AddThemiaAudit{Engine}()` call for your engine, or pass `runMigration: false`
+if you create the audit table yourself.
 
 **One new line** — `Themia.Scheduling`, all seven `Themia.Modules.*` (`Export`, `Identity.Dapper`,
 `Identity.EFCore`, `Messaging`, `Notifications`, `Pdf`, `Storage`), and any caller of the
