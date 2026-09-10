@@ -151,7 +151,31 @@ public static class AiProbeEndpoints
         }
 
         var stopwatch = Stopwatch.StartNew();
-        var completion = await client.CompleteAsync(operation, new AiPrompt { User = prompt }, ct).ConfigureAwait(false);
+        AiCompletion completion;
+        try
+        {
+            completion = await client.CompleteAsync(operation, new AiPrompt { User = prompt }, ct).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // This endpoint exists to diagnose a broken provider configuration, so it must not be the
+            // thing that breaks on one: a 500 answers nothing. IAiCompletionClient is a public seam and
+            // an adopter may have replaced it, so the guard stays even though Themia's own dispatcher no
+            // longer throws. Only the exception's type is reported — a message can carry the configured
+            // base address or another internal detail, and this response crosses the network.
+            stopwatch.Stop();
+            ctx.RequestServices.GetService<ILoggerFactory>()?
+                .CreateLogger(LoggerCategory)
+                .LogError(ex, "AI probe call threw; reporting ProviderError.");
+
+            await WriteJsonAsync(
+                ctx,
+                StatusCodes.Status200OK,
+                new AiProbeCallReport(AiOutcome.ProviderError, null, null, stopwatch.Elapsed, $"probe call threw {ex.GetType().Name}"),
+                ct).ConfigureAwait(false);
+            return;
+        }
+
         stopwatch.Stop();
 
         var report = new AiProbeCallReport(

@@ -18,7 +18,8 @@ namespace Themia.AI.Gemini;
 /// <c>RECITATION</c>, <c>BLOCKLIST</c>, <c>PROHIBITED_CONTENT</c>, <c>SPII</c>) to
 /// <see cref="AiOutcome.Filtered"/>. A prompt-level block (<c>promptFeedback.blockReason</c>, no
 /// candidates at all) also maps to <see cref="AiOutcome.Filtered"/>. Anything else — including a
-/// malformed <c>200</c> payload — maps to <see cref="AiOutcome.ProviderError"/>.
+/// malformed <c>200</c> payload, and any transport failure (DNS, connection refused, TLS, a reset, or
+/// <see cref="HttpClient"/>'s own timeout) — maps to <see cref="AiOutcome.ProviderError"/>.
 /// <c>usageMetadata</c> is read whenever the response carries it, on every outcome.
 /// </remarks>
 public sealed class GeminiCompletionProvider(
@@ -49,6 +50,31 @@ public sealed class GeminiCompletionProvider(
         ArgumentException.ThrowIfNullOrWhiteSpace(model);
         ArgumentNullException.ThrowIfNull(prompt);
 
+        try
+        {
+            return await SendAsync(model, prompt, cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            // The caller's own token is still clear, so this is HttpClient's own Timeout firing rather
+            // than the caller giving up: a transport failure like any other. Caller cancellation — and
+            // the dispatcher's per-attempt timeout, which cancels the token it passed in — leaves the
+            // token set, so it does not match this filter and propagates untouched.
+            return new AiCompletion(AiOutcome.ProviderError, null, null, model, "transport timeout");
+        }
+        catch (Exception ex) when (ex is HttpRequestException or JsonException)
+        {
+            // DNS failure, connection refused, a TLS error or a reset mid-body (HttpRequestException),
+            // and a 200 carrying something other than the JSON this parses — a gateway error page, a
+            // truncated body (JsonException). Every one of them is the transport failing, which is what
+            // AiOutcome.ProviderError is defined to mean; throwing instead would take the retry and the
+            // failover the dispatcher exists to perform away from it.
+            return new AiCompletion(AiOutcome.ProviderError, null, null, model, $"transport failure: {ex.GetType().Name}");
+        }
+    }
+
+    private async Task<AiCompletion> SendAsync(string model, AiPrompt prompt, CancellationToken cancellationToken)
+    {
         var httpClient = httpClientFactory.CreateClient(HttpClientName);
         var requestUri = BuildRequestUri(model);
         var payload = JsonSerializer.Serialize(BuildRequestBody(prompt), SerializeOptions);

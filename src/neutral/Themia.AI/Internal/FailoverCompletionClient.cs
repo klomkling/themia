@@ -8,7 +8,10 @@ namespace Themia.AI.Internal;
 /// provider per <see cref="AiOperation"/>, retries <see cref="AiOutcome.ProviderError"/> with backoff up
 /// to <see cref="AiOptions.MaxRetriesPerProvider"/>, fails over to the next <see cref="AiOptions.Failover"/>
 /// entry on <see cref="AiOutcome.ProviderLimit"/> and on exhausted <see cref="AiOutcome.ProviderError"/>,
-/// and never retries or fails over on <see cref="AiOutcome.Filtered"/>. Design §3 and §6.
+/// and never retries or fails over on <see cref="AiOutcome.Filtered"/>. A provider that throws anything
+/// other than <see cref="OperationCanceledException"/> is treated as having reported
+/// <see cref="AiOutcome.ProviderError"/>, so one broken provider cannot end a call the rest of
+/// <see cref="AiOptions.Failover"/> could have answered. Design §3 and §6.
 /// </summary>
 /// <remarks>
 /// <see cref="AiOptions.TotalBudget"/> bounds every retry and every failover for one
@@ -99,6 +102,28 @@ internal sealed class FailoverCompletionClient(
 
                     continue;
                 }
+                catch (Exception ex)
+                {
+                    // Themia's own providers map a transport failure to ProviderError rather than
+                    // throwing, but IAiCompletionProvider is a public seam an adopter implements too. An
+                    // exception escaping here would end the call at the FIRST provider, which is exactly
+                    // the situation the rest of Failover was configured for. Cancellation is not caught:
+                    // its own handler above runs first and still propagates or reports the budget.
+                    logger.LogWarning(
+                        ex,
+                        "Provider {ProviderKey} threw on attempt {Attempt}/{MaxAttempts}; treating it as ProviderError.",
+                        key, attempt, aiOptions.MaxRetriesPerProvider);
+                    last = new AiCompletion(AiOutcome.ProviderError, null, null, model, $"provider threw {ex.GetType().Name}");
+
+                    if (attempt < aiOptions.MaxRetriesPerProvider)
+                    {
+                        var exhausted = await DelayBeforeRetryAsync(attempt, key, model, budgetCts.Token, cancellationToken)
+                            .ConfigureAwait(false);
+                        if (exhausted is not null) return exhausted;
+                    }
+
+                    continue;
+                }
 
                 last = result;
 
@@ -120,8 +145,8 @@ internal sealed class FailoverCompletionClient(
 
                     case AiOutcome.ProviderError:
                         logger.LogWarning(
-                            "Provider {ProviderKey} reported ProviderError on attempt {Attempt}/{MaxAttempts}.",
-                            key, attempt, aiOptions.MaxRetriesPerProvider);
+                            "Provider {ProviderKey} reported ProviderError ({ProviderStatus}) on attempt {Attempt}/{MaxAttempts}.",
+                            key, result.ProviderStatus, attempt, aiOptions.MaxRetriesPerProvider);
 
                         if (attempt < aiOptions.MaxRetriesPerProvider)
                         {

@@ -39,6 +39,28 @@ internal sealed class FakeProvider(
     }
 }
 
+/// <summary>
+/// Throws instead of producing a completion — what a provider looks like when the transport fails and
+/// nothing maps it: a refused connection to a stopped local server, a DNS failure, a body that is not
+/// JSON. <see cref="FakeProvider"/> cannot express this, which is why no test could see that an
+/// exception from the first provider ended the call instead of failing over.
+/// </summary>
+internal sealed class ThrowingProvider(Exception? exception = null, string key = AiProviderKeys.Gemini)
+    : IAiCompletionProvider
+{
+    public string Key { get; } = key;
+
+    public int Calls { get; private set; }
+
+    public Task<AiCompletion> CompleteAsync(
+        string model, AiPrompt prompt, TimeSpan timeout, CancellationToken cancellationToken = default)
+    {
+        Calls++;
+        cancellationToken.ThrowIfCancellationRequested();
+        throw exception ?? new HttpRequestException("Connection refused (localhost:11434)");
+    }
+}
+
 /// <summary>Records calls without producing one. For asserting that a path did NOT reach a provider.</summary>
 internal sealed class RecordingClient : IAiCompletionClient
 {

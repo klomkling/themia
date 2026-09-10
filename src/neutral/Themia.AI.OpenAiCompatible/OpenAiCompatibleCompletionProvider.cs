@@ -18,7 +18,9 @@ namespace Themia.AI.OpenAiCompatible;
 /// status to <see cref="AiOutcome.ProviderError"/> — then, on a successful HTTP response, maps the first
 /// choice's <c>finish_reason</c>: <c>stop</c> to <see cref="AiOutcome.Completed"/>, <c>length</c> to
 /// <see cref="AiOutcome.Truncated"/>, and <c>content_filter</c> to <see cref="AiOutcome.Filtered"/>.
-/// Anything else — including a malformed <c>200</c> payload — maps to <see cref="AiOutcome.ProviderError"/>.
+/// Anything else — including a malformed <c>200</c> payload, and any transport failure (a refused
+/// connection to a stopped local server, DNS, TLS, a reset, or <see cref="HttpClient"/>'s own timeout) —
+/// maps to <see cref="AiOutcome.ProviderError"/>.
 /// <c>usage</c> is read whenever the response carries it, on every outcome.
 /// </remarks>
 public sealed class OpenAiCompatibleCompletionProvider(
@@ -39,6 +41,31 @@ public sealed class OpenAiCompatibleCompletionProvider(
         ArgumentException.ThrowIfNullOrWhiteSpace(model);
         ArgumentNullException.ThrowIfNull(prompt);
 
+        try
+        {
+            return await SendAsync(model, prompt, cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            // The caller's own token is still clear, so this is HttpClient's own Timeout firing rather
+            // than the caller giving up: a transport failure like any other. Caller cancellation — and
+            // the dispatcher's per-attempt timeout, which cancels the token it passed in — leaves the
+            // token set, so it does not match this filter and propagates untouched.
+            return new AiCompletion(AiOutcome.ProviderError, null, null, model, "transport timeout");
+        }
+        catch (Exception ex) when (ex is HttpRequestException or JsonException)
+        {
+            // The headline deployment for this provider is a local server (Ollama, LM Studio, vLLM) at a
+            // BaseUrl on this machine. A stopped one refuses every connection — precisely the case an
+            // adopter configures a cloud provider behind it to cover — so it has to arrive as
+            // AiOutcome.ProviderError, the outcome the dispatcher retries and fails over on, not as an
+            // exception that ends the call. A malformed 200 (JsonException) is the same failure.
+            return new AiCompletion(AiOutcome.ProviderError, null, null, model, $"transport failure: {ex.GetType().Name}");
+        }
+    }
+
+    private async Task<AiCompletion> SendAsync(string model, AiPrompt prompt, CancellationToken cancellationToken)
+    {
         var options = openAiCompatibleOptions.Value;
         var httpClient = httpClientFactory.CreateClient(HttpClientName);
         var requestUri = BuildRequestUri(options.BaseUrl);

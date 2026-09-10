@@ -105,6 +105,59 @@ public sealed class GoogleGeocodingProviderTests
         Assert.DoesNotContain(capture.AllMessages, m => m.Contains("Sending HTTP request", StringComparison.Ordinal));
     }
 
+    // ---- Transport failure ----
+    //
+    // Every other handler in this suite answers with a status code, so nothing here could reach the path
+    // a real failure takes: a bad DNS name, a refused connection or a TLS error produces no response at
+    // all and HttpClient throws. Nothing sits above this provider to convert that into an outcome — no
+    // dispatcher, no retry — so before this test one unreachable call aborted an adopter's whole backfill
+    // loop instead of failing the single row.
+    [Fact]
+    public async Task A_transport_failure_is_reported_as_provider_error_not_thrown()
+    {
+        var provider = ProviderOver(new ThrowingHandler(new HttpRequestException("No such host is known")));
+
+        var result = await provider.GeocodeAsync("anything", null, default);
+
+        Assert.Equal(GeocodeOutcome.ProviderError, result.Outcome);
+    }
+
+    // The other half of the same defect, and the one the class remarks already claimed to handle: a 200
+    // whose body is not JSON — a captive portal or a proxy error page — threw JsonException past the
+    // status mapping.
+    [Fact]
+    public async Task A_malformed_200_body_is_reported_as_provider_error_not_thrown()
+    {
+        var provider = ProviderOver(new StubHandler(HttpStatusCode.OK, "<html><body>502 Bad Gateway</body></html>"));
+
+        var result = await provider.GeocodeAsync("anything", null, default);
+
+        Assert.Equal(GeocodeOutcome.ProviderError, result.Outcome);
+    }
+
+    // The boundary the transport catch must not cross: a caller who stopped caring gets cancellation, not
+    // a result that reads as one more failed row.
+    [Fact]
+    public async Task Caller_cancellation_still_surfaces_as_cancellation()
+    {
+        var provider = ProviderOver(new ThrowingHandler(new HttpRequestException("No such host is known")));
+        using var cts = new CancellationTokenSource();
+        await cts.CancelAsync();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => provider.GeocodeAsync("anything", null, cts.Token));
+    }
+
+    private static IGeocodingProvider ProviderOver(HttpMessageHandler handler)
+    {
+        var services = new ServiceCollection();
+        services.AddThemiaGeoGoogle(o => o.ApiKey = "unused-test-key");
+        services.AddHttpClient(GoogleGeocodingProvider.HttpClientName)
+            .ConfigurePrimaryHttpMessageHandler(() => handler);
+
+        return services.BuildServiceProvider().GetRequiredService<IGeocodingProvider>();
+    }
+
     // Builds a provider over a stub primary handler returning the fixture body — no network call, so the
     // suite stays runnable without egress. The container is deliberately left undisposed: the returned
     // IGeocodingProvider is used after this method returns, and IHttpClientFactory's pooled handlers must
@@ -158,5 +211,19 @@ internal sealed class CapturingLoggerProvider : ILoggerProvider
         {
             messages.Add($"[{categoryName}] {formatter(state, exception)}");
         }
+    }
+}
+
+/// <summary>
+/// A handler that fails the way a real network failure does — no response at all. Every other stub in
+/// this suite answers with a status code, which cannot reach the code path a stopped server, a bad DNS
+/// name or a TLS error takes.
+/// </summary>
+internal sealed class ThrowingHandler(Exception exception) : HttpMessageHandler
+{
+    protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        throw exception;
     }
 }

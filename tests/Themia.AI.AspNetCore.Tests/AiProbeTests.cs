@@ -346,6 +346,78 @@ public class AiProbeTests
     }
 
     [Fact]
+    public async Task Post_reports_provider_error_when_the_completion_client_throws()
+    {
+        // The endpoint exists to diagnose a broken provider setup, so it must not be the thing that
+        // breaks on one. Unguarded, the exception left the handler and the caller got a 500 — no outcome,
+        // no elapsed time, nothing to diagnose with — on exactly the failure they were probing for.
+        // IAiCompletionClient is a public seam an adopter can replace, so the guard stays even though
+        // Themia's own dispatcher no longer throws.
+        var client = await ThrowingClientServerAsync(new HttpRequestException("Connection refused (localhost:11434)"));
+
+        var res = await client.PostAsync("/ai/probe", content: null);
+
+        Assert.Equal(HttpStatusCode.OK, res.StatusCode);
+        using var doc = JsonDocument.Parse(await res.Content.ReadAsStringAsync());
+        Assert.Equal("ProviderError", doc.RootElement.GetProperty("outcome").GetString());
+    }
+
+    // The exception's message can name the configured base address or another internal detail, and this
+    // response crosses the network to whoever the adopter authorised. Only the type is reported.
+    [Fact]
+    public async Task A_thrown_exceptions_message_never_reaches_the_probe_response()
+    {
+        var client = await ThrowingClientServerAsync(new HttpRequestException("Connection refused (internal-gateway.corp:11434)"));
+
+        var res = await client.PostAsync("/ai/probe", content: null);
+
+        var body = await res.Content.ReadAsStringAsync();
+        Assert.DoesNotContain("internal-gateway.corp", body, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// A server whose <see cref="IAiCompletionClient"/> throws <paramref name="exception"/>. Registered
+    /// after <c>AddThemiaAi</c> so it replaces the dispatcher: the dispatcher's own guard would otherwise
+    /// convert the exception before the endpoint could ever see one.
+    /// </summary>
+    private static async Task<HttpClient> ThrowingClientServerAsync(Exception exception)
+    {
+        var host = await new HostBuilder()
+            .ConfigureWebHost(web =>
+            {
+                web.UseTestServer();
+                web.ConfigureServices(s =>
+                {
+                    s.AddRouting();
+                    s.AddThemiaAi(o => o.Failover = [AiProviderKeys.Gemini]);
+                    s.AddSingleton<IAiCompletionProvider>(new FakeAiCompletionProvider());
+                    s.Configure<AiProviderOptions>(AiProviderKeys.Gemini, po =>
+                    {
+                        po.CompletionModel = "completion-model";
+                        po.TranslationModel = "translation-model";
+                        po.Timeout = TimeSpan.FromSeconds(5);
+                    });
+                    s.AddSingleton<IAiCompletionClient>(new ThrowingCompletionClient(exception));
+                });
+                web.Configure(app =>
+                {
+                    app.UseRouting();
+                    app.UseEndpoints(e => e.MapThemiaAiProbe("/ai/probe", o => o.Authorize = _ => Task.FromResult(true)));
+                });
+            })
+            .StartAsync();
+
+        return host.GetTestClient();
+    }
+
+    private sealed class ThrowingCompletionClient(Exception exception) : IAiCompletionClient
+    {
+        public Task<AiCompletion> CompleteAsync(
+            AiOperation operation, AiPrompt prompt, CancellationToken cancellationToken = default)
+            => throw exception;
+    }
+
+    [Fact]
     public void MapThemiaAiProbe_returns_the_route_group()
     {
         var builder = WebApplication.CreateBuilder();

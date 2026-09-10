@@ -109,6 +109,68 @@ public sealed class GeminiCompletionProviderTests
         Assert.DoesNotContain(capture.AllMessages, m => m.Contains("SECRET-KEY-VALUE", StringComparison.Ordinal));
     }
 
+
+    // ---- Transport failure ----
+    //
+    // Every other handler in this suite answers with a status code, so nothing here could ever reach the
+    // code path a real failure takes: a stopped server, a bad DNS name or a TLS error never produces a
+    // response at all — HttpClient throws HttpRequestException. Before this test the exception escaped
+    // CompleteAsync to the caller, so the dispatcher above never saw ProviderError and never retried or
+    // failed over, and the whole call died at the first unreachable provider.
+    [Fact]
+    public async Task A_transport_failure_is_reported_as_provider_error_not_thrown()
+    {
+        var provider = ProviderOver(new ThrowingHandler(new HttpRequestException("Connection refused")));
+
+        var result = await provider.CompleteAsync("test-model", Build.Prompt(), TimeSpan.FromSeconds(5), default);
+
+        Assert.Equal(AiOutcome.ProviderError, result.Outcome);
+    }
+
+    // The other half of the same defect, and the one the class remarks already claimed to handle: a 200
+    // whose body is not the JSON this parses — a gateway error page, or a body cut short — threw
+    // JsonException straight past the mapping.
+    [Fact]
+    public async Task A_malformed_200_body_is_reported_as_provider_error_not_thrown()
+    {
+        var provider = ProviderOver(new StubHandler(HttpStatusCode.OK, "<html><body>502 Bad Gateway</body></html>"));
+
+        var result = await provider.CompleteAsync("test-model", Build.Prompt(), TimeSpan.FromSeconds(5), default);
+
+        Assert.Equal(AiOutcome.ProviderError, result.Outcome);
+    }
+
+    // The boundary the transport catch must not cross. A caller who stopped caring gets cancellation, not
+    // a result: swallowing it here would turn every cancelled call into a retryable ProviderError and buy
+    // the caller another round of provider calls they had just asked to stop.
+    [Fact]
+    public async Task Caller_cancellation_still_surfaces_as_cancellation()
+    {
+        var provider = ProviderOver(new ThrowingHandler(new HttpRequestException("Connection refused")));
+        using var cts = new CancellationTokenSource();
+        await cts.CancelAsync();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => provider.CompleteAsync("test-model", Build.Prompt(), TimeSpan.FromSeconds(5), cts.Token));
+    }
+
+    // Resolves the provider itself rather than the dispatcher above it, so a transport-failure assertion
+    // reads the provider's own mapping instead of whatever the retry/failover policy made of it.
+    private static IAiCompletionProvider ProviderOver(HttpMessageHandler handler)
+    {
+        var services = new ServiceCollection();
+        services.AddThemiaAiGemini(o =>
+        {
+            o.ApiKey = "unused-test-key";
+            o.CompletionModel = "test-model";
+            o.TranslationModel = "test-model";
+        });
+        services.AddHttpClient(GeminiCompletionProvider.HttpClientName)
+            .ConfigurePrimaryHttpMessageHandler(() => handler);
+
+        return services.BuildServiceProvider().GetRequiredService<IAiCompletionProvider>();
+    }
+
     // Builds a client over a stub primary handler returning the fixture body — no network call, so the
     // suite stays runnable without egress. The container is deliberately left undisposed: the returned
     // IAiCompletionClient is used after this method returns, and IHttpClientFactory's pooled handlers
@@ -189,5 +251,19 @@ internal sealed class CapturingLoggerProvider : ILoggerProvider
         {
             messages.Add($"[{categoryName}] {formatter(state, exception)}");
         }
+    }
+}
+
+/// <summary>
+/// A handler that fails the way a real network failure does — no response at all. Every other stub in
+/// this suite answers with a status code, which cannot reach the code path a stopped server, a bad DNS
+/// name or a TLS error takes.
+/// </summary>
+internal sealed class ThrowingHandler(Exception exception) : HttpMessageHandler
+{
+    protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        throw exception;
     }
 }

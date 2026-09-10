@@ -17,6 +17,36 @@ public class FailoverTests
         Assert.Equal(1, second.Calls);
     }
 
+    // The scenario the failover list exists for, and the one it did not survive: a local Ollama that is
+    // not running refuses every connection, so the provider throws rather than returning an outcome.
+    // Nothing here caught it, so the exception left CompleteAsync and the cloud provider configured
+    // behind it — the entire point of the configuration — was never asked.
+    [Fact]
+    public async Task Fails_over_to_the_next_provider_when_the_first_throws()
+    {
+        var first = new ThrowingProvider();
+        var second = new FakeProvider(AiOutcome.Completed, text: "ok");
+
+        var result = await Build.Client(providers: [first, second])
+            .CompleteAsync(AiOperation.Completion, Build.Prompt(), default);
+
+        Assert.Equal(AiOutcome.Completed, result.Outcome);
+        Assert.Equal("ok", result.Text);
+        Assert.Equal(1, second.Calls);
+    }
+
+    // A throwing provider is retried like any other ProviderError before failover, not abandoned on the
+    // first exception — the failure it stands for (a connection refused, a reset) is often transient.
+    [Fact]
+    public async Task A_throwing_provider_is_retried_before_failover()
+    {
+        var first = new ThrowingProvider();
+        await Build.Client(providers: [first, new FakeProvider(AiOutcome.Completed)])
+            .CompleteAsync(AiOperation.Completion, Build.Prompt(), default);
+
+        Assert.Equal(2, first.Calls);          // AiOptions.MaxRetriesPerProvider defaults to 2
+    }
+
     // A safety refusal is about the content. The next provider refuses it too, so failing over spends a
     // second call to receive the same answer.
     [Fact]

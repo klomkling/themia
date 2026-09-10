@@ -13,7 +13,8 @@ namespace Themia.Geo.Google;
 /// Maps Google's <c>status</c> field: <c>OK</c> → <see cref="GeocodeOutcome.Found"/>,
 /// <c>ZERO_RESULTS</c> → <see cref="GeocodeOutcome.NotFound"/>, <c>OVER_QUERY_LIMIT</c> and
 /// <c>OVER_DAILY_LIMIT</c> → <see cref="GeocodeOutcome.ProviderLimit"/>, everything else — including any
-/// non-success HTTP status and a malformed <c>OK</c> payload — → <see cref="GeocodeOutcome.ProviderError"/>.
+/// non-success HTTP status, a malformed <c>OK</c> payload, and any transport failure (DNS, connection
+/// refused, TLS, a reset, or <see cref="HttpClient"/>'s own timeout) — → <see cref="GeocodeOutcome.ProviderError"/>.
 /// </remarks>
 public sealed class GoogleGeocodingProvider(
     IHttpClientFactory httpClientFactory, IOptions<GoogleGeocodingOptions> googleOptions) : IGeocodingProvider
@@ -30,6 +31,31 @@ public sealed class GoogleGeocodingProvider(
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(query);
 
+        try
+        {
+            return await SendAsync(query, options, cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            // The caller's own token is still clear, so this is HttpClient's own Timeout firing rather
+            // than the caller giving up. Caller cancellation leaves the token set, does not match this
+            // filter, and propagates untouched.
+            return new GeocodeResult(GeocodeOutcome.ProviderError, null, "transport timeout");
+        }
+        catch (Exception ex) when (ex is HttpRequestException or JsonException)
+        {
+            // Nothing sits above this provider to turn an exception into an outcome, so throwing here
+            // aborts an adopter's whole backfill loop over one unreachable call. ProviderError is what
+            // the contract already says a provider-side failure looks like: one row fails, the loop goes
+            // on. The exception's type is reported and its message is not — a message can name the
+            // request's host, and this provider's API key travels in the request URI.
+            return new GeocodeResult(GeocodeOutcome.ProviderError, null, $"transport failure: {ex.GetType().Name}");
+        }
+    }
+
+    private async Task<GeocodeResult> SendAsync(
+        string query, GeocodeOptions? options, CancellationToken cancellationToken)
+    {
         var httpClient = httpClientFactory.CreateClient(HttpClientName);
         var requestUri = BuildRequestUri(query, options);
 
