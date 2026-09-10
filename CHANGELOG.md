@@ -56,7 +56,40 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
   audit-specific: `Themia.Exceptional` (since 0.8.x) and `Themia.AspNetCore.DataProtection` carry the
   identical dependency set today, through the same `Themia.Data.Migrations` reference.
 
+- **(breaking) `AddThemiaAudit(runMigration: true)` now needs `AddThemiaAudit{Engine}()` to migrate**,
+  and says so at startup when it does not get one. The handshake above means the neutral call only
+  records the request; an adopter using `Themia.Audit` with their own `IAuditDialect`/`IAuditStore` and
+  no engine package used to get the table from `AddThemiaAudit` alone and would now get nothing, with
+  no throw and no log, failing at the first write with `relation "audit_log" does not exist`. A
+  requested-but-unpaired migration now fails `AuditOptions` validation at startup, naming the call to
+  add. Pass `runMigration: false` if you create the table yourself. See
+  [MIGRATION.md](MIGRATION.md#unreleased).
+
 ### Fixed
+- **A recorded `runMigration: true` could be silently downgraded.** The `AddThemiaAudit` handshake
+  recorded intent last-wins, so a later `AddThemiaAudit(cfg, runMigration: false)` on the same
+  `IServiceCollection` cancelled an earlier `true` and the schema was never created — a regression
+  against the pre-handshake behaviour, where the first call migrated immediately and could not be
+  called off. `runMigration` now accumulates: a requested migration wins in either order, and a
+  redundant registration after the pair completes stays a no-op.
+
+- **The PostgreSQL boot lock had no test for its own timeout.** `MigrationLockTests` used a
+  five-minute `LockTimeout` and never exercised expiry, which is why the loss of
+  `SET statement_timeout = …;` in front of `pg_advisory_lock` went unnoticed: without it there is no
+  server-side wait bound, so no `57014`, so `TryAcquireLock` never reports a timeout and the wait
+  degrades to the driver's `CommandTimeout` — surfacing through the generic "failed to acquire" wrap
+  instead of the "timed out after {timeout}" message operators are taught to look for. A per-engine
+  expiry test now asserts the timeout-specific message, an elapsed time far below the driver
+  fallback, and (on PostgreSQL) that the inner exception is a `PostgresException` with SQLSTATE
+  `57014`. `IMigrationEngineAdapter.TryAcquireLock` hands that exception back so it is preserved as
+  the `MigrationLockException`'s inner exception, as it was before the engine split.
+
+- **`THEMIA2001` fired on modern test projects.** The build guard keyed on `OutputType == 'Exe'`
+  alone, which was verified against this repo's xUnit v2 projects (libraries) but not against xUnit
+  v3 or MSTest 3, whose test projects are executables — an adopter's test project referencing
+  `Themia.Audit` would have failed to build despite never running a migration. The condition now also
+  excludes `$(IsTestProject)`, with `$(ThemiaSkipMigrationEngineCheck)` as an explicit opt-out.
+
 - **`Themia.Audit/README.md` undercommunicated its own read surface** (coord #0116, #0117): two
   independent consumers read it and both concluded reads were tenant-locked. `IAuditStore.QueryAsync`
   is defined in `Themia.Audit` itself, not in `Themia.Modules.Audit`; `AuditQuery.TenantId = null`
