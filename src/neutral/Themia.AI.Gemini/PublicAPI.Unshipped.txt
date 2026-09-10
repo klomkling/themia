@@ -1,0 +1,18 @@
+#nullable enable
+Themia.AI.Gemini.DependencyInjection.AiGeminiServiceCollectionExtensions
+Themia.AI.Gemini.GeminiCompletionProvider
+Themia.AI.Gemini.GeminiCompletionProvider.CompleteAsync(string! model, Themia.AI.AiPrompt! prompt, System.TimeSpan timeout, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.AI.AiCompletion!>!
+Themia.AI.Gemini.GeminiCompletionProvider.GeminiCompletionProvider(System.Net.Http.IHttpClientFactory! httpClientFactory, Microsoft.Extensions.Options.IOptions<Themia.AI.Gemini.GeminiOptions!>! geminiOptions) -> void
+Themia.AI.Gemini.GeminiCompletionProvider.Key.get -> string!
+Themia.AI.Gemini.GeminiOptions
+Themia.AI.Gemini.GeminiOptions.ApiKey.get -> string!
+Themia.AI.Gemini.GeminiOptions.ApiKey.set -> void
+Themia.AI.Gemini.GeminiOptions.CompletionModel.get -> string!
+Themia.AI.Gemini.GeminiOptions.CompletionModel.set -> void
+Themia.AI.Gemini.GeminiOptions.GeminiOptions() -> void
+Themia.AI.Gemini.GeminiOptions.Timeout.get -> System.TimeSpan
+Themia.AI.Gemini.GeminiOptions.Timeout.set -> void
+Themia.AI.Gemini.GeminiOptions.TranslationModel.get -> string!
+Themia.AI.Gemini.GeminiOptions.TranslationModel.set -> void
+const Themia.AI.Gemini.GeminiCompletionProvider.HttpClientName = "Themia.AI.Gemini" -> string!
+static Themia.AI.Gemini.DependencyInjection.AiGeminiServiceCollectionExtensions.AddThemiaAiGemini(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Themia.AI.Gemini.GeminiOptions!>! configure) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!

@@ -3,7 +3,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Npgsql;
-using Testcontainers.PostgreSql;
 using Themia.Data.Migrations;
 using Themia.Data.Probes;
 using Themia.Framework.Data.EFCore.Abstractions;
@@ -12,19 +11,13 @@ using Xunit;
 
 namespace Themia.Modules.Pdf.SchemaProbe.IntegrationTests;
 
-public sealed class PdfSchemaProbeTests : IAsyncLifetime
+[Collection(PostgresPdfSchemaProbeCollection.Name)]
+public sealed class PdfSchemaProbeTests(PostgresPdfSchemaProbeFixture fixture)
 {
-    private readonly PostgreSqlContainer container =
-        new PostgreSqlBuilder("postgres:16-alpine").Build();
-
-    public Task InitializeAsync() => container.StartAsync();
-
-    public Task DisposeAsync() => container.DisposeAsync().AsTask();
-
     [Fact]
     public async Task Host_ShouldFailToStart_WhenPdfTemplatesIsOffTheSearchPath()
     {
-        var builder = new NpgsqlConnectionStringBuilder(container.GetConnectionString());
+        var builder = new NpgsqlConnectionStringBuilder(fixture.ConnectionString);
 
         using (var seed = new NpgsqlConnection(builder.ConnectionString))
         {

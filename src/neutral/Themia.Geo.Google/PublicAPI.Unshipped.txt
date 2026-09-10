@@ -1,0 +1,11 @@
+#nullable enable
+Themia.Geo.Google.DependencyInjection.GeoGoogleServiceCollectionExtensions
+Themia.Geo.Google.GoogleGeocodingOptions
+Themia.Geo.Google.GoogleGeocodingOptions.ApiKey.get -> string!
+Themia.Geo.Google.GoogleGeocodingOptions.ApiKey.set -> void
+Themia.Geo.Google.GoogleGeocodingOptions.GoogleGeocodingOptions() -> void
+Themia.Geo.Google.GoogleGeocodingProvider
+Themia.Geo.Google.GoogleGeocodingProvider.GeocodeAsync(string! query, Themia.Geo.GeocodeOptions? options = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Geo.GeocodeResult!>!
+Themia.Geo.Google.GoogleGeocodingProvider.GoogleGeocodingProvider(System.Net.Http.IHttpClientFactory! httpClientFactory, Microsoft.Extensions.Options.IOptions<Themia.Geo.Google.GoogleGeocodingOptions!>! googleOptions) -> void
+const Themia.Geo.Google.GoogleGeocodingProvider.HttpClientName = "Themia.Geo.Google" -> string!
+static Themia.Geo.Google.DependencyInjection.GeoGoogleServiceCollectionExtensions.AddThemiaGeoGoogle(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Themia.Geo.Google.GoogleGeocodingOptions!>! configure) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!

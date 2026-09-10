@@ -1,0 +1,45 @@
+#nullable enable
+Themia.AI.AspNetCore.AiProbeCallReport
+Themia.AI.AspNetCore.AiProbeCallReport.AiProbeCallReport(Themia.AI.AiOutcome Outcome, string? Model, Themia.AI.AiUsage? Usage, System.TimeSpan Elapsed, string? ProviderStatus) -> void
+Themia.AI.AspNetCore.AiProbeCallReport.Elapsed.get -> System.TimeSpan
+Themia.AI.AspNetCore.AiProbeCallReport.Elapsed.init -> void
+Themia.AI.AspNetCore.AiProbeCallReport.Model.get -> string?
+Themia.AI.AspNetCore.AiProbeCallReport.Model.init -> void
+Themia.AI.AspNetCore.AiProbeCallReport.Outcome.get -> Themia.AI.AiOutcome
+Themia.AI.AspNetCore.AiProbeCallReport.Outcome.init -> void
+Themia.AI.AspNetCore.AiProbeCallReport.ProviderStatus.get -> string?
+Themia.AI.AspNetCore.AiProbeCallReport.ProviderStatus.init -> void
+Themia.AI.AspNetCore.AiProbeCallReport.Usage.get -> Themia.AI.AiUsage?
+Themia.AI.AspNetCore.AiProbeCallReport.Usage.init -> void
+Themia.AI.AspNetCore.AiProbeConfigurationReport
+Themia.AI.AspNetCore.AiProbeConfigurationReport.AiProbeConfigurationReport(System.Collections.Generic.IReadOnlyList<string!>! RegisteredProviders, System.Collections.Generic.IReadOnlyList<Themia.AI.AspNetCore.AiProbeFailoverEntry!>! Failover, int MaxRetriesPerProvider, System.TimeSpan TotalBudget, bool AllowNoProvider) -> void
+Themia.AI.AspNetCore.AiProbeConfigurationReport.AllowNoProvider.get -> bool
+Themia.AI.AspNetCore.AiProbeConfigurationReport.AllowNoProvider.init -> void
+Themia.AI.AspNetCore.AiProbeConfigurationReport.Failover.get -> System.Collections.Generic.IReadOnlyList<Themia.AI.AspNetCore.AiProbeFailoverEntry!>!
+Themia.AI.AspNetCore.AiProbeConfigurationReport.Failover.init -> void
+Themia.AI.AspNetCore.AiProbeConfigurationReport.MaxRetriesPerProvider.get -> int
+Themia.AI.AspNetCore.AiProbeConfigurationReport.MaxRetriesPerProvider.init -> void
+Themia.AI.AspNetCore.AiProbeConfigurationReport.RegisteredProviders.get -> System.Collections.Generic.IReadOnlyList<string!>!
+Themia.AI.AspNetCore.AiProbeConfigurationReport.RegisteredProviders.init -> void
+Themia.AI.AspNetCore.AiProbeConfigurationReport.TotalBudget.get -> System.TimeSpan
+Themia.AI.AspNetCore.AiProbeConfigurationReport.TotalBudget.init -> void
+Themia.AI.AspNetCore.AiProbeEndpoints
+Themia.AI.AspNetCore.AiProbeFailoverEntry
+Themia.AI.AspNetCore.AiProbeFailoverEntry.AiProbeFailoverEntry(string! Key, bool Registered, string! CompletionModel, string! TranslationModel, System.TimeSpan Timeout) -> void
+Themia.AI.AspNetCore.AiProbeFailoverEntry.CompletionModel.get -> string!
+Themia.AI.AspNetCore.AiProbeFailoverEntry.CompletionModel.init -> void
+Themia.AI.AspNetCore.AiProbeFailoverEntry.Key.get -> string!
+Themia.AI.AspNetCore.AiProbeFailoverEntry.Key.init -> void
+Themia.AI.AspNetCore.AiProbeFailoverEntry.Registered.get -> bool
+Themia.AI.AspNetCore.AiProbeFailoverEntry.Registered.init -> void
+Themia.AI.AspNetCore.AiProbeFailoverEntry.Timeout.get -> System.TimeSpan
+Themia.AI.AspNetCore.AiProbeFailoverEntry.Timeout.init -> void
+Themia.AI.AspNetCore.AiProbeFailoverEntry.TranslationModel.get -> string!
+Themia.AI.AspNetCore.AiProbeFailoverEntry.TranslationModel.init -> void
+Themia.AI.AspNetCore.AiProbeOptions
+Themia.AI.AspNetCore.AiProbeOptions.AiProbeOptions() -> void
+Themia.AI.AspNetCore.AiProbeOptions.Authorize.get -> System.Func<Microsoft.AspNetCore.Http.HttpContext!, System.Threading.Tasks.Task<bool>!>?
+Themia.AI.AspNetCore.AiProbeOptions.Authorize.set -> void
+const Themia.AI.AspNetCore.AiProbeEndpoints.MaxPromptLength = 500 -> int
+const Themia.AI.AspNetCore.AiProbeEndpoints.MaxProviderStatusLength = 200 -> int
+static Themia.AI.AspNetCore.AiProbeEndpoints.MapThemiaAiProbe(this Microsoft.AspNetCore.Routing.IEndpointRouteBuilder! endpoints, string! path = "/ai/probe", System.Action<Themia.AI.AspNetCore.AiProbeOptions!>? configure = null) -> Microsoft.AspNetCore.Routing.RouteGroupBuilder!

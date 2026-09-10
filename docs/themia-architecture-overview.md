@@ -40,11 +40,12 @@ Framework core    Themia.Framework.Core | .Data.EFCore | .AspNetCore | Themia.Mu
 (from Zenity)      Themia.Mediator | Themia.Caching | Themia.Logging | Themia.Services
                   Module system: IThemiaModule / ModuleDescriptor (ADR-0003)
 ─────────────────────────────────────────────────────────────────────────────────────────────
-Neutral cores     Themia.Quartz | Themia.Exceptional(.SqlServer/.MySql/.PostgreSql)
-(no Framework dep) → consumable by BOTH Themia apps and Serenity (PowerACC)
+Neutral cores     Themia.Quartz | Themia.Exceptional(.SqlServer/.MySql/.PostgreSql) | Themia.Geo(.Google)
+(no Framework dep) Themia.AI(.Gemini/.OpenAiCompatible) → consumable by BOTH Themia apps and Serenity (PowerACC)
 ─────────────────────────────────────────────────────────────────────────────────────────────
 Modules           Themia.Modules.* (Scheduling, ExceptionLogging, Identity, Storage,
-(IThemiaModule)   Notifications, Pdf, Export, Geo, AI, Audit) — depend on Framework + neutral cores
+(IThemiaModule)   Notifications, Pdf, Export, Audit) — depend on Framework + neutral cores
+                  (no Themia.Modules.Geo or .AI — neither has tenant state or a schema; see §B)
 ─────────────────────────────────────────────────────────────────────────────────────────────
 [DEFERRED]        Idevs.Net.CoreLib.* (Quartz, Exceptional.*) — Serenity adapter, neutral core + Serenity
                   → built ONLY if/when PowerACC migrates (optional reuse, not a driver)
@@ -119,8 +120,8 @@ you the target: `neutral/` = net8.0;net10.0, everything else = net10.0 (tooling 
 | `Themia.Modules.Pdf` | **ezy-assets** Contract/Proposal PDF + **Idevs** `PdfOptionsBuilder`/PuppeteerSharp + PowerACC reporting | ⬜ to-spec |
 | `Themia.Export` + `Themia.Export.Excel` | **Idevs** `IReportBaseModel`/`IdevsExportRequest`/ClosedXML (Excel), de-Serenity-ized | ✅ **built** (0.6.8 — two stateless neutral cores: typed columns, CSV + xlsx, computed summary rows; no tenant module — the transform is stateless) |
 | `Themia.Modules.Export` | — (new; no prior source) | ✅ **built** (0.6.9 — tenant-aware async export module: `IExportDefinition<TParams>` keyed definitions; on-demand + cron Quartz jobs; Storage delivery via signed link; completion/failure Notifications; 7-day retention cleanup; opt-in `BypassSoftDeleteFilter` for full-data exports; FM schema, PostgreSQL+SQL Server+MySQL) |
-| `Themia.Modules.Geo` | ezy-assets `ProjectGeocodingService` | ⬜ later |
-| `Themia.Modules.AI` | ezy-assets `GeminiAICaption`/`FallbackTextTranslation` | ⬜ later |
+| ~~`Themia.Modules.Geo`~~ — no module; see `Themia.Geo` + `Themia.Geo.Google` in §"Neutral cores" below | ezy-assets `ProjectGeocodingService` | ✅ **built** (0.24.0 — no tenant state, no schema, so there is no module; see correction below) |
+| ~~`Themia.Modules.AI`~~ — no module; see `Themia.AI` + `Themia.AI.Gemini` + `Themia.AI.OpenAiCompatible` below | ezy-assets `GeminiAICaption`/`FallbackTextTranslation` | ✅ **built** (0.24.0 — no tenant state, no schema, so there is no module; see correction below) |
 | `Themia.Modules.Audit` (+ `Themia.Audit`, `.PostgreSql/.SqlServer/.MySql`, `.AspNetCore`) | **new** — the listed sources turned out to describe something else (see below) | ✅ **built** (0.23.0 — append-only activity + authentication event log; unqualified `themia_audit_events` on all three engines; unconditional redaction; `RequireTransaction` for activity events on EF and Dapper alike; `IIdentityEventObserver` audits all twelve Identity events; fail-closed read-only dashboard. Entity change log deferred to 0.24.0) |
 
 > **The `Themia.Modules.Audit` sources listed here were wrong, and the correction is worth keeping.**
@@ -130,6 +131,32 @@ you the target: `neutral/` = net8.0;net10.0, everything else = net10.0 (tooling 
 > diff — it is an **activity log with two columns named old/new**. `AuditEvent` in `Themia.Services` has
 > no old/new fields at all. The entity change log most people mean by "audit" existed in neither source
 > and is being built from scratch in `0.24.0`.
+
+> **The `Themia.Modules.Geo` and `Themia.Modules.AI` rows were wrong on two points each, and both
+> corrections are worth keeping.**
+>
+> **There is no module, for either.** Neither `Themia.Geo` nor `Themia.AI` has tenant-scoped state, a
+> schema, or an `IThemiaModule` lifecycle to run — `Themia.Geo` is coordinate primitives plus an HTTP
+> geocoding call, and `Themia.AI` is an HTTP completion dispatcher plus one typed operation built on it.
+> A module wrapper would add a package whose only content is DI registration the neutral package's own
+> `AddThemiaGeoGoogle`/`AddThemiaAiGemini`/`AddThemiaAiOpenAiCompatible`/`AddThemiaAi` already does.
+> Contrast `Themia.Modules.Audit` directly above, which genuinely needed a module for tenant resolution
+> and transaction enlistment — the pattern was checked per capability, not copied automatically.
+>
+> **The "sources" column named the wrong thing for both — read as ported code, both are placeholders
+> or plumbing, not the capability being built.** `ProjectGeocodingService` (the `Themia.Geo` source) is
+> mostly ezy-assets domain SQL — the code worth reading in it is a hand-rolled Haversine calculation and
+> an HTTP call to Google's Geocoding API; there is no POI store, gazetteer, or name-matching logic in
+> it, and `Themia.Geo` deliberately does not add any of those either (both consumer apps asked it not
+> to — coord #0115). `GeminiAICaption`/`FallbackTextTranslation` (the `Themia.AI` sources) **contain no
+> AI call at all**: the caption service formats request fields into a `StringBuilder` with emoji (its
+> own comment calls it a placeholder that "simulates AI"), and the translation service returns its input
+> unchanged. `Themia.AI` is therefore not a port of either — it is the first real implementation, built
+> against the provider's actual REST shape instead of against ported code that never called one.
+>
+> See `docs/superpowers/specs/2026-09-08-themia-geo-design.md` and
+> `docs/superpowers/specs/2026-09-08-themia-ai-design.md` for the full design and this correction's
+> detail.
 
 ## C. Mediator pipeline behaviors → `Themia.Mediator`
 
@@ -289,7 +316,10 @@ adopter actually needs it.
 - **Phase 1 — Core cross-cutting:** Scheduling ✅, ExceptionLogging ✅, **Identity** ✅, Storage ✅
   (+ multi-DB SqlServer/MySql/Postgres baseline).
 - **Phase 2 — Productivity:** Notifications, Pdf, **Export** ✅.
-- **Phase 3 — Advanced:** Geo, AI, **Audit** ✅ (0.23.0 —
+- **Phase 3 — Advanced:** **Geo** ✅ (0.24.0 —
+  `docs/superpowers/specs/2026-09-08-themia-geo-design.md`; no module, see the correction in §B) and
+  **AI** ✅ (0.24.0 — `docs/superpowers/specs/2026-09-08-themia-ai-design.md`; no module, see the
+  correction in §B); **Audit** ✅ (0.23.0 —
   `docs/superpowers/specs/2026-09-06-themia-audit-design.md`; entity change log deferred to 0.24.0);
   Sequences EF-port ✅ (shipped as
   `Themia.Framework.Data.Sequences`, see `docs/superpowers/specs/2026-09-05-themia-sequences-design.md`
@@ -309,6 +339,8 @@ adopter actually needs it.
 - ✅ Export — `docs/superpowers/specs/2026-06-27-themia-modules-export-design.md` + `docs/superpowers/plans/2026-06-27-themia-modules-export.md` (async export module — 0.6.9)
 - ✅ Audit — `docs/superpowers/specs/2026-09-06-themia-audit-design.md` + `docs/superpowers/plans/2026-09-06-themia-audit.md` (activity + authentication event log — 0.23.0; entity change log scoped for 0.24.0 in §15)
 - ✅ Sequences — `docs/superpowers/specs/2026-09-05-themia-sequences-design.md` + `docs/superpowers/plans/2026-09-05-themia-sequences.md` (document numbering — 0.22.0; supersedes §F on three points, recorded in the spec)
+- ✅ Geo — `docs/superpowers/specs/2026-09-08-themia-geo-design.md` + `docs/superpowers/plans/2026-09-08-themia-geo.md` (coordinate primitives + Google geocoding provider — 0.24.0; no module, supersedes the `Themia.Modules.Geo` row in §B)
+- ✅ AI — `docs/superpowers/specs/2026-09-08-themia-ai-design.md` + `docs/superpowers/plans/2026-09-08-themia-ai.md` (completion dispatch + typed translation, Gemini + OpenAI-compatible providers — 0.24.0; no module, supersedes the `Themia.Modules.AI` row in §B)
 - ⬜ Storage, Notifications, Pdf, … (one spec each, this catalog as parent)
 
 ## Identity JWT slice (0.5.1 — 2026-06-15)

@@ -1,0 +1,37 @@
+#nullable enable
+Themia.Geo.GeoBounds
+Themia.Geo.GeoBounds.Contains(Themia.Geo.GeoPoint point) -> bool
+Themia.Geo.GeoBounds.GeoBounds() -> void
+Themia.Geo.GeoBounds.NorthEast.get -> Themia.Geo.GeoPoint
+Themia.Geo.GeoBounds.SouthWest.get -> Themia.Geo.GeoPoint
+Themia.Geo.GeoDistance
+Themia.Geo.GeocodeOptions
+Themia.Geo.GeocodeOptions.Language.get -> string?
+Themia.Geo.GeocodeOptions.Language.init -> void
+Themia.Geo.GeocodeOptions.Region.get -> string?
+Themia.Geo.GeocodeOptions.Region.init -> void
+Themia.Geo.GeocodeOutcome
+Themia.Geo.GeocodeOutcome.Found = 1 -> Themia.Geo.GeocodeOutcome
+Themia.Geo.GeocodeOutcome.NotFound = 2 -> Themia.Geo.GeocodeOutcome
+Themia.Geo.GeocodeOutcome.ProviderError = 4 -> Themia.Geo.GeocodeOutcome
+Themia.Geo.GeocodeOutcome.ProviderLimit = 3 -> Themia.Geo.GeocodeOutcome
+Themia.Geo.GeocodeOutcome.Unspecified = 0 -> Themia.Geo.GeocodeOutcome
+Themia.Geo.GeocodeResult
+Themia.Geo.GeocodeResult.GeocodeResult(Themia.Geo.GeocodeOutcome Outcome, Themia.Geo.GeoPoint? Point, string? ProviderStatus) -> void
+Themia.Geo.GeocodeResult.Outcome.get -> Themia.Geo.GeocodeOutcome
+Themia.Geo.GeocodeResult.Outcome.init -> void
+Themia.Geo.GeocodeResult.Point.get -> Themia.Geo.GeoPoint?
+Themia.Geo.GeocodeResult.Point.init -> void
+Themia.Geo.GeocodeResult.ProviderStatus.get -> string?
+Themia.Geo.GeocodeResult.ProviderStatus.init -> void
+Themia.Geo.GeoPoint
+Themia.Geo.GeoPoint.GeoPoint() -> void
+Themia.Geo.GeoPoint.GeoPoint(double latitude, double longitude) -> void
+Themia.Geo.GeoPoint.Latitude.get -> double
+Themia.Geo.GeoPoint.Longitude.get -> double
+Themia.Geo.IGeocodingProvider
+Themia.Geo.IGeocodingProvider.GeocodeAsync(string! query, Themia.Geo.GeocodeOptions? options = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Geo.GeocodeResult!>!
+static Themia.Geo.GeoBounds.AroundMetres(Themia.Geo.GeoPoint centre, double metres) -> Themia.Geo.GeoBounds
+static Themia.Geo.GeoDistance.EquirectangularMetres(Themia.Geo.GeoPoint a, Themia.Geo.GeoPoint b) -> double
+static Themia.Geo.GeoDistance.HaversineMetres(Themia.Geo.GeoPoint a, Themia.Geo.GeoPoint b) -> double
+static Themia.Geo.GeoPoint.TryCreate(double latitude, double longitude, out Themia.Geo.GeoPoint point) -> bool
