@@ -92,6 +92,39 @@ bound, and at the default 100 MP that is a **~400 MB decode**. If your uploads a
 host is memory-constrained, set `MaxPixels` from the memory you are willing to spend rather than from
 the camera you expect.
 
+### `MaxPixels` bounds one decode. `MaxConcurrency` is the other term
+
+A pixel budget is not a memory budget. `MaxPixels` bounds a single call, and nothing about it counts
+how many calls are in flight, so the ceiling a *process* can actually reach is:
+
+```
+MaxPixels × 4 bytes × MaxConcurrency
+```
+
+At the defaults (100 MP, 2) that is about **800 MB**. Supply only the first two terms and the third
+one is set by whatever traffic arrives: a browser doing `Promise.allSettled(files.map(upload))` on
+eight selected photos is eight simultaneous requests, so at a configured 64 MP that is ~2 GB of
+decode buffers for one click. This is sharpest for PNG, which cannot be subsampled — every concurrent
+decode is a full-budget allocation from a file that may be a few hundred bytes on the wire.
+
+`MaxConcurrency` (default **2**) is a `SemaphoreSlim` taken *after* the budget check, so an oversized
+image is refused without occupying a slot, and released in a `finally`, so a throw — the common case
+on an upload endpoint, not the rare one — hands the slot straight back. Callers beyond the bound queue
+and honour their cancellation token, so a client that disconnects while queued frees its place.
+
+```csharp
+services.AddThemiaImaging(o =>
+{
+    o.MaxPixels = 64_000_000;   // one decode
+    o.MaxConcurrency = 2;       // × 4 bytes × this = ~512 MB, the process ceiling
+});
+```
+
+**It bounds one process, not the machine.** A semaphore knows nothing about other instances, so behind
+a load balancer the real ceiling is `instances × MaxConcurrency × MaxPixels × 4 bytes`. If the goal is
+"never let this starve a neighbouring process", set a container memory limit too — that is the
+operator's job and no in-process bound can do it.
+
 ## Orientation and metadata are opposite operations on the same field
 
 Re-encoding from a decoded pixel buffer is what drops EXIF — including GPS coordinates, which on a

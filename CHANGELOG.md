@@ -27,6 +27,27 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+### Added
+- **`ImageProcessingOptions.MaxConcurrency` (default `2`) bounds how many images `Themia.Imaging`
+  decodes at once** (coord #0125). `MaxPixels` was a per-decode bound sold in the shape of a memory
+  budget: it bounds one call and nothing counted how many ran together, so the real ceiling was
+  `MaxPixels × 4 bytes × concurrent callers` and the package supplied only the first two terms. A
+  browser uploading eight selected photos in parallel is eight simultaneous requests — ~2 GB of decode
+  buffers at a configured 64 MP — and it is sharpest for PNG, which Skia cannot subsample, so every
+  concurrent decode is a full-budget allocation from a file that may be a few hundred bytes on the
+  wire. A byte limit on the endpoint looks like a guard and is not one.
+
+  Same shape `Themia.Pdf` already ships (`ThemiaPdfOptions.MaxConcurrency`): a `SemaphoreSlim` taken
+  **after** the pixel-budget check, so an oversized image is refused without occupying a slot another
+  caller could use; released in a `finally`, so a throw — ordinary user input on an upload endpoint,
+  not the rare case — hands the slot straight back instead of leaking it; and queued with the caller's
+  `CancellationToken`, so a client that disconnects while waiting frees its place. Validated alongside
+  `MaxEdge`/`MaxPixels`/`Quality`, so a bad value fails `ValidateOnStart` rather than a first upload.
+
+  **Additive with a safe default — not breaking.** Existing registrations gain a bound of 2 without a
+  source change. `MaxPixels`' documentation is corrected to say what it actually bounds (one decode)
+  and to name the other term; `Themia.Imaging`'s README carries the arithmetic.
+
 ## [0.25.0] - 2026-09-10
 
 ### Changed

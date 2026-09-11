@@ -10,12 +10,25 @@ namespace Themia.Imaging;
 /// WebP only — Skia cannot subsample a PNG), the orientation matrix for all eight EXIF origins, and the
 /// disposal that checks <see cref="object.ReferenceEquals"/> before disposing an alias.
 /// <para>
-/// Stateless — register as a singleton.
+/// Register as a singleton. The only state it holds is the concurrency gate
+/// (<see cref="ImageProcessingOptions.MaxConcurrency"/>), and that gate is the point: shared by every
+/// caller of one registration, it is what makes the worst-case decode memory finite. A per-request
+/// instance would hand each caller its own gate and bound nothing.
 /// </para>
 /// </remarks>
 public sealed class SkiaImageProcessor : IImageProcessor
 {
+    // The public parameter every rejection here is about. A constant rather than nameof, because the
+    // decode rejection now lives in Render, which has no parameter of that name — and reporting a
+    // different paramName from the same method's other rejections would be worse than a literal.
+    private const string SourceParameter = "source";
+
     private readonly ImageProcessingOptions defaults;
+
+    // Not disposed, deliberately — the same call as Themia.Pdf's _renderLock. A SemaphoreSlim needs
+    // disposal only when its AvailableWaitHandle was accessed (never here), and disposing one while a
+    // decode sits between WaitAsync and Release turns that Release into an ObjectDisposedException.
+    private readonly SemaphoreSlim slots;
 
     /// <summary>Creates the processor.</summary>
     /// <param name="options">The default processing options, used when a call passes none.</param>
@@ -30,7 +43,19 @@ public sealed class SkiaImageProcessor : IImageProcessor
         {
             throw new ArgumentException(problem, nameof(options));
         }
+
+        // Read once. A semaphore's capacity is fixed at construction, and the options object is mutable,
+        // so a later mutation must not silently disagree with the real bound — which is also why the
+        // per-call options ProcessAsync accepts cannot change it.
+        slots = new SemaphoreSlim(defaults.MaxConcurrency, defaults.MaxConcurrency);
     }
+
+    /// <summary>
+    /// The decode gate. Exposed to this package's tests so they can occupy a slot and read
+    /// <see cref="SemaphoreSlim.CurrentCount"/> directly: a timing assertion cannot tell a working gate
+    /// from a slow machine, and would pass on a fast one with the gate removed.
+    /// </summary>
+    internal SemaphoreSlim Slots => slots;
 
     /// <inheritdoc />
     public async Task<ProcessedImage> ProcessAsync(
@@ -50,7 +75,7 @@ public sealed class SkiaImageProcessor : IImageProcessor
         buffer.Position = 0;
 
         using var codec = SKCodec.Create(buffer)
-            ?? throw new ArgumentException("Unsupported or corrupt image.", nameof(source));
+            ?? throw new ArgumentException("Unsupported or corrupt image.", SourceParameter);
 
         var info = codec.Info;
 
@@ -61,9 +86,41 @@ public sealed class SkiaImageProcessor : IImageProcessor
         {
             throw new ArgumentException(
                 $"Image dimensions {info.Width}x{info.Height} exceed the {effective.MaxPixels:N0}-pixel limit.",
-                nameof(source));
+                SourceParameter);
         }
 
+        // Bound concurrent decodes, and only now — after the budget refusal above, which costs nothing
+        // but a header read. An oversized image must be refused without occupying a slot some other
+        // caller could have used; gating first would make a bomb a denial-of-service against the queue
+        // rather than merely a rejected upload.
+        //
+        // This is the other half of the memory budget: MaxPixels bounds one decode, and without a bound
+        // on how many run at once the real ceiling is however many callers arrive together.
+        // Queuing honours the token, so a caller that disconnects while queued frees its slot rather
+        // than waiting for one it will not use.
+        await slots.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            return Render(codec, info, effective, cancellationToken);
+        }
+        finally
+        {
+            // finally, not a release on the success path: over-budget and undecodable both throw, and on
+            // an upload endpoint a throw is ordinary user input rather than the rare case. A release that
+            // only happened on success would turn the first bad upload into a permanently lost slot.
+            slots.Release();
+        }
+    }
+
+    /// <summary>Decodes, orients, downscales and encodes — the part that holds a slot on the decode gate.</summary>
+    /// <param name="codec">The codec, already created and past the pixel-budget check.</param>
+    /// <param name="info">The codec's declared image info.</param>
+    /// <param name="effective">The options this call runs under.</param>
+    /// <param name="cancellationToken">Checked between the synchronous stages.</param>
+    /// <returns>The re-encoded image.</returns>
+    private static ProcessedImage Render(
+        SKCodec codec, SKImageInfo info, ImageProcessingOptions effective, CancellationToken cancellationToken)
+    {
         // Decode at the largest power-of-two subsample whose long edge still clears MaxEdge, so a very
         // large image never materializes at full resolution; Downscale then trims precisely. Quality is
         // unaffected — the decode is always at least the target size before the final resize.
@@ -81,7 +138,7 @@ public sealed class SkiaImageProcessor : IImageProcessor
 
         cancellationToken.ThrowIfCancellationRequested();
         using var decoded = SKBitmap.Decode(codec, decodeInfo)
-            ?? throw new ArgumentException("Could not decode image.", nameof(source));
+            ?? throw new ArgumentException("Could not decode image.", SourceParameter);
 
         // `decoded` is owned by its `using`. `oriented`/`scaled` are allocated inside the try so a throw
         // from either still disposes whatever was allocated — and only when they are new bitmaps rather
