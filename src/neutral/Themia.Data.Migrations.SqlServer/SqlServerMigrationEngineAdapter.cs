@@ -28,6 +28,9 @@ public sealed class SqlServerMigrationEngineAdapter : IMigrationEngineAdapter
         new SqlConnection(new SqlConnectionStringBuilder(connectionString) { Pooling = false }.ConnectionString);
 
     /// <inheritdoc />
+    public DbConnection CreateConnection(string connectionString) => new SqlConnection(connectionString);
+
+    /// <inheritdoc />
     public bool TryAcquireLock(DbConnection connection, string scope, TimeSpan timeout, out Exception? timeoutCause)
     {
         // sp_getapplock reports a lapsed wait as return code -1, never as an exception, so there is no

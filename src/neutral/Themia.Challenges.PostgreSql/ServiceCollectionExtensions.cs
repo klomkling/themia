@@ -25,6 +25,10 @@ public static class ServiceCollectionExtensions
 
         services.TryAddSingleton<IChallengeDialect>(new PostgresChallengeDialect(connectionString));
 
+        // Register on use, so an adopter who calls only engine-specific methods still has the enum path
+        // (a module, SchedulingSchema.Migrate) resolvable — see MigrationEngineRegistry.Add (coord #0126).
+        MigrationEngineRegistry.Add(PostgresMigrationEngine.Adapter);
+
         ThemiaMigrations.Run(PostgresMigrationEngine.Adapter, connectionString, typeof(ChallengeSchemaMigration).Assembly);
 
         // Both tables are created unqualified on every engine (see ChallengeSchemaMigration), so both

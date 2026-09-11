@@ -1,9 +1,7 @@
 using System.Data.Common;
-using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
-using Npgsql;
 using Quartz;
 using Themia.Data.Migrations;
 
@@ -157,12 +155,38 @@ public static class SchedulingServiceCollectionExtensions
         return services;
     }
 
-    private static Func<DbConnection> ConnectionFactory(MigrationEngine engine, string connectionString) =>
-        engine switch
+    /// <summary>
+    /// The execution-history store's connection factory, routed through
+    /// <see cref="IMigrationEngineAdapter.CreateConnection"/> rather than constructing a driver type here.
+    /// </summary>
+    /// <remarks>
+    /// A <c>switch</c> returning <c>new NpgsqlConnection(…)</c> / <c>new SqlConnection(…)</c> forced this
+    /// package to declare BOTH drivers, so a PostgreSQL-only adopter still took
+    /// <c>Microsoft.Data.SqlClient</c> and the <c>Microsoft.IdentityModel.*</c> / <c>Azure.Identity</c>
+    /// stack it drags with it (coord #0126). The adapter seam already exists for exactly this, and only
+    /// the one <c>Themia.Data.Migrations.{Engine}</c> package the adopter chose carries a driver.
+    /// <para>
+    /// <b>Pooled, not <see cref="IMigrationEngineAdapter.CreateUnpooledConnection"/>.</b> That one exists
+    /// for the migration lock, which is held for a whole migration; a job-store connection is short-lived
+    /// and must go back to the pool.
+    /// </para>
+    /// <para>
+    /// <b>The adapter is resolved lazily, inside the returned delegate.</b> Resolving here would make
+    /// <c>AddThemiaDataMigrations{Engine}()</c> ordering-sensitive — it would have to precede
+    /// <see cref="AddThemiaScheduling"/> — which is precisely the "position-independent in startup"
+    /// property MIGRATION.md promises for Scheduling. The delegate does not run until the store opens its
+    /// first connection, long after the container is built. The engine check below stays eager so an
+    /// unsupported engine still fails at registration, as it did before.
+    /// </para>
+    /// </remarks>
+    internal static Func<DbConnection> ConnectionFactory(MigrationEngine engine, string connectionString)
+    {
+        if (engine is not (MigrationEngine.Postgres or MigrationEngine.SqlServer))
         {
-            MigrationEngine.Postgres => () => new NpgsqlConnection(connectionString),
-            MigrationEngine.SqlServer => () => new SqlConnection(connectionString),
-            _ => throw new NotSupportedException(
-                $"Themia.Scheduling supports PostgreSQL and SQL Server; '{engine}' is not supported."),
-        };
+            throw new NotSupportedException(
+                $"Themia.Scheduling supports PostgreSQL and SQL Server; '{engine}' is not supported.");
+        }
+
+        return () => MigrationEngineRegistry.Resolve(engine).CreateConnection(connectionString);
+    }
 }

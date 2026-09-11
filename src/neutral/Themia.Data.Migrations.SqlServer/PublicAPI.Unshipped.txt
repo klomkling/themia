@@ -2,6 +2,7 @@
 Themia.Data.Migrations.SqlServer.SqlServerMigrationEngine
 Themia.Data.Migrations.SqlServer.SqlServerMigrationEngineAdapter
 Themia.Data.Migrations.SqlServer.SqlServerMigrationEngineAdapter.ConfigureRunner(FluentMigrator.Runner.IMigrationRunnerBuilder! builder) -> void
+Themia.Data.Migrations.SqlServer.SqlServerMigrationEngineAdapter.CreateConnection(string! connectionString) -> System.Data.Common.DbConnection!
 Themia.Data.Migrations.SqlServer.SqlServerMigrationEngineAdapter.CreateUnpooledConnection(string! connectionString) -> System.Data.Common.DbConnection!
 Themia.Data.Migrations.SqlServer.SqlServerMigrationEngineAdapter.DisplayName.get -> string!
 Themia.Data.Migrations.SqlServer.SqlServerMigrationEngineAdapter.Engine.get -> Themia.Data.Migrations.MigrationEngine

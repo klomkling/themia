@@ -7,9 +7,9 @@ using Xunit;
 namespace Themia.Data.Migrations.Tests;
 
 /// <summary>
-/// Pins <c>Themia.Data.Migrations</c>'s PACKED nuspec dependency set — not its csproj's
-/// <c>PackageReference</c> list, which is a different thing and is exactly how the defect this test
-/// guards against arrived.
+/// Pins the PACKED nuspec dependency set of <c>Themia.Data.Migrations</c> and of the packages that must
+/// not reintroduce a driver behind it — not their csprojs' <c>PackageReference</c> lists, which are a
+/// different thing and are exactly how the defect this test guards against arrived.
 /// </summary>
 /// <remarks>
 /// coord #0116, #0117 (spec §1: <c>docs/superpowers/specs/2026-09-09-data-migrations-engine-split.md</c>):
@@ -127,6 +127,80 @@ public sealed class MigrationsPackTests
         }
     }
 
+    /// <summary>
+    /// The packages that declared a driver THEMSELVES, so the engine split never touched them: they were
+    /// not on the transitive path it fixed. <c>Themia.Exceptional</c> carried
+    /// <c>Microsoft.Data.SqlClient</c> (with a <c>VersionOverride</c>) while naming no provider type in
+    /// any of its own <c>.cs</c> files, and <c>Themia.Scheduling</c> carried <c>Npgsql</c> AND
+    /// <c>Microsoft.Data.SqlClient</c> to feed a <c>switch</c> that constructed both. ezy-assets' image
+    /// therefore still carried <c>Microsoft.IdentityModel.*</c> and <c>Azure.Identity</c> after 0.25.0 —
+    /// through these two rather than through Audit (coord #0126). Nothing pinned them, which is why the
+    /// class came back at all; it is pinned now.
+    /// </summary>
+    public static TheoryData<string, string> DriverFreePackages() => new()
+    {
+        { "Themia.Exceptional", "net8.0;net10.0" },
+        { "Themia.Scheduling", "net10.0" },
+    };
+
+    [Theory]
+    [MemberData(nameof(DriverFreePackages))]
+    public void Pack_CarriesNoAdoDriver(string packageId, string targetFrameworks)
+    {
+        // targetFrameworks is documentation carried into the failure message: which legs SHOULD appear,
+        // so a group silently disappearing from the nuspec is legible rather than a vacuous pass.
+        var repoRoot = FindRepoRoot();
+        var project = Path.Combine(repoRoot, "src", "neutral", packageId, $"{packageId}.csproj");
+        var outDir = Path.Combine(Path.GetTempPath(), $"themia-driverpack-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(outDir);
+        try
+        {
+            RunDotnet($"pack \"{project}\" --output \"{outDir}\" --disable-build-servers", repoRoot);
+
+            var nupkg = Directory.GetFiles(outDir, $"{packageId}.*.nupkg")
+                .Single(f => !f.EndsWith(".snupkg", StringComparison.Ordinal));
+            using var zip = ZipFile.OpenRead(nupkg);
+
+            var nuspecEntry = zip.Entries.Single(e => e.FullName.EndsWith(".nuspec", StringComparison.Ordinal));
+            using var nuspecStream = nuspecEntry.Open();
+            var nuspec = XDocument.Load(nuspecStream);
+
+            // Scoped to <dependencies> groups specifically, unlike the test above: these packages also
+            // carry <frameworkReferences> groups (Microsoft.AspNetCore.App), and those are groups too.
+            var groups = nuspec.Descendants()
+                .Where(e => e.Name.LocalName == "dependencies")
+                .SelectMany(d => d.Elements().Where(e => e.Name.LocalName == "group"))
+                .ToArray();
+            Assert.True(groups.Length > 0, $"{packageId} ({targetFrameworks}) packed no dependency group.");
+
+            foreach (var group in groups)
+            {
+                var targetFramework = (string?)group.Attribute("targetFramework") ?? "(unlabelled)";
+
+                var dependencyIds = group.Descendants()
+                    .Where(e => e.Name.LocalName == "dependency")
+                    .Select(e => (string?)e.Attribute("id"))
+                    .Where(id => id is not null)
+                    .Select(id => id!)
+                    .ToArray();
+
+                foreach (var forbidden in ForbiddenDependencyIds)
+                {
+                    Assert.False(
+                        dependencyIds.Any(id => id.Equals(forbidden, StringComparison.OrdinalIgnoreCase)),
+                        $"{packageId} [{targetFramework}] declares the ADO driver '{forbidden}'. "
+                        + $"Full dependency set: [{string.Join(", ", dependencyIds.OrderBy(id => id, StringComparer.Ordinal))}]");
+                }
+            }
+        }
+        finally
+        {
+            try { Directory.Delete(outDir, recursive: true); }
+            catch (IOException) { }
+            catch (UnauthorizedAccessException) { }
+        }
+    }
+
     private static string FindRepoRoot()
     {
         var dir = new DirectoryInfo(AppContext.BaseDirectory);
@@ -139,7 +213,55 @@ public sealed class MigrationsPackTests
             ?? throw new InvalidOperationException("Could not locate Themia.sln above the test base directory.");
     }
 
+    /// <summary>
+    /// Runs one <c>dotnet pack</c>, serialized against any other test host packing the same project.
+    /// </summary>
+    /// <remarks>
+    /// This assembly is multi-targeted, so xUnit runs it as TWO test hosts (net8 and net10) concurrently
+    /// and both execute every pack test. Both then pack the SAME project into the SAME
+    /// <c>bin/Release/&lt;tfm&gt;</c> — most visibly for <c>Themia.Scheduling</c>, which is net10.0-only,
+    /// so the two hosts collide on one output directory rather than on two. Observed from a cold
+    /// <c>obj</c>: <c>GenerateDepsFile</c> failing with <c>IOException: The process cannot access the
+    /// file 'Themia.Scheduling.deps.json' because it is being used by another process</c>.
+    /// <para>
+    /// A named mutex, not per-invocation <c>BaseOutputPath</c>/<c>BaseIntermediateOutputPath</c>: those
+    /// are global MSBuild properties that apply to every REFERENCED project too, so all of them restore
+    /// into one shared <c>obj</c> and the target project's own assets file is overwritten —
+    /// <c>NETSDK1005: Assets file … doesn't have a target for 'net8.0'</c>, measured. Serializing keeps
+    /// the ordinary build layout and removes the concurrency instead.
+    /// </para>
+    /// </remarks>
     private static void RunDotnet(string arguments, string workingDirectory)
+    {
+        // Named per repo root: every pack test in this assembly shares the repo's bin/obj tree, so one
+        // gate for all of them is both sufficient and the simplest thing that cannot deadlock.
+        using var gate = new Mutex(initiallyOwned: false, MutexName(workingDirectory));
+        var held = false;
+        try
+        {
+            // AbandonedMutexException means the other host died holding it; the lock is ours either way.
+            try { held = gate.WaitOne(TimeSpan.FromMinutes(10)); }
+            catch (AbandonedMutexException) { held = true; }
+
+            Assert.True(held, "Timed out waiting for the pack lock held by the other test host.");
+            RunDotnetCore(arguments, workingDirectory);
+        }
+        finally
+        {
+            if (held)
+            {
+                gate.ReleaseMutex();
+            }
+        }
+    }
+
+    /// <summary>A filesystem-safe, collision-free mutex name derived from the repo root path.</summary>
+    private static string MutexName(string workingDirectory) =>
+        "themia-pack-" + Convert.ToHexString(
+            System.Security.Cryptography.SHA256.HashData(
+                System.Text.Encoding.UTF8.GetBytes(workingDirectory)))[..16];
+
+    private static void RunDotnetCore(string arguments, string workingDirectory)
     {
         var psi = new ProcessStartInfo("dotnet", arguments)
         {

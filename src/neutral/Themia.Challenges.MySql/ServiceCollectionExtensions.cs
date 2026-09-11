@@ -35,6 +35,10 @@ public static class ServiceCollectionExtensions
         services.TryAddSingleton<IChallengeDialect>(sp =>
             new MySqlChallengeDialect(connectionString, sp.GetService<ILoggerFactory>() ?? NullLoggerFactory.Instance));
 
+        // Register on use, so an adopter who calls only engine-specific methods still has the enum path
+        // (a module, SchedulingSchema.Migrate) resolvable — see MigrationEngineRegistry.Add (coord #0126).
+        MigrationEngineRegistry.Add(MySqlMigrationEngine.Adapter);
+
         ThemiaMigrations.Run(MySqlMigrationEngine.Adapter, connectionString, typeof(ChallengeSchemaMigration).Assembly);
 
         return services;
