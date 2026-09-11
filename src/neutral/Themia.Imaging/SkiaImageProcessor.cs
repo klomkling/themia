@@ -10,12 +10,25 @@ namespace Themia.Imaging;
 /// WebP only — Skia cannot subsample a PNG), the orientation matrix for all eight EXIF origins, and the
 /// disposal that checks <see cref="object.ReferenceEquals"/> before disposing an alias.
 /// <para>
-/// Stateless — register as a singleton.
+/// Register as a singleton. The only state it holds is the concurrency gate
+/// (<see cref="ImageProcessingOptions.MaxConcurrency"/>), and that gate is the point: shared by every
+/// caller of one registration, it is what makes the worst-case decode memory finite. A per-request
+/// instance would hand each caller its own gate and bound nothing.
 /// </para>
 /// </remarks>
 public sealed class SkiaImageProcessor : IImageProcessor
 {
+    // The public parameter every rejection here is about. A constant rather than nameof, because the
+    // decode rejection now lives in Render, which has no parameter of that name — and reporting a
+    // different paramName from the same method's other rejections would be worse than a literal.
+    private const string SourceParameter = "source";
+
     private readonly ImageProcessingOptions defaults;
+
+    // Not disposed, deliberately — the same call as Themia.Pdf's _renderLock. A SemaphoreSlim needs
+    // disposal only when its AvailableWaitHandle was accessed (never here), and disposing one while a
+    // decode sits between WaitAsync and Release turns that Release into an ObjectDisposedException.
+    private readonly SemaphoreSlim slots;
 
     /// <summary>Creates the processor.</summary>
     /// <param name="options">The default processing options, used when a call passes none.</param>
@@ -30,7 +43,19 @@ public sealed class SkiaImageProcessor : IImageProcessor
         {
             throw new ArgumentException(problem, nameof(options));
         }
+
+        // Read once. A semaphore's capacity is fixed at construction, and the options object is mutable,
+        // so a later mutation must not silently disagree with the real bound — which is also why the
+        // per-call options ProcessAsync accepts cannot change it.
+        slots = new SemaphoreSlim(defaults.MaxConcurrency, defaults.MaxConcurrency);
     }
+
+    /// <summary>
+    /// The decode gate. Exposed to this package's tests so they can occupy a slot and read
+    /// <see cref="SemaphoreSlim.CurrentCount"/> directly: a timing assertion cannot tell a working gate
+    /// from a slow machine, and would pass on a fast one with the gate removed.
+    /// </summary>
+    internal SemaphoreSlim Slots => slots;
 
     /// <inheritdoc />
     public async Task<ProcessedImage> ProcessAsync(
@@ -50,7 +75,7 @@ public sealed class SkiaImageProcessor : IImageProcessor
         buffer.Position = 0;
 
         using var codec = SKCodec.Create(buffer)
-            ?? throw new ArgumentException("Unsupported or corrupt image.", nameof(source));
+            ?? throw new ArgumentException("Unsupported or corrupt image.", SourceParameter);
 
         var info = codec.Info;
 
@@ -61,9 +86,41 @@ public sealed class SkiaImageProcessor : IImageProcessor
         {
             throw new ArgumentException(
                 $"Image dimensions {info.Width}x{info.Height} exceed the {effective.MaxPixels:N0}-pixel limit.",
-                nameof(source));
+                SourceParameter);
         }
 
+        // Bound concurrent decodes, and only now — after the budget refusal above, which costs nothing
+        // but a header read. An oversized image must be refused without occupying a slot some other
+        // caller could have used; gating first would make a bomb a denial-of-service against the queue
+        // rather than merely a rejected upload.
+        //
+        // This is the other half of the memory budget: MaxPixels bounds one decode, and without a bound
+        // on how many run at once the real ceiling is however many callers arrive together.
+        // Queuing honours the token, so a caller that disconnects while queued frees its slot rather
+        // than waiting for one it will not use.
+        await slots.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            return Render(codec, info, effective, cancellationToken);
+        }
+        finally
+        {
+            // finally, not a release on the success path: over-budget and undecodable both throw, and on
+            // an upload endpoint a throw is ordinary user input rather than the rare case. A release that
+            // only happened on success would turn the first bad upload into a permanently lost slot.
+            slots.Release();
+        }
+    }
+
+    /// <summary>Decodes, orients, downscales and encodes — the part that holds a slot on the decode gate.</summary>
+    /// <param name="codec">The codec, already created and past the pixel-budget check.</param>
+    /// <param name="info">The codec's declared image info.</param>
+    /// <param name="effective">The options this call runs under.</param>
+    /// <param name="cancellationToken">Checked between the synchronous stages.</param>
+    /// <returns>The re-encoded image.</returns>
+    private static ProcessedImage Render(
+        SKCodec codec, SKImageInfo info, ImageProcessingOptions effective, CancellationToken cancellationToken)
+    {
         // Decode at the largest power-of-two subsample whose long edge still clears MaxEdge, so a very
         // large image never materializes at full resolution; Downscale then trims precisely. Quality is
         // unaffected — the decode is always at least the target size before the final resize.
@@ -80,44 +137,58 @@ public sealed class SkiaImageProcessor : IImageProcessor
             decodeDims.Width, decodeDims.Height, info.ColorType, info.AlphaType, SKColorSpace.CreateSrgb());
 
         cancellationToken.ThrowIfCancellationRequested();
-        using var decoded = SKBitmap.Decode(codec, decodeInfo)
-            ?? throw new ArgumentException("Could not decode image.", nameof(source));
 
-        // `decoded` is owned by its `using`. `oriented`/`scaled` are allocated inside the try so a throw
-        // from either still disposes whatever was allocated — and only when they are new bitmaps rather
-        // than aliases of `decoded` or of each other.
-        SKBitmap? oriented = null;
-        SKBitmap? scaled = null;
+        // Exactly one bitmap is owned at a time. Orientation and downscale each return either their input
+        // or a new bitmap, and Replace releases the input the moment a new one exists — only then, since
+        // an alias must not be disposed. Holding the decoded source to the end of the call instead kept a
+        // full-size buffer nobody reads alive through the encode, which is where the encoder's own working
+        // memory lands on top of it (measured: a rotated 64 MP JPEG to JPEG peaked at 2.76x, not 2.0x).
+        var bitmap = SKBitmap.Decode(codec, decodeInfo)
+            ?? throw new ArgumentException("Could not decode image.", SourceParameter);
         try
         {
-            oriented = ApplyOrientation(decoded, codec.EncodedOrigin);
-            scaled = Downscale(oriented, effective.MaxEdge);
+            bitmap = Replace(bitmap, ApplyOrientation(bitmap, codec.EncodedOrigin));
+            bitmap = Replace(bitmap, Downscale(bitmap, effective.MaxEdge));
 
             cancellationToken.ThrowIfCancellationRequested();
 
             // Decode, orientation, downscale and encode are all synchronous, so the token is checked at
             // the boundaries between them rather than plumbed through: a 100 MP image whose client has
             // already gone away otherwise runs to completion on a pooled thread.
-            using var image = SKImage.FromBitmap(scaled)
+            //
+            // Encoded from the bitmap's own pixels. SKImage.FromBitmap copies a mutable bitmap in full
+            // (measured on SkiaSharp 4.151.1: exactly one extra decoded-size buffer, in every format), and
+            // SKImage.Encode then encodes that copy through this same SKPixmap.Encode — so skipping it
+            // changes the memory and not a byte, which OutputStabilityTests pins.
+            using var pixels = bitmap.PeekPixels()
                 ?? throw new InvalidOperationException("Could not read the scaled bitmap's pixels.");
-            using var data = image.Encode(EncodedFormat(effective.Format), effective.Quality)
+            using var data = pixels.Encode(EncodedFormat(effective.Format), effective.Quality)
                 ?? throw new InvalidOperationException($"{effective.Format} encoding failed.");
 
             var output = new MemoryStream(data.ToArray()) { Position = 0 };
-            return new ProcessedImage(output, Extension(effective.Format), scaled.Width, scaled.Height);
+            return new ProcessedImage(output, Extension(effective.Format), bitmap.Width, bitmap.Height);
         }
         finally
         {
-            if (scaled is not null && !ReferenceEquals(scaled, oriented))
-            {
-                scaled.Dispose();
-            }
-
-            if (oriented is not null && !ReferenceEquals(oriented, decoded))
-            {
-                oriented.Dispose();
-            }
+            bitmap.Dispose();
         }
+    }
+
+    /// <summary>
+    /// Hands ownership from one pipeline stage's bitmap to the next: disposes <paramref name="previous"/>
+    /// when <paramref name="next"/> is a new bitmap, and leaves it alone when a stage returned it unchanged.
+    /// </summary>
+    /// <param name="previous">The bitmap the stage was given.</param>
+    /// <param name="next">What the stage returned — possibly <paramref name="previous"/> itself.</param>
+    /// <returns><paramref name="next"/>, now the only bitmap the caller owns.</returns>
+    private static SKBitmap Replace(SKBitmap previous, SKBitmap next)
+    {
+        if (!ReferenceEquals(previous, next))
+        {
+            previous.Dispose();
+        }
+
+        return next;
     }
 
     /// <summary>True when width × height exceeds <paramref name="maxPixels"/> — the decompression-bomb guard.</summary>
@@ -180,13 +251,21 @@ public sealed class SkiaImageProcessor : IImageProcessor
 
         var dst = new SKBitmap(width, height, src.ColorType, src.AlphaType);
         using var canvas = new SKCanvas(dst);
+
+        // Not canvas.DrawBitmap: in SkiaSharp that is SKImage.FromBitmap + DrawImage, and FromBitmap copies
+        // a mutable bitmap in full — a third decoded-size buffer alive alongside `src` and `dst` for the
+        // whole draw (measured: 3.01x the decoded size on a 64 MP JPEG, against 2.0x this way).
+        // FromPixels wraps `src`'s memory without copying; the wrapper is disposed before this returns,
+        // so it cannot outlive the bitmap it points into.
+        using var pixels = src.PeekPixels();
+        using var image = SKImage.FromPixels(pixels);
         canvas.SetMatrix(OrientationMatrix(origin, src.Width, src.Height));
-        canvas.DrawBitmap(src, 0, 0, new SKSamplingOptions(SKFilterMode.Linear, SKMipmapMode.None));
+        canvas.DrawImage(image, 0, 0, new SKSamplingOptions(SKFilterMode.Linear, SKMipmapMode.None));
         return dst;
     }
 
     /// <summary>A downscaled copy when the longest edge exceeds <paramref name="maxEdge"/>; otherwise the input unchanged.</summary>
-    private static SKBitmap Downscale(SKBitmap src, int maxEdge)
+    internal static SKBitmap Downscale(SKBitmap src, int maxEdge)
     {
         var longest = Math.Max(src.Width, src.Height);
         if (longest <= maxEdge)
@@ -213,7 +292,7 @@ public sealed class SkiaImageProcessor : IImageProcessor
     }
 
     /// <summary>The affine transform mapping a source pixel to its upright position, per EXIF origin.</summary>
-    private static SKMatrix OrientationMatrix(SKEncodedOrigin origin, int w, int h) => origin switch
+    internal static SKMatrix OrientationMatrix(SKEncodedOrigin origin, int w, int h) => origin switch
     {
         SKEncodedOrigin.TopRight => SKMatrix.CreateScaleTranslation(-1, 1, w, 0),      // flip horizontal
         SKEncodedOrigin.BottomRight => SKMatrix.CreateScaleTranslation(-1, -1, w, h),  // rotate 180

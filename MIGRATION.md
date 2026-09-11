@@ -10,7 +10,7 @@ with the *why* and concrete upgrade steps.
 - Each entry states: **What changed**, **Why**, and **How to upgrade** (before → after).
 - Non-breaking changes are *not* listed here — see the CHANGELOG.
 
-## Unreleased
+## 0.25.1
 
 ### `IMigrationEngineAdapter.CreateConnection` (breaking for third-party adapters)
 

@@ -9,6 +9,8 @@ Themia.Imaging.ImageProcessingOptions
 Themia.Imaging.ImageProcessingOptions.ImageProcessingOptions() -> void
 Themia.Imaging.ImageProcessingOptions.Format.get -> Themia.Imaging.ImageOutputFormat
 Themia.Imaging.ImageProcessingOptions.Format.set -> void
+Themia.Imaging.ImageProcessingOptions.MaxConcurrency.get -> int
+Themia.Imaging.ImageProcessingOptions.MaxConcurrency.set -> void
 Themia.Imaging.ImageProcessingOptions.MaxEdge.get -> int
 Themia.Imaging.ImageProcessingOptions.MaxEdge.set -> void
 Themia.Imaging.ImageProcessingOptions.MaxPixels.get -> long
