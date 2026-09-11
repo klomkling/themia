@@ -66,6 +66,29 @@ internal static class TestImages
     }
 
     /// <summary>
+    /// A high-detail image — two gradients and a seeded noise channel — encoded in
+    /// <paramref name="format"/>. Detail in every region, so a change to any stage that touches pixels
+    /// (sampling, orientation, colour) reaches the encoded bytes; a flat fixture would hide most of them.
+    /// </summary>
+    internal static byte[] Detailed(int width, int height, SKEncodedImageFormat format)
+    {
+        using var bitmap = new SKBitmap(width, height);
+        var random = new Random(Seed: 20260911);
+        for (var y = 0; y < height; y++)
+        {
+            for (var x = 0; x < width; x++)
+            {
+                bitmap.SetPixel(x, y, new SKColor(
+                    (byte)(x * 255 / width), (byte)(y * 255 / height), (byte)random.Next(256)));
+            }
+        }
+
+        using var image = SKImage.FromBitmap(bitmap);
+        using var data = image.Encode(format, 95);
+        return data.ToArray();
+    }
+
+    /// <summary>
     /// A JPEG carrying a real EXIF APP1 segment: the given orientation tag (1–8) and a GPS latitude.
     /// </summary>
     /// <remarks>
@@ -73,9 +96,12 @@ internal static class TestImages
     /// which is why ezy-assets could test orientation only at the unit level and could not test metadata
     /// stripping at all. Building the segment by hand is what makes both testable end to end.
     /// </remarks>
-    internal static byte[] JpegWithExif(int width, int height, int orientation)
+    internal static byte[] JpegWithExif(int width, int height, int orientation) =>
+        WithExif(Jpeg(width, height), orientation);
+
+    /// <summary>The same EXIF APP1 segment as <see cref="JpegWithExif"/>, spliced into an existing JPEG.</summary>
+    internal static byte[] WithExif(byte[] jpeg, int orientation)
     {
-        var jpeg = Jpeg(width, height);
         var app1 = BuildExifApp1(orientation);
 
         var result = new byte[jpeg.Length + app1.Length];
