@@ -46,11 +46,19 @@ served content-type from it; carrying both invites the two to disagree. Dimensio
 caller that persists them does not have to decode the result again.
 
 Options can also be passed per call, for a consumer that wants one size for a listing photo and
-another for an avatar:
+another for an avatar. **Per-call options replace the registered ones — they do not merge with them —
+and that includes `MaxPixels`.** A per-call instance that does not set it runs that call at the class
+default of 100 MP, whatever you registered, and every memory figure below is then wrong for that call.
+Copy it across:
 
 ```csharp
-using var avatar = await imageProcessor.ProcessAsync(stream, new ImageProcessingOptions { MaxEdge = 256 }, ct);
+// registered: IOptions<ImageProcessingOptions>, injected alongside IImageProcessor
+using var avatar = await imageProcessor.ProcessAsync(
+    stream, new ImageProcessingOptions { MaxEdge = 256, MaxPixels = registered.Value.MaxPixels }, ct);
 ```
+
+Not merged, deliberately: `MaxPixels` is a `long` with no "unset" value to inherit from, and turning
+replacement into a merge now would silently change what every existing per-call instance does.
 
 A file that is not a decodable image, or one over the pixel budget, throws `ArgumentException` — a
 condition to report to whoever uploaded it, not a fault to page someone about.
@@ -98,14 +106,19 @@ A pixel budget is not a memory budget. `MaxPixels` bounds a single call, and not
 how many calls are in flight, so the ceiling a *process* can actually reach is:
 
 ```
-MaxPixels × 4 bytes × MaxConcurrency
+MaxPixels × 4 bytes × per-call factor × MaxConcurrency
 ```
 
-At the defaults (100 MP, 2) that is about **800 MB**. Supply only the first two terms and the third
-one is set by whatever traffic arrives: a browser doing `Promise.allSettled(files.map(upload))` on
-eight selected photos is eight simultaneous requests, so at a configured 64 MP that is ~2 GB of
-decode buffers for one click. This is sharpest for PNG, which cannot be subsampled — every concurrent
-decode is a full-budget allocation from a file that may be a few hundred bytes on the wire.
+`MaxPixels × 4 bytes` is one decoded image; the per-call factor is how many of those one call holds at
+its peak, measured below — up to **3.8** for WebP output. At the defaults (100 MP, WebP, 2) that is
+about **3 GB**. Supply no concurrency bound and the last term is set by whatever traffic arrives: a
+browser doing `Promise.allSettled(files.map(upload))` on eight selected photos is eight simultaneous
+requests, so at a configured 64 MP that is ~2 GB of decoded pixels alone for one click. This is
+sharpest for PNG, which cannot be subsampled — every concurrent decode is a full-budget allocation
+from a file that may be a few hundred bytes on the wire.
+
+The formula uses the `MaxPixels` **in effect for each call** — see the per-call caveat under
+[Use](#use).
 
 `MaxConcurrency` (default **2**) is a `SemaphoreSlim` taken *after* the budget check, so an oversized
 image is refused without occupying a slot, and released in a `finally`, so a throw — the common case
@@ -115,10 +128,37 @@ and honour their cancellation token, so a client that disconnects while queued f
 ```csharp
 services.AddThemiaImaging(o =>
 {
-    o.MaxPixels = 64_000_000;   // one decode
-    o.MaxConcurrency = 2;       // × 4 bytes × this = ~512 MB, the process ceiling
+    o.MaxPixels = 64_000_000;   // one decode: 256 MB
+    o.MaxConcurrency = 2;       // × 3.8 (WebP) × this ≈ 1.9 GB, the process ceiling
 });
 ```
+
+### What one call holds
+
+Measured peak of one `ProcessAsync` call on a 64 MP (8000×8000) image with no downscale — the worst
+case — as a multiple of its decoded size, on linux-arm64 with SkiaSharp 4.151.1:
+
+| output | low-detail image | high-detail image¹ |
+| --- | --- | --- |
+| WebP (default) | 2.4× | 3.8× |
+| JPEG | 2.0× | 2.2× |
+| PNG | 2.0× | 2.4× |
+
+¹ Random noise, the least compressible input tried, uploaded as a 37 MB JPEG whose buffered bytes are
+included. A larger upload adds its own size on top.
+
+Where it goes:
+
+- **Pixels: two decoded-size buffers while an EXIF rotation is applied, one otherwise.** The rotation
+  draws the source into a rotated copy, so both exist for the draw, and the source is released the
+  moment it finishes. While a downscale runs, its sampling buffers and the smaller output sit alongside
+  the one buffer; a downscaled call never measured above the same image without the downscale (1.4×
+  for a PNG scaled to 1600 px).
+- **The encoder**, on top of the one remaining buffer: about 0.8× for JPEG, 1.4× (low detail) to
+  2.8× (high detail) for WebP, and for PNG about twice its encoded output.
+
+Size a slot from the high-detail column. On macOS the WebP encoder measured hungrier (5.2× for the same
+high-detail image), so a developer Mac is not a guide to the container.
 
 **It bounds one process, not the machine.** A semaphore knows nothing about other instances, so behind
 a load balancer the real ceiling is `instances × MaxConcurrency × MaxPixels × 4 bytes`. If the goal is

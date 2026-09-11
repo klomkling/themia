@@ -42,8 +42,10 @@ public interface IImageProcessor
     /// upload stream is forward-only.
     /// </param>
     /// <param name="options">
-    /// Overrides for this call, or null to use the registered defaults. Per call because one consumer
-    /// wants different sizes for a listing photo and an avatar.
+    /// Options for this call, or null to use the registered defaults. Per call because one consumer
+    /// wants different sizes for a listing photo and an avatar. They <b>replace</b> the registered options
+    /// rather than merging with them, <see cref="ImageProcessingOptions.MaxPixels"/> included — set it on
+    /// every per-call instance, or that call runs at the class default.
     /// </param>
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>The encoded image and its dimensions.</returns>
