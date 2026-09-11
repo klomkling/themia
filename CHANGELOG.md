@@ -29,6 +29,47 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [0.25.1] - 2026-09-12
 
+### Added
+- **`ImageProcessingOptions.MaxConcurrency` (default `2`) bounds how many images `Themia.Imaging`
+  decodes at once** (coord #0125). `MaxPixels` was a per-decode bound sold in the shape of a memory
+  budget: it bounds one call and nothing counted how many ran together, so the real ceiling was
+  `MaxPixels × 4 bytes × concurrent callers` and the package supplied only the first two terms. A
+  browser uploading eight selected photos in parallel is eight simultaneous requests — ~2 GB of decode
+  buffers at a configured 64 MP — and it is sharpest for PNG, which Skia cannot subsample, so every
+  concurrent decode is a full-budget allocation from a file that may be a few hundred bytes on the
+  wire. A byte limit on the endpoint looks like a guard and is not one.
+
+  Same shape `Themia.Pdf` already ships (`ThemiaPdfOptions.MaxConcurrency`): a `SemaphoreSlim` taken
+  **after** the pixel-budget check, so an oversized image is refused without occupying a slot another
+  caller could use; released in a `finally`, so a throw — ordinary user input on an upload endpoint,
+  not the rare case — hands the slot straight back instead of leaking it; and queued with the caller's
+  `CancellationToken`, so a client that disconnects while waiting frees its place. Validated alongside
+  `MaxEdge`/`MaxPixels`/`Quality`, so a bad value fails `ValidateOnStart` rather than a first upload.
+
+  **Additive with a safe default — not breaking.** Existing registrations gain a bound of 2 without a
+  source change. `MaxPixels`' documentation is corrected to say what it actually bounds (one decode)
+  and to name the other term; `Themia.Imaging`'s README carries the arithmetic.
+
+  **One call held up to three full-size copies of the image; it now holds at most two, with
+  byte-identical output.** `MaxPixels × 4 bytes` is one decoded image, not one call. On SkiaSharp
+  4.151.1 both `SKCanvas.DrawBitmap` (the EXIF rotation) and `SKImage.FromBitmap` (the encode) copy a
+  mutable bitmap in full, and the decoded source was kept alive to the end of the call. The rotation now
+  draws through a non-copying `SKImage.FromPixels`, the encode reads the bitmap's own pixels, and each
+  stage releases its input as soon as its output exists. Measured on a 64 MP image (linux-arm64), pixel
+  buffers peak at 2.0× the decoded size for a rotated JPEG (was 3.0×) and 1.0× for an upright image (was
+  2.0×); with the encoder's working memory, one call peaks at up to 3.8× for WebP (was 5.8×), 2.2× for
+  JPEG (was 4.0×) and 2.4× for PNG (was 4.4×). So the ceiling is `MaxPixels × 4 bytes × MaxConcurrency ×`
+  that factor — about 3 GB at the defaults, not the ~800 MB first documented here. A new
+  `OutputStabilityTests` compares every output format, with and without downscale, over all eight EXIF
+  origins, PNG and WebP, byte for byte against the previous pipeline.
+
+  **Per-call options replace the registration's, `MaxPixels` included — now documented, not changed.**
+  `ProcessAsync(src, new ImageProcessingOptions { MaxEdge = 400 })` runs at the class-default 100 MP
+  whatever the registration set, so a ceiling sized from the registered `MaxPixels` was wrong for that
+  call. Merging would be a silent behaviour change and a `long` has no "unset" value to inherit, so the
+  options docs and README now say to copy `MaxPixels` into every per-call instance.
+
+
 ### Changed
 - **(breaking) `IMigrationEngineAdapter` gained `CreateConnection(string)`** — a pooled, general-purpose
   connection factory alongside the existing `CreateUnpooledConnection`. Deliberately a second method
@@ -71,47 +112,6 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
   package.** The guard is an MSBuild target keyed on `OutputType == 'Exe'` and the absence of any
   `Themia.Data.Migrations.{Engine}` reference — a guard that lives in the build cannot see a call site
   the build never reaches. MIGRATION.md and the 0.25.0 entry above now say which of the two it is.
-
-### Added
-- **`ImageProcessingOptions.MaxConcurrency` (default `2`) bounds how many images `Themia.Imaging`
-  decodes at once** (coord #0125). `MaxPixels` was a per-decode bound sold in the shape of a memory
-  budget: it bounds one call and nothing counted how many ran together, so the real ceiling was
-  `MaxPixels × 4 bytes × concurrent callers` and the package supplied only the first two terms. A
-  browser uploading eight selected photos in parallel is eight simultaneous requests — ~2 GB of decode
-  buffers at a configured 64 MP — and it is sharpest for PNG, which Skia cannot subsample, so every
-  concurrent decode is a full-budget allocation from a file that may be a few hundred bytes on the
-  wire. A byte limit on the endpoint looks like a guard and is not one.
-
-  Same shape `Themia.Pdf` already ships (`ThemiaPdfOptions.MaxConcurrency`): a `SemaphoreSlim` taken
-  **after** the pixel-budget check, so an oversized image is refused without occupying a slot another
-  caller could use; released in a `finally`, so a throw — ordinary user input on an upload endpoint,
-  not the rare case — hands the slot straight back instead of leaking it; and queued with the caller's
-  `CancellationToken`, so a client that disconnects while waiting frees its place. Validated alongside
-  `MaxEdge`/`MaxPixels`/`Quality`, so a bad value fails `ValidateOnStart` rather than a first upload.
-
-  **Additive with a safe default — not breaking.** Existing registrations gain a bound of 2 without a
-  source change. `MaxPixels`' documentation is corrected to say what it actually bounds (one decode)
-  and to name the other term; `Themia.Imaging`'s README carries the arithmetic.
-
-  **One call held up to three full-size copies of the image; it now holds at most two, with
-  byte-identical output.** `MaxPixels × 4 bytes` is one decoded image, not one call. On SkiaSharp
-  4.151.1 both `SKCanvas.DrawBitmap` (the EXIF rotation) and `SKImage.FromBitmap` (the encode) copy a
-  mutable bitmap in full, and the decoded source was kept alive to the end of the call. The rotation now
-  draws through a non-copying `SKImage.FromPixels`, the encode reads the bitmap's own pixels, and each
-  stage releases its input as soon as its output exists. Measured on a 64 MP image (linux-arm64), pixel
-  buffers peak at 2.0× the decoded size for a rotated JPEG (was 3.0×) and 1.0× for an upright image (was
-  2.0×); with the encoder's working memory, one call peaks at up to 3.8× for WebP (was 5.8×), 2.2× for
-  JPEG (was 4.0×) and 2.4× for PNG (was 4.4×). So the ceiling is `MaxPixels × 4 bytes × MaxConcurrency ×`
-  that factor — about 3 GB at the defaults, not the ~800 MB first documented here. A new
-  `OutputStabilityTests` compares every output format, with and without downscale, over all eight EXIF
-  origins, PNG and WebP, byte for byte against the previous pipeline.
-
-  **Per-call options replace the registration's, `MaxPixels` included — now documented, not changed.**
-  `ProcessAsync(src, new ImageProcessingOptions { MaxEdge = 400 })` runs at the class-default 100 MP
-  whatever the registration set, so a ceiling sized from the registered `MaxPixels` was wrong for that
-  call. Merging would be a silent behaviour change and a `long` has no "unset" value to inherit, so the
-  options docs and README now say to copy `MaxPixels` into every per-call instance.
-
 
 ## [0.25.0] - 2026-09-10
 
