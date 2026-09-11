@@ -26,10 +26,21 @@ public interface IAuditStore
     /// This store has no <c>ITenantContext</c> to fall back on — that type lives in the framework, which
     /// this neutral core may not reference — so an empty <see cref="AuditQuery"/> here returns rows across
     /// every tenant. That is the opposite of this codebase's usual default, where both data layers filter
-    /// by tenant by construction. Adopter code should read through <c>Themia.Modules.Audit</c>'s
+    /// by tenant by construction.
+    /// <para>
+    /// <b>If your deployment has tenants</b>, read through <c>Themia.Modules.Audit</c>'s
     /// <c>ITenantAuditReader</c> instead, which forces <see cref="AuditQuery.TenantId"/> to the ambient
-    /// tenant and cannot be asked for another tenant's rows. Call this method directly only when a
-    /// cross-tenant read is actually intended (e.g. a host-level admin report).
+    /// tenant and cannot be asked for another tenant's rows. Calling this method directly is then a
+    /// deliberate cross-tenant read (e.g. a host-level admin report).
+    /// </para>
+    /// <para>
+    /// <b>If your deployment is single-org</b>, this method is the correct path and the module is not a
+    /// hardening of it. "Cross-tenant" is a hazard only where there are other tenants' rows to reach;
+    /// with every row written host-level, <see cref="AuditQuery.HostLevelOnly"/> is simply the read.
+    /// Adopting the module to "harden" such a reader imports an ambient-tenant resolution that has
+    /// nothing to resolve — see coord #0098 for what that cost a consumer in production, and coord
+    /// #0117 for the single-org adopter who recorded this inversion after reading the remark above.
+    /// </para>
     /// </remarks>
     Task<PagedResult<AuditEntry>> QueryAsync(AuditQuery query, DbConnection connection, CancellationToken cancellationToken);
 
