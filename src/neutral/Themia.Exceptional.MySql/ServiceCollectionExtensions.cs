@@ -54,6 +54,10 @@ public static class ServiceCollectionExtensions
 
         // Migrates here, against the adapter directly, instead of inside AddThemiaExceptionalProvider —
         // see the remarks above.
+        // Register on use, so an adopter who calls only engine-specific methods still has the enum path
+        // (a module, SchedulingSchema.Migrate) resolvable — see MigrationEngineRegistry.Add (coord #0126).
+        MigrationEngineRegistry.Add(MySqlMigrationEngine.Adapter);
+
         ThemiaMigrations.Run(MySqlMigrationEngine.Adapter, connectionString, typeof(ExceptionLogMigration).Assembly);
 
         return services;

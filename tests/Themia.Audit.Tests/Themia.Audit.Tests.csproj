@@ -19,5 +19,10 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/neutral/Themia.Audit/Themia.Audit.csproj" />
+    <!-- EngineRegistryHandoffTests asserts that calling an engine-specific entry point leaves the enum
+         path resolvable. Themia.Audit.PostgreSql is the entry point that does no I/O, so the assertion
+         needs no database. Nothing else in this assembly touches MigrationEngineRegistry, which is what
+         makes the test a real reproduction of coord #0126's "engine package present, registry empty". -->
+    <ProjectReference Include="../../src/neutral/Themia.Audit.PostgreSql/Themia.Audit.PostgreSql.csproj" />
   </ItemGroup>
 </Project>

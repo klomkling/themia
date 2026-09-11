@@ -31,6 +31,9 @@ public sealed class MySqlMigrationEngineAdapter : IMigrationEngineAdapter
         new MySqlConnection(new MySqlConnectionStringBuilder(connectionString) { Pooling = false }.ConnectionString);
 
     /// <inheritdoc />
+    public DbConnection CreateConnection(string connectionString) => new MySqlConnection(connectionString);
+
+    /// <inheritdoc />
     public bool TryAcquireLock(DbConnection connection, string scope, TimeSpan timeout, out Exception? timeoutCause)
     {
         // GET_LOCK reports a lapsed wait as an ordinary 0, never as an exception, so there is no engine

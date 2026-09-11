@@ -23,6 +23,10 @@ public static class ServiceCollectionExtensions
 
         services.TryAddSingleton<IChallengeDialect>(new SqlServerChallengeDialect(connectionString));
 
+        // Register on use, so an adopter who calls only engine-specific methods still has the enum path
+        // (a module, SchedulingSchema.Migrate) resolvable — see MigrationEngineRegistry.Add (coord #0126).
+        MigrationEngineRegistry.Add(SqlServerMigrationEngine.Adapter);
+
         ThemiaMigrations.Run(SqlServerMigrationEngine.Adapter, connectionString, typeof(ChallengeSchemaMigration).Assembly);
 
         return services;

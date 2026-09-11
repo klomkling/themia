@@ -25,6 +25,24 @@ public static class MigrationEngineRegistry
     /// any adapter already registered for that engine. Idempotent and thread-safe — safe to call more than
     /// once (e.g. from multiple modules that each depend on the same engine package).
     /// </summary>
+    /// <remarks>
+    /// <b>Every engine-specific entry point calls this too</b> — <c>AddThemiaExceptionalPostgres</c>,
+    /// <c>AddThemiaAudit{Engine}</c>, <c>AddThemiaChallenges{Engine}</c>,
+    /// <c>PersistKeysToThemia{Engine}</c> — even though each already holds its adapter at compile time and
+    /// needs no lookup of its own. The reason is the adopter, not the package: one who calls only
+    /// engine-specific methods still has code resolving the SAME engine through this registry BY ENUM (any
+    /// <c>Themia.Modules.*</c> constructor, <c>SchedulingSchema.Migrate</c>), and that resolution threw
+    /// "no adapter is registered" at boot even though the engine package was plainly referenced — a crash
+    /// loop on a version bump (coord #0126). The <c>THEMIA2001</c> build guard cannot catch it: it checks
+    /// for the engine PACKAGE, which was present; MSBuild cannot see whether any C# calls
+    /// <c>AddThemiaDataMigrations{Engine}()</c>. Registering on use closes that gap by construction.
+    /// <para>
+    /// This does not make <c>AddThemiaDataMigrations{Engine}()</c> optional. An adopter using
+    /// <c>Themia.Scheduling</c> or a module with NO engine-specific package at all has nothing to trigger
+    /// the side effect, and for them the explicit call remains required — and <c>THEMIA2001</c> genuinely
+    /// fires, because in that case the package really is missing.
+    /// </para>
+    /// </remarks>
     /// <param name="adapter">The adapter to register.</param>
     /// <exception cref="ArgumentNullException"><paramref name="adapter"/> is <see langword="null"/>.</exception>
     public static void Add(IMigrationEngineAdapter adapter)

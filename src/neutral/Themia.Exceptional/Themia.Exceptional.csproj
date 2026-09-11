@@ -20,7 +20,11 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="Microsoft.Data.SqlClient" VersionOverride="6.1.5" />
+    <!-- No ADO driver here on purpose. This assembly names no provider type: the store is Dapper over
+         whatever DbConnection an IExceptionalSqlDialect hands it, and the engine packages
+         (Themia.Exceptional.{PostgreSql,MySql,SqlServer}) each carry their own driver. A stray
+         Microsoft.Data.SqlClient reference here put Microsoft.IdentityModel.* and Azure.Identity into
+         every adopter's image, PostgreSQL-only ones included (coord #0126). -->
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../Themia.Data.Migrations/Themia.Data.Migrations.csproj" />

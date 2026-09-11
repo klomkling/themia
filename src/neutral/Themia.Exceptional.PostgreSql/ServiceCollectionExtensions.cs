@@ -50,6 +50,10 @@ public static class ServiceCollectionExtensions
             connectionString: connectionString,
             runMigration: false);
 
+        // Register on use, so an adopter who calls only engine-specific methods still has the enum path
+        // (a module, SchedulingSchema.Migrate) resolvable — see MigrationEngineRegistry.Add (coord #0126).
+        MigrationEngineRegistry.Add(PostgresMigrationEngine.Adapter);
+
         // Migrates here, against the adapter directly, instead of inside AddThemiaExceptionalProvider —
         // see the remarks above.
         ThemiaMigrations.Run(PostgresMigrationEngine.Adapter, connectionString, typeof(ExceptionLogMigration).Assembly);

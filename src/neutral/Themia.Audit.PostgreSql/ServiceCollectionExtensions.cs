@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Themia.Audit.DependencyInjection;
+using Themia.Data.Migrations;
 using Themia.Data.Migrations.PostgreSql;
 
 namespace Themia.Audit.PostgreSql;
@@ -20,6 +21,10 @@ public static class ServiceCollectionExtensions
 
         services.AddSingleton<IAuditDialect, PostgresAuditDialect>();
         services.AddSingleton<IAuditStore, AuditStoreEngine>();
+        // Register on use, so an adopter who calls only engine-specific methods still has the enum path
+        // (a module, SchedulingSchema.Migrate) resolvable — see MigrationEngineRegistry.Add (coord #0126).
+        MigrationEngineRegistry.Add(PostgresMigrationEngine.Adapter);
+
         AuditMigrationHandshake.RecordAdapter(services, PostgresMigrationEngine.Adapter);
         return services;
     }
