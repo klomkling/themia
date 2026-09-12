@@ -4,13 +4,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Current state
 
-This package is **design-phase**: it contains specs and an implementation plan under `docs/`, but
-**no code, no `Themia.sln`, no projects yet**. The first artifact to build is `Themia.AspNetCore`,
-fully specified task-by-task in `docs/superpowers/plans/2026-06-01-themia-aspnetcore.md`. Read
-`docs/themia-architecture-overview.md` first — it is the master document every spec references.
+This package **ships**. `Themia.sln` holds every Themia package across
+`src/{tooling,framework,neutral,modules}` plus its test projects; the current release is **0.25.1**
+(`Directory.Build.props`, `CHANGELOG.md`, 82 tags from `v0.1.0`). Read
+`docs/themia-architecture-overview.md` first — it is the master document every spec references, and
+its §B (module catalog) + "Specs index" carry the per-package status and the release each shipped in.
 
-When implementing, follow the plan's TDD flow (failing test → implement → pass → commit) and the
-superpowers `executing-plans` / `subagent-driven-development` skills it calls out.
+When implementing, follow the TDD flow the plans use (failing test → implement → pass → commit) and the
+superpowers `executing-plans` / `subagent-driven-development` skills they call out.
 
 ## What Themia is
 
@@ -25,11 +26,19 @@ them); the framework core and modules are net10-only. All packages ship under th
 Layered, with a strict dependency direction (lower layers never depend on higher ones):
 
 ```
-Tooling (build-time, netstandard2.0)   Themia.SourceGenerator | Themia.Analyzers(.CodeFixes) | Themia.Generators.Abstractions
-Framework core (net10.0)               Themia.Framework.Core | .Data.EFCore | .AspNetCore | Themia.MultiTenancy
-                                       Themia.Mediator | Themia.Caching | Themia.Logging | Themia.Services
-Neutral cores (net8.0;net10.0)         Themia.Quartz | Themia.Exceptional(.SqlServer/.MySql/.PostgreSql) | Themia.AspNetCore
-Modules (net10.0)                      Themia.Modules.* (Scheduling, ExceptionLogging, Identity, Storage, …)
+Tooling (build-time, netstandard2.0)   Themia.SourceGenerator | Themia.Analyzers | Themia.Generators.Abstractions
+Framework core (net10.0)               Themia.Framework (metapackage) | .Core | .Data.Abstractions | .AspNetCore
+                                       .Data.EFCore(.PostgreSql/.SqlServer) | .Data.Dapper(.PostgreSql/.MySql/.SqlServer)
+                                       .Data.Sequences | Themia.MultiTenancy(.Mediator) | Themia.Mediator
+                                       Themia.Caching | Themia.Logging | Themia.Services
+Neutral cores (net8.0;net10.0)         Themia.AspNetCore(.DataProtection + 3 engines) | Themia.Quartz | Themia.Scheduling
+                                       Themia.Exceptional(3 engines/.AspNetCore) | Themia.Audit(3 engines/.AspNetCore)
+                                       Themia.Messaging(3 engines/.Hmac/.Http/.AspNetCore) | Themia.Notifications | Themia.Pdf
+                                       Themia.Storage(.S3) | Themia.Export(.Excel) | Themia.Geo(.Google) | Themia.AI(.Gemini/.OpenAiCompatible)
+                                       Themia.Challenges(3 engines) | Themia.Totp | Themia.WebAuthn | Themia.PromptPay | Themia.Imaging
+                                       Themia.Data.Migrations(3 engines) | Themia.Data.Probes | Themia.DependencyInjection
+Modules (net10.0)                      Themia.Modules.* (Scheduling, Identity(+5), Storage, Notifications(+3 engines),
+                                       Pdf, Export, Audit, Messaging) — no .ExceptionLogging/.Geo/.AI, see overview §B
 ```
 
 Two structural rules drive nearly every design choice:

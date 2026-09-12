@@ -34,18 +34,27 @@ domain are **not** Themia. Themia gives them the framework + modules to build on
 
 ```
 Tooling           Themia.SourceGenerator (DI + mediator, reflection-free) | Themia.Analyzers
-(build-time)      Themia.Analyzers.CodeFixes | Themia.Generators.Abstractions  — see §E
+(build-time)      Themia.Generators.Abstractions  — see §E (no .CodeFixes: deferred, never built)
 ─────────────────────────────────────────────────────────────────────────────────────────────
-Framework core    Themia.Framework.Core | .Data.EFCore | .AspNetCore | Themia.MultiTenancy
-(from Zenity)      Themia.Mediator | Themia.Caching | Themia.Logging | Themia.Services
+Framework core    Themia.Framework (metapackage) | .Core | .Data.Abstractions | .AspNetCore
+(from Zenity)     .Data.EFCore(.PostgreSql/.SqlServer) | .Data.Dapper(.PostgreSql/.MySql/.SqlServer)
+                  .Data.Sequences | Themia.MultiTenancy(.Mediator) | Themia.Mediator
+                  Themia.Caching | Themia.Logging | Themia.Services
                   Module system: IThemiaModule / ModuleDescriptor (ADR-0003)
 ─────────────────────────────────────────────────────────────────────────────────────────────
-Neutral cores     Themia.Quartz | Themia.Exceptional(.SqlServer/.MySql/.PostgreSql) | Themia.Geo(.Google)
-(no Framework dep) Themia.AI(.Gemini/.OpenAiCompatible) → consumable by BOTH Themia apps and Serenity (PowerACC)
+Neutral cores     Themia.AspNetCore(.DataProtection.{SqlServer/MySql/PostgreSql}) | Themia.Quartz | Themia.Scheduling
+(no Framework dep) Themia.Exceptional(.SqlServer/.MySql/.PostgreSql/.AspNetCore) | Themia.Audit(+3 engines/.AspNetCore)
+                  Themia.Messaging(+3 engines/.Hmac/.Http/.AspNetCore) | Themia.Notifications | Themia.Pdf
+                  Themia.Storage(.S3) | Themia.Export(.Excel) | Themia.Geo(.Google) | Themia.AI(.Gemini/.OpenAiCompatible)
+                  Themia.Challenges(+3 engines) | Themia.Totp | Themia.WebAuthn | Themia.PromptPay | Themia.Imaging
+                  Themia.Data.Migrations(+3 engines) | Themia.Data.Probes | Themia.DependencyInjection
+                  → consumable by BOTH Themia apps and Serenity (PowerACC)
 ─────────────────────────────────────────────────────────────────────────────────────────────
-Modules           Themia.Modules.* (Scheduling, ExceptionLogging, Identity, Storage,
-(IThemiaModule)   Notifications, Pdf, Export, Audit) — depend on Framework + neutral cores
-                  (no Themia.Modules.Geo or .AI — neither has tenant state or a schema; see §B)
+Modules           Themia.Modules.* (Scheduling, Identity(+.Abstractions/.EFCore/.Dapper/.AspNetCore/
+(IThemiaModule)    .ExternalAuth.AspNetCore/.Tokens.AspNetCore), Storage, Notifications(+3 engines),
+                  Pdf, Export, Audit, Messaging) — depend on Framework + neutral cores
+                  (no Themia.Modules.Geo, .AI or .ExceptionLogging — none has tenant state or a
+                   schema of its own; see §B)
 ─────────────────────────────────────────────────────────────────────────────────────────────
 [DEFERRED]        Idevs.Net.CoreLib.* (Quartz, Exceptional.*) — Serenity adapter, neutral core + Serenity
                   → built ONLY if/when PowerACC migrates (optional reuse, not a driver)
@@ -82,10 +91,10 @@ Packages/themia/
 ├── .github/{workflows/{ci,integration,release}.yml, release.yml, dependabot.yml}
 ├── docs/{themia-architecture-overview.md, superpowers/{specs,plans}/}
 ├── src/
-│   ├── tooling/    # netstandard2.0 — Themia.Generators.Abstractions, .SourceGenerator, .Analyzers(.CodeFixes)
-│   ├── neutral/    # net8.0;net10.0 — Themia.AspNetCore, Themia.Quartz, Themia.Exceptional(.SqlServer/.MySql/.PostgreSql)
+│   ├── tooling/    # netstandard2.0 — Themia.Generators.Abstractions, .SourceGenerator, .Analyzers  (no .CodeFixes — see §E)
+│   ├── neutral/    # net8.0;net10.0 — Themia.AspNetCore, .Quartz, .Exceptional(.provider), .Audit, .Messaging, .Storage, … (see §"Layered architecture")
 │   ├── framework/  # net10.0 — Themia.Framework.{Core,Data.EFCore,AspNetCore}, .MultiTenancy, .Mediator, .Caching, .Logging, .Services  (moved in from zenity-v2 at rename)
-│   └── modules/    # net10.0 — Themia.Modules.{Scheduling,ExceptionLogging,Identity,Storage,…}
+│   └── modules/    # net10.0 — Themia.Modules.{Scheduling,Identity,Storage,Notifications,Pdf,Export,Audit,Messaging}
 ├── tests/          # flat: <Package>.Tests/  (Exceptional.Tests carries [Trait("Category","Integration")])
 └── samples/        # optional example apps
 ```
@@ -99,9 +108,13 @@ you the target: `neutral/` = net8.0;net10.0, everything else = net10.0 (tooling 
 | Themia | from Zenity | capability |
 |---|---|---|
 | `Themia.Framework.Core` | Framework.Core | Entity/ValueObject/Result, Domain Events, multi-tenant |
-| `Themia.Framework.Data.EFCore` | Framework.Data.EFCore | EF Core + tenant isolation + audit + provider abstraction (**a first-class data-access peer** — see DECISION #6) |
+| `Themia.Framework.Data.Abstractions` | — (new) | the shared data contract both peers implement (UoW, tenant predicate, soft-delete) |
+| `Themia.Framework.Data.EFCore` (+ `.PostgreSql`, `.SqlServer`) | Framework.Data.EFCore | EF Core + tenant isolation + audit + provider abstraction (**a first-class data-access peer** — see DECISION #6) |
+| `Themia.Framework.Data.Dapper` (+ `.PostgreSql`, `.MySql`, `.SqlServer`) | — (new, 0.4.1–0.4.4) | Dapper + SqlKata, **the co-equal peer** to EF Core over the same schema (DECISION #6) |
+| `Themia.Framework.Data.Sequences` | Idevs `ISequenceProvider` | atomic tenant-scoped document numbering (0.22.0 — realises DECISION #2; see §F) |
 | `Themia.Framework.AspNetCore` | Framework.AspNetCore | ASP.NET integration |
-| `Themia.MultiTenancy` | MultiTenancy | tenant resolution/DI |
+| `Themia.Framework` | — (new, 0.8.0) | **metapackage**: one reference for the core set. Deliberately excludes the data peer — the adopter adds exactly one `.Data.EFCore.*` or `.Data.Dapper.*` to complete the stack |
+| `Themia.MultiTenancy` (+ `.Mediator`) | MultiTenancy | tenant resolution/DI; typed `TenantId` + claims resolution 0.5.6; tenant-presence guard 0.5.7 |
 | `Themia.Mediator` + `Themia.SourceGenerator` | Mediator/SourceGenerator | CQRS dispatch, compile-time, reflection-free |
 | `Themia.Caching` | Core.Caching | Memory/Redis/Garnet/Valkey + MessagePack |
 | `Themia.Logging` | Core.Logging | Serilog-based |
@@ -111,18 +124,19 @@ you the target: `neutral/` = net8.0;net10.0, everything else = net10.0 (tooling 
 
 | Themia module | sources (best-of merge) | status |
 |---|---|---|
-| `Themia.Modules.Scheduling` (+ `Themia.Quartz`) | PowerACC SilkierQuartz | **✅ built** (`Themia.Quartz` neutral core + `Themia.Modules.Scheduling`; dashboard smoke + EF store integration green) |
-| `Themia.Modules.ExceptionLogging` (+ `Themia.Exceptional.*`) | PowerACC/Idevs custom Dapper dialect engine (3 DB). *typed-exceptions + ProblemDetails split out to standalone neutral `Themia.AspNetCore`* | **✅ specced** |
+| `Themia.Modules.Scheduling` (+ `Themia.Quartz`, `Themia.Scheduling`) | PowerACC SilkierQuartz | ✅ **built** (`Themia.Quartz` neutral core + `Themia.Modules.Scheduling`; dashboard smoke + EF store integration green. Scheduling schema moved EF→FluentMigrator in 0.4.7; persistent Quartz/AdoJobStore in 0.4.8; the persistent scheduler split out of the EF-bound module into the neutral `Themia.Scheduling` in 0.15.0) |
+| ~~`Themia.Modules.ExceptionLogging`~~ — no module; shipped as the neutral `Themia.Exceptional` family | PowerACC/Idevs custom Dapper dialect engine (3 DB). *typed-exceptions + ProblemDetails split out to standalone neutral `Themia.AspNetCore`* | ✅ **built** (0.3.0 — `Themia.Exceptional` + PostgreSQL dialect, `.SqlServer`/`.MySql` alongside; `Themia.Exceptional.AspNetCore` dashboard 0.5.8, StackExchange.Exceptional parity + request-context capture 0.6.1. **No `Themia.Modules.ExceptionLogging` package exists** — capture/persist/dashboard carry no tenant-scoped schema of their own, so the module layer was never built; same per-capability check as the Geo/AI correction below) |
 | `Themia.Modules.Identity` (+ `.Abstractions`) | ezy-assets `Jwt/Authentication/RoleAccess/TenantContext/LineLogin` + claims/policies + Zenity Identity.Example | **✅ built** (0.5.0 — tenant-aware user/role/claim store, argon2id, `ICurrentUser`, EF+Dapper, PostgreSQL+SQL Server FM schema) |
 | `Themia.Modules.Identity.AspNetCore` | ezy-assets JWT + authentication flows | **✅ built** (0.5.2 — external/OAuth login: pluggable providers + Google/LINE, `AddThemiaExternalAuth`, `MapIdentityExternalAuthEndpoints`; Facebook/Microsoft/Telegram deferred additive providers — on top of 0.5.1 JWT issuance, rotating refresh tokens, `IAuthenticationFlow`, `MapIdentityAuthEndpoints`) |
-| `Themia.Modules.Storage` | **ezy-assets** S3/Local + **Idevs** `CloudUploadStorage` + **PowerACC** ClamAV scan | ✅ **built** (0.5.3 — Local + S3/R2 backends, tenant-aware metadata + quota, EF+Dapper, PostgreSQL+SQL Server FM schema) |
-| `Themia.Modules.Notifications` | ezy-assets `NotificationDispatcher`/Email/OTP/`Sms2Pro` | ⬜ to-spec |
-| `Themia.Modules.Pdf` | **ezy-assets** Contract/Proposal PDF + **Idevs** `PdfOptionsBuilder`/PuppeteerSharp + PowerACC reporting | ⬜ to-spec |
+| `Themia.Modules.Storage` (+ `Themia.Storage`, `.S3`) | **ezy-assets** S3/Local + **Idevs** `CloudUploadStorage` + **PowerACC** ClamAV scan | ✅ **built** (0.5.3 — Local + S3/R2 backends, tenant-aware metadata + quota, EF+Dapper, PostgreSQL+SQL Server FM schema; Local presigned-transfer routes hardened 0.8.8; permanent unsigned **absolute** public URLs + `X-Content-Type-Options: nosniff` on the serving route 0.9.0, coord #0022) |
+| `Themia.Modules.Notifications` (+ `Themia.Notifications`, `.PostgreSql/.MySql/.SqlServer`) | ezy-assets `NotificationDispatcher`/Email/OTP/`Sms2Pro` | ✅ **built** (0.6.2 neutral `Themia.Notifications` sending core → 0.6.3 tenant-aware module + outbox/drainer/dispatcher + the three per-engine packages; MySQL outbox-claim deadlock under concurrent drainers fixed 0.6.4. **(breaking)** the drain loop moved into `Themia.Messaging` in 0.11.0 so both modules share one implementation instead of forking it; `NotConfigured` sender result mapped through the outbox in 0.12.0) |
+| `Themia.Modules.Pdf` (+ `Themia.Pdf`) | **ezy-assets** Contract/Proposal PDF + **Idevs** `PdfOptionsBuilder`/PuppeteerSharp + PowerACC reporting | ✅ **built** (0.6.0 neutral `Themia.Pdf` HTML→PDF core, Handlebars templates → 0.7.0 tenant-aware template store with global-default fallback + render-by-key; `ThemiaPdfOptions.MaxConcurrency` bounds concurrent renders 0.10.1, coord #0046 — they were completely ungated before) |
 | `Themia.Export` + `Themia.Export.Excel` | **Idevs** `IReportBaseModel`/`IdevsExportRequest`/ClosedXML (Excel), de-Serenity-ized | ✅ **built** (0.6.8 — two stateless neutral cores: typed columns, CSV + xlsx, computed summary rows; no tenant module — the transform is stateless) |
 | `Themia.Modules.Export` | — (new; no prior source) | ✅ **built** (0.6.9 — tenant-aware async export module: `IExportDefinition<TParams>` keyed definitions; on-demand + cron Quartz jobs; Storage delivery via signed link; completion/failure Notifications; 7-day retention cleanup; opt-in `BypassSoftDeleteFilter` for full-data exports; FM schema, PostgreSQL+SQL Server+MySQL) |
 | ~~`Themia.Modules.Geo`~~ — no module; see `Themia.Geo` + `Themia.Geo.Google` in §"Neutral cores" below | ezy-assets `ProjectGeocodingService` | ✅ **built** (0.24.0 — no tenant state, no schema, so there is no module; see correction below) |
 | ~~`Themia.Modules.AI`~~ — no module; see `Themia.AI` + `Themia.AI.Gemini` + `Themia.AI.OpenAiCompatible` below | ezy-assets `GeminiAICaption`/`FallbackTextTranslation` | ✅ **built** (0.24.0 — no tenant state, no schema, so there is no module; see correction below) |
 | `Themia.Modules.Audit` (+ `Themia.Audit`, `.PostgreSql/.SqlServer/.MySql`, `.AspNetCore`) | **new** — the listed sources turned out to describe something else (see below) | ✅ **built** (0.23.0 — append-only activity + authentication event log; unqualified `themia_audit_events` on all three engines; unconditional redaction; `RequireTransaction` for activity events on EF and Dapper alike; `IIdentityEventObserver` audits all twelve Identity events; fail-closed read-only dashboard. Entity change log deferred to 0.24.0) |
+| `Themia.Modules.Messaging` (+ `Themia.Messaging`, `.PostgreSql/.MySql/.SqlServer`, `.Hmac`, `.Http`, `.AspNetCore`) | **new** — service-to-service messaging for the two consumer apps (coord #0050) | ✅ **built** (0.11.0 — neutral transactional outbox/inbox across the three engines, the `themia-hmac-v1` signing scheme shared by both ends of a channel, an HTTP dispatcher that signs and delivers a claimed row, and a receiving minimal-API endpoint filter; tenant-aware module on top. A service's identity was configured twice and was unified into one `MessagingIdentity` in the same line of work) |
 
 > **The `Themia.Modules.Audit` sources listed here were wrong, and the correction is worth keeping.**
 > ezy-assets' `AuditLogRepository` has `OldValue`/`NewValue` `jsonb` columns, so it reads like an entity
@@ -197,7 +211,7 @@ Zenity's mediator source-gen. Referenced by **both** Themia apps and PowerACC (S
 |---|---|---|
 | `Themia.SourceGenerator` | Idevs DI-gen + Zenity mediator-gen | reflection-free: `[Scoped/Singleton/Transient]` DI registration **+** mediator handler registration/dispatch |
 | `Themia.Analyzers` | Idevs `IDEVSGEN1xx` | misuse rules: 2+ connections w/o UoW, log-and-rethrow, sync-over-async Task body, hand-rolled `MAX()+1` sequence |
-| `Themia.Analyzers.CodeFixes` | Idevs CodeFixes | auto-fixes (e.g. scaffold `ISequenceProvider.NextAsync`) |
+| ~~`Themia.Analyzers.CodeFixes`~~ | Idevs CodeFixes | ⬜ **not built** — auto-fixes (e.g. scaffold `ISequenceProvider.NextAsync`) were planned but no such project exists and no `CodeFixProvider` ships anywhere in `src/tooling/`. The analyzers below are diagnostic-only |
 | `Themia.Generators.Abstractions` | Idevs Abstractions | Lifetime/Scanner/Writer/Diagnostics + DI marker attributes |
 
 Port tasks: rename diagnostic IDs `IDEVSGEN1xx → THEMIA1xx`; unify the DI + mediator attribute
@@ -303,7 +317,7 @@ written to hold on both engines). Supporting MariaDB would mean replacing every 
 persisted generated column plus an index on it, across every module that uses one — deferred until an
 adopter actually needs it.
 
-## Phase roadmap (proposed)
+## Phase roadmap (Phases 0–3 delivered)
 
 > **Phase ≠ version.** Phases are a *build-priority* grouping; the published *version* is a separate
 > single-shared counter. They do not align 1:1. Build order, release cadence, and the version each
@@ -312,10 +326,11 @@ adopter actually needs it.
 > (chosen order: `0.1.0` AspNetCore → `0.2.0` framework rename → `0.3.0` remaining neutral cores →
 > `0.4.0` Phase-1 modules → … → `1.0.0`).
 
-- **Phase 0 — Rename** `zenity`/`zenity-v2` → `Themia.Framework.*`/`Themia.Modules.*` (separate task).
-- **Phase 1 — Core cross-cutting:** Scheduling ✅, ExceptionLogging ✅, **Identity** ✅, Storage ✅
+- **Phase 0 — Rename** ✅ `zenity`/`zenity-v2` → `Themia.Framework.*`/`Themia.Modules.*` (0.2.0, tag
+  `v0.2.0` — `docs/superpowers/specs/2026-06-02-themia-0.2.0-framework-rename-design.md`).
+- **Phase 1 — Core cross-cutting:** Scheduling ✅, ExceptionLogging ✅ (neutral family only — no module, see §B), **Identity** ✅, Storage ✅
   (+ multi-DB SqlServer/MySql/Postgres baseline).
-- **Phase 2 — Productivity:** Notifications, Pdf, **Export** ✅.
+- **Phase 2 — Productivity:** **Notifications** ✅ (0.6.2/0.6.3), **Pdf** ✅ (0.6.0/0.7.0), **Export** ✅ (0.6.8/0.6.9).
 - **Phase 3 — Advanced:** **Geo** ✅ (0.24.0 —
   `docs/superpowers/specs/2026-09-08-themia-geo-design.md`; no module, see the correction in §B) and
   **AI** ✅ (0.24.0 — `docs/superpowers/specs/2026-09-08-themia-ai-design.md`; no module, see the
@@ -324,24 +339,73 @@ adopter actually needs it.
   Sequences EF-port ✅ (shipped as
   `Themia.Framework.Data.Sequences`, see `docs/superpowers/specs/2026-09-05-themia-sequences-design.md`
   — §F below is superseded on three points, recorded in that spec);
-  SourceGenerator/analyzer merge.
-- **Ongoing — Strangler:** migrate Idevs.Net.CoreLib's Serenity-free infra into Themia per module.
+  SourceGenerator/analyzer merge ✅ (one build-time family under `src/tooling/`, diagnostic IDs
+  renamed `IDEVSGEN1xx` → `THEMIA1xx`; `Themia.Analyzers.CodeFixes` is the one piece never built — §E).
+- **Deferred — Strangler:** migrating Idevs.Net.CoreLib's Serenity-free infra into Themia per module is
+  **not in progress and never started** — `Idevs.Net.CoreLib` appears once in the whole changelog, and
+  every reference to it here is marked deferred. The Serenity adapter family is built only if/when
+  PowerACC actually migrates, and **PowerACC is not a design driver** (§D). The reusable infra it would
+  have carried was instead written directly into Themia's neutral cores.
 
 ## Specs index
 
-- ✅ `docs/superpowers/specs/2026-06-01-themia-release-strategy-design.md` (versioning + build order)
-- ✅ `docs/superpowers/specs/2026-06-01-themia-quartz-scheduling-design.md`
-- ✅ `docs/superpowers/specs/2026-06-01-themia-exceptional-design.md`
-- ✅ `docs/superpowers/specs/2026-06-14-themia-identity-core-design.md` (Identity core — 0.5.0)
-- ✅ `docs/superpowers/specs/2026-06-15-themia-identity-jwt-design.md` (Identity JWT — 0.5.1)
-- ✅ `docs/superpowers/specs/2026-06-17-themia-storage-design.md` (Storage — 0.5.3) · `docs/superpowers/plans/2026-06-17-themia-storage-0.5.3.md`
-- ⬜ Phase 0 framework rename (`0.2.0`) — own spec when started
-- ✅ Export — `docs/superpowers/specs/2026-06-27-themia-modules-export-design.md` + `docs/superpowers/plans/2026-06-27-themia-modules-export.md` (async export module — 0.6.9)
-- ✅ Audit — `docs/superpowers/specs/2026-09-06-themia-audit-design.md` + `docs/superpowers/plans/2026-09-06-themia-audit.md` (activity + authentication event log — 0.23.0; entity change log scoped for 0.24.0 in §15)
-- ✅ Sequences — `docs/superpowers/specs/2026-09-05-themia-sequences-design.md` + `docs/superpowers/plans/2026-09-05-themia-sequences.md` (document numbering — 0.22.0; supersedes §F on three points, recorded in the spec)
-- ✅ Geo — `docs/superpowers/specs/2026-09-08-themia-geo-design.md` + `docs/superpowers/plans/2026-09-08-themia-geo.md` (coordinate primitives + Google geocoding provider — 0.24.0; no module, supersedes the `Themia.Modules.Geo` row in §B)
-- ✅ AI — `docs/superpowers/specs/2026-09-08-themia-ai-design.md` + `docs/superpowers/plans/2026-09-08-themia-ai.md` (completion dispatch + typed translation, Gemini + OpenAI-compatible providers — 0.24.0; no module, supersedes the `Themia.Modules.AI` row in §B)
-- ⬜ Storage, Notifications, Pdf, … (one spec each, this catalog as parent)
+Every spec below has a sibling plan under `docs/superpowers/plans/` sharing its date-stem. Paths here
+are relative to `docs/superpowers/specs/`. A version in parentheses is the release the spec shipped in.
+
+**Foundation**
+
+- ✅ `2026-06-01-themia-release-strategy-design.md` — versioning + build order (the roadmap this catalog serves)
+- ✅ `2026-06-02-themia-0.2.0-framework-rename-design.md` — Phase 0 rename + cross-cutting consolidation (0.2.0, tag `v0.2.0`)
+- ✅ `2026-07-11-themia-framework-metapackage-design.md` — `Themia.Framework` metapackage + package-selection docs (0.8.0)
+
+**Data layer**
+
+- ✅ `2026-06-07-themia-dapper-data-layer-design.md` — Dapper + SqlKata behind the shared abstraction (0.4.1, PostgreSQL)
+- ✅ `2026-06-09-ef-write-path-tenant-enforcement-design.md` — EF + Dapper write-path tenant enforcement (0.4.2)
+- ✅ `2026-06-10-themia-dapper-mysql-engine-design.md` (0.4.3) · `2026-06-10-themia-dapper-sqlserver-engine-design.md` (0.4.4)
+- ✅ `2026-06-11-themia-efcore-sqlserver-provider-design.md` — EF SQL Server provider + per-engine package split (0.4.5)
+- ✅ `2026-06-12-themia-data-migrations-runner-design.md` — shared FluentMigrator runner, `Themia.Data.Migrations` (0.4.6)
+- ✅ `2026-09-09-data-migrations-engine-split.md` — engine runners split into `.PostgreSql`/`.MySql`/`.SqlServer` (0.25.0)
+- ✅ `2026-08-23-schema-agreement-design.md` — migrations/store schema agreement → `Themia.Data.Probes` (0.17.0, coord #0088)
+- ✅ `2026-09-05-themia-sequences-design.md` — document numbering (0.22.0; supersedes §F on three points, recorded in the spec)
+
+**Tenancy & analyzers**
+
+- ✅ `2026-06-13-themia-isolation-analyzer-gates-design.md` — tenant-isolation analyzer gates, THEMIA103/104 (0.4.9)
+- ✅ `2026-06-18-themia-multitenancy-typed-tenantid-design.md` — typed `TenantId` + claims resolution (0.5.6, coord #0003)
+- ✅ `2026-06-20-themia-tenant-guard-design.md` — tenant-presence guard, MultiTenancy + Mediator bridge (0.5.7)
+
+**Scheduling**
+
+- ✅ `2026-06-01-themia-quartz-scheduling-design.md` — Quartz dashboard (SilkierQuartz port)
+- ✅ `2026-06-12-themia-scheduling-fluentmigrator-design.md` (0.4.7) · `2026-06-12-themia-persistent-quartz-design.md` — AdoJobStore (0.4.8)
+
+**Exception logging**
+
+- ✅ `2026-06-01-themia-exceptional-design.md` — the custom Dapper dialect engine, one schema across three engines
+- ✅ `2026-06-05-themia-0.3.0-exceptional-neutral-core-design.md` — neutral core + PostgreSQL dialect (0.3.0)
+- ✅ `2026-06-20-themia-exceptional-dashboard-design.md` (0.5.8, coord #0009) · `2026-06-22-themia-exceptional-dashboard-se-parity-design.md` — StackExchange parity + request-context capture (0.6.1)
+
+**Identity**
+
+- ✅ `2026-06-14-themia-identity-core-design.md` (0.5.0) · `2026-06-15-themia-identity-jwt-design.md` (0.5.1)
+- ✅ `2026-06-16-themia-identity-external-login-design.md` — external/OAuth login (0.5.2)
+- ✅ `2026-06-23-identity-externalauth-extraction-design.md` — BYO-user-store extraction (0.6.6)
+
+**Modules & neutral capabilities**
+
+- ✅ `2026-06-17-themia-storage-design.md` (0.5.3) · `2026-07-14-storage-public-url-design.md` — permanent public URLs (0.9.0, coord #0022)
+- ✅ `2026-06-21-themia-pdf-neutral-core-design.md` (0.6.0) · `2026-07-07-themia-modules-pdf-design.md` (0.7.0)
+- ✅ `2026-06-22-themia-notifications-design.md` — multi-channel dispatcher (0.6.2 neutral core, 0.6.3 module)
+- ✅ `2026-06-24-themia-export-design.md` (0.6.8) · `2026-06-27-themia-modules-export-design.md` — async/scheduled export (0.6.9)
+- ✅ `2026-07-31-themia-messaging-persistence-design.md` · `2026-07-31-themia-messaging-hmac-transport-design.md` · `2026-08-02-themia-messaging-identity-design.md` — outbox/inbox, HMAC transport, one service identity (0.11.0, coord #0050)
+- ✅ `2026-08-04-themia-challenges-design.md` — one-time secrets, one core (0.12.0)
+- ✅ `2026-09-06-themia-audit-design.md` — activity + authentication event log (0.23.0; entity change log scoped for 0.24.0 in §15)
+- ✅ `2026-09-08-themia-geo-design.md` (0.24.0; no module, supersedes the `Themia.Modules.Geo` row in §B)
+- ✅ `2026-09-08-themia-ai-design.md` (0.24.0; no module, supersedes the `Themia.Modules.AI` row in §B)
+
+**Shipped without a standalone spec** — `Themia.AspNetCore.DataProtection` (0.10.0, coord #0042),
+`Themia.PromptPay` (0.14.0), `Themia.Totp` (0.18.0), `Themia.WebAuthn` (0.20.0), `Themia.Imaging` (0.21.0).
 
 ## Identity JWT slice (0.5.1 — 2026-06-15)
 
@@ -384,10 +448,12 @@ core. Key structural decisions:
    table-based, 3-DB, separate-tx semantic) + optional formatter. See §F.
 3. ✅ **Tooling** — move to Themia as a build-time family (`Themia.SourceGenerator` +
    `Themia.Analyzers` + `.CodeFixes` + `.Generators.Abstractions`), merging Zenity mediator-gen.
-   See §E.
+   **`.CodeFixes` was deferred at 0.2.0 and has never been built** — the shipped family is the other
+   three, diagnostic-only. See §E.
 4. ✅ **Module naming** — capability-named (`Scheduling`, `ExceptionLogging`), applied consistently.
-5. ✅ **Phase-1 module set** — **Scheduling, ExceptionLogging, Identity, Storage** (the two
-   specced + Identity + Storage). Identity + Storage next to be specced.
+5. ✅ **Phase-1 module set** — **Scheduling, ExceptionLogging, Identity, Storage** — all four capabilities
+   shipped. ExceptionLogging shipped as the neutral `Themia.Exceptional` family with **no module
+   package** (§B); the other three have modules.
 
 **Resolved (2026-06-11):**
 6. ✅ **Data-access peers & schema authority** (supersedes #1) — EF Core and Dapper are **selectable
