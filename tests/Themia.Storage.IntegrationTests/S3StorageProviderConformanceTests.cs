@@ -11,7 +11,7 @@ namespace Themia.Storage.IntegrationTests;
 [Trait("Category", "Integration")]
 public sealed class S3StorageProviderConformanceTests : StorageProviderConformanceTests, IAsyncLifetime
 {
-    private readonly MinioContainer container = new MinioBuilder("minio/minio:RELEASE.2025-04-22T22-12-26Z").Build();
+    private readonly MinioContainer container = new MinioBuilder("quay.io/minio/minio:RELEASE.2025-04-22T22-12-26Z").Build();
     private IAmazonS3 client = null!;
     private S3StorageProvider provider = null!;
 
