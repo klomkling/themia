@@ -814,12 +814,36 @@ Not Themia work. Both were posted to propertiezy as coord #0132 on 2026-09-14.
 ## 14. Release
 
 `0.26.0` contains the five packages, the fixture with every `html` at `candidate`, the importer, and the adoption
-test.
+test — subject to the checkpoint below.
 
-Registration points: `Themia.sln`; `CHANGELOG.md`; `MIGRATION.md`; the package table in `README.md`;
+### Build order and the 2026-10-15 checkpoint
+
+Agreed on coord #0130 [8]. The implementation plan orders the work in five blocks, and block 5 depends on nothing
+ezy-assets needs:
+
+1. Core, with PostgreSQL as the engine that proves it.
+2. The MySQL and SQL Server engines and their integration suites.
+3. `Themia.Content.AspNetCore`.
+4. The golden fixture.
+5. Item 4 — `IContentPageImporter` and the adoption test.
+
+Themia posts a go/no-go on #0130 **no later than 2026-10-15**, for a release on 2026-11-01:
+
+- **GO** — blocks 1–5 ship in `0.26.0`.
+- **GO WITHOUT ITEM 4** — blocks 1–4 are on track and block 5 is not; `0.26.0` ships blocks 1–4 and the importer
+  follows in the next release. `IContentPageDialect` already carries the import statement from block 1, so the
+  interface does not change when block 5 lands later.
+- **NO-GO** — blocks 1–4 are not on track, early enough for ezy-assets to build a stopgap.
+
+The checkpoint is a commitment to answer, not to the date.
+
+Registration points: `Themia.sln`; `CHANGELOG.md`; the package table in `README.md`;
 `docs/themia-architecture-overview.md` (a §B row, the layered-architecture block, the specs index); the layered
 block in `CLAUDE.md`. No workflow, Dependabot manifest or CI package list names neutral packages individually —
-verified against every place `Themia.Challenges.PostgreSql` is referenced outside `src/`.
+verified against every place `Themia.Challenges.PostgreSql` is referenced outside `src/`. The new `Markdig`
+`PackageVersion` needs no manifest edit: `.github/dependabot-nuget/Manifest.csproj` references
+`@(PackageVersion)`, so `verify-coverage.sh` sees it automatically. **`MIGRATION.md` gets no entry**: it lists
+breaking changes only ("Non-breaking changes are not listed here"), and this release adds packages.
 
 ---
 
