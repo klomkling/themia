@@ -1,6 +1,7 @@
 # Themia.Content — versioned, bilingual content pages
 
-**Status:** approved design (brainstorming 2026-09-14), not yet implemented.
+**Status:** approved design (brainstorming 2026-09-14), revised the same day after a `/scrutinize` pass — see
+§15. Not yet implemented.
 **Target version:** `0.26.0`, released by **2026-11-01** — ezy-assets' needed-by date (coord #0130 [1]),
 worked back from ezyassets.com launching in December 2026.
 **Tracks:** coord #0130 (filed as `Themia.Modules.Content`), #0131.
@@ -39,7 +40,7 @@ write, and dropped again at render**, and **a stale editor cannot silently overw
 ## 2. Package shape — and why there is no module
 
 ```
-Themia.Content                net8.0;net10.0   Dapper + FluentMigrator. No database driver, no ASP.NET.
+Themia.Content                net8.0;net10.0   Dapper + FluentMigrator + Markdig (parse only). No driver, no ASP.NET.
 Themia.Content.PostgreSql     net8.0;net10.0   Npgsql dialect + registration
 Themia.Content.MySql          net8.0;net10.0   MySqlConnector dialect + registration
 Themia.Content.SqlServer      net8.0;net10.0   Microsoft.Data.SqlClient dialect + registration
@@ -96,6 +97,8 @@ public sealed class ContentSaveResult
     public ContentSaveOutcome Outcome { get; }
     public ContentPage? Page { get; }                              // Saved
     public int? CurrentVersion { get; }                            // Conflict — how far behind the editor is
+    public string? CurrentUpdatedBy { get; }                       // Conflict — lets a client recognise its own write
+    public DateTimeOffset? CurrentUpdatedAt { get; }               // Conflict
     public IReadOnlyList<ContentValidationError> Errors { get; }   // Invalid
     public bool Succeeded => Outcome == ContentSaveOutcome.Saved;
 }
@@ -238,6 +241,15 @@ Every write runs on **one connection and one transaction**, including revert. Pr
 transaction and then called a save that opened its own connection, so the transaction covered the lookups
 and not the write (#0130 [3]).
 
+**Every transaction is opened at `IsolationLevel.ReadCommitted`, on every engine.** PostgreSQL and SQL Server
+default to it; MySQL's InnoDB defaults to REPEATABLE READ, where a plain `SELECT` reads from the snapshot taken
+at the transaction's first read. Revert reads its target revision before the guarded `UPDATE`, so under
+REPEATABLE READ the version it reads afterwards for the 409 is stale. Measured on mysql 8.4.9: the guarded
+`UPDATE` correctly matched zero rows, and the follow-up plain `SELECT` returned version 1 while the committed
+row was at 2; at READ COMMITTED it returned 2. The guard was right and the 409 was wrong. The repository already
+opens MySQL transactions at READ COMMITTED, for a different reason (gap-lock deadlocks), in
+`MySqlMessagingDialect`, `MySqlNotificationsDialect` and `SequenceProvider`.
+
 ### Save
 
 1. Validate (§3). Any failure returns `Invalid` **before a connection is opened.**
@@ -245,7 +257,8 @@ and not the write (#0130 [3]).
 3. **`ExpectedVersion == 0` — create.**
    Take a savepoint. `INSERT` the page at version 1.
    - Inserted: `INSERT` revision 1, commit, return `Saved`.
-   - `IsDuplicateKey`: **roll back to the savepoint**, read the existing row's `current_version`, roll back,
+   - `IsDuplicateKey`: **roll back to the savepoint**, read the existing row's `current_version`, `updated_by`
+     and `updated_at`, roll back,
      return `Conflict(currentVersion)`.
 4. **`ExpectedVersion > 0` — update.**
 
@@ -257,7 +270,8 @@ and not the write (#0130 [3]).
    ```
 
    - One row: `INSERT` revision `ExpectedVersion + 1`, commit, return `Saved`.
-   - Zero rows: read `current_version` for `(slug, language)`. A row exists: `Conflict(currentVersion)`.
+   - Zero rows: read `current_version`, `updated_by` and `updated_at` for `(slug, language)`. A row exists:
+     `Conflict`.
      None: `NotFound`. Roll back.
 
 ### Why a savepoint, and why not the alternatives
@@ -272,7 +286,10 @@ and not the write (#0130 [3]).
   it atomic, and rolling back to the savepoint leaves the transaction able to read the winner.
   `DbTransaction.Save` / `Rollback(savepointName)` is the provider-neutral API. **That all three drivers
   support it is a requirement proven by the concurrent-create test on each engine (§12), not an assumption
-  this spec relies on.**
+  this spec relies on.** Reflection over the pinned drivers (Npgsql 10.0.3, MySqlConnector 2.6.0,
+  Microsoft.Data.SqlClient 6.1.5) shows all three override `Save(string)` and `Rollback(string)`. **Do not gate
+  on `DbTransaction.SupportsSavepoints`:** MySqlConnector and SqlClient do not override it, so it reports `false`
+  on two engines that support savepoints.
 
 ### Two guards, neither of them a read-then-compare
 
@@ -302,6 +319,28 @@ Publishing is a field of the save. **Every save writes a revision, including one
 `IsPublished`.** That matches the reference, so propertiezy's history maps one-to-one on import (§10).
 Revisions do not store `is_published`.
 
+### Content shipped with code — the same path, never SQL
+
+Both consumers ship legal and static text with their releases: propertiezy has nine migrations that write CMS
+content, and ezy-assets will write its pages before launch. The invariants in this section live only in
+`IContentPageService`. **A migration that writes `content_pages` directly recreates, in Themia's own tables, the
+defect §10 found in propertiezy's** — the seven migrations that changed served text without writing a revision.
+
+So content that ships with code goes through `SaveAsync`, from a startup step that runs once the service is
+resolvable (a hosted service, or an explicit call at boot) — never from a FluentMigrator migration, which runs
+before the service exists. The package README says it outright: **never write the `content_*` tables with SQL.**
+
+The pattern needs no new API:
+
+1. `GetForEditAsync(slug, language)`.
+2. No page: `SaveAsync` with `ExpectedVersion = 0`. `Conflict` means another instance seeded it first; stop.
+3. A page at the version this code last wrote — the consumer records it, as propertiezy's migrations did with
+   `"CurrentVersion" = 1` — `SaveAsync` with that version. `Conflict` means an editor saved in between; stop.
+4. A page at any other version: an editor has changed it. Leave it.
+
+Running the step twice writes nothing the second time, and a run that races an editor loses to the editor.
+Both are integration tests (§12).
+
 ---
 
 ## 6. Read path
@@ -327,14 +366,38 @@ fallback. A page that exists in the requested language but is unpublished falls 
 
 `ContentMarkdownRules.Check(markdown)` returns violations of two kinds: `RawHtml` and `DisallowedUrl`.
 
-1. **Remove code first.** Fenced blocks — closed, **or running to the end of input**, since that is how an
-   unclosed fence renders — and inline code spans of any backtick run length. Documenting HTML inside code is
-   legitimate and renders escaped.
-2. **Refuse raw HTML:** any `<name ...>` or `</name>` tag, `<!--`, `<!...`, and `<?`.
-3. **Refuse link, image, reference-definition and autolink destinations whose scheme is not allowed.**
-   Normalise the way a browser does before deciding: decode HTML entities, strip ASCII whitespace and control
-   characters, then allow **no scheme at all** (relative path, `/path`, `#fragment`, `?query`) or exactly
-   **`http`, `https`, `mailto`, `tel`**.
+The markdown is **parsed with Markdig** (the CommonMark core pipeline, no extensions) and the rules run over
+the syntax tree. Nothing is rendered on the server; Markdig is used only to know which bytes are code, which are
+HTML, and which are link destinations.
+
+1. **Refuse raw HTML:** any `HtmlBlock` or `HtmlInline` node — tags, comments, declarations and processing
+   instructions alike. Code blocks (fenced or indented) and code spans are not HTML nodes, so documenting HTML
+   inside code is accepted and renders escaped.
+2. **Refuse destinations whose scheme is not allowed**, on every `LinkInline` (links and images),
+   `AutolinkInline` and `LinkReferenceDefinition`. Normalise the way a browser does before deciding: decode HTML
+   entities, strip ASCII whitespace and control characters, then allow **no scheme at all** (relative path,
+   `/path`, `#fragment`, `?query`) or exactly **`http`, `https`, `mailto`, `tel`**. Markdig has already decoded
+   entities in `Url`; decoding again can only make the check stricter, never looser.
+
+### Why a parser and not regular expressions
+
+The first draft of this rule removed code with regular expressions and scanned what was left. The `/scrutinize`
+pass ran that rule against `marked` 18.0.11 and found it disagreeing with CommonMark's block structure in both
+directions:
+
+| input | regex write rule | `marked` render |
+|---|---|---|
+| an indented code block containing `<b>x</b>` | **reject** — the author is blocked on legitimate content | code |
+| a fence closed by a longer fence, then `[x](javascript:alert(1))` | **accept** — the regex read the rest as code | link refused, silently |
+| backticks on either side of a blank line around `<b>x</b>` | accept — stripped as one code span | HTML dropped, silently |
+
+A set of regular expressions that removes code correctly is a CommonMark block parser, and this one was an
+incomplete one. Markdig 1.3.0 (BSD-2-Clause; `net8.0`, `net10.0`, `netstandard2.0`) classified all thirteen probe
+inputs — these three, plus raw HTML, a comment, an unclosed fence, entity-encoded and angle-bracket destinations,
+a reference definition, a data image, an autolink and a fenced HTML example — the way `marked` renders them.
+Markdig and `marked` are separate implementations and may still disagree on inputs nobody has tried; the fixture
+is where such a case is pinned once found. **The render half remains the safety boundary:** in none of these
+cases did `marked` emit a dangerous destination or a raw tag.
 
 **Refused, not sanitised.** A sanitiser over markdown corrupts it (`a < b` comes back encoded, autolinks are
 mangled, a fenced HTML example loses its content). Refusing tells the author what is wrong and leaves their
@@ -473,9 +536,23 @@ store them, not literal characters.
 | double-tick code | a double-backtick span containing a backtick and `<b>` | accept | one `<code>` element holding the backtick and an escaped `&lt;b&gt;` |
 | html in inline code | a single-backtick span around `<br>` | accept | `<p>use <code>&lt;br&gt;</code> here</p>\n` |
 
-The write verdicts above were produced by a JavaScript transcription of §7. The C# implementation is tested
-against the fixture file, not against this table, and the fixture file is generated from the probe run rather
-than retyped from this table.
+The write verdicts above were produced by a JavaScript transcription of the first, regex-based draft of §7. The
+Markdig-based rule must reproduce every one of them; thirteen of these inputs were checked against Markdig 1.3.0
+during review, not all.
+
+Five entries come from the `/scrutinize` probe, with `html` from the same `marked` 18.0.11 configuration. The
+first three `write` verdicts are Markdig's; the last two are the regex transcription's, not yet run through Markdig.
+
+| name | markdown | write | html |
+|---|---|---|---|
+| indented code with html | `para\n\n    <b>x</b>\n` | accept | `<p>para</p>\n<pre><code>&lt;b&gt;x&lt;/b&gt;\n</code></pre>\n` |
+| longer closing fence, then javascript link | a fence opened with three backticks and closed with four, then `[x](javascript:alert(1))` | reject | `<pre><code>code\n</code></pre>\n<p>x</p>\n` |
+| blockquote fence with html | `> ` before each line of a fence around `<b>x</b>` | accept | `<blockquote>\n<pre><code>&lt;b&gt;x&lt;/b&gt;\n</code></pre>\n</blockquote>\n` |
+| entity-encoded tab in scheme | `[x](java&#9;script:alert(1))` | reject | `<p>x</p>\n` |
+| hex entities without semicolons | `[x](&#x6A&#x61vascript:alert(1))` | reject | `<p>x</p>\n` |
+
+The C# implementation is tested against the fixture file, not against these tables, and the fixture file is
+generated from the probe runs rather than retyped from them.
 
 ---
 
@@ -524,15 +601,18 @@ Success uses `{ "data": ..., "meta": ... }`; lists carry `meta: { page, limit, t
 |---|---|
 | `Saved` | 200 `{ data: page }` |
 | `Invalid` | 422 `ValidationProblem`, `RawHtml` and `DisallowedUrl` reported on field `markdown` |
-| `Conflict` | 409 ProblemDetails with extension `currentVersion` |
+| `Conflict` | 409 ProblemDetails with extensions `currentVersion`, `updatedBy`, `updatedAt` |
 | `NotFound` | 404 ProblemDetails |
 
 This is the one place Themia departs from its own neutral AspNetCore packages, which return bare bodies. It
 follows the maintainer's API standard and propertiezy's `ApiResponse<T>`. ezy-assets returns bare bodies
 elsewhere, but its CMS admin UI is not written yet, so nothing of theirs breaks.
 
-**Retries are safe without an `Idempotency-Key`.** `PUT` and `POST .../revert` both carry `expectedVersion`; a
-replayed request is refused with 409 instead of writing a second revision.
+**A retry cannot write twice, without an `Idempotency-Key`.** `PUT` and `POST .../revert` both carry
+`expectedVersion`; a replayed request is refused with 409 instead of writing a second revision. That also means a
+retry after a lost response reads as a conflict even when the lost request succeeded, and `currentVersion` alone
+cannot tell the two cases apart. The 409 therefore carries `updatedBy` and `updatedAt` of the page as it now
+stands, so a client can recognise its own write.
 
 Request bodies reject unknown members (`JsonUnmappedMemberHandling.Disallow`). A consumer's form should keep
 the author's text on 409 (SvelteKit: `fail()`, not `redirect`).
@@ -664,6 +744,10 @@ One project, one container per engine per assembly (`[CollectionDefinition]`), `
   the test that proves each driver supports savepoints and that the transaction can still read after a lost
   insert** (§5).
 - **Revert of a non-default language leaves the default language byte-identical** (#0130 [3]).
+- **A revert that races a save reports the winner's version in its `Conflict`**, on MySQL above all: revert reads
+  its target revision before the guarded `UPDATE`, the ordering that exposed REPEATABLE READ (§5).
+- **Seeding (§5):** a seed step run twice leaves exactly one revision; a seed step run after an editor's save
+  changes nothing.
 - Revert is atomic, keeps `is_published`, refuses a stale `ExpectedVersion`; a missing target returns `NotFound`.
 - Read: the requested language; the fallback; requested language unpublished falls back; neither returns null.
 - The migration re-runs cleanly; the ledger is `themia_version_<assembly>`; the schema probe runs on PostgreSQL.
@@ -704,7 +788,11 @@ Each test below must turn red when its guard is removed, and the plan records th
 | `ux_content_page_revisions_page_version` | non-service duplicate revision |
 | `Language` carried into the revert's save | non-default-language revert |
 | the content-equals-last-revision import rule | adoption test, step 2 |
-| entity decoding in the URL rule | fixture entries "entity-encoded colon" and "named-entity colon" |
+| the whitespace and control-character strip in the URL rule | fixture entry "entity-encoded tab in scheme" |
+| `IsolationLevel.ReadCommitted` on the transaction | a revert racing a save, on MySQL |
+
+Entity decoding is deliberately not in this table: Markdig decodes `Url` before the rule sees it, so removing the
+rule's own decoding would turn nothing red — a guard listed here that cannot fail would be evidence of nothing.
 
 A guard that cannot be made to fail is not evidence of anything; three have been found in this repository
 already.
@@ -713,7 +801,7 @@ already.
 
 ## 13. Findings handed back to consumers
 
-Not Themia work. Recorded so they are not lost; whether to post them on coord is the maintainer's decision.
+Not Themia work. Both were posted to propertiezy as coord #0132 on 2026-09-14.
 
 1. **propertiezy production: `javascript:` and `data:` destinations pass both halves** (§7). Only admins author
    pages, which bounds the exposure, but the pair's stated guarantee does not hold for URLs. Not touched by
@@ -748,6 +836,15 @@ verified against every place `Themia.Challenges.PostgreSql` is referenced outsid
   (#0130 [3]). Its replacement, an engine-specific insert-if-absent, was dropped because MySQL's row count cannot
   tell an insert from an existing row under `CLIENT_FOUND_ROWS`. The savepoint in §5 is the third version.
 - **Item 4 was scoped out, then back in** (header).
+- **The first draft's markdown rule was a set of regular expressions**, and it disagreed with CommonMark in both
+  directions (§7). Replaced by Markdig's syntax tree.
+- **The first draft named no isolation level.** Under MySQL's default REPEATABLE READ a revert's 409 reported the
+  editor's own version back to it — measured, not inferred (§5).
+- **The first draft enforced every invariant inside the service and offered no path for content shipped with
+  code**, which is how both consumers deliver legal text. §5 now names that path.
+- **The review's own first check of propertiezy's content counted 46 `<b>` tags** — every one a C# XML doc
+  comment. With comment lines excluded, propertiezy's CMS content contains no raw HTML and only `https` and
+  `mailto` links, so adoption does not lock its editors out of saving.
 
 ---
 
@@ -771,3 +868,6 @@ rendering markdown on the server; a configurable URL scheme list; a Themia CI jo
 - Admin authorization is a consumer delegate, fail-closed; refusals are 401 or 403.
 - `{data, meta}` and RFC 7807.
 - Adoption is an importer the consumer feeds; it refuses divergent history rather than repairing it.
+- Markdown rules run over Markdig's syntax tree; nothing is rendered on the server.
+- Every transaction runs at READ COMMITTED.
+- Content that ships with code goes through `SaveAsync`, never SQL.
