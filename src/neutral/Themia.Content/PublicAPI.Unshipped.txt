@@ -115,6 +115,7 @@ Themia.Content.ContentValidationError.Field.get -> string!
 Themia.Content.ContentValidationError.Field.init -> void
 Themia.Content.ContentValidationError.Message.get -> string!
 Themia.Content.ContentValidationError.Message.init -> void
+Themia.Content.DependencyInjection.ContentServiceCollectionExtensions
 Themia.Content.IContentPageDialect
 Themia.Content.IContentPageDialect.CountPagesSql.get -> string!
 Themia.Content.IContentPageDialect.CountRevisionsSql.get -> string!
@@ -129,6 +130,13 @@ Themia.Content.IContentPageDialect.SelectPageSql.get -> string!
 Themia.Content.IContentPageDialect.SelectPublishedSql.get -> string!
 Themia.Content.IContentPageDialect.SelectRevisionSql.get -> string!
 Themia.Content.IContentPageDialect.UpdatePageIfVersionSql.get -> string!
+Themia.Content.IContentPageService
+Themia.Content.IContentPageService.GetForEditAsync(string! slug, string! language, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Content.ContentPage?>!
+Themia.Content.IContentPageService.GetPublishedAsync(string! slug, string? language, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Content.ContentPage?>!
+Themia.Content.IContentPageService.GetRevisionsAsync(string! slug, string! language, int page, int limit, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Content.PagedResult<Themia.Content.ContentPageRevision!>!>!
+Themia.Content.IContentPageService.ListAsync(int page, int limit, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Content.PagedResult<Themia.Content.ContentPageSummary!>!>!
+Themia.Content.IContentPageService.RevertAsync(Themia.Content.ContentPageRevert! revert, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Content.ContentSaveResult!>!
+Themia.Content.IContentPageService.SaveAsync(Themia.Content.ContentPageSave! save, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Content.ContentSaveResult!>!
 Themia.Content.Migrations.ContentSchemaMigration
 Themia.Content.Migrations.ContentSchemaMigration.ContentSchemaMigration() -> void
 override Themia.Content.Migrations.ContentSchemaMigration.Down() -> void
@@ -145,3 +153,4 @@ static Themia.Content.ContentSaveResult.Conflict(int currentVersion, string? upd
 static Themia.Content.ContentSaveResult.Invalid(System.Collections.Generic.IReadOnlyList<Themia.Content.ContentValidationError!>! errors) -> Themia.Content.ContentSaveResult!
 static Themia.Content.ContentSaveResult.NotFound() -> Themia.Content.ContentSaveResult!
 static Themia.Content.ContentSaveResult.Saved(Themia.Content.ContentPage! page) -> Themia.Content.ContentSaveResult!
+static Themia.Content.DependencyInjection.ContentServiceCollectionExtensions.AddThemiaContent(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Themia.Content.ContentOptions!>! configure) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!

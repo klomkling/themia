@@ -4,7 +4,7 @@ namespace Themia.Content;
 
 /// <summary>
 /// Per-database strategy for the content store: a connection, duplicate-key detection, and every SQL statement
-/// <c>IContentPageService</c> runs against the tables created by <see cref="Migrations.ContentSchemaMigration"/>.
+/// <see cref="IContentPageService"/> runs against the tables created by <see cref="Migrations.ContentSchemaMigration"/>.
 /// Implemented once per engine package; this is those packages' only contact with the core.
 /// </summary>
 /// <remarks>

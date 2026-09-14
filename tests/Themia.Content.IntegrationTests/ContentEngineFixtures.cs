@@ -1,7 +1,10 @@
 using Dapper;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
 using Testcontainers.PostgreSql;
+using Themia.Content.DependencyInjection;
+using Themia.Content.Internal;
 using Themia.Content.PostgreSql;
 using Themia.Data.Migrations;
 using Themia.Data.Migrations.PostgreSql;
@@ -45,16 +48,37 @@ public abstract class ContentEngineFixture : IAsyncLifetime
     /// <summary>Whether an index named <paramref name="name"/> exists, read from the engine's catalog.</summary>
     public abstract Task<bool> IndexExistsAsync(string name);
 
-    /// <summary>Builds the service collection. Task 5 adds the core registration here.</summary>
+    /// <summary>The live service, resolved from DI exactly as an adopter resolves it.</summary>
+    public IContentPageService Service { get; private set; } = null!;
+
+    /// <summary>The resolved options: languages th and en, fallback th.</summary>
+    public ContentOptions Options { get; private set; } = null!;
+
+    /// <summary>A service over <paramref name="dialect"/> with this fixture's options and clock — for tests that wrap
+    /// the real dialect.</summary>
+    internal ContentPageService NewService(IContentPageDialect dialect) =>
+        new(dialect, Options, Time, NullLogger<ContentPageService>.Instance);
+
+    /// <summary>Builds the service collection through the adopter's registration path.</summary>
     protected virtual void ConfigureServices(IServiceCollection services, string connectionString)
     {
         services.AddSingleton<TimeProvider>(Time);
+        services.AddThemiaContent(options =>
+        {
+            options.Languages.Add("th");
+            options.Languages.Add("en");
+            options.FallbackLanguage = "th";
+        });
         RegisterEngine(services, connectionString);
     }
 
-    /// <summary>Resolves what tests use. Task 5 adds the service here.</summary>
-    protected virtual void Resolve(IServiceProvider services) =>
+    /// <summary>Resolves what tests use.</summary>
+    protected virtual void Resolve(IServiceProvider services)
+    {
         Dialect = services.GetRequiredService<IContentPageDialect>();
+        Service = services.GetRequiredService<IContentPageService>();
+        Options = services.GetRequiredService<ContentOptions>();
+    }
 
     /// <inheritdoc />
     public async Task InitializeAsync()
