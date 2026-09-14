@@ -14,5 +14,116 @@ Themia.Content.ContentOptions.ContentOptions() -> void
 Themia.Content.ContentOptions.FallbackLanguage.get -> string!
 Themia.Content.ContentOptions.FallbackLanguage.set -> void
 Themia.Content.ContentOptions.Languages.get -> System.Collections.Generic.IList<string!>!
+Themia.Content.ContentPage
+Themia.Content.ContentPage.ContentPage(string! Slug, string! Language, string! Title, string! Markdown, int CurrentVersion, bool IsPublished, System.DateTimeOffset CreatedAt, System.DateTimeOffset UpdatedAt, string? UpdatedBy) -> void
+Themia.Content.ContentPage.CreatedAt.get -> System.DateTimeOffset
+Themia.Content.ContentPage.CreatedAt.init -> void
+Themia.Content.ContentPage.CurrentVersion.get -> int
+Themia.Content.ContentPage.CurrentVersion.init -> void
+Themia.Content.ContentPage.IsPublished.get -> bool
+Themia.Content.ContentPage.IsPublished.init -> void
+Themia.Content.ContentPage.Language.get -> string!
+Themia.Content.ContentPage.Language.init -> void
+Themia.Content.ContentPage.Markdown.get -> string!
+Themia.Content.ContentPage.Markdown.init -> void
+Themia.Content.ContentPage.Slug.get -> string!
+Themia.Content.ContentPage.Slug.init -> void
+Themia.Content.ContentPage.Title.get -> string!
+Themia.Content.ContentPage.Title.init -> void
+Themia.Content.ContentPage.UpdatedAt.get -> System.DateTimeOffset
+Themia.Content.ContentPage.UpdatedAt.init -> void
+Themia.Content.ContentPage.UpdatedBy.get -> string?
+Themia.Content.ContentPage.UpdatedBy.init -> void
+Themia.Content.ContentPageRevert
+Themia.Content.ContentPageRevert.ChangeSummary.get -> string?
+Themia.Content.ContentPageRevert.ChangeSummary.init -> void
+Themia.Content.ContentPageRevert.ContentPageRevert(string! Slug, string! Language, int TargetVersion, int ExpectedVersion, string? ChangeSummary, string? EditorId) -> void
+Themia.Content.ContentPageRevert.EditorId.get -> string?
+Themia.Content.ContentPageRevert.EditorId.init -> void
+Themia.Content.ContentPageRevert.ExpectedVersion.get -> int
+Themia.Content.ContentPageRevert.ExpectedVersion.init -> void
+Themia.Content.ContentPageRevert.Language.get -> string!
+Themia.Content.ContentPageRevert.Language.init -> void
+Themia.Content.ContentPageRevert.Slug.get -> string!
+Themia.Content.ContentPageRevert.Slug.init -> void
+Themia.Content.ContentPageRevert.TargetVersion.get -> int
+Themia.Content.ContentPageRevert.TargetVersion.init -> void
+Themia.Content.ContentPageRevision
+Themia.Content.ContentPageRevision.ChangeSummary.get -> string?
+Themia.Content.ContentPageRevision.ChangeSummary.init -> void
+Themia.Content.ContentPageRevision.ContentPageRevision(int Version, string! Title, string! Markdown, string? ChangeSummary, System.DateTimeOffset CreatedAt, string? CreatedBy) -> void
+Themia.Content.ContentPageRevision.CreatedAt.get -> System.DateTimeOffset
+Themia.Content.ContentPageRevision.CreatedAt.init -> void
+Themia.Content.ContentPageRevision.CreatedBy.get -> string?
+Themia.Content.ContentPageRevision.CreatedBy.init -> void
+Themia.Content.ContentPageRevision.Markdown.get -> string!
+Themia.Content.ContentPageRevision.Markdown.init -> void
+Themia.Content.ContentPageRevision.Title.get -> string!
+Themia.Content.ContentPageRevision.Title.init -> void
+Themia.Content.ContentPageRevision.Version.get -> int
+Themia.Content.ContentPageRevision.Version.init -> void
+Themia.Content.ContentPageSave
+Themia.Content.ContentPageSave.ChangeSummary.get -> string?
+Themia.Content.ContentPageSave.ChangeSummary.init -> void
+Themia.Content.ContentPageSave.ContentPageSave(string! Slug, string! Language, string! Title, string! Markdown, bool IsPublished, int ExpectedVersion, string? ChangeSummary, string? EditorId) -> void
+Themia.Content.ContentPageSave.EditorId.get -> string?
+Themia.Content.ContentPageSave.EditorId.init -> void
+Themia.Content.ContentPageSave.ExpectedVersion.get -> int
+Themia.Content.ContentPageSave.ExpectedVersion.init -> void
+Themia.Content.ContentPageSave.IsPublished.get -> bool
+Themia.Content.ContentPageSave.IsPublished.init -> void
+Themia.Content.ContentPageSave.Language.get -> string!
+Themia.Content.ContentPageSave.Language.init -> void
+Themia.Content.ContentPageSave.Markdown.get -> string!
+Themia.Content.ContentPageSave.Markdown.init -> void
+Themia.Content.ContentPageSave.Slug.get -> string!
+Themia.Content.ContentPageSave.Slug.init -> void
+Themia.Content.ContentPageSave.Title.get -> string!
+Themia.Content.ContentPageSave.Title.init -> void
+Themia.Content.ContentPageSummary
+Themia.Content.ContentPageSummary.ContentPageSummary(string! Slug, string! Language, string! Title, int CurrentVersion, bool IsPublished, System.DateTimeOffset UpdatedAt, string? UpdatedBy) -> void
+Themia.Content.ContentPageSummary.CurrentVersion.get -> int
+Themia.Content.ContentPageSummary.CurrentVersion.init -> void
+Themia.Content.ContentPageSummary.IsPublished.get -> bool
+Themia.Content.ContentPageSummary.IsPublished.init -> void
+Themia.Content.ContentPageSummary.Language.get -> string!
+Themia.Content.ContentPageSummary.Language.init -> void
+Themia.Content.ContentPageSummary.Slug.get -> string!
+Themia.Content.ContentPageSummary.Slug.init -> void
+Themia.Content.ContentPageSummary.Title.get -> string!
+Themia.Content.ContentPageSummary.Title.init -> void
+Themia.Content.ContentPageSummary.UpdatedAt.get -> System.DateTimeOffset
+Themia.Content.ContentPageSummary.UpdatedAt.init -> void
+Themia.Content.ContentPageSummary.UpdatedBy.get -> string?
+Themia.Content.ContentPageSummary.UpdatedBy.init -> void
+Themia.Content.ContentSaveOutcome
+Themia.Content.ContentSaveOutcome.Conflict = 1 -> Themia.Content.ContentSaveOutcome
+Themia.Content.ContentSaveOutcome.Invalid = 2 -> Themia.Content.ContentSaveOutcome
+Themia.Content.ContentSaveOutcome.NotFound = 3 -> Themia.Content.ContentSaveOutcome
+Themia.Content.ContentSaveOutcome.Saved = 0 -> Themia.Content.ContentSaveOutcome
+Themia.Content.ContentSaveResult
+Themia.Content.ContentSaveResult.CurrentUpdatedAt.get -> System.DateTimeOffset?
+Themia.Content.ContentSaveResult.CurrentUpdatedBy.get -> string?
+Themia.Content.ContentSaveResult.CurrentVersion.get -> int?
+Themia.Content.ContentSaveResult.Errors.get -> System.Collections.Generic.IReadOnlyList<Themia.Content.ContentValidationError!>!
+Themia.Content.ContentSaveResult.Outcome.get -> Themia.Content.ContentSaveOutcome
+Themia.Content.ContentSaveResult.Page.get -> Themia.Content.ContentPage?
+Themia.Content.ContentSaveResult.Succeeded.get -> bool
+Themia.Content.ContentValidationError
+Themia.Content.ContentValidationError.ContentValidationError(string! Field, string! Message) -> void
+Themia.Content.ContentValidationError.Field.get -> string!
+Themia.Content.ContentValidationError.Field.init -> void
+Themia.Content.ContentValidationError.Message.get -> string!
+Themia.Content.ContentValidationError.Message.init -> void
+Themia.Content.PagedResult<T>
+Themia.Content.PagedResult<T>.Items.get -> System.Collections.Generic.IReadOnlyList<T>!
+Themia.Content.PagedResult<T>.Items.init -> void
+Themia.Content.PagedResult<T>.PagedResult() -> void
+Themia.Content.PagedResult<T>.Total.get -> int
+Themia.Content.PagedResult<T>.Total.init -> void
 static Themia.Content.ContentMarkdownRules.Check(string! markdown) -> System.Collections.Generic.IReadOnlyList<Themia.Content.ContentMarkdownViolation!>!
 static Themia.Content.ContentMarkdownRules.IsUrlAllowed(string? url) -> bool
+static Themia.Content.ContentSaveResult.Conflict(int currentVersion, string? updatedBy, System.DateTimeOffset updatedAt) -> Themia.Content.ContentSaveResult!
+static Themia.Content.ContentSaveResult.Invalid(System.Collections.Generic.IReadOnlyList<Themia.Content.ContentValidationError!>! errors) -> Themia.Content.ContentSaveResult!
+static Themia.Content.ContentSaveResult.NotFound() -> Themia.Content.ContentSaveResult!
+static Themia.Content.ContentSaveResult.Saved(Themia.Content.ContentPage! page) -> Themia.Content.ContentSaveResult!
