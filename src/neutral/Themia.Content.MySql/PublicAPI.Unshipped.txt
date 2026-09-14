@@ -1,0 +1,18 @@
+#nullable enable
+static Themia.Content.MySql.ServiceCollectionExtensions.AddThemiaContentMySql(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, string! connectionString) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+Themia.Content.MySql.MySqlContentDialect
+Themia.Content.MySql.MySqlContentDialect.CountPagesSql.get -> string!
+Themia.Content.MySql.MySqlContentDialect.CountRevisionsSql.get -> string!
+Themia.Content.MySql.MySqlContentDialect.CreateConnection() -> System.Data.Common.DbConnection!
+Themia.Content.MySql.MySqlContentDialect.ImportPageSql.get -> string!
+Themia.Content.MySql.MySqlContentDialect.InsertPageSql.get -> string!
+Themia.Content.MySql.MySqlContentDialect.InsertRevisionSql.get -> string!
+Themia.Content.MySql.MySqlContentDialect.IsDuplicateKey(System.Data.Common.DbException! exception) -> bool
+Themia.Content.MySql.MySqlContentDialect.ListPagesSql.get -> string!
+Themia.Content.MySql.MySqlContentDialect.ListRevisionsSql.get -> string!
+Themia.Content.MySql.MySqlContentDialect.MySqlContentDialect(string! connectionString) -> void
+Themia.Content.MySql.MySqlContentDialect.SelectPageSql.get -> string!
+Themia.Content.MySql.MySqlContentDialect.SelectPublishedSql.get -> string!
+Themia.Content.MySql.MySqlContentDialect.SelectRevisionSql.get -> string!
+Themia.Content.MySql.MySqlContentDialect.UpdatePageIfVersionSql.get -> string!
+Themia.Content.MySql.ServiceCollectionExtensions

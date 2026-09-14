@@ -17,8 +17,10 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
     <PackageReference Include="Testcontainers.PostgreSql" />
+    <PackageReference Include="Testcontainers.MySql" />
     <PackageReference Include="Dapper" />
     <PackageReference Include="Npgsql" />
+    <PackageReference Include="MySqlConnector" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
     <PackageReference Include="Microsoft.Extensions.Hosting" />
     <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
@@ -26,6 +28,8 @@
   <ItemGroup>
     <ProjectReference Include="../../src/neutral/Themia.Content/Themia.Content.csproj" />
     <ProjectReference Include="../../src/neutral/Themia.Content.PostgreSql/Themia.Content.PostgreSql.csproj" />
+    <ProjectReference Include="../../src/neutral/Themia.Content.MySql/Themia.Content.MySql.csproj" />
     <ProjectReference Include="../../src/neutral/Themia.Data.Migrations.PostgreSql/Themia.Data.Migrations.PostgreSql.csproj" />
+    <ProjectReference Include="../../src/neutral/Themia.Data.Migrations.MySql/Themia.Data.Migrations.MySql.csproj" />
   </ItemGroup>
 </Project>

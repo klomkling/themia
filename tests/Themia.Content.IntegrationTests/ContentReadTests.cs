@@ -105,3 +105,7 @@ public abstract class ContentReadTests(ContentEngineFixture fixture)
 [Collection(PostgresContentCollection.Name)]
 [Trait("Category", "Integration")]
 public sealed class PostgresContentReadTests(PostgresContentFixture fixture) : ContentReadTests(fixture);
+
+[Collection(MySqlContentCollection.Name)]
+[Trait("Category", "Integration")]
+public sealed class MySqlContentReadTests(MySqlContentFixture fixture) : ContentReadTests(fixture);

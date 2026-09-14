@@ -2,11 +2,14 @@ using Dapper;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
+using Testcontainers.MySql;
 using Testcontainers.PostgreSql;
 using Themia.Content.DependencyInjection;
 using Themia.Content.Internal;
+using Themia.Content.MySql;
 using Themia.Content.PostgreSql;
 using Themia.Data.Migrations;
+using Themia.Data.Migrations.MySql;
 using Themia.Data.Migrations.PostgreSql;
 using Xunit;
 
@@ -143,4 +146,47 @@ public sealed class PostgresContentCollection : ICollectionFixture<PostgresConte
 {
     /// <summary>The collection name test classes reference.</summary>
     public const string Name = "Postgres Content";
+}
+
+/// <summary>MySQL: one <c>mysql:8.4</c> container for every MySQL test class.</summary>
+public sealed class MySqlContentFixture : ContentEngineFixture
+{
+    private readonly MySqlContainer container = new MySqlBuilder("mysql:8.4").Build();
+
+    /// <inheritdoc />
+    public override IMigrationEngineAdapter MigrationAdapter => MySqlMigrationEngine.Adapter;
+
+    /// <inheritdoc />
+    protected override async Task<string> StartContainerAsync()
+    {
+        await container.StartAsync();
+        return container.GetConnectionString();
+    }
+
+    /// <inheritdoc />
+    protected override async Task StopContainerAsync() => await container.DisposeAsync();
+
+    /// <inheritdoc />
+    protected override void RegisterEngine(IServiceCollection services, string connectionString) =>
+        services.AddThemiaContentMySql(connectionString);
+
+    /// <inheritdoc />
+    public override Task<bool> TableExistsAsync(string name) =>
+        ScalarAsync<bool>(
+            "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = @Name);",
+            new { Name = name });
+
+    /// <inheritdoc />
+    public override Task<bool> IndexExistsAsync(string name) =>
+        ScalarAsync<bool>(
+            "SELECT EXISTS (SELECT 1 FROM information_schema.statistics WHERE table_schema = DATABASE() AND index_name = @Name);",
+            new { Name = name });
+}
+
+/// <summary>Ties every MySQL test class to one <see cref="MySqlContentFixture"/>.</summary>
+[CollectionDefinition(Name)]
+public sealed class MySqlContentCollection : ICollectionFixture<MySqlContentFixture>
+{
+    /// <summary>The collection name test classes reference.</summary>
+    public const string Name = "MySql Content";
 }

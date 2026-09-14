@@ -89,3 +89,7 @@ public abstract class ContentRevertTests(ContentEngineFixture fixture)
 [Collection(PostgresContentCollection.Name)]
 [Trait("Category", "Integration")]
 public sealed class PostgresContentRevertTests(PostgresContentFixture fixture) : ContentRevertTests(fixture);
+
+[Collection(MySqlContentCollection.Name)]
+[Trait("Category", "Integration")]
+public sealed class MySqlContentRevertTests(MySqlContentFixture fixture) : ContentRevertTests(fixture);

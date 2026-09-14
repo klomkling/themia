@@ -117,3 +117,7 @@ public abstract class ContentSaveTests(ContentEngineFixture fixture)
 [Collection(PostgresContentCollection.Name)]
 [Trait("Category", "Integration")]
 public sealed class PostgresContentSaveTests(PostgresContentFixture fixture) : ContentSaveTests(fixture);
+
+[Collection(MySqlContentCollection.Name)]
+[Trait("Category", "Integration")]
+public sealed class MySqlContentSaveTests(MySqlContentFixture fixture) : ContentSaveTests(fixture);

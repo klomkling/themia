@@ -112,3 +112,7 @@ public abstract class ContentConcurrencyTests(ContentEngineFixture fixture)
 [Collection(PostgresContentCollection.Name)]
 [Trait("Category", "Integration")]
 public sealed class PostgresContentConcurrencyTests(PostgresContentFixture fixture) : ContentConcurrencyTests(fixture);
+
+[Collection(MySqlContentCollection.Name)]
+[Trait("Category", "Integration")]
+public sealed class MySqlContentConcurrencyTests(MySqlContentFixture fixture) : ContentConcurrencyTests(fixture);

@@ -35,3 +35,7 @@ public abstract class ContentSchemaTests(ContentEngineFixture fixture)
 [Collection(PostgresContentCollection.Name)]
 [Trait("Category", "Integration")]
 public sealed class PostgresContentSchemaTests(PostgresContentFixture fixture) : ContentSchemaTests(fixture);
+
+[Collection(MySqlContentCollection.Name)]
+[Trait("Category", "Integration")]
+public sealed class MySqlContentSchemaTests(MySqlContentFixture fixture) : ContentSchemaTests(fixture);
