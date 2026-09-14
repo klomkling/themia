@@ -115,6 +115,24 @@ Themia.Content.ContentValidationError.Field.get -> string!
 Themia.Content.ContentValidationError.Field.init -> void
 Themia.Content.ContentValidationError.Message.get -> string!
 Themia.Content.ContentValidationError.Message.init -> void
+Themia.Content.IContentPageDialect
+Themia.Content.IContentPageDialect.CountPagesSql.get -> string!
+Themia.Content.IContentPageDialect.CountRevisionsSql.get -> string!
+Themia.Content.IContentPageDialect.CreateConnection() -> System.Data.Common.DbConnection!
+Themia.Content.IContentPageDialect.ImportPageSql.get -> string!
+Themia.Content.IContentPageDialect.InsertPageSql.get -> string!
+Themia.Content.IContentPageDialect.InsertRevisionSql.get -> string!
+Themia.Content.IContentPageDialect.IsDuplicateKey(System.Data.Common.DbException! exception) -> bool
+Themia.Content.IContentPageDialect.ListPagesSql.get -> string!
+Themia.Content.IContentPageDialect.ListRevisionsSql.get -> string!
+Themia.Content.IContentPageDialect.SelectPageSql.get -> string!
+Themia.Content.IContentPageDialect.SelectPublishedSql.get -> string!
+Themia.Content.IContentPageDialect.SelectRevisionSql.get -> string!
+Themia.Content.IContentPageDialect.UpdatePageIfVersionSql.get -> string!
+Themia.Content.Migrations.ContentSchemaMigration
+Themia.Content.Migrations.ContentSchemaMigration.ContentSchemaMigration() -> void
+override Themia.Content.Migrations.ContentSchemaMigration.Down() -> void
+override Themia.Content.Migrations.ContentSchemaMigration.Up() -> void
 Themia.Content.PagedResult<T>
 Themia.Content.PagedResult<T>.Items.get -> System.Collections.Generic.IReadOnlyList<T>!
 Themia.Content.PagedResult<T>.Items.init -> void
