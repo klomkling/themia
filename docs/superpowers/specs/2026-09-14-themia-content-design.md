@@ -330,16 +330,18 @@ So content that ships with code goes through `SaveAsync`, from a startup step th
 resolvable (a hosted service, or an explicit call at boot) — never from a FluentMigrator migration, which runs
 before the service exists. The package README says it outright: **never write the `content_*` tables with SQL.**
 
-The pattern needs no new API:
+Each content change the application ships declares **`AppliesToVersion`** — the version the page must be at before
+the change, 0 when the change creates the page. The pattern needs no new API:
 
-1. `GetForEditAsync(slug, language)`.
-2. No page: `SaveAsync` with `ExpectedVersion = 0`. `Conflict` means another instance seeded it first; stop.
-3. A page at the version this code last wrote — the consumer records it, as propertiezy's migrations did with
-   `"CurrentVersion" = 1` — `SaveAsync` with that version. `Conflict` means an editor saved in between; stop.
-4. A page at any other version: an editor has changed it. Leave it.
+1. `GetForEditAsync(slug, language)`; a missing page is at version 0.
+2. The page is at the change's `AppliesToVersion`: `SaveAsync` with `ExpectedVersion = AppliesToVersion`. A
+   `Conflict` means another instance or an editor saved first; stop.
+3. The page is at any other version: the change has already applied, or an editor has changed the page. Leave it.
 
-Running the step twice writes nothing the second time, and a run that races an editor loses to the editor.
-Both are integration tests (§12).
+`AppliesToVersion` is a constant of the change, not a value that moves after each write. A "last written version"
+that advances would find the page at the version just written and save again. With a constant, a re-run skips
+because the page has moved past it, and an editor's save moves the page past it too, so shipped content never
+overwrites an editor. Both are integration tests (§12).
 
 ---
 
