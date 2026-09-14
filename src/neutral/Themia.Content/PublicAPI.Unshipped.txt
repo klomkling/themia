@@ -1,6 +1,18 @@
 #nullable enable
+Themia.Content.ContentMarkdownRules
+Themia.Content.ContentMarkdownViolation
+Themia.Content.ContentMarkdownViolation.ContentMarkdownViolation(Themia.Content.ContentMarkdownViolationKind Kind, string! Detail) -> void
+Themia.Content.ContentMarkdownViolation.Detail.get -> string!
+Themia.Content.ContentMarkdownViolation.Detail.init -> void
+Themia.Content.ContentMarkdownViolation.Kind.get -> Themia.Content.ContentMarkdownViolationKind
+Themia.Content.ContentMarkdownViolation.Kind.init -> void
+Themia.Content.ContentMarkdownViolationKind
+Themia.Content.ContentMarkdownViolationKind.DisallowedUrl = 1 -> Themia.Content.ContentMarkdownViolationKind
+Themia.Content.ContentMarkdownViolationKind.RawHtml = 0 -> Themia.Content.ContentMarkdownViolationKind
 Themia.Content.ContentOptions
 Themia.Content.ContentOptions.ContentOptions() -> void
 Themia.Content.ContentOptions.FallbackLanguage.get -> string!
 Themia.Content.ContentOptions.FallbackLanguage.set -> void
 Themia.Content.ContentOptions.Languages.get -> System.Collections.Generic.IList<string!>!
+static Themia.Content.ContentMarkdownRules.Check(string! markdown) -> System.Collections.Generic.IReadOnlyList<Themia.Content.ContentMarkdownViolation!>!
+static Themia.Content.ContentMarkdownRules.IsUrlAllowed(string? url) -> bool
