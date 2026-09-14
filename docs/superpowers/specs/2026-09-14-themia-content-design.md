@@ -338,10 +338,12 @@ the change, 0 when the change creates the page. The pattern needs no new API:
    `Conflict` means another instance or an editor saved first; stop.
 3. The page is at any other version: the change has already applied, or an editor has changed the page. Leave it.
 
-`AppliesToVersion` is a constant of the change, not a value that moves after each write. A "last written version"
-that advances would find the page at the version just written and save again. With a constant, a re-run skips
-because the page has moved past it, and an editor's save moves the page past it too, so shipped content never
-overwrites an editor. Both are integration tests (§12).
+`AppliesToVersion` is a constant of the change, not a value that moves after each write, and the constant is what
+makes the step safe: `SaveAsync` refuses any save whose `ExpectedVersion` is not the page's current version (the
+update guard above). A "last written version" that advances would pass that guard on every run — a re-run would
+save again, and a run after an editor's save would overwrite the editor. With a constant, both saves are refused.
+Step 3's check only skips a save that would be refused anyway: it saves a round trip and is not what keeps shipped
+content from overwriting an editor. Both are integration tests (§12).
 
 ---
 

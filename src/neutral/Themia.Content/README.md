@@ -55,5 +55,7 @@ new ContentChange("terms", "th", "ข้อกำหนด", termsV1, AppliesToV
 new ContentChange("terms", "th", "ข้อกำหนด", termsV2, AppliesToVersion: 1);
 ```
 
-`AppliesToVersion` never changes after the change is written. Re-running the step is a no-op, and a change never
-overwrites an editor's save.
+`AppliesToVersion` never changes after the change is written, and that constant is what keeps the step safe:
+`SaveAsync` refuses a save whose `ExpectedVersion` is not the page's current version, so a re-run and a run after an
+editor's save are both refused. The version check before the save only skips that round trip — don't pass the
+version you just read as `ExpectedVersion`, or the guard passes every time.
