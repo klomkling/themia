@@ -1,0 +1,6 @@
+#nullable enable
+Themia.Content.ContentOptions
+Themia.Content.ContentOptions.ContentOptions() -> void
+Themia.Content.ContentOptions.FallbackLanguage.get -> string!
+Themia.Content.ContentOptions.FallbackLanguage.set -> void
+Themia.Content.ContentOptions.Languages.get -> System.Collections.Generic.IList<string!>!

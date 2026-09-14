@@ -362,6 +362,7 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Themia.Data.Migrations.MySql", "src\neutral\Themia.Data.Migrations.MySql\Themia.Data.Migrations.MySql.csproj", "{F51B316A-BA98-4B86-B5C5-3C09040FBC37}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Themia.Data.Migrations.SqlServer", "src\neutral\Themia.Data.Migrations.SqlServer\Themia.Data.Migrations.SqlServer.csproj", "{79DB73C6-9D77-4481-B06F-319ADE2BC593}"
+EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Themia.Geo", "src\neutral\Themia.Geo\Themia.Geo.csproj", "{F1DD0B80-6311-441E-910B-F61B6BB2A893}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Themia.Geo.Tests", "tests\Themia.Geo.Tests\Themia.Geo.Tests.csproj", "{35A1B4C4-68F0-406E-B566-AFF2917221B7}"
@@ -385,6 +386,10 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Themia.AI.AspNetCore", "src\neutral\Themia.AI.AspNetCore\Themia.AI.AspNetCore.csproj", "{9F673A19-F505-42AD-8EBD-68AE76DC715A}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Themia.AI.AspNetCore.Tests", "tests\Themia.AI.AspNetCore.Tests\Themia.AI.AspNetCore.Tests.csproj", "{6A4524EF-42A7-4459-95F8-BFB941F0B33A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Themia.Content", "src\neutral\Themia.Content\Themia.Content.csproj", "{3DEE9C27-E9B6-4A7A-9953-61A612617929}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Themia.Content.Tests", "tests\Themia.Content.Tests\Themia.Content.Tests.csproj", "{405E59BC-4A82-4631-88C5-BCD62355BE7C}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -2604,6 +2609,30 @@ Global
 		{6A4524EF-42A7-4459-95F8-BFB941F0B33A}.Release|x64.Build.0 = Release|Any CPU
 		{6A4524EF-42A7-4459-95F8-BFB941F0B33A}.Release|x86.ActiveCfg = Release|Any CPU
 		{6A4524EF-42A7-4459-95F8-BFB941F0B33A}.Release|x86.Build.0 = Release|Any CPU
+		{3DEE9C27-E9B6-4A7A-9953-61A612617929}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3DEE9C27-E9B6-4A7A-9953-61A612617929}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3DEE9C27-E9B6-4A7A-9953-61A612617929}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{3DEE9C27-E9B6-4A7A-9953-61A612617929}.Debug|x64.Build.0 = Debug|Any CPU
+		{3DEE9C27-E9B6-4A7A-9953-61A612617929}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{3DEE9C27-E9B6-4A7A-9953-61A612617929}.Debug|x86.Build.0 = Debug|Any CPU
+		{3DEE9C27-E9B6-4A7A-9953-61A612617929}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3DEE9C27-E9B6-4A7A-9953-61A612617929}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3DEE9C27-E9B6-4A7A-9953-61A612617929}.Release|x64.ActiveCfg = Release|Any CPU
+		{3DEE9C27-E9B6-4A7A-9953-61A612617929}.Release|x64.Build.0 = Release|Any CPU
+		{3DEE9C27-E9B6-4A7A-9953-61A612617929}.Release|x86.ActiveCfg = Release|Any CPU
+		{3DEE9C27-E9B6-4A7A-9953-61A612617929}.Release|x86.Build.0 = Release|Any CPU
+		{405E59BC-4A82-4631-88C5-BCD62355BE7C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{405E59BC-4A82-4631-88C5-BCD62355BE7C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{405E59BC-4A82-4631-88C5-BCD62355BE7C}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{405E59BC-4A82-4631-88C5-BCD62355BE7C}.Debug|x64.Build.0 = Debug|Any CPU
+		{405E59BC-4A82-4631-88C5-BCD62355BE7C}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{405E59BC-4A82-4631-88C5-BCD62355BE7C}.Debug|x86.Build.0 = Debug|Any CPU
+		{405E59BC-4A82-4631-88C5-BCD62355BE7C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{405E59BC-4A82-4631-88C5-BCD62355BE7C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{405E59BC-4A82-4631-88C5-BCD62355BE7C}.Release|x64.ActiveCfg = Release|Any CPU
+		{405E59BC-4A82-4631-88C5-BCD62355BE7C}.Release|x64.Build.0 = Release|Any CPU
+		{405E59BC-4A82-4631-88C5-BCD62355BE7C}.Release|x86.ActiveCfg = Release|Any CPU
+		{405E59BC-4A82-4631-88C5-BCD62355BE7C}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -2797,5 +2826,7 @@ Global
 		{F40A1A8E-91A4-40E7-9F9F-F02EFD4419BC} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 		{9F673A19-F505-42AD-8EBD-68AE76DC715A} = {1F655D57-935D-D295-E882-5052ED9A6376}
 		{6A4524EF-42A7-4459-95F8-BFB941F0B33A} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
+		{3DEE9C27-E9B6-4A7A-9953-61A612617929} = {1F655D57-935D-D295-E882-5052ED9A6376}
+		{405E59BC-4A82-4631-88C5-BCD62355BE7C} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 	EndGlobalSection
 EndGlobal

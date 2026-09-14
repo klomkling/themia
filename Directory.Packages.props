@@ -69,6 +69,9 @@
     <PackageVersion Include="Microsoft.Extensions.Http" Version="10.0.9" />
     <!-- MultiTenancy (Tier 2): Dapper catalog store + ASP.NET Core middleware -->
     <PackageVersion Include="Dapper" Version="2.1.79" />
+    <!-- Content (0.26.0): CommonMark parser for Themia.Content's write-side markdown rules. Parse only, never
+         render. BSD-2-Clause. No Dependabot manifest edit is needed: Manifest.csproj references @(PackageVersion). -->
+    <PackageVersion Include="Markdig" Version="1.3.2" />
     <!-- Framework.Data.Dapper: SqlKata query builder -->
     <PackageVersion Include="SqlKata" Version="4.0.1" />
     <!-- Exceptional (0.3.0): raw Npgsql driver + FluentMigrator schema + System.Text.Json store -->
