@@ -16,9 +16,10 @@ public static class ServiceCollectionExtensions
     /// <see cref="ContentSchemaMigration"/> immediately, and adds a startup probe that fails the host when the two
     /// tables are not on the connection's <c>search_path</c>.
     /// </summary>
-    /// <remarks>Call <c>AddThemiaContent</c> as well, in either order. Content shipped with application code must go
-    /// through <c>IContentPageService.SaveAsync</c> after startup — never through a migration that writes these
-    /// tables (see the package README).</remarks>
+    /// <remarks>Call <see cref="Themia.Content.DependencyInjection.ContentServiceCollectionExtensions.AddThemiaContent"/>
+    /// as well, in either order. Content shipped with application code must go through
+    /// <see cref="Themia.Content.IContentPageService.SaveAsync"/> after startup — never through a migration that
+    /// writes these tables (see the package README).</remarks>
     /// <param name="services">The service collection.</param>
     /// <param name="connectionString">PostgreSQL connection string.</param>
     public static IServiceCollection AddThemiaContentPostgres(this IServiceCollection services, string connectionString)

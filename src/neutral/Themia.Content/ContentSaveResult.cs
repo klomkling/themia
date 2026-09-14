@@ -22,7 +22,7 @@ public enum ContentSaveOutcome
 /// <param name="Message">A message for the author.</param>
 public sealed record ContentValidationError(string Field, string Message);
 
-/// <summary>The result of a page save or revert.</summary>
+/// <summary>The result of <see cref="IContentPageService.SaveAsync"/> or <see cref="IContentPageService.RevertAsync"/>.</summary>
 public sealed class ContentSaveResult
 {
     private ContentSaveResult(
