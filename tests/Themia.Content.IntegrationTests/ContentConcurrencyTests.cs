@@ -15,7 +15,10 @@ public abstract class ContentConcurrencyTests(ContentEngineFixture fixture)
         var slug = NewSlug();
         await fixture.Service.SaveAsync(Save(slug, "th", 0));
         using var barrier = new Barrier(2);
-        var gated = new GatedContentDialect(fixture.Dialect) { BeforeUpdatePage = () => barrier.SignalAndWait(GateTimeout) };
+        var gated = new GatedContentDialect(fixture.Dialect)
+        {
+            BeforeUpdatePage = () => Assert.True(barrier.SignalAndWait(GateTimeout), "peer never reached the gate"),
+        };
         var first = fixture.NewService(gated);
         var second = fixture.NewService(gated);
 
@@ -34,7 +37,10 @@ public abstract class ContentConcurrencyTests(ContentEngineFixture fixture)
     {
         var slug = NewSlug();
         using var barrier = new Barrier(2);
-        var gated = new GatedContentDialect(fixture.Dialect) { BeforeInsertPage = () => barrier.SignalAndWait(GateTimeout) };
+        var gated = new GatedContentDialect(fixture.Dialect)
+        {
+            BeforeInsertPage = () => Assert.True(barrier.SignalAndWait(GateTimeout), "peer never reached the gate"),
+        };
         var first = fixture.NewService(gated);
         var second = fixture.NewService(gated);
 
