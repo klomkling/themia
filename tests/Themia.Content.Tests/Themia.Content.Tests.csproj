@@ -25,4 +25,7 @@
     <ProjectReference Include="../../src/neutral/Themia.Content.MySql/Themia.Content.MySql.csproj" />
     <ProjectReference Include="../../src/neutral/Themia.Content.SqlServer/Themia.Content.SqlServer.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <None Update="Fixtures/markdown-dialect.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>
