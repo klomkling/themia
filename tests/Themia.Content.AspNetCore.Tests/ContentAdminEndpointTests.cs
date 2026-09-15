@@ -324,6 +324,26 @@ public class ContentAdminEndpointTests
     }
 
     [Fact]
+    public async Task Put_ShouldReturnProblemDetails400_WhenTheCharsetIsUnknown()
+    {
+        var service = new FakeContentPageService();
+        var client = await StartAsync(service, AllowAll);
+
+        var request = new HttpRequestMessage(HttpMethod.Put, Prefix + "/pages/terms/th")
+        {
+            Content = new StringContent(ValidBody, Encoding.UTF8, "application/json"),
+        };
+        request.Content.Headers.ContentType!.CharSet = "bogus";
+        request.Headers.Add(ContentTestServer.UserHeader, "user-7");
+
+        var response = await client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+        Assert.Null(service.LastSave);
+    }
+
+    [Fact]
     public async Task Revert_ShouldReturnProblemDetails400AndNotRevert_WhenTheBodyOmitsVersion()
     {
         var service = new FakeContentPageService();

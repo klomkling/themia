@@ -129,8 +129,10 @@ public static class ContentEndpoints
         {
             value = await request.ReadFromJsonAsync<T>(serializerOptions, ct).ConfigureAwait(false);
         }
-        catch (JsonException)
+        catch (Exception exception) when (exception is JsonException or InvalidOperationException)
         {
+            // InvalidOperationException also covers an unrecognised charset (e.g. "charset=bogus"), which
+            // System.Text.Json's body reader throws before it can even attempt to parse JSON.
             return (null, ContentHttpResults.InvalidBody());
         }
 
