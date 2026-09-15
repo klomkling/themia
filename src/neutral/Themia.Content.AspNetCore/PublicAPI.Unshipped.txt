@@ -1,0 +1,3 @@
+#nullable enable
+static Themia.Content.AspNetCore.ContentEndpoints.MapThemiaContentPublicEndpoints(this Microsoft.AspNetCore.Routing.IEndpointRouteBuilder! endpoints, string! prefix = "/pages") -> Microsoft.AspNetCore.Routing.RouteGroupBuilder!
+Themia.Content.AspNetCore.ContentEndpoints
