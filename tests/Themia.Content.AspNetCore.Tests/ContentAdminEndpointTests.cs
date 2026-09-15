@@ -298,6 +298,45 @@ public class ContentAdminEndpointTests
     }
 
     [Fact]
+    public async Task Put_ShouldReturnProblemDetails400AndNotSave_WhenTheBodyOmitsIsPublished()
+    {
+        var service = new FakeContentPageService();
+        var client = await StartAsync(service, AllowAll);
+
+        var response = await client.SendAsync(Request(HttpMethod.Put, "/pages/terms/th", """{"title":"T","markdown":"# T"}"""));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+        Assert.Null(service.LastSave);
+    }
+
+    [Fact]
+    public async Task Put_ShouldReturnProblemDetails400AndNotSave_WhenTheBodyOmitsMarkdown()
+    {
+        var service = new FakeContentPageService();
+        var client = await StartAsync(service, AllowAll);
+
+        var response = await client.SendAsync(Request(HttpMethod.Put, "/pages/terms/th", """{"title":"T","isPublished":true}"""));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+        Assert.Null(service.LastSave);
+    }
+
+    [Fact]
+    public async Task Revert_ShouldReturnProblemDetails400AndNotRevert_WhenTheBodyOmitsVersion()
+    {
+        var service = new FakeContentPageService();
+        var client = await StartAsync(service, AllowAll);
+
+        var response = await client.SendAsync(Request(HttpMethod.Post, "/pages/terms/en/revert", """{"expectedVersion":3}"""));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+        Assert.Null(service.LastRevert);
+    }
+
+    [Fact]
     public async Task Revert_ShouldMapTheBodysVersionToTheTargetVersion()
     {
         var service = new FakeContentPageService { SaveResult = ContentSaveResult.Saved(FakeContentPageService.SamplePage()) };
