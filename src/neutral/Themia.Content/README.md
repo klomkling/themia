@@ -122,3 +122,44 @@ which a browser decodes inside the attribute. `urlAllowed` decodes entities firs
 Copy `tests/Themia.Content.Tests/Fixtures/markdown-dialect.json` from the Themia repository **byte for byte** and
 assert `cmsMarkdown.parse(entry.markdown) === entry.html` for every entry. Every entry ships as `candidate`; report on
 coord when your renderer reproduces them, and they are promoted to `confirmed` once both applications have.
+
+## Importing from an existing schema
+
+`IContentPageImporter` moves pages and their history from another system into empty content tables, once. Themia never
+reads the other system's tables; you read them and hand over the rows. Every rule is checked before anything is
+written, and any violation writes nothing:
+
+| rule | refused as |
+|---|---|
+| the content tables already hold pages | `TargetNotEmpty` |
+| a slug and language appear twice; an invalid slug or unconfigured language | `DuplicateKey`, `InvalidSlugOrLanguage` |
+| a field longer than its column | `FieldTooLong` |
+| revisions are not exactly 1 through the current version | `NonContiguousRevisions` |
+| the page's title or body is not its current revision's | `ContentDiffersFromCurrentRevision` |
+
+The last rule refuses rather than repairs. A page whose served text is in no revision has history that cannot be
+trusted; record the served text as a new revision in the source system first, then import.
+
+Two more things to know. A null page, revision, title or body is a programming error and throws `ArgumentException`
+before anything is checked; an empty string is allowed. And the empty-table check and the writes share one READ
+COMMITTED transaction, so two imports started at the same moment could both see empty tables — run the import once,
+from one process. A page in the source system with no revision at its current version is refused as
+`NonContiguousRevisions`: give it a revision holding its served text first.
+
+For a PostgreSQL source shaped like propertiezy's `CmsPages` / `CmsPageRevisions`:
+
+```csharp
+const string PagesSql = """
+    SELECT "Slug", "Language", "Title", "ContentMarkdown", "CurrentVersion", "IsPublished", "InsertDate", "UpdateDate", "UpdateUserId"
+      FROM "CmsPages" ORDER BY "CmsPageId";
+    """;
+const string RevisionsSql = """
+    SELECT p."Slug", p."Language", r."Version", r."Title", r."ContentMarkdown", r."ChangeSummary", r."CreatedUserId", r."CreatedDate"
+      FROM "CmsPageRevisions" r JOIN "CmsPages" p ON p."CmsPageId" = r."CmsPageId"
+     ORDER BY p."CmsPageId", r."Version";
+    """;
+```
+
+Map each page row and its revisions to `ContentPageImport` / `ContentRevisionImport` (author `Guid`s become strings)
+and call `ImportAsync`. `tests/Themia.Content.IntegrationTests/PropertiezyAdoptionTests.cs` in the Themia repository is
+this recipe, run against a database that already holds rows.

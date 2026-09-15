@@ -42,6 +42,10 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 - **Markdown dialect golden fixture** — `tests/Themia.Content.Tests/Fixtures/markdown-dialect.json`, 29 entries pinning
   the write verdict (tested) and the HTML of the `marked` 18 renderer configuration in the package README (every entry
   `candidate` until both consumer web apps reproduce it).
+- **`Themia.Content` importer** — `IContentPageImporter` moves pages and history from another system into empty content
+  tables in one transaction, preserving versions, timestamps and authors. Refuses, listing every violation and writing
+  nothing, when a page's served content is not its current revision (coord #0130 item 4). Adoption over a database that
+  already holds CMS rows is tested (`PropertiezyAdoptionTests`).
 
 ## [0.25.1] - 2026-09-12
 

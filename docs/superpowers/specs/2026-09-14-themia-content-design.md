@@ -642,6 +642,8 @@ public enum ContentImportRule
 {
     DuplicateKey,                        // (slug, language) appears twice in the input
     InvalidSlugOrLanguage,
+    FieldTooLong,                        // Added during planning: without it, an over-long title fails inside the
+                                          // transaction as a database error instead of being reported against its page.
     NonContiguousRevisions,              // not exactly 1..CurrentVersion
     ContentDiffersFromCurrentRevision,   // see "Why content must equal the last revision"
 }
@@ -672,6 +674,7 @@ public sealed class ContentImportResult
 |---|---|
 | both target tables are empty — a one-time move, never a merge | `TargetNotEmpty` |
 | `(slug, language)` unique across the input; slug and language pass §3 | `Invalid` |
+| titles, change summaries and author ids fit their columns | `Invalid` (`FieldTooLong`) |
 | revisions are `1..CurrentVersion`, contiguous, no duplicates | `Invalid` |
 | **revision `CurrentVersion`'s title and markdown equal the page's, ordinal** | `Invalid` |
 
