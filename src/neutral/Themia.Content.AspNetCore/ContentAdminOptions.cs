@@ -14,8 +14,9 @@ public sealed class ContentAdminOptions
     /// </summary>
     public Func<HttpContext, Task<bool>>? Authorize { get; set; }
 
-    /// <summary>Resolves the id stored as a revision's author. Defaults to the <see cref="ClaimTypes.NameIdentifier"/>
-    /// claim.</summary>
+    /// <summary>Resolves the id stored as a revision's author. Defaults to reading the <see cref="ClaimTypes.NameIdentifier"/>
+    /// claim, which is <see langword="null"/> for a caller with no such claim — for example an API-key scheme — so the
+    /// revision records no author. Set this when <see cref="Authorize"/> admits such callers.</summary>
     public Func<HttpContext, string?> ResolveEditorId { get; set; } =
         context => context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
 }

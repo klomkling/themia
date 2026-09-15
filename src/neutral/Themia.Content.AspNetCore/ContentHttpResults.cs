@@ -22,6 +22,12 @@ internal static class ContentHttpResults
     public static IResult Invalid(IDictionary<string, string[]> errors) =>
         Results.ValidationProblem(errors, statusCode: StatusCodes.Status422UnprocessableEntity);
 
+    public static IResult UnsupportedMediaType() =>
+        Results.Problem(statusCode: StatusCodes.Status415UnsupportedMediaType, title: "Request body must be JSON");
+
+    public static IResult InvalidBody() =>
+        Results.Problem(statusCode: StatusCodes.Status400BadRequest, title: "Invalid request body");
+
 #pragma warning disable CS8524 // Unnamed enum values: a new named outcome must still break this switch at compile time.
     public static IResult FromSave(ContentSaveResult result) => result.Outcome switch
     {

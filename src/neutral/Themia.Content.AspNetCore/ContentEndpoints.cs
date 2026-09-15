@@ -1,8 +1,12 @@
+using System.Globalization;
+using System.Text.Json;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.Json;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Themia.Content.AspNetCore;
 
@@ -60,7 +64,7 @@ public static class ContentEndpoints
         var group = endpoints.MapGroup(prefix);
         group.AddEndpointFilter((context, next) => AuthorizeAsync(context, next, options, logger));
 
-        group.MapGet("pages", async (int? page, int? limit, IContentPageService service, CancellationToken ct) =>
+        group.MapGet("pages", async (string? page, string? limit, IContentPageService service, CancellationToken ct) =>
             await PagedAsync(page, limit, (p, l) => service.ListAsync(p, l, ct)).ConfigureAwait(false));
 
         group.MapGet("pages/{slug}/{language}", async (string slug, string language, IContentPageService service, CancellationToken ct) =>
@@ -70,23 +74,67 @@ public static class ContentEndpoints
         });
 
         group.MapPut("pages/{slug}/{language}", async (
-            string slug, string language, SavePageRequest body, HttpContext http, IContentPageService service, CancellationToken ct) =>
-            ContentHttpResults.FromSave(await service.SaveAsync(
-                new ContentPageSave(slug, language, body.Title, body.Markdown, body.IsPublished, body.ExpectedVersion,
+            string slug, string language, HttpContext http, IContentPageService service,
+            IOptions<JsonOptions> jsonOptions, CancellationToken ct) =>
+        {
+            var (body, error) = await ReadJsonBodyAsync<SavePageRequest>(http.Request, jsonOptions.Value.SerializerOptions, ct)
+                .ConfigureAwait(false);
+            if (error is not null)
+            {
+                return error;
+            }
+
+            return ContentHttpResults.FromSave(await service.SaveAsync(
+                new ContentPageSave(slug, language, body!.Title, body.Markdown, body.IsPublished, body.ExpectedVersion,
                     body.ChangeSummary, options.ResolveEditorId(http)),
-                ct).ConfigureAwait(false)));
+                ct).ConfigureAwait(false));
+        });
 
         group.MapGet("pages/{slug}/{language}/revisions", async (
-            string slug, string language, int? page, int? limit, IContentPageService service, CancellationToken ct) =>
+            string slug, string language, string? page, string? limit, IContentPageService service, CancellationToken ct) =>
             await PagedAsync(page, limit, (p, l) => service.GetRevisionsAsync(slug, language, p, l, ct)).ConfigureAwait(false));
 
         group.MapPost("pages/{slug}/{language}/revert", async (
-            string slug, string language, RevertPageRequest body, HttpContext http, IContentPageService service, CancellationToken ct) =>
-            ContentHttpResults.FromSave(await service.RevertAsync(
-                new ContentPageRevert(slug, language, body.Version, body.ExpectedVersion, body.ChangeSummary, options.ResolveEditorId(http)),
-                ct).ConfigureAwait(false)));
+            string slug, string language, HttpContext http, IContentPageService service,
+            IOptions<JsonOptions> jsonOptions, CancellationToken ct) =>
+        {
+            var (body, error) = await ReadJsonBodyAsync<RevertPageRequest>(http.Request, jsonOptions.Value.SerializerOptions, ct)
+                .ConfigureAwait(false);
+            if (error is not null)
+            {
+                return error;
+            }
+
+            return ContentHttpResults.FromSave(await service.RevertAsync(
+                new ContentPageRevert(slug, language, body!.Version, body.ExpectedVersion, body.ChangeSummary, options.ResolveEditorId(http)),
+                ct).ConfigureAwait(false));
+        });
 
         return group;
+    }
+
+    /// <summary>Reads and validates a JSON request body. Runs inside the handler — after the group's authorization
+    /// filter — so a malformed or disallowed body from an unauthorized caller never reaches this code.</summary>
+    private static async Task<(T? Value, IResult? Error)> ReadJsonBodyAsync<T>(
+        HttpRequest request, JsonSerializerOptions serializerOptions, CancellationToken ct)
+        where T : class
+    {
+        if (!request.HasJsonContentType())
+        {
+            return (null, ContentHttpResults.UnsupportedMediaType());
+        }
+
+        T? value;
+        try
+        {
+            value = await request.ReadFromJsonAsync<T>(serializerOptions, ct).ConfigureAwait(false);
+        }
+        catch (JsonException)
+        {
+            return (null, ContentHttpResults.InvalidBody());
+        }
+
+        return value is null ? (null, ContentHttpResults.InvalidBody()) : (value, null);
     }
 
     private static async ValueTask<object?> AuthorizeAsync(
@@ -98,9 +146,10 @@ public static class ContentEndpoints
         {
             allowed = options.Authorize is not null && await options.Authorize(http).ConfigureAwait(false);
         }
-        catch (Exception exception) when (exception is not OperationCanceledException)
+        catch (Exception exception) when (exception is not OperationCanceledException || !http.RequestAborted.IsCancellationRequested)
         {
             // A broken delegate must not open the routes. Logged once here; the request is refused below.
+            // An OperationCanceledException from an actually-aborted request is not "broken" — let it propagate.
             logger?.LogWarning(exception, "Content admin Authorize delegate threw; the request is refused.");
             allowed = false;
         }
@@ -113,18 +162,27 @@ public static class ContentEndpoints
         return http.User.Identity?.IsAuthenticated == true ? ContentHttpResults.Forbidden() : ContentHttpResults.Unauthorized();
     }
 
-    private static async Task<IResult> PagedAsync<T>(int? page, int? limit, Func<int, int, Task<PagedResult<T>>> query)
+    private static async Task<IResult> PagedAsync<T>(string? page, string? limit, Func<int, int, Task<PagedResult<T>>> query)
     {
-        var p = page ?? 1;
-        var l = limit ?? DefaultPageSize;
         var errors = new Dictionary<string, string[]>(StringComparer.Ordinal);
+        var maxPage = int.MaxValue / MaxPageSize;
+        var p = 1;
+        var l = DefaultPageSize;
 
-        if (p < 1 || p > int.MaxValue / MaxPageSize)
+        if (page is not null && !int.TryParse(page, NumberStyles.Integer, CultureInfo.InvariantCulture, out p))
         {
-            errors["page"] = ["Page must be 1 or greater."];
+            errors["page"] = ["Page must be a whole number."];
+        }
+        else if (p < 1 || p > maxPage)
+        {
+            errors["page"] = [$"Page must be between 1 and {maxPage}."];
         }
 
-        if (l < 1 || l > MaxPageSize)
+        if (limit is not null && !int.TryParse(limit, NumberStyles.Integer, CultureInfo.InvariantCulture, out l))
+        {
+            errors["limit"] = ["Limit must be a whole number."];
+        }
+        else if (l < 1 || l > MaxPageSize)
         {
             errors["limit"] = [$"Limit must be between 1 and {MaxPageSize}."];
         }

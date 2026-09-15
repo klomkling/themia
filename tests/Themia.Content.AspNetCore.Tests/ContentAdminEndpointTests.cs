@@ -233,6 +233,71 @@ public class ContentAdminEndpointTests
     }
 
     [Fact]
+    public async Task Put_ShouldReturn401AndNotReadTheBody_WhenAnonymousSendsMalformedJson()
+    {
+        var service = new FakeContentPageService();
+        var client = await StartAsync(service, new ContentAdminOptions());
+
+        var response = await client.SendAsync(Request(HttpMethod.Put, "/pages/terms/th", "{not json", user: null));
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        Assert.Null(service.LastSave);
+    }
+
+    [Fact]
+    public async Task Put_ShouldReturnProblemDetails400_WhenTheBodyHasAnUnknownMember()
+    {
+        var service = new FakeContentPageService();
+        var client = await StartAsync(service, AllowAll);
+
+        var response = await client.SendAsync(Request(
+            HttpMethod.Put, "/pages/terms/th",
+            """{"title":"T","markdown":"# T","isPublished":true,"expectedVersion":0,"bogus":1}"""));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+        Assert.Null(service.LastSave);
+    }
+
+    [Fact]
+    public async Task Put_ShouldReturnProblemDetails400_WhenTheBodyIsMalformed()
+    {
+        var service = new FakeContentPageService();
+        var client = await StartAsync(service, AllowAll);
+
+        var response = await client.SendAsync(Request(HttpMethod.Put, "/pages/terms/th", "{not json"));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+        Assert.Null(service.LastSave);
+    }
+
+    [Fact]
+    public async Task List_ShouldReturn422_WhenPageIsNotANumber()
+    {
+        var service = new FakeContentPageService();
+        var client = await StartAsync(service, AllowAll);
+
+        var response = await client.SendAsync(Request(HttpMethod.Get, "/pages?page=abc"));
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+        Assert.Equal(0, service.Calls);
+    }
+
+    [Fact]
+    public async Task AdminRoutes_ShouldRefuseWith403_WhenAuthorizeThrowsOperationCanceledWithoutAbort()
+    {
+        var service = new FakeContentPageService();
+        var client = await StartAsync(service, new ContentAdminOptions { Authorize = _ => throw new OperationCanceledException() });
+
+        var response = await client.SendAsync(Request(HttpMethod.Get, "/pages"));
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.Equal(0, service.Calls);
+    }
+
+    [Fact]
     public async Task Revert_ShouldMapTheBodysVersionToTheTargetVersion()
     {
         var service = new FakeContentPageService { SaveResult = ContentSaveResult.Saved(FakeContentPageService.SamplePage()) };
