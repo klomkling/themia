@@ -39,6 +39,13 @@ public static class ContentServiceCollectionExtensions
             provider.GetRequiredService<TimeProvider>(),
             provider.GetRequiredService<ILogger<ContentPageService>>()));
 
+        services.TryAddSingleton<IContentPageImporter>(provider => new ContentPageImporter(
+            provider.GetService<IContentPageDialect>() ?? throw new InvalidOperationException(
+                "No IContentPageDialect is registered. Call AddThemiaContentPostgres, AddThemiaContentMySql or " +
+                "AddThemiaContentSqlServer as well as AddThemiaContent."),
+            provider.GetRequiredService<ContentOptions>(),
+            provider.GetRequiredService<ILogger<ContentPageImporter>>()));
+
         return services;
     }
 }

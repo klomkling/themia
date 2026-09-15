@@ -57,6 +57,9 @@ public abstract class ContentEngineFixture : IAsyncLifetime
     /// <summary>The live service, resolved from DI exactly as an adopter resolves it.</summary>
     public IContentPageService Service { get; private set; } = null!;
 
+    /// <summary>The live importer, resolved from DI exactly as an adopter resolves it.</summary>
+    public IContentPageImporter Importer { get; private set; } = null!;
+
     /// <summary>The resolved options: languages th and en, fallback th.</summary>
     public ContentOptions Options { get; private set; } = null!;
 
@@ -83,6 +86,7 @@ public abstract class ContentEngineFixture : IAsyncLifetime
     {
         Dialect = services.GetRequiredService<IContentPageDialect>();
         Service = services.GetRequiredService<IContentPageService>();
+        Importer = services.GetRequiredService<IContentPageImporter>();
         Options = services.GetRequiredService<ContentOptions>();
     }
 
@@ -109,6 +113,16 @@ public abstract class ContentEngineFixture : IAsyncLifetime
         await using var connection = Dialect.CreateConnection();
         await connection.OpenAsync();
         return (await connection.ExecuteScalarAsync<T>(sql, parameters))!;
+    }
+
+    /// <summary>Deletes every page and revision. Import tests need empty tables; tests in one collection run sequentially,
+    /// and no other test reads rows it did not create in the same test.</summary>
+    public async Task ClearContentAsync()
+    {
+        await using var connection = Dialect.CreateConnection();
+        await connection.OpenAsync();
+        await connection.ExecuteAsync("DELETE FROM content_page_revisions;");
+        await connection.ExecuteAsync("DELETE FROM content_pages;");
     }
 }
 

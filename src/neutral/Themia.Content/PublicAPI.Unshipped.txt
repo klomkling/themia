@@ -1,4 +1,30 @@
 #nullable enable
+Themia.Content.ContentImportOutcome
+Themia.Content.ContentImportOutcome.Imported = 0 -> Themia.Content.ContentImportOutcome
+Themia.Content.ContentImportOutcome.Invalid = 2 -> Themia.Content.ContentImportOutcome
+Themia.Content.ContentImportOutcome.TargetNotEmpty = 1 -> Themia.Content.ContentImportOutcome
+Themia.Content.ContentImportResult
+Themia.Content.ContentImportResult.ImportedPages.get -> int
+Themia.Content.ContentImportResult.ImportedRevisions.get -> int
+Themia.Content.ContentImportResult.Outcome.get -> Themia.Content.ContentImportOutcome
+Themia.Content.ContentImportResult.PagesFailingCurrentRules.get -> int
+Themia.Content.ContentImportResult.RevisionsFailingCurrentRules.get -> int
+Themia.Content.ContentImportResult.Succeeded.get -> bool
+Themia.Content.ContentImportResult.Violations.get -> System.Collections.Generic.IReadOnlyList<Themia.Content.ContentImportViolation!>!
+Themia.Content.ContentImportRule
+Themia.Content.ContentImportRule.ContentDiffersFromCurrentRevision = 4 -> Themia.Content.ContentImportRule
+Themia.Content.ContentImportRule.DuplicateKey = 0 -> Themia.Content.ContentImportRule
+Themia.Content.ContentImportRule.FieldTooLong = 2 -> Themia.Content.ContentImportRule
+Themia.Content.ContentImportRule.InvalidSlugOrLanguage = 1 -> Themia.Content.ContentImportRule
+Themia.Content.ContentImportRule.NonContiguousRevisions = 3 -> Themia.Content.ContentImportRule
+Themia.Content.ContentImportViolation
+Themia.Content.ContentImportViolation.ContentImportViolation(string! Slug, string! Language, Themia.Content.ContentImportRule Rule) -> void
+Themia.Content.ContentImportViolation.Language.get -> string!
+Themia.Content.ContentImportViolation.Language.init -> void
+Themia.Content.ContentImportViolation.Rule.get -> Themia.Content.ContentImportRule
+Themia.Content.ContentImportViolation.Rule.init -> void
+Themia.Content.ContentImportViolation.Slug.get -> string!
+Themia.Content.ContentImportViolation.Slug.init -> void
 Themia.Content.ContentMarkdownRules
 Themia.Content.ContentMarkdownViolation
 Themia.Content.ContentMarkdownViolation.ContentMarkdownViolation(Themia.Content.ContentMarkdownViolationKind Kind, string! Detail) -> void
@@ -34,6 +60,28 @@ Themia.Content.ContentPage.UpdatedAt.get -> System.DateTimeOffset
 Themia.Content.ContentPage.UpdatedAt.init -> void
 Themia.Content.ContentPage.UpdatedBy.get -> string?
 Themia.Content.ContentPage.UpdatedBy.init -> void
+Themia.Content.ContentPageImport
+Themia.Content.ContentPageImport.ContentPageImport(string! Slug, string! Language, string! Title, string! Markdown, int CurrentVersion, bool IsPublished, System.DateTimeOffset CreatedAt, System.DateTimeOffset UpdatedAt, string? UpdatedBy, System.Collections.Generic.IReadOnlyList<Themia.Content.ContentRevisionImport!>! Revisions) -> void
+Themia.Content.ContentPageImport.CreatedAt.get -> System.DateTimeOffset
+Themia.Content.ContentPageImport.CreatedAt.init -> void
+Themia.Content.ContentPageImport.CurrentVersion.get -> int
+Themia.Content.ContentPageImport.CurrentVersion.init -> void
+Themia.Content.ContentPageImport.IsPublished.get -> bool
+Themia.Content.ContentPageImport.IsPublished.init -> void
+Themia.Content.ContentPageImport.Language.get -> string!
+Themia.Content.ContentPageImport.Language.init -> void
+Themia.Content.ContentPageImport.Markdown.get -> string!
+Themia.Content.ContentPageImport.Markdown.init -> void
+Themia.Content.ContentPageImport.Revisions.get -> System.Collections.Generic.IReadOnlyList<Themia.Content.ContentRevisionImport!>!
+Themia.Content.ContentPageImport.Revisions.init -> void
+Themia.Content.ContentPageImport.Slug.get -> string!
+Themia.Content.ContentPageImport.Slug.init -> void
+Themia.Content.ContentPageImport.Title.get -> string!
+Themia.Content.ContentPageImport.Title.init -> void
+Themia.Content.ContentPageImport.UpdatedAt.get -> System.DateTimeOffset
+Themia.Content.ContentPageImport.UpdatedAt.init -> void
+Themia.Content.ContentPageImport.UpdatedBy.get -> string?
+Themia.Content.ContentPageImport.UpdatedBy.init -> void
 Themia.Content.ContentPageRevert
 Themia.Content.ContentPageRevert.ChangeSummary.get -> string?
 Themia.Content.ContentPageRevert.ChangeSummary.init -> void
@@ -96,6 +144,20 @@ Themia.Content.ContentPageSummary.UpdatedAt.get -> System.DateTimeOffset
 Themia.Content.ContentPageSummary.UpdatedAt.init -> void
 Themia.Content.ContentPageSummary.UpdatedBy.get -> string?
 Themia.Content.ContentPageSummary.UpdatedBy.init -> void
+Themia.Content.ContentRevisionImport
+Themia.Content.ContentRevisionImport.ChangeSummary.get -> string?
+Themia.Content.ContentRevisionImport.ChangeSummary.init -> void
+Themia.Content.ContentRevisionImport.ContentRevisionImport(int Version, string! Title, string! Markdown, string? ChangeSummary, string? CreatedBy, System.DateTimeOffset CreatedAt) -> void
+Themia.Content.ContentRevisionImport.CreatedAt.get -> System.DateTimeOffset
+Themia.Content.ContentRevisionImport.CreatedAt.init -> void
+Themia.Content.ContentRevisionImport.CreatedBy.get -> string?
+Themia.Content.ContentRevisionImport.CreatedBy.init -> void
+Themia.Content.ContentRevisionImport.Markdown.get -> string!
+Themia.Content.ContentRevisionImport.Markdown.init -> void
+Themia.Content.ContentRevisionImport.Title.get -> string!
+Themia.Content.ContentRevisionImport.Title.init -> void
+Themia.Content.ContentRevisionImport.Version.get -> int
+Themia.Content.ContentRevisionImport.Version.init -> void
 Themia.Content.ContentSaveOutcome
 Themia.Content.ContentSaveOutcome.Conflict = 1 -> Themia.Content.ContentSaveOutcome
 Themia.Content.ContentSaveOutcome.Invalid = 2 -> Themia.Content.ContentSaveOutcome
@@ -130,6 +192,8 @@ Themia.Content.IContentPageDialect.SelectPageSql.get -> string!
 Themia.Content.IContentPageDialect.SelectPublishedSql.get -> string!
 Themia.Content.IContentPageDialect.SelectRevisionSql.get -> string!
 Themia.Content.IContentPageDialect.UpdatePageIfVersionSql.get -> string!
+Themia.Content.IContentPageImporter
+Themia.Content.IContentPageImporter.ImportAsync(System.Collections.Generic.IReadOnlyList<Themia.Content.ContentPageImport!>! pages, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Content.ContentImportResult!>!
 Themia.Content.IContentPageService
 Themia.Content.IContentPageService.GetForEditAsync(string! slug, string! language, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Content.ContentPage?>!
 Themia.Content.IContentPageService.GetPublishedAsync(string! slug, string? language, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Content.ContentPage?>!
@@ -147,6 +211,9 @@ Themia.Content.PagedResult<T>.Items.init -> void
 Themia.Content.PagedResult<T>.PagedResult() -> void
 Themia.Content.PagedResult<T>.Total.get -> int
 Themia.Content.PagedResult<T>.Total.init -> void
+static Themia.Content.ContentImportResult.Imported(int pages, int revisions, int pagesFailingCurrentRules, int revisionsFailingCurrentRules) -> Themia.Content.ContentImportResult!
+static Themia.Content.ContentImportResult.Invalid(System.Collections.Generic.IReadOnlyList<Themia.Content.ContentImportViolation!>! violations, int pagesFailingCurrentRules, int revisionsFailingCurrentRules) -> Themia.Content.ContentImportResult!
+static Themia.Content.ContentImportResult.TargetNotEmpty() -> Themia.Content.ContentImportResult!
 static Themia.Content.ContentMarkdownRules.Check(string! markdown) -> System.Collections.Generic.IReadOnlyList<Themia.Content.ContentMarkdownViolation!>!
 static Themia.Content.ContentMarkdownRules.IsUrlAllowed(string? url) -> bool
 static Themia.Content.ContentSaveResult.Conflict(int currentVersion, string? updatedBy, System.DateTimeOffset updatedAt) -> Themia.Content.ContentSaveResult!
