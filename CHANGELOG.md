@@ -27,6 +27,8 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.26.0] - 2026-09-16
+
 ### Added
 
 - **`Themia.Content`** (+ `.PostgreSql` / `.MySql` / `.SqlServer`) — versioned, bilingual content pages keyed by slug
@@ -41,7 +43,9 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
   consumer-supplied `Authorize` delegate that refuses when unset or throwing.
 - **Markdown dialect golden fixture** — `tests/Themia.Content.Tests/Fixtures/markdown-dialect.json`, 29 entries pinning
   the write verdict (tested) and the HTML of the `marked` 18 renderer configuration in the package README (every entry
-  `candidate` until both consumer web apps reproduce it).
+  `candidate` until both consumer web apps reproduce it). The published renderer decodes an impossible numeric entity
+  (`&#x110000;`) to U+FFFD as a browser does; `String.fromCodePoint` throws on one, which would answer every reader of
+  that page with a 500 (found by propertiezy while adopting the configuration, coord #0132).
 - **`Themia.Content` importer** — `IContentPageImporter` moves pages and history from another system into empty content
   tables in one transaction, preserving versions, timestamps and authors. Refuses, listing every violation and writing
   nothing, when a page's served content is not its current revision (coord #0130 item 4). Adoption over a database that
