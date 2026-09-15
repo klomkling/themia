@@ -1,3 +1,10 @@
 #nullable enable
 static Themia.Content.AspNetCore.ContentEndpoints.MapThemiaContentPublicEndpoints(this Microsoft.AspNetCore.Routing.IEndpointRouteBuilder! endpoints, string! prefix = "/pages") -> Microsoft.AspNetCore.Routing.RouteGroupBuilder!
+static Themia.Content.AspNetCore.ContentEndpoints.MapThemiaContentAdminEndpoints(this Microsoft.AspNetCore.Routing.IEndpointRouteBuilder! endpoints, Themia.Content.AspNetCore.ContentAdminOptions! options, string! prefix = "/admin/content") -> Microsoft.AspNetCore.Routing.RouteGroupBuilder!
+Themia.Content.AspNetCore.ContentAdminOptions
+Themia.Content.AspNetCore.ContentAdminOptions.ContentAdminOptions() -> void
+Themia.Content.AspNetCore.ContentAdminOptions.Authorize.get -> System.Func<Microsoft.AspNetCore.Http.HttpContext!, System.Threading.Tasks.Task<bool>!>?
+Themia.Content.AspNetCore.ContentAdminOptions.Authorize.set -> void
+Themia.Content.AspNetCore.ContentAdminOptions.ResolveEditorId.get -> System.Func<Microsoft.AspNetCore.Http.HttpContext!, string?>!
+Themia.Content.AspNetCore.ContentAdminOptions.ResolveEditorId.set -> void
 Themia.Content.AspNetCore.ContentEndpoints
