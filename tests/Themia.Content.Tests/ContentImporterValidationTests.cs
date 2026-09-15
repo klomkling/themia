@@ -68,4 +68,43 @@ public class ContentImporterValidationTests
         Assert.Equal(1, result.RevisionsFailingCurrentRules);
         Assert.Equal(0, result.PagesFailingCurrentRules);
     }
+
+    [Fact]
+    public async Task Import_ShouldReportContentDiffers_WhenOnlyTheTitleDiffersFromTheCurrentRevision()
+    {
+        var page = Page("terms", "th", 1, "# T", (1, "# T")) with { Title = "Different Title" };
+
+        var (result, dialect) = await ImportAsync(page);
+
+        Assert.Equal(ContentImportOutcome.Invalid, result.Outcome);
+        Assert.Contains(result.Violations, v => v is { Slug: "terms", Rule: ContentImportRule.ContentDiffersFromCurrentRevision });
+        Assert.Equal(0, dialect.ConnectionsRequested);
+    }
+
+    [Fact]
+    public async Task Import_ShouldThrow_WhenARevisionElementIsNull()
+    {
+        var dialect = new CountingContentDialect();
+        var importer = new ContentPageImporter(dialect, Options(), NullLogger<ContentPageImporter>.Instance);
+        var page = Page("terms", "th", 1, "# T", (1, "# T")) with
+        {
+            Revisions = [new ContentRevisionImport(1, "Title", "# T", null, null, At), null!],
+        };
+
+        await Assert.ThrowsAsync<ArgumentException>(() => importer.ImportAsync([page]));
+
+        Assert.Equal(0, dialect.ConnectionsRequested);
+    }
+
+    [Fact]
+    public async Task Import_ShouldThrow_WhenAPageMarkdownIsNull()
+    {
+        var dialect = new CountingContentDialect();
+        var importer = new ContentPageImporter(dialect, Options(), NullLogger<ContentPageImporter>.Instance);
+        var page = Page("terms", "th", 1, "# T", (1, "# T")) with { Markdown = null! };
+
+        await Assert.ThrowsAsync<ArgumentException>(() => importer.ImportAsync([page]));
+
+        Assert.Equal(0, dialect.ConnectionsRequested);
+    }
 }

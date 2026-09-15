@@ -61,7 +61,8 @@ public enum ContentImportRule
 
 /// <summary>One page that broke one rule.</summary>
 /// <param name="Slug">The page's slug as given.</param>
-/// <param name="Language">The page's language as given.</param>
+/// <param name="Language">The page's language as given, except for <see cref="ContentImportRule.DuplicateKey"/>,
+/// which reports the normalised language.</param>
 /// <param name="Rule">The rule it broke.</param>
 public sealed record ContentImportViolation(string Slug, string Language, ContentImportRule Rule);
 

@@ -24,6 +24,7 @@ internal sealed class ContentPageImporter : IContentPageImporter
     public async Task<ContentImportResult> ImportAsync(IReadOnlyList<ContentPageImport> pages, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(pages);
+        EnsureNoNullFields(pages);
 
         var pagesFailing = pages.Count(p => ContentMarkdownRules.Check(p.Markdown ?? string.Empty).Count > 0);
         var revisionsFailing = pages.SelectMany(p => p.Revisions ?? []).Count(r => ContentMarkdownRules.Check(r.Markdown ?? string.Empty).Count > 0);
@@ -148,4 +149,54 @@ internal sealed class ContentPageImporter : IContentPageImporter
 
     private static void Add(ContentPageImport page, List<ContentImportViolation> violations, IEnumerable<ContentImportRule> rules) =>
         violations.AddRange(rules.Select(rule => new ContentImportViolation(page.Slug, page.Language, rule)));
+
+    /// <summary>Throws when a page, a revision, or a required text field is missing. These are programmer errors —
+    /// a null here means the caller built its rows wrong — not import rules, so they are refused before any rule
+    /// is checked and before any connection is opened.</summary>
+    private static void EnsureNoNullFields(IReadOnlyList<ContentPageImport> pages)
+    {
+        for (var i = 0; i < pages.Count; i++)
+        {
+            var page = pages[i];
+            if (page is null)
+            {
+                throw new ArgumentException($"pages[{i}] is null", nameof(pages));
+            }
+
+            if (page.Title is null)
+            {
+                throw new ArgumentException($"pages[{i}].Title is null", nameof(pages));
+            }
+
+            if (page.Markdown is null)
+            {
+                throw new ArgumentException($"pages[{i}].Markdown is null", nameof(pages));
+            }
+
+            var revisions = page.Revisions;
+            if (revisions is null)
+            {
+                continue;
+            }
+
+            for (var j = 0; j < revisions.Count; j++)
+            {
+                var revision = revisions[j];
+                if (revision is null)
+                {
+                    throw new ArgumentException($"pages[{i}].Revisions[{j}] is null", nameof(pages));
+                }
+
+                if (revision.Title is null)
+                {
+                    throw new ArgumentException($"pages[{i}].Revisions[{j}].Title is null", nameof(pages));
+                }
+
+                if (revision.Markdown is null)
+                {
+                    throw new ArgumentException($"pages[{i}].Revisions[{j}].Markdown is null", nameof(pages));
+                }
+            }
+        }
+    }
 }

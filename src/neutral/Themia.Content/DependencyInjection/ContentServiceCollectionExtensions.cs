@@ -10,8 +10,9 @@ public static class ContentServiceCollectionExtensions
 {
     /// <summary>
     /// Registers validated <see cref="ContentOptions"/>, <see cref="TimeProvider.System"/> (unless one is registered),
-    /// logging, and <see cref="IContentPageService"/>. Does not register a dialect — call exactly one of
-    /// <c>AddThemiaContentPostgres</c>, <c>AddThemiaContentMySql</c> or <c>AddThemiaContentSqlServer</c>, in either order.
+    /// logging, <see cref="IContentPageService"/> and <see cref="IContentPageImporter"/>. Does not register a dialect —
+    /// call exactly one of <c>AddThemiaContentPostgres</c>, <c>AddThemiaContentMySql</c> or
+    /// <c>AddThemiaContentSqlServer</c>, in either order.
     /// </summary>
     /// <remarks>The dialect is checked when <see cref="IContentPageService"/> is first resolved, not here, so every
     /// registration order works and a missing engine still fails loudly.</remarks>
