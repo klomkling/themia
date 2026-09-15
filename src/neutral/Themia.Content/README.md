@@ -76,10 +76,15 @@ import { Marked } from 'marked';
 
 const ALLOWED_SCHEMES = new Set(['http', 'https', 'mailto', 'tel']);
 
+// An impossible code point decodes to U+FFFD, as a browser does. String.fromCodePoint throws on one,
+// which would turn a saved page into a 500 for every reader (coord #0132).
+const REPLACEMENT = String.fromCharCode(0xfffd);
+const codePoint = (n: number): string => (n >= 0 && n <= 0x10ffff ? String.fromCodePoint(n) : REPLACEMENT);
+
 function decodeEntities(s: string): string {
   return s
-    .replace(/&#x([0-9a-f]+);?/gi, (_, h) => String.fromCodePoint(parseInt(h, 16)))
-    .replace(/&#([0-9]+);?/g, (_, d) => String.fromCodePoint(parseInt(d, 10)))
+    .replace(/&#x([0-9a-f]+);?/gi, (_, h) => codePoint(parseInt(h, 16)))
+    .replace(/&#([0-9]+);?/g, (_, d) => codePoint(parseInt(d, 10)))
     .replace(/&colon;/gi, ':')
     .replace(/&tab;/gi, '\t')
     .replace(/&newline;/gi, '\n')
