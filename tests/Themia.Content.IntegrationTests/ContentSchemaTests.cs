@@ -39,3 +39,7 @@ public sealed class PostgresContentSchemaTests(PostgresContentFixture fixture) :
 [Collection(MySqlContentCollection.Name)]
 [Trait("Category", "Integration")]
 public sealed class MySqlContentSchemaTests(MySqlContentFixture fixture) : ContentSchemaTests(fixture);
+
+[Collection(SqlServerContentCollection.Name)]
+[Trait("Category", "Integration")]
+public sealed class SqlServerContentSchemaTests(SqlServerContentFixture fixture) : ContentSchemaTests(fixture);

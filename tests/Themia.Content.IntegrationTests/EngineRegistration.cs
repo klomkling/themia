@@ -2,6 +2,7 @@ using System.Runtime.CompilerServices;
 using Themia.Data.Migrations;
 using Themia.Data.Migrations.MySql;
 using Themia.Data.Migrations.PostgreSql;
+using Themia.Data.Migrations.SqlServer;
 
 namespace Themia.Content.IntegrationTests;
 
@@ -15,6 +16,7 @@ internal static class EngineRegistration
     {
         MigrationEngineRegistry.Add(PostgresMigrationEngine.Adapter);
         MigrationEngineRegistry.Add(MySqlMigrationEngine.Adapter);
+        MigrationEngineRegistry.Add(SqlServerMigrationEngine.Adapter);
     }
 #pragma warning restore CA2255
 }

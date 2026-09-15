@@ -121,3 +121,7 @@ public sealed class PostgresContentSaveTests(PostgresContentFixture fixture) : C
 [Collection(MySqlContentCollection.Name)]
 [Trait("Category", "Integration")]
 public sealed class MySqlContentSaveTests(MySqlContentFixture fixture) : ContentSaveTests(fixture);
+
+[Collection(SqlServerContentCollection.Name)]
+[Trait("Category", "Integration")]
+public sealed class SqlServerContentSaveTests(SqlServerContentFixture fixture) : ContentSaveTests(fixture);

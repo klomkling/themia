@@ -75,3 +75,7 @@ public sealed class PostgresContentSeedingTests(PostgresContentFixture fixture) 
 [Collection(MySqlContentCollection.Name)]
 [Trait("Category", "Integration")]
 public sealed class MySqlContentSeedingTests(MySqlContentFixture fixture) : ContentSeedingTests(fixture);
+
+[Collection(SqlServerContentCollection.Name)]
+[Trait("Category", "Integration")]
+public sealed class SqlServerContentSeedingTests(SqlServerContentFixture fixture) : ContentSeedingTests(fixture);

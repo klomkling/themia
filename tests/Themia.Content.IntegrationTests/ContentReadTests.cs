@@ -109,3 +109,7 @@ public sealed class PostgresContentReadTests(PostgresContentFixture fixture) : C
 [Collection(MySqlContentCollection.Name)]
 [Trait("Category", "Integration")]
 public sealed class MySqlContentReadTests(MySqlContentFixture fixture) : ContentReadTests(fixture);
+
+[Collection(SqlServerContentCollection.Name)]
+[Trait("Category", "Integration")]
+public sealed class SqlServerContentReadTests(SqlServerContentFixture fixture) : ContentReadTests(fixture);

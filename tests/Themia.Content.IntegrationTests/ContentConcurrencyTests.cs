@@ -116,3 +116,7 @@ public sealed class PostgresContentConcurrencyTests(PostgresContentFixture fixtu
 [Collection(MySqlContentCollection.Name)]
 [Trait("Category", "Integration")]
 public sealed class MySqlContentConcurrencyTests(MySqlContentFixture fixture) : ContentConcurrencyTests(fixture);
+
+[Collection(SqlServerContentCollection.Name)]
+[Trait("Category", "Integration")]
+public sealed class SqlServerContentConcurrencyTests(SqlServerContentFixture fixture) : ContentConcurrencyTests(fixture);

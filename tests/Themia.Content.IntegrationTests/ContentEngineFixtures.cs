@@ -2,15 +2,18 @@ using Dapper;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
+using Testcontainers.MsSql;
 using Testcontainers.MySql;
 using Testcontainers.PostgreSql;
 using Themia.Content.DependencyInjection;
 using Themia.Content.Internal;
 using Themia.Content.MySql;
 using Themia.Content.PostgreSql;
+using Themia.Content.SqlServer;
 using Themia.Data.Migrations;
 using Themia.Data.Migrations.MySql;
 using Themia.Data.Migrations.PostgreSql;
+using Themia.Data.Migrations.SqlServer;
 using Xunit;
 
 namespace Themia.Content.IntegrationTests;
@@ -189,4 +192,48 @@ public sealed class MySqlContentCollection : ICollectionFixture<MySqlContentFixt
 {
     /// <summary>The collection name test classes reference.</summary>
     public const string Name = "MySql Content";
+}
+
+/// <summary>SQL Server: one <c>mssql/server:2022-CU14-ubuntu-22.04</c> container for every SQL Server test class.</summary>
+public sealed class SqlServerContentFixture : ContentEngineFixture
+{
+    private readonly MsSqlContainer container =
+        new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-CU14-ubuntu-22.04").Build();
+
+    /// <inheritdoc />
+    public override IMigrationEngineAdapter MigrationAdapter => SqlServerMigrationEngine.Adapter;
+
+    /// <inheritdoc />
+    protected override async Task<string> StartContainerAsync()
+    {
+        await container.StartAsync();
+        return container.GetConnectionString();
+    }
+
+    /// <inheritdoc />
+    protected override async Task StopContainerAsync() => await container.DisposeAsync();
+
+    /// <inheritdoc />
+    protected override void RegisterEngine(IServiceCollection services, string connectionString) =>
+        services.AddThemiaContentSqlServer(connectionString);
+
+    /// <inheritdoc />
+    public override Task<bool> TableExistsAsync(string name) =>
+        ScalarAsync<bool>(
+            "SELECT CAST(CASE WHEN EXISTS (SELECT 1 FROM sys.tables WHERE name = @Name) THEN 1 ELSE 0 END AS bit);",
+            new { Name = name });
+
+    /// <inheritdoc />
+    public override Task<bool> IndexExistsAsync(string name) =>
+        ScalarAsync<bool>(
+            "SELECT CAST(CASE WHEN EXISTS (SELECT 1 FROM sys.indexes WHERE name = @Name) THEN 1 ELSE 0 END AS bit);",
+            new { Name = name });
+}
+
+/// <summary>Ties every SQL Server test class to one <see cref="SqlServerContentFixture"/>.</summary>
+[CollectionDefinition(Name)]
+public sealed class SqlServerContentCollection : ICollectionFixture<SqlServerContentFixture>
+{
+    /// <summary>The collection name test classes reference.</summary>
+    public const string Name = "SqlServer Content";
 }
