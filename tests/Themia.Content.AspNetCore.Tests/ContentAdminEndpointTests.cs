@@ -164,14 +164,16 @@ public class ContentAdminEndpointTests
     }
 
     [Fact]
-    public async Task Put_ShouldSendExpectedVersionZero_WhenTheBodyOmitsIt()
+    public async Task Put_ShouldReturnProblemDetails400AndNotSave_WhenTheBodyOmitsExpectedVersion()
     {
         var service = new FakeContentPageService();
         var client = await StartAsync(service, AllowAll);
 
-        await client.SendAsync(Request(HttpMethod.Put, "/pages/terms/th", """{"title":"T","markdown":"# T","isPublished":true}"""));
+        var response = await client.SendAsync(Request(HttpMethod.Put, "/pages/terms/th", """{"title":"T","markdown":"# T","isPublished":true}"""));
 
-        Assert.Equal(0, service.LastSave!.ExpectedVersion);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+        Assert.Null(service.LastSave);
     }
 
     [Fact]
@@ -350,6 +352,19 @@ public class ContentAdminEndpointTests
         var client = await StartAsync(service, AllowAll);
 
         var response = await client.SendAsync(Request(HttpMethod.Post, "/pages/terms/en/revert", """{"expectedVersion":3}"""));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+        Assert.Null(service.LastRevert);
+    }
+
+    [Fact]
+    public async Task Revert_ShouldReturnProblemDetails400AndNotRevert_WhenTheBodyOmitsExpectedVersion()
+    {
+        var service = new FakeContentPageService();
+        var client = await StartAsync(service, AllowAll);
+
+        var response = await client.SendAsync(Request(HttpMethod.Post, "/pages/terms/en/revert", """{"version":1}"""));
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);

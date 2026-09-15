@@ -621,6 +621,12 @@ stands, so a client can recognise its own write.
 Request bodies reject unknown members (`JsonUnmappedMemberHandling.Disallow`). A consumer's form should keep
 the author's text on 409 (SvelteKit: `fail()`, not `redirect`).
 
+**Every body member except `changeSummary` is required** (`[JsonRequired]`); a missing one is a 400 ProblemDetails
+and nothing is saved. That includes `isPublished`, which would otherwise bind `false` and unpublish a live page,
+and `expectedVersion`: propertiezy's endpoint bound an omitted version as 0, which refuses an update but reports it
+as a 409 that looks like another editor's save. A client that forgets the version is a client defect, and 400
+says so. Decided by the maintainer before 0.26.0 (2026-09-16), because tightening it after release breaks clients.
+
 ---
 
 ## 10. Adoption over an existing schema — item 4
