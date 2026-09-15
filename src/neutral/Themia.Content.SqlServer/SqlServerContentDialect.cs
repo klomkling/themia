@@ -4,6 +4,15 @@ using Microsoft.Data.SqlClient;
 namespace Themia.Content.SqlServer;
 
 /// <summary>SQL Server implementation of <see cref="IContentPageDialect"/> (Microsoft.Data.SqlClient).</summary>
+/// <remarks>
+/// <para>With <c>XACT_ABORT OFF</c> — the ADO.NET default for a connection opened via
+/// <see cref="System.Data.Common.DbConnection.BeginTransactionAsync(System.Data.IsolationLevel, System.Threading.CancellationToken)"/> —
+/// a duplicate-key error does not doom the enclosing transaction, so <c>ContentPageService</c>'s savepoint
+/// rollback on the create path is harmless but not load-bearing on this engine: the transaction could keep going
+/// without it. A server- or session-level <c>XACT_ABORT ON</c> (for example set via <c>user options</c>) changes
+/// that — a duplicate key then rolls back the whole transaction, and the create path would fault instead of
+/// returning <c>Conflict</c>, because there would be nothing left to roll back to and no page left to read back.</para>
+/// </remarks>
 public sealed class SqlServerContentDialect : IContentPageDialect
 {
     private const int UniqueConstraintViolation = 2627;

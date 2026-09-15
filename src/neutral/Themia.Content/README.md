@@ -15,6 +15,8 @@ services.AddThemiaContent(options =>
 services.AddThemiaContentPostgres(connectionString); // or AddThemiaContentMySql / AddThemiaContentSqlServer
 ```
 
+MySQL requires 8.0.13 or later; MariaDB is not supported.
+
 The engine method runs the schema migration immediately. Both tables are platform-level: there is no tenant column.
 
 ## Never write the content tables with SQL

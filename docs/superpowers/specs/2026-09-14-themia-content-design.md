@@ -1,7 +1,7 @@
 # Themia.Content — versioned, bilingual content pages
 
 **Status:** approved design (brainstorming 2026-09-14), revised the same day after a `/scrutinize` pass — see
-§15. Not yet implemented.
+§15. Implemented on `feat/themia-content`; release pending (0.26.0).
 **Target version:** `0.26.0`, released by **2026-11-01** — ezy-assets' needed-by date (coord #0130 [1]),
 worked back from ezyassets.com launching in December 2026.
 **Tracks:** coord #0130 (filed as `Themia.Modules.Content`), #0131.
@@ -749,7 +749,9 @@ One project, one container per engine per assembly (`[CollectionDefinition]`), `
   revision.
 - **Concurrent creates of the same `(slug, language)`**: one `Saved`, one `Conflict` carrying version 1. **This is
   the test that proves each driver supports savepoints and that the transaction can still read after a lost
-  insert** (§5).
+  insert** (§5). On SQL Server, with the ADO.NET default `XACT_ABORT OFF`, it proves the savepoint calls
+  themselves succeed, not that they are required for this outcome — see the remarks on
+  `SqlServerContentDialect`.
 - **Revert of a non-default language leaves the default language byte-identical** (#0130 [3]).
 - **A revert that races a save reports the winner's version in its `Conflict`**, on MySQL above all: revert reads
   its target revision before the guarded `UPDATE`, the ordering that exposed REPEATABLE READ (§5).
@@ -760,12 +762,13 @@ One project, one container per engine per assembly (`[CollectionDefinition]`), `
 - The migration re-runs cleanly; the ledger is `themia_version_<assembly>`; the schema probe runs on PostgreSQL.
 - A non-service insert of a duplicate `(page_id, version)` fails.
 
-**Races are forced, not hoped for.** A `RaceGatingContentDialect` wraps the real dialect and places a two-party
-`Barrier` in the getter of the guarded statement, following `RaceGatingChallengeDialect`, whose remarks record
-that a bare `Task.WhenAll` did not reliably make two calls overlap. It works identically on all three engines.
+**Races are forced, not hoped for.** A `GatedContentDialect` wraps the real dialect and places a two-party
+`Barrier` behind hooks that run when the service reads the guarded statement's SQL, following
+`RaceGatingChallengeDialect`, whose remarks record that a bare `Task.WhenAll` did not reliably make two calls
+overlap. It works identically on all three engines.
 Propertiezy's lock-waiter polling on `pg_locks` is deterministic too, but PostgreSQL-only.
 
-### `Themia.Content.AspNetCore.Tests` — `WebApplicationFactory`
+### `Themia.Content.AspNetCore.Tests` — a `TestServer` host
 
 Unset `Authorize` refuses every admin route; 401 versus 403; 422 on field `markdown`; 409 carries
 `currentVersion`; the envelope shape; an unknown request member is refused; `EditorId` from the default claim
