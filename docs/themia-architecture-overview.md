@@ -48,6 +48,7 @@ Neutral cores     Themia.AspNetCore(.DataProtection.{SqlServer/MySql/PostgreSql}
                   Themia.Storage(.S3) | Themia.Export(.Excel) | Themia.Geo(.Google) | Themia.AI(.Gemini/.OpenAiCompatible)
                   Themia.Challenges(+3 engines) | Themia.Totp | Themia.WebAuthn | Themia.PromptPay | Themia.Imaging
                   Themia.Data.Migrations(+3 engines) | Themia.Data.Probes | Themia.DependencyInjection
+                  Themia.Content(+3 engines/.AspNetCore)
                   → consumable by BOTH Themia apps and Serenity (PowerACC)
 ─────────────────────────────────────────────────────────────────────────────────────────────
 Modules           Themia.Modules.* (Scheduling, Identity(+.Abstractions/.EFCore/.Dapper/.AspNetCore/
@@ -137,6 +138,7 @@ you the target: `neutral/` = net8.0;net10.0, everything else = net10.0 (tooling 
 | ~~`Themia.Modules.AI`~~ — no module; see `Themia.AI` + `Themia.AI.Gemini` + `Themia.AI.OpenAiCompatible` below | ezy-assets `GeminiAICaption`/`FallbackTextTranslation` | ✅ **built** (0.24.0 — no tenant state, no schema, so there is no module; see correction below) |
 | `Themia.Modules.Audit` (+ `Themia.Audit`, `.PostgreSql/.SqlServer/.MySql`, `.AspNetCore`) | **new** — the listed sources turned out to describe something else (see below) | ✅ **built** (0.23.0 — append-only activity + authentication event log; unqualified `themia_audit_events` on all three engines; unconditional redaction; `RequireTransaction` for activity events on EF and Dapper alike; `IIdentityEventObserver` audits all twelve Identity events; fail-closed read-only dashboard. Entity change log deferred to 0.24.0) |
 | `Themia.Modules.Messaging` (+ `Themia.Messaging`, `.PostgreSql/.MySql/.SqlServer`, `.Hmac`, `.Http`, `.AspNetCore`) | **new** — service-to-service messaging for the two consumer apps (coord #0050) | ✅ **built** (0.11.0 — neutral transactional outbox/inbox across the three engines, the `themia-hmac-v1` signing scheme shared by both ends of a channel, an HTTP dispatcher that signs and delivers a claimed row, and a receiving minimal-API endpoint filter; tenant-aware module on top. A service's identity was configured twice and was unified into one `MessagingIdentity` in the same line of work) |
+| ~~`Themia.Modules.Content`~~ — no module; see `Themia.Content` (+ `.PostgreSql/.MySql/.SqlServer`, `.AspNetCore`) | propertiezy's production CMS pages, as reference — coord #0130 | ✅ **built** (0.26.0 — versioned bilingual pages; stale-version refusal on create and update; raw HTML and unsafe schemes refused at write over Markdig; golden renderer fixture. Platform-level content has no tenant state, so there is no module) |
 
 > **The `Themia.Modules.Audit` sources listed here were wrong, and the correction is worth keeping.**
 > ezy-assets' `AuditLogRepository` has `OldValue`/`NewValue` `jsonb` columns, so it reads like an entity
@@ -403,6 +405,7 @@ are relative to `docs/superpowers/specs/`. A version in parentheses is the relea
 - ✅ `2026-09-06-themia-audit-design.md` — activity + authentication event log (0.23.0; entity change log scoped for 0.24.0 in §15)
 - ✅ `2026-09-08-themia-geo-design.md` (0.24.0; no module, supersedes the `Themia.Modules.Geo` row in §B)
 - ✅ `2026-09-08-themia-ai-design.md` (0.24.0; no module, supersedes the `Themia.Modules.AI` row in §B)
+- ✅ `2026-09-14-themia-content-design.md` — versioned bilingual content pages (0.26.0, coord #0130)
 
 **Shipped without a standalone spec** — `Themia.AspNetCore.DataProtection` (0.10.0, coord #0042),
 `Themia.PromptPay` (0.14.0), `Themia.Totp` (0.18.0), `Themia.WebAuthn` (0.20.0), `Themia.Imaging` (0.21.0).

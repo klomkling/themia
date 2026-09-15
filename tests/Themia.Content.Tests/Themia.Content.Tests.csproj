@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="coverlet.collector">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+    <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/neutral/Themia.Content/Themia.Content.csproj" />
+    <ProjectReference Include="../../src/neutral/Themia.Content.PostgreSql/Themia.Content.PostgreSql.csproj" />
+    <ProjectReference Include="../../src/neutral/Themia.Content.MySql/Themia.Content.MySql.csproj" />
+    <ProjectReference Include="../../src/neutral/Themia.Content.SqlServer/Themia.Content.SqlServer.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Update="Fixtures/markdown-dialect.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

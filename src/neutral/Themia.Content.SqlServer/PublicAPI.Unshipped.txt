@@ -1,0 +1,18 @@
+#nullable enable
+static Themia.Content.SqlServer.ServiceCollectionExtensions.AddThemiaContentSqlServer(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, string! connectionString) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+Themia.Content.SqlServer.ServiceCollectionExtensions
+Themia.Content.SqlServer.SqlServerContentDialect
+Themia.Content.SqlServer.SqlServerContentDialect.CountPagesSql.get -> string!
+Themia.Content.SqlServer.SqlServerContentDialect.CountRevisionsSql.get -> string!
+Themia.Content.SqlServer.SqlServerContentDialect.CreateConnection() -> System.Data.Common.DbConnection!
+Themia.Content.SqlServer.SqlServerContentDialect.ImportPageSql.get -> string!
+Themia.Content.SqlServer.SqlServerContentDialect.InsertPageSql.get -> string!
+Themia.Content.SqlServer.SqlServerContentDialect.InsertRevisionSql.get -> string!
+Themia.Content.SqlServer.SqlServerContentDialect.IsDuplicateKey(System.Data.Common.DbException! exception) -> bool
+Themia.Content.SqlServer.SqlServerContentDialect.ListPagesSql.get -> string!
+Themia.Content.SqlServer.SqlServerContentDialect.ListRevisionsSql.get -> string!
+Themia.Content.SqlServer.SqlServerContentDialect.SelectPageSql.get -> string!
+Themia.Content.SqlServer.SqlServerContentDialect.SelectPublishedSql.get -> string!
+Themia.Content.SqlServer.SqlServerContentDialect.SelectRevisionSql.get -> string!
+Themia.Content.SqlServer.SqlServerContentDialect.SqlServerContentDialect(string! connectionString) -> void
+Themia.Content.SqlServer.SqlServerContentDialect.UpdatePageIfVersionSql.get -> string!

@@ -1,0 +1,18 @@
+#nullable enable
+static Themia.Content.PostgreSql.ServiceCollectionExtensions.AddThemiaContentPostgres(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, string! connectionString) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+Themia.Content.PostgreSql.PostgresContentDialect
+Themia.Content.PostgreSql.PostgresContentDialect.CountPagesSql.get -> string!
+Themia.Content.PostgreSql.PostgresContentDialect.CountRevisionsSql.get -> string!
+Themia.Content.PostgreSql.PostgresContentDialect.CreateConnection() -> System.Data.Common.DbConnection!
+Themia.Content.PostgreSql.PostgresContentDialect.ImportPageSql.get -> string!
+Themia.Content.PostgreSql.PostgresContentDialect.InsertPageSql.get -> string!
+Themia.Content.PostgreSql.PostgresContentDialect.InsertRevisionSql.get -> string!
+Themia.Content.PostgreSql.PostgresContentDialect.IsDuplicateKey(System.Data.Common.DbException! exception) -> bool
+Themia.Content.PostgreSql.PostgresContentDialect.ListPagesSql.get -> string!
+Themia.Content.PostgreSql.PostgresContentDialect.ListRevisionsSql.get -> string!
+Themia.Content.PostgreSql.PostgresContentDialect.PostgresContentDialect(string! connectionString) -> void
+Themia.Content.PostgreSql.PostgresContentDialect.SelectPageSql.get -> string!
+Themia.Content.PostgreSql.PostgresContentDialect.SelectPublishedSql.get -> string!
+Themia.Content.PostgreSql.PostgresContentDialect.SelectRevisionSql.get -> string!
+Themia.Content.PostgreSql.PostgresContentDialect.UpdatePageIfVersionSql.get -> string!
+Themia.Content.PostgreSql.ServiceCollectionExtensions
