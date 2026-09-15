@@ -65,8 +65,9 @@ version you just read as `ExpectedVersion`, or the guard passes every time.
 Themia refuses raw HTML and unsafe link schemes at write. **The web renderer is still the safety boundary**: it must
 drop raw HTML and refuse the same schemes again, because the write rule cannot fix rows saved before it existed.
 
-Render with **`marked` 18.x and exactly this configuration**. The golden fixture pins its bytes; `markdown-it`
-matched on 5 of 12 inputs and cannot reproduce it.
+Render with **`marked` 18.x and exactly this configuration**. The fixture's bytes were verified on `marked` 18.0.11
+and 18.0.13; pin an exact version in your web app and re-run the fixture before upgrading. The golden fixture pins
+its bytes; `markdown-it` matched on 5 of 12 inputs and cannot reproduce it.
 
 ```ts
 import { Marked } from 'marked';
@@ -88,7 +89,7 @@ export function urlAllowed(raw: string | null | undefined): boolean {
     .filter((c) => { const n = c.codePointAt(0) ?? 0; return n > 0x20 && n !== 0x7f; })
     .join('');
   const m = /^([a-z][a-z0-9+.-]*):/i.exec(u);
-  return !m || ALLOWED_SCHEMES.has(m[1].toLowerCase());
+  return !m || ALLOWED_SCHEMES.has(m[1]!.toLowerCase());
 }
 
 const EXPLICIT_ANCHOR = /\s*\{#([a-z0-9][a-z0-9-]*)\}\s*$/i;
@@ -100,7 +101,7 @@ export const cmsMarkdown = new Marked({
       const m = EXPLICIT_ANCHOR.exec(token.text);
       const html = this.parser.parseInline(token.tokens);
       return m
-        ? `<h${token.depth} id="${m[1].toLowerCase()}">${html.replace(EXPLICIT_ANCHOR, '')}</h${token.depth}>\n`
+        ? `<h${token.depth} id="${m[1]!.toLowerCase()}">${html.replace(EXPLICIT_ANCHOR, '')}</h${token.depth}>\n`
         : `<h${token.depth}>${html}</h${token.depth}>\n`;
     },
     link(token) {

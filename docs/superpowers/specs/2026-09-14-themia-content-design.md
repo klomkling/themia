@@ -464,7 +464,7 @@ export function urlAllowed(raw: string | null | undefined): boolean {
     .filter((c) => { const n = c.codePointAt(0) ?? 0; return n > 0x20 && n !== 0x7f; })
     .join('');
   const m = /^([a-z][a-z0-9+.-]*):/i.exec(u);
-  return !m || ALLOWED_SCHEMES.has(m[1].toLowerCase());
+  return !m || ALLOWED_SCHEMES.has(m[1]!.toLowerCase());
 }
 
 const EXPLICIT_ANCHOR = /\s*\{#([a-z0-9][a-z0-9-]*)\}\s*$/i;
@@ -476,7 +476,7 @@ export const cmsMarkdown = new Marked({
       const m = EXPLICIT_ANCHOR.exec(token.text);
       const html = this.parser.parseInline(token.tokens);
       return m
-        ? `<h${token.depth} id="${m[1].toLowerCase()}">${html.replace(EXPLICIT_ANCHOR, '')}</h${token.depth}>\n`
+        ? `<h${token.depth} id="${m[1]!.toLowerCase()}">${html.replace(EXPLICIT_ANCHOR, '')}</h${token.depth}>\n`
         : `<h${token.depth}>${html}</h${token.depth}>\n`;
     },
     link(token) {
