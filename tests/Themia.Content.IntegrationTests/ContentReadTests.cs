@@ -100,6 +100,16 @@ public abstract class ContentReadTests(ContentEngineFixture fixture)
         Assert.Equal(0, result.Total);
         Assert.Empty(result.Items);
     }
+
+    [Fact]
+    public async Task GetPublished_ShouldNotMatch_WhenTheSlugDiffersOnlyInCaseOrTrailingSpace()
+    {
+        var slug = NewSlug();
+        await fixture.Service.SaveAsync(Save(slug, "th", 0));
+
+        Assert.Null(await fixture.Service.GetPublishedAsync(slug.ToUpperInvariant(), "th"));
+        Assert.Null(await fixture.Service.GetPublishedAsync(slug + " ", "th"));
+    }
 }
 
 [Collection(PostgresContentCollection.Name)]

@@ -89,4 +89,25 @@ public class ContentServiceRegistrationTests
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => service.ListAsync(page, limit));
         Assert.Equal(0, dialect.ConnectionsRequested);
     }
+
+    [Theory]
+    [InlineData("TERMS")]
+    [InlineData("terms ")]
+    [InlineData(" terms")]
+    [InlineData("Terms")]
+    public async Task Reads_ShouldReturnNothingAndOpenNoConnection_WhenTheSlugIsNotCanonical(string slug)
+    {
+        var dialect = new CountingContentDialect();
+        var service = new ContentPageService(dialect, Options(), TimeProvider.System, NullLogger<ContentPageService>.Instance);
+
+        var published = await service.GetPublishedAsync(slug, "th");
+        var forEdit = await service.GetForEditAsync(slug, "th");
+        var revisions = await service.GetRevisionsAsync(slug, "th", 1, 20);
+
+        Assert.Null(published);
+        Assert.Null(forEdit);
+        Assert.Empty(revisions.Items);
+        Assert.Equal(0, revisions.Total);
+        Assert.Equal(0, dialect.ConnectionsRequested);
+    }
 }

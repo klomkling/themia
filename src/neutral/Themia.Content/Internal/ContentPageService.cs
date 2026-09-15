@@ -44,6 +44,11 @@ internal sealed class ContentPageService : IContentPageService
     {
         ArgumentNullException.ThrowIfNull(slug);
 
+        if (!ContentPageValidator.IsValidSlug(slug))
+        {
+            return null;
+        }
+
         var requested = ContentLanguage.Normalise(language);
         if (!options.IsConfigured(requested))
         {
@@ -61,6 +66,11 @@ internal sealed class ContentPageService : IContentPageService
     public async Task<ContentPage?> GetForEditAsync(string slug, string language, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(slug);
+
+        if (!ContentPageValidator.IsValidSlug(slug))
+        {
+            return null;
+        }
 
         await using var connection = await OpenAsync(ct).ConfigureAwait(false);
         var row = await SelectPageAsync(connection, null, new PageKey(slug, ContentLanguage.Normalise(language)), ct).ConfigureAwait(false);
@@ -84,6 +94,11 @@ internal sealed class ContentPageService : IContentPageService
     {
         ArgumentNullException.ThrowIfNull(slug);
         ValidatePaging(page, limit);
+
+        if (!ContentPageValidator.IsValidSlug(slug))
+        {
+            return new PagedResult<ContentPageRevision> { Items = [], Total = 0 };
+        }
 
         var key = new PageKey(slug, ContentLanguage.Normalise(language));
         await using var connection = await OpenAsync(ct).ConfigureAwait(false);
