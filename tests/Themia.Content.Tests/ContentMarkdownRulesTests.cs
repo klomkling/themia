@@ -47,6 +47,10 @@ public class ContentMarkdownRulesTests
     [InlineData("```\ncode\n````\n\n[x](javascript:alert(1))")]
     [InlineData("[x](java&#9;script:alert(1))")]
     [InlineData("[x](&#x6A&#x61vascript:alert(1))")]
+    [InlineData("<javascript:alert(1)>")]
+    [InlineData("[r]: javascript:alert(1)")]
+    [InlineData("[x](java&tab;script:alert(1))")]
+    [InlineData("[x](java&newline;script:alert(1))")]
     public void Check_ShouldReportDisallowedUrl_WhenADestinationHasAnUnsafeScheme(string markdown)
     {
         var violations = ContentMarkdownRules.Check(markdown);
@@ -70,6 +74,8 @@ public class ContentMarkdownRulesTests
     [InlineData("vbscript:msgbox(1)", false)]
     [InlineData("data:text/html;base64,PHNjcmlwdD4=", false)]
     [InlineData("java&#99999999;script:alert(1)", false)]
+    [InlineData("java&tab;script:alert(1)", false)]
+    [InlineData("java&newline;script:alert(1)", false)]
     public void IsUrlAllowed_ShouldAllowOnlyTheFourSchemesOrNone(string? url, bool expected) =>
         Assert.Equal(expected, ContentMarkdownRules.IsUrlAllowed(url));
 
