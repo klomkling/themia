@@ -27,6 +27,22 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+### Added
+
+- **`Themia.Content`** (+ `.PostgreSql` / `.MySql` / `.SqlServer`) — versioned, bilingual content pages keyed by slug
+  and language, for legal and static pages (coord #0130). Every save writes an immutable revision; a stale
+  `ExpectedVersion` is refused on create (a unique index behind a savepoint) and on update (the `UPDATE`'s own
+  `WHERE`), on every engine, at READ COMMITTED. Revert saves an old revision's body as a new version and carries the
+  language explicitly. Raw HTML and link destinations outside `http`/`https`/`mailto`/`tel` are refused at write,
+  checked over Markdig's syntax tree. No tenant column and no module: the content is platform-level. Content that
+  ships with application code goes through `SaveAsync`, never SQL — see the package README.
+- **`Themia.Content.AspNetCore`** — optional public read (`{data}`, language fallback) and admin list/edit/revisions/
+  revert routes (`{data, meta}`, RFC 7807, 409 carrying `currentVersion`, `updatedBy`, `updatedAt`) behind a
+  consumer-supplied `Authorize` delegate that refuses when unset or throwing.
+- **Markdown dialect golden fixture** — `tests/Themia.Content.Tests/Fixtures/markdown-dialect.json`, 29 entries pinning
+  the write verdict (tested) and the HTML of the `marked` 18 renderer configuration in the package README (every entry
+  `candidate` until both consumer web apps reproduce it).
+
 ## [0.25.1] - 2026-09-12
 
 ### Added

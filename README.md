@@ -88,6 +88,7 @@ and reference the individual `Themia.*` packages you need instead.
 | PDF templates + rendering | `Themia.Modules.Pdf` |
 | Exception logging + dashboard | `Themia.Exceptional` + one `Themia.Exceptional.{SqlServer\|PostgreSql\|MySql}` + `Themia.Exceptional.AspNetCore` |
 | Notifications | `Themia.Modules.Notifications` + one `Themia.Modules.Notifications.{SqlServer\|PostgreSql\|MySql}` |
+| Content pages (legal/static, versioned, bilingual) | `Themia.Content` + one `Themia.Content.{SqlServer\|PostgreSql\|MySql}`; optional `Themia.Content.AspNetCore` |
 
 > **Peer-coupling caveat:** some modules (`Identity`, `Storage`, `Notifications`, `Export`)
 > currently reference both the EF Core and Dapper data peers (tracked follow-up,

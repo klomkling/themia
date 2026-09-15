@@ -37,6 +37,7 @@ Neutral cores (net8.0;net10.0)         Themia.AspNetCore(.DataProtection + 3 eng
                                        Themia.Storage(.S3) | Themia.Export(.Excel) | Themia.Geo(.Google) | Themia.AI(.Gemini/.OpenAiCompatible)
                                        Themia.Challenges(3 engines) | Themia.Totp | Themia.WebAuthn | Themia.PromptPay | Themia.Imaging
                                        Themia.Data.Migrations(3 engines) | Themia.Data.Probes | Themia.DependencyInjection
+                                       Themia.Content(3 engines/.AspNetCore)
 Modules (net10.0)                      Themia.Modules.* (Scheduling, Identity(+5), Storage, Notifications(+3 engines),
                                        Pdf, Export, Audit, Messaging) — no .ExceptionLogging/.Geo/.AI, see overview §B
 ```
