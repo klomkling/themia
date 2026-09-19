@@ -1,0 +1,3 @@
+#nullable enable
+Themia.Storage.AspNetCore.LocalStorageEndpoints
+static Themia.Storage.AspNetCore.LocalStorageEndpoints.MapThemiaLocalStorage(this Microsoft.AspNetCore.Routing.IEndpointRouteBuilder! endpoints, string! prefix) -> Microsoft.AspNetCore.Routing.IEndpointRouteBuilder!

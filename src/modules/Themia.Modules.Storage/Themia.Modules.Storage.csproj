@@ -7,6 +7,7 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../../neutral/Themia.Storage/Themia.Storage.csproj" />
+    <ProjectReference Include="../../neutral/Themia.Storage.AspNetCore/Themia.Storage.AspNetCore.csproj" />
     <ProjectReference Include="../../neutral/Themia.Storage.S3/Themia.Storage.S3.csproj" />
     <ProjectReference Include="../../framework/Themia.Framework.Core/Themia.Framework.Core.csproj" />
     <ProjectReference Include="../../framework/Themia.Framework.Data.Abstractions/Themia.Framework.Data.Abstractions.csproj" />

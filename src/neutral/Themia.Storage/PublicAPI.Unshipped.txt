@@ -81,3 +81,14 @@ Themia.Storage.Local.LocalStorageOptions.PublicRootPath.set -> void
 Themia.Storage.Local.LocalStorageOptions.PublicBaseUrl.get -> string!
 Themia.Storage.Local.LocalStorageOptions.PublicBaseUrl.set -> void
 Themia.Storage.Local.LocalStorageProvider.GetPublicUrl(string! key) -> System.Uri!
+Themia.Storage.Urls.IStorageUrlService
+Themia.Storage.Urls.IStorageUrlService.GetDownloadUrlAsync(string! key, System.TimeSpan lifetime, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Uri!>!
+Themia.Storage.Urls.StorageUrlOptions
+Themia.Storage.Urls.StorageUrlOptions.PresignedBaseUrl.get -> string!
+Themia.Storage.Urls.StorageUrlOptions.PresignedBaseUrl.set -> void
+Themia.Storage.Urls.StorageUrlOptions.StorageUrlOptions() -> void
+Themia.Storage.Urls.StorageUrlService
+Themia.Storage.Urls.StorageUrlService.GetDownloadUrlAsync(string! key, System.TimeSpan lifetime, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Uri!>!
+Themia.Storage.Urls.StorageUrlService.StorageUrlService(Themia.Storage.IStorageProvider! provider, Microsoft.Extensions.Options.IOptions<Themia.Storage.Urls.StorageUrlOptions!>! options) -> void
+Themia.Storage.Urls.StorageUrlServiceCollectionExtensions
+static Themia.Storage.Urls.StorageUrlServiceCollectionExtensions.AddThemiaStorageUrls(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Themia.Storage.Urls.StorageUrlOptions!>? configure = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!

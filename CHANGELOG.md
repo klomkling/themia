@@ -27,6 +27,41 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.28.0] - 2026-09-19
+
+### Added
+- **`Themia.Storage.AspNetCore` — serve Local presigned downloads without the module** (coord #0134,
+  opsezy). `app.MapThemiaLocalStorage(prefix)` maps `GET {prefix}/_local/get`. The route already existed
+  inside `Themia.Modules.Storage` — but none of our three consumers takes the module; they construct
+  `LocalStorageProvider` directly, so each had to write the controller themselves. opsezy did. The module
+  now maps this same route instead of keeping its own copy.
+
+  Anonymous by construction: its own group, never returned, **and** `AllowAnonymous` — not returning the
+  group is not enough, because an authorization `FallbackPolicy` applies to every endpoint without auth
+  metadata and would put every link behind a login. A bad, expired or mismatched token is a bare `403`.
+  Mapping without a `LocalUrlSigner` fails at startup.
+
+- **`IStorageUrlService` + `AddThemiaStorageUrls` in `Themia.Storage`** — absolute presigned download URLs
+  from anywhere, including a background job with no HTTP request to take a host from. S3 URLs are returned
+  untouched; Local ones are joined onto `StorageUrlOptions.PresignedBaseUrl` ("presigned", not "download":
+  the same mount serves `_local/put`). The join is a string join on purpose — `new Uri(base, "_local/get")`
+  drops the base's last segment when it has no trailing slash, turning every link into a 404 over one
+  character of config. The base is validated at startup and checked against the mapped prefix.
+
+### Security
+- **Every Local presigned download now carries `Content-Security-Policy: sandbox`**, plus
+  `X-Content-Type-Options: nosniff` and `Cache-Control: private, no-store`. `nosniff` stops a browser
+  guessing a type and does nothing for a file whose declared type is already dangerous: an uploaded SVG
+  with a `<script>`, opened from its presigned link, ran on the API's origin. The module's route had
+  neither `nosniff` nor `no-store` before this. Applies to `Themia.Modules.Storage` hosts too.
+
+### Changed
+- `Themia.Modules.Storage`'s `_local/get` answers a refused token with **`403` instead of `401`**. `401`
+  means "authenticate", and there is nothing to authenticate with — a frontend that sends every `401` to the
+  login page would send a user with an expired link somewhere that cannot help them. With an S3/R2 backend
+  the route is no longer mapped at all rather than mapped to answer `404`; the status a client sees is
+  unchanged.
+
 ## [0.27.0] - 2026-09-19
 
 ### Added
