@@ -104,7 +104,7 @@ public sealed class LocalSignedRouteTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Tampered_token_is_rejected_with_401()
+    public async Task Tampered_token_is_rejected_with_403()
     {
         const string key = "acme/docs/secret.txt";
         var url = await AbsoluteAsync(key, PresignedUrlOperation.Get);
@@ -112,11 +112,11 @@ public sealed class LocalSignedRouteTests : IAsyncLifetime
         var tampered = url[..^1] + (url[^1] == 'A' ? 'B' : 'A');
 
         var response = await client.GetAsync(tampered);
-        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
     [Fact]
-    public async Task Expired_token_is_rejected_with_401()
+    public async Task Expired_token_is_rejected_with_403()
     {
         const string key = "acme/docs/old.txt";
         // Sign with an already-elapsed expiry so the route rejects it.
@@ -124,7 +124,25 @@ public sealed class LocalSignedRouteTests : IAsyncLifetime
         var url = $"/storage/_local/get?key={Uri.EscapeDataString(key)}&token={Uri.EscapeDataString(token)}";
 
         var response = await client.GetAsync(url);
-        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task The_module_download_carries_the_shared_security_headers()
+    {
+        // The module serves _local/get through Themia.Storage.AspNetCore's route, so a fix to the headers there
+        // reaches a module host too. Before it did, the module sent neither nosniff nor no-store, and an uploaded
+        // SVG opened from its signed link could run script on this origin.
+        const string key = "acme/docs/drawing.svg";
+        await provider.PutAsync(key, new MemoryStream("<svg xmlns='http://www.w3.org/2000/svg'/>"u8.ToArray()),
+            new StoragePutOptions("image/svg+xml"));
+
+        var response = await client.GetAsync(await AbsoluteAsync(key, PresignedUrlOperation.Get));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("sandbox", string.Join(",", response.Headers.GetValues("Content-Security-Policy")));
+        Assert.Equal("nosniff", string.Join(",", response.Headers.GetValues("X-Content-Type-Options")));
+        Assert.Contains("no-store", response.Headers.CacheControl!.ToString());
     }
 
     private async Task<string> AbsoluteAsync(string key, PresignedUrlOperation operation)

@@ -6,6 +6,12 @@
     <PackageTags>themia;storage;blob;object-storage;filesystem</PackageTags>
   </PropertyGroup>
   <ItemGroup>
+    <!-- For IStorageUrlService's registration and its startup-validated options only; the provider itself
+         stays DI-free and is constructed by hand as before. -->
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Options" />
+  </ItemGroup>
+  <ItemGroup>
     <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>

@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Themia.Storage;
+using Themia.Storage.AspNetCore;
 using Themia.Storage.Local;
 
 namespace Themia.Modules.Storage.Endpoints;
@@ -79,28 +80,15 @@ public static class StorageEndpoints
             return Results.Ok(new { key = stored.Key, sizeBytes = stored.SizeBytes });
         });
 
-        // Serve a Local presigned download (the token authorizes exactly this physical key).
-        // Returns 404 when the backend is not Local (the signer is only registered for UseLocal).
-        transfer.MapGet("/_local/get", async (
-            [FromQuery] string key,
-            [FromQuery] string token,
-            [FromServices] LocalUrlSigner? signer,
-            [FromServices] IStorageProvider provider,
-            CancellationToken ct) =>
+        // Serve a Local presigned download — the same route Themia.Storage.AspNetCore gives a host that does
+        // not take this module, so the two cannot drift: one set of security headers (nosniff, no-store and a
+        // CSP sandbox, without which an uploaded SVG runs script on this origin) and one answer (403) to a bad
+        // token. Mapped only for the Local backend: with S3/R2 no _local URL is ever minted, the signer is not
+        // registered, and the route simply does not exist.
+        if (endpoints.ServiceProvider.GetService<LocalUrlSigner>() is not null)
         {
-            if (signer is null)
-            {
-                return Results.NotFound();
-            }
-
-            if (!signer.TryVerify(key, PresignedUrlOperation.Get, token, DateTimeOffset.UtcNow))
-            {
-                return Results.Unauthorized();
-            }
-
-            var read = await provider.GetAsync(key, ct);
-            return read is null ? Results.NotFound() : Results.Stream(read.Content, read.ContentType);
-        });
+            endpoints.MapThemiaLocalStorage(prefix);
+        }
 
         // Accept a Local presigned upload (the token authorizes exactly this physical key).
         // Returns 404 when the backend is not Local (the signer is only registered for UseLocal).
