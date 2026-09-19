@@ -17,9 +17,14 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # timeout-minutes (coord #0136): ~3x the longest successful publish in the last 40 runs (9.4 min).
+  # Killing a publish half-way is safe to re-run: the tag step skips an existing tag, nuget push uses
+  # --skip-duplicate, and the GitHub Release step is idempotent. The wait for the `nuget` environment's
+  # approval happens before the job starts, so it does not count against this.
   check:
     name: Check version & tag
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     outputs:
       version: ${{ steps.decide.outputs.version }}
       should_release: ${{ steps.decide.outputs.should_release }}
@@ -98,6 +103,7 @@ jobs:
     needs: check
     if: needs.check.outputs.should_release == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     environment: nuget
     permissions:
       contents: write    # push the release tag, create the GitHub Release

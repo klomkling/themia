@@ -19,9 +19,13 @@ concurrency:
 # build gate and the test shards run in parallel (each rebuilds — fine), and the tests are sharded to
 # cut the tail. Integration (Testcontainers) tests run nightly in integration.yml, not here.
 jobs:
+  # timeout-minutes on every job (coord #0136). None had one, so a hang held a runner for GitHub's
+  # 360-minute default. Each is ~3-5x the longest successful run in the last 40 (2026-09-19): build 3.6,
+  # test shard 3.5, analyzer smoke 2.3, migrations guard 1.7, aggregator and Copilot request 0.1 minutes.
   build:
     name: Build & inline review
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
         with:
@@ -77,6 +81,7 @@ jobs:
   test:
     name: Test (shard ${{ matrix.shard }}/3)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     strategy:
       fail-fast: false          # one shard failing must not cancel the others (see all failures at once)
       matrix:
@@ -153,6 +158,7 @@ jobs:
     needs: [build, test]
     if: always()
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - name: Require build + all test shards to have succeeded
         run: |
@@ -165,6 +171,7 @@ jobs:
   analyzer-flow:
     name: Analyzer flow (adopter smoke test)
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
 
@@ -191,6 +198,7 @@ jobs:
   migrations-engine-guard:
     name: Migrations engine guard (adopter smoke test)
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
 
@@ -227,6 +235,7 @@ jobs:
        github.event.action == 'ready_for_review' ||
        github.event.action == 'synchronize')
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     permissions:
       pull-requests: write
     steps:
