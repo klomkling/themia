@@ -21,6 +21,88 @@ public sealed class PdfRenderingIntegrationTests
         Assert.Equal(new byte[] { 0x25, 0x50, 0x44, 0x46, 0x2D }, bytes[..5]);
     }
 
+    /// <summary>
+    /// A server that accepts a connection and never answers. An <c>&lt;img&gt;</c> pointing at it keeps the
+    /// page's load event from firing, so <c>SetContentAsync</c> never returns on its own — the shape of a
+    /// template referencing an image or font on a host that stops responding.
+    /// </summary>
+    private sealed class SilentServer : IDisposable
+    {
+        private readonly System.Net.Sockets.TcpListener listener = new(System.Net.IPAddress.Loopback, 0);
+        private readonly List<System.Net.Sockets.TcpClient> held = [];
+
+        public SilentServer()
+        {
+            listener.Start();
+            _ = AcceptForeverAsync();
+        }
+
+        public string Url => $"http://127.0.0.1:{((System.Net.IPEndPoint)listener.LocalEndpoint).Port}/never.png";
+
+        private async Task AcceptForeverAsync()
+        {
+            try
+            {
+                while (true)
+                {
+                    held.Add(await listener.AcceptTcpClientAsync());   // hold it open; send nothing
+                }
+            }
+            catch (ObjectDisposedException) { }
+            catch (System.Net.Sockets.SocketException) { }
+        }
+
+        public void Dispose()
+        {
+            listener.Stop();
+            foreach (var c in held) c.Dispose();
+        }
+    }
+
+    [Fact]
+    public async Task A_render_that_never_finishes_loading_times_out_and_gives_its_slot_back()
+    {
+        // MaxConcurrency 1: before the deadline existed, this render held the only slot for ever and the
+        // follow-up render below would have waited behind it indefinitely.
+        using var server = new SilentServer();
+        await using var renderer = new PuppeteerPdfRenderer(
+            new ThemiaPdfOptions { MaxConcurrency = 1, RenderTimeout = TimeSpan.FromSeconds(3) },
+            NullLogger<PuppeteerPdfRenderer>.Instance);
+        await renderer.RenderHtmlAsync("<p>warm up: launch Chromium outside the timed render</p>");
+
+        var started = System.Diagnostics.Stopwatch.StartNew();
+        var error = await Assert.ThrowsAsync<TimeoutException>(
+            () => renderer.RenderHtmlAsync($"<img src=\"{server.Url}\">"));
+        started.Stop();
+
+        Assert.Contains(nameof(ThemiaPdfOptions.RenderTimeout), error.Message);
+        // Well under PuppeteerSharp's own 30 s navigation timeout, so it was Themia's deadline that fired.
+        Assert.True(started.Elapsed < TimeSpan.FromSeconds(20), $"timed out after {started.Elapsed}");
+
+        // The slot came back: a normal render now completes — bounded, so a regression fails instead of hanging.
+        var next = await renderer.RenderHtmlAsync("<p>after</p>").WaitAsync(TimeSpan.FromSeconds(60));
+        Assert.Equal(new byte[] { 0x25, 0x50, 0x44, 0x46, 0x2D }, next[..5]);
+    }
+
+    [Fact]
+    public async Task Cancelling_a_stuck_render_gives_its_slot_back()
+    {
+        // The caller's token used to be honoured only BETWEEN page calls; a SetContent in flight ran to
+        // completion — here, never.
+        using var server = new SilentServer();
+        await using var renderer = new PuppeteerPdfRenderer(
+            new ThemiaPdfOptions { MaxConcurrency = 1 },
+            NullLogger<PuppeteerPdfRenderer>.Instance);
+        await renderer.RenderHtmlAsync("<p>warm up</p>");
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => renderer.RenderHtmlAsync($"<img src=\"{server.Url}\">", ct: cts.Token));
+
+        var next = await renderer.RenderHtmlAsync("<p>after</p>").WaitAsync(TimeSpan.FromSeconds(60));
+        Assert.True(next.Length > 0);
+    }
+
     [Theory]
     [InlineData(1)]
     [InlineData(2)]

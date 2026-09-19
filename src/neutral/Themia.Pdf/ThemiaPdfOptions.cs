@@ -59,6 +59,31 @@ public sealed class ThemiaPdfOptions
     public int MaxConcurrency { get; set; } = 2;
 
     /// <summary>
+    /// Wall-clock deadline for one render's work in the browser — opening the page, loading the HTML and
+    /// printing it. Default 60 seconds; must be positive. A render past it throws
+    /// <see cref="System.TimeoutException"/> and gives its concurrency slot back.
+    /// </summary>
+    /// <remarks>
+    /// Without it, a render that never completes holds its <see cref="MaxConcurrency"/> slot for ever, and at
+    /// the default of a small single-digit ceiling a couple of stuck renders stop all PDF generation in the
+    /// process — with no error, because nothing has failed. That happened: an integration run on 2026-09-06
+    /// sat in one render for 5h53m. PuppeteerSharp's own timeouts (a 180-second protocol timeout, 30-second
+    /// navigation) did not end it, so this deadline is enforced by Themia around the whole operation rather
+    /// than delegated to the library.
+    /// <para>
+    /// On expiry the page is closed; if even that does not finish promptly, the browser process is killed
+    /// and relaunched on the next render, because a Chromium that cannot close a page will not render the
+    /// next one either. Killing it also fails any other render in flight on that browser — deliberately:
+    /// they were running on the same wedged process.
+    /// </para>
+    /// <para>
+    /// Launching Chromium, including a first-run download, is not counted: it happens once and can
+    /// legitimately take minutes on a cold host.
+    /// </para>
+    /// </remarks>
+    public TimeSpan RenderTimeout { get; set; } = TimeSpan.FromSeconds(60);
+
+    /// <summary>
     /// Optional hook to register custom helpers or partials on the Handlebars engine at construction.
     /// The built-in <c>emptyIfNull</c> helper is always registered first.
     /// </summary>

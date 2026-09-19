@@ -24,6 +24,7 @@ internal sealed class PuppeteerPdfRenderer : IPdfRenderer, IAsyncDisposable, IDi
     private readonly ILogger<PuppeteerPdfRenderer> _logger;
     private readonly SemaphoreSlim _browserLock = new(1, 1);
     private readonly SemaphoreSlim _renderLock;
+    private readonly TimeSpan _renderTimeout;
     private int _inFlight;
     private int _peakInFlight;
     // volatile: the outer fast-path read in EnsureBrowserAsync runs outside the lock, so the
@@ -45,7 +46,18 @@ internal sealed class PuppeteerPdfRenderer : IPdfRenderer, IAsyncDisposable, IDi
                 $"{nameof(ThemiaPdfOptions)}.{nameof(ThemiaPdfOptions.MaxConcurrency)} must be at least 1.");
 
         _renderLock = new SemaphoreSlim(options.MaxConcurrency, options.MaxConcurrency);
+
+        // Snapshot for the same reason as MaxConcurrency.
+        if (options.RenderTimeout <= TimeSpan.Zero)
+            throw new ArgumentOutOfRangeException(
+                nameof(options), options.RenderTimeout,
+                $"{nameof(ThemiaPdfOptions)}.{nameof(ThemiaPdfOptions.RenderTimeout)} must be positive.");
+
+        _renderTimeout = options.RenderTimeout;
     }
+
+    /// <summary>How long an abandoned render's page gets to close before the browser is killed instead.</summary>
+    internal static readonly TimeSpan PageCloseGrace = TimeSpan.FromSeconds(5);
 
     /// <summary>
     /// Highest number of renders seen in flight at once. Exposed for tests that assert the concurrency bound
@@ -69,19 +81,106 @@ internal sealed class PuppeteerPdfRenderer : IPdfRenderer, IAsyncDisposable, IDi
         {
             var browser = await EnsureBrowserAsync(ct).ConfigureAwait(false);
 
-            // PuppeteerSharp's page methods don't take a CancellationToken, so honor ct between
-            // stages — combined with the WaitAsync(ct) in EnsureBrowserAsync this is the available
-            // granularity (a SetContent/PdfData call already in flight runs to completion). Render
-            // failures propagate untouched to the top-level handler (THEMIA101: no log-and-rethrow).
-            await using var page = await browser.NewPageAsync().ConfigureAwait(false);
-            await page.SetContentAsync(html).ConfigureAwait(false);
-            ct.ThrowIfCancellationRequested();
-            return await page.PdfDataAsync(ToPdfOptions(opts)).ConfigureAwait(false);
+            // PuppeteerSharp's page methods take no CancellationToken, and its own timeouts did not end a
+            // render that hung for 5h53m. So the deadline and the caller's token are enforced HERE, around
+            // the whole page operation: WaitAsync stops waiting, the slot is released in the finally below,
+            // and the abandoned page is closed (or the browser killed) so the stuck work cannot pile up.
+            // Render failures propagate untouched to the top-level handler (THEMIA101: no log-and-rethrow).
+            var page = new PageHolder();
+            var work = RenderPageAsync(browser, html, opts, page);
+            try
+            {
+                return await work.WaitAsync(_renderTimeout, ct).ConfigureAwait(false);
+            }
+            catch (TimeoutException)
+            {
+                await AbandonAsync(browser, page, work).ConfigureAwait(false);
+                throw new TimeoutException(
+                    $"Themia.Pdf: the render did not finish within {nameof(ThemiaPdfOptions)}.{nameof(ThemiaPdfOptions.RenderTimeout)} " +
+                    $"({_renderTimeout}). Its page was abandoned and its concurrency slot released.");
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                await AbandonAsync(browser, page, work).ConfigureAwait(false);
+                throw;
+            }
         }
         finally
         {
             Interlocked.Decrement(ref _inFlight);
             _renderLock.Release();
+        }
+    }
+
+    /// <summary>The page a render is using, published as soon as it exists so an abandonment can close it.</summary>
+    private sealed class PageHolder
+    {
+        public volatile IPage? Page;
+    }
+
+    private static async Task<byte[]> RenderPageAsync(IBrowser browser, string html, PdfRenderOptions opts, PageHolder holder)
+    {
+        await using var page = await browser.NewPageAsync().ConfigureAwait(false);
+        holder.Page = page;
+        await page.SetContentAsync(html).ConfigureAwait(false);
+        return await page.PdfDataAsync(ToPdfOptions(opts)).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Stops an abandoned render from holding browser resources: close its page, and if that does not finish
+    /// within <see cref="PageCloseGrace"/> — or the page was never created, meaning NewPage itself is what hung —
+    /// kill the browser so the next render launches a fresh one.
+    /// </summary>
+    private async Task AbandonAsync(IBrowser browser, PageHolder holder, Task<byte[]> work)
+    {
+        // The abandoned task may still fault later (its page closed underneath it, or the browser killed);
+        // observe that so it never surfaces as an unobserved task exception.
+        _ = work.ContinueWith(static t => _ = t.Exception, TaskContinuationOptions.OnlyOnFaulted);
+
+        if (holder.Page is { } page)
+        {
+            try
+            {
+                await page.CloseAsync().WaitAsync(PageCloseGrace).ConfigureAwait(false);
+                return;
+            }
+            catch (Exception ex) when (ex is TimeoutException or PuppeteerException or ObjectDisposedException)
+            {
+                // Could not close it: the browser is not answering. Fall through and replace the browser.
+            }
+        }
+
+        await KillBrowserAsync(browser).ConfigureAwait(false);
+    }
+
+    private async Task KillBrowserAsync(IBrowser browser)
+    {
+        _logger.LogWarning(
+            "Themia.Pdf: a render exceeded its deadline and its page could not be closed; killing the Chromium " +
+            "process so the next render launches a fresh one. Other renders in flight on it will fail.");
+
+        // Kill rather than Dispose: Dispose blocks on the same async close that just failed to complete.
+        try
+        {
+            browser.Process?.Kill(entireProcessTree: true);
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception)
+        {
+            // Already exited.
+        }
+
+        // Forget it so EnsureBrowserAsync relaunches instead of disposing — and blocking on — the dead one.
+        await _browserLock.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            if (ReferenceEquals(_browser, browser))
+            {
+                _browser = null;
+            }
+        }
+        finally
+        {
+            _browserLock.Release();
         }
     }
 
