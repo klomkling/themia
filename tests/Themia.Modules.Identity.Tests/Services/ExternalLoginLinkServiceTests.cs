@@ -42,6 +42,9 @@ public sealed class ExternalLoginLinkServiceTests
     private ExternalLoginLinkService Build(IRepository<ExternalLoginLink, Guid>? linkRepo = null) =>
         new(users, linkRepo ?? links, uow, clock, new DataFilterScope(), options, hooks, [observer]);
 
+    private ExternalLoginLinkService BuildWith(IUserLifecycleHooks rules) =>
+        new(users, links, uow, clock, new DataFilterScope(), options, rules, [observer]);
+
     private User Seed(string name = "alice", bool active = true)
     {
         var user = new User { UserName = name, NormalizedUserName = name.ToUpperInvariant(), TenantId = Acme, IsActive = active };
@@ -271,6 +274,79 @@ public sealed class ExternalLoginLinkServiceTests
         Assert.Equal(ExternalLoginUnlinkOutcome.UserNotFound, result.Outcome);
     }
 
+    // ---- current links and refusal codes (coord #0139) ------------------------------------------
+
+    [Fact]
+    public async Task LinkAsync_hands_the_hook_every_link_the_user_holds_before_the_new_one()
+    {
+        // "One identity per provider" needs the user's links, and the hook cannot read them itself: the
+        // only supported read is this service, which is the one calling the hook.
+        var alice = Seed();
+        var sut = Build();
+        await sut.LinkAsync(alice.Id, Telegram("tg-1"));
+        await sut.LinkAsync(alice.Id, new ExternalIdentity("line", "ln-1", null, false, "ln"));
+        var rules = new SnapshotHooks();
+
+        await BuildWith(rules).LinkAsync(alice.Id, Telegram("tg-2"));
+
+        Assert.Equal(["telegram:tg-1", "line:ln-1"], rules.SeenOnLink!.Select(l => $"{l.Provider}:{l.Subject}"));
+    }
+
+    [Fact]
+    public async Task UnlinkAsync_hands_the_hook_every_link_the_user_holds_not_only_the_providers()
+    {
+        // "Never unlink the last channel" is a question about the OTHER providers.
+        var alice = Seed();
+        var sut = Build();
+        await sut.LinkAsync(alice.Id, Telegram("tg-1"));
+        await sut.LinkAsync(alice.Id, new ExternalIdentity("line", "ln-1", null, false, "ln"));
+        var rules = new SnapshotHooks();
+
+        await BuildWith(rules).UnlinkAsync(alice.Id, "telegram");
+
+        Assert.Equal(["telegram", "line"], rules.SeenOnUnlink!.Select(l => l.Provider));
+    }
+
+    [Fact]
+    public async Task A_rule_over_the_current_links_refuses_the_last_channel_with_its_code()
+    {
+        var alice = Seed();
+        await Build().LinkAsync(alice.Id, Telegram("tg-1"));
+        var sut = BuildWith(new SnapshotHooks());
+
+        var result = await sut.UnlinkAsync(alice.Id, "telegram");
+
+        Assert.Equal(ExternalLoginUnlinkOutcome.Refused, result.Outcome);
+        Assert.Equal("last_channel", result.RefusalCode);
+        Assert.Equal("this is your only channel", result.Reason);
+        Assert.Single(linkStore);
+    }
+
+    [Fact]
+    public async Task A_rule_over_the_current_links_refuses_a_second_identity_with_its_code()
+    {
+        var alice = Seed();
+        await Build().LinkAsync(alice.Id, Telegram("tg-1"));
+        var sut = BuildWith(new SnapshotHooks());
+
+        var result = await sut.LinkAsync(alice.Id, Telegram("tg-2"));
+
+        Assert.Equal(ExternalLoginLinkOutcome.Refused, result.Outcome);
+        Assert.Equal("channel_already_linked", result.RefusalCode);
+        Assert.Single(linkStore);
+    }
+
+    [Fact]
+    public async Task A_refusal_without_a_code_has_no_code()
+    {
+        var alice = Seed();
+        hooks.RefuseLink = "no";
+
+        var result = await Build().LinkAsync(alice.Id, Telegram("tg-1"));
+
+        Assert.Null(result.RefusalCode);
+    }
+
     // ---- list and look up ----------------------------------------------------------------------
 
     [Fact]
@@ -452,6 +528,36 @@ public sealed class ExternalLoginLinkServiceTests
 
     // ---- doubles -------------------------------------------------------------------------------
 
+    /// <summary>Opsezy's two channel rules (coord #0139), written against the overloads that carry the
+    /// user's current links.</summary>
+    private sealed class SnapshotHooks : IUserLifecycleHooks
+    {
+        public IReadOnlyList<ExternalLoginInfo>? SeenOnLink { get; private set; }
+        public IReadOnlyList<ExternalLoginInfo>? SeenOnUnlink { get; private set; }
+
+        public ValueTask<UserMutationDecision> OnBeforeLinkExternalLoginAsync(
+            Guid userId, string provider, string subject, IReadOnlyList<ExternalLoginInfo> currentLogins,
+            CancellationToken cancellationToken)
+        {
+            SeenOnLink = currentLogins;
+            return ValueTask.FromResult(currentLogins.Any(l => l.Provider == provider)
+                ? UserMutationDecision.Refuse("you already linked this channel", "channel_already_linked")
+                : UserMutationDecision.Allow());
+        }
+
+        public ValueTask<UserMutationDecision> OnBeforeUnlinkExternalLoginAsync(
+            Guid userId, string provider, IReadOnlyList<ExternalLoginInfo> currentLogins,
+            CancellationToken cancellationToken)
+        {
+            SeenOnUnlink = currentLogins;
+            return ValueTask.FromResult(currentLogins.All(l => l.Provider == provider)
+                ? UserMutationDecision.Refuse("this is your only channel", "last_channel")
+                : UserMutationDecision.Allow());
+        }
+    }
+
+    /// <summary>Implements the original overloads only — every pre-#0139 implementation looks like this, and
+    /// the tests using it prove the service still reaches them through the new overloads' defaults.</summary>
     private sealed class ScriptedHooks : IUserLifecycleHooks
     {
         public string? RefuseLink { get; set; }

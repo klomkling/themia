@@ -48,6 +48,12 @@ public readonly record struct ExternalLoginLinkResult(ExternalLoginLinkOutcome O
 {
     /// <summary>Whether the identity is linked to the user now — newly or already.</summary>
     public bool IsLinked => Outcome is ExternalLoginLinkOutcome.Linked or ExternalLoginLinkOutcome.AlreadyLinkedToUser;
+
+    /// <summary>
+    /// The hook's machine-readable code when <see cref="Outcome"/> is <see cref="ExternalLoginLinkOutcome.Refused"/>
+    /// and the hook gave one; otherwise null. Branch on this, not on <see cref="Reason"/>.
+    /// </summary>
+    public string? RefusalCode { get; init; }
 }
 
 /// <summary>Why <see cref="IExternalLoginLinkService.UnlinkAsync"/> did or did not unlink.</summary>
@@ -69,7 +75,14 @@ public enum ExternalLoginUnlinkOutcome
 /// <summary>The outcome of <see cref="IExternalLoginLinkService.UnlinkAsync"/>.</summary>
 /// <param name="Outcome">What happened.</param>
 /// <param name="Reason">The hook's reason when <paramref name="Outcome"/> is <see cref="ExternalLoginUnlinkOutcome.Refused"/>; otherwise null.</param>
-public readonly record struct ExternalLoginUnlinkResult(ExternalLoginUnlinkOutcome Outcome, string? Reason = null);
+public readonly record struct ExternalLoginUnlinkResult(ExternalLoginUnlinkOutcome Outcome, string? Reason = null)
+{
+    /// <summary>
+    /// The hook's machine-readable code when <see cref="Outcome"/> is <see cref="ExternalLoginUnlinkOutcome.Refused"/>
+    /// and the hook gave one; otherwise null. Branch on this, not on <see cref="Reason"/>.
+    /// </summary>
+    public string? RefusalCode { get; init; }
+}
 
 /// <summary>
 /// Manages the external identities linked to an existing user: attach, detach, list, and look up.
@@ -114,7 +127,7 @@ public interface IExternalLoginLinkService
     /// <para>
     /// A user may hold more than one identity from the same provider — two Google accounts is legitimate —
     /// so a second link for a provider is not refused here. A consumer allowing one per provider enforces
-    /// it in <see cref="IUserLifecycleHooks.OnBeforeLinkExternalLoginAsync"/>.
+    /// it in <see cref="IUserLifecycleHooks.OnBeforeLinkExternalLoginAsync(Guid, string, string, IReadOnlyList{ExternalLoginInfo}, CancellationToken)"/>.
     /// </para>
     /// </remarks>
     Task<ExternalLoginLinkResult> LinkAsync(
@@ -129,7 +142,7 @@ public interface IExternalLoginLinkService
     /// This is how a user without a password locks themselves out. Themia does not refuse the "last"
     /// method itself, because it cannot know every way a consumer's users sign in — a rule like "never
     /// leave a user with no channel" belongs in
-    /// <see cref="IUserLifecycleHooks.OnBeforeUnlinkExternalLoginAsync"/>.
+    /// <see cref="IUserLifecycleHooks.OnBeforeUnlinkExternalLoginAsync(Guid, string, IReadOnlyList{ExternalLoginInfo}, CancellationToken)"/>.
     /// </remarks>
     Task<ExternalLoginUnlinkResult> UnlinkAsync(
         Guid userId, string provider, CancellationToken cancellationToken = default);

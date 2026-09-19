@@ -25,10 +25,11 @@ public enum UserMutationOutcome
 /// <summary>The outcome of a mutation on <see cref="IUserService"/>.</summary>
 public readonly record struct UserMutationResult
 {
-    private UserMutationResult(UserMutationOutcome outcome, string? reason)
+    private UserMutationResult(UserMutationOutcome outcome, string? reason, string? refusalCode = null)
     {
         Outcome = outcome;
         Reason = reason;
+        RefusalCode = refusalCode;
     }
 
     /// <summary>Why it succeeded or failed.</summary>
@@ -40,6 +41,12 @@ public readonly record struct UserMutationResult
     /// the change.
     /// </summary>
     public string? Reason { get; }
+
+    /// <summary>
+    /// The hook's machine-readable code when <see cref="Outcome"/> is <see cref="UserMutationOutcome.Refused"/>
+    /// and the hook gave one; otherwise null. Branch on this, not on <see cref="Reason"/>.
+    /// </summary>
+    public string? RefusalCode { get; }
 
     /// <summary>Whether the mutation was applied.</summary>
     public bool Succeeded => Outcome == UserMutationOutcome.Success;
@@ -56,15 +63,22 @@ public readonly record struct UserMutationResult
     /// <summary>A hook refused the change.</summary>
     /// <param name="reason">What to tell whoever attempted it.</param>
     public static UserMutationResult Refused(string reason) => new(UserMutationOutcome.Refused, reason);
+
+    /// <summary>A hook refused the change.</summary>
+    /// <param name="reason">What to tell whoever attempted it.</param>
+    /// <param name="refusalCode">The hook's machine-readable code, or null when it gave none.</param>
+    public static UserMutationResult Refused(string reason, string? refusalCode) =>
+        new(UserMutationOutcome.Refused, reason, refusalCode);
 }
 
 /// <summary>A hook's answer to a proposed mutation.</summary>
 public readonly record struct UserMutationDecision
 {
-    private UserMutationDecision(bool allowed, string? reason)
+    private UserMutationDecision(bool allowed, string? reason, string? code)
     {
         IsAllowed = allowed;
         Reason = reason;
+        Code = code;
     }
 
     /// <summary>Whether the mutation may proceed.</summary>
@@ -73,8 +87,14 @@ public readonly record struct UserMutationDecision
     /// <summary>Why it was refused; null when allowed.</summary>
     public string? Reason { get; }
 
+    /// <summary>
+    /// The stable, machine-readable code for the refusal, surfaced to the caller as its result's
+    /// <c>RefusalCode</c>; null when allowed or refused without one.
+    /// </summary>
+    public string? Code { get; }
+
     /// <summary>Let the mutation proceed.</summary>
-    public static UserMutationDecision Allow() => new(true, null);
+    public static UserMutationDecision Allow() => new(true, null, null);
 
     /// <summary>
     /// Refuse the mutation. Nothing is written and the caller receives
@@ -87,7 +107,23 @@ public readonly record struct UserMutationDecision
     public static UserMutationDecision Refuse(string reason)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(reason);
-        return new UserMutationDecision(false, reason);
+        return new UserMutationDecision(false, reason, null);
+    }
+
+    /// <summary>
+    /// Refuse the mutation with a machine-readable <paramref name="code"/> the caller can branch on.
+    /// </summary>
+    /// <param name="reason">What to tell whoever attempted the change, as for <see cref="Refuse(string)"/>.</param>
+    /// <param name="code">
+    /// A stable code such as <c>"last_channel"</c>. Once a consumer registers two rules on one mutation, the
+    /// caller can tell which refused only by this — matching on <paramref name="reason"/> breaks the day the
+    /// wording changes.
+    /// </param>
+    public static UserMutationDecision Refuse(string reason, string code)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(reason);
+        ArgumentException.ThrowIfNullOrWhiteSpace(code);
+        return new UserMutationDecision(false, reason, code);
     }
 }
 

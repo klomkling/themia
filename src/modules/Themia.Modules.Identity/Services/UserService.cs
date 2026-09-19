@@ -270,7 +270,7 @@ public sealed class UserService : IUserService
         if (!decision.IsAllowed)
         {
             await RaiseAsync((o, ct) => o.OnUserMutationRefusedAsync(userId, UserMutation.Email, decision.Reason!, ct), cancellationToken).ConfigureAwait(false);
-            return UserMutationResult.Refused(decision.Reason!);
+            return UserMutationResult.Refused(decision.Reason!, decision.Code);
         }
 
         string? normalized = null;
@@ -312,7 +312,7 @@ public sealed class UserService : IUserService
         if (!decision.IsAllowed)
         {
             await RaiseAsync((o, ct) => o.OnUserMutationRefusedAsync(userId, UserMutation.EmailConfirmation, decision.Reason!, ct), cancellationToken).ConfigureAwait(false);
-            return UserMutationResult.Refused(decision.Reason!);
+            return UserMutationResult.Refused(decision.Reason!, decision.Code);
         }
 
         user.EmailConfirmed = true;
@@ -336,7 +336,7 @@ public sealed class UserService : IUserService
         if (!decision.IsAllowed)
         {
             await RaiseAsync((o, ct) => o.OnUserMutationRefusedAsync(userId, UserMutation.Phone, decision.Reason!, ct), cancellationToken).ConfigureAwait(false);
-            return UserMutationResult.Refused(decision.Reason!);
+            return UserMutationResult.Refused(decision.Reason!, decision.Code);
         }
 
         var normalized = phoneNormalizer.Normalize(phoneNumber);
@@ -377,7 +377,7 @@ public sealed class UserService : IUserService
         if (!decision.IsAllowed)
         {
             await RaiseAsync((o, ct) => o.OnUserMutationRefusedAsync(userId, UserMutation.PhoneConfirmation, decision.Reason!, ct), cancellationToken).ConfigureAwait(false);
-            return UserMutationResult.Refused(decision.Reason!);
+            return UserMutationResult.Refused(decision.Reason!, decision.Code);
         }
 
         user.PhoneNumberConfirmed = true;
@@ -402,7 +402,7 @@ public sealed class UserService : IUserService
         if (!decision.IsAllowed)
         {
             await RaiseAsync((o, ct) => o.OnUserMutationRefusedAsync(userId, UserMutation.Password, decision.Reason!, ct), cancellationToken).ConfigureAwait(false);
-            return UserMutationResult.Refused(decision.Reason!);
+            return UserMutationResult.Refused(decision.Reason!, decision.Code);
         }
 
         user.PasswordHash = passwordHasher.Hash(password);
@@ -495,7 +495,7 @@ public sealed class UserService : IUserService
         if (!decision.IsAllowed)
         {
             await RaiseAsync((o, ct) => o.OnUserMutationRefusedAsync(userId, UserMutation.Active, decision.Reason!, ct), cancellationToken).ConfigureAwait(false);
-            return UserMutationResult.Refused(decision.Reason!);
+            return UserMutationResult.Refused(decision.Reason!, decision.Code);
         }
 
         user.IsActive = isActive;
@@ -519,7 +519,7 @@ public sealed class UserService : IUserService
         if (!decision.IsAllowed)
         {
             await RaiseAsync((o, ct) => o.OnUserMutationRefusedAsync(userId, UserMutation.Deleted, decision.Reason!, ct), cancellationToken).ConfigureAwait(false);
-            return UserMutationResult.Refused(decision.Reason!);
+            return UserMutationResult.Refused(decision.Reason!, decision.Code);
         }
 
         users.Remove(user);

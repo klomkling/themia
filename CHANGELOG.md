@@ -27,6 +27,24 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+### Added
+- **Link and unlink hooks now receive the user's current links** (`Themia.Modules.Identity`, coord #0139).
+  `IUserLifecycleHooks` gains `OnBeforeLinkExternalLoginAsync` and `OnBeforeUnlinkExternalLoginAsync`
+  overloads taking `IReadOnlyList<ExternalLoginInfo> currentLogins`, and the module calls those. "One identity
+  per provider" and "never unlink the last channel" both need that list, and a hook had no supported way to
+  read it: the only read is `IExternalLoginLinkService`, which is the service invoking the hook, so injecting
+  it is a DI cycle. The unlink overload gets every provider's links, not only the one being removed. The new
+  overloads default to calling the old ones, so an existing implementation is still consulted.
+- **A refusal can carry a machine-readable code.** `UserMutationDecision.Refuse(reason, code)`, surfaced as
+  `RefusalCode` on `UserMutationResult`, `ExternalLoginLinkResult` and `ExternalLoginUnlinkResult`. With two
+  rules on one mutation a caller could previously tell which refused only by matching the free-text reason.
+
+### Changed
+- **(breaking, source)** The original `OnBeforeLinkExternalLoginAsync` / `OnBeforeUnlinkExternalLoginAsync`
+  overloads no longer default their `CancellationToken`: the public-API analyzer (RS0027) requires the
+  optional parameter on the overload with the most parameters. Only code that *calls* a hook directly
+  without a token is affected — implementations compile unchanged. See [MIGRATION.md](MIGRATION.md).
+
 ## [0.28.1] - 2026-09-19
 
 ### Fixed

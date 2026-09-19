@@ -139,6 +139,54 @@ public class UserLifecycleHooksTests
         Assert.NotNull(await sut.FindByUserNameAsync("alice"));
     }
 
+    [Fact]
+    public async Task Every_refusal_carries_the_hooks_code()
+    {
+        // A caller with two rules on one mutation can tell them apart only by code (coord #0139). A code
+        // honoured on some paths reads as honoured on all, so every path is asserted.
+        var userId = await SeedAsync();
+        Assert.True((await sut.SetPhoneNumberAsync(userId, "+66811112222")).Succeeded);
+        hooks.RefusalCode = "rule_x";
+        hooks.RefuseSetEmail = hooks.RefuseConfirmEmail = hooks.RefuseSetPhoneNumber =
+            hooks.RefuseConfirmPhoneNumber = hooks.RefuseSetPassword = hooks.RefuseSetActive =
+            hooks.RefuseDelete = "refused";
+
+        UserMutationResult[] results =
+        [
+            await sut.SetEmailAsync(userId, "new@example.com"),
+            await sut.ConfirmEmailAsync(userId),
+            await sut.SetPhoneNumberAsync(userId, "+66899998888"),
+            await sut.ConfirmPhoneNumberAsync(userId),
+            await sut.SetPasswordAsync(userId, "newpw"),
+            await sut.SetActiveAsync(userId, false),
+            await sut.DeleteAsync(userId),
+        ];
+
+        Assert.All(results, r =>
+        {
+            Assert.Equal(UserMutationOutcome.Refused, r.Outcome);
+            Assert.Equal("rule_x", r.RefusalCode);
+        });
+    }
+
+    [Fact]
+    public async Task A_refusal_without_a_code_has_no_code()
+    {
+        var userId = await SeedAsync();
+        hooks.RefuseSetEmail = "refused";
+
+        var result = await sut.SetEmailAsync(userId, "new@example.com");
+
+        Assert.Null(result.RefusalCode);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("  ")]
+    public void Refuse_rejects_a_blank_code(string? code) =>
+        Assert.ThrowsAny<ArgumentException>(() => UserMutationDecision.Refuse("refused", code!));
+
     // ---- observation -------------------------------------------------------------------------
 
     [Fact]

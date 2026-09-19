@@ -98,14 +98,19 @@ public sealed class ExternalLoginLinkService : IExternalLoginLinkService
                 : ExternalLoginLinkOutcome.LinkedToAnotherUser);
         }
 
-        var decision = await hooks.OnBeforeLinkExternalLoginAsync(user.Id, provider, subject, cancellationToken)
+        var current = await LinksOfAsync(user, provider: null, cancellationToken).ConfigureAwait(false);
+        var decision = await hooks
+            .OnBeforeLinkExternalLoginAsync(user.Id, provider, subject, current.Select(ToInfo).ToArray(), cancellationToken)
             .ConfigureAwait(false);
         if (!decision.IsAllowed)
         {
             await RaiseAsync(
                 (o, ct) => o.OnUserMutationRefusedAsync(user.Id, UserMutation.ExternalLogin, decision.Reason!, ct),
                 cancellationToken).ConfigureAwait(false);
-            return new ExternalLoginLinkResult(ExternalLoginLinkOutcome.Refused, decision.Reason);
+            return new ExternalLoginLinkResult(ExternalLoginLinkOutcome.Refused, decision.Reason)
+            {
+                RefusalCode = decision.Code,
+            };
         }
 
         try
@@ -144,20 +149,27 @@ public sealed class ExternalLoginLinkService : IExternalLoginLinkService
             return new ExternalLoginUnlinkResult(ExternalLoginUnlinkOutcome.UserNotFound);
         }
 
-        var held = await LinksOfAsync(user, normalized, cancellationToken).ConfigureAwait(false);
-        if (held.Count == 0)
+        // Every provider's links, not only this one's: the hook's "last channel" rule is about the others.
+        var current = await LinksOfAsync(user, provider: null, cancellationToken).ConfigureAwait(false);
+        // Ignoring case as the SQL Server and MySQL collations did when this filter ran in the query.
+        var held = current.Where(l => string.Equals(l.Provider, normalized, StringComparison.OrdinalIgnoreCase)).ToArray();
+        if (held.Length == 0)
         {
             return new ExternalLoginUnlinkResult(ExternalLoginUnlinkOutcome.NotLinked);
         }
 
-        var decision = await hooks.OnBeforeUnlinkExternalLoginAsync(user.Id, normalized, cancellationToken)
+        var decision = await hooks
+            .OnBeforeUnlinkExternalLoginAsync(user.Id, normalized, current.Select(ToInfo).ToArray(), cancellationToken)
             .ConfigureAwait(false);
         if (!decision.IsAllowed)
         {
             await RaiseAsync(
                 (o, ct) => o.OnUserMutationRefusedAsync(user.Id, UserMutation.ExternalLogin, decision.Reason!, ct),
                 cancellationToken).ConfigureAwait(false);
-            return new ExternalLoginUnlinkResult(ExternalLoginUnlinkOutcome.Refused, decision.Reason);
+            return new ExternalLoginUnlinkResult(ExternalLoginUnlinkOutcome.Refused, decision.Reason)
+            {
+                RefusalCode = decision.Code,
+            };
         }
 
         foreach (var link in held)

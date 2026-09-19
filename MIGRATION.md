@@ -10,6 +10,32 @@ with the *why* and concrete upgrade steps.
 - Each entry states: **What changed**, **Why**, and **How to upgrade** (before → after).
 - Non-breaking changes are *not* listed here — see the CHANGELOG.
 
+## Unreleased
+
+### Original link/unlink hook overloads lose their `CancellationToken` default (breaking for direct callers)
+
+**What changed:** `IUserLifecycleHooks.OnBeforeLinkExternalLoginAsync(Guid, string, string, CancellationToken)`
+and `OnBeforeUnlinkExternalLoginAsync(Guid, string, CancellationToken)` no longer default the token. The
+default moved to the new overloads that take `IReadOnlyList<ExternalLoginInfo> currentLogins`.
+
+**Why:** the new overloads exist so a hook can see the user's current links (coord #0139). The public-API
+analyzer requires an optional parameter to sit on the overload with the most parameters (RS0027), and two
+overloads that both default the token are ambiguous to extend later (RS0026).
+
+**Who is affected:** only code that *calls* one of the original overloads without passing a token — usually a
+test invoking a hook directly. Implementations compile unchanged, and are still consulted: the module calls
+the new overloads, whose defaults forward to the originals.
+
+**How to upgrade:**
+
+```csharp
+// before
+await hooks.OnBeforeUnlinkExternalLoginAsync(userId, "telegram");
+
+// after — pass the token, or move the rule to the overload that carries the user's links
+await hooks.OnBeforeUnlinkExternalLoginAsync(userId, "telegram", CancellationToken.None);
+```
+
 ## 0.27.0
 
 ### `IRefreshTokenService.RevokeAllForUserAsync` (breaking for custom implementations)
