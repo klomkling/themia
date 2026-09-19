@@ -139,15 +139,44 @@ public sealed class LocalStorageEndpointsTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task An_expired_link_is_403_on_the_injected_clock()
+    public async Task An_expired_link_is_403()
     {
+        // Signed directly with an expiry already past — the provider stamps expiry from the system clock, so
+        // that is the only honest way to produce an expired link.
         await PutAsync("docs/a.txt", "hello", "text/plain");
-        var url = await SignedUrlAsync("docs/a.txt", TimeSpan.FromMinutes(1));
-        clock.Advance(TimeSpan.FromMinutes(2));
+        var token = new LocalUrlSigner(SigningKey).Sign("docs/a.txt", PresignedUrlOperation.Get, DateTimeOffset.UtcNow.AddMinutes(-1));
 
-        var response = await client.GetAsync(url);
+        var response = await client.GetAsync($"{Mount}/_local/get?key=docs%2Fa.txt&token={Uri.EscapeDataString(token)}");
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task A_host_clock_set_in_the_past_does_not_revive_an_expired_link()
+    {
+        // The provider stamps a link's expiry from the system clock. Checking it against the host's
+        // TimeProvider instead — a FakeTimeProvider starts in the year 2000 — would make every expired link
+        // valid for ever. Signing and checking must read the same clock.
+        await PutAsync("docs/a.txt", "hello", "text/plain");
+        var token = new LocalUrlSigner(SigningKey).Sign("docs/a.txt", PresignedUrlOperation.Get, DateTimeOffset.UtcNow.AddMinutes(-1));
+        using var pastClockHost = await StartAsync(services: s => s.AddSingleton<TimeProvider>(new FakeTimeProvider()));
+
+        var response = await pastClockHost.GetTestClient()
+            .GetAsync($"{Mount}/_local/get?key=docs%2Fa.txt&token={Uri.EscapeDataString(token)}");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task A_host_clock_set_in_the_future_does_not_refuse_a_fresh_link()
+    {
+        await PutAsync("docs/a.txt", "hello", "text/plain");
+        using var futureClockHost = await StartAsync(
+            services: s => s.AddSingleton<TimeProvider>(new FakeTimeProvider(DateTimeOffset.UtcNow.AddYears(1))));
+
+        var response = await futureClockHost.GetTestClient().GetAsync(await SignedUrlAsync("docs/a.txt"));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
     [Fact]
@@ -228,6 +257,37 @@ public sealed class LocalStorageEndpointsTests : IAsyncLifetime
     public async Task A_base_url_ending_with_the_mount_is_accepted(string baseUrl)
     {
         using var ok = await StartAsync(services: s => s.AddThemiaStorageUrls(o => o.PresignedBaseUrl = baseUrl));
+
+        Assert.NotNull(ok);
+    }
+
+    [Fact]
+    public async Task A_root_mount_accepts_a_root_base_url()
+    {
+        using var root = await new HostBuilder()
+            .ConfigureWebHost(web => web
+                .UseTestServer()
+                .ConfigureServices(s =>
+                {
+                    s.AddRouting();
+                    s.AddSingleton<IStorageProvider>(provider);
+                    s.AddSingleton(new LocalUrlSigner(SigningKey));
+                    s.AddThemiaStorageUrls(o => o.PresignedBaseUrl = "http://localhost/");
+                })
+                .Configure(app => app.UseRouting().UseEndpoints(e => e.MapThemiaLocalStorage("/"))))
+            .StartAsync();
+        await PutAsync("docs/a.txt", "hello", "text/plain");
+        var urls = root.Services.GetRequiredService<IStorageUrlService>();
+
+        var response = await root.GetTestClient().GetAsync(await urls.GetDownloadUrlAsync("docs/a.txt", TimeSpan.FromMinutes(5)));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task A_base_url_differing_only_in_case_is_accepted_because_routing_ignores_case()
+    {
+        using var ok = await StartAsync(services: s => s.AddThemiaStorageUrls(o => o.PresignedBaseUrl = "https://api.example.com/API/v1/Storage"));
 
         Assert.NotNull(ok);
     }

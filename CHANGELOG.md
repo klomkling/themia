@@ -39,7 +39,9 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
   Anonymous by construction: its own group, never returned, **and** `AllowAnonymous` — not returning the
   group is not enough, because an authorization `FallbackPolicy` applies to every endpoint without auth
   metadata and would put every link behind a login. A bad, expired or mismatched token is a bare `403`.
-  Mapping without a `LocalUrlSigner` fails at startup.
+  Mapping without a `LocalUrlSigner` fails at startup. Expiry is checked against the **system** clock, the
+  one `LocalStorageProvider` signs with — not the host's `TimeProvider`, which in a consumer's integration
+  tests is often a `FakeTimeProvider` starting in 2000 and would make every expired link valid for ever.
 
 - **`IStorageUrlService` + `AddThemiaStorageUrls` in `Themia.Storage`** — absolute presigned download URLs
   from anywhere, including a background job with no HTTP request to take a host from. S3 URLs are returned

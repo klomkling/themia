@@ -71,9 +71,13 @@ public static class LocalStorageEndpoints
                 "download would fail.");
         }
 
+        // Compared without trailing slashes on either side — so a root mount ("/") is the empty path and
+        // matches any base — and ignoring case, because routing does: a base of https://host/API/v1/storage
+        // serves links from a /api/v1/storage mount perfectly well and must not be refused at startup.
         var baseUrl = endpoints.ServiceProvider.GetService<IOptions<StorageUrlOptions>>()?.Value.PresignedBaseUrl;
         if (!string.IsNullOrWhiteSpace(baseUrl) &&
-            !new Uri(baseUrl, UriKind.Absolute).AbsolutePath.TrimEnd('/').EndsWith(mount, StringComparison.Ordinal))
+            !new Uri(baseUrl, UriKind.Absolute).AbsolutePath.TrimEnd('/')
+                .EndsWith(mount.TrimEnd('/'), StringComparison.OrdinalIgnoreCase))
         {
             throw new InvalidOperationException(
                 $"StorageUrlOptions.PresignedBaseUrl ('{baseUrl}') must end with the mount passed to " +
@@ -97,11 +101,17 @@ public static class LocalStorageEndpoints
 
         var services = context.RequestServices;
         var signer = services.GetRequiredService<LocalUrlSigner>();
-        var clock = services.GetService<TimeProvider>() ?? TimeProvider.System;
+
+        // The SYSTEM clock, deliberately not the host's TimeProvider: the expiry was stamped by
+        // LocalStorageProvider.GetPresignedUrlAsync from DateTimeOffset.UtcNow, and signing and checking must
+        // read the same clock. A host that registers another TimeProvider — a FakeTimeProvider in its
+        // integration tests starts in the year 2000 — would otherwise make every expired link valid for ever,
+        // or, with a clock running ahead, refuse every link.
+        var now = DateTimeOffset.UtcNow;
 
         // One answer for every rejection, so a prober learns nothing about which part was wrong.
         if (string.IsNullOrWhiteSpace(key) || string.IsNullOrWhiteSpace(token) ||
-            !signer.TryVerify(key, PresignedUrlOperation.Get, token, clock.GetUtcNow()))
+            !signer.TryVerify(key, PresignedUrlOperation.Get, token, now))
         {
             return Results.StatusCode(StatusCodes.Status403Forbidden);
         }
