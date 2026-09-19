@@ -27,6 +27,8 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.29.0] - 2026-09-20
+
 ### Added
 - **Link and unlink hooks now receive the user's current links** (`Themia.Modules.Identity`, coord #0139).
   `IUserLifecycleHooks` gains `OnBeforeLinkExternalLoginAsync` and `OnBeforeUnlinkExternalLoginAsync`
