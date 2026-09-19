@@ -373,6 +373,83 @@ public sealed class ExternalLoginLinkServiceTests
         Assert.Equal(ExternalLoginUnlinkOutcome.UserNotFound, (await sut.UnlinkAsync(alice.Id, "telegram")).Outcome);
     }
 
+    // ---- platform users reached from a tenant scope ---------------------------------------------
+    //
+    // A link made from a tenant scope lands in that tenant's partition whoever the user is: the data layer
+    // stamps the ambient tenant on insert (FakeRepository mirrors it). Review once proposed checking the
+    // platform partition for a platform user instead; on the real engines that checks a partition the insert
+    // never reaches, and the relink violates the tenant index. These pin the ambient-partition model; the
+    // conformance suite pins the same thing on all four engines.
+
+    private User SeedPlatform(string name)
+    {
+        var user = new User { UserName = name, NormalizedUserName = name.ToUpperInvariant(), TenantId = null, IsActive = true };
+        user.SetId(Guid.CreateVersion7());
+        userStore.Add(user);
+        return user;
+    }
+
+    private void SeedPlatformLink(Guid userId, string provider, string subject)
+    {
+        var link = new ExternalLoginLink
+        {
+            UserId = userId, Provider = provider, ExternalId = subject, TenantId = null, CreatedAt = clock.GetUtcNow(),
+        };
+        link.SetId(Guid.CreateVersion7());
+        linkStore.Add(link);
+    }
+
+    [Fact]
+    public async Task A_platform_user_linked_from_a_tenant_scope_gets_that_tenants_link_and_relinks_idempotently()
+    {
+        options.AllowPlatformLogin = false;
+        var admin = SeedPlatform("admin");
+        var sut = Build();
+
+        var first = await sut.LinkAsync(admin.Id, Telegram("tg-admin"));
+        var again = await sut.LinkAsync(admin.Id, Telegram("tg-admin"));
+
+        Assert.Equal(ExternalLoginLinkOutcome.Linked, first.Outcome);
+        Assert.Equal(ExternalLoginLinkOutcome.AlreadyLinkedToUser, again.Outcome);
+        Assert.Equal(Acme, Assert.Single(linkStore).TenantId);
+    }
+
+    [Fact]
+    public async Task A_platform_owned_identity_is_refused_when_this_scopes_sign_in_would_resolve_it()
+    {
+        // With platform sign-in on, signing in here with this identity reaches the platform owner — so it
+        // already belongs to somebody, from this scope's point of view.
+        options.AllowPlatformLogin = true;
+        var owner = SeedPlatform("owner");
+        var other = SeedPlatform("other");
+        SeedPlatformLink(owner.Id, "telegram", "tg-owned");
+
+        var result = await Build().LinkAsync(other.Id, Telegram("tg-owned"));
+
+        Assert.Equal(ExternalLoginLinkOutcome.LinkedToAnotherUser, result.Outcome);
+        Assert.Single(linkStore);
+    }
+
+    [Fact]
+    public async Task Listing_and_unlinking_from_a_tenant_scope_never_reach_the_platforms_own_links()
+    {
+        // Batch and single agree — review found them disagreeing about exactly this user — and neither
+        // exposes, nor unlinks, a link the tenant does not own.
+        var admin = SeedPlatform("admin");
+        SeedPlatformLink(admin.Id, "line", "ln-global");
+        var sut = Build();
+        await sut.LinkAsync(admin.Id, Telegram("tg-acme"));
+
+        var single = await sut.GetLoginsAsync(admin.Id);
+        var batch = await sut.GetLoginsForUsersAsync([admin.Id]);
+        var unlinkGlobal = await sut.UnlinkAsync(admin.Id, "line");
+
+        Assert.Equal("tg-acme", Assert.Single(single).Subject);
+        Assert.Equal(single, batch[admin.Id]);
+        Assert.Equal(ExternalLoginUnlinkOutcome.NotLinked, unlinkGlobal.Outcome);
+        Assert.Contains(linkStore, l => l.ExternalId == "ln-global");
+    }
+
     // ---- doubles -------------------------------------------------------------------------------
 
     private sealed class ScriptedHooks : IUserLifecycleHooks

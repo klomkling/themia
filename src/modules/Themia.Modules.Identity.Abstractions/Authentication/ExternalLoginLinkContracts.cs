@@ -81,7 +81,14 @@ public readonly record struct ExternalLoginUnlinkResult(ExternalLoginUnlinkOutco
 /// <c>identity.external_logins</c>. Folding these into it would force every BYO adopter to implement
 /// operations over a table they do not have.
 /// <para>
-/// All operations follow the ambient tenant scope, as <see cref="IExternalLoginService"/> does.
+/// All operations act on the <b>ambient partition</b>: the links of the current tenant, or the platform's
+/// under a platform scope. That is where a new link lands — the data layer stamps the ambient tenant on
+/// every insert — and what this scope's sign-in consults first. So a platform user linked from a tenant
+/// scope gets that tenant's link, and listing or unlinking from a tenant scope never reaches the platform's
+/// own links. Ownership alone looks further: with
+/// <see cref="IdentityModuleOptions.AllowPlatformLogin"/> on, an identity held in the platform partition is
+/// answered <see cref="ExternalLoginLinkOutcome.LinkedToAnotherUser"/>, because this scope's sign-in would
+/// resolve it to that owner.
 /// </para>
 /// <para>
 /// <b>Linking and unlinking do not end any session.</b> A caller unlinking a compromised identity should
@@ -142,9 +149,8 @@ public interface IExternalLoginLinkService
     /// Named apart from <see cref="GetLoginsAsync"/> rather than overloading it: two overloads that both
     /// default the cancellation token are ambiguous to add to later without breaking callers (RS0026).
     /// <para>
-    /// Follows the ambient tenant, plus genuine platform users' links under
-    /// <see cref="IdentityModuleOptions.AllowPlatformLogin"/> — the same reach a single lookup has. Ids that
-    /// resolve to no user in scope simply have no entry.
+    /// The ambient partition only — the same reach <see cref="GetLoginsAsync"/> has. Ids with no links in this
+    /// scope simply have no entry.
     /// </para>
     /// </remarks>
     Task<IReadOnlyDictionary<Guid, IReadOnlyList<ExternalLoginInfo>>> GetLoginsForUsersAsync(

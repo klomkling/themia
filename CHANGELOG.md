@@ -57,6 +57,14 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
   for somebody. That rule belongs in the unlink hook, where the consumer knows every way its users sign
   in.
 
+  **Every operation acts on the ambient partition** — the current tenant's links, or the platform's under a
+  platform scope. That is where an insert lands (the data layer stamps the ambient tenant on every new
+  tenant entity, so a platform user linked from a tenant scope gets that tenant's link) and what this
+  scope's sign-in consults first. Listing and unlinking from a tenant scope therefore never reach the
+  platform's own links. A review proposed checking the platform partition for platform users instead; on
+  the real engines that checks a partition the insert never reaches, and the conformance suite now pins
+  the ambient model on all four peers.
+
   Race-safe at the database: two concurrent links of one identity to different users produce exactly one
   `Linked`; the loser's insert violates the existing unique index and is answered `LinkedToAnotherUser`.
   Verified on the real engines, EF and Dapper × PostgreSQL and SQL Server, with the race forced into the

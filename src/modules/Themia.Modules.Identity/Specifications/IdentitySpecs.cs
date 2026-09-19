@@ -206,27 +206,6 @@ internal sealed class ExternalLoginsByUserSpec : Specification<ExternalLoginLink
     }
 }
 
-/// <summary>A platform (global) user's external-login links, bypassing the tenant filter so they resolve
-/// from a tenant scope. The <c>TenantId == null</c> predicate means only a genuine platform link matches,
-/// never another tenant's (mirrors <see cref="PlatformExternalLoginByProviderKeySpec"/>).</summary>
-internal sealed class PlatformExternalLoginsByUserSpec : Specification<ExternalLoginLink>
-{
-    public PlatformExternalLoginsByUserSpec(Guid userId, string? provider = null)
-    {
-        if (provider is null)
-        {
-            Where(l => l.UserId == userId && l.TenantId == null);
-        }
-        else
-        {
-            Where(l => l.UserId == userId && l.Provider == provider && l.TenantId == null);
-        }
-
-        AddOrderBy(l => l.CreatedAt, descending: false);
-        WithoutTenantFilter();
-    }
-}
-
 /// <summary>The external-login links of any of the given users within the ambient tenant.</summary>
 internal sealed class ExternalLoginsByUsersSpec : Specification<ExternalLoginLink>
 {
@@ -234,18 +213,6 @@ internal sealed class ExternalLoginsByUsersSpec : Specification<ExternalLoginLin
     {
         Where(l => userIds.Contains(l.UserId));
         AddOrderBy(l => l.CreatedAt, descending: false);
-    }
-}
-
-/// <summary>The platform (global) external-login links of any of the given users, bypassing the tenant
-/// filter. The <c>TenantId == null</c> predicate means only genuine platform links match.</summary>
-internal sealed class PlatformExternalLoginsByUsersSpec : Specification<ExternalLoginLink>
-{
-    public PlatformExternalLoginsByUsersSpec(IReadOnlyCollection<Guid> userIds)
-    {
-        Where(l => userIds.Contains(l.UserId) && l.TenantId == null);
-        AddOrderBy(l => l.CreatedAt, descending: false);
-        WithoutTenantFilter();
     }
 }
 

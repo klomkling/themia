@@ -840,6 +840,24 @@ public abstract class IdentityStoreConformanceTests
         Assert.Equal(ExternalLoginUnlinkOutcome.UserNotFound, (await b.Linking.UnlinkAsync(userInA, "telegram")).Outcome);
     }
 
+    [Fact] // a platform user reached from a tenant scope with platform sign-in off: an outcome, not a unique-index exception
+    public async Task Relinking_a_platform_user_from_a_tenant_scope_is_idempotent()
+    {
+        await ResetAsync();
+        Guid admin;
+        await using (var platform = NewScope(tenant: null))
+        {
+            admin = (await platform.Users.CreateAsync("platform-admin", "pw")).UserId!.Value;
+        }
+
+        await using var s = NewScope(new TenantId("acme"), allowPlatformLogin: false);
+        var identity = new ExternalIdentity("telegram", "tg-admin", null, false, null);
+
+        Assert.Equal(ExternalLoginLinkOutcome.Linked, (await s.Linking.LinkAsync(admin, identity)).Outcome);
+        Assert.Equal(ExternalLoginLinkOutcome.AlreadyLinkedToUser, (await s.Linking.LinkAsync(admin, identity)).Outcome);
+        Assert.Equal("tg-admin", Assert.Single((await s.Linking.GetLoginsForUsersAsync([admin]))[admin]).Subject);
+    }
+
     [Fact] // revoke-all without a token in hand: the path after unlinking a compromised channel
     public async Task Revoke_all_for_user_by_id_ends_every_session()
     {

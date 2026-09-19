@@ -115,13 +115,13 @@ public sealed class ExternalLoginLinkService : IExternalLoginLinkService
             await unitOfWork.ExecuteInTransactionAsync(
                 ct => InsertLinkAsync(user, provider, subject, ct), cancellationToken).ConfigureAwait(false);
         }
-        catch (UniqueConstraintException)
+        catch (UniqueConstraintException ex)
         {
             // Lost a race on (tenant, provider, external_id): the winner is committed and visible now. Answer
             // with whoever won — which may be this same user, from a concurrent request of their own.
             var winner = await OwnerOfAsync(provider, subject, cancellationToken).ConfigureAwait(false)
                 ?? throw new InvalidOperationException(
-                    $"Linking '{provider}:{subject}' hit a unique violation, but no link exists afterwards.");
+                    $"Linking '{provider}:{subject}' hit a unique violation, but no link exists afterwards.", ex);
             return new ExternalLoginLinkResult(winner == user.Id
                 ? ExternalLoginLinkOutcome.AlreadyLinkedToUser
                 : ExternalLoginLinkOutcome.LinkedToAnotherUser);
@@ -207,18 +207,9 @@ public sealed class ExternalLoginLinkService : IExternalLoginLinkService
             return new Dictionary<Guid, IReadOnlyList<ExternalLoginInfo>>();
         }
 
-        var found = new List<ExternalLoginLink>(
-            await links.ListAsync(new ExternalLoginsByUsersSpec(distinct), cancellationToken).ConfigureAwait(false));
-
-        // The same reach a single lookup has: genuine platform users' links, when platform login is allowed.
-        // Under a platform ambient scope the first query already returned them, so de-duplicate by id.
-        if (options.AllowPlatformLogin)
-        {
-            var seen = found.Select(l => l.Id).ToHashSet();
-            var platform = await links.ListAsync(new PlatformExternalLoginsByUsersSpec(distinct), cancellationToken)
-                .ConfigureAwait(false);
-            found.AddRange(platform.Where(l => seen.Add(l.Id)));
-        }
+        // The ambient partition only — the same reach GetLoginsAsync has, and one query.
+        var found = await links.ListAsync(new ExternalLoginsByUsersSpec(distinct), cancellationToken)
+            .ConfigureAwait(false);
 
         return found
             .GroupBy(l => l.UserId)
@@ -238,7 +229,17 @@ public sealed class ExternalLoginLinkService : IExternalLoginLinkService
             users, links, options, provider.ToLowerInvariant(), subject, cancellationToken);
     }
 
-    /// <summary>The id of the user a (provider, subject) link belongs to, or null when unlinked.</summary>
+    /// <summary>The id of the user a (provider, subject) link belongs to, or null when unlinked: the same
+    /// answer this scope's sign-in would give — the ambient partition, then the platform one under
+    /// <see cref="IdentityModuleOptions.AllowPlatformLogin"/>.</summary>
+    /// <remarks>
+    /// The ambient partition is also where the insert lands, whoever the user is: the data layer stamps the
+    /// ambient tenant on every new tenant entity (Dapper unconditionally, at save), so a link for a platform
+    /// user made from a tenant scope is that tenant's link. Looking in the platform partition for a platform
+    /// user instead — tempting, and once proposed in review — checks a partition the insert never reaches,
+    /// and a relink then violates the tenant index it did not look at. The conformance suite pins this on
+    /// every engine.
+    /// </remarks>
     private async Task<Guid?> OwnerOfAsync(string provider, string subject, CancellationToken cancellationToken)
     {
         var found = await ExternalLoginLookup.FindLinkAsync(links, options, provider, subject, cancellationToken)
@@ -246,12 +247,12 @@ public sealed class ExternalLoginLinkService : IExternalLoginLinkService
         return found?.Link.UserId;
     }
 
-    /// <summary>The user's links, optionally for one provider, oldest first — read the way the user resolved.</summary>
+    /// <summary>The user's links in the ambient partition, optionally for one provider, oldest first — the
+    /// links this scope's sign-in uses, and the partition a link made here lands in. A platform user's links
+    /// made from another scope are not this scope's to list or remove.</summary>
     private Task<IReadOnlyList<ExternalLoginLink>> LinksOfAsync(
         User user, string? provider, CancellationToken cancellationToken) =>
-        user.TenantId is null
-            ? links.ListAsync(new PlatformExternalLoginsByUserSpec(user.Id, provider), cancellationToken)
-            : links.ListAsync(new ExternalLoginsByUserSpec(user.Id, provider), cancellationToken);
+        links.ListAsync(new ExternalLoginsByUserSpec(user.Id, provider), cancellationToken);
 
     private async Task InsertLinkAsync(User user, string provider, string subject, CancellationToken cancellationToken)
     {
