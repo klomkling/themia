@@ -196,6 +196,10 @@ return result.Outcome switch
 };
 ```
 
+With more than one rule on a mutation, refuse with a code — `UserMutationDecision.Refuse(reason, code)` —
+and branch on the result's `RefusalCode`, never on the wording of `Reason`. Every result that can be
+`Refused` carries it.
+
 **Transaction contract.** A before-hook runs inside the caller's scope, before the module touches any
 entity and before its unit of work opens. It must not call `SaveChanges` and must not open a
 transaction on the same scoped connection — the module saves immediately after the hook returns, so a
@@ -239,8 +243,8 @@ Four rules worth knowing before you build on it:
 - **A deactivated or locked-out user is never linked** (`UserInactive`) — the same rule the sign-in
   path's auto-link follows, so a reactivation cannot inherit a login nobody approved.
 - **A user may hold several identities from one provider.** Two Google accounts is legitimate, so the
-  module does not refuse a second. If your product allows one per provider, refuse it in
-  `IUserLifecycleHooks.OnBeforeLinkExternalLoginAsync`.
+  module does not refuse a second. If your product allows one per provider, refuse it in the
+  `IUserLifecycleHooks.OnBeforeLinkExternalLoginAsync` overload that carries `currentLogins`.
 - **Linking and unlinking end no sessions.** Sessions are not tagged by the identity that opened them, so
   after unlinking a compromised identity call `IRefreshTokenService.RevokeAllForUserAsync(userId)` — it is
   the only way to reach the session that identity holds.
@@ -249,6 +253,32 @@ Four rules worth knowing before you build on it:
 sign-in method can live entirely outside Identity (a phone-OTP login on `Themia.Challenges`, for one), so
 "the last way in" is something only your code can compute. Put that rule in
 `IUserLifecycleHooks.OnBeforeUnlinkExternalLoginAsync`.
+
+Both link hooks have an overload that receives the user's current links, because a hook cannot read them
+itself — `IExternalLoginLinkService` is the one calling it, so injecting it is a DI cycle. The unlink
+overload gets every provider's links, not only the one being removed:
+
+```csharp
+internal sealed class ChannelRules : IUserLifecycleHooks
+{
+    public ValueTask<UserMutationDecision> OnBeforeLinkExternalLoginAsync(
+        Guid userId, string provider, string subject, IReadOnlyList<ExternalLoginInfo> currentLogins,
+        CancellationToken ct = default) =>
+        ValueTask.FromResult(currentLogins.Any(l => l.Provider == provider)
+            ? UserMutationDecision.Refuse("You already linked this channel.", "channel_already_linked")
+            : UserMutationDecision.Allow());
+
+    public ValueTask<UserMutationDecision> OnBeforeUnlinkExternalLoginAsync(
+        Guid userId, string provider, IReadOnlyList<ExternalLoginInfo> currentLogins,
+        CancellationToken ct = default) =>
+        ValueTask.FromResult(currentLogins.All(l => l.Provider == provider)
+            ? UserMutationDecision.Refuse("This is your only channel.", "last_channel")
+            : UserMutationDecision.Allow());
+}
+```
+
+The list is read before the write, not locked: two concurrent links for one user each see the other's
+absent, so a rule that must hold under concurrency needs a constraint of its own.
 
 ## Notes / gotchas
 
