@@ -5,8 +5,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Current state
 
 This package **ships**. `Themia.sln` holds every Themia package across
-`src/{tooling,framework,neutral,modules}` plus its test projects; the current release is **0.25.1**
-(`Directory.Build.props`, `CHANGELOG.md`, 82 tags from `v0.1.0`). Read
+`src/{tooling,framework,neutral,modules}` plus its test projects. Read the current release from `<Version>` in
+`Directory.Build.props` (or the top of `CHANGELOG.md` / `git tag --sort=-v:refname`) — it is
+deliberately not recorded here, because a number in this file goes stale every release. Read
 `docs/themia-architecture-overview.md` first — it is the master document every spec references, and
 its §B (module catalog) + "Specs index" carry the per-package status and the release each shipped in.
 
