@@ -33,6 +33,11 @@ jobs:
   integration:
     name: Integration (Testcontainers)
     runs-on: ubuntu-latest
+    # Last resort only (coord #0136). A job that hits this is CANCELLED, not failed, so the
+    # `if: failure()` issue step below would not run — which is why the test step carries its own,
+    # shorter timeout and vstest its per-test hang detection. Longest successful run in the last 40
+    # nights: 15.4 min (median 12.9).
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v7
 
@@ -59,7 +64,19 @@ jobs:
       - name: Integration tests
         # Inverse of ci.yml: Category=Integration only. Re-runnable from the
         # Actions tab if a DB image pull fails at fixture init.
-        run: dotnet test --configuration Release --no-build --verbosity normal --filter "Category=Integration"
+        #
+        # Hang handling, innermost first (coord #0136). On 2026-09-06 one TFM leg of
+        # Themia.Pdf.IntegrationTests stopped mid-run and the job sat for GitHub's 360-minute default with
+        # nothing in the log to say which test:
+        #   --blame-hang-timeout  vstest kills a test host whose single test runs past 10 minutes and NAMES
+        #                         that test. The longest single integration test is well under a minute.
+        #   step timeout-minutes  a step that times out FAILS, so the issue step below still runs.
+        #   job timeout-minutes   cancels — the issue step does not run. Last resort.
+        # Measured, not assumed (probe run 35432777211, 2026-09-19): a step timeout gives outcome=failure and
+        # runs `if: failure()` steps; a job timeout gives cancelled, skips them, and runs only
+        # `if: cancelled()` / `if: always()`. Searches disagreed; the probe did not.
+        timeout-minutes: 40
+        run: dotnet test --configuration Release --no-build --verbosity normal --filter "Category=Integration" --blame-hang-timeout 10m --blame-hang-dump-type none
 
       # The two steps below only track state in an issue — they are best-effort and must never
       # flip the job's result (only the test step decides that), so gh errors are swallowed.
