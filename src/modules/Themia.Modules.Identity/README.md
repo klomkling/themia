@@ -147,6 +147,7 @@ Inject any of:
 | `IRoleService` | Create roles, assign/remove users from roles |
 | `IClaimService` | Add/remove user and role claims, resolve effective claims |
 | `IUserTokenService` | Generate and consume one-time tokens (email confirm, password reset, etc.) |
+| `IExternalLoginLinkService` | Link, unlink, list and look up the external identities on an existing user (see below) |
 | `ICurrentUser` | Read the authenticated principal (UserId, TenantId, Roles, Claims) |
 
 ## Refusing and observing user mutations
@@ -201,6 +202,53 @@ transaction on the same scoped connection — the module saves immediately after
 hook holding a transaction there turns a refusal into a deadlock. Read freely; write through your own
 connection if you must write at all. `OnUserMutatedAsync` runs after the save: the change is already
 committed, and throwing does not undo it.
+
+## Linking external identities to an existing user
+
+`IExternalLoginService.ResolveOrProvisionAsync` is the sign-in path: it resolves an identity, and opens an
+account when it cannot. `IExternalLoginLinkService` is everything else — for a user who is already signed
+in and wants a second channel, and for code that needs to ask "who owns this identity?" without creating
+anyone.
+
+```csharp
+// The user is signed in (via LINE) and has just proved control of a Telegram identity.
+var result = await linking.LinkAsync(userId, telegramIdentity, ct);
+return result.Outcome switch
+{
+    ExternalLoginLinkOutcome.Linked or
+    ExternalLoginLinkOutcome.AlreadyLinkedToUser => await ReissueSessionAsync(userId, ct),
+    ExternalLoginLinkOutcome.LinkedToAnotherUser => Conflict("channel_identity_already_linked"),
+    ExternalLoginLinkOutcome.UserInactive        => Forbid(),
+    ExternalLoginLinkOutcome.Refused             => Conflict(result.Reason),
+    ExternalLoginLinkOutcome.UserNotFound        => Unauthorized(),
+    _ => throw new UnreachableException(),
+};
+
+// "Does anyone own this identity?" — never provisions.
+var owner = await linking.FindUserByLoginAsync("telegram", subject, ct);
+
+// A notification job resolving addresses for a batch of recipients: one call, not one per row.
+var byUser = await linking.GetLoginsForUsersAsync(recipientIds, ct);   // at most 1,000 distinct ids
+```
+
+Four rules worth knowing before you build on it:
+
+- **An identity is never moved between users.** Linking one another user holds returns
+  `LinkedToAnotherUser` and writes nothing. Two concurrent links of the same identity to different users
+  are settled by the database's unique index: exactly one `Linked`.
+- **A deactivated or locked-out user is never linked** (`UserInactive`) — the same rule the sign-in
+  path's auto-link follows, so a reactivation cannot inherit a login nobody approved.
+- **A user may hold several identities from one provider.** Two Google accounts is legitimate, so the
+  module does not refuse a second. If your product allows one per provider, refuse it in
+  `IUserLifecycleHooks.OnBeforeLinkExternalLoginAsync`.
+- **Linking and unlinking end no sessions.** Sessions are not tagged by the identity that opened them, so
+  after unlinking a compromised identity call `IRefreshTokenService.RevokeAllForUserAsync(userId)` — it is
+  the only way to reach the session that identity holds.
+
+**Unlinking is how a user without a password locks themselves out**, and the module does not stop it: a
+sign-in method can live entirely outside Identity (a phone-OTP login on `Themia.Challenges`, for one), so
+"the last way in" is something only your code can compute. Put that rule in
+`IUserLifecycleHooks.OnBeforeUnlinkExternalLoginAsync`.
 
 ## Notes / gotchas
 

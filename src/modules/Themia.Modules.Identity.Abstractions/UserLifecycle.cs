@@ -121,4 +121,7 @@ public enum UserMutation
 
     /// <summary>The user was created.</summary>
     Created = 128,
+
+    /// <summary>An external identity was linked to or unlinked from the user.</summary>
+    ExternalLogin = 256,
 }

@@ -187,6 +187,68 @@ internal sealed class ExternalLoginByProviderKeySpec : Specification<ExternalLog
         Where(l => l.Provider == provider && l.ExternalId == externalId);
 }
 
+/// <summary>A user's external-login links within the ambient tenant, oldest first. Optionally narrowed
+/// to one provider.</summary>
+internal sealed class ExternalLoginsByUserSpec : Specification<ExternalLoginLink>
+{
+    public ExternalLoginsByUserSpec(Guid userId, string? provider = null)
+    {
+        if (provider is null)
+        {
+            Where(l => l.UserId == userId);
+        }
+        else
+        {
+            Where(l => l.UserId == userId && l.Provider == provider);
+        }
+
+        AddOrderBy(l => l.CreatedAt, descending: false);
+    }
+}
+
+/// <summary>A platform (global) user's external-login links, bypassing the tenant filter so they resolve
+/// from a tenant scope. The <c>TenantId == null</c> predicate means only a genuine platform link matches,
+/// never another tenant's (mirrors <see cref="PlatformExternalLoginByProviderKeySpec"/>).</summary>
+internal sealed class PlatformExternalLoginsByUserSpec : Specification<ExternalLoginLink>
+{
+    public PlatformExternalLoginsByUserSpec(Guid userId, string? provider = null)
+    {
+        if (provider is null)
+        {
+            Where(l => l.UserId == userId && l.TenantId == null);
+        }
+        else
+        {
+            Where(l => l.UserId == userId && l.Provider == provider && l.TenantId == null);
+        }
+
+        AddOrderBy(l => l.CreatedAt, descending: false);
+        WithoutTenantFilter();
+    }
+}
+
+/// <summary>The external-login links of any of the given users within the ambient tenant.</summary>
+internal sealed class ExternalLoginsByUsersSpec : Specification<ExternalLoginLink>
+{
+    public ExternalLoginsByUsersSpec(IReadOnlyCollection<Guid> userIds)
+    {
+        Where(l => userIds.Contains(l.UserId));
+        AddOrderBy(l => l.CreatedAt, descending: false);
+    }
+}
+
+/// <summary>The platform (global) external-login links of any of the given users, bypassing the tenant
+/// filter. The <c>TenantId == null</c> predicate means only genuine platform links match.</summary>
+internal sealed class PlatformExternalLoginsByUsersSpec : Specification<ExternalLoginLink>
+{
+    public PlatformExternalLoginsByUsersSpec(IReadOnlyCollection<Guid> userIds)
+    {
+        Where(l => userIds.Contains(l.UserId) && l.TenantId == null);
+        AddOrderBy(l => l.CreatedAt, descending: false);
+        WithoutTenantFilter();
+    }
+}
+
 /// <summary>Finds a platform (global) external-login link by provider and subject, bypassing the tenant
 /// filter. The <c>TenantId == null</c> predicate guarantees only a genuine platform link matches — never
 /// another tenant's — so it is safe to resolve from a tenant scope (mirrors the platform user specs and

@@ -95,6 +95,35 @@ public interface IUserLifecycleHooks
         Guid userId, CancellationToken cancellationToken = default)
         => ValueTask.FromResult(UserMutationDecision.Allow());
 
+    /// <summary>Called before an external identity is linked to the user.</summary>
+    /// <param name="userId">The user.</param>
+    /// <param name="provider">The provider key, lower-cased.</param>
+    /// <param name="subject">The provider subject.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>Whether to proceed.</returns>
+    /// <remarks>
+    /// Where a consumer allowing one identity per provider enforces it — the module permits several,
+    /// because two accounts at the same provider are legitimate in general.
+    /// </remarks>
+    ValueTask<UserMutationDecision> OnBeforeLinkExternalLoginAsync(
+        Guid userId, string provider, string subject, CancellationToken cancellationToken = default)
+        => ValueTask.FromResult(UserMutationDecision.Allow());
+
+    /// <summary>Called before every link the user holds for a provider is removed.</summary>
+    /// <param name="userId">The user.</param>
+    /// <param name="provider">The provider key, lower-cased.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>Whether to proceed.</returns>
+    /// <remarks>
+    /// Unlinking is how a user without a password locks themselves out. The module cannot refuse the
+    /// "last" sign-in method itself, because a method can live entirely outside it — a phone-OTP login
+    /// built on <c>Themia.Challenges</c>, for one — so "last" would be wrong for somebody. The consumer
+    /// knows every way its users sign in; this is where that rule goes.
+    /// </remarks>
+    ValueTask<UserMutationDecision> OnBeforeUnlinkExternalLoginAsync(
+        Guid userId, string provider, CancellationToken cancellationToken = default)
+        => ValueTask.FromResult(UserMutationDecision.Allow());
+
     /// <summary>Called after a mutation has been applied and saved.</summary>
     /// <param name="userId">The user.</param>
     /// <param name="mutation">What changed.</param>

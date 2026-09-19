@@ -137,6 +137,13 @@ internal sealed class FakeRefreshTokenService : IRefreshTokenService
         LastRevokeAllForUser = allForUser;
         return Task.CompletedTask;
     }
+
+    public Task<int> RevokeAllForUserAsync(Guid userId, CancellationToken cancellationToken = default)
+    {
+        RevokeCalls++;
+        LastRevokeAllForUser = true;
+        return Task.FromResult(0);
+    }
 }
 
 internal sealed class FakePasswordHasher : IPasswordHasher

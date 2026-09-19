@@ -115,6 +115,7 @@ public static class IdentityServiceCollectionExtensions
         services.TryAddScoped<IUserTokenService, UserTokenService>();
         services.TryAddScoped<IRefreshTokenService, RefreshTokenService>();
         services.TryAddScoped<IExternalLoginService, ExternalLoginService>();
+        services.TryAddScoped<IExternalLoginLinkService, ExternalLoginLinkService>();
         services.TryAddScoped<IClaimsPrincipalFactory, ClaimsPrincipalFactory>();
 
         return services;

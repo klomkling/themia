@@ -48,6 +48,7 @@ public abstract class IdentityStoreConformanceTests
         public IUserTokenService Tokens => Inner.ServiceProvider.GetRequiredService<IUserTokenService>();
         public IRefreshTokenService RefreshTokens => Inner.ServiceProvider.GetRequiredService<IRefreshTokenService>();
         public IExternalLoginService ExternalLogins => Inner.ServiceProvider.GetRequiredService<IExternalLoginService>();
+        public IExternalLoginLinkService Linking => Inner.ServiceProvider.GetRequiredService<IExternalLoginLinkService>();
         public IRepository<ExternalLoginLink, Guid> Links => Inner.ServiceProvider.GetRequiredService<IRepository<ExternalLoginLink, Guid>>();
         public IUnitOfWork UnitOfWork => Inner.ServiceProvider.GetRequiredService<IUnitOfWork>();
 
@@ -713,6 +714,174 @@ public abstract class IdentityStoreConformanceTests
         }
     }
 
+    // ---- coord #0135: link / unlink / list / find, and revoke-all by user id --------------------
+
+    [Fact] // the round trip an adopter actually runs, on the real schema and both data peers
+    public async Task Link_list_and_unlink_round_trip()
+    {
+        await ResetAsync();
+        await using var s = NewScope(new TenantId("acme"));
+        var user = (await s.Users.CreateAsync("linker", "pw")).UserId!.Value;
+
+        Assert.Equal(ExternalLoginLinkOutcome.Linked,
+            (await s.Linking.LinkAsync(user, new ExternalIdentity("LINE", "ln-1", null, false, null))).Outcome);
+        Assert.Equal(ExternalLoginLinkOutcome.Linked,
+            (await s.Linking.LinkAsync(user, new ExternalIdentity("Telegram", "tg-1", null, false, null))).Outcome);
+
+        var logins = await s.Linking.GetLoginsAsync(user);
+        Assert.Equal(["line", "telegram"], logins.Select(l => l.Provider));
+        Assert.Equal(user, (await s.Linking.FindUserByLoginAsync("telegram", "tg-1"))?.Id);
+
+        Assert.Equal(ExternalLoginUnlinkOutcome.Unlinked, (await s.Linking.UnlinkAsync(user, "telegram")).Outcome);
+        Assert.Equal("line", Assert.Single(await s.Linking.GetLoginsAsync(user)).Provider);
+        Assert.Null(await s.Linking.FindUserByLoginAsync("telegram", "tg-1"));
+    }
+
+    [Fact] // an identity is never moved between users, on the real unique index
+    public async Task Link_refuses_an_identity_owned_by_another_user()
+    {
+        await ResetAsync();
+        await using var s = NewScope(new TenantId("acme"));
+        var owner = (await s.Users.CreateAsync("owner", "pw")).UserId!.Value;
+        var thief = (await s.Users.CreateAsync("thief", "pw")).UserId!.Value;
+        var identity = new ExternalIdentity("telegram", "tg-owned", null, false, null);
+        await s.Linking.LinkAsync(owner, identity);
+
+        var result = await s.Linking.LinkAsync(thief, identity);
+
+        Assert.Equal(ExternalLoginLinkOutcome.LinkedToAnotherUser, result.Outcome);
+        Assert.Equal(owner, (await s.Linking.FindUserByLoginAsync("telegram", "tg-owned"))?.Id);
+    }
+
+    [Fact] // concurrency: a lost link race is answered with the winner, not a 500
+    public async Task Link_race_loser_answers_with_the_winner()
+    {
+        await ResetAsync();
+        var tenant = new TenantId("acme");
+        Guid winner, loser;
+        await using (var seed = NewScope(tenant))
+        {
+            winner = (await seed.Users.CreateAsync("link-winner", "pw")).UserId!.Value;
+            loser = (await seed.Users.CreateAsync("link-loser", "pw")).UserId!.Value;
+        }
+
+        // The before-link hook runs after the ownership check and before the insert — the exact window the
+        // unique index guards. Committing the winner's link there, in its own scope, makes the loser's
+        // insert violate the index on the real engine.
+        await using (var s = NewScope(tenant, configureServices: services =>
+            services.AddScoped<IUserLifecycleHooks>(sp => new RaceInjectingHooks(sp, winner, "telegram", "tg-race"))))
+        {
+            var result = await s.Linking.LinkAsync(loser, new ExternalIdentity("telegram", "tg-race", null, false, null));
+
+            Assert.Equal(ExternalLoginLinkOutcome.LinkedToAnotherUser, result.Outcome);
+        }
+
+        await using (var verify = NewScope(tenant))
+        {
+            Assert.Equal(winner, (await verify.Linking.FindUserByLoginAsync("telegram", "tg-race"))?.Id);
+            Assert.Empty(await verify.Linking.GetLoginsAsync(loser));
+        }
+    }
+
+    [Fact] // the batch path is a collection Contains, which Dapper must translate to IN rather than refuse
+    public async Task Logins_for_users_are_fetched_in_one_call()
+    {
+        await ResetAsync();
+        await using var s = NewScope(new TenantId("acme"));
+        var a = (await s.Users.CreateAsync("batch-a", "pw")).UserId!.Value;
+        var b = (await s.Users.CreateAsync("batch-b", "pw")).UserId!.Value;
+        var c = (await s.Users.CreateAsync("batch-c", "pw")).UserId!.Value;
+        await s.Linking.LinkAsync(a, new ExternalIdentity("line", "ln-a", null, false, null));
+        await s.Linking.LinkAsync(a, new ExternalIdentity("telegram", "tg-a", null, false, null));
+        await s.Linking.LinkAsync(b, new ExternalIdentity("line", "ln-b", null, false, null));
+
+        var map = await s.Linking.GetLoginsForUsersAsync([a, b, c]);
+
+        Assert.Equal(2, map.Count);
+        Assert.Equal(["ln-a", "tg-a"], map[a].Select(l => l.Subject));
+        Assert.Equal("ln-b", Assert.Single(map[b]).Subject);
+        Assert.False(map.ContainsKey(c));
+    }
+
+    [Fact] // opsezy's configuration: a fixed platform scope, TenantId = null throughout
+    public async Task Linking_works_in_the_platform_scope()
+    {
+        await ResetAsync();
+        await using var s = NewScope(tenant: null);
+        var user = (await s.Users.CreateAsync("platform-linker", "pw")).UserId!.Value;
+
+        Assert.Equal(ExternalLoginLinkOutcome.Linked,
+            (await s.Linking.LinkAsync(user, new ExternalIdentity("line", "ln-p", null, false, null))).Outcome);
+        Assert.Equal(ExternalLoginLinkOutcome.Linked,
+            (await s.Linking.LinkAsync(user, new ExternalIdentity("telegram", "tg-p", null, false, null))).Outcome);
+
+        Assert.Equal(2, (await s.Linking.GetLoginsAsync(user)).Count);
+        Assert.Equal(2, (await s.Linking.GetLoginsForUsersAsync([user]))[user].Count);
+        Assert.Equal(user, (await s.Linking.FindUserByLoginAsync("line", "ln-p"))?.Id);
+        Assert.Equal(ExternalLoginUnlinkOutcome.Unlinked, (await s.Linking.UnlinkAsync(user, "line")).Outcome);
+        Assert.Equal("telegram", Assert.Single(await s.Linking.GetLoginsAsync(user)).Provider);
+    }
+
+    [Fact] // a tenant cannot see, list or unlink another tenant's identities
+    public async Task Linking_is_tenant_isolated()
+    {
+        await ResetAsync();
+        Guid userInA;
+        await using (var a = NewScope(new TenantId("a")))
+        {
+            userInA = (await a.Users.CreateAsync("iso-a", "pw")).UserId!.Value;
+            await a.Linking.LinkAsync(userInA, new ExternalIdentity("telegram", "tg-iso", null, false, null));
+        }
+
+        await using var b = NewScope(new TenantId("b"), allowPlatformLogin: false);
+        Assert.Null(await b.Linking.FindUserByLoginAsync("telegram", "tg-iso"));
+        Assert.Empty(await b.Linking.GetLoginsAsync(userInA));
+        Assert.Empty(await b.Linking.GetLoginsForUsersAsync([userInA]));
+        Assert.Equal(ExternalLoginUnlinkOutcome.UserNotFound, (await b.Linking.UnlinkAsync(userInA, "telegram")).Outcome);
+    }
+
+    [Fact] // revoke-all without a token in hand: the path after unlinking a compromised channel
+    public async Task Revoke_all_for_user_by_id_ends_every_session()
+    {
+        await ResetAsync();
+        await using var s = NewScope(new TenantId("acme"));
+        var user = (await s.Users.CreateAsync("rt-by-id", "pw")).UserId!.Value;
+        var bystander = (await s.Users.CreateAsync("rt-by-id-bystander", "pw")).UserId!.Value;
+        var first = await s.RefreshTokens.IssueAsync(user);
+        var second = await s.RefreshTokens.IssueAsync(user);
+        var theirs = await s.RefreshTokens.IssueAsync(bystander);
+
+        var revoked = await s.RefreshTokens.RevokeAllForUserAsync(user);
+
+        Assert.Equal(2, revoked);
+        Assert.Equal(RefreshOutcome.ReuseDetected, (await s.RefreshTokens.ValidateAndRotateAsync(first.RawToken)).Outcome);
+        Assert.Equal(RefreshOutcome.ReuseDetected, (await s.RefreshTokens.ValidateAndRotateAsync(second.RawToken)).Outcome);
+        Assert.Equal(RefreshOutcome.Success, (await s.RefreshTokens.ValidateAndRotateAsync(theirs.RawToken)).Outcome);
+    }
+
+    [Fact] // a user id from another tenant revokes nothing
+    public async Task Revoke_all_for_user_by_id_is_tenant_scoped()
+    {
+        await ResetAsync();
+        Guid userInA;
+        RefreshIssue tokenInA;
+        await using (var a = NewScope(new TenantId("a")))
+        {
+            userInA = (await a.Users.CreateAsync("rt-iso-a", "pw")).UserId!.Value;
+            tokenInA = await a.RefreshTokens.IssueAsync(userInA);
+        }
+
+        await using (var b = NewScope(new TenantId("b"), allowPlatformLogin: false))
+        {
+            Assert.Equal(0, await b.RefreshTokens.RevokeAllForUserAsync(userInA));
+        }
+
+        await using (var a = NewScope(new TenantId("a")))
+        {
+            Assert.Equal(RefreshOutcome.Success, (await a.RefreshTokens.ValidateAndRotateAsync(tokenInA.RawToken)).Outcome);
+        }
+    }
+
     [Fact] // a deactivated account is never auto-linked: returned un-linked for the flow gate to block
     public async Task External_auto_link_skipped_for_inactive_user()
     {
@@ -953,4 +1122,36 @@ file sealed class RaceWinnerNameUserService(
         => inner.SetActiveAsync(userId, isActive, cancellationToken);
     public Task<UserMutationResult> DeleteAsync(Guid userId, CancellationToken cancellationToken = default)
         => inner.DeleteAsync(userId, cancellationToken);
+}
+
+/// <summary>Commits a winner's link for (provider, subject) in an independent scope the first time a link
+/// is vetted — after the service's ownership check and before its insert — so the insert that follows
+/// violates the real unique index. A stand-in for a truly concurrent second request.</summary>
+file sealed class RaceInjectingHooks(IServiceProvider rootProvider, Guid winnerUserId, string provider, string subject)
+    : IUserLifecycleHooks
+{
+    private int raced;
+
+    public async ValueTask<UserMutationDecision> OnBeforeLinkExternalLoginAsync(
+        Guid userId, string provider1, string subject1, CancellationToken cancellationToken = default)
+    {
+        if (Interlocked.Exchange(ref raced, 1) == 0)
+        {
+            await using var scope = rootProvider.CreateAsyncScope();
+            var links = scope.ServiceProvider.GetRequiredService<IRepository<ExternalLoginLink, Guid>>();
+            var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+            var link = new ExternalLoginLink
+            {
+                UserId = winnerUserId,
+                Provider = provider,
+                ExternalId = subject,
+                CreatedAt = DateTimeOffset.UtcNow,
+            };
+            link.SetId(Guid.CreateVersion7());
+            await links.AddAsync(link, cancellationToken);
+            await unitOfWork.SaveChangesAsync(cancellationToken);
+        }
+
+        return UserMutationDecision.Allow();
+    }
 }

@@ -27,6 +27,58 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.27.0] - 2026-09-19
+
+### Added
+- **`IExternalLoginLinkService` — link, unlink, list and look up the external identities on an existing
+  user** (`Themia.Modules.Identity`, coord #0135, opsezy). Until now the only operation over
+  `identity.external_logins` was the sign-in path's resolve-or-provision, so attaching a second channel to
+  a signed-in user, disconnecting one, or asking "who owns this identity?" meant raw SQL against a
+  Themia-owned table.
+
+  `LinkAsync`, `UnlinkAsync`, `GetLoginsAsync`, `GetLoginsForUsersAsync` (up to 1,000 users per call, one
+  query rather than one per user) and `FindUserByLoginAsync` — the same lookup sign-in performs first,
+  without the account it would then open.
+
+  **A new service, not five more members on `IExternalLoginService`.** That interface is the
+  bring-your-own seam of the external sign-in flow — `ByoExternalLoginTests` runs the flow with only a
+  stub of it and no Identity persistence at all. Growing it would force every BYO adopter to implement
+  operations over a table they do not have.
+
+  Both outcomes are enums. `LinkAsync` adds two states to what was asked for: `UserInactive`, because the
+  sign-in path's auto-link already refuses to bind a new credential to a deactivated or locked-out user
+  and linking follows the same rule; and `Refused`, because link and unlink now ask
+  `IUserLifecycleHooks` first (`OnBeforeLinkExternalLoginAsync` / `OnBeforeUnlinkExternalLoginAsync`,
+  both defaulting to allow, announced as `UserMutation.ExternalLogin`). #0099's principle was that every
+  mutation to a user's credential state has a hook, and a link is one.
+
+  **Unlinking is how a user without a password locks themselves out, and the module does not refuse the
+  "last" method itself** — a sign-in method can live entirely outside Identity, so "last" would be wrong
+  for somebody. That rule belongs in the unlink hook, where the consumer knows every way its users sign
+  in.
+
+  Race-safe at the database: two concurrent links of one identity to different users produce exactly one
+  `Linked`; the loser's insert violates the existing unique index and is answered `LinkedToAnotherUser`.
+  Verified on the real engines, EF and Dapper × PostgreSQL and SQL Server, with the race forced into the
+  window between the ownership check and the insert.
+
+- **`IRefreshTokenService.RevokeAllForUserAsync(userId)`** — revoke-all without a token in hand, for the
+  moment after unlinking a compromised identity. Sessions are not tagged by the identity that opened them,
+  so this is the only way to end the one it holds. **(breaking)** for custom implementations — see below.
+
+### Changed
+- **(breaking)** `IRefreshTokenService` gains `RevokeAllForUserAsync` **with no default
+  implementation.** The last addition there, `ResolveOwnerAsync`, got a default returning null so custom
+  implementations kept compiling — harmless for an audit attribution. A do-nothing default here would let
+  a caller believe every session had ended while all of them stayed valid, so a custom implementation that
+  cannot revoke must fail to compile rather than fail silently. See [MIGRATION.md](MIGRATION.md).
+
+### Known gap, recorded not fixed
+- `ResolveOrProvisionAsync`'s auto-link by verified email is also a credential mutation and still asks no
+  hook. Its existing "don't bind" path returns the user unlinked and relies on the flow's active-user gate
+  to stop the sign-in; for a *refused* link the user is active, so that path would sign them in anyway. It
+  needs its own outcome through the external-auth flow, and is a follow-up.
+
 ## [0.26.0] - 2026-09-16
 
 ### Added

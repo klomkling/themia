@@ -10,6 +10,42 @@ with the *why* and concrete upgrade steps.
 - Each entry states: **What changed**, **Why**, and **How to upgrade** (before → after).
 - Non-breaking changes are *not* listed here — see the CHANGELOG.
 
+## 0.27.0
+
+### `IRefreshTokenService.RevokeAllForUserAsync` (breaking for custom implementations)
+
+**What changed:** `IRefreshTokenService` gains
+`Task<int> RevokeAllForUserAsync(Guid userId, CancellationToken cancellationToken = default)`, with **no
+default implementation**.
+
+**Why:** a caller that unlinks a compromised external identity has no token of that session to present,
+and sessions are not tagged by the identity that opened them — revoking every session of the user by id is
+the only way to end the compromised one. A default that did nothing would compile everywhere and let that
+caller believe the sessions had ended while every one stayed valid. The previous addition to this
+interface (`ResolveOwnerAsync`) *did* get a default, because returning null only loses an audit
+attribution; this one cannot fail safe, so it fails to compile instead.
+
+**Who is affected:** only code that implements `IRefreshTokenService` itself — including test doubles.
+Two of Themia's own test fakes broke on this change; that is the signal, not an accident. Callers of the
+interface, and anyone using the built-in `RefreshTokenService`, change nothing.
+
+**How to upgrade:**
+
+```csharp
+// before — compiled against 0.26
+public sealed class MyRefreshTokenService : IRefreshTokenService { /* ... */ }
+
+// after — revoke every non-expired, non-revoked token the user holds, and say how many
+public async Task<int> RevokeAllForUserAsync(Guid userId, CancellationToken ct = default)
+{
+    // resolve the user in the caller's tenant scope first: an id from another tenant revokes nothing
+    return await _store.RevokeActiveForUserAsync(userId, _clock.GetUtcNow(), ct);
+}
+```
+
+A test double that never issues real tokens can return `Task.FromResult(0)` — but record the call, so the
+test that needs sessions ended can assert they were.
+
 ## 0.25.1
 
 ### `IMigrationEngineAdapter.CreateConnection` (breaking for third-party adapters)
