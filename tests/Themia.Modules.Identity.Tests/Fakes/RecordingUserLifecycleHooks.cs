@@ -20,6 +20,9 @@ internal sealed class RecordingUserLifecycleHooks : IUserLifecycleHooks
     public string? RefuseSetActive { get; set; }
     public string? RefuseDelete { get; set; }
 
+    /// <summary>The machine code every refusal carries; null refuses with a reason only.</summary>
+    public string? RefusalCode { get; set; }
+
     /// <summary>The mutations announced through <see cref="IUserLifecycleHooks.OnUserMutatedAsync"/>.</summary>
     public List<UserMutation> Observed { get; } = [];
 
@@ -94,6 +97,8 @@ internal sealed class RecordingUserLifecycleHooks : IUserLifecycleHooks
         return ValueTask.CompletedTask;
     }
 
-    private static ValueTask<UserMutationDecision> Decide(string? refusal) =>
-        ValueTask.FromResult(refusal is null ? UserMutationDecision.Allow() : UserMutationDecision.Refuse(refusal));
+    private ValueTask<UserMutationDecision> Decide(string? refusal) =>
+        ValueTask.FromResult(refusal is null ? UserMutationDecision.Allow()
+            : RefusalCode is null ? UserMutationDecision.Refuse(refusal)
+            : UserMutationDecision.Refuse(refusal, RefusalCode));
 }

@@ -281,6 +281,7 @@ Themia.Modules.Identity.Abstractions.UserMutation.PhoneConfirmation = 16 -> Them
 Themia.Modules.Identity.Abstractions.UserMutationDecision
 Themia.Modules.Identity.Abstractions.UserMutationDecision.IsAllowed.get -> bool
 Themia.Modules.Identity.Abstractions.UserMutationDecision.Reason.get -> string?
+Themia.Modules.Identity.Abstractions.UserMutationDecision.Code.get -> string?
 Themia.Modules.Identity.Abstractions.UserMutationDecision.UserMutationDecision() -> void
 Themia.Modules.Identity.Abstractions.UserMutationOutcome
 Themia.Modules.Identity.Abstractions.UserMutationOutcome.Duplicate = 2 -> Themia.Modules.Identity.Abstractions.UserMutationOutcome
@@ -290,12 +291,15 @@ Themia.Modules.Identity.Abstractions.UserMutationOutcome.UserNotFound = 1 -> The
 Themia.Modules.Identity.Abstractions.UserMutationResult
 Themia.Modules.Identity.Abstractions.UserMutationResult.Outcome.get -> Themia.Modules.Identity.Abstractions.UserMutationOutcome
 Themia.Modules.Identity.Abstractions.UserMutationResult.Reason.get -> string?
+Themia.Modules.Identity.Abstractions.UserMutationResult.RefusalCode.get -> string?
 Themia.Modules.Identity.Abstractions.UserMutationResult.Succeeded.get -> bool
 Themia.Modules.Identity.Abstractions.UserMutationResult.UserMutationResult() -> void
 static Themia.Modules.Identity.Abstractions.UserMutationDecision.Allow() -> Themia.Modules.Identity.Abstractions.UserMutationDecision
 static Themia.Modules.Identity.Abstractions.UserMutationDecision.Refuse(string! reason) -> Themia.Modules.Identity.Abstractions.UserMutationDecision
+static Themia.Modules.Identity.Abstractions.UserMutationDecision.Refuse(string! reason, string! code) -> Themia.Modules.Identity.Abstractions.UserMutationDecision
 static Themia.Modules.Identity.Abstractions.UserMutationResult.Duplicate() -> Themia.Modules.Identity.Abstractions.UserMutationResult
 static Themia.Modules.Identity.Abstractions.UserMutationResult.Refused(string! reason) -> Themia.Modules.Identity.Abstractions.UserMutationResult
+static Themia.Modules.Identity.Abstractions.UserMutationResult.Refused(string! reason, string? refusalCode) -> Themia.Modules.Identity.Abstractions.UserMutationResult
 static Themia.Modules.Identity.Abstractions.UserMutationResult.Success() -> Themia.Modules.Identity.Abstractions.UserMutationResult
 static Themia.Modules.Identity.Abstractions.UserMutationResult.UserNotFound() -> Themia.Modules.Identity.Abstractions.UserMutationResult
 Themia.Modules.Identity.Abstractions.Authentication.IIdentityEventObserver
@@ -338,6 +342,8 @@ Themia.Modules.Identity.Abstractions.Authentication.ExternalLoginLinkResult.Outc
 Themia.Modules.Identity.Abstractions.Authentication.ExternalLoginLinkResult.Outcome.init -> void
 Themia.Modules.Identity.Abstractions.Authentication.ExternalLoginLinkResult.Reason.get -> string?
 Themia.Modules.Identity.Abstractions.Authentication.ExternalLoginLinkResult.Reason.init -> void
+Themia.Modules.Identity.Abstractions.Authentication.ExternalLoginLinkResult.RefusalCode.get -> string?
+Themia.Modules.Identity.Abstractions.Authentication.ExternalLoginLinkResult.RefusalCode.init -> void
 Themia.Modules.Identity.Abstractions.Authentication.ExternalLoginUnlinkOutcome
 Themia.Modules.Identity.Abstractions.Authentication.ExternalLoginUnlinkOutcome.NotLinked = 1 -> Themia.Modules.Identity.Abstractions.Authentication.ExternalLoginUnlinkOutcome
 Themia.Modules.Identity.Abstractions.Authentication.ExternalLoginUnlinkOutcome.Refused = 3 -> Themia.Modules.Identity.Abstractions.Authentication.ExternalLoginUnlinkOutcome
@@ -350,6 +356,8 @@ Themia.Modules.Identity.Abstractions.Authentication.ExternalLoginUnlinkResult.Ou
 Themia.Modules.Identity.Abstractions.Authentication.ExternalLoginUnlinkResult.Outcome.init -> void
 Themia.Modules.Identity.Abstractions.Authentication.ExternalLoginUnlinkResult.Reason.get -> string?
 Themia.Modules.Identity.Abstractions.Authentication.ExternalLoginUnlinkResult.Reason.init -> void
+Themia.Modules.Identity.Abstractions.Authentication.ExternalLoginUnlinkResult.RefusalCode.get -> string?
+Themia.Modules.Identity.Abstractions.Authentication.ExternalLoginUnlinkResult.RefusalCode.init -> void
 Themia.Modules.Identity.Abstractions.Authentication.IExternalLoginLinkService
 Themia.Modules.Identity.Abstractions.Authentication.IExternalLoginLinkService.FindUserByLoginAsync(string! provider, string! subject, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Identity.Abstractions.Entities.User?>!
 Themia.Modules.Identity.Abstractions.Authentication.IExternalLoginLinkService.GetLoginsAsync(System.Guid userId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Themia.Modules.Identity.Abstractions.Authentication.ExternalLoginInfo!>!>!
@@ -358,6 +366,8 @@ Themia.Modules.Identity.Abstractions.Authentication.IExternalLoginLinkService.Li
 Themia.Modules.Identity.Abstractions.Authentication.IExternalLoginLinkService.UnlinkAsync(System.Guid userId, string! provider, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Identity.Abstractions.Authentication.ExternalLoginUnlinkResult>!
 Themia.Modules.Identity.Abstractions.Authentication.IRefreshTokenService.RevokeAllForUserAsync(System.Guid userId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<int>!
 const Themia.Modules.Identity.Abstractions.Authentication.IExternalLoginLinkService.MaxBatchSize = 1000 -> int
-Themia.Modules.Identity.Abstractions.IUserLifecycleHooks.OnBeforeLinkExternalLoginAsync(System.Guid userId, string! provider, string! subject, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<Themia.Modules.Identity.Abstractions.UserMutationDecision>
-Themia.Modules.Identity.Abstractions.IUserLifecycleHooks.OnBeforeUnlinkExternalLoginAsync(System.Guid userId, string! provider, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<Themia.Modules.Identity.Abstractions.UserMutationDecision>
+Themia.Modules.Identity.Abstractions.IUserLifecycleHooks.OnBeforeLinkExternalLoginAsync(System.Guid userId, string! provider, string! subject, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask<Themia.Modules.Identity.Abstractions.UserMutationDecision>
+Themia.Modules.Identity.Abstractions.IUserLifecycleHooks.OnBeforeLinkExternalLoginAsync(System.Guid userId, string! provider, string! subject, System.Collections.Generic.IReadOnlyList<Themia.Modules.Identity.Abstractions.Authentication.ExternalLoginInfo!>! currentLogins, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<Themia.Modules.Identity.Abstractions.UserMutationDecision>
+Themia.Modules.Identity.Abstractions.IUserLifecycleHooks.OnBeforeUnlinkExternalLoginAsync(System.Guid userId, string! provider, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask<Themia.Modules.Identity.Abstractions.UserMutationDecision>
+Themia.Modules.Identity.Abstractions.IUserLifecycleHooks.OnBeforeUnlinkExternalLoginAsync(System.Guid userId, string! provider, System.Collections.Generic.IReadOnlyList<Themia.Modules.Identity.Abstractions.Authentication.ExternalLoginInfo!>! currentLogins, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<Themia.Modules.Identity.Abstractions.UserMutationDecision>
 Themia.Modules.Identity.Abstractions.UserMutation.ExternalLogin = 256 -> Themia.Modules.Identity.Abstractions.UserMutation
