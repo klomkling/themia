@@ -86,6 +86,22 @@ public interface IRefreshTokenService
     /// <param name="cancellationToken">A cancellation token.</param>
     Task RevokeAsync(string rawToken, bool allForUser, CancellationToken cancellationToken = default);
 
+    /// <summary>Revokes every active refresh token a user holds, without needing one of them in hand.</summary>
+    /// <param name="userId">The owning user (must resolve in scope).</param>
+    /// <param name="cancellationToken">A cancellation token.</param>
+    /// <returns>How many tokens were revoked; 0 when the user does not resolve in scope.</returns>
+    /// <remarks>
+    /// For the moments a caller has no token to present — after unlinking a compromised external identity,
+    /// on an administrator's "sign out everywhere". Sessions are not tagged by the identity that opened
+    /// them, so this is the only way to end the one a compromised identity holds.
+    /// <para>
+    /// No default implementation, unlike <see cref="ResolveOwnerAsync"/>. A default that did nothing would
+    /// let a caller believe every session had ended while all of them stayed valid; a custom implementation
+    /// that cannot revoke should fail to compile rather than fail silently.
+    /// </para>
+    /// </remarks>
+    Task<int> RevokeAllForUserAsync(Guid userId, CancellationToken cancellationToken = default);
+
     /// <summary>Resolves the id of the user who owns a presented raw token, without consuming, rotating,
     /// or revoking it. Used to attribute an audit event (e.g. logout) to a user before the token is
     /// acted upon.</summary>

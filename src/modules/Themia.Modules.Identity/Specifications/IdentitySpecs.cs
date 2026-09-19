@@ -187,6 +187,35 @@ internal sealed class ExternalLoginByProviderKeySpec : Specification<ExternalLog
         Where(l => l.Provider == provider && l.ExternalId == externalId);
 }
 
+/// <summary>A user's external-login links within the ambient tenant, oldest first. Optionally narrowed
+/// to one provider.</summary>
+internal sealed class ExternalLoginsByUserSpec : Specification<ExternalLoginLink>
+{
+    public ExternalLoginsByUserSpec(Guid userId, string? provider = null)
+    {
+        if (provider is null)
+        {
+            Where(l => l.UserId == userId);
+        }
+        else
+        {
+            Where(l => l.UserId == userId && l.Provider == provider);
+        }
+
+        AddOrderBy(l => l.CreatedAt, descending: false);
+    }
+}
+
+/// <summary>The external-login links of any of the given users within the ambient tenant.</summary>
+internal sealed class ExternalLoginsByUsersSpec : Specification<ExternalLoginLink>
+{
+    public ExternalLoginsByUsersSpec(IReadOnlyCollection<Guid> userIds)
+    {
+        Where(l => userIds.Contains(l.UserId));
+        AddOrderBy(l => l.CreatedAt, descending: false);
+    }
+}
+
 /// <summary>Finds a platform (global) external-login link by provider and subject, bypassing the tenant
 /// filter. The <c>TenantId == null</c> predicate guarantees only a genuine platform link matches — never
 /// another tenant's — so it is safe to resolve from a tenant scope (mirrors the platform user specs and

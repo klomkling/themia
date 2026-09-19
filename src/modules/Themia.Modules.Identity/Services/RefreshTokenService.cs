@@ -176,6 +176,26 @@ public sealed class RefreshTokenService : IRefreshTokenService
         }
     }
 
+    /// <inheritdoc />
+    public async Task<int> RevokeAllForUserAsync(Guid userId, CancellationToken cancellationToken = default)
+    {
+        // Resolve the owner in scope first, as every other operation here does: a user id from another
+        // tenant revokes nothing rather than ending that tenant's sessions.
+        var user = await IdentityScope.ResolveUserAsync(users, userId, cancellationToken).ConfigureAwait(false);
+        if (user is null)
+        {
+            return 0;
+        }
+
+        var now = timeProvider.GetUtcNow();
+        var revoked = await tokens.UpdateWhereAsync(
+            new ActiveRefreshTokensByUserSpec(user.Id, now),
+            set => set.Set(t => t.RevokedAt, now),
+            cancellationToken).ConfigureAwait(false);
+        logger.LogInformation("Revoked all active refresh tokens for user {UserId} ({Count} tokens).", user.Id, revoked);
+        return revoked;
+    }
+
     private async Task RevokeFamilyAsync(Guid familyId, DateTimeOffset now, CancellationToken cancellationToken)
     {
         // One set-based UPDATE over the family's not-yet-revoked tokens — the spec's RevokedAt == null
