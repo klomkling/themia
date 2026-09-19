@@ -22,6 +22,26 @@ public sealed class PuppeteerPdfRendererTests
         Assert.Contains(nameof(ThemiaPdfOptions.MaxConcurrency), ex.Message);
     }
 
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1000)]
+    public void Ctor_NonPositiveRenderTimeout_Throws(int milliseconds)
+    {
+        var options = new ThemiaPdfOptions { RenderTimeout = TimeSpan.FromMilliseconds(milliseconds) };
+
+        var ex = Assert.Throws<ArgumentOutOfRangeException>(
+            () => new PuppeteerPdfRenderer(options, NullLogger<PuppeteerPdfRenderer>.Instance));
+
+        Assert.Contains(nameof(ThemiaPdfOptions.RenderTimeout), ex.Message);
+    }
+
+    [Fact]
+    public void RenderTimeout_DefaultsToAFiniteDeadline()
+    {
+        // Finite on purpose: without a deadline a stuck render holds its concurrency slot for ever.
+        Assert.Equal(TimeSpan.FromSeconds(60), new ThemiaPdfOptions().RenderTimeout);
+    }
+
     [Fact]
     public void MaxConcurrency_DefaultsToASmallBound()
     {

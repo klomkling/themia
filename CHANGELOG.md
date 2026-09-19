@@ -27,6 +27,30 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.28.1] - 2026-09-19
+
+### Fixed
+- **A PDF render can no longer hold its concurrency slot for ever** (`Themia.Pdf`). New
+  `ThemiaPdfOptions.RenderTimeout`, default **60 seconds**, bounds each render's work in the browser —
+  opening the page, loading the HTML, printing it. Past it, the render throws `TimeoutException` naming the
+  option and gives its slot back; the abandoned page is closed, and if even that does not finish within five
+  seconds the Chromium process is killed and relaunched on the next render.
+
+  Found through the nightly, not a consumer: on 2026-09-06 one TFM leg of `Themia.Pdf.IntegrationTests`
+  passed one of its five tests and sat for 5h53m. In production that shape is worse than slow — a stuck
+  render keeps its `MaxConcurrency` slot, so at the default of 2 two stuck renders stop all PDF generation
+  in the process, and nothing reports an error because nothing has failed. PuppeteerSharp's own timeouts
+  (180-second protocol, 30-second navigation) did not end that run, so the deadline is enforced by Themia
+  around the whole operation rather than delegated to the library.
+
+  The caller's `CancellationToken` now frees the slot too. It used to be honoured only *between* page calls,
+  so a cancelled render whose `SetContent` was stuck kept running regardless.
+
+  Launching Chromium — including a first-run download, which can legitimately take minutes — is not counted.
+
+  Killing a wedged browser also fails any other render in flight on it. Deliberately: they were running on
+  the same unresponsive process.
+
 ## [0.28.0] - 2026-09-19
 
 ### Added
