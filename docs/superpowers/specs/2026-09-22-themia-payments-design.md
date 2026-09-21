@@ -31,8 +31,12 @@ It is **not** billing. Prices, plans, entitlements, invoices, tax, settlement re
 policy are app domain and stay in the apps — the same boundary `Themia.PromptPay` already states for
 itself ("Out of scope, permanently").
 
+**Settlement shape (decided 2026-09-22).** Every payment lands in the platform's own merchant account;
+agents and landlords are paid out later by periodic transfer, not by the shopper paying them directly. So
+there is no per-tenant merchant onboarding, and no flow where Themia must hold someone else's credentials.
+
 **No `Themia.Modules.Payments`.** Nothing here is tenant-scoped or persistent: one merchant account per
-app (decided 2026-09-22), no table, no migration, no `IThemiaModule` lifecycle. Each app stores its own
+app, no table, no migration, no `IThemiaModule` lifecycle. Each app stores its own
 order ↔ charge mapping, because only the app knows what the charge was *for*. If per-tenant merchant
 credentials ever appear, that is the moment a module becomes necessary — not before.
 
@@ -372,6 +376,14 @@ Changed:
 - **2C2P ships as a port, not a rewrite of its flow.** Redirect API, hosted page, backend notification —
   the same flow ezy-assets ran. What changes is everything in §10.
 - **No module, no store, no tenant scoping** while credentials are one account per app.
+- **A self-generated PromptPay QR is not a collection path for these apps.** It has no automatic
+  confirmation: nothing tells the system the transfer happened, so every payment needs a human to read a
+  slip or a bank statement. Beam's QR slip verification does **not** close that gap — it matches a slip
+  against *one of your Beam charges* and flips that charge to `SUCCEEDED` (`404 NOT_FOUND_ERROR` when the
+  slip matches nothing), so it confirms gateway charges and cannot confirm a QR Themia rendered offline.
+  Automating a self-generated QR would need a bank feed or a third-party slip service — a new vendor, and
+  out of scope. Collection therefore runs through `IPaymentGateway`; the direct QR stays available for
+  printed or bill-payment QR codes that nobody waits on.
 - **`Themia.PromptPay` does not move under this family and is not renamed.** It builds an EMVCo payload
   offline — no credentials, no charge, no status, no webhook — so it cannot implement `IPaymentGateway`, and
   a `Themia.Payments.PromptPay` name would promise a lifecycle it does not have. The QR-vs-gateway split is

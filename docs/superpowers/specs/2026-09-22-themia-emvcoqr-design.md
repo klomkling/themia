@@ -2,8 +2,9 @@
 
 **Status:** deferred. Written now so the split is decided before something forces it, **not** scheduled.
 **Build trigger:** either (a) a second country's QR scheme is needed (QRIS, DuitNow, PayNow, VietQR, KHQR),
-or (b) a consumer needs to **read** an EMVCo payload rather than write one — see §3, which is the likelier
-of the two and already has a caller in sight.
+or (b) a consumer needs to **read** an EMVCo payload rather than write one — see §3. Neither is live:
+payment collection runs through `IPaymentGateway` (payments spec §11), and `Themia.PromptPay` currently has
+**no consumer at all** — no app pins it and no app references its types.
 **Target version:** none assigned. Do not implement on this document alone; re-read §7 first.
 **Related:** `2026-09-22-themia-payments-design.md` (§11 decides PromptPay does not move under
 `Themia.Payments`), `Themia.PromptPay` README ("Out of scope, permanently").
@@ -57,7 +58,9 @@ runtime rather than at compile time.
 
 - **Beam slip verification** takes `format=RAW` with "the content of the QR code from the bank transfer
   slip". An app that scans the slip itself holds an EMVCo payload and today has nowhere in Themia to parse
-  or sanity-check it before spending an API call.
+  or sanity-check it before spending an API call. Note what this does **not** enable: Beam matches the slip
+  against one of *its own* charges and answers `404` otherwise, so it never confirms a QR this package
+  rendered. Parsing is a pre-flight check, not a verification path.
 - A **received** PromptPay QR (a payer-presented or merchant-presented code from elsewhere) can be checked
   for CRC validity and inspected for proxy/amount before use.
 
