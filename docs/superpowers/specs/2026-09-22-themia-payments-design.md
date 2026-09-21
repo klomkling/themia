@@ -1,9 +1,11 @@
 # Themia.Payments — design
 
 **Status:** proposed scope, not yet implemented.
-**Target version:** `0.30.0` (core + Beam adapter together; a core with no adapter ships nothing usable).
+**Target version:** `0.30.0` (core + both adapters together; a core with no adapter ships nothing usable,
+and one adapter cannot show whether the core generalises).
 **Evidence:** three consumers need online payment collection — ezy-assets (subscription), propertiezy
-(boost / slot packs, coord #0052), opsezy. One provider is chosen today: **Beam** (`beamcheckout.com`).
+(boost / slot packs, coord #0052), opsezy. The provider chosen for new work is **Beam** (`beamcheckout.com`); **2C2P** is ported from
+production code ezy-assets already ran.
 **Prior art:** the pre-Themia `EzyAssets.Interfaces.PaymentGateway` + `.ChillPay` + `.TwoCTwoP` trio in
 `backup-repo/ezy-assets`. That abstraction survived two real providers on two methods; §10 lists what it
 got right and the eight things this design deliberately does differently.
@@ -15,9 +17,15 @@ got right and the eight things this design deliberately does differently.
 A provider-agnostic seam for **collecting a payment and learning the outcome**, plus one adapter.
 
 ```
-Themia.Payments        net8.0;net10.0   IPaymentGateway, IPaymentWebhookVerifier, Money, PaymentStatus
-Themia.Payments.Beam   net8.0;net10.0   BeamPaymentGateway, BeamWebhookVerifier, + Beam-only surface
+Themia.Payments          net8.0;net10.0   IPaymentGateway, IPaymentWebhookVerifier, Money, PaymentStatus
+Themia.Payments.Beam     net8.0;net10.0   BeamPaymentGateway, BeamWebhookVerifier, + Beam-only surface
+Themia.Payments.TwoCTwoP net8.0;net10.0   2C2P PGW 4.3 (Redirect API), JWT transport
 ```
+
+Two adapters, not one. 2C2P is in scope from the start because **ezy-assets already ran it in production**
+(`EzyAssets.Interfaces.TwoCTwoP`, PGW Redirect API) — the integration is a port, not a discovery, and a
+second real adapter is the only way to know whether the core is genuinely provider-shaped. §7b lists the
+four places 2C2P moved the core's design, which is the return on building both.
 
 It is **not** billing. Prices, plans, entitlements, invoices, tax, settlement reconciliation and refund
 policy are app domain and stay in the apps — the same boundary `Themia.PromptPay` already states for
@@ -35,8 +43,8 @@ credentials ever appear, that is the moment a module becomes necessary — not b
 Two packages cost more than one, and "one provider" is normally the argument against an abstraction.
 It does not hold here:
 
-- **A second provider is already named.** 2C2P and Stripe are both under consideration, and ezy-assets
-  ran ChillPay **and** 2C2P simultaneously before Themia existed.
+- **The second provider is not hypothetical — it is being built here.** ezy-assets ran ChillPay **and**
+  2C2P simultaneously before Themia existed, and the 2C2P adapter in §7b is a port of that code.
 - **The realistic case is *add*, not *replace*.** Beam covers PromptPay and Thai wallets; a card-heavy or
   cross-border flow lands on another provider. Two live providers need a selection point, which is the
   abstraction.
@@ -68,9 +76,21 @@ compared ordinally.
 
 ```csharp
 Task<ChargeCreation> CreateChargeAsync(CreateChargeRequest request, CancellationToken ct = default);
-Task<Charge>         GetChargeAsync(string chargeId, CancellationToken ct = default);
+Task<Charge>         GetChargeAsync(ChargeRef charge, CancellationToken ct = default);
 Task<RefundCreation> RefundAsync(RefundRequest request, CancellationToken ct = default);
 ```
+
+`ChargeRef` is **not** a `string chargeId`, and that is 2C2P's doing: Beam reads a charge by its own
+`chargeId` (`GET /api/v1/charges/{id}`), while 2C2P's Payment Inquiry takes the merchant's own `invoiceNo`
+and has no provider-side id to ask by before payment. A single-provider design would have hard-coded the
+Beam shape here and broken on the first port.
+
+```csharp
+public readonly record struct ChargeRef(string? ProviderChargeId, string ReferenceId);
+```
+
+The app always holds `ReferenceId`; `ProviderChargeId` is filled when the provider issued one. Adapters use
+whichever they support and never silently ignore the other.
 
 The old interface had exactly two — `RequestToken` (start a payment) and `Inquiry` (ask its status) — and
 those two were enough for ChillPay and 2C2P. This keeps both, async with a `CancellationToken`, and adds
@@ -129,8 +149,11 @@ public sealed record PaymentFailure(FailureReason Reason, string ProviderCode, s
 ```
 
 `FailureReason`: `Unknown` · `ProcessingFailed` · `InsufficientFunds` · `AuthenticationFailed` ·
-`Declined` · `Expired`. The adapter maps; the raw `ProviderCode` is always carried, because the normalized
-reason will be `Unknown` for codes we have not seen and an operator still needs the real one.
+`Declined` · `Expired` · `Canceled`. The adapter maps; the raw `ProviderCode` is always carried, because the
+normalized reason will be `Unknown` for codes we have not seen and an operator still needs the real one.
+
+`Canceled` exists because of 2C2P (`0003 Transaction is cancelled`); Beam alone would not have produced it.
+Second-provider pressure on the core is the point of §2, and this is the cheapest example of it.
 
 **A failed payment is not a failed call.** Beam returns HTTP 2xx for a charge that fails — the request was
 processed correctly. Transport/validation problems throw (§5); a declined payment does not.
@@ -234,6 +257,58 @@ surfacing as a provider validation error.
 
 ---
 
+## 7b. `Themia.Payments.TwoCTwoP`
+
+2C2P **PGW API 4.3, Redirect flow** — the flow ezy-assets already ran: request a payment token, send the
+shopper to the hosted page, learn the outcome from the backend notification, and inquire as the fallback.
+
+| Concern | Decision |
+| --- | --- |
+| Transport | Every request body is `{"payload": "<JWT>"}` and every response is the same. **JWT HS256 signed with the merchant secret key** — the signature *is* the authentication; there is no bearer or basic header. |
+| Endpoints | `https://pgw.2c2p.com/payment/4.3/paymentToken` and `/paymentInquiry`; sandbox `https://sandbox-pgw.2c2p.com/...`. Selected by a `TwoCTwoPEnvironment` enum. |
+| Options | `TwoCTwoPOptions { MerchantId, SecretKey, Environment, PaymentChannels, Timeout }`, validated on start. |
+| Create | `paymentToken` with `merchantID`, `invoiceNo` (the app's `ReferenceId`, **AN 20 max**), `description`, `amount`, `currencyCode`, `paymentChannel[]`, `backendReturnUrl`, `frontendReturnUrl`. Response: `paymentToken`, `webPaymentUrl`, `respCode`, `respDesc` → `NextAction.Redirect(webPaymentUrl)`. |
+| Read | `paymentInquiry` by `invoiceNo` (or `paymentToken`) + `locale`. |
+| Refund / void | **Payment Process API**, `processType` (e.g. `I` settle, `V` void/refund) with `invoiceNo`, `actionAmount` and `idempotencyID`. Note this API is **XML**, not JSON, while the rest of PGW 4.3 is JWT-over-JSON — the adapter isolates that, and nothing about it reaches the core. |
+| Notification | 2C2P POSTs the payment result to `backendReturnUrl` as a JWT signed with the same secret. |
+
+### The four places 2C2P changed the core
+
+1. **`ChargeRef` instead of `string chargeId`** (§4) — 2C2P has no provider id to read by.
+2. **`FailureReason.Canceled`** (§4) — `0003`.
+3. **`RefundCreation.RefundId` is nullable.** Beam returns `refundId`; 2C2P's Payment Process answers the
+   action without minting a refund object, so a consumer keying refunds by provider id would break on port.
+4. **The webhook verifier takes raw bytes and a header bag, and returns an outcome enum** (§6) — it is not
+   an "HMAC header" interface. Beam verifies `X-Beam-Signature` over the body; 2C2P verifies the JWT
+   signature of the body itself and uses no header at all. Both fit without changing the interface, which
+   is the strongest available evidence that §6 is not Beam-shaped.
+
+### Amounts, and the one that bites
+
+Beam takes **integer minor units** (`10000` = 100.00 THB). 2C2P takes a **decimal** (`1000.00`). Core stays
+minor units (§3) and each adapter converts at its edge, with the 2C2P side formatting to exactly two
+decimals under `InvariantCulture`. The old `TwoCTwoPService` passed `order.Amount` — a bare `decimal` from
+a `decimal`-typed model — straight into the JWT payload, so this conversion never existed and a
+culture-dependent format was one `CurrentCulture` away.
+
+### Status mapping
+
+| 2C2P `respCode` | Core |
+| --- | --- |
+| `0000` | `Succeeded` |
+| `0001`, `2001` | `Pending` |
+| `0003` | `Failed` + `Canceled` |
+| `0004` (soft decline, retry after 3DS) | `Failed` + `AuthenticationFailed` |
+| `2002` (not found) | throws `PaymentApiException(NotFound)` |
+| `2003`, `0999` | `Failed` + `ProcessingFailed` |
+| `4xxx` card codes (`4005` do not honor, `4051` insufficient funds, …) | `Failed` + `Declined` / `InsufficientFunds`, raw code always carried |
+
+Card `4xxx` codes are mapped only where the meaning is unambiguous; everything else lands on `Unknown`
+with its code intact, because a wrong normalization is worse than an honest `Unknown` (the old adapter
+collapsed the lot into `IsSuccess = respCode == "0000"` plus a description string).
+
+---
+
 ## 8. Deliberately not in v1
 
 Cards, 3DS, card tokenization, CIT/MIT, installments, Beam Bolt devices, store links, transactions and
@@ -258,8 +333,14 @@ but only after one app has run the hand-wired version and we know the shape of w
 - Status/failure/action mapping tables driven by recorded Beam payloads.
 - No "wait until final" helper is shipped, so no test pins one: a charge can stay `Pending` for ever (§4),
   and a helper that loops is a hang waiting for an adopter to inherit.
-- Live calls against Playground are integration tests, skipped unless `THEMIA_BEAM_*` env vars are set;
-  CI runs the unit suite only.
+- **2C2P:** a JWT round-trip against a fixed secret and a pinned token (sign → the documented payload,
+  verify → the documented claims), `respCode` mapping across the table in §7b, decimal formatting under a
+  comma-decimal `CurrentCulture` (the regression the old code could have had), and rejection of an
+  `invoiceNo` over 20 characters **before** the call.
+- **One test suite runs against both adapters** over the `IPaymentGateway` contract — create → read →
+  refund with a recorded transport — so a change that fits only one provider fails.
+- Live calls against Playground / sandbox-pgw are integration tests, skipped unless `THEMIA_BEAM_*` /
+  `THEMIA_2C2P_*` env vars are set; CI runs the unit suite only.
 
 ---
 
@@ -287,8 +368,10 @@ Changed:
 
 ## 11. Decisions — do not relitigate
 
-- **Two packages from day one** (core + Beam), for the reasons in §2. Adding 2C2P or Stripe later is a new
-  adapter package and a DI line, not an app change.
+- **Three packages from day one** (core + Beam + 2C2P), for the reasons in §2. A third provider later is a
+  new adapter package and a DI line, not an app change.
+- **2C2P ships as a port, not a rewrite of its flow.** Redirect API, hosted page, backend notification —
+  the same flow ezy-assets ran. What changes is everything in §10.
 - **No module, no store, no tenant scoping** while credentials are one account per app.
 - **`Themia.PromptPay` does not move under this family and is not renamed.** It builds an EMVCo payload
   offline — no credentials, no charge, no status, no webhook — so it cannot implement `IPaymentGateway`, and
