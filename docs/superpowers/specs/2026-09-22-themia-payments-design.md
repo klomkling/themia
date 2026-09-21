@@ -14,7 +14,7 @@ got right and the eight things this design deliberately does differently.
 
 ## 1. What this is
 
-A provider-agnostic seam for **collecting a payment and learning the outcome**, plus one adapter.
+A provider-agnostic seam for **collecting a payment and learning the outcome**, plus two adapters.
 
 ```
 Themia.Payments          net8.0;net10.0   IPaymentGateway, IPaymentWebhookVerifier, Money, PaymentStatus
@@ -38,10 +38,9 @@ credentials ever appear, that is the moment a module becomes necessary — not b
 
 ---
 
-## 2. Why a core abstraction at all, with one provider
+## 2. Why a core abstraction and not one package per app
 
-Two packages cost more than one, and "one provider" is normally the argument against an abstraction.
-It does not hold here:
+An abstraction with a single implementation is usually premature. That objection does not apply here:
 
 - **The second provider is not hypothetical — it is being built here.** ezy-assets ran ChillPay **and**
   2C2P simultaneously before Themia existed, and the 2C2P adapter in §7b is a port of that code.
