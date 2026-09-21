@@ -39,8 +39,9 @@ So the reusable seam is the payload format — which is exactly why the family n
 
 The obvious symmetry is `Themia.EmvcoQr.PromptPay`. It is rejected as the default:
 
-- `Themia.PromptPay` is **published** (0.14.0, coord #0055) and consumed. Renaming costs every
-  consumer a `PackageReference` change, a namespace change, and a `PublicAPI` reset — for a tidier name.
+- `Themia.PromptPay` is **published** (0.14.0, coord #0055). It has no consumer today, but a published id
+  is not free to move: anyone who picks it up later, or any release note that names it, has to be corrected,
+  and the rename costs a `PackageReference` change, a namespace change and a `PublicAPI` reset.
 - Its 18-line public surface (`PromptPayQr`, `PromptPayProxy`, `BillerRegistration`) does not change under
   the split; only the internals move. A rename would be churn with no API benefit.
 
