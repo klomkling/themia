@@ -35,25 +35,29 @@ itself ("Out of scope, permanently").
 agents and landlords are paid out later by periodic transfer, not by the shopper paying them directly. So
 there is no per-tenant merchant onboarding, and no flow where Themia must hold someone else's credentials.
 
-> **OPEN REGULATORY QUESTION — this shape may not be permitted as described.** KBank's Thai QR Payment
-> merchant conditions (read 2026-09-22 during onboarding) state: *"กรณีที่บริษัทให้บริการในรูปแบบ Platform
-> รับเงินแทน แล้วจ่ายเงินให้ร้านค้าที่ใช้บริการ Platform ภายหลัง บริษัทต้องมีใบอนุญาตการให้บริการรับชำระค่าสินค้าและบริการ
-> (Bill Payment) จากธปท."* — collecting on behalf of others and settling later is a licensed activity, and
-> that is a **Bank of Thailand** rule, not a KBank product rule: it follows the money, not the provider, so
-> switching to Beam or 2C2P does not avoid it. The same page also lists real estate among the industries
-> needing a specific business licence, and requires a Thai company ≥1 year old with ≥1M THB registered
-> capital and ≥300 transactions/month.
+> **ANSWERED — and it constrains what a payment here is allowed to be.** KBank's Thai QR merchant
+> conditions flagged it (*"กรณีที่บริษัทให้บริการในรูปแบบ Platform รับเงินแทน แล้วจ่ายเงินให้ร้านค้าที่ใช้บริการ Platform
+> ภายหลัง บริษัทต้องมีใบอนุญาต..."*), and counsel answered it for opsezy on 2026-09-22: a platform that
+> receives a customer's payment for work done by an agent, holds it, and settles later **is** a regulated
+> payment business under the Payment Systems Act B.E. 2560 (s.16 — payment agent / payment facilitator),
+> and operating without a licence carries criminal penalties. This is a rule about the flow of funds, so no
+> choice of provider avoids it.
 >
-> Three ways out, in ascending cost: (a) let the licensed PSP hold and split the money — sub-merchant /
-> split settlement, which both Beam (partner mode) and 2C2P (`subMerchantList`) have a concept for, so the
-> platform never holds another party's funds; (b) characterise the receipt as the platform's **own** revenue
-> with agents paid as suppliers, which is a legal and tax question for counsel, not an engineering one;
-> (c) obtain the licence.
+> Three compliant structures, all of which keep this spec's design intact:
 >
-> **Nothing in this spec changes under (a) or (b)** — `IPaymentGateway` is the same interface either way —
-> but the answer decides whether per-merchant credentials and split payouts are needed, which is exactly
-> what `Themia.Modules.Payments` was ruled out for below. Settle it with counsel before implementation
-> starts.
+> 1. **Direct payment + invoiced commission** (opsezy V1 today). The customer pays the **agent** directly —
+>    the platform only shows the agent's account or PromptPay QR — and the platform separately invoices the
+>    agent for commission. The only charge Themia creates is that commission: the platform's **own**
+>    revenue, one merchant account, one party. Exactly the shape §1 assumes.
+> 2. **Licensed-PSP split payment.** Agents onboard as sub-merchants of a licensed PSP; the PSP holds and
+>    splits. The platform only *instructs* the split. See §8 for what this would add.
+> 3. **Principal / subcontractor.** The platform contracts with the customer itself, so the receipt is its
+>    own revenue; it then pays agents as subcontractors. Same engineering shape as (1), different tax
+>    (VAT on gross) and full liability for the work.
+>
+> **What this means for Themia:** every charge `IPaymentGateway` creates is the platform's own revenue. A
+> charge that collects someone else's money is out of scope by law, not by preference — and (2) is the only
+> route that changes the interface.
 
 **No `Themia.Modules.Payments`.** Nothing here is tenant-scoped or persistent: one merchant account per
 app, no table, no migration, no `IThemiaModule` lifecycle. Each app stores its own
@@ -338,6 +342,12 @@ Cards, 3DS, card tokenization, CIT/MIT, installments, Beam Bolt devices, store l
 settlement reports. Cards drag PCI scope and a second flow (`skip3dsFlow`, authorization/capture) that no
 consumer has asked for; the other three are Beam-only concepts with no second implementation in sight.
 
+Also out: **sub-merchant / split payment**. Structure (2) in §1 would add an "on behalf of" dimension to
+every call — a sub-merchant id on `CreateChargeRequest`, a split instruction, and per-merchant onboarding
+state — which is also the one thing that would justify `Themia.Modules.Payments`. Beam has partner mode
+(`X-Beam-Partner-ID`) and 2C2P has `subMerchantList`, so both adapters could grow it. Not now: no consumer
+is on that structure, and designing a split model against zero live merchants would be guesswork.
+
 Also out: an HTTP endpoint. A `Themia.Payments.AspNetCore` with a mapped webhook endpoint, `EnableBuffering`
 and a verification filter is a reasonable phase 2 — it is where the raw-body mistake is easiest to make —
 but only after one app has run the hand-wired version and we know the shape of what it needs.
@@ -396,9 +406,16 @@ Changed:
 - **2C2P ships as a port, not a rewrite of its flow.** Redirect API, hosted page, backend notification —
   the same flow ezy-assets ran. What changes is everything in §10.
 - **No module, no store, no tenant scoping** while credentials are one account per app.
-- **A self-generated PromptPay QR is not a collection path for these apps.** It has no automatic
-  confirmation: nothing tells the system the transfer happened, so every payment needs a human to read a
-  slip or a bank statement. Beam's QR slip verification does **not** close that gap — it matches a slip
+- **`Themia.PromptPay` has a consumer again, and it is the compliant structure that gives it one.** Under
+  structure (1) above, the platform renders **the agent's** PromptPay QR so the customer pays the agent
+  directly — money that must never touch the platform's account. A gateway cannot serve that flow by
+  construction, because a gateway charge settles to the merchant who created it. So the offline QR builder
+  is not a leftover: it is what keeps the money out of our hands.
+- **A self-generated PromptPay QR is still not a collection path for the platform's own revenue.** It has
+  no automatic confirmation: nothing tells the system the transfer happened, so every payment needs a human
+  to read a slip or a bank statement. Commission and subscription charges therefore go through
+  `IPaymentGateway`. And note whose problem confirmation is in structure (1): the money is the **agent's**,
+  so a slip check there verifies a transfer into the agent's account, not ours. Beam's QR slip verification does **not** close that gap — it matches a slip
   against *one of your Beam charges* and flips that charge to `SUCCEEDED` (`404 NOT_FOUND_ERROR` when the
   slip matches nothing), so it confirms gateway charges and cannot confirm a QR Themia rendered offline.
   Automating a self-generated QR would need a bank feed or a third-party slip service — a new vendor, and
