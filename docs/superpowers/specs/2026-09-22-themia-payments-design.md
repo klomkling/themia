@@ -35,6 +35,26 @@ itself ("Out of scope, permanently").
 agents and landlords are paid out later by periodic transfer, not by the shopper paying them directly. So
 there is no per-tenant merchant onboarding, and no flow where Themia must hold someone else's credentials.
 
+> **OPEN REGULATORY QUESTION — this shape may not be permitted as described.** KBank's Thai QR Payment
+> merchant conditions (read 2026-09-22 during onboarding) state: *"กรณีที่บริษัทให้บริการในรูปแบบ Platform
+> รับเงินแทน แล้วจ่ายเงินให้ร้านค้าที่ใช้บริการ Platform ภายหลัง บริษัทต้องมีใบอนุญาตการให้บริการรับชำระค่าสินค้าและบริการ
+> (Bill Payment) จากธปท."* — collecting on behalf of others and settling later is a licensed activity, and
+> that is a **Bank of Thailand** rule, not a KBank product rule: it follows the money, not the provider, so
+> switching to Beam or 2C2P does not avoid it. The same page also lists real estate among the industries
+> needing a specific business licence, and requires a Thai company ≥1 year old with ≥1M THB registered
+> capital and ≥300 transactions/month.
+>
+> Three ways out, in ascending cost: (a) let the licensed PSP hold and split the money — sub-merchant /
+> split settlement, which both Beam (partner mode) and 2C2P (`subMerchantList`) have a concept for, so the
+> platform never holds another party's funds; (b) characterise the receipt as the platform's **own** revenue
+> with agents paid as suppliers, which is a legal and tax question for counsel, not an engineering one;
+> (c) obtain the licence.
+>
+> **Nothing in this spec changes under (a) or (b)** — `IPaymentGateway` is the same interface either way —
+> but the answer decides whether per-merchant credentials and split payouts are needed, which is exactly
+> what `Themia.Modules.Payments` was ruled out for below. Settle it with counsel before implementation
+> starts.
+
 **No `Themia.Modules.Payments`.** Nothing here is tenant-scoped or persistent: one merchant account per
 app, no table, no migration, no `IThemiaModule` lifecycle. Each app stores its own
 order ↔ charge mapping, because only the app knows what the charge was *for*. If per-tenant merchant
