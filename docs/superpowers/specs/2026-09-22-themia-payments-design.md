@@ -59,12 +59,13 @@ there is no per-tenant merchant onboarding, and no flow where Themia must hold s
 >
 > | App | Structure | Status |
 > | --- | --- | --- |
-> | opsezy | (1) direct payment + invoiced commission | counsel answered 2026-09-22; the charge Themia creates is the commission |
+> | opsezy | **(3) principal / subcontractor** — chosen 2026-09-23 after the founders compared the three | the customer contracts with the platform and pays it; the platform hires the technician under a works contract. The charge Themia creates is the **full job price**, and it is the platform's own revenue. Structure (1) was what they ran before this decision |
 > | propertiezy | own revenue only — Boost / slot packs sold to agents | counsel answered 2026-09-22: **not in scope of the Act at all**, no licence. Their Terms of Use also state they take no money, deposit or consideration from buyers or renters, so the constraint is contractual as well as regulatory |
 > | ezy-assets | SaaS subscription + add-ons, and a **zero-custody** commission ledger | counsel answered 2026-09-22: subscriptions and add-ons are own revenue, **safe**; the Phase 5 commission feature is safe *because* the platform never touches deal money — the agency transfers to the agent and the system only records proof |
 >
 > All three consumers answered, and all three land in the same place: **every charge `IPaymentGateway`
-> creates is the platform's own revenue** — subscription, add-on, boost, commission invoice. A charge that
+> creates is the platform's own revenue** — subscription, add-on, boost, or the full price of a job the
+> platform itself contracted for. A charge that
 > collects someone else's money is out of scope by law, not by preference, and (2) is the only route that
 > would change this interface. The tax side (receipt / tax invoice, 3% withholding when the payer is a
 > company, VAT registration past the threshold, and VAT on **gross** under structure (3)) is app domain and
@@ -364,6 +365,18 @@ collapsed the lot into `IsSuccess = respCode == "0000"` plus a description strin
 Cards, 3DS, card tokenization, CIT/MIT, installments, Beam Bolt devices, store links, transactions and
 settlement reports. Cards drag PCI scope and a second flow (`skip3dsFlow`, authorization/capture) that no
 consumer has asked for; the other three are Beam-only concepts with no second implementation in sight.
+
+**What opsezy's choice of structure (3) adds, and it is all app domain:** the platform now issues the tax
+invoice to the customer, withholds 3% when it pays the technician, and carries VAT on the gross. None of
+that enters this package — but two existing Themia packages are on the path: document numbering for tax
+invoices (`Themia.Framework.Data.Sequences`, whose gaps-are-acceptable semantic needs a cancelled-document
+policy on top for Revenue Department purposes) and private storage for withholding certificates and the
+technician's tax id (`StorageVisibility.Private` + presigned URLs, per the PDPA note above).
+
+One thing the choice makes sharper: **refunds are now ours to make.** Under structure (1) a dissatisfied
+customer was the technician's problem; under (3) the platform owes the refund, which makes §7's refund
+semantics load-bearing — partial refunds exist only on card charges, so a QR PromptPay job refunds in full
+or not at all.
 
 Also out: **sub-merchant / split payment**. Structure (2) in §1 would add an "on behalf of" dimension to
 every call — a sub-merchant id on `CreateChargeRequest`, a split instruction, and per-merchant onboarding
