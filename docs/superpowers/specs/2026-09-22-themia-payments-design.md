@@ -61,12 +61,26 @@ there is no per-tenant merchant onboarding, and no flow where Themia must hold s
 > | --- | --- | --- |
 > | opsezy | (1) direct payment + invoiced commission | counsel answered 2026-09-22; the charge Themia creates is the commission |
 > | propertiezy | own revenue only — Boost / slot packs sold to agents | counsel answered 2026-09-22: **not in scope of the Act at all**, no licence. Their Terms of Use also state they take no money, deposit or consideration from buyers or renters, so the constraint is contractual as well as regulatory |
-> | ezy-assets | subscription — own revenue on its face | not yet answered |
+> | ezy-assets | SaaS subscription + add-ons, and a **zero-custody** commission ledger | counsel answered 2026-09-22: subscriptions and add-ons are own revenue, **safe**; the Phase 5 commission feature is safe *because* the platform never touches deal money — the agency transfers to the agent and the system only records proof |
 >
-> **What this means for Themia:** every charge `IPaymentGateway` creates is the platform's own revenue. A
-> charge that collects someone else's money is out of scope by law, not by preference — and (2) is the only
-> route that changes the interface. The tax side (receipt / tax invoice, 3% withholding when the payer is a
-> company, VAT registration past the threshold) is app domain and does not enter this package.
+> All three consumers answered, and all three land in the same place: **every charge `IPaymentGateway`
+> creates is the platform's own revenue** — subscription, add-on, boost, commission invoice. A charge that
+> collects someone else's money is out of scope by law, not by preference, and (2) is the only route that
+> would change this interface. The tax side (receipt / tax invoice, 3% withholding when the payer is a
+> company, VAT registration past the threshold, and VAT on **gross** under structure (3)) is app domain and
+> does not enter this package.
+>
+> Two constraints from the same advice that land on *other* Themia packages, recorded here because this is
+> where the reasoning lives:
+>
+> - **Payout proof and slip images are high-risk personal data** (bank account numbers, transfer slips, an
+>   ID card where a 50-ทวิ is issued). They must be stored privately and reached only by an authorised role
+>   — never at a permanent unsigned URL. In Themia terms that means `StorageVisibility.Private` plus
+>   `IStorageProvider.GetPresignedUrlAsync`, and **not** `GetPublicUrl`, which exists for listing photos.
+>   A consumer that reaches for the public-URL feature here has a PDPA problem, not a storage problem.
+> - **AML.** Real-estate brokerage is a reporting entity under the Anti-Money Laundering Act; a platform
+>   that starts receiving deal or deposit money inherits CDD/KYC and suspicious-transaction reporting. That
+>   is another reason the zero-custody line is not merely a licensing technicality.
 
 **No `Themia.Modules.Payments`.** Nothing here is tenant-scoped or persistent: one merchant account per
 app, no table, no migration, no `IThemiaModule` lifecycle. Each app stores its own
