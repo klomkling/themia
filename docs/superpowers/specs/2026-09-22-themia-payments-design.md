@@ -55,9 +55,18 @@ there is no per-tenant merchant onboarding, and no flow where Themia must hold s
 >    own revenue; it then pays agents as subcontractors. Same engineering shape as (1), different tax
 >    (VAT on gross) and full liability for the work.
 >
+> **Per consumer, as answered so far:**
+>
+> | App | Structure | Status |
+> | --- | --- | --- |
+> | opsezy | (1) direct payment + invoiced commission | counsel answered 2026-09-22; the charge Themia creates is the commission |
+> | propertiezy | own revenue only — Boost / slot packs sold to agents | counsel answered 2026-09-22: **not in scope of the Act at all**, no licence. Their Terms of Use also state they take no money, deposit or consideration from buyers or renters, so the constraint is contractual as well as regulatory |
+> | ezy-assets | subscription — own revenue on its face | not yet answered |
+>
 > **What this means for Themia:** every charge `IPaymentGateway` creates is the platform's own revenue. A
 > charge that collects someone else's money is out of scope by law, not by preference — and (2) is the only
-> route that changes the interface.
+> route that changes the interface. The tax side (receipt / tax invoice, 3% withholding when the payer is a
+> company, VAT registration past the threshold) is app domain and does not enter this package.
 
 **No `Themia.Modules.Payments`.** Nothing here is tenant-scoped or persistent: one merchant account per
 app, no table, no migration, no `IThemiaModule` lifecycle. Each app stores its own
@@ -406,11 +415,14 @@ Changed:
 - **2C2P ships as a port, not a rewrite of its flow.** Redirect API, hosted page, backend notification —
   the same flow ezy-assets ran. What changes is everything in §10.
 - **No module, no store, no tenant scoping** while credentials are one account per app.
-- **`Themia.PromptPay` has a consumer again, and it is the compliant structure that gives it one.** Under
-  structure (1) above, the platform renders **the agent's** PromptPay QR so the customer pays the agent
-  directly — money that must never touch the platform's account. A gateway cannot serve that flow by
-  construction, because a gateway charge settles to the merchant who created it. So the offline QR builder
-  is not a leftover: it is what keeps the money out of our hands.
+- **`Themia.PromptPay` has a plausible consumer under structure (1), but not an actual one yet.** That
+  structure needs the customer to pay **the agent** directly, which means showing the agent's account or
+  rendering the agent's PromptPay QR — and a gateway cannot do it, because a gateway charge settles to the
+  merchant who created it. This package is the only thing in Themia that can produce such a QR. What is
+  *not* true, and was briefly claimed here: that an app does this today. None does. opsezy's own payment
+  spec (2026-09-15, written a week before counsel answered) renders a **Beam** dynamic PromptPay QR and has
+  the customer paying Beam with the platform refunding — the shape counsel flagged. So the decision below
+  stands on cost-to-keep, not on a live consumer, until an app actually adopts structure (1) in code.
 - **A self-generated PromptPay QR is still not a collection path for the platform's own revenue.** It has
   no automatic confirmation: nothing tells the system the transfer happened, so every payment needs a human
   to read a slip or a bank statement. Commission and subscription charges therefore go through
