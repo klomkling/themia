@@ -60,7 +60,7 @@ there is no per-tenant merchant onboarding, and no flow where Themia must hold s
 > | App | Structure | Status |
 > | --- | --- | --- |
 > | opsezy | **(3) principal / subcontractor** — chosen 2026-09-23 after the founders compared the three | the customer contracts with the platform and pays it; the platform hires the technician under a works contract. The charge Themia creates is the **full job price**, and it is the platform's own revenue. Structure (1) was what they ran before this decision |
-> | propertiezy | own revenue only — Boost / slot packs sold to agents | counsel answered 2026-09-22: **not in scope of the Act at all**, no licence. Their Terms of Use also state they take no money, deposit or consideration from buyers or renters, so the constraint is contractual as well as regulatory |
+> | propertiezy | own revenue only — Boost / slot packs sold to agents | counsel answered 2026-09-22: **not in scope of the Act at all**, no licence. Confirmed against their repo on coord #0145: no deposit, booking fee, escrow or rent collection anywhere in the roadmap, and the "we take no money from buyers or renters" sentence is a seeded CMS page under a revision rule, so it cannot drift silently. One adjacent thing they flagged themselves: prepaid Boost credits are stored value, which is a different regulatory question from collect-on-behalf and one they will put to counsel before building — it does not reach this interface either way |
 > | ezy-assets | SaaS subscription + add-ons, and a **zero-custody** commission ledger | counsel answered 2026-09-22: subscriptions and add-ons are own revenue, **safe**; the Phase 5 commission feature is safe *because* the platform never touches deal money — the agency transfers to the agent and the system only records proof |
 >
 > All three consumers answered, and all three land in the same place: **every charge `IPaymentGateway`
@@ -187,6 +187,12 @@ declares which it supports, and startup fails if the configuration can ask for o
 
 `Pending` · `Succeeded` · `Failed`. Beam's own lifecycle, and the intersection of the others.
 
+**A late success can arrive after the thing being sold has expired.** propertiezy raised this on coord #0145
+and it generalises: their products are time-boxed (a bump, a hero slot for 30 days), so a `charge.succeeded`
+that lands after the window has passed forces a three-way choice — start a window the buyer no longer gets,
+refund, or credit. Whoever owns the product decides; the package's part is to make sure the late event still
+arrives and is not silently dropped.
+
 **`Pending` is not a transient state you may wait on.** Beam documents that an abandoned charge can stay
 `PENDING` **indefinitely** — the shopper closes the QR screen and nothing further happens. Any consumer
 loop that waits for a final status must carry its own timeout and treat the timeout as unpaid, while
@@ -268,6 +274,13 @@ Rules, each one a failure mode we would otherwise ship:
   does not silently fall back to the policy's methods, because a caller that asked for one method usually has
   a reason (a saved card, a retry of a failed attempt).
 - **No store, no ledger.** Pure function of amount and configuration.
+
+The band shape was checked against a real price list before it was written down: propertiezy's boost ladder
+spans ฿25 to ฿7,350, with four products at or under ฿299 (coord #0145). At ฿25 a percentage card fee is a
+double-digit share of the charge, which is this section's argument at its most extreme, and one boundary
+somewhere between ฿300 and ฿1,000 covers their whole small-ticket population — one band plus `Above`, exactly
+the shape above. Their real numbers land with a pricing decision in October; because this is configuration,
+they do not need a Themia release to apply them.
 
 What it deliberately does **not** do: pick the cheapest method, reorder what the shopper sees, or model fees.
 Fee schedules are per-merchant contract terms, they change without a release, and a wrong one silently costs
