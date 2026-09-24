@@ -45,15 +45,15 @@ there is no per-tenant merchant onboarding, and no flow where Themia must hold s
 >
 > Three compliant structures, all of which keep this spec's design intact:
 >
-> 1. **Direct payment + invoiced commission** (opsezy V1 today). The customer pays the **agent** directly —
+> 1. **Direct payment + invoiced commission** (what opsezy ran until 2026-09-23). The customer pays the **agent** directly —
 >    the platform only shows the agent's account or PromptPay QR — and the platform separately invoices the
 >    agent for commission. The only charge Themia creates is that commission: the platform's **own**
 >    revenue, one merchant account, one party. Exactly the shape §1 assumes.
 > 2. **Licensed-PSP split payment.** Agents onboard as sub-merchants of a licensed PSP; the PSP holds and
 >    splits. The platform only *instructs* the split. See §8 for what this would add.
-> 3. **Principal / subcontractor.** The platform contracts with the customer itself, so the receipt is its
->    own revenue; it then pays agents as subcontractors. Same engineering shape as (1), different tax
->    (VAT on gross) and full liability for the work.
+> 3. **Principal / subcontractor** (opsezy's choice, 2026-09-23). The platform contracts with the customer
+>    itself, so the receipt is its own revenue; it then pays agents as subcontractors. Same engineering
+>    shape as (1), different tax (VAT on gross) and full liability for the work.
 >
 > **Per consumer, as answered so far:**
 >
