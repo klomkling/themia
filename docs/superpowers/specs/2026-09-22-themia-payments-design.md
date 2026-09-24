@@ -153,7 +153,7 @@ refund, which the old one lacked and every consumer here needs.
 | --- | --- |
 | `Amount` | `Money`. |
 | `ReferenceId` | The app's own order id. The only field the app can find its order by when a webhook arrives. Required. |
-| `Method` | `PaymentMethod` enum — v1: `QrPromptPay`, `HostedCheckout`. |
+| `AllowedMethods` | The methods this charge may be paid with, as a set (§4b). **One element** means a direct charge with that method; **more than one** means a hosted page offering the choice. Both providers work this way: Beam names a single `paymentMethodType` on a charge and enables groups on a payment link, 2C2P takes `paymentChannel[]`. |
 | `ReturnUrl` | Where the shopper lands after an off-site step. Optional. |
 | `ExpiresAt` | When the QR / link stops being payable. Optional. |
 | `IdempotencyKey` | **Caller-supplied and stable across retries** (§5). Optional; generated per call when absent, which is only safe because a generated key is used for that call's internal retries too. |
@@ -175,6 +175,13 @@ Beam answers `actionRequired` as `NONE` / `REDIRECT` / `ENCODED_IMAGE`; 2C2P ret
 Omise returns `authorize_uri` or a QR image. The three-way shape is the common denominator, not a Beam
 detail. A closed hierarchy (not a nullable-field bag) so a consumer's `switch` breaks when a fourth
 action appears.
+
+### `PaymentMethod`
+
+`QrPromptPay` · `Card` · `MobileBanking` · `Wallet`. The four that both adapters can serve and that differ in
+cost. Finer distinctions stay provider-side: Beam's `KPLUS` / `SCB_EASY` / `KRUNGSRI_APP` / `BANGKOK_BANK_APP`
+are all `MobileBanking`, and `TRUE_MONEY` / `LINE_PAY` / `SHOPEE_PAY` / `ALIPAY` are all `Wallet`. An adapter
+declares which it supports, and startup fails if the configuration can ask for one it cannot serve (§4b).
 
 ### `PaymentStatus`
 
@@ -208,6 +215,63 @@ Second-provider pressure on the core is the point of §2, and this is the cheape
 
 **A failed payment is not a failed call.** Beam returns HTTP 2xx for a charge that fails — the request was
 processed correctly. Transport/validation problems throw (§5); a declined payment does not.
+
+---
+
+## 4b. Method policy by amount — optional, and off unless configured
+
+The fee on a payment depends on how it is paid: a QR transfer is cents or a flat fee, a card is a percentage.
+On a 200 THB charge the card fee can be a tenth of the whole amount, and on a 50,000 THB one a customer who
+cannot use a card may simply not pay. Every adopter here ends up wanting the same rule with different numbers:
+*small amounts, cheap methods only; above a threshold, open up the expensive ones.*
+
+```csharp
+public sealed record PaymentMethodBand(long UpToMinorUnitsInclusive, IReadOnlyList<PaymentMethod> Methods);
+
+public sealed class PaymentMethodPolicy
+{
+    public string Currency { get; init; } = "THB";
+    public IReadOnlyList<PaymentMethodBand> Bands { get; init; } = [];
+    public IReadOnlyList<PaymentMethod> Above { get; init; } = [];   // beyond the last band
+
+    public IReadOnlyList<PaymentMethod> Resolve(Money amount);
+}
+```
+
+```jsonc
+// 1,000 THB and under: QR or a banking app. Above that, cards as well.
+"Payments": {
+  "MethodPolicy": {
+    "Currency": "THB",
+    "Bands":  [ { "UpToMinorUnitsInclusive": 100000, "Methods": [ "QrPromptPay", "MobileBanking" ] } ],
+    "Above":  [ "QrPromptPay", "MobileBanking", "Card" ]
+  }
+}
+```
+
+**Thresholds are in minor units**, because `Money` is (§3): `100000` is 1,000.00 THB. Writing `1000` there
+means ten baht, which is why the property name says so rather than being called `UpTo`.
+
+Rules, each one a failure mode we would otherwise ship:
+
+- **Off by default.** No `MethodPolicy` configured means the caller's `AllowedMethods` is used unchanged. This
+  is a policy an adopter opts into, not a default that quietly narrows what a charge accepts.
+- **Validated at startup** (`ValidateOnStart`), not at the first payment: bands strictly ascending, no
+  duplicates, no empty method list, `Above` non-empty, and every method named must be one the **registered
+  adapter declares it supports**. A policy that can produce `Wallet` against an adapter without wallets is a
+  configuration error, and the only safe time to find it is boot.
+- **Inclusive upper bound**, spelled in the property name, with a test at exactly the boundary. "≤ 1,000" and
+  "< 1,000" differ by one charge a day at the threshold, and the argument is unwinnable after the fact.
+- **Currency-scoped.** `Resolve` on a `Money` of another currency throws rather than applying baht bands.
+- **Intersection, not replacement.** The result is `caller ∩ policy`. A caller asking for `Card` only, on an
+  amount where the policy forbids it, gets an empty set — which **throws** with both lists in the message. It
+  does not silently fall back to the policy's methods, because a caller that asked for one method usually has
+  a reason (a saved card, a retry of a failed attempt).
+- **No store, no ledger.** Pure function of amount and configuration.
+
+What it deliberately does **not** do: pick the cheapest method, reorder what the shopper sees, or model fees.
+Fee schedules are per-merchant contract terms, they change without a release, and a wrong one silently costs
+money — so the package takes the rule the adopter writes and does not try to compute it.
 
 ---
 
