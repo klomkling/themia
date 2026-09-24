@@ -406,6 +406,10 @@ are relative to `docs/superpowers/specs/`. A version in parentheses is the relea
 - ✅ `2026-09-08-themia-geo-design.md` (0.24.0; no module, supersedes the `Themia.Modules.Geo` row in §B)
 - ✅ `2026-09-08-themia-ai-design.md` (0.24.0; no module, supersedes the `Themia.Modules.AI` row in §B)
 - ✅ `2026-09-14-themia-content-design.md` — versioned bilingual content pages (0.26.0, coord #0130)
+- ⬜ `2026-09-22-themia-payments-design.md` — `Themia.Payments` + `.Beam`: charge/refund/webhook seam and the
+  Beam adapter (proposed for 0.30.0; no plan written yet)
+- ⬜ `2026-09-22-themia-emvcoqr-design.md` — extracting EMVCo TLV/CRC out of `Themia.PromptPay`
+  (**deferred** — builds only on the trigger in its header; no plan written yet)
 
 **Shipped without a standalone spec** — `Themia.AspNetCore.DataProtection` (0.10.0, coord #0042),
 `Themia.PromptPay` (0.14.0), `Themia.Totp` (0.18.0), `Themia.WebAuthn` (0.20.0), `Themia.Imaging` (0.21.0).
