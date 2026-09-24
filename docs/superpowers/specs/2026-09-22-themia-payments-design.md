@@ -446,7 +446,10 @@ Also out: **sub-merchant / split payment**. Structure (2) in §1 would add an "o
 every call — a sub-merchant id on `CreateChargeRequest`, a split instruction, and per-merchant onboarding
 state — which is also the one thing that would justify `Themia.Modules.Payments`. Beam has partner mode
 (`X-Beam-Partner-ID`) and 2C2P has `subMerchantList`, so both adapters could grow it. Not now: no consumer
-is on that structure, and designing a split model against zero live merchants would be guesswork.
+is on that structure, and designing a split model against zero live merchants would be guesswork. ezy-assets
+answered directly on coord #0146 (2026-09-25): a payout may grow out of their commission ledger eventually,
+but not in their v1 or v2, and the blocker is the licensing structure rather than the engineering — so v1
+here is not to be held for it.
 
 Also out: an HTTP endpoint. A `Themia.Payments.AspNetCore` with a mapped webhook endpoint, `EnableBuffering`
 and a verification filter is a reasonable phase 2 — it is where the raw-body mistake is easiest to make —
