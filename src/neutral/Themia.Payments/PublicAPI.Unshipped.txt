@@ -1,0 +1,44 @@
+#nullable enable
+Themia.Payments.Money
+Themia.Payments.Money.Money() -> void
+Themia.Payments.Money.MinorUnits.get -> long
+Themia.Payments.Money.Currency.get -> string!
+static Themia.Payments.Money.Thb(long minorUnits) -> Themia.Payments.Money
+static Themia.Payments.Money.From(long minorUnits, string! currency) -> Themia.Payments.Money
+Themia.Payments.PaymentStatus
+Themia.Payments.PaymentStatus.Pending = 0 -> Themia.Payments.PaymentStatus
+Themia.Payments.PaymentStatus.Succeeded = 1 -> Themia.Payments.PaymentStatus
+Themia.Payments.PaymentStatus.Failed = 2 -> Themia.Payments.PaymentStatus
+Themia.Payments.FailureReason
+Themia.Payments.FailureReason.Unknown = 0 -> Themia.Payments.FailureReason
+Themia.Payments.FailureReason.ProcessingFailed = 1 -> Themia.Payments.FailureReason
+Themia.Payments.FailureReason.InsufficientFunds = 2 -> Themia.Payments.FailureReason
+Themia.Payments.FailureReason.AuthenticationFailed = 3 -> Themia.Payments.FailureReason
+Themia.Payments.FailureReason.Declined = 4 -> Themia.Payments.FailureReason
+Themia.Payments.FailureReason.Expired = 5 -> Themia.Payments.FailureReason
+Themia.Payments.FailureReason.Canceled = 6 -> Themia.Payments.FailureReason
+Themia.Payments.PaymentMethod
+Themia.Payments.PaymentMethod.QrPromptPay = 0 -> Themia.Payments.PaymentMethod
+Themia.Payments.PaymentMethod.Card = 1 -> Themia.Payments.PaymentMethod
+Themia.Payments.PaymentMethod.MobileBanking = 2 -> Themia.Payments.PaymentMethod
+Themia.Payments.PaymentMethod.Wallet = 3 -> Themia.Payments.PaymentMethod
+Themia.Payments.PaymentEventType
+Themia.Payments.PaymentEventType.ChargeSucceeded = 0 -> Themia.Payments.PaymentEventType
+Themia.Payments.PaymentEventType.ChargeFailed = 1 -> Themia.Payments.PaymentEventType
+Themia.Payments.PaymentEventType.RefundSucceeded = 2 -> Themia.Payments.PaymentEventType
+Themia.Payments.PaymentEventType.RefundFailed = 3 -> Themia.Payments.PaymentEventType
+Themia.Payments.PaymentEventType.Other = 4 -> Themia.Payments.PaymentEventType
+Themia.Payments.WebhookOutcome
+Themia.Payments.WebhookOutcome.Verified = 0 -> Themia.Payments.WebhookOutcome
+Themia.Payments.WebhookOutcome.SignatureMissing = 1 -> Themia.Payments.WebhookOutcome
+Themia.Payments.WebhookOutcome.SignatureMismatch = 2 -> Themia.Payments.WebhookOutcome
+Themia.Payments.WebhookOutcome.UnknownEvent = 3 -> Themia.Payments.WebhookOutcome
+Themia.Payments.WebhookOutcome.Malformed = 4 -> Themia.Payments.WebhookOutcome
+Themia.Payments.FailureKind
+Themia.Payments.FailureKind.Authentication = 0 -> Themia.Payments.FailureKind
+Themia.Payments.FailureKind.Validation = 1 -> Themia.Payments.FailureKind
+Themia.Payments.FailureKind.NotFound = 2 -> Themia.Payments.FailureKind
+Themia.Payments.FailureKind.Permission = 3 -> Themia.Payments.FailureKind
+Themia.Payments.FailureKind.RateLimited = 4 -> Themia.Payments.FailureKind
+Themia.Payments.FailureKind.Transient = 5 -> Themia.Payments.FailureKind
+Themia.Payments.FailureKind.Unknown = 6 -> Themia.Payments.FailureKind
