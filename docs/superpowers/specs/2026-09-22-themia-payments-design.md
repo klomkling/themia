@@ -359,7 +359,13 @@ Endpoints used: `POST /api/v1/charges`, `GET /api/v1/charges/{id}`, `POST /api/v
 only by an app that references this package deliberately:
 
 - **Payment Links** — hosted checkout. Create / get / disable; a link is immutable otherwise. Modelled
-  separately from a charge because a link *produces* charges (`source: PAYMENT_LINK`).
+  separately from a charge because a link *produces* charges (`source: PAYMENT_LINK`, `sourceId` = the link id).
+  The gateway also uses links **internally**: a request whose `AllowedMethods` holds more than one method, or
+  holds `MobileBanking` / `Wallet` (groups that exist only on a link), becomes a payment link, and
+  `ChargeCreation.ChargeId` is then the link id. `GetChargeAsync` follows a link id to the charge that paid it,
+  and a null provider id is looked up by `referenceId` — Beam lists charges by `referenceId`, `source_in` and
+  `sourceId`. Sending `linkSettings` replaces the account's defaults and an omitted group is disabled, so the
+  adapter sends every group explicitly.
 - **QR slip verification** — `multipart/form-data`, `format=RAW` (the QR content off the slip) or `IMAGE`.
   Two traps the wrapper enforces: it is the QR **on the slip**, not the one the shopper scanned; and
   `verificationResult` never reports failure — an unverifiable slip is a `4xx`, so the HTTP status is the

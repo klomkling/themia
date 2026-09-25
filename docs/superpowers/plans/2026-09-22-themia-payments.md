@@ -1534,8 +1534,10 @@ public class BeamOptionsTests
 
         using var provider = services.BuildServiceProvider();
 
+        // QrPromptPay and Card are charged directly; MobileBanking and Wallet go through a payment link
+        // (Task 7), so all four are genuinely servable.
         Assert.Equal(
-            [PaymentMethod.QrPromptPay, PaymentMethod.Card],
+            [PaymentMethod.QrPromptPay, PaymentMethod.Card, PaymentMethod.MobileBanking, PaymentMethod.Wallet],
             provider.GetRequiredService<IPaymentGatewayCapabilities>().SupportedMethods);
     }
 }
@@ -1753,9 +1755,25 @@ git commit -m "feat(payments-beam): options, DI and request plumbing"
 
 **Interfaces:**
 - Consumes: `BeamOptions`, `BeamHttp`, `PaymentMethodGate`, `CreateChargeRequestValidator`.
-- Produces: `BeamPaymentGateway` (implements `IPaymentGateway`, `IPaymentGatewayCapabilities`; `public const string HttpClientName = "themia-payments-beam"`), `BeamMapping.ToBeamMethod(PaymentMethod)`, `BeamMapping.ToNextAction(JsonElement)`.
+- Produces: `BeamPaymentGateway` (implements `IPaymentGateway`, `IPaymentGatewayCapabilities`; `public const string HttpClientName = "themia-payments-beam"`), `BeamMapping.ToDirectChargeType(PaymentMethod) -> string?`, `BeamMapping.ToLinkGroup(PaymentMethod) -> string`, `BeamMapping.ToLinkSettings(IReadOnlyList<PaymentMethod>)`, `BeamMapping.ToNextAction(JsonElement)`, and `internal static class BeamPaymentLinks` (create/get) reused by Task 11.
 
-Beam v1 supports `QrPromptPay` and `Card` only (`MobileBanking` and `Wallet` are reachable only through a payment link, which is Task 11's Beam-only surface).
+**How a request is routed**, and why: `CreateChargeRequest.AllowedMethods` promises that more than one method means
+a hosted page offering the choice (Task 2). Beam's charges API names exactly one `paymentMethodType`, and has
+no single type for "mobile banking" or "e-wallet" — those exist only as groups on a payment link. So:
+
+| `AllowedMethods` after the gate | Beam call | `ChargeCreation` |
+| --- | --- | --- |
+| exactly `[QrPromptPay]` or exactly `[Card]` | `POST /api/v1/charges` | the charge id, and `ShowQr` or `Redirect` from `actionRequired` |
+| anything else — two or more methods, or `MobileBanking` / `Wallet` alone | `POST /api/v1/payment-links` | the **payment link id**, and `Redirect(url)` |
+
+A link is not a charge: each payment *attempt* on it creates its own charge (`source: PAYMENT_LINK`,
+`sourceId: <paymentLinkId>`), and the link becomes `PAID` when one of them succeeds. Task 8 teaches
+`GetChargeAsync` to follow a link id to the charge that paid it.
+
+**The `linkSettings` trap.** Sending `linkSettings` *replaces* the merchant's account defaults, and any group
+left out of the object is **disabled**. So the adapter always sends every group it knows —
+`qrPromptPay`, `card`, `mobileBanking`, `eWallets`, and `cardInstallments` / `buyNowPayLater` set to `false`
+— rather than relying on omission meaning either thing.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -1850,20 +1868,63 @@ public class BeamCreateChargeTests
         Assert.Equal(new Uri("https://pay.example/1"), Assert.IsType<NextAction.Redirect>(creation.Action).Url);
     }
 
-    [Fact]
-    public async Task A_method_this_adapter_cannot_charge_with_is_refused_before_the_call()
-    {
-        var (gateway, handler) = Build("{}");
+    private const string PaymentLinkResponse = """
+    { "paymentLinkId": "rGtqz6DafS", "url": "https://playground-pay.beamcheckout.com/m/rGtqz6DafS",
+      "status": "ACTIVE", "order": { "netAmount": 250000, "currency": "THB", "referenceId": "order-3" } }
+    """;
 
-        var ex = await Assert.ThrowsAsync<PaymentApiException>(() => gateway.CreateChargeAsync(new CreateChargeRequest
+    [Fact]
+    public async Task Two_methods_become_one_payment_link_with_exactly_those_groups_enabled()
+    {
+        var (gateway, handler) = Build(PaymentLinkResponse);
+
+        var creation = await gateway.CreateChargeAsync(new CreateChargeRequest
         {
-            Amount = Money.Thb(500),
+            Amount = Money.Thb(250000),
+            ReferenceId = "order-3",
+            AllowedMethods = [PaymentMethod.QrPromptPay, PaymentMethod.Card],
+        });
+
+        Assert.Equal("/api/v1/payment-links", handler.Requests[0].RequestUri!.AbsolutePath);
+        using var sent = JsonDocument.Parse(handler.Bodies[0]);
+        var order = sent.RootElement.GetProperty("order");
+        Assert.Equal(250000, order.GetProperty("netAmount").GetInt64());
+        Assert.Equal("order-3", order.GetProperty("referenceId").GetString());
+
+        var settings = sent.RootElement.GetProperty("linkSettings");
+        Assert.True(settings.GetProperty("qrPromptPay").GetProperty("isEnabled").GetBoolean());
+        Assert.True(settings.GetProperty("card").GetProperty("isEnabled").GetBoolean());
+        // Sent explicitly as false, never omitted: Beam treats an omitted group as disabled today, but a
+        // payload that says what it means does not depend on that staying true.
+        Assert.False(settings.GetProperty("mobileBanking").GetProperty("isEnabled").GetBoolean());
+        Assert.False(settings.GetProperty("eWallets").GetProperty("isEnabled").GetBoolean());
+        Assert.False(settings.GetProperty("cardInstallments").GetProperty("isEnabled").GetBoolean());
+        Assert.False(settings.GetProperty("buyNowPayLater").GetProperty("isEnabled").GetBoolean());
+
+        Assert.Equal("rGtqz6DafS", creation.ChargeId);
+        Assert.Equal(new Uri("https://playground-pay.beamcheckout.com/m/rGtqz6DafS"),
+            Assert.IsType<NextAction.Redirect>(creation.Action).Url);
+        Assert.Equal(PaymentStatus.Pending, creation.Status);
+    }
+
+    [Fact]
+    public async Task A_wallet_only_request_becomes_a_payment_link_offering_only_ewallets()
+    {
+        // Beam has no single charge type for "e-wallet"; the group exists only on a link.
+        var (gateway, handler) = Build(PaymentLinkResponse);
+
+        await gateway.CreateChargeAsync(new CreateChargeRequest
+        {
+            Amount = Money.Thb(250000),
             ReferenceId = "order-3",
             AllowedMethods = [PaymentMethod.Wallet],
-        }));
+        });
 
-        Assert.Equal("method_not_supported", ex.ProviderCode);
-        Assert.Empty(handler.Requests);
+        using var sent = JsonDocument.Parse(handler.Bodies[0]);
+        var settings = sent.RootElement.GetProperty("linkSettings");
+        Assert.True(settings.GetProperty("eWallets").GetProperty("isEnabled").GetBoolean());
+        Assert.False(settings.GetProperty("qrPromptPay").GetProperty("isEnabled").GetBoolean());
+        Assert.False(settings.GetProperty("card").GetProperty("isEnabled").GetBoolean());
     }
 
     [Fact]
@@ -1903,14 +1964,40 @@ Expected: FAIL — `BeamPaymentGateway` does not exist.
 `BeamMapping.cs` holds every translation in one file: method → `paymentMethodType`, `actionRequired` → `NextAction`, `status` → `PaymentStatus`, `failureCode` → `FailureReason`, `errorCode` → `FailureKind`. Write it as `internal static class BeamMapping` with one method per direction; Task 8 adds the status and failure maps, this task adds:
 
 ```csharp
-public static string ToBeamMethod(PaymentMethod method) => method switch
+/// <summary>The Beam charge type for a method that can be charged directly, or null when it cannot.</summary>
+public static string? ToDirectChargeType(PaymentMethod method) => method switch
 {
     PaymentMethod.QrPromptPay => "QR_PROMPT_PAY",
     PaymentMethod.Card => "CARD",
-    _ => throw new PaymentApiException(
-        FailureKind.Validation, "method_not_supported", httpStatus: 0,
-        $"The Beam adapter charges with QrPromptPay or Card; {method} is reachable only through a payment link."),
+    _ => null,   // MobileBanking and Wallet exist only as payment-link groups
 };
+
+/// <summary>The <c>linkSettings</c> group for a method. Every method has one.</summary>
+public static string ToLinkGroup(PaymentMethod method) => method switch
+{
+    PaymentMethod.QrPromptPay => "qrPromptPay",
+    PaymentMethod.Card => "card",
+    PaymentMethod.MobileBanking => "mobileBanking",
+    PaymentMethod.Wallet => "eWallets",
+    _ => throw new ArgumentOutOfRangeException(nameof(method), method, null),
+};
+
+/// <summary>
+/// A <c>linkSettings</c> object that enables exactly <paramref name="allowed"/> and disables every other
+/// group explicitly — sending the object replaces the account defaults, and an omitted group is disabled.
+/// </summary>
+public static Dictionary<string, object> ToLinkSettings(IReadOnlyList<PaymentMethod> allowed)
+{
+    var settings = new Dictionary<string, object>(StringComparer.Ordinal);
+    foreach (var method in Enum.GetValues<PaymentMethod>())
+    {
+        settings[ToLinkGroup(method)] = new { isEnabled = allowed.Contains(method) };
+    }
+
+    settings["cardInstallments"] = new { isEnabled = false };
+    settings["buyNowPayLater"] = new { isEnabled = false };
+    return settings;
+}
 
 public static FailureKind ToFailureKind(int httpStatus, string errorCode) => errorCode switch
 {
@@ -1923,7 +2010,35 @@ public static FailureKind ToFailureKind(int httpStatus, string errorCode) => err
 };
 ```
 
-`BeamPaymentGateway.CreateChargeAsync` in order: `CreateChargeRequestValidator.Validate(request)`, `gate.Apply(request.Amount, request.AllowedMethods)`, map the single method (more than one is Task 11's payment-link path — for now throw `PaymentApiException(Validation, "multiple_methods_need_a_payment_link", 0)`), build the JSON with `System.Text.Json`, send through `BeamHttp.Create`, translate a non-2xx into `PaymentApiException`, and read `actionRequired`.
+`BeamPaymentGateway.CreateChargeAsync` in order:
+
+1. `CreateChargeRequestValidator.Validate(request)`.
+2. `var allowed = gate.Apply(request.Amount, request.AllowedMethods);`
+3. Route: if `allowed.Count == 1` and `BeamMapping.ToDirectChargeType(allowed[0])` is not null, post a charge:
+
+```json
+{ "amount": 10000, "currency": "THB", "referenceId": "order_190822",
+  "paymentMethod": { "paymentMethodType": "QR_PROMPT_PAY", "qrPromptPay": { "expiryTime": "<ExpiresAt, when set>" } },
+  "returnUrl": "<ReturnUrl, when set>" }
+```
+
+   and map `actionRequired` (`NONE` → `None`, `REDIRECT` → `Redirect(redirect.redirectUrl)`, `ENCODED_IMAGE` →
+   `ShowQr(Convert.FromBase64String(encodedImage.imageBase64Encoded), encodedImage.rawData, encodedImage.expiry)`).
+
+   Otherwise post a payment link:
+
+```json
+{ "order": { "netAmount": 250000, "currency": "THB", "referenceId": "order-3", "description": "<Description, when set>" },
+  "linkSettings": { "qrPromptPay": { "isEnabled": true }, "card": { "isEnabled": true },
+                    "mobileBanking": { "isEnabled": false }, "eWallets": { "isEnabled": false },
+                    "cardInstallments": { "isEnabled": false }, "buyNowPayLater": { "isEnabled": false } },
+  "redirectUrl": "<ReturnUrl, when set>", "expiresAt": "<ExpiresAt, when set>" }
+```
+
+   and return `new ChargeCreation(paymentLinkId, PaymentStatus.Pending, new NextAction.Redirect(new Uri(url)))`.
+   The link create lives in `Internal/BeamPaymentLinks.cs` as an internal helper, because Task 11's public
+   `BeamPaymentClient` exposes the same call.
+4. Every call goes through `BeamHttp.Create`; a non-2xx becomes a `PaymentApiException` via `BeamMapping.ToFailureKind`.
 
 - [ ] **Step 4: Run the tests, build, commit**
 
@@ -1943,7 +2058,7 @@ git commit -m "feat(payments-beam): create a charge"
 - Create: `tests/Themia.Payments.Beam.Tests/BeamGetChargeTests.cs`, `BeamRetryTests.cs`
 
 **Interfaces:**
-- Produces: `GetChargeAsync` over `GET /api/v1/charges/{chargeId}`, `BeamMapping.ToStatus(string)`, `BeamMapping.ToFailure(string?, string?)`, and `BeamHttp.SendWithRetryAsync(...)`.
+- Produces: `GetChargeAsync` over `GET /api/v1/charges/{chargeId}`, falling back to `GET /api/v1/payment-links/{id}` for a link id and to `GET /api/v1/charges?referenceId=` when no provider id is known; `BeamMapping.ToStatus(string)`, `BeamMapping.ToFailure(string?, string?)`, and `BeamHttp.SendWithRetryAsync(...)`.
 
 This is Review Focus item 4: a retry must carry the same idempotency key.
 
@@ -1967,15 +2082,77 @@ public async Task A_failed_charge_carries_the_reason_and_the_raw_code()
 }
 
 [Fact]
-public async Task Reading_a_charge_without_a_provider_id_is_refused_because_beam_has_no_lookup_by_reference()
+public async Task Without_a_provider_id_the_charge_is_found_by_reference_preferring_the_one_that_succeeded()
 {
-    var (gateway, handler) = Build("{}");
+    // GET /api/v1/charges?referenceId= lists most recent first. A link can carry several attempts, so a later
+    // failed attempt must not hide the one that actually paid.
+    var (gateway, handler) = Build("""
+    { "charges": [
+        { "chargeId": "ch_3", "referenceId": "order-1", "status": "FAILED", "currency": "THB", "amount": 199, "failureCode": "CH_PROCESSING_FAILED" },
+        { "chargeId": "ch_2", "referenceId": "order-1", "status": "SUCCEEDED", "currency": "THB", "amount": 199 } ] }
+    """);
 
-    var ex = await Assert.ThrowsAsync<PaymentApiException>(
-        () => gateway.GetChargeAsync(new ChargeRef(ProviderChargeId: null, ReferenceId: "order-1")));
+    var charge = await gateway.GetChargeAsync(new ChargeRef(ProviderChargeId: null, ReferenceId: "order-1"));
 
-    Assert.Equal("provider_charge_id_required", ex.ProviderCode);
-    Assert.Empty(handler.Requests);
+    Assert.Equal("/api/v1/charges", handler.Requests[0].RequestUri!.AbsolutePath);
+    Assert.Contains("referenceId=order-1", handler.Requests[0].RequestUri!.Query, StringComparison.Ordinal);
+    Assert.Equal("ch_2", charge.ChargeId);
+    Assert.Equal(PaymentStatus.Succeeded, charge.Status);
+}
+
+[Fact]
+public async Task A_payment_link_id_is_followed_to_the_charge_that_paid_it()
+{
+    // ChargeCreation for a multi-method request carries the link id (Task 7). Reading it back must work.
+    var handler = new StubHandler()
+        .Enqueue(HttpStatusCode.NotFound, """{ "error": { "errorCode": "NOT_FOUND_ERROR" } }""")          // not a charge id
+        .Enqueue(HttpStatusCode.OK, """{ "paymentLinkId": "rGtqz6DafS", "status": "PAID",
+                                          "order": { "netAmount": 199, "currency": "THB", "referenceId": "order-1" } }""")
+        .Enqueue(HttpStatusCode.OK, """{ "charges": [
+            { "chargeId": "ch_9", "referenceId": "order-1", "status": "SUCCEEDED", "currency": "THB", "amount": 199,
+              "source": "PAYMENT_LINK", "sourceId": "rGtqz6DafS" } ] }""");
+    var gateway = BuildWith(handler);
+
+    var charge = await gateway.GetChargeAsync(new ChargeRef("rGtqz6DafS", "order-1"));
+
+    Assert.Equal("/api/v1/payment-links/rGtqz6DafS", handler.Requests[1].RequestUri!.AbsolutePath);
+    Assert.Contains("sourceId=rGtqz6DafS", handler.Requests[2].RequestUri!.Query, StringComparison.Ordinal);
+    Assert.Equal("ch_9", charge.ChargeId);
+    Assert.Equal(PaymentStatus.Succeeded, charge.Status);
+}
+
+[Fact]
+public async Task An_unpaid_active_link_reads_as_pending_with_the_links_amount()
+{
+    var handler = new StubHandler()
+        .Enqueue(HttpStatusCode.NotFound, """{ "error": { "errorCode": "NOT_FOUND_ERROR" } }""")
+        .Enqueue(HttpStatusCode.OK, """{ "paymentLinkId": "rGtqz6DafS", "status": "ACTIVE",
+                                          "order": { "netAmount": 250000, "currency": "THB", "referenceId": "order-3" } }""");
+    var gateway = BuildWith(handler);
+
+    var charge = await gateway.GetChargeAsync(new ChargeRef("rGtqz6DafS", "order-3"));
+
+    Assert.Equal(PaymentStatus.Pending, charge.Status);
+    Assert.Equal(Money.Thb(250000), charge.Amount);
+    Assert.Equal("rGtqz6DafS", charge.ChargeId);
+}
+
+[Theory]
+[InlineData("EXPIRED", FailureReason.Expired)]
+[InlineData("DISABLED", FailureReason.Canceled)]
+public async Task A_link_that_can_no_longer_be_paid_reads_as_failed(string linkStatus, FailureReason reason)
+{
+    var handler = new StubHandler()
+        .Enqueue(HttpStatusCode.NotFound, """{ "error": { "errorCode": "NOT_FOUND_ERROR" } }""")
+        .Enqueue(HttpStatusCode.OK, $$"""{ "paymentLinkId": "L", "status": "{{linkStatus}}",
+                                          "order": { "netAmount": 100, "currency": "THB", "referenceId": "o" } }""");
+    var gateway = BuildWith(handler);
+
+    var charge = await gateway.GetChargeAsync(new ChargeRef("L", "o"));
+
+    Assert.Equal(PaymentStatus.Failed, charge.Status);
+    Assert.Equal(reason, charge.Failure!.Reason);
+    Assert.Equal(linkStatus, charge.Failure.ProviderCode);
 }
 
 [Fact]
@@ -2072,6 +2249,20 @@ public static PaymentFailure? ToFailure(string? failureCode, string? message)
     return new PaymentFailure(reason, failureCode, message);
 }
 ```
+
+`GetChargeAsync` resolves in this order, using only documented endpoints:
+
+1. `ProviderChargeId` set → `GET /api/v1/charges/{id}`. A 200 is mapped and returned.
+2. That returned 404 → treat the id as a payment link: `GET /api/v1/payment-links/{id}`.
+   - `ACTIVE` → `Charge(id, reference, Money.From(order.netAmount, order.currency), Pending, null, null)`.
+   - `PAID`, `VOIDED`, `REFUNDED` → `GET /api/v1/charges?source_in=PAYMENT_LINK&sourceId={id}` and return the
+     first `SUCCEEDED` charge. (`VOIDED`/`REFUNDED` still read as the charge that paid; the refund is its own
+     event and its own record — this method answers "was it paid", not "is the money still here".)
+   - `EXPIRED` → `Failed` with `FailureReason.Expired`; `DISABLED` → `Failed` with `FailureReason.Canceled`;
+     the link status is the `ProviderCode` in both.
+   - A 404 here too → `PaymentApiException(FailureKind.NotFound, "NOT_FOUND_ERROR", 404)`.
+3. `ProviderChargeId` null → `GET /api/v1/charges?referenceId={reference}`; return the first `SUCCEEDED`,
+   otherwise the most recent. An empty list → `PaymentApiException(FailureKind.NotFound, "no_charge_for_reference", 0)`.
 
 `BeamHttp.SendWithRetryAsync` builds the key **once** (`request.IdempotencyKey ?? Guid.NewGuid().ToString("N")`), then loops at most 3 attempts, retrying only on `>=500`, `429` and `HttpRequestException`/`TaskCanceledException`, with `Task.Delay(TimeSpan.FromMilliseconds(200 * 2^attempt) + jitter)`. Each attempt builds a **fresh** `HttpRequestMessage` (an `HttpRequestMessage` cannot be resent) carrying that same key.
 
@@ -2307,6 +2498,9 @@ git commit -m "feat(payments-beam): webhook verifier pinned to Beam's published 
 - Produces: `BeamPaymentClient` with `CreatePaymentLinkAsync`, `GetPaymentLinkAsync`, `DisablePaymentLinkAsync`, `VerifyQrSlipAsync(Stream image, string fileName, …)` and `VerifyQrSlipAsync(string rawQrContent, …)`, returning `BeamSlipVerification(string ChargeId, BeamSlipVerificationResult Result)` where the enum is `UpdatedToSucceeded` / `AlreadySucceeded`.
 
 These are on the concrete client, not on `IPaymentGateway`, because no second provider offers them.
+`CreatePaymentLinkAsync` and `GetPaymentLinkAsync` call the same `Internal/BeamPaymentLinks` helper Task 7
+wrote — the gateway already creates links for multi-method requests; this is the direct handle for a caller
+that wants link-only features such as order items or delivery-address collection.
 
 - [ ] **Step 1: Write the failing tests** — one for a link create posting to `/api/v1/payment-links`, one for `PATCH /api/v1/payment-links/{id}/disable`, and three for slip verification:
 
@@ -2466,16 +2660,19 @@ public class JwtHs256Tests
     }
 
     [Fact]
-    public void Amounts_are_serialized_with_two_decimals_under_any_culture()
+    public void A_decimal_is_written_as_a_json_number_with_its_scale_intact_under_any_culture()
     {
+        // The encoder adds no formatting of its own: System.Text.Json writes a decimal with the scale it
+        // carries, as a number, culture-invariantly. Forcing two places is the adapter's job (Task 13).
         var original = CultureInfo.CurrentCulture;
         try
         {
             CultureInfo.CurrentCulture = new CultureInfo("de-DE");   // comma decimal separator
-            var token = JwtHs256.Encode(new Dictionary<string, object?> { ["amount"] = 1000.5m }, "secret");
+            var token = JwtHs256.Encode(new Dictionary<string, object?> { ["amount"] = 1000.50m }, "secret");
 
             Assert.True(JwtHs256.TryDecode(token, "secret", out var payload));
-            Assert.Equal("1000.50", payload.GetProperty("amount").GetRawText().Trim('"'));
+            Assert.Equal(JsonValueKind.Number, payload.GetProperty("amount").ValueKind);
+            Assert.Equal("1000.50", payload.GetProperty("amount").GetRawText());
         }
         finally
         {
@@ -2486,7 +2683,7 @@ public class JwtHs256Tests
 ```
 
 - [ ] **Step 2: Run and watch them fail.**
-- [ ] **Step 3: Implement** `JwtHs256` with `Base64UrlEncode`/`Base64UrlDecode` (`'+'`→`'-'`, `'/'`→`'_'`, strip `'='`), `HMACSHA256.HashData`, `CryptographicOperations.FixedTimeEquals` on verify, and a `JsonSerializerOptions` that writes `decimal` with `ToString("F2", CultureInfo.InvariantCulture)`.
+- [ ] **Step 3: Implement** `JwtHs256` with `Base64UrlEncode`/`Base64UrlDecode` (`'+'`→`'-'`, `'/'`→`'_'`, strip `'='`), `HMACSHA256.HashData`, `CryptographicOperations.FixedTimeEquals` on verify, and **default** `JsonSerializerOptions` — no decimal converter. A converter that formats with `ToString("F2")` writes a **string** (`"1000.50"`), while 2C2P's own examples send `"amount": 1000.00` as a number.
 - [ ] **Step 4: Run, build, commit**
 
 ```bash
@@ -2503,7 +2700,7 @@ git commit -m "feat(payments-2c2p): HS256 JWT transport helper"
 - Create: `tests/Themia.Payments.TwoCTwoP.Tests/TwoCTwoPGatewayTests.cs`
 
 **Interfaces:**
-- Produces: `TwoCTwoPPaymentGateway : IPaymentGateway, IPaymentGatewayCapabilities`, `AddThemiaPaymentsTwoCTwoP(...)`, `TwoCTwoPMapping.ToStatus(string respCode)` and `.ToFailure(string respCode, string? respDesc)`.
+- Produces: `TwoCTwoPPaymentGateway : IPaymentGateway, IPaymentGatewayCapabilities`, `AddThemiaPaymentsTwoCTwoP(...)`, `TwoCTwoPMapping.ToStatus(string respCode)`, `.ToFailure(string respCode, string? respDesc)`, `.ToDecimalAmount(Money) -> decimal` and `.FromDecimalAmount(decimal, string) -> Money`.
 
 Endpoints: `POST {base}/payment/4.3/paymentToken` and `POST {base}/payment/4.3/paymentInquiry`, base `https://sandbox-pgw.2c2p.com` or `https://pgw.2c2p.com`. Both take and return `{"payload": "<jwt>"}`.
 
@@ -2532,7 +2729,7 @@ public async Task Creating_a_charge_sends_a_jwt_payload_and_returns_the_hosted_u
     Assert.Equal("/payment/4.3/paymentToken", handler.Requests[0].RequestUri!.AbsolutePath);
     var sent = PayloadOf(handler.Bodies[0]);
     Assert.Equal("order-1", sent.GetProperty("invoiceNo").GetString());
-    Assert.Equal("1000.00", sent.GetProperty("amount").GetRawText().Trim('"'));
+    Assert.Equal("1000.00", sent.GetProperty("amount").GetRawText());   // a number; a string would fail here
     Assert.Equal(["CC", "QR"], sent.GetProperty("paymentChannel").EnumerateArray().Select(e => e.GetString()));
     Assert.Equal(new Uri("https://sandbox-pgw-ui.2c2p.com/payment/4.3/#/token/abc"),
         Assert.IsType<NextAction.Redirect>(creation.Action).Url);
@@ -2611,8 +2808,70 @@ public async Task A_transaction_not_found_becomes_a_not_found_exception()
 ```
 
 - [ ] **Step 2: Run and watch them fail.**
-- [ ] **Step 3: Implement.** Method mapping to `paymentChannel`: `Card` → `"CC"`, `QrPromptPay` → `"QR"`, `MobileBanking` → `"MB"`, `Wallet` → `"EW"`; `SupportedMethods` lists all four. `ChargeId` is the invoice number, because 2C2P has no id before payment. Amount conversion: `MinorUnits / 100m` formatted `F2` invariant on the way out, `decimal.Parse(...) * 100` rounded to a `long` on the way back.
-- [ ] **Step 4: Run, build, commit**
+- [ ] **Step 3: Add the amount-conversion tests**
+
+```csharp
+[Theory]
+[InlineData(100050, "1000.50")]
+[InlineData(100000, "1000.00")]
+[InlineData(2500, "25.00")]
+[InlineData(25, "0.25")]
+public void Minor_units_become_a_two_place_json_number(long minorUnits, string expected)
+{
+    var amount = TwoCTwoPMapping.ToDecimalAmount(Money.Thb(minorUnits));
+
+    Assert.Equal(expected, JsonSerializer.Serialize(amount));   // a number, not a quoted string
+}
+
+[Theory]
+[InlineData("1000.50", 100050)]
+[InlineData("1000", 100000)]
+[InlineData("0.25", 25)]
+public void A_decimal_amount_comes_back_as_exact_minor_units(string json, long expected)
+{
+    var money = TwoCTwoPMapping.FromDecimalAmount(JsonDocument.Parse(json).RootElement.GetDecimal(), "THB");
+
+    Assert.Equal(Money.Thb(expected), money);
+}
+
+[Fact]
+public void A_currency_whose_minor_unit_is_not_a_hundredth_is_refused()
+{
+    // Dividing by 100 is only right for two-decimal currencies; JPY has none and KWD has three.
+    var ex = Assert.Throws<PaymentApiException>(() => TwoCTwoPMapping.ToDecimalAmount(Money.From(1000, "JPY")));
+
+    Assert.Equal("currency_not_supported", ex.ProviderCode);
+}
+```
+
+- [ ] **Step 4: Implement.** Method mapping to `paymentChannel`: `Card` → `"CC"`, `QrPromptPay` → `"QR"`, `MobileBanking` → `"MB"`, `Wallet` → `"EW"`; `SupportedMethods` lists all four. `ChargeId` is the invoice number, because 2C2P has no id before payment. Amounts:
+
+```csharp
+private static readonly HashSet<string> TwoDecimalCurrencies = new(StringComparer.Ordinal) { "THB", "USD", "SGD", "MYR", "EUR" };
+
+/// <summary>Minor units as the two-place decimal 2C2P expects, e.g. 100050 → 1000.50.</summary>
+/// <remarks>
+/// <c>minorUnits / 100m</c> alone is not enough: decimal division yields the smallest scale that is exact, so
+/// 100050 becomes <c>1000.5</c> and 100000 becomes <c>1000</c>, and System.Text.Json writes the scale it is
+/// given. Adding <c>0.00m</c> raises the scale to two — decimal addition keeps the larger operand scale — so
+/// the value serializes as <c>1000.50</c>, still a JSON number. Checked on net10.0.
+/// </remarks>
+public static decimal ToDecimalAmount(Money money)
+{
+    if (!TwoDecimalCurrencies.Contains(money.Currency))
+    {
+        throw new PaymentApiException(FailureKind.Validation, "currency_not_supported", httpStatus: 0,
+            $"The 2C2P adapter converts two-decimal currencies only; {money.Currency} is not one of them.");
+    }
+
+    return (money.MinorUnits / 100m) + 0.00m;
+}
+
+/// <summary>A 2C2P decimal amount back into minor units.</summary>
+public static Money FromDecimalAmount(decimal amount, string currency) =>
+    Money.From(decimal.ToInt64(decimal.Round(amount * 100m, 0, MidpointRounding.ToEven)), currency);
+```
+- [ ] **Step 5: Run, build, commit**
 
 ```bash
 git add src/neutral/Themia.Payments.TwoCTwoP tests/Themia.Payments.TwoCTwoP.Tests
@@ -2801,7 +3060,7 @@ git commit -m "test(payments): one contract suite over both adapters"
 - Create: `src/neutral/Themia.Payments/README.md`, `src/neutral/Themia.Payments.Beam/README.md`, `src/neutral/Themia.Payments.TwoCTwoP/README.md`
 - Modify: `CHANGELOG.md`, `docs/themia-architecture-overview.md` (§B catalog rows and the Specs index marker), `Directory.Build.props`
 
-- [ ] **Step 1: Write the three READMEs.** Each states what the package is, the smallest working registration, and the traps a reader must know before using it — for the core: `Pending` can last for ever, the webhook signature proves origin and not freshness, partial refunds are card-only, and every charge must be the platform's own revenue. For Beam: the environments, that `MobileBanking`/`Wallet` are payment-link-only, and that slip verification matches only Beam's own charges. For 2C2P: that the JWT signature *is* the authentication, the 20-character `invoiceNo` cap, and that refunds go through an XML API.
+- [ ] **Step 1: Write the three READMEs.** Each states what the package is, the smallest working registration, and the traps a reader must know before using it — for the core: `Pending` can last for ever, the webhook signature proves origin and not freshness, partial refunds are card-only, and every charge must be the platform's own revenue. For Beam: the environments; that a request allowing more than one method, or allowing `MobileBanking`/`Wallet`, becomes a payment link whose `ChargeCreation.ChargeId` is the **link** id (and that `GetChargeAsync` follows it to the charge that paid); and that slip verification matches only Beam's own charges. For 2C2P: that the JWT signature *is* the authentication, the 20-character `invoiceNo` cap, and that refunds go through an XML API.
 
 - [ ] **Step 2: Add the catalog rows.** In `docs/themia-architecture-overview.md` §B add `Themia.Payments`, `Themia.Payments.Beam` and `Themia.Payments.TwoCTwoP` with their status and release, and change the Specs index line for `2026-09-22-themia-payments-design.md` from ⬜ to ✅ with `(0.30.0)`.
 
