@@ -137,3 +137,28 @@ Themia.Payments.PaymentApiException.ProviderCode.get -> string!
 Themia.Payments.PaymentApiException.HttpStatus.get -> int
 Themia.Payments.CreateChargeRequestValidator
 static Themia.Payments.CreateChargeRequestValidator.Validate(Themia.Payments.CreateChargeRequest! request) -> void
+Themia.Payments.PaymentMethodBand
+Themia.Payments.PaymentMethodBand.PaymentMethodBand(long UpToMinorUnitsInclusive, System.Collections.Generic.IReadOnlyList<Themia.Payments.PaymentMethod>! Methods) -> void
+Themia.Payments.PaymentMethodBand.UpToMinorUnitsInclusive.get -> long
+Themia.Payments.PaymentMethodBand.UpToMinorUnitsInclusive.init -> void
+Themia.Payments.PaymentMethodBand.Methods.get -> System.Collections.Generic.IReadOnlyList<Themia.Payments.PaymentMethod>!
+Themia.Payments.PaymentMethodBand.Methods.init -> void
+Themia.Payments.PaymentMethodPolicy
+Themia.Payments.PaymentMethodPolicy.PaymentMethodPolicy() -> void
+Themia.Payments.PaymentMethodPolicy.Currency.get -> string!
+Themia.Payments.PaymentMethodPolicy.Currency.init -> void
+Themia.Payments.PaymentMethodPolicy.Bands.get -> System.Collections.Generic.IReadOnlyList<Themia.Payments.PaymentMethodBand!>!
+Themia.Payments.PaymentMethodPolicy.Bands.init -> void
+Themia.Payments.PaymentMethodPolicy.Above.get -> System.Collections.Generic.IReadOnlyList<Themia.Payments.PaymentMethod>!
+Themia.Payments.PaymentMethodPolicy.Above.init -> void
+Themia.Payments.PaymentMethodPolicy.Resolve(Themia.Payments.Money amount) -> System.Collections.Generic.IReadOnlyList<Themia.Payments.PaymentMethod>!
+Themia.Payments.PaymentMethodPolicy.Validate() -> System.Collections.Generic.IReadOnlyList<string!>!
+Themia.Payments.PaymentMethodPolicy.AllNamedMethods() -> System.Collections.Generic.IReadOnlyList<Themia.Payments.PaymentMethod>!
+Themia.Payments.ThemiaPaymentsOptions
+Themia.Payments.ThemiaPaymentsOptions.ThemiaPaymentsOptions() -> void
+Themia.Payments.ThemiaPaymentsOptions.MethodPolicy.get -> Themia.Payments.PaymentMethodPolicy?
+Themia.Payments.ThemiaPaymentsOptions.MethodPolicy.set -> void
+const Themia.Payments.ThemiaPaymentsOptions.SectionName = "Payments" -> string!
+Themia.Payments.PaymentMethodGate
+Themia.Payments.PaymentMethodGate.PaymentMethodGate(Microsoft.Extensions.Options.IOptions<Themia.Payments.ThemiaPaymentsOptions!>! options) -> void
+Themia.Payments.PaymentMethodGate.Apply(Themia.Payments.Money amount, System.Collections.Generic.IReadOnlyList<Themia.Payments.PaymentMethod>! requested) -> System.Collections.Generic.IReadOnlyList<Themia.Payments.PaymentMethod>!
