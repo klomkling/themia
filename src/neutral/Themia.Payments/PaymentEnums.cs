@@ -46,7 +46,7 @@ public enum FailureReason
 /// <remarks>
 /// Finer distinctions stay provider-side: Beam's KPLUS / SCB_EASY / KRUNGSRI_APP / BANGKOK_BANK_APP are all
 /// <see cref="MobileBanking"/>, and TRUE_MONEY / LINE_PAY / SHOPEE_PAY / ALIPAY are all <see cref="Wallet"/>.
-/// An adapter declares which of these it supports through <c>IPaymentGatewayCapabilities</c> (a later task).
+/// An adapter declares which of these it supports through <see cref="IPaymentGatewayCapabilities"/>.
 /// </remarks>
 public enum PaymentMethod
 {
