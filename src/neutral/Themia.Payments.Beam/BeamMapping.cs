@@ -11,12 +11,18 @@ internal static class BeamMapping
     public static readonly JsonSerializerOptions SerializeOptions =
         new() { DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull };
 
-    /// <summary>The Beam charge type for a method that can be charged directly, or null when it cannot.</summary>
+    /// <summary>
+    /// The Beam charge type for a method that can be charged directly, or null when it cannot. Only
+    /// <see cref="PaymentMethod.QrPromptPay"/> qualifies in v1: a direct <c>CARD</c> charge needs card data
+    /// or a token, and tokenization/3DS are out of scope (spec §8), so <see cref="PaymentMethod.Card"/>
+    /// always routes through a payment link instead, where Beam's hosted page collects the card.
+    /// <see cref="PaymentMethod.MobileBanking"/> and <see cref="PaymentMethod.Wallet"/> exist only as
+    /// payment-link groups and were never direct-chargeable.
+    /// </summary>
     public static string? ToDirectChargeType(PaymentMethod method) => method switch
     {
         PaymentMethod.QrPromptPay => "QR_PROMPT_PAY",
-        PaymentMethod.Card => "CARD",
-        _ => null, // MobileBanking and Wallet exist only as payment-link groups
+        _ => null,
     };
 
     /// <summary>The <c>linkSettings</c> group for a method. Every method has one.</summary>

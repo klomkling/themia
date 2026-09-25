@@ -59,7 +59,7 @@ public class BeamCreateChargeTests
         {
             Amount = Money.Thb(500),
             ReferenceId = "order-2",
-            AllowedMethods = [PaymentMethod.Card],
+            AllowedMethods = [PaymentMethod.QrPromptPay],
         });
 
         Assert.Equal(new Uri("https://pay.example/1"), Assert.IsType<NextAction.Redirect>(creation.Action).Url);
@@ -117,6 +117,32 @@ public class BeamCreateChargeTests
         Assert.True(settings.GetProperty("eWallets").GetProperty("isEnabled").GetBoolean());
         Assert.False(settings.GetProperty("qrPromptPay").GetProperty("isEnabled").GetBoolean());
         Assert.False(settings.GetProperty("card").GetProperty("isEnabled").GetBoolean());
+    }
+
+    [Fact]
+    public async Task A_card_only_request_becomes_a_payment_link_offering_only_card()
+    {
+        // Card tokenization/3DS are out of scope for v1, so a direct CARD charge can never succeed —
+        // Card always routes through a payment link, where Beam's hosted page collects the card.
+        var (gateway, handler) = BeamTestHost.Build(BeamTestHost.PaymentLinkResponse);
+
+        var creation = await gateway.CreateChargeAsync(new CreateChargeRequest
+        {
+            Amount = Money.Thb(250000),
+            ReferenceId = "order-3",
+            AllowedMethods = [PaymentMethod.Card],
+        });
+
+        Assert.Equal("/api/v1/payment-links", handler.Requests[0].RequestUri!.AbsolutePath);
+        using var sent = JsonDocument.Parse(handler.Bodies[0]);
+        var settings = sent.RootElement.GetProperty("linkSettings");
+        Assert.True(settings.GetProperty("card").GetProperty("isEnabled").GetBoolean());
+        Assert.False(settings.GetProperty("qrPromptPay").GetProperty("isEnabled").GetBoolean());
+        Assert.False(settings.GetProperty("mobileBanking").GetProperty("isEnabled").GetBoolean());
+        Assert.False(settings.GetProperty("eWallets").GetProperty("isEnabled").GetBoolean());
+
+        Assert.Equal(new Uri("https://playground-pay.beamcheckout.com/m/rGtqz6DafS"),
+            Assert.IsType<NextAction.Redirect>(creation.Action).Url);
     }
 
     [Fact]
