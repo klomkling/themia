@@ -1165,6 +1165,7 @@ public sealed class PaymentMethodGate
 `MethodPolicy/PaymentMethodPolicyValidator.cs`:
 
 ```csharp
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
 namespace Themia.Payments;
@@ -1174,13 +1175,23 @@ namespace Themia.Payments;
 /// An <see cref="IValidateOptions{TOptions}"/> rather than a fluent predicate, because the check needs the
 /// adapter's <see cref="IPaymentGatewayCapabilities"/>. A policy that can produce a method the adapter does
 /// not support is a configuration error, and boot is the only safe time to find it.
+/// <para>
+/// Takes <see cref="IServiceProvider"/> and resolves the capabilities at validation time, rather than taking
+/// them as a constructor parameter, for two reasons. The capabilities are optional — the core can be
+/// registered with no adapter — and an optional constructor dependency cannot be expressed with the
+/// type-based <c>ServiceDescriptor</c> that <c>TryAddEnumerable</c> requires. And resolving late means the
+/// order of <c>AddThemiaPayments</c> and the adapter's own <c>Add…</c> does not matter.
+/// </para>
 /// </remarks>
 internal sealed class PaymentMethodPolicyValidator : IValidateOptions<ThemiaPaymentsOptions>
 {
-    private readonly IPaymentGatewayCapabilities? capabilities;
+    private readonly IServiceProvider services;
 
-    public PaymentMethodPolicyValidator(IPaymentGatewayCapabilities? capabilities = null) =>
-        this.capabilities = capabilities;
+    public PaymentMethodPolicyValidator(IServiceProvider services)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        this.services = services;
+    }
 
     public ValidateOptionsResult Validate(string? name, ThemiaPaymentsOptions options)
     {
@@ -1193,7 +1204,7 @@ internal sealed class PaymentMethodPolicyValidator : IValidateOptions<ThemiaPaym
 
         var errors = policy.Validate().ToList();
 
-        if (capabilities is not null)
+        if (services.GetService<IPaymentGatewayCapabilities>() is { } capabilities)
         {
             var unsupported = policy.AllNamedMethods().Except(capabilities.SupportedMethods).ToArray();
             if (unsupported.Length > 0)
@@ -1263,6 +1274,37 @@ public class DependencyInjectionTests
 
         Assert.NotNull(provider.GetRequiredService<PaymentMethodGate>());
         Assert.Equal("THB", provider.GetRequiredService<IOptions<ThemiaPaymentsOptions>>().Value.MethodPolicy!.Currency);
+    }
+
+    [Fact]
+    public void Registering_twice_does_not_throw_and_adds_the_validator_once()
+    {
+        // The adapter's Add… calls AddThemiaPayments itself, and the host usually calls it again with its
+        // own policy. Both calls must be safe, and must not stack two validators.
+        var services = new ServiceCollection();
+
+        services.AddThemiaPayments();
+        services.AddThemiaPayments(o => o.MethodPolicy = null);
+
+        Assert.Single(services, d => d.ServiceType == typeof(IValidateOptions<ThemiaPaymentsOptions>));
+    }
+
+    [Fact]
+    public void Capabilities_registered_after_the_core_are_still_checked()
+    {
+        var services = new ServiceCollection();
+        services.AddThemiaPayments(o => o.MethodPolicy = new PaymentMethodPolicy
+        {
+            Currency = "THB",
+            Bands = [new PaymentMethodBand(100000, [PaymentMethod.QrPromptPay])],
+            Above = [PaymentMethod.Wallet],
+        });
+        services.AddSingleton<IPaymentGatewayCapabilities>(new QrOnlyCapabilities());   // after, on purpose
+
+        using var provider = services.BuildServiceProvider();
+
+        Assert.Throws<OptionsValidationException>(
+            () => provider.GetRequiredService<IOptions<ThemiaPaymentsOptions>>().Value);
     }
 
     [Fact]
@@ -1391,8 +1433,12 @@ public static class PaymentsServiceCollectionExtensions
 
         options.ValidateOnStart();
 
-        services.TryAddEnumerable(ServiceDescriptor.Singleton<IValidateOptions<ThemiaPaymentsOptions>>(
-            sp => new PaymentMethodPolicyValidator(sp.GetService<IPaymentGatewayCapabilities>())));
+        // Type-based descriptor, never a factory lambda: TryAddEnumerable dedupes on the implementation
+        // type, and a factory descriptor has none, so it throws ArgumentException ("indistinguishable from
+        // other services registered") at registration — every host would fail to start. Verified on net10.0;
+        // Themia.Totp registers its validator the same way for the same reason.
+        services.TryAddEnumerable(
+            ServiceDescriptor.Singleton<IValidateOptions<ThemiaPaymentsOptions>, PaymentMethodPolicyValidator>());
         services.TryAddSingleton<PaymentMethodGate>();
         return services;
     }
