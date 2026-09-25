@@ -1,4 +1,10 @@
+using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+
 using Microsoft.Extensions.Options;
+
+using Themia.Payments.Beam.Internal;
 
 namespace Themia.Payments.Beam;
 
@@ -46,9 +52,28 @@ public sealed class BeamPaymentGateway : IPaymentGateway, IPaymentGatewayCapabil
     ];
 
     /// <inheritdoc />
-    /// <exception cref="NotSupportedException">Not yet implemented; see Task 7.</exception>
-    public Task<ChargeCreation> CreateChargeAsync(CreateChargeRequest request, CancellationToken cancellationToken = default) =>
-        throw new NotSupportedException("Implemented in Task 7/8/9.");
+    /// <exception cref="PaymentApiException">
+    /// The request was refused locally, the policy left no allowed method, or Beam rejected the call.
+    /// </exception>
+    public async Task<ChargeCreation> CreateChargeAsync(CreateChargeRequest request, CancellationToken cancellationToken = default)
+    {
+        CreateChargeRequestValidator.Validate(request);
+        var allowed = gate.Apply(request.Amount, request.AllowedMethods);
+        var beamOptions = options.Value;
+        var httpClient = httpClientFactory.CreateClient(HttpClientName);
+
+        // Exactly one method, and Beam names a charge type for it, goes straight to a charge. Everything
+        // else — two or more methods, or MobileBanking/Wallet alone, which have no direct charge type —
+        // goes through a payment link instead.
+        if (allowed.Count == 1 && BeamMapping.ToDirectChargeType(allowed[0]) is { } chargeType)
+        {
+            return await CreateDirectChargeAsync(httpClient, beamOptions, request, chargeType, cancellationToken)
+                .ConfigureAwait(false);
+        }
+
+        return await BeamPaymentLinks.CreateAsync(httpClient, beamOptions, request, allowed, cancellationToken)
+            .ConfigureAwait(false);
+    }
 
     /// <inheritdoc />
     /// <exception cref="NotSupportedException">Not yet implemented; see Task 8.</exception>
@@ -59,4 +84,80 @@ public sealed class BeamPaymentGateway : IPaymentGateway, IPaymentGatewayCapabil
     /// <exception cref="NotSupportedException">Not yet implemented; see Task 9.</exception>
     public Task<RefundCreation> RefundAsync(RefundRequest request, CancellationToken cancellationToken = default) =>
         throw new NotSupportedException("Implemented in Task 7/8/9.");
+
+    private static async Task<ChargeCreation> CreateDirectChargeAsync(
+        HttpClient httpClient, BeamOptions beamOptions, CreateChargeRequest request, string chargeType,
+        CancellationToken cancellationToken)
+    {
+        var payload = JsonSerializer.Serialize(BuildChargeRequestBody(request, chargeType), BeamMapping.SerializeOptions);
+        using var httpRequest = BeamHttp.Create(
+            HttpMethod.Post,
+            "/api/v1/charges",
+            beamOptions,
+            new StringContent(payload, Encoding.UTF8, "application/json"),
+            request.IdempotencyKey);
+
+        using var response = await httpClient.SendAsync(httpRequest, cancellationToken).ConfigureAwait(false);
+        var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+        await using (stream.ConfigureAwait(false))
+        {
+            var (parsed, root) = await BeamMapping.TryParseAsync(stream, cancellationToken).ConfigureAwait(false);
+            if (!response.IsSuccessStatusCode)
+            {
+                throw BeamMapping.ToApiException(response.StatusCode, parsed ? root : null);
+            }
+
+            var chargeId = root.GetProperty("chargeId").GetString()!;
+            return new ChargeCreation(chargeId, PaymentStatus.Pending, BeamMapping.ToNextAction(root));
+        }
+    }
+
+    private static ChargeRequestBody BuildChargeRequestBody(CreateChargeRequest request, string chargeType) =>
+        new()
+        {
+            Amount = request.Amount.MinorUnits,
+            Currency = request.Amount.Currency,
+            ReferenceId = request.ReferenceId,
+            PaymentMethod = new ChargeMethodBody
+            {
+                PaymentMethodType = chargeType,
+                QrPromptPay = chargeType == "QR_PROMPT_PAY" && request.ExpiresAt is { } expiry
+                    ? new QrPromptPaySettings { ExpiryTime = expiry }
+                    : null,
+            },
+            ReturnUrl = request.ReturnUrl,
+        };
+
+    private sealed class ChargeRequestBody
+    {
+        [JsonPropertyName("amount")]
+        public required long Amount { get; init; }
+
+        [JsonPropertyName("currency")]
+        public required string Currency { get; init; }
+
+        [JsonPropertyName("referenceId")]
+        public required string ReferenceId { get; init; }
+
+        [JsonPropertyName("paymentMethod")]
+        public required ChargeMethodBody PaymentMethod { get; init; }
+
+        [JsonPropertyName("returnUrl")]
+        public Uri? ReturnUrl { get; init; }
+    }
+
+    private sealed class ChargeMethodBody
+    {
+        [JsonPropertyName("paymentMethodType")]
+        public required string PaymentMethodType { get; init; }
+
+        [JsonPropertyName("qrPromptPay")]
+        public QrPromptPaySettings? QrPromptPay { get; init; }
+    }
+
+    private sealed class QrPromptPaySettings
+    {
+        [JsonPropertyName("expiryTime")]
+        public required DateTimeOffset ExpiryTime { get; init; }
+    }
 }
