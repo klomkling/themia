@@ -135,3 +135,5 @@ Themia.Payments.PaymentApiException.PaymentApiException(Themia.Payments.FailureK
 Themia.Payments.PaymentApiException.Kind.get -> Themia.Payments.FailureKind
 Themia.Payments.PaymentApiException.ProviderCode.get -> string!
 Themia.Payments.PaymentApiException.HttpStatus.get -> int
+Themia.Payments.CreateChargeRequestValidator
+static Themia.Payments.CreateChargeRequestValidator.Validate(Themia.Payments.CreateChargeRequest! request) -> void
