@@ -162,3 +162,29 @@ const Themia.Payments.ThemiaPaymentsOptions.SectionName = "Payments" -> string!
 Themia.Payments.PaymentMethodGate
 Themia.Payments.PaymentMethodGate.PaymentMethodGate(Microsoft.Extensions.Options.IOptions<Themia.Payments.ThemiaPaymentsOptions!>! options) -> void
 Themia.Payments.PaymentMethodGate.Apply(Themia.Payments.Money amount, System.Collections.Generic.IReadOnlyList<Themia.Payments.PaymentMethod>! requested) -> System.Collections.Generic.IReadOnlyList<Themia.Payments.PaymentMethod>!
+Themia.Payments.PaymentEvent
+Themia.Payments.PaymentEvent.PaymentEvent(Themia.Payments.PaymentEventType Type, string? ChargeId, string? ReferenceId, Themia.Payments.Money? Amount, Themia.Payments.PaymentStatus Status, System.DateTimeOffset OccurredAt, string! RawJson) -> void
+Themia.Payments.PaymentEvent.Type.get -> Themia.Payments.PaymentEventType
+Themia.Payments.PaymentEvent.Type.init -> void
+Themia.Payments.PaymentEvent.ChargeId.get -> string?
+Themia.Payments.PaymentEvent.ChargeId.init -> void
+Themia.Payments.PaymentEvent.ReferenceId.get -> string?
+Themia.Payments.PaymentEvent.ReferenceId.init -> void
+Themia.Payments.PaymentEvent.Amount.get -> Themia.Payments.Money?
+Themia.Payments.PaymentEvent.Amount.init -> void
+Themia.Payments.PaymentEvent.Status.get -> Themia.Payments.PaymentStatus
+Themia.Payments.PaymentEvent.Status.init -> void
+Themia.Payments.PaymentEvent.OccurredAt.get -> System.DateTimeOffset
+Themia.Payments.PaymentEvent.OccurredAt.init -> void
+Themia.Payments.PaymentEvent.RawJson.get -> string!
+Themia.Payments.PaymentEvent.RawJson.init -> void
+Themia.Payments.WebhookVerification
+Themia.Payments.WebhookVerification.WebhookVerification(Themia.Payments.WebhookOutcome Outcome, Themia.Payments.PaymentEvent? Event) -> void
+Themia.Payments.WebhookVerification.Outcome.get -> Themia.Payments.WebhookOutcome
+Themia.Payments.WebhookVerification.Outcome.init -> void
+Themia.Payments.WebhookVerification.Event.get -> Themia.Payments.PaymentEvent?
+Themia.Payments.WebhookVerification.Event.init -> void
+Themia.Payments.IPaymentWebhookVerifier
+Themia.Payments.IPaymentWebhookVerifier.Verify(System.ReadOnlySpan<byte> rawBody, System.Collections.Generic.IReadOnlyDictionary<string!, string!>! headers) -> Themia.Payments.WebhookVerification!
+Themia.Payments.DependencyInjection.PaymentsServiceCollectionExtensions
+static Themia.Payments.DependencyInjection.PaymentsServiceCollectionExtensions.AddThemiaPayments(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Themia.Payments.ThemiaPaymentsOptions!>? configure = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
