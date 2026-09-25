@@ -361,7 +361,9 @@ only by an app that references this package deliberately:
 - **Payment Links** — hosted checkout. Create / get / disable; a link is immutable otherwise. Modelled
   separately from a charge because a link *produces* charges (`source: PAYMENT_LINK`, `sourceId` = the link id).
   The gateway also uses links **internally**: a request whose `AllowedMethods` holds more than one method, or
-  holds `MobileBanking` / `Wallet` (groups that exist only on a link), becomes a payment link, and
+  holds `Card`, `MobileBanking` or `Wallet` alone, becomes a payment link. `MobileBanking` and `Wallet` exist
+  only as link groups; `Card` has no direct path in v1 because a direct card charge needs card data or a token
+  and tokenization is out of scope (§8) — so the only direct charge is a lone `QrPromptPay`, and
   `ChargeCreation.ChargeId` is then the link id. `GetChargeAsync` follows a link id to the charge that paid it,
   and a null provider id is looked up by `referenceId` — Beam lists charges by `referenceId`, `source_in` and
   `sourceId`. Sending `linkSettings` replaces the account's defaults and an omitted group is disabled, so the

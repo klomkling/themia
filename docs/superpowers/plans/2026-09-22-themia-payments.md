@@ -1763,8 +1763,11 @@ no single type for "mobile banking" or "e-wallet" — those exist only as groups
 
 | `AllowedMethods` after the gate | Beam call | `ChargeCreation` |
 | --- | --- | --- |
-| exactly `[QrPromptPay]` or exactly `[Card]` | `POST /api/v1/charges` | the charge id, and `ShowQr` or `Redirect` from `actionRequired` |
-| anything else — two or more methods, or `MobileBanking` / `Wallet` alone | `POST /api/v1/payment-links` | the **payment link id**, and `Redirect(url)` |
+| exactly `[QrPromptPay]` | `POST /api/v1/charges` | the charge id, and `ShowQr` or `Redirect` from `actionRequired` |
+| anything else — two or more methods, or `Card`, `MobileBanking` or `Wallet` alone | `POST /api/v1/payment-links` | the **payment link id**, and `Redirect(url)` |
+
+`Card` goes through a link even alone (ruling during execution, 2026-09-26): a direct card charge needs card data or a
+card token, and tokenization is out of scope for v1 (§8), so only the hosted page can collect the card.
 
 A link is not a charge: each payment *attempt* on it creates its own charge (`source: PAYMENT_LINK`,
 `sourceId: <paymentLinkId>`), and the link becomes `PAID` when one of them succeeds. Task 8 teaches
