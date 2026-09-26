@@ -37,6 +37,9 @@ internal static class BeamHttp
     /// Sends a request, retrying on a transient failure — <c>5xx</c>, <c>429</c>, <see cref="HttpRequestException"/>,
     /// or a <see cref="TaskCanceledException"/> that is not the caller's own cancellation — up to
     /// <see cref="MaxAttempts"/> times, with exponential backoff plus jitter. Never retries a <c>4xx</c>.
+    /// When the last attempt still fails at the transport, throws <see cref="PaymentApiException"/>
+    /// (<see cref="FailureKind.Transient"/>, <c>transport_error</c> or <c>timeout</c>); the caller's own
+    /// cancellation propagates as <see cref="OperationCanceledException"/>.
     /// </summary>
     /// <param name="httpClient">The client to send on.</param>
     /// <param name="method">The HTTP method.</param>
@@ -69,13 +72,26 @@ internal static class BeamHttp
             {
                 response = await httpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
             }
-            catch (HttpRequestException) when (!isLastAttempt)
+            catch (HttpRequestException ex)
             {
+                if (isLastAttempt)
+                {
+                    throw new PaymentApiException(
+                        FailureKind.Transient, "transport_error", 0, $"The provider could not be reached after {MaxAttempts} attempts.", ex);
+                }
+
                 await Task.Delay(BackoffDelay(attempt), cancellationToken).ConfigureAwait(false);
                 continue;
             }
-            catch (TaskCanceledException) when (!isLastAttempt && !cancellationToken.IsCancellationRequested)
+            catch (TaskCanceledException ex) when (!cancellationToken.IsCancellationRequested)
             {
+                // Not the caller's own cancellation (that propagates as-is): the per-request timeout fired.
+                if (isLastAttempt)
+                {
+                    throw new PaymentApiException(
+                        FailureKind.Transient, "timeout", 0, $"The provider did not respond within the timeout after {MaxAttempts} attempts.", ex);
+                }
+
                 await Task.Delay(BackoffDelay(attempt), cancellationToken).ConfigureAwait(false);
                 continue;
             }

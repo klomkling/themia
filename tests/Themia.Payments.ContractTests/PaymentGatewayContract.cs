@@ -77,6 +77,58 @@ public abstract class PaymentGatewayContract
         Assert.Equal(Money.Thb(100000), charge.Amount);
     }
 
+    [Fact]
+    public async Task Exhausted_transport_failures_surface_as_a_transient_payment_exception()
+    {
+        var handler = new StubHandler();
+        for (var i = 0; i < 3; i++)
+        {
+            handler.EnqueueThrow(() => new HttpRequestException("connection refused"));
+        }
+
+        var ex = await Assert.ThrowsAsync<PaymentApiException>(() => CreateGateway(handler).CreateChargeAsync(Request()));
+
+        Assert.Equal(FailureKind.Transient, ex.Kind);
+        Assert.Equal("transport_error", ex.ProviderCode);
+        Assert.Equal(0, ex.HttpStatus);
+        Assert.IsType<HttpRequestException>(ex.InnerException);
+        Assert.Equal(3, handler.Requests.Count);
+    }
+
+    [Fact]
+    public async Task Exhausted_timeouts_surface_as_a_transient_payment_exception()
+    {
+        var handler = new StubHandler();
+        for (var i = 0; i < 3; i++)
+        {
+            handler.EnqueueThrow(() => new TaskCanceledException("timed out"));
+        }
+
+        var ex = await Assert.ThrowsAsync<PaymentApiException>(() => CreateGateway(handler).CreateChargeAsync(Request()));
+
+        Assert.Equal(FailureKind.Transient, ex.Kind);
+        Assert.Equal("timeout", ex.ProviderCode);
+        Assert.Equal(0, ex.HttpStatus);
+        Assert.IsType<TaskCanceledException>(ex.InnerException);
+    }
+
+    [Fact]
+    public async Task The_callers_own_cancellation_propagates_unwrapped()
+    {
+        using var cts = new CancellationTokenSource();
+        var handler = new StubHandler();
+        handler.EnqueueThrow(() => new HttpRequestException("connection refused"));
+        handler.EnqueueThrow(() => new HttpRequestException("connection refused"));
+        handler.EnqueueThrow(() =>
+        {
+            cts.Cancel();
+            return new TaskCanceledException("cancelled by the caller", null, cts.Token);
+        });
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => CreateGateway(handler).CreateChargeAsync(Request(), cts.Token));
+    }
+
     private static CreateChargeRequest Request() => new()
     {
         Amount = Money.Thb(100000),

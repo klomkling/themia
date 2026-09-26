@@ -7,7 +7,7 @@ namespace Themia.Payments.Beam.Tests;
 /// members so every adapter's contract subclass can override them.</remarks>
 public sealed class StubHandler : HttpMessageHandler
 {
-    private readonly Queue<(HttpStatusCode Status, string Body)> responses = new();
+    private readonly Queue<(HttpStatusCode Status, string Body, Func<Exception>? Throw)> responses = new();
 
     public List<HttpRequestMessage> Requests { get; } = [];
 
@@ -15,7 +15,14 @@ public sealed class StubHandler : HttpMessageHandler
 
     public StubHandler Enqueue(HttpStatusCode status, string body)
     {
-        responses.Enqueue((status, body));
+        responses.Enqueue((status, body, null));
+        return this;
+    }
+
+    /// <summary>Makes the next attempt throw what <paramref name="exception"/> returns instead of responding.</summary>
+    public StubHandler EnqueueThrow(Func<Exception> exception)
+    {
+        responses.Enqueue((default, "", exception));
         return this;
     }
 
@@ -25,7 +32,12 @@ public sealed class StubHandler : HttpMessageHandler
         Requests.Add(request);
         Bodies.Add(request.Content is null ? "" : await request.Content.ReadAsStringAsync(cancellationToken));
 
-        var (status, body) = responses.Count > 0 ? responses.Dequeue() : (HttpStatusCode.OK, "{}");
+        var (status, body, exception) = responses.Count > 0 ? responses.Dequeue() : (HttpStatusCode.OK, "{}", null);
+        if (exception is not null)
+        {
+            throw exception();
+        }
+
         return new HttpResponseMessage(status) { Content = new StringContent(body) };
     }
 }
