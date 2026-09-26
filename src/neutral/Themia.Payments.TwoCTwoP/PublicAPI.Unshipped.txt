@@ -25,3 +25,6 @@ Themia.Payments.TwoCTwoP.TwoCTwoPPaymentGateway.RefundAsync(Themia.Payments.Refu
 const Themia.Payments.TwoCTwoP.TwoCTwoPPaymentGateway.HttpClientName = "themia-payments-2c2p" -> string!
 Themia.Payments.TwoCTwoP.DependencyInjection.TwoCTwoPServiceCollectionExtensions
 static Themia.Payments.TwoCTwoP.DependencyInjection.TwoCTwoPServiceCollectionExtensions.AddThemiaPaymentsTwoCTwoP(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Themia.Payments.TwoCTwoP.TwoCTwoPOptions!>! configure) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+Themia.Payments.TwoCTwoP.TwoCTwoPWebhookVerifier
+Themia.Payments.TwoCTwoP.TwoCTwoPWebhookVerifier.TwoCTwoPWebhookVerifier(Microsoft.Extensions.Options.IOptions<Themia.Payments.TwoCTwoP.TwoCTwoPOptions!>! options) -> void
+Themia.Payments.TwoCTwoP.TwoCTwoPWebhookVerifier.Verify(System.ReadOnlySpan<byte> rawBody, System.Collections.Generic.IReadOnlyDictionary<string!, string!>! headers) -> Themia.Payments.WebhookVerification!
