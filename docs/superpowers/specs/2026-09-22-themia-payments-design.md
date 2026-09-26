@@ -405,7 +405,7 @@ shopper to the hosted page, learn the outcome from the backend notification, and
 | Options | `TwoCTwoPOptions { MerchantId, SecretKey, Environment, PaymentChannels, Timeout }`, validated on start. |
 | Create | `paymentToken` with `merchantID`, `invoiceNo` (the app's `ReferenceId`, **AN 20 max**), `description`, `amount`, `currencyCode`, `paymentChannel[]`, `backendReturnUrl`, `frontendReturnUrl`. Response: `paymentToken`, `webPaymentUrl`, `respCode`, `respDesc` → `NextAction.Redirect(webPaymentUrl)`. |
 | Read | `paymentInquiry` by `invoiceNo` (or `paymentToken`) + `locale`. |
-| Refund / void | **Payment Process API**, `processType` (e.g. `I` settle, `V` void/refund) with `invoiceNo`, `actionAmount` and `idempotencyID`. Note this API is **XML**, not JSON, while the rest of PGW 4.3 is JWT-over-JSON — the adapter isolates that, and nothing about it reaches the core. |
+| Refund / void | **Not in v1.** `RefundAsync` throws `PaymentApiException(FailureKind.Validation, "refund_not_supported")`; refund from the 2C2P merchant portal. Verified 2026-09-27 against developer.2c2p.com: refunds go through the Payment Maintenance API (`POST https://demo2.2c2p.com/PaymentAction/2.0/action`, production `https://t.2c2p.com/PaymentAction/2.0/action`), an XML `PaymentProcessRequest` (version 4.6, `processType` `R`) wrapped in JWE (RSA-OAEP + A256GCM, 2C2P's certificate) inside JWS PS256 (the merchant's private key), and only settled transactions refund. That needs a merchant key pair and 2C2P's certificate in options, and cannot be tested without them; it is deferred until a merchant has sandbox keys. |
 | Notification | 2C2P POSTs the payment result to `backendReturnUrl` as a JWT signed with the same secret. |
 
 ### The four places 2C2P changed the core

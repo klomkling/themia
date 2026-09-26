@@ -178,11 +178,16 @@ public sealed class TwoCTwoPPaymentGateway : IPaymentGateway, IPaymentGatewayCap
     }
 
     /// <inheritdoc />
-    /// <remarks>2C2P refunds and voids go through the Payment Process endpoint (spec §7b), which is XML rather
-    /// than the JWT-over-JSON transport every other 2C2P call in this adapter uses — added in Task 14.</remarks>
-    /// <exception cref="NotImplementedException">Always. Not yet implemented.</exception>
+    /// <remarks>
+    /// Not supported in this version: refund from the 2C2P merchant portal. 2C2P refunds go through the Payment
+    /// Maintenance API, which needs the merchant's RSA key pair and 2C2P's certificate (JWE inside JWS) rather
+    /// than the shared secret every other call here uses (spec §7b).
+    /// </remarks>
+    /// <exception cref="PaymentApiException">Always, with <see cref="FailureKind.Validation"/> and
+    /// <c>refund_not_supported</c>. Nothing is sent to 2C2P.</exception>
     public Task<RefundCreation> RefundAsync(RefundRequest request, CancellationToken cancellationToken = default) =>
-        throw new NotImplementedException("2C2P refunds are implemented in Task 14 (Payment Process endpoint).");
+        Task.FromException<RefundCreation>(new PaymentApiException(FailureKind.Validation, "refund_not_supported", httpStatus: 0,
+            "The 2C2P adapter does not support refunds; refund from the 2C2P merchant portal."));
 
     /// <summary>
     /// Parses the response body and returns its verified <c>payload</c> contents. Throws for anything else: a

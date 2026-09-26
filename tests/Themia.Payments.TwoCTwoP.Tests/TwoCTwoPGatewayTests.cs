@@ -150,6 +150,20 @@ public class TwoCTwoPGatewayTests
     }
 
     [Fact]
+    public async Task A_refund_is_refused_as_not_supported_without_calling_2c2p()
+    {
+        var handler = new StubHandler();
+        var gateway = BuildGateway(handler);
+
+        var ex = await Assert.ThrowsAsync<PaymentApiException>(() => gateway.RefundAsync(
+            new RefundRequest(new ChargeRef(null, "order-1"), Money.Thb(50000), "changed mind", "r-1")));
+
+        Assert.Equal(FailureKind.Validation, ex.Kind);
+        Assert.Equal("refund_not_supported", ex.ProviderCode);
+        Assert.Empty(handler.Requests);
+    }
+
+    [Fact]
     public async Task A_response_signed_with_the_wrong_secret_is_treated_as_malformed()
     {
         var handler = new StubHandler().Enqueue(HttpStatusCode.OK, ResponseEnvelope(
