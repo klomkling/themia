@@ -1,0 +1,18 @@
+#nullable enable
+Themia.Payments.TwoCTwoP.TwoCTwoPEnvironment
+Themia.Payments.TwoCTwoP.TwoCTwoPEnvironment.Sandbox = 0 -> Themia.Payments.TwoCTwoP.TwoCTwoPEnvironment
+Themia.Payments.TwoCTwoP.TwoCTwoPEnvironment.Production = 1 -> Themia.Payments.TwoCTwoP.TwoCTwoPEnvironment
+Themia.Payments.TwoCTwoP.TwoCTwoPOptions
+Themia.Payments.TwoCTwoP.TwoCTwoPOptions.TwoCTwoPOptions() -> void
+Themia.Payments.TwoCTwoP.TwoCTwoPOptions.MerchantId.get -> string!
+Themia.Payments.TwoCTwoP.TwoCTwoPOptions.MerchantId.set -> void
+Themia.Payments.TwoCTwoP.TwoCTwoPOptions.SecretKey.get -> string!
+Themia.Payments.TwoCTwoP.TwoCTwoPOptions.SecretKey.set -> void
+Themia.Payments.TwoCTwoP.TwoCTwoPOptions.Environment.get -> Themia.Payments.TwoCTwoP.TwoCTwoPEnvironment
+Themia.Payments.TwoCTwoP.TwoCTwoPOptions.Environment.set -> void
+Themia.Payments.TwoCTwoP.TwoCTwoPOptions.PaymentChannels.get -> System.Collections.Generic.IReadOnlyList<Themia.Payments.PaymentMethod>!
+Themia.Payments.TwoCTwoP.TwoCTwoPOptions.PaymentChannels.set -> void
+Themia.Payments.TwoCTwoP.TwoCTwoPOptions.Timeout.get -> System.TimeSpan
+Themia.Payments.TwoCTwoP.TwoCTwoPOptions.Timeout.set -> void
+static Themia.Payments.TwoCTwoP.TwoCTwoPOptions.BaseAddressFor(Themia.Payments.TwoCTwoP.TwoCTwoPEnvironment environment) -> System.Uri!
+const Themia.Payments.TwoCTwoP.TwoCTwoPOptions.SectionName = "Payments:TwoCTwoP" -> string!
