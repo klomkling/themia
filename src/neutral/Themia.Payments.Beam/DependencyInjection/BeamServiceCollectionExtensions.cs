@@ -10,8 +10,9 @@ public static class BeamServiceCollectionExtensions
 {
     /// <summary>
     /// Registers <see cref="BeamOptions"/> (validated with <c>ValidateOnStart</c>), the named
-    /// <see cref="HttpClient"/>, and <see cref="BeamPaymentGateway"/> as <see cref="IPaymentGateway"/> and
-    /// <see cref="IPaymentGatewayCapabilities"/>.
+    /// <see cref="HttpClient"/>, <see cref="BeamPaymentGateway"/> as <see cref="IPaymentGateway"/> and
+    /// <see cref="IPaymentGatewayCapabilities"/>, and <see cref="BeamWebhookVerifier"/> as
+    /// <see cref="IPaymentWebhookVerifier"/>.
     /// </summary>
     /// <param name="services">The service collection.</param>
     /// <param name="configure">Sets the merchant id, API key and environment.</param>
@@ -40,6 +41,7 @@ public static class BeamServiceCollectionExtensions
         services.TryAddSingleton<BeamPaymentGateway>();
         services.TryAddSingleton<IPaymentGateway>(sp => sp.GetRequiredService<BeamPaymentGateway>());
         services.TryAddSingleton<IPaymentGatewayCapabilities>(sp => sp.GetRequiredService<BeamPaymentGateway>());
+        services.TryAddSingleton<IPaymentWebhookVerifier, BeamWebhookVerifier>();
 
         // So the gate exists even when the host forgot the core call. AddThemiaPayments is idempotent:
         // it uses TryAdd and TryAddEnumerable throughout.

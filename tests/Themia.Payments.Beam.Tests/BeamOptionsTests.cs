@@ -53,4 +53,20 @@ public class BeamOptionsTests
             [PaymentMethod.QrPromptPay, PaymentMethod.Card, PaymentMethod.MobileBanking, PaymentMethod.Wallet],
             provider.GetRequiredService<IPaymentGatewayCapabilities>().SupportedMethods);
     }
+
+    [Fact]
+    public void The_webhook_verifier_resolves_to_the_beam_implementation()
+    {
+        var services = new ServiceCollection();
+        services.AddThemiaPaymentsBeam(o =>
+        {
+            o.MerchantId = "m";
+            o.ApiKey = "k";
+            o.Environment = BeamEnvironment.Playground;
+        });
+
+        using var provider = services.BuildServiceProvider();
+
+        Assert.IsType<BeamWebhookVerifier>(provider.GetRequiredService<IPaymentWebhookVerifier>());
+    }
 }

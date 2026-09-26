@@ -23,4 +23,7 @@
   <ItemGroup>
     <ProjectReference Include="../../src/neutral/Themia.Payments.Beam/Themia.Payments.Beam.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <None Update="Fixtures/beam-webhook-vector.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>

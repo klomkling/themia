@@ -1,4 +1,7 @@
 #nullable enable
+Themia.Payments.Beam.BeamWebhookVerifier
+Themia.Payments.Beam.BeamWebhookVerifier.BeamWebhookVerifier(Microsoft.Extensions.Options.IOptions<Themia.Payments.Beam.BeamOptions!>! options) -> void
+Themia.Payments.Beam.BeamWebhookVerifier.Verify(System.ReadOnlySpan<byte> rawBody, System.Collections.Generic.IReadOnlyDictionary<string!, string!>! headers) -> Themia.Payments.WebhookVerification!
 Themia.Payments.Beam.BeamEnvironment
 Themia.Payments.Beam.BeamEnvironment.Playground = 0 -> Themia.Payments.Beam.BeamEnvironment
 Themia.Payments.Beam.BeamEnvironment.Production = 1 -> Themia.Payments.Beam.BeamEnvironment
