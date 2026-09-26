@@ -2735,7 +2735,7 @@ public async Task Creating_a_charge_sends_a_jwt_payload_and_returns_the_hosted_u
     var sent = PayloadOf(handler.Bodies[0]);
     Assert.Equal("order-1", sent.GetProperty("invoiceNo").GetString());
     Assert.Equal("1000.00", sent.GetProperty("amount").GetRawText());   // a number; a string would fail here
-    Assert.Equal(["CC", "QR"], sent.GetProperty("paymentChannel").EnumerateArray().Select(e => e.GetString()));
+    Assert.Equal(["CC", "THQR"], sent.GetProperty("paymentChannel").EnumerateArray().Select(e => e.GetString()));
     Assert.Equal(new Uri("https://sandbox-pgw-ui.2c2p.com/payment/4.3/#/token/abc"),
         Assert.IsType<NextAction.Redirect>(creation.Action).Url);
     Assert.Equal("order-1", creation.ChargeId);              // 2C2P mints no id before payment
@@ -2849,7 +2849,7 @@ public void A_currency_whose_minor_unit_is_not_a_hundredth_is_refused()
 }
 ```
 
-- [ ] **Step 4: Implement.** Method mapping to `paymentChannel`: `Card` → `"CC"`, `QrPromptPay` → `"QR"`, `MobileBanking` → `"MB"`, `Wallet` → `"EW"`; `SupportedMethods` lists all four. `ChargeId` is the invoice number, because 2C2P has no id before payment. Amounts:
+- [ ] **Step 4: Implement.** Method mapping to `paymentChannel`: `Card` → `"CC"`, `QrPromptPay` → `"THQR"`, `MobileBanking` → `"DEEPLINK"`, `Wallet` → `"EWALLET"` (2C2P group codes, per developer.2c2p.com/docs/reference-payment-channels); `SupportedMethods` is `TwoCTwoPOptions.PaymentChannels`, or all four when that is empty. `ChargeId` is the invoice number, because 2C2P has no id before payment. Amounts:
 
 ```csharp
 private static readonly HashSet<string> TwoDecimalCurrencies = new(StringComparer.Ordinal) { "THB", "USD", "SGD", "MYR", "EUR" };
