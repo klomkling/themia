@@ -139,6 +139,7 @@ you the target: `neutral/` = net8.0;net10.0, everything else = net10.0 (tooling 
 | `Themia.Modules.Audit` (+ `Themia.Audit`, `.PostgreSql/.SqlServer/.MySql`, `.AspNetCore`) | **new** — the listed sources turned out to describe something else (see below) | ✅ **built** (0.23.0 — append-only activity + authentication event log; unqualified `themia_audit_events` on all three engines; unconditional redaction; `RequireTransaction` for activity events on EF and Dapper alike; `IIdentityEventObserver` audits all twelve Identity events; fail-closed read-only dashboard. Entity change log deferred to 0.24.0) |
 | `Themia.Modules.Messaging` (+ `Themia.Messaging`, `.PostgreSql/.MySql/.SqlServer`, `.Hmac`, `.Http`, `.AspNetCore`) | **new** — service-to-service messaging for the two consumer apps (coord #0050) | ✅ **built** (0.11.0 — neutral transactional outbox/inbox across the three engines, the `themia-hmac-v1` signing scheme shared by both ends of a channel, an HTTP dispatcher that signs and delivers a claimed row, and a receiving minimal-API endpoint filter; tenant-aware module on top. A service's identity was configured twice and was unified into one `MessagingIdentity` in the same line of work) |
 | ~~`Themia.Modules.Content`~~ — no module; see `Themia.Content` (+ `.PostgreSql/.MySql/.SqlServer`, `.AspNetCore`) | propertiezy's production CMS pages, as reference — coord #0130 | ✅ **built** (0.26.0 — versioned bilingual pages; stale-version refusal on create and update; raw HTML and unsafe schemes refused at write over Markdig; golden renderer fixture. Platform-level content has no tenant state, so there is no module) |
+| ~~`Themia.Modules.Payments`~~ — no module; see `Themia.Payments` + `.Beam` + `.TwoCTwoP` below | the pre-Themia ChillPay/2C2P abstraction (survived two providers already) | ✅ **built** (0.30.0 — provider-agnostic `IPaymentGateway`/`IPaymentWebhookVerifier` seam, a `PaymentMethodPolicy` amount-band gate, and Beam Checkout + 2C2P PGW 4.3 adapters; 2C2P refunds not supported in this version. No tenant state or schema, so there is no module — same per-capability check as the Geo/AI/Content corrections above) |
 
 > **The `Themia.Modules.Audit` sources listed here were wrong, and the correction is worth keeping.**
 > ezy-assets' `AuditLogRepository` has `OldValue`/`NewValue` `jsonb` columns, so it reads like an entity
@@ -406,8 +407,8 @@ are relative to `docs/superpowers/specs/`. A version in parentheses is the relea
 - ✅ `2026-09-08-themia-geo-design.md` (0.24.0; no module, supersedes the `Themia.Modules.Geo` row in §B)
 - ✅ `2026-09-08-themia-ai-design.md` (0.24.0; no module, supersedes the `Themia.Modules.AI` row in §B)
 - ✅ `2026-09-14-themia-content-design.md` — versioned bilingual content pages (0.26.0, coord #0130)
-- ⬜ `2026-09-22-themia-payments-design.md` — `Themia.Payments` + `.Beam`: charge/refund/webhook seam and the
-  Beam adapter (proposed for 0.30.0; no plan written yet)
+- ✅ `2026-09-22-themia-payments-design.md` — `Themia.Payments` + `.Beam` + `.TwoCTwoP`: charge/refund/webhook
+  seam and the Beam + 2C2P adapters (0.30.0)
 - ⬜ `2026-09-22-themia-emvcoqr-design.md` — extracting EMVCo TLV/CRC out of `Themia.PromptPay`
   (**deferred** — builds only on the trigger in its header; no plan written yet)
 

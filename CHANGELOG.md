@@ -27,6 +27,35 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+### Added
+- **A provider-agnostic payment seam, with Beam Checkout and 2C2P adapters** (`Themia.Payments`,
+  `Themia.Payments.Beam`, `Themia.Payments.TwoCTwoP`). `IPaymentGateway` creates, reads and refunds a
+  charge; `IPaymentWebhookVerifier` checks a webhook's signature before reading it; a
+  `PaymentMethodPolicy` lets an adopter restrict which methods an amount may be paid with (a card's
+  percentage fee can dwarf a small charge), enforced by `PaymentMethodGate` and validated at startup
+  against the registered adapter's `IPaymentGatewayCapabilities`. No `Themia.Modules.Payments` — nothing
+  here is tenant-scoped or persisted. Every charge must be the platform's own revenue; collecting on
+  behalf of someone else is a licensed payment business under Thailand's Payment Systems Act and is out
+  of scope by law (spec §1).
+
+  A few things every adopter needs to know before relying on either adapter:
+  - `PaymentStatus.Pending` can last for ever — a shopper who never finishes leaves a charge `Pending`
+    indefinitely, and this package deliberately ships no wait-until-final helper. Give every unresolved
+    charge your own timeout.
+  - A verified webhook proves origin, not freshness. Beam's `X-Beam-Signature` covers the body with no
+    timestamp or nonce, so a captured, genuine webhook replays correctly for ever — deduplicate on your
+    own key (charge id + status) before acting on one.
+  - Partial refunds are card-only: Beam refunds a `CARD` charge in part, but a QR PromptPay charge only
+    refunds in full or not at all.
+  - With Beam, only a lone `QrPromptPay` charge is a direct charge — a lone `Card`, `MobileBanking`,
+    `Wallet`, or more than one method offered together, creates a payment link instead, and
+    `ChargeCreation.ChargeId` is then the **link's** id; `GetChargeAsync` follows it to the charge that
+    paid it. Slip verification (`BeamPaymentClient.VerifyQrSlipAsync`) matches only this merchant's own
+    Beam-created charges.
+  - **2C2P refunds are not supported in this version** — `RefundAsync` always throws
+    `PaymentApiException(FailureKind.Validation, "refund_not_supported")`; refund from the 2C2P merchant
+    portal until a real merchant RSA key pair exists for its JWE/JWS Payment Maintenance API.
+
 ## [0.29.0] - 2026-09-20
 
 ### Added
