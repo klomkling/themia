@@ -304,7 +304,7 @@ public class TwoCTwoPGatewayTests
     [InlineData("0.25", 25)]
     public void A_decimal_amount_comes_back_as_exact_minor_units(string json, long expected)
     {
-        var money = TwoCTwoPMapping.FromDecimalAmount(JsonDocument.Parse(json).RootElement.GetDecimal(), "THB");
+        Assert.True(TwoCTwoPMapping.TryFromDecimalAmount(JsonDocument.Parse(json).RootElement.GetDecimal(), "THB", out var money));
 
         Assert.Equal(Money.Thb(expected), money);
     }
@@ -316,6 +316,48 @@ public class TwoCTwoPGatewayTests
         var ex = Assert.Throws<PaymentApiException>(() => TwoCTwoPMapping.ToDecimalAmount(Money.From(1000, "JPY")));
 
         Assert.Equal("currency_not_supported", ex.ProviderCode);
+    }
+
+    [Theory]
+    [InlineData("not a url")]
+    [InlineData("/payment/4.3/#/token/abc")]
+    [InlineData("ftp://sandbox-pgw-ui.2c2p.com/x")]
+    public async Task A_web_payment_url_that_is_not_an_absolute_http_url_is_a_malformed_response(string url)
+    {
+        var handler = new StubHandler().Enqueue(HttpStatusCode.OK, ResponseEnvelope(new Dictionary<string, object?>
+        {
+            ["webPaymentUrl"] = url, ["respCode"] = "0000", ["respDesc"] = "Success",
+        }));
+        var gateway = BuildGateway(handler);
+
+        var ex = await Assert.ThrowsAsync<PaymentApiException>(() => gateway.CreateChargeAsync(new CreateChargeRequest
+        {
+            Amount = Money.Thb(100000),
+            ReferenceId = "order-1",
+            AllowedMethods = [PaymentMethod.QrPromptPay],
+        }));
+
+        Assert.Equal(FailureKind.Unknown, ex.Kind);
+        Assert.Equal("malformed_response", ex.ProviderCode);
+    }
+
+    [Theory]
+    [InlineData("1e30", "THB")]                         // overflows decimal * 100 and long
+    [InlineData("92233720368547758.08", "THB")]         // one satang past long.MaxValue
+    [InlineData("-5.00", "THB")]
+    [InlineData("10.00", "TH")]
+    public async Task An_inquired_amount_money_cannot_hold_is_a_malformed_response(string amount, string currency)
+    {
+        var claims = $$"""
+        { "invoiceNo": "order-1", "amount": {{amount}}, "currencyCode": "{{currency}}", "respCode": "0000", "respDesc": "Success" }
+        """;
+        var handler = new StubHandler().Enqueue(HttpStatusCode.OK, ResponseEnvelope(
+            JsonSerializer.Deserialize<Dictionary<string, object?>>(claims)!));
+        var gateway = BuildGateway(handler);
+
+        var ex = await Assert.ThrowsAsync<PaymentApiException>(() => gateway.GetChargeAsync(new ChargeRef(null, "order-1")));
+
+        Assert.Equal("malformed_response", ex.ProviderCode);
     }
 
     private static TwoCTwoPPaymentGateway BuildGateway(StubHandler handler, Action<TwoCTwoPOptions>? configure = null)

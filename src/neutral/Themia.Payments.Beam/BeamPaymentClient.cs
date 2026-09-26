@@ -145,7 +145,7 @@ public sealed class BeamPaymentClient
         var (id, url) = await BeamPaymentLinks.CreateLinkAsync(
             httpClient, options.Value, request, allowed, idempotencyKey, cancellationToken).ConfigureAwait(false);
 
-        return new BeamPaymentLink(id, new Uri(url), BeamPaymentLinkStatus.Active, request.Amount, request.ReferenceId, request.ExpiresAt);
+        return new BeamPaymentLink(id, url, BeamPaymentLinkStatus.Active, request.Amount, request.ReferenceId, request.ExpiresAt);
     }
 
     /// <summary>Reads a payment link's current state.</summary>
@@ -161,16 +161,16 @@ public sealed class BeamPaymentClient
         var httpClient = httpClientFactory.CreateClient(BeamPaymentGateway.HttpClientName);
 
         var link = await BeamPaymentLinks.GetAsync(httpClient, options.Value, paymentLinkId, cancellationToken).ConfigureAwait(false);
-        if (string.IsNullOrEmpty(link.Url))
+        if (link.Url is null)
         {
-            throw new PaymentApiException(FailureKind.Unknown, "malformed_response", (int)HttpStatusCode.OK);
+            throw BeamMapping.Malformed((int)HttpStatusCode.OK);
         }
 
         return new BeamPaymentLink(
             paymentLinkId,
-            new Uri(link.Url),
+            link.Url,
             ToLinkStatus(link.Status),
-            Money.From(link.NetAmount, link.Currency),
+            link.Amount,
             link.ReferenceId,
             link.ExpiresAt);
     }

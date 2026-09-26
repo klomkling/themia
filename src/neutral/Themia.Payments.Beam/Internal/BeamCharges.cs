@@ -118,7 +118,7 @@ internal static class BeamCharges
         HttpClient httpClient, BeamOptions beamOptions, string linkId, CancellationToken cancellationToken)
     {
         var link = await BeamPaymentLinks.GetAsync(httpClient, beamOptions, linkId, cancellationToken).ConfigureAwait(false);
-        var amount = Money.From(link.NetAmount, link.Currency);
+        var amount = link.Amount;
 
         return link.Status switch
         {
@@ -215,6 +215,7 @@ internal static class BeamCharges
             !chargeElement.TryGetProperty("amount", out var amountElement) ||
             amountElement.ValueKind != JsonValueKind.Number ||
             !amountElement.TryGetInt64(out var amountMinorUnits) ||
+            !BeamMapping.TryMoney(amountMinorUnits, currency, out var amount) ||
             !BeamMapping.TryGetNonEmptyString(chargeElement, "status", out var statusText))
         {
             throw new PaymentApiException(FailureKind.Unknown, "malformed_response", httpStatus);
@@ -242,7 +243,7 @@ internal static class BeamCharges
         return new Charge(
             chargeId,
             referenceId,
-            Money.From(amountMinorUnits, currency),
+            amount,
             status,
             BeamMapping.ToFailure(failureCode, null),
             completedAt);

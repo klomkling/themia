@@ -21,7 +21,7 @@ internal static class BeamPaymentLinks
         var payload = JsonSerializer.Serialize(BuildRequestBody(request, allowed), BeamMapping.SerializeOptions);
         var idempotencyKey = request.IdempotencyKey ?? Guid.NewGuid().ToString("N");
         var (id, url) = await PostCreateAsync(httpClient, options, payload, idempotencyKey, cancellationToken).ConfigureAwait(false);
-        return new ChargeCreation(id, PaymentStatus.Pending, new NextAction.Redirect(new Uri(url)));
+        return new ChargeCreation(id, PaymentStatus.Pending, new NextAction.Redirect(url));
     }
 
     /// <summary>
@@ -30,7 +30,7 @@ internal static class BeamPaymentLinks
     /// Shares <see cref="PostCreateAsync"/> with <see cref="CreateAsync"/> rather than parsing the 201
     /// response a second time.
     /// </summary>
-    public static Task<(string Id, string Url)> CreateLinkAsync(
+    public static Task<(string Id, Uri Url)> CreateLinkAsync(
         HttpClient httpClient,
         BeamOptions options,
         BeamPaymentLinkRequest request,
@@ -71,7 +71,7 @@ internal static class BeamPaymentLinks
     /// POSTs a payment-link create body and parses Beam's <c>{ "id", "url" }</c> response — the one place
     /// that response is parsed, shared by <see cref="CreateAsync"/> and <see cref="CreateLinkAsync"/>.
     /// </summary>
-    private static async Task<(string Id, string Url)> PostCreateAsync(
+    private static async Task<(string Id, Uri Url)> PostCreateAsync(
         HttpClient httpClient, BeamOptions options, string payload, string idempotencyKey, CancellationToken cancellationToken)
     {
         using var response = await BeamHttp.SendWithRetryAsync(
@@ -97,7 +97,7 @@ internal static class BeamPaymentLinks
             if (!parsed ||
                 root.ValueKind != JsonValueKind.Object ||
                 !BeamMapping.TryGetNonEmptyString(root, "id", out var id) ||
-                !BeamMapping.TryGetNonEmptyString(root, "url", out var url))
+                !BeamMapping.TryGetHttpUrl(root, "url", out var url))
             {
                 throw new PaymentApiException(FailureKind.Unknown, "malformed_response", (int)response.StatusCode);
             }
@@ -141,15 +141,22 @@ internal static class BeamPaymentLinks
                 netAmountElement.ValueKind != JsonValueKind.Number ||
                 !netAmountElement.TryGetInt64(out var netAmount) ||
                 !BeamMapping.TryGetNonEmptyString(order, "currency", out var currency) ||
+                !BeamMapping.TryMoney(netAmount, currency, out var amount) ||
                 !BeamMapping.TryGetNonEmptyString(order, "referenceId", out var referenceId))
             {
                 throw new PaymentApiException(FailureKind.Unknown, "malformed_response", (int)response.StatusCode);
             }
 
-            // "url" and "expiresAt" are optional here: BeamCharges.GetByPaymentLinkIdAsync (Task 8) never
-            // needed them, so existing fixtures omit them — only BeamPaymentClient.GetPaymentLinkAsync
-            // (Task 11) requires "url", and it checks for that itself rather than failing this shared parse.
-            var url = BeamMapping.TryGetNonEmptyString(root, "url", out var urlValue) ? urlValue : null;
+            // "url" and "expiresAt" are optional here: BeamCharges.GetByPaymentLinkIdAsync never needs them, so
+            // only BeamPaymentClient.GetPaymentLinkAsync requires "url", checking for it itself. Present but not
+            // an absolute http(s) URL is malformed either way.
+            Uri? url = null;
+            if (BeamMapping.TryGetNonEmptyString(root, "url", out var urlValue))
+            {
+                url = BeamMapping.TryParseHttpUrl(urlValue, out var parsedUrl)
+                    ? parsedUrl
+                    : throw BeamMapping.Malformed((int)response.StatusCode);
+            }
 
             DateTimeOffset? expiresAt = null;
             if (root.TryGetProperty("expiresAt", out var expiresAtElement) &&
@@ -163,19 +170,18 @@ internal static class BeamPaymentLinks
                 expiresAt = parsedExpiresAt;
             }
 
-            return new PaymentLinkStatus(status, url, netAmount, currency, referenceId, expiresAt);
+            return new PaymentLinkStatus(status, url, amount, referenceId, expiresAt);
         }
     }
 
     /// <summary>A payment link's GET response, reduced to what its two callers need.</summary>
     /// <param name="Status"><c>ACTIVE</c>, <c>PAID</c>, <c>VOIDED</c>, <c>REFUNDED</c>, <c>EXPIRED</c> or <c>DISABLED</c>.</param>
     /// <param name="Url">The link's checkout URL, when Beam sent one.</param>
-    /// <param name="NetAmount">The order's amount, in minor units.</param>
-    /// <param name="Currency">The order's currency.</param>
+    /// <param name="Amount">The order's net amount.</param>
     /// <param name="ReferenceId">The order's reference id.</param>
     /// <param name="ExpiresAt">When the link stops accepting payment, when it has an expiry.</param>
     internal readonly record struct PaymentLinkStatus(
-        string Status, string? Url, long NetAmount, string Currency, string ReferenceId, DateTimeOffset? ExpiresAt);
+        string Status, Uri? Url, Money Amount, string ReferenceId, DateTimeOffset? ExpiresAt);
 
     private static PaymentLinkRequestBody BuildRequestBody(CreateChargeRequest request, IReadOnlyList<PaymentMethod> allowed) =>
         new()

@@ -210,13 +210,12 @@ public sealed class BeamWebhookVerifier : IPaymentWebhookVerifier
             return true;
         }
 
-        if (!amountElement.TryGetInt64(out var minorUnits) || minorUnits < 0 ||
-            currencyElement.GetString() is not { Length: 3 } currency || !currency.All(char.IsAsciiLetter))
+        if (!amountElement.TryGetInt64(out var minorUnits) || !BeamMapping.TryMoney(minorUnits, currencyElement.GetString(), out var money))
         {
             return false;
         }
 
-        amount = Money.From(minorUnits, currency);
+        amount = money;
         return true;
     }
 

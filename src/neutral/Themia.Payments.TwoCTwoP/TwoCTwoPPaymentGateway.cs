@@ -125,12 +125,13 @@ public sealed class TwoCTwoPPaymentGateway : IPaymentGateway, IPaymentGatewayCap
                 TwoCTwoPMapping.ToFailureKind((int)response.StatusCode, respCode), respCode, (int)response.StatusCode, respDesc);
         }
 
-        if (!TwoCTwoPMapping.TryGetNonEmptyString(verified, "webPaymentUrl", out var webPaymentUrl))
+        if (!TwoCTwoPMapping.TryGetNonEmptyString(verified, "webPaymentUrl", out var webPaymentUrlText) ||
+            !TwoCTwoPMapping.TryParseHttpUrl(webPaymentUrlText, out var webPaymentUrl))
         {
             throw new PaymentApiException(FailureKind.Unknown, "malformed_response", (int)response.StatusCode);
         }
 
-        return new ChargeCreation(request.ReferenceId, PaymentStatus.Pending, new NextAction.Redirect(new Uri(webPaymentUrl)));
+        return new ChargeCreation(request.ReferenceId, PaymentStatus.Pending, new NextAction.Redirect(webPaymentUrl));
     }
 
     /// <inheritdoc />

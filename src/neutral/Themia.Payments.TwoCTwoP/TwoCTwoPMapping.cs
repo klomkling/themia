@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Text.Json;
 
@@ -9,6 +10,9 @@ namespace Themia.Payments.TwoCTwoP;
 internal static class TwoCTwoPMapping
 {
     /// <summary>Currencies whose minor unit is a hundredth — the only ones <see cref="ToDecimalAmount"/> accepts.</summary>
+    /// <summary>The largest decimal amount whose minor units still fit in a <see cref="long"/>.</summary>
+    private const decimal MaxDecimalAmount = long.MaxValue / 100m;
+
     private static readonly HashSet<string> TwoDecimalCurrencies = new(StringComparer.Ordinal) { "THB", "USD", "SGD", "MYR", "EUR" };
 
     /// <summary>The 2C2P <c>paymentChannel</c> group code for a method (developer.2c2p.com/docs/reference-payment-channels).</summary>
@@ -76,9 +80,36 @@ internal static class TwoCTwoPMapping
         return (money.MinorUnits / 100m) + 0.00m;
     }
 
-    /// <summary>A 2C2P decimal amount back into minor units.</summary>
-    public static Money FromDecimalAmount(decimal amount, string currency) =>
-        Money.From(decimal.ToInt64(decimal.Round(amount * 100m, 0, MidpointRounding.ToEven)), currency);
+    /// <summary>
+    /// A 2C2P decimal amount back into minor units, without throwing: <see langword="false"/> for a negative
+    /// amount, one too large for <see cref="long"/> minor units, or a currency that is not three ASCII letters.
+    /// </summary>
+    public static bool TryFromDecimalAmount(decimal amount, string? currency, out Money money)
+    {
+        if (amount < 0 || amount > MaxDecimalAmount || currency is not { Length: 3 } || !currency.All(char.IsAsciiLetter))
+        {
+            money = default;
+            return false;
+        }
+
+        money = Money.From(decimal.ToInt64(decimal.Round(amount * 100m, 0, MidpointRounding.ToEven)), currency);
+        return true;
+    }
+
+    /// <summary>Parses an absolute <c>http</c>/<c>https</c> URL, without throwing. Scheme-checked, not just
+    /// <see cref="UriKind.Absolute"/>: on Unix a rooted path parses as an absolute <c>file://</c> URI.</summary>
+    public static bool TryParseHttpUrl(string? value, [NotNullWhen(true)] out Uri? url)
+    {
+        if (Uri.TryCreate(value, UriKind.Absolute, out var parsed) &&
+            (parsed.Scheme == Uri.UriSchemeHttps || parsed.Scheme == Uri.UriSchemeHttp))
+        {
+            url = parsed;
+            return true;
+        }
+
+        url = null;
+        return false;
+    }
 
     /// <summary>
     /// Parses 2C2P's <c>transactionDateTime</c> — always <c>"yyyyMMddHHmmss"</c> (e.g. "20260927153000"), per the
@@ -167,7 +198,7 @@ internal static class TwoCTwoPMapping
     /// <param name="transactionTimeOffset">The UTC offset to read a present <c>transactionDateTime</c> with
     /// (<see cref="TwoCTwoPOptions.TransactionTimeOffset"/>).</param>
     /// <exception cref="PaymentApiException">The response is missing or misshapes <c>amount</c> or
-    /// <c>currencyCode</c>, or has a present, non-empty <c>transactionDateTime</c> that does not parse.</exception>
+    /// <c>currencyCode</c> (including a negative, overflowing or non-ISO value), or has a present, non-empty <c>transactionDateTime</c> that does not parse.</exception>
     public static Charge ToCharge(
         JsonElement verified, string requestedInvoiceNo, string respCode, int httpStatus, TimeSpan transactionTimeOffset)
     {
@@ -177,8 +208,9 @@ internal static class TwoCTwoPMapping
 
         if (!verified.TryGetProperty("amount", out var amountElement) ||
             amountElement.ValueKind != JsonValueKind.Number ||
-            !amountElement.TryGetDecimal(out var amount) ||
-            !TryGetNonEmptyString(verified, "currencyCode", out var currency))
+            !amountElement.TryGetDecimal(out var decimalAmount) ||
+            !TryGetNonEmptyString(verified, "currencyCode", out var currency) ||
+            !TryFromDecimalAmount(decimalAmount, currency, out var amount))
         {
             throw new PaymentApiException(FailureKind.Unknown, "malformed_response", httpStatus);
         }
@@ -203,6 +235,6 @@ internal static class TwoCTwoPMapping
             completedAt = parsedTransactionTime;
         }
 
-        return new Charge(invoiceNo, invoiceNo, FromDecimalAmount(amount, currency), status, failure, completedAt);
+        return new Charge(invoiceNo, invoiceNo, amount, status, failure, completedAt);
     }
 }

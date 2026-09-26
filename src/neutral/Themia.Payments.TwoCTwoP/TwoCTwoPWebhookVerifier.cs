@@ -99,7 +99,7 @@ public sealed class TwoCTwoPWebhookVerifier : IPaymentWebhookVerifier
     /// <summary>
     /// Reads <c>amount</c>/<c>currencyCode</c> into a <see cref="Money"/>. Returns <see langword="false"/> when
     /// either is present with the wrong JSON type, or does not form a value
-    /// <see cref="TwoCTwoPMapping.FromDecimalAmount"/> can accept — never lets that throw. Only when
+    /// <see cref="TwoCTwoPMapping.TryFromDecimalAmount"/> can accept — never lets that throw. Only when
     /// <b>both</b> are absent is nothing claimed, which is not an error (<see cref="PaymentEvent.Amount"/> is
     /// nullable for exactly this case).
     /// </summary>
@@ -115,20 +115,14 @@ public sealed class TwoCTwoPWebhookVerifier : IPaymentWebhookVerifier
 
         if (!hasAmount || amountElement.ValueKind != JsonValueKind.Number ||
             !hasCurrency || currencyElement.ValueKind != JsonValueKind.String ||
-            !amountElement.TryGetDecimal(out var decimalAmount))
+            !amountElement.TryGetDecimal(out var decimalAmount) ||
+            !TwoCTwoPMapping.TryFromDecimalAmount(decimalAmount, currencyElement.GetString(), out var money))
         {
             return false;
         }
 
-        try
-        {
-            amount = TwoCTwoPMapping.FromDecimalAmount(decimalAmount, currencyElement.GetString() ?? "");
-            return true;
-        }
-        catch (Exception ex) when (ex is ArgumentException or OverflowException)
-        {
-            return false;
-        }
+        amount = money;
+        return true;
     }
 
     /// <summary>

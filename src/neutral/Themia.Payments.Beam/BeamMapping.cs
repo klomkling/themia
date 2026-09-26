@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -64,11 +65,56 @@ internal static class BeamMapping
 
         return actionRequired switch
         {
-            "REDIRECT" => new NextAction.Redirect(
-                new Uri(root.GetProperty("redirect").GetProperty("redirectUrl").GetString()!)),
-            "ENCODED_IMAGE" => ToShowQr(root.GetProperty("encodedImage"), httpStatus),
+            "REDIRECT" => root.TryGetProperty("redirect", out var redirect) &&
+                TryGetHttpUrl(redirect, "redirectUrl", out var redirectUrl)
+                    ? new NextAction.Redirect(redirectUrl)
+                    : throw Malformed(httpStatus),
+            "ENCODED_IMAGE" => root.TryGetProperty("encodedImage", out var encodedImage)
+                ? ToShowQr(encodedImage, httpStatus)
+                : throw Malformed(httpStatus),
             _ => new NextAction.None(),
         };
+    }
+
+    /// <summary>The exception for a 2xx body that does not hold what the adapter needs.</summary>
+    public static PaymentApiException Malformed(int httpStatus) =>
+        new(FailureKind.Unknown, "malformed_response", httpStatus);
+
+    /// <summary>
+    /// Reads a property as an absolute <c>http</c>/<c>https</c> URL, without throwing. Scheme-checked, not just
+    /// <see cref="UriKind.Absolute"/>: on Unix a rooted path such as <c>/m/x</c> parses as an absolute <c>file://</c> URI.
+    /// </summary>
+    public static bool TryGetHttpUrl(JsonElement root, string propertyName, [NotNullWhen(true)] out Uri? url) =>
+        TryParseHttpUrl(TryGetNonEmptyString(root, propertyName, out var value) ? value : null, out url);
+
+    /// <summary>Parses an absolute <c>http</c>/<c>https</c> URL, without throwing. See <see cref="TryGetHttpUrl"/>.</summary>
+    public static bool TryParseHttpUrl(string? value, [NotNullWhen(true)] out Uri? url)
+    {
+        if (Uri.TryCreate(value, UriKind.Absolute, out var parsed) &&
+            (parsed.Scheme == Uri.UriSchemeHttps || parsed.Scheme == Uri.UriSchemeHttp))
+        {
+            url = parsed;
+            return true;
+        }
+
+        url = null;
+        return false;
+    }
+
+    /// <summary>
+    /// Builds a <see cref="Money"/> from provider values without throwing: <see langword="false"/> for a negative
+    /// amount or a currency that is not three ASCII letters — exactly what <see cref="Money.From"/> would reject.
+    /// </summary>
+    public static bool TryMoney(long minorUnits, string? currency, out Money money)
+    {
+        if (minorUnits < 0 || currency is not { Length: 3 } || !currency.All(char.IsAsciiLetter))
+        {
+            money = default;
+            return false;
+        }
+
+        money = Money.From(minorUnits, currency);
+        return true;
     }
 
     /// <summary>Maps a Beam charge or payment-link status to a normalized <see cref="PaymentStatus"/>.</summary>
@@ -162,7 +208,17 @@ internal static class BeamMapping
 
     private static NextAction.ShowQr ToShowQr(JsonElement encodedImage, int httpStatus)
     {
-        var imageBase64 = encodedImage.GetProperty("imageBase64Encoded").GetString()!;
+        if (!TryGetNonEmptyString(encodedImage, "imageBase64Encoded", out var imageBase64))
+        {
+            throw Malformed(httpStatus);
+        }
+
+        var image = new byte[imageBase64.Length];
+        if (!Convert.TryFromBase64String(imageBase64, image, out var imageLength))
+        {
+            throw Malformed(httpStatus);
+        }
+
         var rawPayload = encodedImage.TryGetProperty("rawData", out var rawDataElement) &&
             rawDataElement.ValueKind == JsonValueKind.String
                 ? rawDataElement.GetString()
@@ -180,6 +236,6 @@ internal static class BeamMapping
             expiry = parsedExpiry;
         }
 
-        return new NextAction.ShowQr(Convert.FromBase64String(imageBase64), rawPayload, expiry);
+        return new NextAction.ShowQr(image[..imageLength], rawPayload, expiry);
     }
 }

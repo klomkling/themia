@@ -197,7 +197,11 @@ public sealed class BeamPaymentGateway : IPaymentGateway, IPaymentGatewayCapabil
                 throw BeamMapping.ToApiException(response.StatusCode, parsed ? root : null);
             }
 
-            var chargeId = root.GetProperty("chargeId").GetString()!;
+            if (!parsed || !BeamMapping.TryGetNonEmptyString(root, "chargeId", out var chargeId))
+            {
+                throw BeamMapping.Malformed((int)response.StatusCode);
+            }
+
             return new ChargeCreation(chargeId, PaymentStatus.Pending, BeamMapping.ToNextAction(root, (int)response.StatusCode));
         }
     }
