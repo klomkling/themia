@@ -11,6 +11,16 @@ namespace Themia.Payments.Beam;
 /// <remarks>
 /// Pinned to Beam's own published golden vector (docs.beamcheckout.com/webhook-authentication): the same
 /// body, key and signature there must verify here, byte for byte.
+/// <para>
+/// The event name comes from the unsigned <c>X-Beam-Event</c> header — the HMAC covers only the body — so
+/// it is reconciled against the signed body before being trusted. For the four modelled event types, the
+/// body must agree with the header or the result is <see cref="WebhookOutcome.Malformed"/>:
+/// <c>charge.succeeded</c>/<c>charge.failed</c> require a non-empty <c>chargeId</c>, no <c>refundId</c>
+/// property, and <c>status</c> exactly <c>SUCCEEDED</c>/<c>FAILED</c> respectively;
+/// <c>refund.succeeded</c>/<c>refund.failed</c> require a non-empty <c>refundId</c> and the matching
+/// <c>status</c>. Any other header value (including a missing one) is <see cref="PaymentEventType.Other"/>
+/// and is not checked for consistency.
+/// </para>
 /// </remarks>
 public sealed class BeamWebhookVerifier : IPaymentWebhookVerifier
 {
@@ -91,6 +101,20 @@ public sealed class BeamWebhookVerifier : IPaymentWebhookVerifier
                 return new WebhookVerification(WebhookOutcome.Malformed, null);
             }
 
+            var type = ToEventType(eventName);
+            if (IsModelled(type) && !IsConsistentWithBody(root, type))
+            {
+                // The unsigned X-Beam-Event header disagrees with the signed body: never trust the header.
+                return new WebhookVerification(WebhookOutcome.Malformed, null);
+            }
+
+            if (!TryReadAmount(root, out var amount) && IsModelled(type))
+            {
+                // Present but not a value Money.From can accept (negative, or a malformed currency code).
+                // Amount is part of what the consumer acts on for a modelled type, so treat it as tampered.
+                return new WebhookVerification(WebhookOutcome.Malformed, null);
+            }
+
             var chargeId = root.TryGetProperty("chargeId", out var chargeIdElement) &&
                 chargeIdElement.ValueKind == JsonValueKind.String
                     ? chargeIdElement.GetString()
@@ -101,15 +125,13 @@ public sealed class BeamWebhookVerifier : IPaymentWebhookVerifier
                     ? referenceIdElement.GetString()
                     : null;
 
-            var amount = TryGetAmount(root, out var money) ? (Money?)money : null;
-
             var status = root.TryGetProperty("status", out var statusElement) &&
                 statusElement.ValueKind == JsonValueKind.String
                     ? BeamMapping.ToStatus(statusElement.GetString() ?? "")
                     : PaymentStatus.Pending;
 
             var paymentEvent = new PaymentEvent(
-                ToEventType(eventName),
+                type,
                 chargeId,
                 referenceId,
                 amount,
@@ -121,21 +143,61 @@ public sealed class BeamWebhookVerifier : IPaymentWebhookVerifier
         }
     }
 
-    private static bool TryGetAmount(JsonElement root, out Money money)
+    private static bool IsModelled(PaymentEventType type) => type is
+        PaymentEventType.ChargeSucceeded or PaymentEventType.ChargeFailed or
+        PaymentEventType.RefundSucceeded or PaymentEventType.RefundFailed;
+
+    /// <summary>
+    /// Checks the signed body against the unsigned header's claimed type. See the class remarks for the
+    /// per-type rules; only called for the four modelled types.
+    /// </summary>
+    private static bool IsConsistentWithBody(JsonElement root, PaymentEventType type) => type switch
     {
-        if (root.TryGetProperty("amount", out var amountElement) &&
-            amountElement.ValueKind == JsonValueKind.Number &&
-            amountElement.TryGetInt64(out var minorUnits) &&
-            root.TryGetProperty("currency", out var currencyElement) &&
-            currencyElement.ValueKind == JsonValueKind.String &&
-            currencyElement.GetString() is { Length: > 0 } currency)
+        PaymentEventType.ChargeSucceeded => IsChargeConsistent(root, "SUCCEEDED"),
+        PaymentEventType.ChargeFailed => IsChargeConsistent(root, "FAILED"),
+        PaymentEventType.RefundSucceeded => IsRefundConsistent(root, "SUCCEEDED"),
+        PaymentEventType.RefundFailed => IsRefundConsistent(root, "FAILED"),
+        _ => true,
+    };
+
+    private static bool IsChargeConsistent(JsonElement root, string expectedStatus) =>
+        BeamMapping.TryGetNonEmptyString(root, "chargeId", out _) &&
+        !root.TryGetProperty("refundId", out _) &&
+        HasStatus(root, expectedStatus);
+
+    private static bool IsRefundConsistent(JsonElement root, string expectedStatus) =>
+        BeamMapping.TryGetNonEmptyString(root, "refundId", out _) &&
+        HasStatus(root, expectedStatus);
+
+    private static bool HasStatus(JsonElement root, string expectedStatus) =>
+        root.TryGetProperty("status", out var statusElement) &&
+        statusElement.ValueKind == JsonValueKind.String &&
+        string.Equals(statusElement.GetString(), expectedStatus, StringComparison.Ordinal);
+
+    /// <summary>
+    /// Reads <c>amount</c>/<c>currency</c> into a <see cref="Money"/>. Returns <see langword="false"/> only
+    /// when both properties are present but do not form a value <see cref="Money.From"/> can accept (a
+    /// negative amount, or a currency that is not three ASCII letters) — never lets that throw. When either
+    /// property is simply absent, no amount was claimed: that is not an error, so this returns
+    /// <see langword="true"/> with <paramref name="amount"/> left <see langword="null"/>.
+    /// </summary>
+    private static bool TryReadAmount(JsonElement root, out Money? amount)
+    {
+        amount = null;
+        if (!root.TryGetProperty("amount", out var amountElement) || amountElement.ValueKind != JsonValueKind.Number ||
+            !root.TryGetProperty("currency", out var currencyElement) || currencyElement.ValueKind != JsonValueKind.String)
         {
-            money = Money.From(minorUnits, currency);
             return true;
         }
 
-        money = default;
-        return false;
+        if (!amountElement.TryGetInt64(out var minorUnits) || minorUnits < 0 ||
+            currencyElement.GetString() is not { Length: 3 } currency || !currency.All(char.IsAsciiLetter))
+        {
+            return false;
+        }
+
+        amount = Money.From(minorUnits, currency);
+        return true;
     }
 
     private static bool TryGetOccurredAt(JsonElement root, out DateTimeOffset occurredAt)

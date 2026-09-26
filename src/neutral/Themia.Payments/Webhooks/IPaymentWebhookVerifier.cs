@@ -9,6 +9,13 @@ namespace Themia.Payments;
 /// Verification proves origin, not freshness. Beam's signature covers the body with no timestamp and no
 /// nonce, so a captured request replays for ever; deduplication is the consumer's, on (charge id, status).
 /// </para>
+/// <para>
+/// A provider may deliver the event name (<see cref="PaymentEvent.Type"/>) outside the signed body — as an
+/// unsigned header, for example — so it is not itself authenticated by the signature check. An
+/// implementation must reconcile a claimed type against the signed body before trusting it, and report
+/// <see cref="WebhookOutcome.Malformed"/> when they disagree, rather than returning a
+/// <see cref="PaymentEvent"/> whose <see cref="PaymentEvent.Type"/> the body does not actually support.
+/// </para>
 /// </remarks>
 public interface IPaymentWebhookVerifier
 {

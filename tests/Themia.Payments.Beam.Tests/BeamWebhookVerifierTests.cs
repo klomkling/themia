@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Options;
 using Themia.Payments;
@@ -18,6 +20,15 @@ public class BeamWebhookVerifierTests
 
     private static Dictionary<string, string> Headers(string signature, string eventName = "charge.succeeded") =>
         new(StringComparer.OrdinalIgnoreCase) { ["X-Beam-Signature"] = signature, ["X-Beam-Event"] = eventName };
+
+    /// <summary>Signs an arbitrary test body with the same key/algorithm as the verifier, for cases the
+    /// golden fixture cannot cover. Never mutates the golden fixture itself.</summary>
+    private static (byte[] Body, string Signature) Sign(string json)
+    {
+        var body = Encoding.UTF8.GetBytes(json);
+        var signature = Convert.ToBase64String(HMACSHA256.HashData(Convert.FromBase64String(Key), body));
+        return (body, signature);
+    }
 
     [Fact]
     public void The_published_vector_verifies()
@@ -65,6 +76,85 @@ public class BeamWebhookVerifierTests
 
         Assert.Equal(WebhookOutcome.Verified, result.Outcome);
         Assert.Equal(PaymentEventType.Other, result.Event!.Type);
+    }
+
+    [Fact]
+    public void A_negative_signed_amount_is_malformed_not_an_exception()
+    {
+        var (body, signature) = Sign(
+            """{"chargeId":"ch_1","status":"SUCCEEDED","amount":-100,"currency":"THB","createdAt":"2025-01-01T00:00:00Z"}""");
+
+        var result = Verifier().Verify(body, Headers(signature));
+
+        Assert.Equal(WebhookOutcome.Malformed, result.Outcome);
+    }
+
+    [Fact]
+    public void An_invalid_signed_currency_code_is_malformed_not_an_exception()
+    {
+        var (body, signature) = Sign(
+            """{"chargeId":"ch_1","status":"SUCCEEDED","amount":100,"currency":"BAHT","createdAt":"2025-01-01T00:00:00Z"}""");
+
+        var result = Verifier().Verify(body, Headers(signature));
+
+        Assert.Equal(WebhookOutcome.Malformed, result.Outcome);
+    }
+
+    [Fact]
+    public void A_charge_failed_body_claimed_as_charge_succeeded_is_malformed()
+    {
+        var (body, signature) = Sign(
+            """{"chargeId":"ch_1","status":"FAILED","amount":100,"currency":"THB","createdAt":"2025-01-01T00:00:00Z"}""");
+
+        var result = Verifier().Verify(body, Headers(signature, "charge.succeeded"));
+
+        Assert.Equal(WebhookOutcome.Malformed, result.Outcome);
+    }
+
+    [Fact]
+    public void A_refund_body_claimed_as_charge_succeeded_is_malformed()
+    {
+        // A refund body carries a chargeId and status SUCCEEDED too; only the refundId rule catches this.
+        var (body, signature) = Sign(
+            """{"chargeId":"ch_1","refundId":"rf_1","status":"SUCCEEDED","amount":100,"currency":"THB","createdAt":"2025-01-01T00:00:00Z"}""");
+
+        var result = Verifier().Verify(body, Headers(signature, "charge.succeeded"));
+
+        Assert.Equal(WebhookOutcome.Malformed, result.Outcome);
+    }
+
+    [Fact]
+    public void A_charge_succeeded_claim_with_no_status_in_the_body_is_malformed()
+    {
+        var (body, signature) = Sign(
+            """{"chargeId":"ch_1","amount":100,"currency":"THB","createdAt":"2025-01-01T00:00:00Z"}""");
+
+        var result = Verifier().Verify(body, Headers(signature, "charge.succeeded"));
+
+        Assert.Equal(WebhookOutcome.Malformed, result.Outcome);
+    }
+
+    [Fact]
+    public void A_consistent_refund_succeeded_body_verifies()
+    {
+        var (body, signature) = Sign(
+            """{"refundId":"rf_1","status":"SUCCEEDED","amount":100,"currency":"THB","createdAt":"2025-01-01T00:00:00Z"}""");
+
+        var result = Verifier().Verify(body, Headers(signature, "refund.succeeded"));
+
+        Assert.Equal(WebhookOutcome.Verified, result.Outcome);
+        Assert.Equal(PaymentEventType.RefundSucceeded, result.Event!.Type);
+    }
+
+    [Fact]
+    public void The_golden_vector_stays_verified_as_charge_succeeded()
+    {
+        // Confirms the golden body itself satisfies the new consistency rule: chargeId, no refundId,
+        // status SUCCEEDED.
+        var result = Verifier().Verify(Vector(), Headers(Signature, "charge.succeeded"));
+
+        Assert.Equal(WebhookOutcome.Verified, result.Outcome);
+        Assert.Equal(PaymentEventType.ChargeSucceeded, result.Event!.Type);
     }
 
     [Fact]
