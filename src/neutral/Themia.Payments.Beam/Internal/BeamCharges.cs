@@ -15,39 +15,55 @@ internal static class BeamCharges
     public static async Task<(bool Found, Charge? Charge)> TryGetByIdAsync(
         HttpClient httpClient, BeamOptions beamOptions, string chargeId, CancellationToken cancellationToken)
     {
-        using var response = await BeamHttp.SendWithRetryAsync(
-            httpClient,
-            HttpMethod.Get,
-            $"/api/v1/charges/{Uri.EscapeDataString(chargeId)}",
-            beamOptions,
-            contentFactory: null,
-            idempotencyKey: null,
-            cancellationToken).ConfigureAwait(false);
-
-        var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
-        await using (stream.ConfigureAwait(false))
+        var (statusCode, parsed, root) = await GetChargeByIdAsync(httpClient, beamOptions, chargeId, cancellationToken)
+            .ConfigureAwait(false);
+        if (statusCode == HttpStatusCode.NotFound)
         {
-            var (parsed, root) = await BeamMapping.TryParseAsync(stream, cancellationToken).ConfigureAwait(false);
-            if (response.StatusCode == HttpStatusCode.NotFound)
-            {
-                return (false, null);
-            }
-
-            if (!response.IsSuccessStatusCode)
-            {
-                throw BeamMapping.ToApiException(response.StatusCode, parsed ? root : null);
-            }
-
-            return (true, ToCharge(root, (int)response.StatusCode));
+            return (false, null);
         }
+
+        if (!IsSuccess(statusCode))
+        {
+            throw BeamMapping.ToApiException(statusCode, parsed ? root : null);
+        }
+
+        return (true, ToCharge(root, (int)statusCode));
     }
 
     /// <summary>
     /// Reads a charge by id together with its <c>paymentMethod.paymentMethodType</c> — the only caller that
     /// needs the method type is the refund partial-amount guard (Task 9), so it is not carried on the shared
-    /// <see cref="Charge"/> type. Reuses <see cref="ToCharge"/> rather than parsing the body twice.
+    /// <see cref="Charge"/> type. Reuses <see cref="ToCharge"/> rather than parsing the body twice. Unlike
+    /// <see cref="TryGetByIdAsync"/>, a 404 here is not special-cased — it throws like any other non-2xx,
+    /// because by the time a refund needs this, the charge id is already known to exist.
     /// </summary>
     public static async Task<(Charge Charge, string? PaymentMethodType)> GetByIdWithPaymentMethodAsync(
+        HttpClient httpClient, BeamOptions beamOptions, string chargeId, CancellationToken cancellationToken)
+    {
+        var (statusCode, parsed, root) = await GetChargeByIdAsync(httpClient, beamOptions, chargeId, cancellationToken)
+            .ConfigureAwait(false);
+        if (!IsSuccess(statusCode))
+        {
+            throw BeamMapping.ToApiException(statusCode, parsed ? root : null);
+        }
+
+        var charge = ToCharge(root, (int)statusCode);
+        var paymentMethodType = root.TryGetProperty("paymentMethod", out var paymentMethod) &&
+            BeamMapping.TryGetNonEmptyString(paymentMethod, "paymentMethodType", out var type)
+                ? type
+                : null;
+
+        return (charge, paymentMethodType);
+    }
+
+    /// <summary>
+    /// GET <c>/api/v1/charges/{id}</c> through the retry wrapper (no idempotency key) and parses the body,
+    /// leaving the not-found and success/failure decisions to the caller — <see cref="TryGetByIdAsync"/> and
+    /// <see cref="GetByIdWithPaymentMethodAsync"/> differ only in what they do with a 404. The returned
+    /// <see cref="JsonElement"/> is safe to use after this method returns: <see cref="BeamMapping.TryParseAsync"/>
+    /// clones it from its own <see cref="JsonDocument"/> before that document is disposed.
+    /// </summary>
+    private static async Task<(HttpStatusCode StatusCode, bool Parsed, JsonElement Root)> GetChargeByIdAsync(
         HttpClient httpClient, BeamOptions beamOptions, string chargeId, CancellationToken cancellationToken)
     {
         using var response = await BeamHttp.SendWithRetryAsync(
@@ -63,20 +79,13 @@ internal static class BeamCharges
         await using (stream.ConfigureAwait(false))
         {
             var (parsed, root) = await BeamMapping.TryParseAsync(stream, cancellationToken).ConfigureAwait(false);
-            if (!response.IsSuccessStatusCode)
-            {
-                throw BeamMapping.ToApiException(response.StatusCode, parsed ? root : null);
-            }
-
-            var charge = ToCharge(root, (int)response.StatusCode);
-            var paymentMethodType = root.TryGetProperty("paymentMethod", out var paymentMethod) &&
-                BeamMapping.TryGetNonEmptyString(paymentMethod, "paymentMethodType", out var type)
-                    ? type
-                    : null;
-
-            return (charge, paymentMethodType);
+            return (response.StatusCode, parsed, root);
         }
     }
+
+    /// <summary>Whether an HTTP status is a 2xx — the same check <see cref="HttpResponseMessage.IsSuccessStatusCode"/>
+    /// makes, kept here so <see cref="GetChargeByIdAsync"/>'s callers can apply it after the response is disposed.</summary>
+    private static bool IsSuccess(HttpStatusCode status) => (int)status is >= 200 and < 300;
 
     /// <summary>Follows a payment-link id to what it says about the charge that paid it, or its own pending/failed state.</summary>
     public static async Task<Charge> GetByPaymentLinkIdAsync(
