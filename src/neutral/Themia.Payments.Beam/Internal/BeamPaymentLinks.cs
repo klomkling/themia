@@ -19,14 +19,16 @@ internal static class BeamPaymentLinks
         CancellationToken cancellationToken)
     {
         var payload = JsonSerializer.Serialize(BuildRequestBody(request, allowed), BeamMapping.SerializeOptions);
-        using var httpRequest = BeamHttp.Create(
+        var idempotencyKey = request.IdempotencyKey ?? Guid.NewGuid().ToString("N");
+        using var response = await BeamHttp.SendWithRetryAsync(
+            httpClient,
             HttpMethod.Post,
             "/api/v1/payment-links",
             options,
-            new StringContent(payload, Encoding.UTF8, "application/json"),
-            request.IdempotencyKey);
+            () => new StringContent(payload, Encoding.UTF8, "application/json"),
+            idempotencyKey,
+            cancellationToken).ConfigureAwait(false);
 
-        using var response = await httpClient.SendAsync(httpRequest, cancellationToken).ConfigureAwait(false);
         var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
         await using (stream.ConfigureAwait(false))
         {
@@ -40,8 +42,8 @@ internal static class BeamPaymentLinks
             // "paymentLinkId" belongs to the GET response and the webhook payload, not to create.
             if (!parsed ||
                 root.ValueKind != JsonValueKind.Object ||
-                !TryGetNonEmptyString(root, "id", out var id) ||
-                !TryGetNonEmptyString(root, "url", out var url))
+                !BeamMapping.TryGetNonEmptyString(root, "id", out var id) ||
+                !BeamMapping.TryGetNonEmptyString(root, "url", out var url))
             {
                 throw new PaymentApiException(FailureKind.Unknown, "malformed_response", (int)response.StatusCode);
             }
@@ -50,19 +52,55 @@ internal static class BeamPaymentLinks
         }
     }
 
-    private static bool TryGetNonEmptyString(JsonElement root, string propertyName, out string value)
+    /// <summary>Reads a payment link's current status and order — Beam's GET response, not the create shape.</summary>
+    /// <exception cref="PaymentApiException">
+    /// Beam rejected the call (including a 404 for an id that is not a payment link either), or the 2xx body was
+    /// missing a field this method needs.
+    /// </exception>
+    public static async Task<PaymentLinkStatus> GetAsync(
+        HttpClient httpClient, BeamOptions options, string linkId, CancellationToken cancellationToken)
     {
-        if (root.TryGetProperty(propertyName, out var element) &&
-            element.ValueKind == JsonValueKind.String &&
-            element.GetString() is { Length: > 0 } nonEmpty)
-        {
-            value = nonEmpty;
-            return true;
-        }
+        using var response = await BeamHttp.SendWithRetryAsync(
+            httpClient,
+            HttpMethod.Get,
+            $"/api/v1/payment-links/{Uri.EscapeDataString(linkId)}",
+            options,
+            contentFactory: null,
+            idempotencyKey: null,
+            cancellationToken).ConfigureAwait(false);
 
-        value = "";
-        return false;
+        var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+        await using (stream.ConfigureAwait(false))
+        {
+            var (parsed, root) = await BeamMapping.TryParseAsync(stream, cancellationToken).ConfigureAwait(false);
+            if (!response.IsSuccessStatusCode)
+            {
+                throw BeamMapping.ToApiException(response.StatusCode, parsed ? root : null);
+            }
+
+            if (!parsed ||
+                root.ValueKind != JsonValueKind.Object ||
+                !BeamMapping.TryGetNonEmptyString(root, "status", out var status) ||
+                !root.TryGetProperty("order", out var order) ||
+                order.ValueKind != JsonValueKind.Object ||
+                !order.TryGetProperty("netAmount", out var netAmountElement) ||
+                netAmountElement.ValueKind != JsonValueKind.Number ||
+                !BeamMapping.TryGetNonEmptyString(order, "currency", out var currency) ||
+                !BeamMapping.TryGetNonEmptyString(order, "referenceId", out var referenceId))
+            {
+                throw new PaymentApiException(FailureKind.Unknown, "malformed_response", (int)response.StatusCode);
+            }
+
+            return new PaymentLinkStatus(status, netAmountElement.GetInt64(), currency, referenceId);
+        }
     }
+
+    /// <summary>A payment link's GET response, reduced to what <see cref="BeamPaymentGateway.GetChargeAsync"/> needs.</summary>
+    /// <param name="Status"><c>ACTIVE</c>, <c>PAID</c>, <c>VOIDED</c>, <c>REFUNDED</c>, <c>EXPIRED</c> or <c>DISABLED</c>.</param>
+    /// <param name="NetAmount">The order's amount, in minor units.</param>
+    /// <param name="Currency">The order's currency.</param>
+    /// <param name="ReferenceId">The order's reference id.</param>
+    internal readonly record struct PaymentLinkStatus(string Status, long NetAmount, string Currency, string ReferenceId);
 
     private static PaymentLinkRequestBody BuildRequestBody(CreateChargeRequest request, IReadOnlyList<PaymentMethod> allowed) =>
         new()

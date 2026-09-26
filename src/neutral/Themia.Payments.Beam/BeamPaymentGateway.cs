@@ -76,9 +76,30 @@ public sealed class BeamPaymentGateway : IPaymentGateway, IPaymentGatewayCapabil
     }
 
     /// <inheritdoc />
-    /// <exception cref="NotSupportedException">Not yet implemented; see Task 8.</exception>
-    public Task<Charge> GetChargeAsync(ChargeRef charge, CancellationToken cancellationToken = default) =>
-        throw new NotSupportedException("Implemented in Task 7/8/9.");
+    /// <exception cref="PaymentApiException">Beam rejected the call, or no charge could be found.</exception>
+    /// <remarks>
+    /// Resolves in three steps: a provider charge id reads <c>GET /api/v1/charges/{id}</c> directly; a 404 there
+    /// is retried as a payment link id (<c>GET /api/v1/payment-links/{id}</c>), following a paid link to the
+    /// charge that paid it; with no provider id at all, the app's reference id is looked up instead.
+    /// </remarks>
+    public async Task<Charge> GetChargeAsync(ChargeRef charge, CancellationToken cancellationToken = default)
+    {
+        var beamOptions = options.Value;
+        var httpClient = httpClientFactory.CreateClient(HttpClientName);
+
+        if (charge.ProviderChargeId is { Length: > 0 } chargeId)
+        {
+            var (found, result) = await BeamCharges.TryGetByIdAsync(httpClient, beamOptions, chargeId, cancellationToken)
+                .ConfigureAwait(false);
+            return found
+                ? result!
+                : await BeamCharges.GetByPaymentLinkIdAsync(httpClient, beamOptions, chargeId, cancellationToken)
+                    .ConfigureAwait(false);
+        }
+
+        return await BeamCharges.GetByReferenceAsync(httpClient, beamOptions, charge.ReferenceId, cancellationToken)
+            .ConfigureAwait(false);
+    }
 
     /// <inheritdoc />
     /// <exception cref="NotSupportedException">Not yet implemented; see Task 9.</exception>
@@ -90,14 +111,16 @@ public sealed class BeamPaymentGateway : IPaymentGateway, IPaymentGatewayCapabil
         CancellationToken cancellationToken)
     {
         var payload = JsonSerializer.Serialize(BuildChargeRequestBody(request, chargeType), BeamMapping.SerializeOptions);
-        using var httpRequest = BeamHttp.Create(
+        var idempotencyKey = request.IdempotencyKey ?? Guid.NewGuid().ToString("N");
+        using var response = await BeamHttp.SendWithRetryAsync(
+            httpClient,
             HttpMethod.Post,
             "/api/v1/charges",
             beamOptions,
-            new StringContent(payload, Encoding.UTF8, "application/json"),
-            request.IdempotencyKey);
+            () => new StringContent(payload, Encoding.UTF8, "application/json"),
+            idempotencyKey,
+            cancellationToken).ConfigureAwait(false);
 
-        using var response = await httpClient.SendAsync(httpRequest, cancellationToken).ConfigureAwait(false);
         var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
         await using (stream.ConfigureAwait(false))
         {

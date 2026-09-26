@@ -69,6 +69,50 @@ internal static class BeamMapping
         };
     }
 
+    /// <summary>Maps a Beam charge or payment-link status to a normalized <see cref="PaymentStatus"/>.</summary>
+    public static PaymentStatus ToStatus(string status) => status switch
+    {
+        "SUCCEEDED" => PaymentStatus.Succeeded,
+        "FAILED" => PaymentStatus.Failed,
+        _ => PaymentStatus.Pending,
+    };
+
+    /// <summary>Maps a charge's <c>failureCode</c> to a normalized <see cref="PaymentFailure"/>, or null when there is none.</summary>
+    public static PaymentFailure? ToFailure(string? failureCode, string? message)
+    {
+        if (string.IsNullOrWhiteSpace(failureCode))
+        {
+            return null;
+        }
+
+        var reason = failureCode switch
+        {
+            "CH_INSUFFICIENT_FUNDS" => FailureReason.InsufficientFunds,
+            "CH_AUTHENTICATION_FAILED" => FailureReason.AuthenticationFailed,
+            "CH_PROCESSING_FAILED" => FailureReason.ProcessingFailed,
+            _ when failureCode.StartsWith("CH_CARD_", StringComparison.Ordinal) => FailureReason.Declined,
+            _ => FailureReason.Unknown,
+        };
+
+        return new PaymentFailure(reason, failureCode, message);
+    }
+
+    /// <summary>Reads a required non-empty string property, without throwing on a missing or malformed one.</summary>
+    public static bool TryGetNonEmptyString(JsonElement root, string propertyName, out string value)
+    {
+        if (root.ValueKind == JsonValueKind.Object &&
+            root.TryGetProperty(propertyName, out var element) &&
+            element.ValueKind == JsonValueKind.String &&
+            element.GetString() is { Length: > 0 } nonEmpty)
+        {
+            value = nonEmpty;
+            return true;
+        }
+
+        value = "";
+        return false;
+    }
+
     /// <summary>Maps a Beam error code to a normalized failure kind, falling back on the HTTP status.</summary>
     public static FailureKind ToFailureKind(int httpStatus, string errorCode) => errorCode switch
     {
