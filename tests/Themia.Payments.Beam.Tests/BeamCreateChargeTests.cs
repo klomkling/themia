@@ -68,7 +68,7 @@ public class BeamCreateChargeTests
     [Fact]
     public async Task Two_methods_become_one_payment_link_with_exactly_those_groups_enabled()
     {
-        var (gateway, handler) = BeamTestHost.Build(BeamTestHost.PaymentLinkResponse);
+        var (gateway, handler) = BeamTestHost.Build(BeamTestHost.PaymentLinkResponse, HttpStatusCode.Created);
 
         var creation = await gateway.CreateChargeAsync(new CreateChargeRequest
         {
@@ -103,7 +103,7 @@ public class BeamCreateChargeTests
     public async Task A_wallet_only_request_becomes_a_payment_link_offering_only_ewallets()
     {
         // Beam has no single charge type for "e-wallet"; the group exists only on a link.
-        var (gateway, handler) = BeamTestHost.Build(BeamTestHost.PaymentLinkResponse);
+        var (gateway, handler) = BeamTestHost.Build(BeamTestHost.PaymentLinkResponse, HttpStatusCode.Created);
 
         await gateway.CreateChargeAsync(new CreateChargeRequest
         {
@@ -124,7 +124,7 @@ public class BeamCreateChargeTests
     {
         // Card tokenization/3DS are out of scope for v1, so a direct CARD charge can never succeed —
         // Card always routes through a payment link, where Beam's hosted page collects the card.
-        var (gateway, handler) = BeamTestHost.Build(BeamTestHost.PaymentLinkResponse);
+        var (gateway, handler) = BeamTestHost.Build(BeamTestHost.PaymentLinkResponse, HttpStatusCode.Created);
 
         var creation = await gateway.CreateChargeAsync(new CreateChargeRequest
         {
@@ -143,6 +143,27 @@ public class BeamCreateChargeTests
 
         Assert.Equal(new Uri("https://playground-pay.beamcheckout.com/m/rGtqz6DafS"),
             Assert.IsType<NextAction.Redirect>(creation.Action).Url);
+    }
+
+    [Fact]
+    public async Task A_payment_link_create_response_missing_an_id_becomes_a_typed_exception()
+    {
+        // A regression guard for reading "paymentLinkId" (the GET/webhook shape) off the create response
+        // instead of "id" (Beam's actual CreatePaymentLinkResponse) — this must not surface as a raw
+        // NullReferenceException/FormatException.
+        var (gateway, _) = BeamTestHost.Build("""
+        { "url": "https://playground-pay.beamcheckout.com/m/rGtqz6DafS" }
+        """, HttpStatusCode.Created);
+
+        var ex = await Assert.ThrowsAsync<PaymentApiException>(() => gateway.CreateChargeAsync(new CreateChargeRequest
+        {
+            Amount = Money.Thb(250000),
+            ReferenceId = "order-3",
+            AllowedMethods = [PaymentMethod.Wallet],
+        }));
+
+        Assert.Equal(FailureKind.Unknown, ex.Kind);
+        Assert.Equal("malformed_response", ex.ProviderCode);
     }
 
     [Fact]

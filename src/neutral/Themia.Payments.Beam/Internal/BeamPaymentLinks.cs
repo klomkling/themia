@@ -36,10 +36,32 @@ internal static class BeamPaymentLinks
                 throw BeamMapping.ToApiException(response.StatusCode, parsed ? root : null);
             }
 
-            var paymentLinkId = root.GetProperty("paymentLinkId").GetString()!;
-            var url = root.GetProperty("url").GetString()!;
-            return new ChargeCreation(paymentLinkId, PaymentStatus.Pending, new NextAction.Redirect(new Uri(url)));
+            // The create response is { "id": "...", "url": "..." } (Beam's CreatePaymentLinkResponse) —
+            // "paymentLinkId" belongs to the GET response and the webhook payload, not to create.
+            if (!parsed ||
+                root.ValueKind != JsonValueKind.Object ||
+                !TryGetNonEmptyString(root, "id", out var id) ||
+                !TryGetNonEmptyString(root, "url", out var url))
+            {
+                throw new PaymentApiException(FailureKind.Unknown, "malformed_response", (int)response.StatusCode);
+            }
+
+            return new ChargeCreation(id, PaymentStatus.Pending, new NextAction.Redirect(new Uri(url)));
         }
+    }
+
+    private static bool TryGetNonEmptyString(JsonElement root, string propertyName, out string value)
+    {
+        if (root.TryGetProperty(propertyName, out var element) &&
+            element.ValueKind == JsonValueKind.String &&
+            element.GetString() is { Length: > 0 } nonEmpty)
+        {
+            value = nonEmpty;
+            return true;
+        }
+
+        value = "";
+        return false;
     }
 
     private static PaymentLinkRequestBody BuildRequestBody(CreateChargeRequest request, IReadOnlyList<PaymentMethod> allowed) =>

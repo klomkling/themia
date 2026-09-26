@@ -25,8 +25,20 @@ internal static class BeamTestHost
     }
     """;
 
-    /// <summary>A payment-link creation response.</summary>
+    /// <summary>
+    /// A payment-link CREATE response (Beam's <c>CreatePaymentLinkResponse</c>, HTTP 201): <c>id</c> and
+    /// <c>url</c> only. Do not confuse with <see cref="PaymentLinkGetResponse"/> — the GET shape carries
+    /// <c>paymentLinkId</c> instead of <c>id</c>, plus <c>status</c> and <c>order</c>.
+    /// </summary>
     public const string PaymentLinkResponse = """
+    { "id": "rGtqz6DafS", "url": "https://playground-pay.beamcheckout.com/m/rGtqz6DafS" }
+    """;
+
+    /// <summary>
+    /// A payment-link GET response: <c>paymentLinkId</c>, <c>url</c>, <c>status</c> and <c>order</c>. Not
+    /// used by any test yet — added for Task 8's GetChargeAsync-follows-a-link-id work.
+    /// </summary>
+    public const string PaymentLinkGetResponse = """
     { "paymentLinkId": "rGtqz6DafS", "url": "https://playground-pay.beamcheckout.com/m/rGtqz6DafS",
       "status": "ACTIVE", "order": { "netAmount": 250000, "currency": "THB", "referenceId": "order-3" } }
     """;
