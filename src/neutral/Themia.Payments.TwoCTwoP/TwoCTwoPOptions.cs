@@ -21,6 +21,10 @@ public sealed class TwoCTwoPOptions
     /// <summary>Per-request timeout. Default 30 seconds.</summary>
     public TimeSpan Timeout { get; set; } = TimeSpan.FromSeconds(30);
 
+    /// <summary>The UTC offset of 2C2P's transactionDateTime, which carries none and whose zone 2C2P does not
+    /// document. Defaults to +07:00 (Thailand). Confirm against a sandbox transaction.</summary>
+    public TimeSpan TransactionTimeOffset { get; set; } = TimeSpan.FromHours(7);
+
     /// <summary>The base address for an environment.</summary>
     /// <param name="environment">The environment.</param>
     /// <returns>Its base address.</returns>

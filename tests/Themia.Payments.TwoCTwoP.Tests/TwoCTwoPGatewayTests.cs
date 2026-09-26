@@ -102,7 +102,7 @@ public class TwoCTwoPGatewayTests
         var handler = new StubHandler().Enqueue(HttpStatusCode.OK, ResponseEnvelope(new Dictionary<string, object?>
         {
             ["invoiceNo"] = "order-1", ["amount"] = 1000.00m, ["currencyCode"] = "THB",
-            ["respCode"] = "0000", ["respDesc"] = "Success", ["transactionDateTime"] = "2026-09-22T10:00:00",
+            ["respCode"] = "0000", ["respDesc"] = "Success", ["transactionDateTime"] = "20260922100000",
         }));
         var gateway = BuildGateway(handler);
 
@@ -112,6 +112,69 @@ public class TwoCTwoPGatewayTests
         Assert.Equal("order-1", PayloadOf(handler.Bodies[0]).GetProperty("invoiceNo").GetString());
         Assert.Equal(PaymentStatus.Succeeded, charge.Status);
         Assert.Equal(Money.Thb(100000), charge.Amount);          // 1000.00 THB back into minor units
+        // 2C2P's transactionDateTime carries no offset; the default TransactionTimeOffset (+07:00) applies.
+        Assert.Equal(new DateTimeOffset(2026, 9, 22, 10, 0, 0, TimeSpan.FromHours(7)), charge.CompletedAt);
+    }
+
+    [Fact]
+    public async Task Reading_a_charge_uses_the_configured_transaction_time_offset()
+    {
+        var handler = new StubHandler().Enqueue(HttpStatusCode.OK, ResponseEnvelope(new Dictionary<string, object?>
+        {
+            ["invoiceNo"] = "order-1", ["amount"] = 1000.00m, ["currencyCode"] = "THB",
+            ["respCode"] = "0000", ["respDesc"] = "Success", ["transactionDateTime"] = "20260922100000",
+        }));
+        var gateway = BuildGateway(handler, o => o.TransactionTimeOffset = TimeSpan.Zero);
+
+        var charge = await gateway.GetChargeAsync(new ChargeRef(ProviderChargeId: null, ReferenceId: "order-1"));
+
+        Assert.Equal(new DateTimeOffset(2026, 9, 22, 10, 0, 0, TimeSpan.Zero), charge.CompletedAt);
+    }
+
+    [Fact]
+    public async Task An_absent_transactionDateTime_leaves_completedAt_null()
+    {
+        var handler = new StubHandler().Enqueue(HttpStatusCode.OK, ResponseEnvelope(new Dictionary<string, object?>
+        {
+            ["invoiceNo"] = "order-1", ["amount"] = 1000.00m, ["currencyCode"] = "THB",
+            ["respCode"] = "0000", ["respDesc"] = "Success",
+        }));
+        var gateway = BuildGateway(handler);
+
+        var charge = await gateway.GetChargeAsync(new ChargeRef(ProviderChargeId: null, ReferenceId: "order-1"));
+
+        Assert.Null(charge.CompletedAt);
+    }
+
+    [Fact]
+    public async Task An_empty_transactionDateTime_leaves_completedAt_null()
+    {
+        var handler = new StubHandler().Enqueue(HttpStatusCode.OK, ResponseEnvelope(new Dictionary<string, object?>
+        {
+            ["invoiceNo"] = "order-1", ["amount"] = 1000.00m, ["currencyCode"] = "THB",
+            ["respCode"] = "0000", ["respDesc"] = "Success", ["transactionDateTime"] = "",
+        }));
+        var gateway = BuildGateway(handler);
+
+        var charge = await gateway.GetChargeAsync(new ChargeRef(ProviderChargeId: null, ReferenceId: "order-1"));
+
+        Assert.Null(charge.CompletedAt);
+    }
+
+    [Fact]
+    public async Task An_unparsable_transactionDateTime_is_a_malformed_response()
+    {
+        var handler = new StubHandler().Enqueue(HttpStatusCode.OK, ResponseEnvelope(new Dictionary<string, object?>
+        {
+            ["invoiceNo"] = "order-1", ["amount"] = 1000.00m, ["currencyCode"] = "THB",
+            ["respCode"] = "0000", ["respDesc"] = "Success", ["transactionDateTime"] = "2026-09-22T10:00:00",
+        }));
+        var gateway = BuildGateway(handler);
+
+        var ex = await Assert.ThrowsAsync<PaymentApiException>(
+            () => gateway.GetChargeAsync(new ChargeRef(ProviderChargeId: null, ReferenceId: "order-1")));
+
+        Assert.Equal("malformed_response", ex.ProviderCode);
     }
 
     [Theory]

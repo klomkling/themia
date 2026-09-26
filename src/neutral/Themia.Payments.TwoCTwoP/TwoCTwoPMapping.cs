@@ -80,6 +80,24 @@ internal static class TwoCTwoPMapping
     public static Money FromDecimalAmount(decimal amount, string currency) =>
         Money.From(decimal.ToInt64(decimal.Round(amount * 100m, 0, MidpointRounding.ToEven)), currency);
 
+    /// <summary>
+    /// Parses 2C2P's <c>transactionDateTime</c> — always <c>"yyyyMMddHHmmss"</c> (e.g. "20260927153000"), per the
+    /// backend-notification and payment-inquiry parameter references. 2C2P's own timestamp carries no offset and
+    /// does not document its zone, so the caller supplies one (<see cref="TwoCTwoPOptions.TransactionTimeOffset"/>).
+    /// </summary>
+    internal static bool TryParseTransactionDateTime(string? value, TimeSpan offset, out DateTimeOffset result)
+    {
+        if (DateTime.TryParseExact(
+                value, "yyyyMMddHHmmss", CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsed))
+        {
+            result = new DateTimeOffset(parsed, offset);
+            return true;
+        }
+
+        result = default;
+        return false;
+    }
+
     /// <summary>Reads a required non-empty string property, without throwing on a missing or malformed one.</summary>
     public static bool TryGetNonEmptyString(JsonElement root, string propertyName, out string value)
     {
@@ -146,9 +164,12 @@ internal static class TwoCTwoPMapping
     /// <param name="requestedInvoiceNo">The invoice this inquiry asked for, used when the response omits its own.</param>
     /// <param name="respCode">The response's <c>respCode</c>, already read by the caller.</param>
     /// <param name="httpStatus">The response's HTTP status, carried only for a malformed-body exception.</param>
-    /// <exception cref="PaymentApiException">The response is missing or misshapes <c>amount</c>, <c>currencyCode</c>,
-    /// or a present <c>transactionDateTime</c>.</exception>
-    public static Charge ToCharge(JsonElement verified, string requestedInvoiceNo, string respCode, int httpStatus)
+    /// <param name="transactionTimeOffset">The UTC offset to read a present <c>transactionDateTime</c> with
+    /// (<see cref="TwoCTwoPOptions.TransactionTimeOffset"/>).</param>
+    /// <exception cref="PaymentApiException">The response is missing or misshapes <c>amount</c> or
+    /// <c>currencyCode</c>, or has a present, non-empty <c>transactionDateTime</c> that does not parse.</exception>
+    public static Charge ToCharge(
+        JsonElement verified, string requestedInvoiceNo, string respCode, int httpStatus, TimeSpan transactionTimeOffset)
     {
         var invoiceNo = TryGetNonEmptyString(verified, "invoiceNo", out var invoiceFromResponse)
             ? invoiceFromResponse
@@ -169,14 +190,12 @@ internal static class TwoCTwoPMapping
         DateTimeOffset? completedAt = null;
         if (status != PaymentStatus.Pending &&
             verified.TryGetProperty("transactionDateTime", out var transactionTimeElement) &&
-            transactionTimeElement.ValueKind == JsonValueKind.String)
+            transactionTimeElement.ValueKind == JsonValueKind.String &&
+            transactionTimeElement.GetString() is { Length: > 0 } transactionTimeRaw)
         {
-            // No trailing "Z": 2C2P's transactionDateTime carries no offset, unlike Beam's transactionTime, so
-            // JsonElement.TryGetDateTimeOffset (which needs one) cannot read it. Treat it as UTC instead.
-            if (!DateTimeOffset.TryParse(
-                    transactionTimeElement.GetString(), CultureInfo.InvariantCulture,
-                    DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal,
-                    out var parsedTransactionTime))
+            // Absent or empty is not an error (2C2P's inquiry does not always carry one); present and non-empty
+            // must parse as 2C2P's own "yyyyMMddHHmmss" format, or the response is malformed.
+            if (!TryParseTransactionDateTime(transactionTimeRaw, transactionTimeOffset, out var parsedTransactionTime))
             {
                 throw new PaymentApiException(FailureKind.Unknown, "malformed_response", httpStatus);
             }

@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Text.Json;
 
 using Microsoft.Extensions.Options;
@@ -26,7 +25,8 @@ public sealed class TwoCTwoPWebhookVerifier : IPaymentWebhookVerifier
     private readonly IOptions<TwoCTwoPOptions> options;
 
     /// <summary>Creates the verifier.</summary>
-    /// <param name="options">Supplies <see cref="TwoCTwoPOptions.SecretKey"/>.</param>
+    /// <param name="options">Supplies <see cref="TwoCTwoPOptions.SecretKey"/> and
+    /// <see cref="TwoCTwoPOptions.TransactionTimeOffset"/>.</param>
     public TwoCTwoPWebhookVerifier(IOptions<TwoCTwoPOptions> options)
     {
         ArgumentNullException.ThrowIfNull(options);
@@ -64,11 +64,11 @@ public sealed class TwoCTwoPWebhookVerifier : IPaymentWebhookVerifier
                 return new WebhookVerification(WebhookOutcome.SignatureMismatch, null);
             }
 
-            return ParseEvent(payload);
+            return ParseEvent(payload, options.Value.TransactionTimeOffset);
         }
     }
 
-    private static WebhookVerification ParseEvent(JsonElement payload)
+    private static WebhookVerification ParseEvent(JsonElement payload, TimeSpan transactionTimeOffset)
     {
         if (!TwoCTwoPMapping.TryGetNonEmptyString(payload, "invoiceNo", out var invoiceNo) ||
             !TwoCTwoPMapping.TryGetNonEmptyString(payload, "respCode", out var respCode))
@@ -76,7 +76,8 @@ public sealed class TwoCTwoPWebhookVerifier : IPaymentWebhookVerifier
             return new WebhookVerification(WebhookOutcome.Malformed, null);
         }
 
-        if (!TryReadAmount(payload, out var amount) || !TryReadOccurredAt(payload, out var occurredAt))
+        if (!TryReadAmount(payload, out var amount) ||
+            !TryReadOccurredAt(payload, transactionTimeOffset, out var occurredAt))
         {
             return new WebhookVerification(WebhookOutcome.Malformed, null);
         }
@@ -131,26 +132,19 @@ public sealed class TwoCTwoPWebhookVerifier : IPaymentWebhookVerifier
     }
 
     /// <summary>
-    /// Reads <c>transactionDateTime</c> (2C2P's own timestamp, no offset — parsed as UTC, as
-    /// <see cref="TwoCTwoPMapping.ToCharge"/> does). Absent is not an error: the notification does not always
-    /// carry one, and receipt time stands in. Present but unparsable is malformed, the same as a bad amount.
+    /// Reads and parses <c>transactionDateTime</c> (2C2P's own <c>"yyyyMMddHHmmss"</c> timestamp, offset by
+    /// <paramref name="transactionTimeOffset"/> since 2C2P's own format carries none). Mandatory per the 2C2P
+    /// notification spec: absent, non-string, empty, or unparsable is all malformed — this verifier never
+    /// fabricates a receipt time as a substitute.
     /// </summary>
-    private static bool TryReadOccurredAt(JsonElement payload, out DateTimeOffset occurredAt)
+    private static bool TryReadOccurredAt(JsonElement payload, TimeSpan transactionTimeOffset, out DateTimeOffset occurredAt)
     {
-        occurredAt = DateTimeOffset.UtcNow;
         if (!payload.TryGetProperty("transactionDateTime", out var element) || element.ValueKind != JsonValueKind.String)
         {
-            return true;
-        }
-
-        if (!DateTimeOffset.TryParse(
-                element.GetString(), CultureInfo.InvariantCulture,
-                DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var parsed))
-        {
+            occurredAt = default;
             return false;
         }
 
-        occurredAt = parsed;
-        return true;
+        return TwoCTwoPMapping.TryParseTransactionDateTime(element.GetString(), transactionTimeOffset, out occurredAt);
     }
 }

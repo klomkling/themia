@@ -53,6 +53,25 @@ public class TwoCTwoPOptionsTests
     }
 
     [Fact]
+    public void A_transaction_time_offset_beyond_fourteen_hours_fails_validation_at_startup()
+    {
+        var services = new ServiceCollection();
+        services.AddThemiaPaymentsTwoCTwoP(o =>
+        {
+            o.MerchantId = "m";
+            o.SecretKey = "secret";
+            o.Environment = TwoCTwoPEnvironment.Sandbox;
+            o.TransactionTimeOffset = TimeSpan.FromHours(15);
+        });
+
+        using var provider = services.BuildServiceProvider();
+
+        var ex = Assert.Throws<OptionsValidationException>(
+            () => { _ = provider.GetRequiredService<IOptions<TwoCTwoPOptions>>().Value; });
+        Assert.Contains("TransactionTimeOffset", string.Join(" ", ex.Failures), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void The_gateway_resolves_to_the_2c2p_implementation()
     {
         var services = new ServiceCollection();

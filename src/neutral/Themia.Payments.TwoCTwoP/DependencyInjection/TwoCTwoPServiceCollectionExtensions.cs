@@ -30,6 +30,9 @@ public static class TwoCTwoPServiceCollectionExtensions
             .Validate(o => !string.IsNullOrWhiteSpace(o.MerchantId), "TwoCTwoPOptions.MerchantId must be set.")
             .Validate(o => !string.IsNullOrWhiteSpace(o.SecretKey), "TwoCTwoPOptions.SecretKey must be set.")
             .Validate(o => o.Timeout > TimeSpan.Zero, "TwoCTwoPOptions.Timeout must be positive.")
+            .Validate(
+                o => o.TransactionTimeOffset >= TimeSpan.FromHours(-14) && o.TransactionTimeOffset <= TimeSpan.FromHours(14),
+                "TwoCTwoPOptions.TransactionTimeOffset must be within +/-14 hours.")
             .ValidateOnStart();
 
         services.AddHttpClient(TwoCTwoPPaymentGateway.HttpClientName, (sp, client) =>

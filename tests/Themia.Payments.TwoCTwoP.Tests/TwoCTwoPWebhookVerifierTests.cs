@@ -14,6 +14,9 @@ public class TwoCTwoPWebhookVerifierTests
     private static TwoCTwoPWebhookVerifier Verifier(string secret) =>
         new(Options.Create(new TwoCTwoPOptions { MerchantId = "m", SecretKey = secret }));
 
+    private static TwoCTwoPWebhookVerifier Verifier(string secret, TimeSpan transactionTimeOffset) =>
+        new(Options.Create(new TwoCTwoPOptions { MerchantId = "m", SecretKey = secret, TransactionTimeOffset = transactionTimeOffset }));
+
     private static byte[] Envelope(string token) =>
         Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new { payload = token }));
 
@@ -25,7 +28,7 @@ public class TwoCTwoPWebhookVerifierTests
             payload = JwtHs256.Encode(new Dictionary<string, object?>
             {
                 ["invoiceNo"] = "order-1", ["amount"] = 1000.00m, ["currencyCode"] = "THB",
-                ["respCode"] = "0000", ["respDesc"] = "Success",
+                ["respCode"] = "0000", ["respDesc"] = "Success", ["transactionDateTime"] = "20260927153000",
             }, "secret"),
         }));
 
@@ -90,7 +93,10 @@ public class TwoCTwoPWebhookVerifierTests
         // 2C2P's 0001/2001 pending codes have no ChargePending member in PaymentEventType; the closest
         // existing member is Other — authentic, just not one of the four this package fully models.
         var token = JwtHs256.Encode(
-            new Dictionary<string, object?> { ["invoiceNo"] = "order-1", ["respCode"] = "0001" }, "secret");
+            new Dictionary<string, object?>
+            {
+                ["invoiceNo"] = "order-1", ["respCode"] = "0001", ["transactionDateTime"] = "20260927153000",
+            }, "secret");
 
         var result = Verifier("secret").Verify(Envelope(token), new Dictionary<string, string>());
 
@@ -103,7 +109,11 @@ public class TwoCTwoPWebhookVerifierTests
     public void A_failed_respCode_maps_to_charge_failed()
     {
         var token = JwtHs256.Encode(
-            new Dictionary<string, object?> { ["invoiceNo"] = "order-1", ["respCode"] = "0003", ["respDesc"] = "Cancelled" },
+            new Dictionary<string, object?>
+            {
+                ["invoiceNo"] = "order-1", ["respCode"] = "0003", ["respDesc"] = "Cancelled",
+                ["transactionDateTime"] = "20260927153000",
+            },
             "secret");
 
         var result = Verifier("secret").Verify(Envelope(token), new Dictionary<string, string>());
@@ -143,7 +153,10 @@ public class TwoCTwoPWebhookVerifierTests
     public void A_verified_payload_with_no_amount_at_all_still_verifies_with_a_null_amount()
     {
         var token = JwtHs256.Encode(
-            new Dictionary<string, object?> { ["invoiceNo"] = "order-1", ["respCode"] = "0000" }, "secret");
+            new Dictionary<string, object?>
+            {
+                ["invoiceNo"] = "order-1", ["respCode"] = "0000", ["transactionDateTime"] = "20260927153000",
+            }, "secret");
 
         var result = Verifier("secret").Verify(Envelope(token), new Dictionary<string, string>());
 
@@ -155,7 +168,10 @@ public class TwoCTwoPWebhookVerifierTests
     public void Headers_are_never_consulted_2c2p_uses_none()
     {
         var token = JwtHs256.Encode(
-            new Dictionary<string, object?> { ["invoiceNo"] = "order-1", ["respCode"] = "0000" }, "secret");
+            new Dictionary<string, object?>
+            {
+                ["invoiceNo"] = "order-1", ["respCode"] = "0000", ["transactionDateTime"] = "20260927153000",
+            }, "secret");
 
         // A header bag that would mislead a header-driven verifier (as Beam's would be) must have no effect.
         var headers = new Dictionary<string, string> { ["X-Beam-Event"] = "charge.failed" };
@@ -163,5 +179,74 @@ public class TwoCTwoPWebhookVerifierTests
 
         Assert.Equal(WebhookOutcome.Verified, result.Outcome);
         Assert.Equal(PaymentEventType.ChargeSucceeded, result.Event!.Type);
+    }
+
+    [Fact]
+    public void OccurredAt_reads_2c2ps_yyyyMMddHHmmss_format_with_the_default_thailand_offset()
+    {
+        var token = JwtHs256.Encode(
+            new Dictionary<string, object?>
+            {
+                ["invoiceNo"] = "order-1", ["respCode"] = "0000", ["transactionDateTime"] = "20260927153000",
+            }, "secret");
+
+        var result = Verifier("secret").Verify(Envelope(token), new Dictionary<string, string>());
+
+        Assert.Equal(WebhookOutcome.Verified, result.Outcome);
+        Assert.Equal(new DateTimeOffset(2026, 9, 27, 15, 30, 0, TimeSpan.FromHours(7)), result.Event!.OccurredAt);
+    }
+
+    [Fact]
+    public void OccurredAt_uses_the_configured_offset_when_set_to_utc()
+    {
+        var token = JwtHs256.Encode(
+            new Dictionary<string, object?>
+            {
+                ["invoiceNo"] = "order-1", ["respCode"] = "0000", ["transactionDateTime"] = "20260927153000",
+            }, "secret");
+
+        var result = Verifier("secret", TimeSpan.Zero).Verify(Envelope(token), new Dictionary<string, string>());
+
+        Assert.Equal(WebhookOutcome.Verified, result.Outcome);
+        Assert.Equal(new DateTimeOffset(2026, 9, 27, 15, 30, 0, TimeSpan.Zero), result.Event!.OccurredAt);
+    }
+
+    [Fact]
+    public void A_missing_transactionDateTime_is_malformed_not_defaulted_to_now()
+    {
+        var token = JwtHs256.Encode(
+            new Dictionary<string, object?> { ["invoiceNo"] = "order-1", ["respCode"] = "0000" }, "secret");
+
+        var result = Verifier("secret").Verify(Envelope(token), new Dictionary<string, string>());
+
+        Assert.Equal(WebhookOutcome.Malformed, result.Outcome);
+    }
+
+    [Fact]
+    public void An_iso_transactionDateTime_is_malformed_2c2p_never_sends_iso()
+    {
+        var token = JwtHs256.Encode(
+            new Dictionary<string, object?>
+            {
+                ["invoiceNo"] = "order-1", ["respCode"] = "0000", ["transactionDateTime"] = "2026-09-27T15:30:00",
+            }, "secret");
+
+        var result = Verifier("secret").Verify(Envelope(token), new Dictionary<string, string>());
+
+        Assert.Equal(WebhookOutcome.Malformed, result.Outcome);
+    }
+
+    [Fact]
+    public void An_uncalendrical_transactionDateTime_is_malformed()
+    {
+        var token = JwtHs256.Encode(
+            new Dictionary<string, object?>
+            {
+                ["invoiceNo"] = "order-1", ["respCode"] = "0000", ["transactionDateTime"] = "20261399000000",
+            }, "secret");
+
+        var result = Verifier("secret").Verify(Envelope(token), new Dictionary<string, string>());
+
+        Assert.Equal(WebhookOutcome.Malformed, result.Outcome);
     }
 }

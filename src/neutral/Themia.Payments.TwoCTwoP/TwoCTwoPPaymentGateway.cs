@@ -174,7 +174,7 @@ public sealed class TwoCTwoPPaymentGateway : IPaymentGateway, IPaymentGatewayCap
             throw new PaymentApiException(FailureKind.NotFound, respCode, (int)response.StatusCode, respDesc);
         }
 
-        return TwoCTwoPMapping.ToCharge(verified, invoiceNo, respCode, (int)response.StatusCode);
+        return TwoCTwoPMapping.ToCharge(verified, invoiceNo, respCode, (int)response.StatusCode, twoCTwoPOptions.TransactionTimeOffset);
     }
 
     /// <inheritdoc />

@@ -14,6 +14,8 @@ Themia.Payments.TwoCTwoP.TwoCTwoPOptions.PaymentChannels.get -> System.Collectio
 Themia.Payments.TwoCTwoP.TwoCTwoPOptions.PaymentChannels.set -> void
 Themia.Payments.TwoCTwoP.TwoCTwoPOptions.Timeout.get -> System.TimeSpan
 Themia.Payments.TwoCTwoP.TwoCTwoPOptions.Timeout.set -> void
+Themia.Payments.TwoCTwoP.TwoCTwoPOptions.TransactionTimeOffset.get -> System.TimeSpan
+Themia.Payments.TwoCTwoP.TwoCTwoPOptions.TransactionTimeOffset.set -> void
 static Themia.Payments.TwoCTwoP.TwoCTwoPOptions.BaseAddressFor(Themia.Payments.TwoCTwoP.TwoCTwoPEnvironment environment) -> System.Uri!
 const Themia.Payments.TwoCTwoP.TwoCTwoPOptions.SectionName = "Payments:TwoCTwoP" -> string!
 Themia.Payments.TwoCTwoP.TwoCTwoPPaymentGateway
