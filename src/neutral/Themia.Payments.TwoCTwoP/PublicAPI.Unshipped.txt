@@ -16,3 +16,12 @@ Themia.Payments.TwoCTwoP.TwoCTwoPOptions.Timeout.get -> System.TimeSpan
 Themia.Payments.TwoCTwoP.TwoCTwoPOptions.Timeout.set -> void
 static Themia.Payments.TwoCTwoP.TwoCTwoPOptions.BaseAddressFor(Themia.Payments.TwoCTwoP.TwoCTwoPEnvironment environment) -> System.Uri!
 const Themia.Payments.TwoCTwoP.TwoCTwoPOptions.SectionName = "Payments:TwoCTwoP" -> string!
+Themia.Payments.TwoCTwoP.TwoCTwoPPaymentGateway
+Themia.Payments.TwoCTwoP.TwoCTwoPPaymentGateway.TwoCTwoPPaymentGateway(System.Net.Http.IHttpClientFactory! httpClientFactory, Microsoft.Extensions.Options.IOptions<Themia.Payments.TwoCTwoP.TwoCTwoPOptions!>! options, Themia.Payments.PaymentMethodGate! gate) -> void
+Themia.Payments.TwoCTwoP.TwoCTwoPPaymentGateway.SupportedMethods.get -> System.Collections.Generic.IReadOnlyList<Themia.Payments.PaymentMethod>!
+Themia.Payments.TwoCTwoP.TwoCTwoPPaymentGateway.CreateChargeAsync(Themia.Payments.CreateChargeRequest! request, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Payments.ChargeCreation!>!
+Themia.Payments.TwoCTwoP.TwoCTwoPPaymentGateway.GetChargeAsync(Themia.Payments.ChargeRef charge, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Payments.Charge!>!
+Themia.Payments.TwoCTwoP.TwoCTwoPPaymentGateway.RefundAsync(Themia.Payments.RefundRequest! request, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Payments.RefundCreation!>!
+const Themia.Payments.TwoCTwoP.TwoCTwoPPaymentGateway.HttpClientName = "themia-payments-2c2p" -> string!
+Themia.Payments.TwoCTwoP.DependencyInjection.TwoCTwoPServiceCollectionExtensions
+static Themia.Payments.TwoCTwoP.DependencyInjection.TwoCTwoPServiceCollectionExtensions.AddThemiaPaymentsTwoCTwoP(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Themia.Payments.TwoCTwoP.TwoCTwoPOptions!>! configure) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
