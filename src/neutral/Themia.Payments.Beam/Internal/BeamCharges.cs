@@ -10,6 +10,32 @@ namespace Themia.Payments.Beam.Internal;
 /// </summary>
 internal static class BeamCharges
 {
+    /// <summary>
+    /// Resolves a <see cref="ChargeRef"/> in three steps: a provider id reads the charge directly; a 404 there is
+    /// retried as a payment link id, following a paid link to the charge that paid it; with no provider id at
+    /// all, the app's reference id is looked up instead. <c>IsUnpaidLink</c> is true when the id named a link
+    /// that no charge has paid yet — the returned <see cref="Charge"/> then describes the link itself.
+    /// </summary>
+    public static async Task<(Charge Charge, bool IsUnpaidLink)> ResolveAsync(
+        HttpClient httpClient, BeamOptions beamOptions, ChargeRef charge, CancellationToken cancellationToken)
+    {
+        if (charge.ProviderChargeId is not { Length: > 0 } id)
+        {
+            return (await GetByReferenceAsync(httpClient, beamOptions, charge.ReferenceId, cancellationToken)
+                .ConfigureAwait(false), false);
+        }
+
+        var (found, byId) = await TryGetByIdAsync(httpClient, beamOptions, id, cancellationToken).ConfigureAwait(false);
+        if (found)
+        {
+            return (byId!, false);
+        }
+
+        // A paid link resolves to the charge that paid it, which has its own id; an unpaid link describes itself.
+        var viaLink = await GetByPaymentLinkIdAsync(httpClient, beamOptions, id, cancellationToken).ConfigureAwait(false);
+        return (viaLink, string.Equals(viaLink.ChargeId, id, StringComparison.Ordinal));
+    }
+
     /// <summary>Reads a charge by its own id. A 404 is reported as not-found rather than thrown, since the id
     /// may still name a payment link.</summary>
     public static async Task<(bool Found, Charge? Charge)> TryGetByIdAsync(

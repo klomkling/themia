@@ -84,29 +84,20 @@ public sealed class BeamPaymentGateway : IPaymentGateway, IPaymentGatewayCapabil
     /// </remarks>
     public async Task<Charge> GetChargeAsync(ChargeRef charge, CancellationToken cancellationToken = default)
     {
-        var beamOptions = options.Value;
         var httpClient = httpClientFactory.CreateClient(HttpClientName);
-
-        if (charge.ProviderChargeId is { Length: > 0 } chargeId)
-        {
-            var (found, result) = await BeamCharges.TryGetByIdAsync(httpClient, beamOptions, chargeId, cancellationToken)
-                .ConfigureAwait(false);
-            return found
-                ? result!
-                : await BeamCharges.GetByPaymentLinkIdAsync(httpClient, beamOptions, chargeId, cancellationToken)
-                    .ConfigureAwait(false);
-        }
-
-        return await BeamCharges.GetByReferenceAsync(httpClient, beamOptions, charge.ReferenceId, cancellationToken)
+        var (resolved, _) = await BeamCharges.ResolveAsync(httpClient, options.Value, charge, cancellationToken)
             .ConfigureAwait(false);
+        return resolved;
     }
 
     /// <inheritdoc />
     /// <exception cref="PaymentApiException">
-    /// No charge could be resolved for the reference id, the charge is not a <c>CARD</c> charge but a partial
+    /// No charge could be resolved for the reference id, a payment link id names a link no charge has paid, the charge is not a <c>CARD</c> charge but a partial
     /// amount was requested, a partial amount's currency does not match the charge's, or Beam rejected the call.
     /// </exception>
     /// <remarks>
+    /// The charge is resolved first exactly as <see cref="GetChargeAsync"/> resolves it, so a payment link id
+    /// refunds the charge that paid the link.
     /// Beam refunds only <c>CARD</c> charges in part — a QR PromptPay charge refunds in full or not at all —
     /// so a partial <paramref name="request"/> reads the charge first to check the payment method before posting.
     /// </remarks>
@@ -116,10 +107,16 @@ public sealed class BeamPaymentGateway : IPaymentGateway, IPaymentGatewayCapabil
         var beamOptions = options.Value;
         var httpClient = httpClientFactory.CreateClient(HttpClientName);
 
-        var chargeId = request.Charge.ProviderChargeId is { Length: > 0 } providerChargeId
-            ? providerChargeId
-            : (await BeamCharges.GetByReferenceAsync(httpClient, beamOptions, request.Charge.ReferenceId, cancellationToken)
-                .ConfigureAwait(false)).ChargeId;
+        // The same resolution GetChargeAsync uses: a payment link id (what a link-based ChargeCreation carries)
+        // must become the id of the charge that paid it, because Beam refunds charges, not links.
+        var (resolved, isUnpaidLink) = await BeamCharges.ResolveAsync(httpClient, beamOptions, request.Charge, cancellationToken)
+            .ConfigureAwait(false);
+        if (isUnpaidLink)
+        {
+            throw new PaymentApiException(FailureKind.NotFound, "no_charge_for_link", 0);
+        }
+
+        var chargeId = resolved.ChargeId;
 
         if (request.Amount is { } amount)
         {
