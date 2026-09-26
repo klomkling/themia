@@ -69,4 +69,21 @@ public class BeamOptionsTests
 
         Assert.IsType<BeamWebhookVerifier>(provider.GetRequiredService<IPaymentWebhookVerifier>());
     }
+
+    [Fact]
+    public void The_beam_only_client_resolves_as_a_singleton()
+    {
+        var services = new ServiceCollection();
+        services.AddThemiaPaymentsBeam(o =>
+        {
+            o.MerchantId = "m";
+            o.ApiKey = "k";
+            o.Environment = BeamEnvironment.Playground;
+        });
+
+        using var provider = services.BuildServiceProvider();
+
+        var client = provider.GetRequiredService<BeamPaymentClient>();
+        Assert.Same(client, provider.GetRequiredService<BeamPaymentClient>());
+    }
 }

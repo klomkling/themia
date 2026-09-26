@@ -5,8 +5,8 @@ using System.Text.Json.Serialization;
 namespace Themia.Payments.Beam.Internal;
 
 /// <summary>
-/// Beam's payment-link create call. Lives here, not inline in <see cref="BeamPaymentGateway"/>, because
-/// Task 11's public <c>BeamPaymentClient</c> exposes the same call directly.
+/// Beam's payment-link create, get and disable calls. Lives here, not inline in <see cref="BeamPaymentGateway"/>,
+/// because Task 11's public <c>BeamPaymentClient</c> exposes the same calls directly.
 /// </summary>
 internal static class BeamPaymentLinks
 {
@@ -20,6 +20,60 @@ internal static class BeamPaymentLinks
     {
         var payload = JsonSerializer.Serialize(BuildRequestBody(request, allowed), BeamMapping.SerializeOptions);
         var idempotencyKey = request.IdempotencyKey ?? Guid.NewGuid().ToString("N");
+        var (id, url) = await PostCreateAsync(httpClient, options, payload, idempotencyKey, cancellationToken).ConfigureAwait(false);
+        return new ChargeCreation(id, PaymentStatus.Pending, new NextAction.Redirect(new Uri(url)));
+    }
+
+    /// <summary>
+    /// Creates a payment link from Task 11's <see cref="BeamPaymentClient"/>'s own request, which carries
+    /// fields <see cref="CreateChargeRequest"/> has no room for (<c>cancelUrl</c>, the collection flags).
+    /// Shares <see cref="PostCreateAsync"/> with <see cref="CreateAsync"/> rather than parsing the 201
+    /// response a second time.
+    /// </summary>
+    public static Task<(string Id, string Url)> CreateLinkAsync(
+        HttpClient httpClient,
+        BeamOptions options,
+        BeamPaymentLinkRequest request,
+        IReadOnlyList<PaymentMethod> allowed,
+        string idempotencyKey,
+        CancellationToken cancellationToken)
+    {
+        var payload = JsonSerializer.Serialize(BuildRequestBody(request, allowed), BeamMapping.SerializeOptions);
+        return PostCreateAsync(httpClient, options, payload, idempotencyKey, cancellationToken);
+    }
+
+    /// <summary>Disables a payment link. Beam reports success as HTTP 202.</summary>
+    public static async Task DisableAsync(
+        HttpClient httpClient, BeamOptions options, string linkId, CancellationToken cancellationToken)
+    {
+        var idempotencyKey = Guid.NewGuid().ToString("N");
+        using var response = await BeamHttp.SendWithRetryAsync(
+            httpClient,
+            HttpMethod.Patch,
+            $"/api/v1/payment-links/{Uri.EscapeDataString(linkId)}/disable",
+            options,
+            contentFactory: null,
+            idempotencyKey,
+            cancellationToken).ConfigureAwait(false);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+            await using (stream.ConfigureAwait(false))
+            {
+                var (parsed, root) = await BeamMapping.TryParseAsync(stream, cancellationToken).ConfigureAwait(false);
+                throw BeamMapping.ToApiException(response.StatusCode, parsed ? root : null);
+            }
+        }
+    }
+
+    /// <summary>
+    /// POSTs a payment-link create body and parses Beam's <c>{ "id", "url" }</c> response — the one place
+    /// that response is parsed, shared by <see cref="CreateAsync"/> and <see cref="CreateLinkAsync"/>.
+    /// </summary>
+    private static async Task<(string Id, string Url)> PostCreateAsync(
+        HttpClient httpClient, BeamOptions options, string payload, string idempotencyKey, CancellationToken cancellationToken)
+    {
         using var response = await BeamHttp.SendWithRetryAsync(
             httpClient,
             HttpMethod.Post,
@@ -48,7 +102,7 @@ internal static class BeamPaymentLinks
                 throw new PaymentApiException(FailureKind.Unknown, "malformed_response", (int)response.StatusCode);
             }
 
-            return new ChargeCreation(id, PaymentStatus.Pending, new NextAction.Redirect(new Uri(url)));
+            return (id, url);
         }
     }
 
@@ -92,16 +146,36 @@ internal static class BeamPaymentLinks
                 throw new PaymentApiException(FailureKind.Unknown, "malformed_response", (int)response.StatusCode);
             }
 
-            return new PaymentLinkStatus(status, netAmount, currency, referenceId);
+            // "url" and "expiresAt" are optional here: BeamCharges.GetByPaymentLinkIdAsync (Task 8) never
+            // needed them, so existing fixtures omit them — only BeamPaymentClient.GetPaymentLinkAsync
+            // (Task 11) requires "url", and it checks for that itself rather than failing this shared parse.
+            var url = BeamMapping.TryGetNonEmptyString(root, "url", out var urlValue) ? urlValue : null;
+
+            DateTimeOffset? expiresAt = null;
+            if (root.TryGetProperty("expiresAt", out var expiresAtElement) &&
+                expiresAtElement.ValueKind == JsonValueKind.String)
+            {
+                if (!expiresAtElement.TryGetDateTimeOffset(out var parsedExpiresAt))
+                {
+                    throw new PaymentApiException(FailureKind.Unknown, "malformed_response", (int)response.StatusCode);
+                }
+
+                expiresAt = parsedExpiresAt;
+            }
+
+            return new PaymentLinkStatus(status, url, netAmount, currency, referenceId, expiresAt);
         }
     }
 
-    /// <summary>A payment link's GET response, reduced to what <see cref="BeamPaymentGateway.GetChargeAsync"/> needs.</summary>
+    /// <summary>A payment link's GET response, reduced to what its two callers need.</summary>
     /// <param name="Status"><c>ACTIVE</c>, <c>PAID</c>, <c>VOIDED</c>, <c>REFUNDED</c>, <c>EXPIRED</c> or <c>DISABLED</c>.</param>
+    /// <param name="Url">The link's checkout URL, when Beam sent one.</param>
     /// <param name="NetAmount">The order's amount, in minor units.</param>
     /// <param name="Currency">The order's currency.</param>
     /// <param name="ReferenceId">The order's reference id.</param>
-    internal readonly record struct PaymentLinkStatus(string Status, long NetAmount, string Currency, string ReferenceId);
+    /// <param name="ExpiresAt">When the link stops accepting payment, when it has an expiry.</param>
+    internal readonly record struct PaymentLinkStatus(
+        string Status, string? Url, long NetAmount, string Currency, string ReferenceId, DateTimeOffset? ExpiresAt);
 
     private static PaymentLinkRequestBody BuildRequestBody(CreateChargeRequest request, IReadOnlyList<PaymentMethod> allowed) =>
         new()
@@ -118,6 +192,24 @@ internal static class BeamPaymentLinks
             ExpiresAt = request.ExpiresAt,
         };
 
+    private static PaymentLinkRequestBody BuildRequestBody(BeamPaymentLinkRequest request, IReadOnlyList<PaymentMethod> allowed) =>
+        new()
+        {
+            Order = new PaymentLinkOrder
+            {
+                NetAmount = request.Amount.MinorUnits,
+                Currency = request.Amount.Currency,
+                ReferenceId = request.ReferenceId,
+                Description = request.Description,
+            },
+            LinkSettings = BeamMapping.ToLinkSettings(allowed),
+            RedirectUrl = request.RedirectUrl,
+            CancelUrl = request.CancelUrl,
+            ExpiresAt = request.ExpiresAt,
+            CollectPhoneNumber = request.CollectPhoneNumber,
+            CollectDeliveryAddress = request.CollectDeliveryAddress,
+        };
+
     private sealed class PaymentLinkRequestBody
     {
         [JsonPropertyName("order")]
@@ -129,8 +221,17 @@ internal static class BeamPaymentLinks
         [JsonPropertyName("redirectUrl")]
         public Uri? RedirectUrl { get; init; }
 
+        [JsonPropertyName("cancelUrl")]
+        public Uri? CancelUrl { get; init; }
+
         [JsonPropertyName("expiresAt")]
         public DateTimeOffset? ExpiresAt { get; init; }
+
+        [JsonPropertyName("collectPhoneNumber")]
+        public bool? CollectPhoneNumber { get; init; }
+
+        [JsonPropertyName("collectDeliveryAddress")]
+        public bool? CollectDeliveryAddress { get; init; }
     }
 
     private sealed class PaymentLinkOrder

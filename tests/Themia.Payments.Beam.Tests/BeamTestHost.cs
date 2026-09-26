@@ -59,6 +59,18 @@ internal static class BeamTestHost
         return new BeamPaymentGateway(new StubClientFactory(client), options, gate);
     }
 
+    /// <summary>
+    /// Builds a <see cref="BeamPaymentClient"/> backed by a caller-supplied handler (Task 11). Takes an
+    /// optional <paramref name="gate"/> so a test can install a method policy that would otherwise leave the
+    /// default no-op gate letting everything through.
+    /// </summary>
+    public static BeamPaymentClient BuildClient(StubHandler handler, PaymentMethodGate? gate = null)
+    {
+        var client = new HttpClient(handler) { BaseAddress = BeamOptions.BaseAddressFor(BeamEnvironment.Playground) };
+        var options = Options.Create(new BeamOptions { MerchantId = "m", ApiKey = "k" });
+        return new BeamPaymentClient(new StubClientFactory(client), options, gate ?? new PaymentMethodGate(Options.Create(new ThemiaPaymentsOptions())));
+    }
+
     private sealed class StubClientFactory(HttpClient client) : IHttpClientFactory
     {
         public HttpClient CreateClient(string name) => client;
