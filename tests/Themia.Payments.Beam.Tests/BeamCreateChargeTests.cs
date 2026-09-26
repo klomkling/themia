@@ -167,6 +167,30 @@ public class BeamCreateChargeTests
     }
 
     [Fact]
+    public async Task An_encoded_image_with_an_unparsable_expiry_becomes_a_typed_exception()
+    {
+        // A valid JSON string but not a valid date — must not raise a raw FormatException.
+        var (gateway, _) = BeamTestHost.Build("""
+        {
+          "actionRequired": "ENCODED_IMAGE",
+          "chargeId": "ch_1",
+          "encodedImage": { "imageBase64Encoded": "aGVsbG8=", "expiry": "not-a-date" },
+          "paymentMethodType": "QR_PROMPT_PAY"
+        }
+        """);
+
+        var ex = await Assert.ThrowsAsync<PaymentApiException>(() => gateway.CreateChargeAsync(new CreateChargeRequest
+        {
+            Amount = Money.Thb(10000),
+            ReferenceId = "order-1",
+            AllowedMethods = [PaymentMethod.QrPromptPay],
+        }));
+
+        Assert.Equal(FailureKind.Unknown, ex.Kind);
+        Assert.Equal("malformed_response", ex.ProviderCode);
+    }
+
+    [Fact]
     public async Task A_beam_error_becomes_a_typed_exception()
     {
         var (gateway, _) = BeamTestHost.Build("""

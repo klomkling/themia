@@ -85,13 +85,14 @@ internal static class BeamPaymentLinks
                 order.ValueKind != JsonValueKind.Object ||
                 !order.TryGetProperty("netAmount", out var netAmountElement) ||
                 netAmountElement.ValueKind != JsonValueKind.Number ||
+                !netAmountElement.TryGetInt64(out var netAmount) ||
                 !BeamMapping.TryGetNonEmptyString(order, "currency", out var currency) ||
                 !BeamMapping.TryGetNonEmptyString(order, "referenceId", out var referenceId))
             {
                 throw new PaymentApiException(FailureKind.Unknown, "malformed_response", (int)response.StatusCode);
             }
 
-            return new PaymentLinkStatus(status, netAmountElement.GetInt64(), currency, referenceId);
+            return new PaymentLinkStatus(status, netAmount, currency, referenceId);
         }
     }
 

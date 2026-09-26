@@ -53,7 +53,9 @@ internal static class BeamMapping
     }
 
     /// <summary>Maps a direct-charge response's <c>actionRequired</c> to a <see cref="NextAction"/>.</summary>
-    public static NextAction ToNextAction(JsonElement root)
+    /// <param name="root">The response body.</param>
+    /// <param name="httpStatus">The response's HTTP status, carried only for a malformed-body exception.</param>
+    public static NextAction ToNextAction(JsonElement root, int httpStatus)
     {
         var actionRequired = root.TryGetProperty("actionRequired", out var actionElement) &&
             actionElement.ValueKind == JsonValueKind.String
@@ -64,7 +66,7 @@ internal static class BeamMapping
         {
             "REDIRECT" => new NextAction.Redirect(
                 new Uri(root.GetProperty("redirect").GetProperty("redirectUrl").GetString()!)),
-            "ENCODED_IMAGE" => ToShowQr(root.GetProperty("encodedImage")),
+            "ENCODED_IMAGE" => ToShowQr(root.GetProperty("encodedImage"), httpStatus),
             _ => new NextAction.None(),
         };
     }
@@ -158,17 +160,25 @@ internal static class BeamMapping
         }
     }
 
-    private static NextAction.ShowQr ToShowQr(JsonElement encodedImage)
+    private static NextAction.ShowQr ToShowQr(JsonElement encodedImage, int httpStatus)
     {
         var imageBase64 = encodedImage.GetProperty("imageBase64Encoded").GetString()!;
         var rawPayload = encodedImage.TryGetProperty("rawData", out var rawDataElement) &&
             rawDataElement.ValueKind == JsonValueKind.String
                 ? rawDataElement.GetString()
                 : null;
-        var expiry = encodedImage.TryGetProperty("expiry", out var expiryElement) &&
-            expiryElement.ValueKind == JsonValueKind.String
-                ? expiryElement.GetDateTimeOffset()
-                : (DateTimeOffset?)null;
+
+        DateTimeOffset? expiry = null;
+        if (encodedImage.TryGetProperty("expiry", out var expiryElement) &&
+            expiryElement.ValueKind == JsonValueKind.String)
+        {
+            if (!expiryElement.TryGetDateTimeOffset(out var parsedExpiry))
+            {
+                throw new PaymentApiException(FailureKind.Unknown, "malformed_response", httpStatus);
+            }
+
+            expiry = parsedExpiry;
+        }
 
         return new NextAction.ShowQr(Convert.FromBase64String(imageBase64), rawPayload, expiry);
     }

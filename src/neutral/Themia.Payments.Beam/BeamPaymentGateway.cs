@@ -131,7 +131,7 @@ public sealed class BeamPaymentGateway : IPaymentGateway, IPaymentGatewayCapabil
             }
 
             var chargeId = root.GetProperty("chargeId").GetString()!;
-            return new ChargeCreation(chargeId, PaymentStatus.Pending, BeamMapping.ToNextAction(root));
+            return new ChargeCreation(chargeId, PaymentStatus.Pending, BeamMapping.ToNextAction(root, (int)response.StatusCode));
         }
     }
 

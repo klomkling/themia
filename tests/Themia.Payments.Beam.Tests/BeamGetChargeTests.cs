@@ -107,4 +107,49 @@ public class BeamGetChargeTests
         Assert.Equal(reason, charge.Failure!.Reason);
         Assert.Equal(linkStatus, charge.Failure.ProviderCode);
     }
+
+    [Fact]
+    public async Task A_non_integral_amount_becomes_a_typed_exception()
+    {
+        // 199.5 is a valid JSON number but not a valid minor-units amount — must not raise a raw FormatException.
+        var (gateway, _) = Build("""
+        { "chargeId": "ch_1", "referenceId": "order-1", "status": "SUCCEEDED", "currency": "THB", "amount": 199.5 }
+        """);
+
+        var ex = await Assert.ThrowsAsync<PaymentApiException>(() => gateway.GetChargeAsync(new ChargeRef("ch_1", "order-1")));
+
+        Assert.Equal(FailureKind.Unknown, ex.Kind);
+        Assert.Equal("malformed_response", ex.ProviderCode);
+    }
+
+    [Fact]
+    public async Task An_unparsable_transaction_time_on_a_succeeded_charge_becomes_a_typed_exception()
+    {
+        var (gateway, _) = Build("""
+        { "chargeId": "ch_1", "referenceId": "order-1", "status": "SUCCEEDED", "currency": "THB", "amount": 199,
+          "transactionTime": "not-a-date" }
+        """);
+
+        var ex = await Assert.ThrowsAsync<PaymentApiException>(() => gateway.GetChargeAsync(new ChargeRef("ch_1", "order-1")));
+
+        Assert.Equal(FailureKind.Unknown, ex.Kind);
+        Assert.Equal("malformed_response", ex.ProviderCode);
+    }
+
+    [Fact]
+    public async Task A_non_integral_link_net_amount_becomes_a_typed_exception()
+    {
+        var handler = new StubHandler()
+            .Enqueue(HttpStatusCode.NotFound, """{ "error": { "errorCode": "NOT_FOUND_ERROR" } }""")
+            .Enqueue(HttpStatusCode.OK, """
+            { "paymentLinkId": "L", "status": "ACTIVE",
+              "order": { "netAmount": 1.5, "currency": "THB", "referenceId": "o" } }
+            """);
+        var gateway = BuildWith(handler);
+
+        var ex = await Assert.ThrowsAsync<PaymentApiException>(() => gateway.GetChargeAsync(new ChargeRef("L", "o")));
+
+        Assert.Equal(FailureKind.Unknown, ex.Kind);
+        Assert.Equal("malformed_response", ex.ProviderCode);
+    }
 }

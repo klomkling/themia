@@ -143,6 +143,7 @@ internal static class BeamCharges
             !BeamMapping.TryGetNonEmptyString(chargeElement, "currency", out var currency) ||
             !chargeElement.TryGetProperty("amount", out var amountElement) ||
             amountElement.ValueKind != JsonValueKind.Number ||
+            !amountElement.TryGetInt64(out var amountMinorUnits) ||
             !BeamMapping.TryGetNonEmptyString(chargeElement, "status", out var statusText))
         {
             throw new PaymentApiException(FailureKind.Unknown, "malformed_response", httpStatus);
@@ -153,16 +154,24 @@ internal static class BeamCharges
             failureCodeElement.ValueKind == JsonValueKind.String
                 ? failureCodeElement.GetString()
                 : null;
-        var completedAt = status != PaymentStatus.Pending &&
+
+        DateTimeOffset? completedAt = null;
+        if (status != PaymentStatus.Pending &&
             chargeElement.TryGetProperty("transactionTime", out var transactionTimeElement) &&
-            transactionTimeElement.ValueKind == JsonValueKind.String
-                ? transactionTimeElement.GetDateTimeOffset()
-                : (DateTimeOffset?)null;
+            transactionTimeElement.ValueKind == JsonValueKind.String)
+        {
+            if (!transactionTimeElement.TryGetDateTimeOffset(out var parsedTransactionTime))
+            {
+                throw new PaymentApiException(FailureKind.Unknown, "malformed_response", httpStatus);
+            }
+
+            completedAt = parsedTransactionTime;
+        }
 
         return new Charge(
             chargeId,
             referenceId,
-            Money.From(amountElement.GetInt64(), currency),
+            Money.From(amountMinorUnits, currency),
             status,
             BeamMapping.ToFailure(failureCode, null),
             completedAt);
