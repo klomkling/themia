@@ -3,7 +3,9 @@ using System.Net;
 namespace Themia.Payments.Beam.Tests;
 
 /// <summary>Replays scripted responses and records what was sent, including each attempt's headers.</summary>
-internal sealed class StubHandler : HttpMessageHandler
+/// <remarks>Public, not internal: Task 15's <c>PaymentGatewayContract</c> exposes it through public abstract
+/// members so every adapter's contract subclass can override them.</remarks>
+public sealed class StubHandler : HttpMessageHandler
 {
     private readonly Queue<(HttpStatusCode Status, string Body)> responses = new();
 

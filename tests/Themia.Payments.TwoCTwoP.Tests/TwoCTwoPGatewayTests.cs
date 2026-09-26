@@ -4,6 +4,7 @@ using System.Text.Json;
 using Microsoft.Extensions.Options;
 
 using Themia.Payments;
+using Themia.Payments.Beam.Tests;
 using Themia.Payments.TwoCTwoP.Internal;
 
 using Xunit;

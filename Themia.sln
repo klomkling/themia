@@ -419,6 +419,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Themia.Payments.TwoCTwoP", 
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Themia.Payments.TwoCTwoP.Tests", "tests\Themia.Payments.TwoCTwoP.Tests\Themia.Payments.TwoCTwoP.Tests.csproj", "{DAD98AFC-5439-4E8E-96B5-06A4F22F3936}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Themia.Payments.ContractTests", "tests\Themia.Payments.ContractTests\Themia.Payments.ContractTests.csproj", "{A238B771-15BA-4E83-891E-4B9923EC5C64}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -2829,6 +2831,18 @@ Global
 		{DAD98AFC-5439-4E8E-96B5-06A4F22F3936}.Release|x64.Build.0 = Release|Any CPU
 		{DAD98AFC-5439-4E8E-96B5-06A4F22F3936}.Release|x86.ActiveCfg = Release|Any CPU
 		{DAD98AFC-5439-4E8E-96B5-06A4F22F3936}.Release|x86.Build.0 = Release|Any CPU
+		{A238B771-15BA-4E83-891E-4B9923EC5C64}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A238B771-15BA-4E83-891E-4B9923EC5C64}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A238B771-15BA-4E83-891E-4B9923EC5C64}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{A238B771-15BA-4E83-891E-4B9923EC5C64}.Debug|x64.Build.0 = Debug|Any CPU
+		{A238B771-15BA-4E83-891E-4B9923EC5C64}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{A238B771-15BA-4E83-891E-4B9923EC5C64}.Debug|x86.Build.0 = Debug|Any CPU
+		{A238B771-15BA-4E83-891E-4B9923EC5C64}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A238B771-15BA-4E83-891E-4B9923EC5C64}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A238B771-15BA-4E83-891E-4B9923EC5C64}.Release|x64.ActiveCfg = Release|Any CPU
+		{A238B771-15BA-4E83-891E-4B9923EC5C64}.Release|x64.Build.0 = Release|Any CPU
+		{A238B771-15BA-4E83-891E-4B9923EC5C64}.Release|x86.ActiveCfg = Release|Any CPU
+		{A238B771-15BA-4E83-891E-4B9923EC5C64}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -3038,5 +3052,6 @@ Global
 		{4D3FB20B-AE5F-43C9-859C-51A6E7840626} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 		{25E066C4-B383-4EE6-9FFE-7DA1F478EC36} = {4DF3F49F-9FBC-1412-1B49-C0C7F47113B4}
 		{DAD98AFC-5439-4E8E-96B5-06A4F22F3936} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
+		{A238B771-15BA-4E83-891E-4B9923EC5C64} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 	EndGlobalSection
 EndGlobal

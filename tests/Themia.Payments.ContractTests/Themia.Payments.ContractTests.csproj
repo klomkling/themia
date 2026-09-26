@@ -21,10 +21,11 @@
     <PackageReference Include="Microsoft.Extensions.Logging" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="../../src/neutral/Themia.Payments.Beam/Themia.Payments.Beam.csproj" />
     <ProjectReference Include="../../src/neutral/Themia.Payments.TwoCTwoP/Themia.Payments.TwoCTwoP.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <!-- Shared with Themia.Payments.Beam.Tests and Themia.Payments.ContractTests (Task 15) — one copy, linked. -->
+    <!-- One StubHandler source (Task 15); linked from Themia.Payments.Beam.Tests rather than copied. -->
     <Compile Include="..\Themia.Payments.Beam.Tests\StubHandler.cs" Link="StubHandler.cs" />
   </ItemGroup>
 </Project>

@@ -26,5 +26,7 @@
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="Themia.Payments.TwoCTwoP.Tests" />
+    <!-- The contract suite (Task 15) signs its own scripted JWT response envelopes with JwtHs256. -->
+    <InternalsVisibleTo Include="Themia.Payments.ContractTests" />
   </ItemGroup>
 </Project>
