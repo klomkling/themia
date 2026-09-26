@@ -197,7 +197,12 @@ public sealed class BeamPaymentClient
     /// <paramref name="rawQrContent"/> is blank, or Beam rejected the call — including
     /// <see cref="FailureKind.NotFound"/> when the slip matches no charge of this merchant's.
     /// </exception>
+    // RS0026/RS0027: this and the Stream overload below each carry an optional CancellationToken by
+    // design — the brief's exact required shape for a first-shipped surface (no prior binary-compat
+    // surface to protect yet).
+#pragma warning disable RS0026, RS0027
     public Task<BeamSlipVerification> VerifyQrSlipAsync(string rawQrContent, CancellationToken cancellationToken = default)
+#pragma warning restore RS0026, RS0027
     {
         if (string.IsNullOrWhiteSpace(rawQrContent))
         {
@@ -212,21 +217,33 @@ public sealed class BeamPaymentClient
     /// <param name="image">The slip image. Read fully and buffered before the first attempt; safe to dispose after this returns.</param>
     /// <param name="fileName">
     /// The image's file name — only its extension is used, to tell Beam the image type. Must end in
-    /// <c>.png</c>, <c>.jpg</c> or <c>.jpeg</c> (case-insensitive).
+    /// <c>.png</c>, <c>.jpg</c> or <c>.jpeg</c> (case-insensitive), and must not contain a double quote,
+    /// a backslash, or a control character (including CR/LF) — it is interpolated into a
+    /// Content-Disposition header.
     /// </param>
     /// <param name="cancellationToken">Propagated to the HTTP call.</param>
     /// <exception cref="ArgumentNullException"><paramref name="image"/> is null.</exception>
     /// <exception cref="ArgumentException"><paramref name="fileName"/> is null or blank.</exception>
     /// <exception cref="PaymentApiException">
-    /// The image is larger than 2 MB or <paramref name="fileName"/>'s extension is unsupported, or Beam
+    /// The image is larger than 2 MB, <paramref name="fileName"/>'s extension is unsupported,
+    /// <paramref name="fileName"/> contains a double quote, a backslash, or a control character, or Beam
     /// rejected the call — including <see cref="FailureKind.NotFound"/> when the slip matches no charge of
     /// this merchant's.
     /// </exception>
+    // RS0026/RS0027: see the raw-content overload above for why the optional CancellationToken here is by
+    // design.
+#pragma warning disable RS0026, RS0027
     public async Task<BeamSlipVerification> VerifyQrSlipAsync(
         Stream image, string fileName, CancellationToken cancellationToken = default)
+#pragma warning restore RS0026, RS0027
     {
         ArgumentNullException.ThrowIfNull(image);
         ArgumentException.ThrowIfNullOrWhiteSpace(fileName);
+
+        if (HasInvalidFileNameCharacters(fileName))
+        {
+            throw new PaymentApiException(FailureKind.Validation, "slip_image_filename_invalid", 0);
+        }
 
         if (!HasSupportedImageExtension(fileName))
         {
@@ -263,6 +280,24 @@ public sealed class BeamPaymentClient
         fileName.EndsWith(".png", StringComparison.OrdinalIgnoreCase) ||
         fileName.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase) ||
         fileName.EndsWith(".jpeg", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Rejects characters that would break out of the hand-built, quoted Content-Disposition
+    /// <c>fileName</c> parameter — a double quote or backslash would end the quoted string early, and a
+    /// control character (including CR/LF) would inject extra header lines into the multipart part.
+    /// </summary>
+    private static bool HasInvalidFileNameCharacters(string fileName)
+    {
+        foreach (var c in fileName)
+        {
+            if (c is '"' or '\\' || char.IsControl(c))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     /// <summary>
     /// Reads <paramref name="image"/> into memory, throwing as soon as it exceeds the 2 MB limit rather than

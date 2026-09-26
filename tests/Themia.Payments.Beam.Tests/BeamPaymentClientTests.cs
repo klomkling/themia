@@ -110,6 +110,21 @@ public class BeamPaymentClientTests
     }
 
     [Fact]
+    public async Task Getting_a_link_with_no_url_is_a_malformed_response()
+    {
+        var (_, handler) = Build("""
+        { "paymentLinkId": "L", "status": "ACTIVE",
+          "order": { "netAmount": 100, "currency": "THB", "referenceId": "o" } }
+        """);
+        var client = BuildClient(handler);
+
+        var ex = await Assert.ThrowsAsync<PaymentApiException>(() => client.GetPaymentLinkAsync("L"));
+
+        Assert.Equal(FailureKind.Unknown, ex.Kind);
+        Assert.Equal("malformed_response", ex.ProviderCode);
+    }
+
+    [Fact]
     public async Task Disabling_a_link_patches_and_accepts_202()
     {
         var handler = new StubHandler().Enqueue(HttpStatusCode.Accepted, "{}");
@@ -197,6 +212,34 @@ public class BeamPaymentClientTests
         var ex = await Assert.ThrowsAsync<PaymentApiException>(() => client.VerifyQrSlipAsync(image, "slip.gif"));
 
         Assert.Equal("slip_image_type_unsupported", ex.ProviderCode);
+        Assert.Empty(handler.Requests);
+    }
+
+    [Fact]
+    public async Task A_slip_image_filename_containing_a_double_quote_is_refused_before_any_request()
+    {
+        // Unescaped, this would break out of the hand-built Content-Disposition's quoted fileName.
+        var handler = new StubHandler();
+        var client = BuildClient(handler);
+        using var image = new MemoryStream([1, 2, 3]);
+
+        var ex = await Assert.ThrowsAsync<PaymentApiException>(() => client.VerifyQrSlipAsync(image, "sl\"ip.png"));
+
+        Assert.Equal("slip_image_filename_invalid", ex.ProviderCode);
+        Assert.Empty(handler.Requests);
+    }
+
+    [Fact]
+    public async Task A_slip_image_filename_containing_crlf_is_refused_before_any_request()
+    {
+        // Unescaped, this would inject extra header lines into the multipart part.
+        var handler = new StubHandler();
+        var client = BuildClient(handler);
+        using var image = new MemoryStream([1, 2, 3]);
+
+        var ex = await Assert.ThrowsAsync<PaymentApiException>(() => client.VerifyQrSlipAsync(image, "sl\r\nip.png"));
+
+        Assert.Equal("slip_image_filename_invalid", ex.ProviderCode);
         Assert.Empty(handler.Requests);
     }
 
