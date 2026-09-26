@@ -102,9 +102,79 @@ public sealed class BeamPaymentGateway : IPaymentGateway, IPaymentGatewayCapabil
     }
 
     /// <inheritdoc />
-    /// <exception cref="NotSupportedException">Not yet implemented; see Task 9.</exception>
-    public Task<RefundCreation> RefundAsync(RefundRequest request, CancellationToken cancellationToken = default) =>
-        throw new NotSupportedException("Implemented in Task 7/8/9.");
+    /// <exception cref="PaymentApiException">
+    /// No charge could be resolved for the reference id, the charge is not a <c>CARD</c> charge but a partial
+    /// amount was requested, a partial amount's currency does not match the charge's, or Beam rejected the call.
+    /// </exception>
+    /// <remarks>
+    /// Beam refunds only <c>CARD</c> charges in part — a QR PromptPay charge refunds in full or not at all —
+    /// so a partial <paramref name="request"/> reads the charge first to check the payment method before posting.
+    /// </remarks>
+    public async Task<RefundCreation> RefundAsync(RefundRequest request, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var beamOptions = options.Value;
+        var httpClient = httpClientFactory.CreateClient(HttpClientName);
+
+        var chargeId = request.Charge.ProviderChargeId is { Length: > 0 } providerChargeId
+            ? providerChargeId
+            : (await BeamCharges.GetByReferenceAsync(httpClient, beamOptions, request.Charge.ReferenceId, cancellationToken)
+                .ConfigureAwait(false)).ChargeId;
+
+        if (request.Amount is { } amount)
+        {
+            var (charge, paymentMethodType) = await BeamCharges.GetByIdWithPaymentMethodAsync(
+                httpClient, beamOptions, chargeId, cancellationToken).ConfigureAwait(false);
+
+            if (paymentMethodType != "CARD")
+            {
+                throw new PaymentApiException(FailureKind.Validation, "partial_refund_unsupported", 0,
+                    $"Beam refunds only CARD charges in part; this charge was paid by {paymentMethodType ?? "an unknown method"}. Refund it in full or not at all.");
+            }
+
+            if (!string.Equals(amount.Currency, charge.Amount.Currency, StringComparison.Ordinal))
+            {
+                throw new PaymentApiException(FailureKind.Validation, "refund_currency_mismatch", 0);
+            }
+        }
+
+        return await CreateRefundAsync(httpClient, beamOptions, chargeId, request, cancellationToken).ConfigureAwait(false);
+    }
+
+    private static async Task<RefundCreation> CreateRefundAsync(
+        HttpClient httpClient, BeamOptions beamOptions, string chargeId, RefundRequest request,
+        CancellationToken cancellationToken)
+    {
+        var payload = JsonSerializer.Serialize(
+            new RefundRequestBody { ChargeId = chargeId, Reason = request.Reason, Amount = request.Amount?.MinorUnits },
+            BeamMapping.SerializeOptions);
+        var idempotencyKey = request.IdempotencyKey ?? Guid.NewGuid().ToString("N");
+        using var response = await BeamHttp.SendWithRetryAsync(
+            httpClient,
+            HttpMethod.Post,
+            "/api/v1/refunds",
+            beamOptions,
+            () => new StringContent(payload, Encoding.UTF8, "application/json"),
+            idempotencyKey,
+            cancellationToken).ConfigureAwait(false);
+
+        var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+        await using (stream.ConfigureAwait(false))
+        {
+            var (parsed, root) = await BeamMapping.TryParseAsync(stream, cancellationToken).ConfigureAwait(false);
+            if (!response.IsSuccessStatusCode)
+            {
+                throw BeamMapping.ToApiException(response.StatusCode, parsed ? root : null);
+            }
+
+            if (!parsed || !BeamMapping.TryGetNonEmptyString(root, "refundId", out var refundId))
+            {
+                throw new PaymentApiException(FailureKind.Unknown, "malformed_response", (int)response.StatusCode);
+            }
+
+            return new RefundCreation(refundId, PaymentStatus.Pending);
+        }
+    }
 
     private static async Task<ChargeCreation> CreateDirectChargeAsync(
         HttpClient httpClient, BeamOptions beamOptions, CreateChargeRequest request, string chargeType,
@@ -182,5 +252,17 @@ public sealed class BeamPaymentGateway : IPaymentGateway, IPaymentGatewayCapabil
     {
         [JsonPropertyName("expiryTime")]
         public required DateTimeOffset ExpiryTime { get; init; }
+    }
+
+    private sealed class RefundRequestBody
+    {
+        [JsonPropertyName("chargeId")]
+        public required string ChargeId { get; init; }
+
+        [JsonPropertyName("reason")]
+        public string? Reason { get; init; }
+
+        [JsonPropertyName("amount")]
+        public long? Amount { get; init; }
     }
 }

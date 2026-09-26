@@ -42,6 +42,42 @@ internal static class BeamCharges
         }
     }
 
+    /// <summary>
+    /// Reads a charge by id together with its <c>paymentMethod.paymentMethodType</c> — the only caller that
+    /// needs the method type is the refund partial-amount guard (Task 9), so it is not carried on the shared
+    /// <see cref="Charge"/> type. Reuses <see cref="ToCharge"/> rather than parsing the body twice.
+    /// </summary>
+    public static async Task<(Charge Charge, string? PaymentMethodType)> GetByIdWithPaymentMethodAsync(
+        HttpClient httpClient, BeamOptions beamOptions, string chargeId, CancellationToken cancellationToken)
+    {
+        using var response = await BeamHttp.SendWithRetryAsync(
+            httpClient,
+            HttpMethod.Get,
+            $"/api/v1/charges/{Uri.EscapeDataString(chargeId)}",
+            beamOptions,
+            contentFactory: null,
+            idempotencyKey: null,
+            cancellationToken).ConfigureAwait(false);
+
+        var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+        await using (stream.ConfigureAwait(false))
+        {
+            var (parsed, root) = await BeamMapping.TryParseAsync(stream, cancellationToken).ConfigureAwait(false);
+            if (!response.IsSuccessStatusCode)
+            {
+                throw BeamMapping.ToApiException(response.StatusCode, parsed ? root : null);
+            }
+
+            var charge = ToCharge(root, (int)response.StatusCode);
+            var paymentMethodType = root.TryGetProperty("paymentMethod", out var paymentMethod) &&
+                BeamMapping.TryGetNonEmptyString(paymentMethod, "paymentMethodType", out var type)
+                    ? type
+                    : null;
+
+            return (charge, paymentMethodType);
+        }
+    }
+
     /// <summary>Follows a payment-link id to what it says about the charge that paid it, or its own pending/failed state.</summary>
     public static async Task<Charge> GetByPaymentLinkIdAsync(
         HttpClient httpClient, BeamOptions beamOptions, string linkId, CancellationToken cancellationToken)
