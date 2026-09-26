@@ -15,7 +15,10 @@ public sealed class BeamOptions
     /// <summary>Which environment to call.</summary>
     public BeamEnvironment Environment { get; set; } = BeamEnvironment.Playground;
 
-    /// <summary>The base64 HMAC key from Lighthouse, used to verify webhooks. Never logged.</summary>
+    /// <summary>
+    /// The base64 HMAC key from Lighthouse, used to verify webhooks. Never logged. Optional, but when set it
+    /// must decode to at least 16 bytes — validated at startup.
+    /// </summary>
     public string? WebhookHmacKey { get; set; }
 
     /// <summary>The partner id, for a partner acting for a merchant. Sent as <c>X-Beam-Partner-ID</c>.</summary>

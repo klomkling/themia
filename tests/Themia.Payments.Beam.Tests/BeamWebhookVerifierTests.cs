@@ -172,4 +172,22 @@ public class BeamWebhookVerifierTests
         Assert.Equal(WebhookOutcome.Verified, result.Outcome);
         Assert.Equal(PaymentEventType.ChargeSucceeded, result.Event!.Type);
     }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("not base64!")]
+    [InlineData("AAECAwQFBgc=")] // 8 bytes: too short to be a real key
+    public void A_verifier_built_around_an_unusable_key_never_verifies_a_forged_signature(string key)
+    {
+        // Constructed directly, bypassing the DI validation: an empty key must fail closed, not HMAC with 0 bytes.
+        var verifier = new BeamWebhookVerifier(
+            Options.Create(new BeamOptions { MerchantId = "m", ApiKey = "k", WebhookHmacKey = key }));
+        var body = Vector();
+        var decoded = Convert.TryFromBase64String(key, new byte[64], out var written) ? written : 0;
+        var forgeKey = Convert.FromBase64String(decoded > 0 ? key : "");
+        var forged = Convert.ToBase64String(HMACSHA256.HashData(forgeKey, body));
+
+        Assert.Throws<InvalidOperationException>(() => verifier.Verify(body, Headers(forged)));
+    }
 }

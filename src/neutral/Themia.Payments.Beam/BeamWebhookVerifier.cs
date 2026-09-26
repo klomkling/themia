@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Options;
+using Themia.Payments.Beam.Internal;
 
 namespace Themia.Payments.Beam;
 
@@ -27,6 +28,7 @@ public sealed class BeamWebhookVerifier : IPaymentWebhookVerifier
     private static readonly string[] OccurredAtFields = ["transactionTime", "updatedAt", "createdAt"];
 
     private readonly IOptions<BeamOptions> options;
+    private byte[]? decodedKey;
 
     /// <summary>Creates the verifier.</summary>
     /// <param name="options">Supplies <see cref="BeamOptions.WebhookHmacKey"/>.</param>
@@ -37,7 +39,10 @@ public sealed class BeamWebhookVerifier : IPaymentWebhookVerifier
     }
 
     /// <inheritdoc />
-    /// <exception cref="InvalidOperationException"><see cref="BeamOptions.WebhookHmacKey"/> is not set.</exception>
+    /// <exception cref="InvalidOperationException">
+    /// <see cref="BeamOptions.WebhookHmacKey"/> is not a usable key: null, blank, not base64, or shorter than
+    /// 16 bytes. This fails closed — a signature is never checked against an empty or undecodable key.
+    /// </exception>
     public WebhookVerification Verify(ReadOnlySpan<byte> rawBody, IReadOnlyDictionary<string, string> headers)
     {
         ArgumentNullException.ThrowIfNull(headers);
@@ -47,11 +52,8 @@ public sealed class BeamWebhookVerifier : IPaymentWebhookVerifier
             return new WebhookVerification(WebhookOutcome.SignatureMissing, null);
         }
 
-        var key = options.Value.WebhookHmacKey
-            ?? throw new InvalidOperationException("BeamOptions.WebhookHmacKey must be set to verify webhooks.");
-
         Span<byte> computed = stackalloc byte[32];
-        HMACSHA256.HashData(Convert.FromBase64String(key), rawBody, computed);
+        HMACSHA256.HashData(Key(), rawBody, computed);
 
         Span<byte> presented = stackalloc byte[32];
         if (!Convert.TryFromBase64String(provided, presented, out var written)
@@ -63,6 +65,24 @@ public sealed class BeamWebhookVerifier : IPaymentWebhookVerifier
 
         TryGetHeader(headers, "X-Beam-Event", out var eventName);
         return ParseEvent(rawBody, eventName);
+    }
+
+    /// <summary>Decodes the configured key once; throws rather than ever returning an unusable key.</summary>
+    private byte[] Key()
+    {
+        if (decodedKey is not null)
+        {
+            return decodedKey;
+        }
+
+        if (!BeamWebhookKey.TryDecode(options.Value.WebhookHmacKey, out var key))
+        {
+            throw new InvalidOperationException(
+                $"BeamOptions.WebhookHmacKey must be set to the base64 of at least {BeamWebhookKey.MinimumBytes} bytes to verify webhooks.");
+        }
+
+        decodedKey = key;
+        return key;
     }
 
     /// <summary>Finds a header value, matching the name case-insensitively regardless of the dictionary's own comparer.</summary>

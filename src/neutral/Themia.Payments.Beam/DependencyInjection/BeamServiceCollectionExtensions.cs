@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
+using Themia.Payments.Beam.Internal;
 using Themia.Payments.DependencyInjection;
 
 namespace Themia.Payments.Beam.DependencyInjection;
@@ -30,6 +31,9 @@ public static class BeamServiceCollectionExtensions
             .Validate(o => !string.IsNullOrWhiteSpace(o.MerchantId), "BeamOptions.MerchantId must be set.")
             .Validate(o => !string.IsNullOrWhiteSpace(o.ApiKey), "BeamOptions.ApiKey must be set.")
             .Validate(o => o.Timeout > TimeSpan.Zero, "BeamOptions.Timeout must be positive.")
+            .Validate(
+                o => o.WebhookHmacKey is null || BeamWebhookKey.TryDecode(o.WebhookHmacKey, out _),
+                $"BeamOptions.WebhookHmacKey, when set, must be the base64 of at least {BeamWebhookKey.MinimumBytes} bytes.")
             .ValidateOnStart();
 
         services.AddHttpClient(BeamPaymentGateway.HttpClientName, (sp, client) =>

@@ -34,6 +34,51 @@ public class BeamOptionsTests
         Assert.Contains("MerchantId", string.Join(" ", ex.Failures), StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("not base64!")]
+    [InlineData("AAECAwQFBgc=")] // valid base64 of only 8 bytes
+    public void An_unusable_webhook_key_fails_validation_at_startup_without_echoing_it(string key)
+    {
+        var services = new ServiceCollection();
+        services.AddThemiaPaymentsBeam(o =>
+        {
+            o.MerchantId = "m";
+            o.ApiKey = "k";
+            o.WebhookHmacKey = key;
+        });
+
+        using var provider = services.BuildServiceProvider();
+
+        var ex = Assert.Throws<OptionsValidationException>(
+            () => { _ = provider.GetRequiredService<IOptions<BeamOptions>>().Value; });
+        var failures = string.Join(" ", ex.Failures);
+        Assert.Contains("WebhookHmacKey", failures, StringComparison.Ordinal);
+        if (key.Trim().Length > 0)
+        {
+            Assert.DoesNotContain(key, failures, StringComparison.Ordinal);
+        }
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("AAECAwQFBgcICQoLDA0ODw==")] // 16 bytes, the minimum
+    public void An_absent_or_sufficiently_long_webhook_key_passes_validation(string? key)
+    {
+        var services = new ServiceCollection();
+        services.AddThemiaPaymentsBeam(o =>
+        {
+            o.MerchantId = "m";
+            o.ApiKey = "k";
+            o.WebhookHmacKey = key;
+        });
+
+        using var provider = services.BuildServiceProvider();
+
+        Assert.Equal(key, provider.GetRequiredService<IOptions<BeamOptions>>().Value.WebhookHmacKey);
+    }
+
     [Fact]
     public void The_adapter_declares_what_it_can_charge_with()
     {
