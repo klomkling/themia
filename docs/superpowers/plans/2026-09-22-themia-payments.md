@@ -1871,9 +1871,10 @@ public class BeamCreateChargeTests
         Assert.Equal(new Uri("https://pay.example/1"), Assert.IsType<NextAction.Redirect>(creation.Action).Url);
     }
 
+    // The CREATE response is { id, url } (Swagger: CreatePaymentLinkResponse, HTTP 201). paymentLinkId is the
+    // GET/webhook shape — reading it from a create response returns nothing in production.
     private const string PaymentLinkResponse = """
-    { "paymentLinkId": "rGtqz6DafS", "url": "https://playground-pay.beamcheckout.com/m/rGtqz6DafS",
-      "status": "ACTIVE", "order": { "netAmount": 250000, "currency": "THB", "referenceId": "order-3" } }
+    { "id": "rGtqz6DafS", "url": "https://playground-pay.beamcheckout.com/m/rGtqz6DafS" }
     """;
 
     [Fact]
@@ -2038,7 +2039,8 @@ public static FailureKind ToFailureKind(int httpStatus, string errorCode) => err
   "redirectUrl": "<ReturnUrl, when set>", "expiresAt": "<ExpiresAt, when set>" }
 ```
 
-   and return `new ChargeCreation(paymentLinkId, PaymentStatus.Pending, new NextAction.Redirect(new Uri(url)))`.
+   and return `new ChargeCreation(id, PaymentStatus.Pending, new NextAction.Redirect(new Uri(url)))` — the create
+   response is `{ "id", "url" }` (HTTP 201), not the GET shape with `paymentLinkId`.
    The link create lives in `Internal/BeamPaymentLinks.cs` as an internal helper, because Task 11's public
    `BeamPaymentClient` exposes the same call.
 4. Every call goes through `BeamHttp.Create`; a non-2xx becomes a `PaymentApiException` via `BeamMapping.ToFailureKind`.
@@ -2090,7 +2092,7 @@ public async Task Without_a_provider_id_the_charge_is_found_by_reference_preferr
     // GET /api/v1/charges?referenceId= lists most recent first. A link can carry several attempts, so a later
     // failed attempt must not hide the one that actually paid.
     var (gateway, handler) = Build("""
-    { "charges": [
+    { "data": [
         { "chargeId": "ch_3", "referenceId": "order-1", "status": "FAILED", "currency": "THB", "amount": 199, "failureCode": "CH_PROCESSING_FAILED" },
         { "chargeId": "ch_2", "referenceId": "order-1", "status": "SUCCEEDED", "currency": "THB", "amount": 199 } ] }
     """);
@@ -2111,7 +2113,7 @@ public async Task A_payment_link_id_is_followed_to_the_charge_that_paid_it()
         .Enqueue(HttpStatusCode.NotFound, """{ "error": { "errorCode": "NOT_FOUND_ERROR" } }""")          // not a charge id
         .Enqueue(HttpStatusCode.OK, """{ "paymentLinkId": "rGtqz6DafS", "status": "PAID",
                                           "order": { "netAmount": 199, "currency": "THB", "referenceId": "order-1" } }""")
-        .Enqueue(HttpStatusCode.OK, """{ "charges": [
+        .Enqueue(HttpStatusCode.OK, """{ "data": [
             { "chargeId": "ch_9", "referenceId": "order-1", "status": "SUCCEEDED", "currency": "THB", "amount": 199,
               "source": "PAYMENT_LINK", "sourceId": "rGtqz6DafS" } ] }""");
     var gateway = BuildWith(handler);
@@ -2264,7 +2266,7 @@ public static PaymentFailure? ToFailure(string? failureCode, string? message)
    - `EXPIRED` → `Failed` with `FailureReason.Expired`; `DISABLED` → `Failed` with `FailureReason.Canceled`;
      the link status is the `ProviderCode` in both.
    - A 404 here too → `PaymentApiException(FailureKind.NotFound, "NOT_FOUND_ERROR", 404)`.
-3. `ProviderChargeId` null → `GET /api/v1/charges?referenceId={reference}`; return the first `SUCCEEDED`,
+3. `ProviderChargeId` null → `GET /api/v1/charges?referenceId={reference}` (response `{ "data": [...], "totalCount": n }`); return the first `SUCCEEDED`,
    otherwise the most recent. An empty list → `PaymentApiException(FailureKind.NotFound, "no_charge_for_reference", 0)`.
 
 `BeamHttp.SendWithRetryAsync` builds the key **once** (`request.IdempotencyKey ?? Guid.NewGuid().ToString("N")`), then loops at most 3 attempts, retrying only on `>=500`, `429` and `HttpRequestException`/`TaskCanceledException`, with `Task.Delay(TimeSpan.FromMilliseconds(200 * 2^attempt) + jitter)`. Each attempt builds a **fresh** `HttpRequestMessage` (an `HttpRequestMessage` cannot be resent) carrying that same key.
