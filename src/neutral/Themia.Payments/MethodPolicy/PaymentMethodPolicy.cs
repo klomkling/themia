@@ -9,8 +9,15 @@ namespace Themia.Payments;
 /// </remarks>
 public sealed class PaymentMethodPolicy
 {
-    /// <summary>The ISO 4217 code these bands are written in.</summary>
-    public string Currency { get; init; } = "THB";
+    /// <summary>The ISO 4217 code these bands are written in. Stored upper-case, as <see cref="Money"/> stores it,
+    /// so a configured <c>"thb"</c> matches <see cref="Money.Thb"/>.</summary>
+    public string Currency
+    {
+        get => currency;
+        init => currency = value?.ToUpperInvariant() ?? "";
+    }
+
+    private readonly string currency = "THB";
 
     /// <summary>Bands in ascending order of their upper bound.</summary>
     public IReadOnlyList<PaymentMethodBand> Bands { get; init; } = [];

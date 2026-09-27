@@ -41,6 +41,20 @@ public class PaymentMethodPolicyTests
     }
 
     [Fact]
+    public void A_lower_case_currency_is_the_same_currency()
+    {
+        var policy = new PaymentMethodPolicy
+        {
+            Currency = "thb",
+            Bands = [new PaymentMethodBand(100000, [PaymentMethod.QrPromptPay])],
+            Above = [PaymentMethod.Card],
+        };
+
+        Assert.Empty(policy.Validate());
+        Assert.Equal([PaymentMethod.QrPromptPay], policy.Resolve(Money.Thb(50000)));
+    }
+
+    [Fact]
     public void Bands_must_ascend()
     {
         var policy = new PaymentMethodPolicy
