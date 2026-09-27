@@ -8,7 +8,7 @@ public static class RefundRequestValidator
     /// <param name="request">The request.</param>
     /// <exception cref="ArgumentNullException"><paramref name="request"/> is null.</exception>
     /// <exception cref="ArgumentException"><see cref="RefundRequest.Charge"/> names no charge.</exception>
-    /// <exception cref="PaymentApiException">The idempotency key is blank, over 255 characters, or has a control character.</exception>
+    /// <exception cref="PaymentApiException">The idempotency key is blank, over 255 characters, or not visible ASCII.</exception>
     public static void Validate(RefundRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);

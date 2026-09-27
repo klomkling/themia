@@ -67,8 +67,8 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
     and capabilities, silently.
   - Beam's `WebhookHmacKey`, when set, must be the base64 of at least 16 bytes — validated at startup;
     the verifier fails closed on an unusable key.
-  - A caller-supplied idempotency key must be non-blank, ≤ 255 characters and free of control
-    characters (`idempotency_key_invalid`).
+  - A caller-supplied idempotency key must be non-blank, ≤ 255 characters of visible ASCII
+    (`idempotency_key_invalid`).
 
 ## [0.29.0] - 2026-09-20
 

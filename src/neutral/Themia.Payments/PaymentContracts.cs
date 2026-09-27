@@ -87,7 +87,7 @@ public sealed record CreateChargeRequest
     /// <summary>
     /// Stable across retries of the same logical operation. Generated per call when absent — which is safe
     /// only because the generated key is reused for that call's own internal retries. When set: non-blank, at
-    /// most 255 characters, no control characters — otherwise refused as <c>idempotency_key_invalid</c>.
+    /// most 255 characters of visible ASCII — otherwise refused as <c>idempotency_key_invalid</c>.
     /// </summary>
     public string? IdempotencyKey { get; init; }
 }

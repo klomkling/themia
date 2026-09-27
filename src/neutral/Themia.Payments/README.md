@@ -8,13 +8,13 @@ a provider package (`Themia.Payments.Beam`, `Themia.Payments.TwoCTwoP`) implemen
 
 Every charge created through this seam must be the platform's **own revenue**. Collecting money on
 behalf of someone else and settling it later is a licensed payment business under Thailand's Payment
-Systems Act, so that flow is out of scope by law, not preference — see the design document's §1.
+Systems Act, so that flow is out of scope by law, not preference.
 
 ## No `Themia.Modules.Payments`
 
 Nothing here is tenant-scoped or persisted — no schema, no `IThemiaModule` — so there is no module, the
 same call as `Themia.Geo` and `Themia.AI`. The one thing that would justify one, sub-merchant split
-payment, is out of scope by the consumers' own answers (spec §1, §8).
+payment, is out of scope: no adopter needs it, and it is the licensed flow above.
 
 ## The smallest working registration
 
@@ -53,7 +53,7 @@ A 2xx body that does not hold what the adapter needs is
 `PaymentApiException(FailureKind.Unknown, "malformed_response", status)`.
 
 A caller-supplied `IdempotencyKey` (on a charge, a refund, or a Beam payment link) must be non-blank, at
-most 255 characters and free of control characters, or it is refused locally as
+most 255 characters of visible ASCII (no spaces or control characters), or it is refused locally as
 `PaymentApiException(FailureKind.Validation, "idempotency_key_invalid", 0)`. A `ChargeRef` with neither
 id set is an `ArgumentException` in every adapter.
 
