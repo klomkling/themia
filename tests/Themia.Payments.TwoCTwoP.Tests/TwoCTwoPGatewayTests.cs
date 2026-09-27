@@ -217,6 +217,12 @@ public class TwoCTwoPGatewayTests
     }
 
     [Fact]
+    public void An_unsigned_system_error_is_transient_like_a_signed_one()
+    {
+        Assert.Equal(FailureKind.Transient, TwoCTwoPMapping.ToFailureKind(200, "0999"));
+    }
+
+    [Fact]
     public async Task A_transaction_not_found_becomes_a_not_found_exception()
     {
         var handler = new StubHandler().Enqueue(HttpStatusCode.OK, ResponseEnvelope(new Dictionary<string, object?>
@@ -230,6 +236,17 @@ public class TwoCTwoPGatewayTests
 
         Assert.Equal(FailureKind.NotFound, ex.Kind);
         Assert.Equal("2002", ex.ProviderCode);
+    }
+
+    [Fact]
+    public void An_invalid_refund_request_faults_the_returned_task_rather_than_throwing_at_the_call()
+    {
+        var gateway = BuildGateway(new StubHandler());
+
+        var task = gateway.RefundAsync(new RefundRequest(default, null, null, null));
+
+        Assert.True(task.IsFaulted);
+        Assert.IsType<ArgumentException>(task.Exception!.InnerException);
     }
 
     [Fact]

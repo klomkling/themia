@@ -192,14 +192,23 @@ public sealed class TwoCTwoPPaymentGateway : IPaymentGateway, IPaymentGatewayCap
     /// Maintenance API, which needs the merchant's RSA key pair and 2C2P's certificate (JWE inside JWS) rather
     /// than the shared secret every other call here uses.
     /// </remarks>
-    /// <exception cref="ArgumentNullException"><paramref name="request"/> is null (thrown synchronously).</exception>
-    /// <exception cref="ArgumentException">The request's charge reference names no charge (thrown synchronously).</exception>
-    /// <exception cref="PaymentApiException"><c>idempotency_key_invalid</c> (thrown synchronously) for an invalid key;
+    /// <exception cref="ArgumentNullException"><paramref name="request"/> is null (on the returned task).</exception>
+    /// <exception cref="ArgumentException">The request's charge reference names no charge (on the returned task).</exception>
+    /// <exception cref="PaymentApiException"><c>idempotency_key_invalid</c> for an invalid key;
     /// otherwise always, with <see cref="FailureKind.Validation"/> and <c>refund_not_supported</c>. Nothing is sent to 2C2P.</exception>
     public Task<RefundCreation> RefundAsync(RefundRequest request, CancellationToken cancellationToken = default)
     {
         // Validated like every adapter's refund, so an invalid request is refused the same way everywhere.
-        RefundRequestValidator.Validate(request);
+        // Every exception goes on the returned Task, as with Beam's async RefundAsync.
+        try
+        {
+            RefundRequestValidator.Validate(request);
+        }
+        catch (Exception ex) when (ex is ArgumentException or PaymentApiException)
+        {
+            return Task.FromException<RefundCreation>(ex);
+        }
+
         return Task.FromException<RefundCreation>(new PaymentApiException(FailureKind.Validation, "refund_not_supported", httpStatus: 0,
             "The 2C2P adapter does not support refunds; refund from the 2C2P merchant portal."));
     }

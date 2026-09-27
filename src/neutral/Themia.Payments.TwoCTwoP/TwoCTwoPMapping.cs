@@ -9,10 +9,10 @@ namespace Themia.Payments.TwoCTwoP;
 /// <summary>Every 2C2P &lt;-&gt; <c>Themia.Payments</c> translation lives here: channels, amounts, statuses, and errors.</summary>
 internal static class TwoCTwoPMapping
 {
-    /// <summary>Currencies whose minor unit is a hundredth — the only ones <see cref="ToDecimalAmount"/> accepts.</summary>
     /// <summary>The largest decimal amount whose minor units still fit in a <see cref="long"/>.</summary>
     private const decimal MaxDecimalAmount = long.MaxValue / 100m;
 
+    /// <summary>Currencies whose minor unit is a hundredth — the only ones <see cref="ToDecimalAmount"/> accepts.</summary>
     private static readonly HashSet<string> TwoDecimalCurrencies = new(StringComparer.Ordinal) { "THB", "USD", "SGD", "MYR", "EUR" };
 
     /// <summary>The 2C2P <c>paymentChannel</c> group code for a method (developer.2c2p.com/docs/reference-payment-channels).</summary>
@@ -69,6 +69,7 @@ internal static class TwoCTwoPMapping
     {
         "0004" => FailureKind.Authentication,
         "2002" => FailureKind.NotFound,
+        "0999" => FailureKind.Transient,   // 2C2P's own system error, signed or not
         _ => httpStatus >= 500 ? FailureKind.Transient : FailureKind.Unknown,
     };
 
