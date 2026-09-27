@@ -18,8 +18,15 @@ services.AddThemiaPaymentsBeam(o =>
 });
 ```
 
-`AddThemiaPaymentsBeam` validates `MerchantId`, `ApiKey` and `Timeout` on start, registers the named
-`HttpClient`, and calls `AddThemiaPayments()` itself — a host does not need to call both.
+`AddThemiaPaymentsBeam` validates `MerchantId`, `ApiKey`, `Timeout` and `WebhookHmacKey` on start,
+registers the named `HttpClient`, and calls `AddThemiaPayments()` itself — a host does not need to call
+both. Register only one payment adapter per container (see the `Themia.Payments` README).
+
+**`WebhookHmacKey` is optional, but when set it must be the base64 of at least 16 bytes** — the key
+Lighthouse gives you is 32. An empty, blank, non-base64 or short key fails startup validation (the key
+itself is never echoed in the message), and `BeamWebhookVerifier` fails closed on any unusable key with
+`InvalidOperationException` rather than computing an HMAC with it: an empty key would let anyone forge a
+valid `X-Beam-Signature`.
 
 ## Only a lone `QrPromptPay` charge is a direct charge
 
@@ -30,7 +37,7 @@ the method policy) to exactly `[QrPromptPay]`. Everything else — a lone `Card`
 shopper choose.
 
 This is not the same failure mode as "no direct card charge type" — a direct `POST /api/v1/charges` needs
-card data or a saved card token, and card tokenization is out of scope for this version (spec §8), so a
+card data or a saved card token, and card tokenization is out of scope for this version, so a
 lone `[Card]` request could never succeed as a direct charge anyway. Routing it through a link, where
 Beam's own hosted page collects the card, is the only way a card payment can complete at all today.
 
@@ -38,7 +45,9 @@ Beam's own hosted page collects the card, is the only way a card payment can com
 `GetChargeAsync` knows this: given that id, it first tries `GET /api/v1/charges/{id}` (a genuine charge
 id), and on a 404 retries it as `GET /api/v1/payment-links/{id}`, following a **paid** link to the charge
 that actually paid it. A charge id you got back from a single-method QR charge is a real charge id from
-the start; a charge id from any other request is a link id until someone pays it.
+the start; a charge id from any other request is a link id until someone pays it. `RefundAsync` resolves
+the id exactly the same way before posting, so refunding by a link id refunds the charge that paid the
+link; a link nobody has paid yet is `PaymentApiException(FailureKind.NotFound, "no_charge_for_link")`.
 
 ```csharp
 var creation = await gateway.CreateChargeAsync(new CreateChargeRequest
@@ -51,6 +60,21 @@ var creation = await gateway.CreateChargeAsync(new CreateChargeRequest
 // Later, regardless of which path created it:
 var charge = await gateway.GetChargeAsync(new ChargeRef(creation.ChargeId, "order-42"));
 ```
+
+## How many HTTP calls a method makes
+
+Each HTTP call may take up to ~91 s with the default 30 s `Timeout` (3 attempts plus backoff — see the
+`Themia.Payments` README), so the chains below set the worst case. Pass a `CancellationToken` with your
+own deadline.
+
+| Call | HTTP calls |
+| --- | --- |
+| `CreateChargeAsync` | 1 |
+| `GetChargeAsync` by charge id / by reference | 1 |
+| `GetChargeAsync` by a paid link id | 3 (charge 404 → link → the link's charges), up to ~4.5 min |
+| `RefundAsync`, full, by charge id / by reference | 2 (resolve, then refund) |
+| `RefundAsync`, partial, by charge id / by reference | 3 (resolve, read the payment method, refund) |
+| `RefundAsync` by a link id | 4 full / 5 partial, up to ~7.5 min |
 
 ## `BeamPaymentClient` — Beam-only features
 

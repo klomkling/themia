@@ -20,7 +20,14 @@ services.AddThemiaPaymentsTwoCTwoP(o =>
 ```
 
 `AddThemiaPaymentsTwoCTwoP` validates `MerchantId`, `SecretKey`, `Timeout` and `TransactionTimeOffset` on
-start, registers the named `HttpClient`, and calls `AddThemiaPayments()` itself.
+start, registers the named `HttpClient`, and calls `AddThemiaPayments()` itself. Register only one
+payment adapter per container (see the `Themia.Payments` README).
+
+Every method makes a single HTTP call, retried up to 3 attempts: with the default 30 s `Timeout` that is
+up to ~91 s — pass a `CancellationToken` with your own deadline. A non-2xx response with no 2C2P body at
+all (an HTML error page from a proxy) throws `PaymentApiException` with `ProviderCode` `HTTP_{status}`,
+classified by status (`5xx` Transient, `429` RateLimited, `401` Authentication, `403` Permission, `404`
+NotFound).
 
 ## The JWT signature *is* the authentication
 
@@ -48,6 +55,20 @@ letting a 21-character reference id fail at the provider.
 separate provider-issued id to track. `GetChargeAsync` (2C2P's Payment Inquiry) reads by `invoiceNo`
 first; a `ChargeRef.ProviderChargeId` is accepted only as a fallback, and only because for this provider
 invoice number and charge id are the same value.
+
+## `respCode` mapping — `0999` is not a failed payment
+
+| 2C2P `respCode` | Inquiry (`GetChargeAsync`) | Backend notification |
+| --- | --- | --- |
+| `0000` | `Succeeded` | `ChargeSucceeded` |
+| `0001`, `2001` | `Pending` | `Other`, status `Pending` |
+| `0003` / `0004` / `2003` / `4005` / `4051` | `Failed` + `Canceled` / `AuthenticationFailed` / `ProcessingFailed` / `Declined` / `InsufficientFunds` | `ChargeFailed` |
+| `2002` | throws `PaymentApiException(NotFound)` | `ChargeFailed` |
+| `0999` and any other code | throws `PaymentApiException(Transient)`, raw code as `ProviderCode` | `Other`, status `Pending` — never `ChargeFailed` |
+
+`0999` is 2C2P's own system error, and an unrecognised code says nothing reliable about whether the
+shopper paid: reporting either as a failed payment could get a paid order cancelled. Retry the inquiry
+instead. The raw code is always carried.
 
 ## Refunds are not supported in this version
 

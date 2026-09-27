@@ -32,6 +32,31 @@ services.AddThemiaPayments(); // idempotent — AddThemiaPaymentsBeam already ca
 adapter's own `Add…` calls it too, with `TryAdd`/`TryAddEnumerable` throughout, so registering both is
 never a duplicate and the order between them does not matter.
 
+**One adapter per container.** Each adapter registers `IPaymentGateway`, `IPaymentGatewayCapabilities`
+and `IPaymentWebhookVerifier` with `TryAdd`, so registering both `AddThemiaPaymentsBeam` and
+`AddThemiaPaymentsTwoCTwoP` in one container does not fail — the **first** one silently keeps all three
+seams and the second only adds its own concrete types. Pick one provider per container.
+
+## Failures, retries and the time budget
+
+Every adapter retries a transient failure (`5xx`, `429`, a transport error, or its own per-request
+timeout) up to **3 attempts** per HTTP call, with exponential backoff plus jitter, and never retries a
+`4xx`. With the default 30-second `Timeout`, one HTTP call can therefore take **about 91 seconds** in the
+worst case, and a method that chains several calls multiplies that (each adapter's README lists its
+chains). **Pass a `CancellationToken` carrying your own deadline**; your cancellation propagates as
+`OperationCanceledException` and is never retried or wrapped.
+
+When the retries are exhausted at the transport, the call throws
+`PaymentApiException(FailureKind.Transient, "transport_error" | "timeout", httpStatus: 0)` with the
+underlying exception as `InnerException` — never a raw `HttpRequestException` or `TaskCanceledException`.
+A 2xx body that does not hold what the adapter needs is
+`PaymentApiException(FailureKind.Unknown, "malformed_response", status)`.
+
+A caller-supplied `IdempotencyKey` (on a charge, a refund, or a Beam payment link) must be non-blank, at
+most 255 characters and free of control characters, or it is refused locally as
+`PaymentApiException(FailureKind.Validation, "idempotency_key_invalid", 0)`. A `ChargeRef` with neither
+id set is an `ArgumentException` in every adapter.
+
 ## `PaymentStatus.Pending` can last for ever
 
 ```csharp

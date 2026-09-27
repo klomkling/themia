@@ -50,11 +50,25 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
   - With Beam, only a lone `QrPromptPay` charge is a direct charge — a lone `Card`, `MobileBanking`,
     `Wallet`, or more than one method offered together, creates a payment link instead, and
     `ChargeCreation.ChargeId` is then the **link's** id; `GetChargeAsync` follows it to the charge that
-    paid it. Slip verification (`BeamPaymentClient.VerifyQrSlipAsync`) matches only this merchant's own
-    Beam-created charges.
+    paid it, and `RefundAsync` resolves it the same way, so it refunds that charge. Slip verification
+    (`BeamPaymentClient.VerifyQrSlipAsync`) matches only this merchant's own Beam-created charges.
   - **2C2P refunds are not supported in this version** — `RefundAsync` always throws
     `PaymentApiException(FailureKind.Validation, "refund_not_supported")`; refund from the 2C2P merchant
     portal until a real merchant RSA key pair exists for its JWE/JWS Payment Maintenance API.
+  - A 2C2P inquiry answering `0999` (system error) or an unrecognised `respCode` throws
+    `PaymentApiException(FailureKind.Transient)` rather than returning a `Failed` charge; a signed
+    notification with such a code is `Verified` + `PaymentEventType.Other`, never `ChargeFailed`.
+  - Each HTTP call retries up to 3 attempts, so with the default 30 s `Timeout` one call can take ~91 s,
+    and Beam chains several (`GetChargeAsync` on a link id: 3 calls, ~4.5 min; `RefundAsync` on a link
+    id: up to 5). Pass a `CancellationToken` with your own deadline. Exhausted retries surface as
+    `PaymentApiException(FailureKind.Transient, "transport_error" | "timeout")`, never a raw
+    `HttpRequestException`/`TaskCanceledException`.
+  - One adapter per container: registering both keeps the first adapter's `IPaymentGateway`, verifier
+    and capabilities, silently.
+  - Beam's `WebhookHmacKey`, when set, must be the base64 of at least 16 bytes — validated at startup;
+    the verifier fails closed on an unusable key.
+  - A caller-supplied idempotency key must be non-blank, ≤ 255 characters and free of control
+    characters (`idempotency_key_invalid`).
 
 ## [0.29.0] - 2026-09-20
 
