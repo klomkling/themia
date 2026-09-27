@@ -14,6 +14,8 @@ public interface IStorageProvider
     /// <returns>Metadata for the written object. <see cref="StorageObjectInfo.Length"/> is the stored byte
     /// count when known; it may be 0 if the supplied stream is non-seekable and the backend does not report
     /// a length. Callers needing an authoritative size should use a seekable stream or stat the object.</returns>
+    /// <exception cref="ArgumentException"><see cref="StoragePutOptions.Visibility"/> disagrees with the key's
+    /// <see cref="StorageKey.PublicPrefix"/> (see <see cref="StorageKey.EnsureMatchesVisibility"/>).</exception>
     Task<StorageObjectInfo> PutAsync(string key, Stream content, StoragePutOptions options, CancellationToken cancellationToken = default);
 
     /// <summary>Reads the object at <paramref name="key"/>, or <see langword="null"/> when absent.</summary>

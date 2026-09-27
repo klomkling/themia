@@ -35,6 +35,27 @@ public static class StorageKey
     public static bool IsPublic(string key) =>
         key is not null && key.StartsWith(PublicPrefix, StringComparison.Ordinal);
 
+    /// <summary>Rejects a write whose key prefix and requested visibility disagree. A provider places an
+    /// object by its key prefix, so a mismatch would store it somewhere the caller did not ask for — for
+    /// <see cref="StorageVisibility.Private"/> with a <see cref="PublicPrefix"/> key, world-readable.</summary>
+    /// <param name="key">The physical object key.</param>
+    /// <param name="visibility">The visibility the caller requested.</param>
+    /// <exception cref="System.ArgumentNullException"><paramref name="key"/> is <see langword="null"/>.</exception>
+    /// <exception cref="System.ArgumentException">The key is public and <paramref name="visibility"/> is
+    /// <see cref="StorageVisibility.Private"/>, or the reverse.</exception>
+    public static void EnsureMatchesVisibility(string key, StorageVisibility visibility)
+    {
+        ArgumentNullException.ThrowIfNull(key);
+        var keyVisibility = IsPublic(key) ? StorageVisibility.Public : StorageVisibility.Private;
+        if (keyVisibility != visibility)
+        {
+            throw new ArgumentException(
+                $"Object key '{key}' addresses the {keyVisibility} container but {visibility} was requested. " +
+                $"Keys starting with '{PublicPrefix}' are public; all others are private.",
+                nameof(key));
+        }
+    }
+
     /// <summary>Removes the visibility prefix, yielding the key as the container stores it.</summary>
     /// <param name="key">The physical object key.</param>
     /// <returns>The key without its <see cref="PublicPrefix"/>; an unprefixed key is returned unchanged.</returns>

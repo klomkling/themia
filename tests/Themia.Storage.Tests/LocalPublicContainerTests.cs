@@ -29,7 +29,7 @@ public sealed class LocalPublicContainerTests : IDisposable
     {
         var provider = Create();
         await provider.PutAsync("t1/a.txt", new MemoryStream(Encoding.UTF8.GetBytes("private")), new StoragePutOptions("text/plain"));
-        await provider.PutAsync("public/t1/a.txt", new MemoryStream(Encoding.UTF8.GetBytes("public")), new StoragePutOptions("text/plain"));
+        await provider.PutAsync("public/t1/a.txt", new MemoryStream(Encoding.UTF8.GetBytes("public")), new StoragePutOptions("text/plain", Visibility: StorageVisibility.Public));
 
         var priv = await provider.GetAsync("t1/a.txt");
         var pub = await provider.GetAsync("public/t1/a.txt");
@@ -42,10 +42,34 @@ public sealed class LocalPublicContainerTests : IDisposable
     public async Task A_public_object_is_written_under_the_public_root_only()
     {
         var provider = Create();
-        await provider.PutAsync("public/t1/a.txt", new MemoryStream([1, 2, 3]), new StoragePutOptions("text/plain"));
+        await provider.PutAsync("public/t1/a.txt", new MemoryStream([1, 2, 3]), new StoragePutOptions("text/plain", Visibility: StorageVisibility.Public));
 
         Assert.True(File.Exists(Path.Combine(publicRoot, "blobs", "t1", "a.txt")), "public blob must live under PublicRootPath with the prefix stripped");
         Assert.False(Directory.Exists(Path.Combine(root, "blobs", "t1")), "nothing may be written under the private root");
+    }
+
+    [Fact]
+    public async Task Put_refuses_a_public_key_marked_Private_and_writes_nothing()
+    {
+        // coord #0147: the caller asked for Private, the key prefix would have stored it publicly. A silent
+        // disclosure must become a failed call.
+        var provider = Create();
+        await Assert.ThrowsAsync<ArgumentException>(() => provider.PutAsync(
+            "public/t1/a.pdf", new MemoryStream([1]), new StoragePutOptions("application/pdf", Visibility: StorageVisibility.Private)));
+
+        Assert.False(Directory.Exists(publicRoot), "nothing may be written under the public root");
+        Assert.False(Directory.Exists(root), "nothing may be written under the private root");
+    }
+
+    [Fact]
+    public async Task Put_refuses_a_private_key_marked_Public_and_writes_nothing()
+    {
+        var provider = Create();
+        await Assert.ThrowsAsync<ArgumentException>(() => provider.PutAsync(
+            "t1/a.pdf", new MemoryStream([1]), new StoragePutOptions("application/pdf", Visibility: StorageVisibility.Public)));
+
+        Assert.False(Directory.Exists(publicRoot), "nothing may be written under the public root");
+        Assert.False(Directory.Exists(root), "nothing may be written under the private root");
     }
 
     [Fact]

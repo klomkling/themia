@@ -92,3 +92,4 @@ Themia.Storage.Urls.StorageUrlService.GetDownloadUrlAsync(string! key, System.Ti
 Themia.Storage.Urls.StorageUrlService.StorageUrlService(Themia.Storage.IStorageProvider! provider, Microsoft.Extensions.Options.IOptions<Themia.Storage.Urls.StorageUrlOptions!>! options) -> void
 Themia.Storage.Urls.StorageUrlServiceCollectionExtensions
 static Themia.Storage.Urls.StorageUrlServiceCollectionExtensions.AddThemiaStorageUrls(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Themia.Storage.Urls.StorageUrlOptions!>? configure = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static Themia.Storage.StorageKey.EnsureMatchesVisibility(string! key, Themia.Storage.StorageVisibility visibility) -> void

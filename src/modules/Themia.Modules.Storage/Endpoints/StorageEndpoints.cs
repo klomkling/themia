@@ -127,8 +127,11 @@ public static class StorageEndpoints
                 buffer.Write(chunk, 0, read);
             }
 
+            // The signed key already carries its container (TenantStorage built it from the requested
+            // visibility), so the visibility is read back from it rather than defaulted to Private.
             buffer.Position = 0;
-            await provider.PutAsync(key, buffer, new StoragePutOptions(request.ContentType ?? "application/octet-stream"), ct);
+            var visibility = StorageKey.IsPublic(key) ? StorageVisibility.Public : StorageVisibility.Private;
+            await provider.PutAsync(key, buffer, new StoragePutOptions(request.ContentType ?? "application/octet-stream", Visibility: visibility), ct);
             return Results.NoContent();
         });
 

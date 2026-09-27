@@ -27,6 +27,16 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+### Fixed
+- **(breaking)** **`IStorageProvider.PutAsync` refuses a key whose prefix disagrees with
+  `StoragePutOptions.Visibility`** (`Themia.Storage`, `Themia.Storage.S3`). Both providers place an object
+  by its key's `public/` prefix and never read `Visibility`, so `Visibility = Private` with a `public/` key
+  stored the object world-readable with no error or log. Local and S3 now throw `ArgumentException` on a
+  mismatch in either direction, before anything is written (new `StorageKey.EnsureMatchesVisibility`).
+  `ITenantStorage` callers are unaffected — it derives the prefix from `Visibility` — and the module's
+  `/_local/put` upload route now takes the visibility from the signed key. See
+  [MIGRATION.md](MIGRATION.md). (coord #0147)
+
 ## [0.30.0] - 2026-09-27
 
 ### Added
