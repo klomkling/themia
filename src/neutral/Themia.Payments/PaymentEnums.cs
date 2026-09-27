@@ -97,7 +97,11 @@ public enum WebhookOutcome
     /// <summary>A signature was present and did not match.</summary>
     SignatureMismatch,
 
-    /// <summary>Authentic but unrecognised event name.</summary>
+    /// <summary>
+    /// Authentic but unrecognised event name. <b>Reserved:</b> no current adapter produces it — Beam and 2C2P
+    /// both return <see cref="Verified"/> with <see cref="PaymentEventType.Other"/> for an authentic event they
+    /// do not model. Handle it anyway, as a future adapter may.
+    /// </summary>
     UnknownEvent,
 
     /// <summary>The body could not be parsed.</summary>
