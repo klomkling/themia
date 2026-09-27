@@ -436,12 +436,16 @@ culture-dependent format was one `CurrentCulture` away.
 | `0003` | `Failed` + `Canceled` |
 | `0004` (soft decline, retry after 3DS) | `Failed` + `AuthenticationFailed` |
 | `2002` (not found) | throws `PaymentApiException(NotFound)` |
-| `2003`, `0999` | `Failed` + `ProcessingFailed` |
-| `4xxx` card codes (`4005` do not honor, `4051` insufficient funds, …) | `Failed` + `Declined` / `InsufficientFunds`, raw code always carried |
+| `2003` | `Failed` + `ProcessingFailed` |
+| `4005` (do not honor), `4051` (insufficient funds) | `Failed` + `Declined` / `InsufficientFunds`, raw code always carried |
+| `0999` (system error) and any code not listed above | inquiry: throws `PaymentApiException(Transient)` with the raw code; notification: `Verified` + `PaymentEventType.Other`, never `ChargeFailed` |
 
-Card `4xxx` codes are mapped only where the meaning is unambiguous; everything else lands on `Unknown`
-with its code intact, because a wrong normalization is worse than an honest `Unknown` (the old adapter
-collapsed the lot into `IsSuccess = respCode == "0000"` plus a description string).
+The known table is exactly the codes above. `0999` and unrecognised codes (including other `4xxx` card
+codes) say nothing reliable about whether the shopper paid, so they are a failed *call* to retry, never
+a failed *payment* an app might act on by cancelling a paid order (user ruling, final review). A
+`Failed` code without its own reason falls back to `Unknown` with its code intact, because a wrong
+normalization is worse than an honest `Unknown` (the old adapter collapsed the lot into
+`IsSuccess = respCode == "0000"` plus a description string).
 
 ---
 

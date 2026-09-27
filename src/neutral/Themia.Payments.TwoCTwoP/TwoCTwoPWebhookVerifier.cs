@@ -82,8 +82,10 @@ public sealed class TwoCTwoPWebhookVerifier : IPaymentWebhookVerifier
             return new WebhookVerification(WebhookOutcome.Malformed, null);
         }
 
-        var status = TwoCTwoPMapping.ToStatus(respCode);
-        var type = status switch
+        // 0999 or an unknown code says nothing reliable about the payment: authentic, but never ChargeFailed.
+        var isKnown = TwoCTwoPMapping.IsKnownRespCode(respCode);
+        var status = isKnown ? TwoCTwoPMapping.ToStatus(respCode) : PaymentStatus.Pending;
+        var type = !isKnown ? PaymentEventType.Other : status switch
         {
             PaymentStatus.Succeeded => PaymentEventType.ChargeSucceeded,
             PaymentStatus.Failed => PaymentEventType.ChargeFailed,

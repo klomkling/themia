@@ -136,7 +136,9 @@ public sealed class TwoCTwoPPaymentGateway : IPaymentGateway, IPaymentGatewayCap
 
     /// <inheritdoc />
     /// <exception cref="ArgumentException"><paramref name="charge"/> carries neither a reference id nor a provider charge id.</exception>
-    /// <exception cref="PaymentApiException">2C2P found no such transaction, or rejected the call.</exception>
+    /// <exception cref="PaymentApiException">2C2P found no such transaction (<see cref="FailureKind.NotFound"/>),
+    /// answered with <c>0999</c> or a <c>respCode</c> this package does not know (<see cref="FailureKind.Transient"/>,
+    /// the raw code as <see cref="PaymentApiException.ProviderCode"/> — retry the read), or rejected the call.</exception>
     /// <remarks>2C2P's Payment Inquiry reads by <c>invoiceNo</c>, which is the app's own reference id — the
     /// provider charge id is only a fallback, and only because 2C2P's invoice number and charge id are the same value.</remarks>
     public async Task<Charge> GetChargeAsync(ChargeRef charge, CancellationToken cancellationToken = default)
@@ -169,10 +171,17 @@ public sealed class TwoCTwoPPaymentGateway : IPaymentGateway, IPaymentGatewayCap
             throw new PaymentApiException(FailureKind.Unknown, "malformed_response", (int)response.StatusCode);
         }
 
+        var respDesc = TwoCTwoPMapping.TryGetNonEmptyString(verified, "respDesc", out var desc) ? desc : null;
         if (respCode == "2002")
         {
-            var respDesc = TwoCTwoPMapping.TryGetNonEmptyString(verified, "respDesc", out var desc) ? desc : null;
             throw new PaymentApiException(FailureKind.NotFound, respCode, (int)response.StatusCode, respDesc);
+        }
+
+        // 0999 (2C2P system error) or a code this package does not know: the inquiry did not say whether the
+        // shopper paid, so this is a failed call to retry, never a failed payment an app might act on.
+        if (!TwoCTwoPMapping.IsKnownRespCode(respCode))
+        {
+            throw new PaymentApiException(FailureKind.Transient, respCode, (int)response.StatusCode, respDesc);
         }
 
         return TwoCTwoPMapping.ToCharge(verified, invoiceNo, respCode, (int)response.StatusCode, twoCTwoPOptions.TransactionTimeOffset);

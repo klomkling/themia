@@ -25,8 +25,18 @@ internal static class TwoCTwoPMapping
         _ => throw new ArgumentOutOfRangeException(nameof(method), method, null),
     };
 
-    /// <summary>Maps a 2C2P <c>respCode</c> to a normalized <see cref="PaymentStatus"/>. Fails closed: any code
-    /// this package does not recognize as succeeded or pending is reported as failed, never succeeded.</summary>
+    /// <summary>
+    /// Whether this package knows what a <c>respCode</c> says about the payment: <c>0000</c>, <c>0001</c>,
+    /// <c>2001</c>, <c>2002</c>, <c>0003</c>, <c>0004</c>, <c>2003</c>, <c>4005</c>, <c>4051</c>. Anything else —
+    /// including <c>0999</c>, 2C2P's own system error — says nothing reliable about whether the shopper paid, so a
+    /// caller must never report it as a failed payment (an app could cancel an order that was in fact paid).
+    /// </summary>
+    public static bool IsKnownRespCode(string respCode) => respCode is
+        "0000" or "0001" or "2001" or "2002" or "0003" or "0004" or "2003" or "4005" or "4051";
+
+    /// <summary>Maps a known 2C2P <c>respCode</c> (<see cref="IsKnownRespCode"/>) to a normalized
+    /// <see cref="PaymentStatus"/>. Never reports an unrecognized code as succeeded; callers check
+    /// <see cref="IsKnownRespCode"/> first so it is never reported as failed either.</summary>
     public static PaymentStatus ToStatus(string respCode) => respCode switch
     {
         "0000" => PaymentStatus.Succeeded,
@@ -35,8 +45,8 @@ internal static class TwoCTwoPMapping
     };
 
     /// <summary>Maps a 2C2P <c>respCode</c> to a normalized <see cref="PaymentFailure"/>, or null for a
-    /// succeeded or pending code. Fails closed: an unrecognized code lands on <see cref="FailureReason.ProcessingFailed"/>,
-    /// never on a reason that implies the payment could still be retried the same way.</summary>
+    /// succeeded or pending code. A code without an unambiguous meaning lands on <see cref="FailureReason.Unknown"/>
+    /// with the raw code carried — an honest unknown beats a wrong normalization.</summary>
     public static PaymentFailure? ToFailure(string respCode, string? respDesc)
     {
         var reason = respCode switch
@@ -44,9 +54,10 @@ internal static class TwoCTwoPMapping
             "0000" or "0001" or "2001" => (FailureReason?)null,
             "0003" => FailureReason.Canceled,
             "0004" => FailureReason.AuthenticationFailed,
+            "2003" => FailureReason.ProcessingFailed,
             "4051" => FailureReason.InsufficientFunds,
             "4005" => FailureReason.Declined,
-            _ => FailureReason.ProcessingFailed,
+            _ => FailureReason.Unknown,
         };
 
         return reason is { } value ? new PaymentFailure(value, respCode, respDesc) : null;

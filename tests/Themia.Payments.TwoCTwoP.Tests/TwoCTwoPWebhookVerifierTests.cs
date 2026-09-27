@@ -42,6 +42,27 @@ public class TwoCTwoPWebhookVerifierTests
         Assert.Equal(PaymentStatus.Succeeded, result.Event.Status);
     }
 
+    [Theory]
+    [InlineData("0999")]
+    [InlineData("9999")]
+    public void A_notification_with_a_system_error_or_unknown_code_is_other_never_charge_failed(string respCode)
+    {
+        var body = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new
+        {
+            payload = JwtHs256.Encode(new Dictionary<string, object?>
+            {
+                ["invoiceNo"] = "order-1", ["amount"] = 1000.00m, ["currencyCode"] = "THB",
+                ["respCode"] = respCode, ["respDesc"] = "System error", ["transactionDateTime"] = "20260927153000",
+            }, "secret"),
+        }));
+
+        var result = Verifier("secret").Verify(body, new Dictionary<string, string>());
+
+        Assert.Equal(WebhookOutcome.Verified, result.Outcome);
+        Assert.Equal(PaymentEventType.Other, result.Event!.Type);
+        Assert.NotEqual(PaymentStatus.Failed, result.Event.Status);
+    }
+
     [Fact]
     public void A_notification_signed_with_another_secret_is_a_mismatch()
     {

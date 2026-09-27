@@ -184,7 +184,7 @@ public class TwoCTwoPGatewayTests
     [InlineData("0003", PaymentStatus.Failed, FailureReason.Canceled)]
     [InlineData("0004", PaymentStatus.Failed, FailureReason.AuthenticationFailed)]
     [InlineData("2003", PaymentStatus.Failed, FailureReason.ProcessingFailed)]
-    [InlineData("0999", PaymentStatus.Failed, FailureReason.ProcessingFailed)]
+    [InlineData("2002", PaymentStatus.Failed, FailureReason.Unknown)]
     [InlineData("4051", PaymentStatus.Failed, FailureReason.InsufficientFunds)]
     [InlineData("4005", PaymentStatus.Failed, FailureReason.Declined)]
     public void Response_codes_map_to_a_status_and_a_reason(string respCode, PaymentStatus status, FailureReason reason)
@@ -195,6 +195,25 @@ public class TwoCTwoPGatewayTests
             Assert.Equal(reason, TwoCTwoPMapping.ToFailure(respCode, "desc")!.Reason);
             Assert.Equal(respCode, TwoCTwoPMapping.ToFailure(respCode, "desc")!.ProviderCode);
         }
+    }
+
+    [Theory]
+    [InlineData("0999")]   // 2C2P's own "system error": says nothing about whether the shopper paid
+    [InlineData("9999")]   // a code this package does not know
+    public async Task An_inquiry_with_a_system_error_or_unknown_code_is_transient_not_a_failed_charge(string respCode)
+    {
+        var handler = new StubHandler().Enqueue(HttpStatusCode.OK, ResponseEnvelope(new Dictionary<string, object?>
+        {
+            ["invoiceNo"] = "order-1", ["amount"] = 1000.00m, ["currencyCode"] = "THB",
+            ["respCode"] = respCode, ["respDesc"] = "System error",
+        }));
+        var gateway = BuildGateway(handler);
+
+        var ex = await Assert.ThrowsAsync<PaymentApiException>(() => gateway.GetChargeAsync(new ChargeRef(null, "order-1")));
+
+        Assert.Equal(FailureKind.Transient, ex.Kind);
+        Assert.Equal(respCode, ex.ProviderCode);
+        Assert.Equal(200, ex.HttpStatus);
     }
 
     [Fact]
