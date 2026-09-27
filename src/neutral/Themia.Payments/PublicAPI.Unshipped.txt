@@ -188,3 +188,7 @@ Themia.Payments.IPaymentWebhookVerifier
 Themia.Payments.IPaymentWebhookVerifier.Verify(System.ReadOnlySpan<byte> rawBody, System.Collections.Generic.IReadOnlyDictionary<string!, string!>! headers) -> Themia.Payments.WebhookVerification!
 Themia.Payments.DependencyInjection.PaymentsServiceCollectionExtensions
 static Themia.Payments.DependencyInjection.PaymentsServiceCollectionExtensions.AddThemiaPayments(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Themia.Payments.ThemiaPaymentsOptions!>? configure = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+Themia.Payments.ChargeRefValidator
+static Themia.Payments.ChargeRefValidator.Validate(Themia.Payments.ChargeRef charge) -> void
+Themia.Payments.RefundRequestValidator
+static Themia.Payments.RefundRequestValidator.Validate(Themia.Payments.RefundRequest! request) -> void

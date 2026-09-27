@@ -67,4 +67,31 @@ public class CreateChargeRequestValidatorTests
     {
         CreateChargeRequestValidator.Validate(Valid());
     }
+
+    public static TheoryData<string> InvalidIdempotencyKeys => new()
+    {
+        "",
+        "   ",
+        new string('k', 256),
+        "order-1\nX-Injected: 1",
+        "order-1\u0000",
+    };
+
+    [Theory]
+    [MemberData(nameof(InvalidIdempotencyKeys))]
+    public void An_invalid_idempotency_key_is_refused(string key)
+    {
+        var ex = Assert.Throws<PaymentApiException>(
+            () => CreateChargeRequestValidator.Validate(Valid() with { IdempotencyKey = key }));
+
+        Assert.Equal(FailureKind.Validation, ex.Kind);
+        Assert.Equal("idempotency_key_invalid", ex.ProviderCode);
+        Assert.Equal(0, ex.HttpStatus);
+    }
+
+    [Fact]
+    public void A_255_character_idempotency_key_is_accepted()
+    {
+        CreateChargeRequestValidator.Validate(Valid() with { IdempotencyKey = new string('k', 255) });
+    }
 }

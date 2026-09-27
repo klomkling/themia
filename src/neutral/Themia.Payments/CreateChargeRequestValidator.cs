@@ -39,6 +39,8 @@ public static class CreateChargeRequestValidator
         {
             throw Refuse("expiry_in_the_past", "ExpiresAt is already past.");
         }
+
+        IdempotencyKeyRule.Validate(request.IdempotencyKey);
     }
 
     private static PaymentApiException Refuse(string code, string message) =>

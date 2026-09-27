@@ -145,11 +145,8 @@ public sealed class TwoCTwoPPaymentGateway : IPaymentGateway, IPaymentGatewayCap
     /// provider charge id is only a fallback, and only because 2C2P's invoice number and charge id are the same value.</remarks>
     public async Task<Charge> GetChargeAsync(ChargeRef charge, CancellationToken cancellationToken = default)
     {
-        var invoiceNo = !string.IsNullOrEmpty(charge.ReferenceId)
-            ? charge.ReferenceId
-            : charge.ProviderChargeId is { Length: > 0 } providerChargeId
-                ? providerChargeId
-                : throw new ArgumentException("A ChargeRef needs a ReferenceId or a ProviderChargeId.", nameof(charge));
+        ChargeRefValidator.Validate(charge);
+        var invoiceNo = !string.IsNullOrWhiteSpace(charge.ReferenceId) ? charge.ReferenceId : charge.ProviderChargeId!;
 
         var twoCTwoPOptions = options.Value;
         var httpClient = httpClientFactory.CreateClient(HttpClientName);
@@ -195,11 +192,17 @@ public sealed class TwoCTwoPPaymentGateway : IPaymentGateway, IPaymentGatewayCap
     /// Maintenance API, which needs the merchant's RSA key pair and 2C2P's certificate (JWE inside JWS) rather
     /// than the shared secret every other call here uses.
     /// </remarks>
-    /// <exception cref="PaymentApiException">Always, with <see cref="FailureKind.Validation"/> and
-    /// <c>refund_not_supported</c>. Nothing is sent to 2C2P.</exception>
-    public Task<RefundCreation> RefundAsync(RefundRequest request, CancellationToken cancellationToken = default) =>
-        Task.FromException<RefundCreation>(new PaymentApiException(FailureKind.Validation, "refund_not_supported", httpStatus: 0,
+    /// <exception cref="ArgumentNullException"><paramref name="request"/> is null (thrown synchronously).</exception>
+    /// <exception cref="ArgumentException">The request's charge reference names no charge (thrown synchronously).</exception>
+    /// <exception cref="PaymentApiException"><c>idempotency_key_invalid</c> (thrown synchronously) for an invalid key;
+    /// otherwise always, with <see cref="FailureKind.Validation"/> and <c>refund_not_supported</c>. Nothing is sent to 2C2P.</exception>
+    public Task<RefundCreation> RefundAsync(RefundRequest request, CancellationToken cancellationToken = default)
+    {
+        // Validated like every adapter's refund, so an invalid request is refused the same way everywhere.
+        RefundRequestValidator.Validate(request);
+        return Task.FromException<RefundCreation>(new PaymentApiException(FailureKind.Validation, "refund_not_supported", httpStatus: 0,
             "The 2C2P adapter does not support refunds; refund from the 2C2P merchant portal."));
+    }
 
     /// <summary>
     /// Parses the response body and returns its verified <c>payload</c> contents. Throws for anything else: a

@@ -129,6 +129,40 @@ public abstract class PaymentGatewayContract
             () => CreateGateway(handler).CreateChargeAsync(Request(), cts.Token));
     }
 
+    [Fact]
+    public async Task Reading_a_charge_ref_with_neither_id_is_an_argument_exception_and_sends_nothing()
+    {
+        var handler = new StubHandler();
+
+        var ex = await Assert.ThrowsAsync<ArgumentException>(
+            () => CreateGateway(handler).GetChargeAsync(new ChargeRef(null, "")));
+
+        Assert.Equal("charge", ex.ParamName);
+        Assert.Empty(handler.Requests);
+    }
+
+    [Fact]
+    public async Task A_default_charge_ref_is_the_same_argument_exception()
+    {
+        var handler = new StubHandler();
+
+        await Assert.ThrowsAsync<ArgumentException>(() => CreateGateway(handler).GetChargeAsync(default));
+
+        Assert.Empty(handler.Requests);
+    }
+
+    [Fact]
+    public async Task An_invalid_refund_idempotency_key_is_refused_before_anything_is_sent()
+    {
+        var handler = new StubHandler();
+
+        var ex = await Assert.ThrowsAsync<PaymentApiException>(() => CreateGateway(handler).RefundAsync(
+            new RefundRequest(new ChargeRef("ch_1", "order-1"), null, null, new string('k', 256))));
+
+        Assert.Equal("idempotency_key_invalid", ex.ProviderCode);
+        Assert.Empty(handler.Requests);
+    }
+
     private static CreateChargeRequest Request() => new()
     {
         Amount = Money.Thb(100000),

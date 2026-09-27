@@ -260,4 +260,22 @@ public class BeamPaymentClientTests
         Assert.Contains(Encoding.UTF8.GetString(imageBytes), handler.Bodies[0], StringComparison.Ordinal);
         Assert.Contains(Encoding.UTF8.GetString(imageBytes), handler.Bodies[1], StringComparison.Ordinal);
     }
+
+    [Fact]
+    public async Task A_payment_link_with_an_invalid_idempotency_key_is_refused_before_the_call()
+    {
+        var handler = new StubHandler();
+        var client = BeamTestHost.BuildClient(handler);
+
+        var ex = await Assert.ThrowsAsync<PaymentApiException>(() => client.CreatePaymentLinkAsync(new BeamPaymentLinkRequest
+        {
+            Amount = Money.Thb(10000),
+            ReferenceId = "order-1",
+            AllowedMethods = [PaymentMethod.Card],
+            IdempotencyKey = "key\r\nX-Injected: 1",
+        }));
+
+        Assert.Equal("idempotency_key_invalid", ex.ProviderCode);
+        Assert.Empty(handler.Requests);
+    }
 }

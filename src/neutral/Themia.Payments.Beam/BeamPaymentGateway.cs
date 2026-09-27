@@ -78,6 +78,7 @@ public sealed class BeamPaymentGateway : IPaymentGateway, IPaymentGatewayCapabil
     }
 
     /// <inheritdoc />
+    /// <exception cref="ArgumentException"><paramref name="charge"/> carries neither a reference id nor a provider charge id.</exception>
     /// <exception cref="PaymentApiException">Beam rejected the call, or no charge could be found.</exception>
     /// <remarks>
     /// Resolves in three steps: a provider charge id reads <c>GET /api/v1/charges/{id}</c> directly; a 404 there
@@ -86,6 +87,7 @@ public sealed class BeamPaymentGateway : IPaymentGateway, IPaymentGatewayCapabil
     /// </remarks>
     public async Task<Charge> GetChargeAsync(ChargeRef charge, CancellationToken cancellationToken = default)
     {
+        ChargeRefValidator.Validate(charge);
         var httpClient = httpClientFactory.CreateClient(HttpClientName);
         var (resolved, _) = await BeamCharges.ResolveAsync(httpClient, options.Value, charge, cancellationToken)
             .ConfigureAwait(false);
@@ -93,8 +95,10 @@ public sealed class BeamPaymentGateway : IPaymentGateway, IPaymentGatewayCapabil
     }
 
     /// <inheritdoc />
+    /// <exception cref="ArgumentNullException"><paramref name="request"/> is null.</exception>
+    /// <exception cref="ArgumentException">The request's charge reference names no charge.</exception>
     /// <exception cref="PaymentApiException">
-    /// No charge could be resolved for the reference id, a payment link id names a link no charge has paid, the charge is not a <c>CARD</c> charge but a partial
+    /// The idempotency key is invalid, no charge could be resolved for the reference id, a payment link id names a link no charge has paid, the charge is not a <c>CARD</c> charge but a partial
     /// amount was requested, a partial amount's currency does not match the charge's, or Beam rejected the call.
     /// </exception>
     /// <remarks>
@@ -105,7 +109,7 @@ public sealed class BeamPaymentGateway : IPaymentGateway, IPaymentGatewayCapabil
     /// </remarks>
     public async Task<RefundCreation> RefundAsync(RefundRequest request, CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(request);
+        RefundRequestValidator.Validate(request);
         var beamOptions = options.Value;
         var httpClient = httpClientFactory.CreateClient(HttpClientName);
 

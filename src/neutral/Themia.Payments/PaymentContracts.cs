@@ -86,7 +86,8 @@ public sealed record CreateChargeRequest
 
     /// <summary>
     /// Stable across retries of the same logical operation. Generated per call when absent — which is safe
-    /// only because the generated key is reused for that call's own internal retries.
+    /// only because the generated key is reused for that call's own internal retries. When set: non-blank, at
+    /// most 255 characters, no control characters — otherwise refused as <c>idempotency_key_invalid</c>.
     /// </summary>
     public string? IdempotencyKey { get; init; }
 }
@@ -96,7 +97,7 @@ public sealed record CreateChargeRequest
 /// <param name="Amount">How much, or null for the maximum refundable amount. A partial amount is refused
 /// for methods whose provider does not support one.</param>
 /// <param name="Reason">Free text kept on the refund.</param>
-/// <param name="IdempotencyKey">Stable across retries, as on a charge.</param>
+/// <param name="IdempotencyKey">Stable across retries, with the same limits as on a charge.</param>
 public sealed record RefundRequest(ChargeRef Charge, Money? Amount, string? Reason, string? IdempotencyKey);
 
 /// <summary>The outcome of requesting a refund.</summary>

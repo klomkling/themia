@@ -263,6 +263,7 @@ public sealed class BeamPaymentClient
             ReferenceId = request.ReferenceId,
             AllowedMethods = request.AllowedMethods,
             ExpiresAt = request.ExpiresAt,
+            IdempotencyKey = request.IdempotencyKey,
         });
 
     private static BeamPaymentLinkStatus ToLinkStatus(string status) => status switch
