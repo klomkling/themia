@@ -18,7 +18,8 @@ internal static class BeamCharges
     public static async Task<(Charge Charge, bool IsUnpaidLink)> ResolveAsync(
         HttpClient httpClient, BeamOptions beamOptions, ChargeRef charge, CancellationToken cancellationToken)
     {
-        if (charge.ProviderChargeId is not { Length: > 0 } id)
+        var id = charge.ProviderChargeId;
+        if (string.IsNullOrWhiteSpace(id))
         {
             return (await GetByReferenceAsync(httpClient, beamOptions, charge.ReferenceId, cancellationToken)
                 .ConfigureAwait(false), false);

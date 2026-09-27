@@ -46,6 +46,19 @@ public class BeamGetChargeTests
     }
 
     [Fact]
+    public async Task A_whitespace_provider_id_counts_as_unset_and_the_charge_is_found_by_reference()
+    {
+        var (gateway, handler) = Build("""
+        { "data": [ { "chargeId": "ch_2", "referenceId": "order-1", "status": "SUCCEEDED", "currency": "THB", "amount": 199 } ] }
+        """);
+
+        var charge = await gateway.GetChargeAsync(new ChargeRef(ProviderChargeId: "  ", ReferenceId: "order-1"));
+
+        Assert.Equal("/api/v1/charges", handler.Requests[0].RequestUri!.AbsolutePath);
+        Assert.Equal("ch_2", charge.ChargeId);
+    }
+
+    [Fact]
     public async Task A_payment_link_id_is_followed_to_the_charge_that_paid_it()
     {
         // ChargeCreation for a multi-method request carries the link id (Task 7). Reading it back must work.
