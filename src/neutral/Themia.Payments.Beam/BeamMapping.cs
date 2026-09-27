@@ -15,7 +15,7 @@ internal static class BeamMapping
     /// <summary>
     /// The Beam charge type for a method that can be charged directly, or null when it cannot. Only
     /// <see cref="PaymentMethod.QrPromptPay"/> qualifies in v1: a direct <c>CARD</c> charge needs card data
-    /// or a token, and tokenization/3DS are out of scope (spec §8), so <see cref="PaymentMethod.Card"/>
+    /// or a token, and tokenization/3DS are out of scope in v1, so <see cref="PaymentMethod.Card"/>
     /// always routes through a payment link instead, where Beam's hosted page collects the card.
     /// <see cref="PaymentMethod.MobileBanking"/> and <see cref="PaymentMethod.Wallet"/> exist only as
     /// payment-link groups and were never direct-chargeable.

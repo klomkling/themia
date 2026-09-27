@@ -4,7 +4,7 @@ namespace Themia.Payments;
 /// <remarks>
 /// Every charge created here is the platform's <b>own revenue</b>. Collecting money on behalf of someone
 /// else and settling it later is a licensed payment business in Thailand, so that flow is out of scope by
-/// law rather than by preference — see the design document's §1.
+/// law rather than by preference.
 /// </remarks>
 public interface IPaymentGateway
 {

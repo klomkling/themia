@@ -92,8 +92,8 @@ public class BeamOptionsTests
 
         using var provider = services.BuildServiceProvider();
 
-        // QrPromptPay and Card are charged directly; MobileBanking and Wallet go through a payment link
-        // (Task 7), so all four are genuinely servable.
+        // A lone QrPromptPay is charged directly; everything else goes through a payment link, so all four
+        // are genuinely servable.
         Assert.Equal(
             [PaymentMethod.QrPromptPay, PaymentMethod.Card, PaymentMethod.MobileBanking, PaymentMethod.Wallet],
             provider.GetRequiredService<IPaymentGatewayCapabilities>().SupportedMethods);

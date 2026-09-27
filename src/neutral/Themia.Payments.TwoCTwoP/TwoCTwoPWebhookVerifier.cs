@@ -8,7 +8,7 @@ namespace Themia.Payments.TwoCTwoP;
 
 /// <summary>Verifies a 2C2P backend notification by its own JWT signature, then reads the event from it.</summary>
 /// <remarks>
-/// Spec §7b: every 2C2P body is <c>{"payload":"&lt;JWT&gt;"}</c>, HS256-signed with the merchant secret — the
+/// Every 2C2P body is <c>{"payload":"&lt;JWT&gt;"}</c>, HS256-signed with the merchant secret — the
 /// signature <b>is</b> the authentication. Unlike Beam, 2C2P sends no header at all: <c>headers</c> is accepted
 /// only to satisfy <see cref="IPaymentWebhookVerifier"/> and is never consulted.
 /// <para>

@@ -11,11 +11,13 @@ namespace Themia.Payments.TwoCTwoP;
 /// <summary>2C2P PGW 4.3 (Redirect API) <see cref="IPaymentGateway"/> adapter.</summary>
 /// <remarks>
 /// Every request and response body is <c>{"payload": "&lt;JWT&gt;"}</c>, HS256-signed with the merchant secret
-/// (spec §7b) — there is no bearer or basic header, and every response is verified before it is trusted (a
-/// response that fails verification is never parsed). 2C2P mints no charge id before payment, so
+/// — there is no bearer or basic header. A signed <c>payload</c> is verified before any of it is trusted, and an
+/// unverified payload is never parsed into a result. The one unsigned body read is 2C2P's plain
+/// <c>{ "respCode", "respDesc" }</c> request-rejection shape, and only to raise a <see cref="PaymentApiException"/>
+/// carrying that code. 2C2P mints no charge id before payment, so
 /// <see cref="ChargeCreation.ChargeId"/> and <see cref="Charge.ChargeId"/> are always the caller's own
-/// <see cref="CreateChargeRequest.ReferenceId"/> — 2C2P's <c>invoiceNo</c>. Refunds go through the (XML) Payment
-/// Process endpoint, added in Task 14; this adapter does not yet support them.
+/// <see cref="CreateChargeRequest.ReferenceId"/> — 2C2P's <c>invoiceNo</c>. Refunds are not supported in this
+/// version (see <see cref="RefundAsync"/>).
 /// </remarks>
 public sealed class TwoCTwoPPaymentGateway : IPaymentGateway, IPaymentGatewayCapabilities
 {
@@ -191,7 +193,7 @@ public sealed class TwoCTwoPPaymentGateway : IPaymentGateway, IPaymentGatewayCap
     /// <remarks>
     /// Not supported in this version: refund from the 2C2P merchant portal. 2C2P refunds go through the Payment
     /// Maintenance API, which needs the merchant's RSA key pair and 2C2P's certificate (JWE inside JWS) rather
-    /// than the shared secret every other call here uses (spec §7b).
+    /// than the shared secret every other call here uses.
     /// </remarks>
     /// <exception cref="PaymentApiException">Always, with <see cref="FailureKind.Validation"/> and
     /// <c>refund_not_supported</c>. Nothing is sent to 2C2P.</exception>

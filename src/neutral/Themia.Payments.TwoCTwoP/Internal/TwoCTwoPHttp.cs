@@ -4,7 +4,7 @@ namespace Themia.Payments.TwoCTwoP.Internal;
 
 /// <summary>Sends a 2C2P PGW 4.3 request with retry. Unlike Beam, 2C2P carries no auth header or idempotency
 /// header — the JWT signature over the body is the only authentication, and an idempotency key (when the
-/// caller wants one) travels inside that same signed body (spec §7b, §5).</summary>
+/// caller wants one) travels inside that same signed body.</summary>
 internal static class TwoCTwoPHttp
 {
     /// <summary>The maximum number of attempts <see cref="SendWithRetryAsync"/> makes for one logical call.</summary>

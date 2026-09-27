@@ -5,8 +5,7 @@ namespace Themia.Payments.Beam.Internal;
 
 /// <summary>
 /// Beam's charge-reading calls: by id, by payment-link id, and by the app's own reference id. Lives here, not
-/// inline in <see cref="BeamPaymentGateway"/>, for the same reason as <see cref="BeamPaymentLinks"/> — Task 11's
-/// public <c>BeamPaymentClient</c> exposes the same reads directly.
+/// inline in <see cref="BeamPaymentGateway"/>, so the gateway's reads and refunds share one resolution path.
 /// </summary>
 internal static class BeamCharges
 {
@@ -58,7 +57,7 @@ internal static class BeamCharges
 
     /// <summary>
     /// Reads a charge by id together with its <c>paymentMethod.paymentMethodType</c> — the only caller that
-    /// needs the method type is the refund partial-amount guard (Task 9), so it is not carried on the shared
+    /// needs the method type is the refund partial-amount guard, so it is not carried on the shared
     /// <see cref="Charge"/> type. Reuses <see cref="ToCharge"/> rather than parsing the body twice. Unlike
     /// <see cref="TryGetByIdAsync"/>, a 404 here is not special-cased — it throws like any other non-2xx,
     /// because by the time a refund needs this, the charge id is already known to exist.

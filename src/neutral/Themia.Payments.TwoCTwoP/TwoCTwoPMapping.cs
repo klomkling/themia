@@ -182,7 +182,7 @@ internal static class TwoCTwoPMapping
     }
 
     /// <summary>
-    /// Verifies and decodes <c>root.payload</c> (spec §7b: every 2C2P response is <c>{"payload": "&lt;JWT&gt;"}</c>).
+    /// Verifies and decodes <c>root.payload</c> (every 2C2P response is <c>{"payload": "&lt;JWT&gt;"}</c>).
     /// False when there is no string <c>payload</c> property, or the JWT does not verify with <paramref name="secret"/> —
     /// a caller must never parse an unverified payload into a result.
     /// </summary>

@@ -6,7 +6,7 @@ namespace Themia.Payments.Beam.Internal;
 
 /// <summary>
 /// Beam's payment-link create, get and disable calls. Lives here, not inline in <see cref="BeamPaymentGateway"/>,
-/// because Task 11's public <c>BeamPaymentClient</c> exposes the same calls directly.
+/// because the public <see cref="BeamPaymentClient"/> exposes the same calls directly.
 /// </summary>
 internal static class BeamPaymentLinks
 {
@@ -25,7 +25,7 @@ internal static class BeamPaymentLinks
     }
 
     /// <summary>
-    /// Creates a payment link from Task 11's <see cref="BeamPaymentClient"/>'s own request, which carries
+    /// Creates a payment link from <see cref="BeamPaymentClient"/>'s own request, which carries
     /// fields <see cref="CreateChargeRequest"/> has no room for (<c>cancelUrl</c>, the collection flags).
     /// Shares <see cref="PostCreateAsync"/> with <see cref="CreateAsync"/> rather than parsing the 201
     /// response a second time.

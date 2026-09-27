@@ -417,7 +417,8 @@ public class TwoCTwoPGatewayTests
     {
         using var document = JsonDocument.Parse(requestBody);
         var token = document.RootElement.GetProperty("payload").GetString()!;
-        return JwtHs256.DecodePayloadWithoutVerifying(token);
+        Assert.True(JwtHs256.TryDecode(token, Secret, out var payload));
+        return payload;
     }
 
     private sealed class StubClientFactory(HttpClient client) : IHttpClientFactory

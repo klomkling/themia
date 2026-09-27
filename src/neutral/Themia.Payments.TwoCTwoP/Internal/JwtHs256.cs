@@ -5,7 +5,7 @@ using System.Text.Json;
 namespace Themia.Payments.TwoCTwoP.Internal;
 
 /// <summary>
-/// HS256 JWT encode/decode for 2C2P's transport (spec §7b): every request and response body is
+/// HS256 JWT encode/decode for 2C2P's transport: every request and response body is
 /// <c>{"payload": "&lt;JWT&gt;"}</c>, and the signature is the only authentication — there is no bearer or
 /// basic header. No JWT library: this is base64url plus <see cref="HMACSHA256"/>, and a dependency here would
 /// reach every consumer of a <c>net8.0;net10.0</c> package for thirty lines.
@@ -80,25 +80,6 @@ internal static class JwtHs256
         {
             return false;
         }
-    }
-
-    /// <summary>Decodes the payload segment without checking the signature. Used only where the caller has
-    /// no secret to verify with (none in this package today). Throws on a malformed token or payload — unlike
-    /// <see cref="TryDecode"/>, there is no signature-mismatch case to fold a parse failure into.</summary>
-    /// <param name="token">The compact JWT.</param>
-    /// <returns>The payload, parsed as JSON.</returns>
-    /// <exception cref="FormatException">The token does not have three segments, or a segment is not valid base64url.</exception>
-    /// <exception cref="JsonException">The payload segment is not a JSON object.</exception>
-    public static JsonElement DecodePayloadWithoutVerifying(string token)
-    {
-        var parts = token.Split('.');
-        if (parts.Length != 3)
-        {
-            throw new FormatException("A JWT has three dot-separated segments.");
-        }
-
-        using var document = JsonDocument.Parse(Base64UrlDecode(parts[1]));
-        return document.RootElement.Clone();
     }
 
     private static byte[] Sign(string signingInput, string secret) =>

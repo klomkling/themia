@@ -10,8 +10,10 @@ namespace Themia.Payments.Beam;
 
 /// <summary>Beam Checkout's <see cref="IPaymentGateway"/> adapter.</summary>
 /// <remarks>
-/// QR PromptPay and card are charged directly; mobile banking and wallet go through a Beam payment link.
-/// All four are genuinely servable, even though the request-building path differs per method — see Task 7.
+/// Only a request whose sole allowed method is QR PromptPay is charged directly; everything else — card,
+/// mobile banking, wallet, or any two or more methods — goes through a Beam payment link, whose id is then
+/// what <see cref="ChargeCreation.ChargeId"/> carries. <see cref="GetChargeAsync"/> and <see cref="RefundAsync"/>
+/// both resolve a link id to the charge that paid it.
 /// </remarks>
 public sealed class BeamPaymentGateway : IPaymentGateway, IPaymentGatewayCapabilities
 {
@@ -39,9 +41,9 @@ public sealed class BeamPaymentGateway : IPaymentGateway, IPaymentGatewayCapabil
     }
 
     /// <summary>
-    /// The methods this adapter can charge with: <see cref="PaymentMethod.QrPromptPay"/> and
-    /// <see cref="PaymentMethod.Card"/> directly, <see cref="PaymentMethod.MobileBanking"/> and
-    /// <see cref="PaymentMethod.Wallet"/> through a payment link.
+    /// The methods this adapter can charge with: <see cref="PaymentMethod.QrPromptPay"/> (directly when it is
+    /// the only allowed method), and <see cref="PaymentMethod.Card"/>, <see cref="PaymentMethod.MobileBanking"/>
+    /// and <see cref="PaymentMethod.Wallet"/> through a payment link.
     /// </summary>
     public IReadOnlyList<PaymentMethod> SupportedMethods { get; } =
     [
