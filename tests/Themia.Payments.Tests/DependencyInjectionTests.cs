@@ -27,16 +27,30 @@ public class DependencyInjectionTests
     }
 
     [Fact]
-    public void Registering_twice_does_not_throw_and_adds_the_validator_once()
+    public void Registering_twice_does_not_throw_and_adds_the_validator_and_the_gate_once()
     {
         // The adapter's Add… calls AddThemiaPayments itself, and the host usually calls it again with its
-        // own policy. Both calls must be safe, and must not stack two validators.
+        // own policy. Both calls must be safe, must not stack two validators or gates, and the host's
+        // later configure delegate must still apply.
         var services = new ServiceCollection();
 
-        services.AddThemiaPayments();
-        services.AddThemiaPayments(o => o.MethodPolicy = null);
+        services.AddThemiaPayments(o => o.MethodPolicy = new PaymentMethodPolicy
+        {
+            Currency = "THB",
+            Bands = [new PaymentMethodBand(100000, [PaymentMethod.QrPromptPay])],
+            Above = [PaymentMethod.QrPromptPay],
+        });
+        services.AddThemiaPayments(o => o.MethodPolicy = new PaymentMethodPolicy
+        {
+            Currency = "USD",
+            Bands = [new PaymentMethodBand(100000, [PaymentMethod.QrPromptPay])],
+            Above = [PaymentMethod.QrPromptPay],
+        });
 
         Assert.Single(services, d => d.ServiceType == typeof(IValidateOptions<ThemiaPaymentsOptions>));
+        Assert.Single(services, d => d.ServiceType == typeof(PaymentMethodGate));
+        using var provider = services.BuildServiceProvider();
+        Assert.Equal("USD", provider.GetRequiredService<IOptions<ThemiaPaymentsOptions>>().Value.MethodPolicy!.Currency);
     }
 
     [Fact]
