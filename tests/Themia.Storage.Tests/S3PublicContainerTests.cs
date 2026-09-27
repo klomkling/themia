@@ -13,6 +13,17 @@ public sealed class S3PublicContainerTests
         Region = "us-east-1",
     });
 
+    [Theory]
+    [InlineData("public/t1/a.pdf", StorageVisibility.Private)]
+    [InlineData("t1/a.pdf", StorageVisibility.Public)]
+    public async Task Put_refuses_a_key_whose_prefix_disagrees_with_Visibility(string key, StorageVisibility visibility)
+    {
+        // coord #0147: same rule as the Local provider, so a call that fails locally cannot succeed on S3.
+        // Thrown before any request is built, so no bucket is contacted.
+        await Assert.ThrowsAsync<ArgumentException>(() => Create().PutAsync(
+            key, new MemoryStream([1]), new StoragePutOptions("application/pdf", Visibility: visibility)));
+    }
+
     [Fact]
     public void GetPublicUrl_composes_the_configured_base_with_the_stripped_key()
     {

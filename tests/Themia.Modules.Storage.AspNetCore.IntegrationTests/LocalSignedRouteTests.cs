@@ -21,6 +21,7 @@ public sealed class LocalSignedRouteTests : IAsyncLifetime
     private const string SigningKey = "test-signing-key-at-least-32-characters-long";
     private const long MaxObjectSizeBytes = 32; // small cap so the oversize _local/put test trips 413
     private readonly string root = Path.Combine(Path.GetTempPath(), "themia-storage-http", Guid.NewGuid().ToString("N"));
+    private readonly string publicRoot = Path.Combine(Path.GetTempPath(), "themia-storage-http-public", Guid.NewGuid().ToString("N"));
 
     private WebApplication app = null!;
     private HttpClient client = null!;
@@ -42,6 +43,8 @@ public sealed class LocalSignedRouteTests : IAsyncLifetime
             {
                 o.RootPath = root;
                 o.SigningKey = SigningKey;
+                o.PublicRootPath = publicRoot;
+                o.PublicBaseUrl = "https://api.example.com/storage/public";
             });
 
         builder.Services.AddSingleton<ITenantContext>(new TenantContext(new TenantId("acme")));
@@ -61,6 +64,7 @@ public sealed class LocalSignedRouteTests : IAsyncLifetime
         client?.Dispose();
         await app.DisposeAsync();
         if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        if (Directory.Exists(publicRoot)) Directory.Delete(publicRoot, recursive: true);
     }
 
     [Fact]
@@ -82,6 +86,22 @@ public sealed class LocalSignedRouteTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
         var downloaded = await getResponse.Content.ReadAsByteArrayAsync();
         Assert.Equal(payload, downloaded);
+    }
+
+    [Fact]
+    public async Task Signed_put_of_a_public_key_lands_in_the_public_root()
+    {
+        // The provider refuses a key/visibility mismatch (coord #0147), so the upload endpoint must take the
+        // visibility from the signed key rather than default it to Private.
+        const string key = "public/acme/logo.png";
+        var putUrl = await AbsoluteAsync(key, PresignedUrlOperation.Put);
+        using var putContent = new ByteArrayContent([1, 2, 3]);
+        putContent.Headers.Add("Content-Type", "image/png");
+
+        var putResponse = await client.PutAsync(putUrl, putContent);
+
+        Assert.Equal(HttpStatusCode.NoContent, putResponse.StatusCode);
+        Assert.True(File.Exists(Path.Combine(publicRoot, "blobs", "acme", "logo.png")));
     }
 
     [Fact]

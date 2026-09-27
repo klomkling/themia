@@ -15,7 +15,11 @@ public enum PresignedUrlOperation
 /// <param name="Metadata">Optional provider metadata (small string pairs); may be empty.</param>
 /// <param name="Overwrite">Whether to overwrite an existing object at the key (default true).</param>
 /// <param name="Visibility">Which container the object is written to. Defaults to
-/// <see cref="StorageVisibility.Private"/> and is <b>immutable</b> once written.</param>
+/// <see cref="StorageVisibility.Private"/> and is <b>immutable</b> once written. At the
+/// <see cref="IStorageProvider"/> level the key's <see cref="StorageKey.PublicPrefix"/> selects the container,
+/// and this must agree with it: <see cref="IStorageProvider.PutAsync"/> throws
+/// <see cref="System.ArgumentException"/> on a mismatch rather than store the object somewhere the caller
+/// did not ask for.</param>
 public readonly record struct StoragePutOptions(
     string ContentType,
     IReadOnlyDictionary<string, string>? Metadata = null,

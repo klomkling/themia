@@ -27,6 +27,7 @@ public sealed class LocalStorageProvider : IStorageProvider
     public async Task<StorageObjectInfo> PutAsync(string key, Stream content, StoragePutOptions options, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(content);
+        StorageKey.EnsureMatchesVisibility(key, options.Visibility);
         var blobPath = ResolveBlobPath(key);
         if (!options.Overwrite && File.Exists(blobPath))
         {

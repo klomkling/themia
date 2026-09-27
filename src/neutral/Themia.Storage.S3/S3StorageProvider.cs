@@ -47,6 +47,7 @@ public sealed class S3StorageProvider : IStorageProvider, IDisposable
     public async Task<StorageObjectInfo> PutAsync(string key, Stream content, StoragePutOptions options, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(content);
+        Themia.Storage.StorageKey.EnsureMatchesVisibility(key, options.Visibility);
         var (resolvedBucket, resolvedKey) = Resolve(key);
         var contentType = string.IsNullOrEmpty(options.ContentType) ? "application/octet-stream" : options.ContentType;
         var response = await client.PutObjectAsync(new PutObjectRequest

@@ -10,6 +10,45 @@ with the *why* and concrete upgrade steps.
 - Each entry states: **What changed**, **Why**, and **How to upgrade** (before → after).
 - Non-breaking changes are *not* listed here — see the CHANGELOG.
 
+## Unreleased
+
+### `IStorageProvider.PutAsync` throws when the key prefix and `Visibility` disagree (breaking for direct provider callers)
+
+**What changed:** `LocalStorageProvider.PutAsync` and `S3StorageProvider.PutAsync` throw `ArgumentException`
+when `StoragePutOptions.Visibility` does not match the key: `Private` with a key starting `public/`, or
+`Public` with a key that does not.
+
+**Why:** the provider picks the container from the key prefix alone, so `Visibility` was silently ignored.
+A caller who asked for `Private` on a `public/` key got a world-readable object and nothing said so — for a
+document carrying personal data, a disclosure (coord #0147).
+
+**Who is affected:** code calling `IStorageProvider.PutAsync` directly in either mismatched shape:
+
+- a `public/` key with the default `Visibility` (`Private`) — previously stored public;
+- an unprefixed key with `Visibility = Public` — previously stored private, so the object was never
+  reachable at its public URL.
+
+`ITenantStorage` builds the prefix from `Visibility`, so its callers are unaffected.
+
+**How to upgrade:**
+
+```csharp
+// before — stored publicly because of the key; Visibility defaulted to Private and was ignored
+await provider.PutAsync("public/listings/42.jpg", stream, new StoragePutOptions("image/jpeg"));
+
+// after — say what the key already says
+await provider.PutAsync("public/listings/42.jpg", stream,
+    new StoragePutOptions("image/jpeg", Visibility: StorageVisibility.Public));
+
+// before — asked for Public, stored private because the key has no prefix
+await provider.PutAsync("listings/42.jpg", stream,
+    new StoragePutOptions("image/jpeg", Visibility: StorageVisibility.Public));
+
+// after — a public object's key carries the prefix
+await provider.PutAsync(StorageKey.PublicPrefix + "listings/42.jpg", stream,
+    new StoragePutOptions("image/jpeg", Visibility: StorageVisibility.Public));
+```
+
 ## 0.29.0
 
 ### Original link/unlink hook overloads lose their `CancellationToken` default (breaking for direct callers)
