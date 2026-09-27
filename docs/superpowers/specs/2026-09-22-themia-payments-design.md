@@ -60,7 +60,7 @@ there is no per-tenant merchant onboarding, and no flow where Themia must hold s
 > | App | Structure | Status |
 > | --- | --- | --- |
 > | opsezy | **(3) principal / subcontractor** — chosen 2026-09-23 after the founders compared the three | the customer contracts with the platform and pays it; the platform hires the technician under a works contract. The charge Themia creates is the **full job price**, and it is the platform's own revenue. Structure (1) was what they ran before this decision |
-> | propertiezy | own revenue only — Boost / slot packs sold to agents | counsel answered 2026-09-22: **not in scope of the Act at all**, no licence. Their Terms of Use also state they take no money, deposit or consideration from buyers or renters, so the constraint is contractual as well as regulatory |
+> | propertiezy | own revenue only — Boost / slot packs sold to agents | counsel answered 2026-09-22: **not in scope of the Act at all**, no licence. Confirmed against their repo on coord #0145: no deposit, booking fee, escrow or rent collection anywhere in the roadmap, and the "we take no money from buyers or renters" sentence is a seeded CMS page under a revision rule, so it cannot drift silently. One adjacent thing they flagged themselves: prepaid Boost credits are stored value, which is a different regulatory question from collect-on-behalf and one they will put to counsel before building — it does not reach this interface either way |
 > | ezy-assets | SaaS subscription + add-ons, and a **zero-custody** commission ledger | counsel answered 2026-09-22: subscriptions and add-ons are own revenue, **safe**; the Phase 5 commission feature is safe *because* the platform never touches deal money — the agency transfers to the agent and the system only records proof |
 >
 > All three consumers answered, and all three land in the same place: **every charge `IPaymentGateway`
@@ -187,6 +187,12 @@ declares which it supports, and startup fails if the configuration can ask for o
 
 `Pending` · `Succeeded` · `Failed`. Beam's own lifecycle, and the intersection of the others.
 
+**A late success can arrive after the thing being sold has expired.** propertiezy raised this on coord #0145
+and it generalises: their products are time-boxed (a bump, a hero slot for 30 days), so a `charge.succeeded`
+that lands after the window has passed forces a three-way choice — start a window the buyer no longer gets,
+refund, or credit. Whoever owns the product decides; the package's part is to make sure the late event still
+arrives and is not silently dropped.
+
 **`Pending` is not a transient state you may wait on.** Beam documents that an abandoned charge can stay
 `PENDING` **indefinitely** — the shopper closes the QR screen and nothing further happens. Any consumer
 loop that waits for a final status must carry its own timeout and treat the timeout as unpaid, while
@@ -269,6 +275,13 @@ Rules, each one a failure mode we would otherwise ship:
   a reason (a saved card, a retry of a failed attempt).
 - **No store, no ledger.** Pure function of amount and configuration.
 
+The band shape was checked against a real price list before it was written down: propertiezy's boost ladder
+spans ฿25 to ฿7,350, with four products at or under ฿299 (coord #0145). At ฿25 a percentage card fee is a
+double-digit share of the charge, which is this section's argument at its most extreme, and one boundary
+somewhere between ฿300 and ฿1,000 covers their whole small-ticket population — one band plus `Above`, exactly
+the shape above. Their real numbers land with a pricing decision in October; because this is configuration,
+they do not need a Themia release to apply them.
+
 What it deliberately does **not** do: pick the cheapest method, reorder what the shopper sees, or model fees.
 Fee schedules are per-merchant contract terms, they change without a release, and a wrong one silently costs
 money — so the package takes the rule the adopter writes and does not try to compute it.
@@ -346,7 +359,15 @@ Endpoints used: `POST /api/v1/charges`, `GET /api/v1/charges/{id}`, `POST /api/v
 only by an app that references this package deliberately:
 
 - **Payment Links** — hosted checkout. Create / get / disable; a link is immutable otherwise. Modelled
-  separately from a charge because a link *produces* charges (`source: PAYMENT_LINK`).
+  separately from a charge because a link *produces* charges (`source: PAYMENT_LINK`, `sourceId` = the link id).
+  The gateway also uses links **internally**: a request whose `AllowedMethods` holds more than one method, or
+  holds `Card`, `MobileBanking` or `Wallet` alone, becomes a payment link. `MobileBanking` and `Wallet` exist
+  only as link groups; `Card` has no direct path in v1 because a direct card charge needs card data or a token
+  and tokenization is out of scope (§8) — so the only direct charge is a lone `QrPromptPay`, and
+  `ChargeCreation.ChargeId` is then the link id. `GetChargeAsync` follows a link id to the charge that paid it,
+  and a null provider id is looked up by `referenceId` — Beam lists charges by `referenceId`, `source_in` and
+  `sourceId`. Sending `linkSettings` replaces the account's defaults and an omitted group is disabled, so the
+  adapter sends every group explicitly.
 - **QR slip verification** — `multipart/form-data`, `format=RAW` (the QR content off the slip) or `IMAGE`.
   Two traps the wrapper enforces: it is the QR **on the slip**, not the one the shopper scanned; and
   `verificationResult` never reports failure — an unverifiable slip is a `4xx`, so the HTTP status is the
@@ -384,7 +405,7 @@ shopper to the hosted page, learn the outcome from the backend notification, and
 | Options | `TwoCTwoPOptions { MerchantId, SecretKey, Environment, PaymentChannels, Timeout }`, validated on start. |
 | Create | `paymentToken` with `merchantID`, `invoiceNo` (the app's `ReferenceId`, **AN 20 max**), `description`, `amount`, `currencyCode`, `paymentChannel[]`, `backendReturnUrl`, `frontendReturnUrl`. Response: `paymentToken`, `webPaymentUrl`, `respCode`, `respDesc` → `NextAction.Redirect(webPaymentUrl)`. |
 | Read | `paymentInquiry` by `invoiceNo` (or `paymentToken`) + `locale`. |
-| Refund / void | **Payment Process API**, `processType` (e.g. `I` settle, `V` void/refund) with `invoiceNo`, `actionAmount` and `idempotencyID`. Note this API is **XML**, not JSON, while the rest of PGW 4.3 is JWT-over-JSON — the adapter isolates that, and nothing about it reaches the core. |
+| Refund / void | **Not in v1.** `RefundAsync` throws `PaymentApiException(FailureKind.Validation, "refund_not_supported")`; refund from the 2C2P merchant portal. Verified 2026-09-27 against developer.2c2p.com: refunds go through the Payment Maintenance API (`POST https://demo2.2c2p.com/PaymentAction/2.0/action`, production `https://t.2c2p.com/PaymentAction/2.0/action`), an XML `PaymentProcessRequest` (version 4.6, `processType` `R`) wrapped in JWE (RSA-OAEP + A256GCM, 2C2P's certificate) inside JWS PS256 (the merchant's private key), and only settled transactions refund. That needs a merchant key pair and 2C2P's certificate in options, and cannot be tested without them; it is deferred until a merchant has sandbox keys. |
 | Notification | 2C2P POSTs the payment result to `backendReturnUrl` as a JWT signed with the same secret. |
 
 ### The four places 2C2P changed the core
@@ -415,12 +436,15 @@ culture-dependent format was one `CurrentCulture` away.
 | `0003` | `Failed` + `Canceled` |
 | `0004` (soft decline, retry after 3DS) | `Failed` + `AuthenticationFailed` |
 | `2002` (not found) | throws `PaymentApiException(NotFound)` |
-| `2003`, `0999` | `Failed` + `ProcessingFailed` |
-| `4xxx` card codes (`4005` do not honor, `4051` insufficient funds, …) | `Failed` + `Declined` / `InsufficientFunds`, raw code always carried |
+| `4005` (do not honor), `4051` (insufficient funds) | `Failed` + `Declined` / `InsufficientFunds`, raw code always carried |
+| `0999` (system error), `2003` ("Payment / Inquiry Failed" — ambiguous: may be the inquiry that failed) and any code not listed above | inquiry: throws `PaymentApiException(Transient)` with the raw code; notification: `Verified` + `PaymentEventType.Other`, never `ChargeFailed` |
 
-Card `4xxx` codes are mapped only where the meaning is unambiguous; everything else lands on `Unknown`
-with its code intact, because a wrong normalization is worse than an honest `Unknown` (the old adapter
-collapsed the lot into `IsSuccess = respCode == "0000"` plus a description string).
+The known table is exactly the codes above. `0999` and unrecognised codes (including other `4xxx` card
+codes) say nothing reliable about whether the shopper paid, so they are a failed *call* to retry, never
+a failed *payment* an app might act on by cancelling a paid order (user ruling, final review). A
+`Failed` code without its own reason falls back to `Unknown` with its code intact, because a wrong
+normalization is worse than an honest `Unknown` (the old adapter collapsed the lot into
+`IsSuccess = respCode == "0000"` plus a description string).
 
 ---
 
@@ -446,7 +470,10 @@ Also out: **sub-merchant / split payment**. Structure (2) in §1 would add an "o
 every call — a sub-merchant id on `CreateChargeRequest`, a split instruction, and per-merchant onboarding
 state — which is also the one thing that would justify `Themia.Modules.Payments`. Beam has partner mode
 (`X-Beam-Partner-ID`) and 2C2P has `subMerchantList`, so both adapters could grow it. Not now: no consumer
-is on that structure, and designing a split model against zero live merchants would be guesswork.
+is on that structure, and designing a split model against zero live merchants would be guesswork. ezy-assets
+answered directly on coord #0146 (2026-09-25): a payout may grow out of their commission ledger eventually,
+but not in their v1 or v2, and the blocker is the licensing structure rather than the engineering — so v1
+here is not to be held for it.
 
 Also out: an HTTP endpoint. A `Themia.Payments.AspNetCore` with a mapped webhook endpoint, `EnableBuffering`
 and a verification filter is a reasonable phase 2 — it is where the raw-body mistake is easiest to make —

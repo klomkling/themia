@@ -1,0 +1,90 @@
+#nullable enable
+Themia.Payments.Beam.BeamWebhookVerifier
+Themia.Payments.Beam.BeamWebhookVerifier.BeamWebhookVerifier(Microsoft.Extensions.Options.IOptions<Themia.Payments.Beam.BeamOptions!>! options) -> void
+Themia.Payments.Beam.BeamWebhookVerifier.Verify(System.ReadOnlySpan<byte> rawBody, System.Collections.Generic.IReadOnlyDictionary<string!, string!>! headers) -> Themia.Payments.WebhookVerification!
+Themia.Payments.Beam.BeamEnvironment
+Themia.Payments.Beam.BeamEnvironment.Playground = 0 -> Themia.Payments.Beam.BeamEnvironment
+Themia.Payments.Beam.BeamEnvironment.Production = 1 -> Themia.Payments.Beam.BeamEnvironment
+Themia.Payments.Beam.BeamOptions
+Themia.Payments.Beam.BeamOptions.BeamOptions() -> void
+Themia.Payments.Beam.BeamOptions.MerchantId.get -> string!
+Themia.Payments.Beam.BeamOptions.MerchantId.set -> void
+Themia.Payments.Beam.BeamOptions.ApiKey.get -> string!
+Themia.Payments.Beam.BeamOptions.ApiKey.set -> void
+Themia.Payments.Beam.BeamOptions.Environment.get -> Themia.Payments.Beam.BeamEnvironment
+Themia.Payments.Beam.BeamOptions.Environment.set -> void
+Themia.Payments.Beam.BeamOptions.WebhookHmacKey.get -> string?
+Themia.Payments.Beam.BeamOptions.WebhookHmacKey.set -> void
+Themia.Payments.Beam.BeamOptions.PartnerId.get -> string?
+Themia.Payments.Beam.BeamOptions.PartnerId.set -> void
+Themia.Payments.Beam.BeamOptions.Timeout.get -> System.TimeSpan
+Themia.Payments.Beam.BeamOptions.Timeout.set -> void
+static Themia.Payments.Beam.BeamOptions.BaseAddressFor(Themia.Payments.Beam.BeamEnvironment environment) -> System.Uri!
+const Themia.Payments.Beam.BeamOptions.SectionName = "Payments:Beam" -> string!
+Themia.Payments.Beam.BeamPaymentGateway
+Themia.Payments.Beam.BeamPaymentGateway.BeamPaymentGateway(System.Net.Http.IHttpClientFactory! httpClientFactory, Microsoft.Extensions.Options.IOptions<Themia.Payments.Beam.BeamOptions!>! options, Themia.Payments.PaymentMethodGate! gate) -> void
+Themia.Payments.Beam.BeamPaymentGateway.SupportedMethods.get -> System.Collections.Generic.IReadOnlyList<Themia.Payments.PaymentMethod>!
+Themia.Payments.Beam.BeamPaymentGateway.CreateChargeAsync(Themia.Payments.CreateChargeRequest! request, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Payments.ChargeCreation!>!
+Themia.Payments.Beam.BeamPaymentGateway.GetChargeAsync(Themia.Payments.ChargeRef charge, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Payments.Charge!>!
+Themia.Payments.Beam.BeamPaymentGateway.RefundAsync(Themia.Payments.RefundRequest! request, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Payments.RefundCreation!>!
+const Themia.Payments.Beam.BeamPaymentGateway.HttpClientName = "themia-payments-beam" -> string!
+Themia.Payments.Beam.DependencyInjection.BeamServiceCollectionExtensions
+static Themia.Payments.Beam.DependencyInjection.BeamServiceCollectionExtensions.AddThemiaPaymentsBeam(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Themia.Payments.Beam.BeamOptions!>! configure) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+Themia.Payments.Beam.BeamPaymentLinkRequest
+Themia.Payments.Beam.BeamPaymentLinkRequest.Amount.get -> Themia.Payments.Money
+Themia.Payments.Beam.BeamPaymentLinkRequest.Amount.init -> void
+Themia.Payments.Beam.BeamPaymentLinkRequest.ReferenceId.get -> string!
+Themia.Payments.Beam.BeamPaymentLinkRequest.ReferenceId.init -> void
+Themia.Payments.Beam.BeamPaymentLinkRequest.AllowedMethods.get -> System.Collections.Generic.IReadOnlyList<Themia.Payments.PaymentMethod>!
+Themia.Payments.Beam.BeamPaymentLinkRequest.AllowedMethods.init -> void
+Themia.Payments.Beam.BeamPaymentLinkRequest.Description.get -> string?
+Themia.Payments.Beam.BeamPaymentLinkRequest.Description.init -> void
+Themia.Payments.Beam.BeamPaymentLinkRequest.RedirectUrl.get -> System.Uri?
+Themia.Payments.Beam.BeamPaymentLinkRequest.RedirectUrl.init -> void
+Themia.Payments.Beam.BeamPaymentLinkRequest.CancelUrl.get -> System.Uri?
+Themia.Payments.Beam.BeamPaymentLinkRequest.CancelUrl.init -> void
+Themia.Payments.Beam.BeamPaymentLinkRequest.ExpiresAt.get -> System.DateTimeOffset?
+Themia.Payments.Beam.BeamPaymentLinkRequest.ExpiresAt.init -> void
+Themia.Payments.Beam.BeamPaymentLinkRequest.CollectPhoneNumber.get -> bool
+Themia.Payments.Beam.BeamPaymentLinkRequest.CollectPhoneNumber.init -> void
+Themia.Payments.Beam.BeamPaymentLinkRequest.CollectDeliveryAddress.get -> bool
+Themia.Payments.Beam.BeamPaymentLinkRequest.CollectDeliveryAddress.init -> void
+Themia.Payments.Beam.BeamPaymentLinkRequest.IdempotencyKey.get -> string?
+Themia.Payments.Beam.BeamPaymentLinkRequest.IdempotencyKey.init -> void
+Themia.Payments.Beam.BeamPaymentLink
+Themia.Payments.Beam.BeamPaymentLink.BeamPaymentLink(string! Id, System.Uri! Url, Themia.Payments.Beam.BeamPaymentLinkStatus Status, Themia.Payments.Money Amount, string? ReferenceId, System.DateTimeOffset? ExpiresAt) -> void
+Themia.Payments.Beam.BeamPaymentLink.Id.get -> string!
+Themia.Payments.Beam.BeamPaymentLink.Id.init -> void
+Themia.Payments.Beam.BeamPaymentLink.Url.get -> System.Uri!
+Themia.Payments.Beam.BeamPaymentLink.Url.init -> void
+Themia.Payments.Beam.BeamPaymentLink.Status.get -> Themia.Payments.Beam.BeamPaymentLinkStatus
+Themia.Payments.Beam.BeamPaymentLink.Status.init -> void
+Themia.Payments.Beam.BeamPaymentLink.Amount.get -> Themia.Payments.Money
+Themia.Payments.Beam.BeamPaymentLink.Amount.init -> void
+Themia.Payments.Beam.BeamPaymentLink.ReferenceId.get -> string?
+Themia.Payments.Beam.BeamPaymentLink.ReferenceId.init -> void
+Themia.Payments.Beam.BeamPaymentLink.ExpiresAt.get -> System.DateTimeOffset?
+Themia.Payments.Beam.BeamPaymentLink.ExpiresAt.init -> void
+Themia.Payments.Beam.BeamPaymentLinkStatus
+Themia.Payments.Beam.BeamPaymentLinkStatus.Active = 0 -> Themia.Payments.Beam.BeamPaymentLinkStatus
+Themia.Payments.Beam.BeamPaymentLinkStatus.Disabled = 1 -> Themia.Payments.Beam.BeamPaymentLinkStatus
+Themia.Payments.Beam.BeamPaymentLinkStatus.Expired = 2 -> Themia.Payments.Beam.BeamPaymentLinkStatus
+Themia.Payments.Beam.BeamPaymentLinkStatus.Paid = 3 -> Themia.Payments.Beam.BeamPaymentLinkStatus
+Themia.Payments.Beam.BeamPaymentLinkStatus.Voided = 4 -> Themia.Payments.Beam.BeamPaymentLinkStatus
+Themia.Payments.Beam.BeamPaymentLinkStatus.Refunded = 5 -> Themia.Payments.Beam.BeamPaymentLinkStatus
+Themia.Payments.Beam.BeamSlipVerificationResult
+Themia.Payments.Beam.BeamSlipVerificationResult.UpdatedToSucceeded = 0 -> Themia.Payments.Beam.BeamSlipVerificationResult
+Themia.Payments.Beam.BeamSlipVerificationResult.AlreadySucceeded = 1 -> Themia.Payments.Beam.BeamSlipVerificationResult
+Themia.Payments.Beam.BeamSlipVerification
+Themia.Payments.Beam.BeamSlipVerification.BeamSlipVerification(string! ChargeId, Themia.Payments.Beam.BeamSlipVerificationResult Result) -> void
+Themia.Payments.Beam.BeamSlipVerification.ChargeId.get -> string!
+Themia.Payments.Beam.BeamSlipVerification.ChargeId.init -> void
+Themia.Payments.Beam.BeamSlipVerification.Result.get -> Themia.Payments.Beam.BeamSlipVerificationResult
+Themia.Payments.Beam.BeamSlipVerification.Result.init -> void
+Themia.Payments.Beam.BeamPaymentClient
+Themia.Payments.Beam.BeamPaymentClient.BeamPaymentClient(System.Net.Http.IHttpClientFactory! httpClientFactory, Microsoft.Extensions.Options.IOptions<Themia.Payments.Beam.BeamOptions!>! options, Themia.Payments.PaymentMethodGate! gate) -> void
+Themia.Payments.Beam.BeamPaymentClient.CreatePaymentLinkAsync(Themia.Payments.Beam.BeamPaymentLinkRequest! request, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Payments.Beam.BeamPaymentLink!>!
+Themia.Payments.Beam.BeamPaymentClient.GetPaymentLinkAsync(string! paymentLinkId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Payments.Beam.BeamPaymentLink!>!
+Themia.Payments.Beam.BeamPaymentClient.DisablePaymentLinkAsync(string! paymentLinkId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Payments.Beam.BeamPaymentClient.VerifyQrSlipAsync(string! rawQrContent, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Payments.Beam.BeamSlipVerification!>!
+Themia.Payments.Beam.BeamPaymentClient.VerifyQrSlipAsync(System.IO.Stream! image, string! fileName, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Payments.Beam.BeamSlipVerification!>!

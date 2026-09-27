@@ -1,0 +1,172 @@
+using Themia.Payments.Beam.Tests;
+
+using Xunit;
+
+namespace Themia.Payments.ContractTests;
+
+/// <summary>
+/// One suite, run against every adapter (<see cref="BeamContractTests"/>, <see cref="TwoCTwoPContractTests"/>).
+/// A change that fits only one provider fails here — this is what keeps the core from drifting back into a
+/// single provider's shape.
+/// </summary>
+public abstract class PaymentGatewayContract
+{
+    /// <summary>Builds the adapter under test, wired to <paramref name="handler"/> and, when given, restricted
+    /// by <paramref name="policy"/>.</summary>
+    protected abstract IPaymentGateway CreateGateway(StubHandler handler, PaymentMethodPolicy? policy = null);
+
+    /// <summary>Scripts <paramref name="handler"/> with this provider's response to creating a charge.</summary>
+    protected abstract void ScriptChargeCreated(StubHandler handler);
+
+    /// <summary>Scripts <paramref name="handler"/> so that reading back <c>ChargeRef("ch_1", "order-1")</c>
+    /// returns a succeeded charge for <see cref="Request"/>'s amount.</summary>
+    protected abstract void ScriptChargeSucceeded(StubHandler handler);
+
+    [Fact]
+    public async Task Creating_a_charge_returns_a_pending_charge_with_a_next_action()
+    {
+        var handler = new StubHandler();
+        ScriptChargeCreated(handler);
+
+        var creation = await CreateGateway(handler).CreateChargeAsync(Request());
+
+        Assert.Equal(PaymentStatus.Pending, creation.Status);
+        Assert.NotNull(creation.ChargeId);
+        Assert.IsNotType<NextAction.None>(creation.Action);
+    }
+
+    [Fact]
+    public async Task A_zero_amount_never_reaches_the_provider()
+    {
+        var handler = new StubHandler();
+
+        await Assert.ThrowsAsync<PaymentApiException>(
+            () => CreateGateway(handler).CreateChargeAsync(Request() with { Amount = Money.Thb(0) }));
+
+        Assert.Empty(handler.Requests);
+    }
+
+    [Fact]
+    public async Task The_method_policy_is_honoured_by_every_adapter()
+    {
+        var handler = new StubHandler();
+        var policy = new PaymentMethodPolicy
+        {
+            Currency = "THB",
+            Bands = [new PaymentMethodBand(100000, [PaymentMethod.QrPromptPay])],
+            Above = [PaymentMethod.QrPromptPay, PaymentMethod.Card],
+        };
+
+        var ex = await Assert.ThrowsAsync<PaymentApiException>(() => CreateGateway(handler, policy)
+            .CreateChargeAsync(Request() with { Amount = Money.Thb(50000), AllowedMethods = [PaymentMethod.Card] }));
+
+        Assert.Equal("method_not_allowed_for_amount", ex.ProviderCode);
+        Assert.Empty(handler.Requests);
+    }
+
+    [Fact]
+    public async Task A_succeeded_charge_reads_back_with_its_amount_and_no_failure()
+    {
+        var handler = new StubHandler();
+        ScriptChargeSucceeded(handler);
+
+        var charge = await CreateGateway(handler).GetChargeAsync(new ChargeRef("ch_1", "order-1"));
+
+        Assert.Equal(PaymentStatus.Succeeded, charge.Status);
+        Assert.Null(charge.Failure);
+        Assert.Equal(Money.Thb(100000), charge.Amount);
+    }
+
+    [Fact]
+    public async Task Exhausted_transport_failures_surface_as_a_transient_payment_exception()
+    {
+        var handler = new StubHandler();
+        for (var i = 0; i < 3; i++)
+        {
+            handler.EnqueueThrow(() => new HttpRequestException("connection refused"));
+        }
+
+        var ex = await Assert.ThrowsAsync<PaymentApiException>(() => CreateGateway(handler).CreateChargeAsync(Request()));
+
+        Assert.Equal(FailureKind.Transient, ex.Kind);
+        Assert.Equal("transport_error", ex.ProviderCode);
+        Assert.Equal(0, ex.HttpStatus);
+        Assert.IsType<HttpRequestException>(ex.InnerException);
+        Assert.Equal(3, handler.Requests.Count);
+    }
+
+    [Fact]
+    public async Task Exhausted_timeouts_surface_as_a_transient_payment_exception()
+    {
+        var handler = new StubHandler();
+        for (var i = 0; i < 3; i++)
+        {
+            handler.EnqueueThrow(() => new TaskCanceledException("timed out"));
+        }
+
+        var ex = await Assert.ThrowsAsync<PaymentApiException>(() => CreateGateway(handler).CreateChargeAsync(Request()));
+
+        Assert.Equal(FailureKind.Transient, ex.Kind);
+        Assert.Equal("timeout", ex.ProviderCode);
+        Assert.Equal(0, ex.HttpStatus);
+        Assert.IsType<TaskCanceledException>(ex.InnerException);
+    }
+
+    [Fact]
+    public async Task The_callers_own_cancellation_propagates_unwrapped()
+    {
+        using var cts = new CancellationTokenSource();
+        var handler = new StubHandler();
+        handler.EnqueueThrow(() => new HttpRequestException("connection refused"));
+        handler.EnqueueThrow(() => new HttpRequestException("connection refused"));
+        handler.EnqueueThrow(() =>
+        {
+            cts.Cancel();
+            return new TaskCanceledException("cancelled by the caller", null, cts.Token);
+        });
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => CreateGateway(handler).CreateChargeAsync(Request(), cts.Token));
+    }
+
+    [Fact]
+    public async Task Reading_a_charge_ref_with_neither_id_is_an_argument_exception_and_sends_nothing()
+    {
+        var handler = new StubHandler();
+
+        var ex = await Assert.ThrowsAsync<ArgumentException>(
+            () => CreateGateway(handler).GetChargeAsync(new ChargeRef(null, "")));
+
+        Assert.Equal("charge", ex.ParamName);
+        Assert.Empty(handler.Requests);
+    }
+
+    [Fact]
+    public async Task A_default_charge_ref_is_the_same_argument_exception()
+    {
+        var handler = new StubHandler();
+
+        await Assert.ThrowsAsync<ArgumentException>(() => CreateGateway(handler).GetChargeAsync(default));
+
+        Assert.Empty(handler.Requests);
+    }
+
+    [Fact]
+    public async Task An_invalid_refund_idempotency_key_is_refused_before_anything_is_sent()
+    {
+        var handler = new StubHandler();
+
+        var ex = await Assert.ThrowsAsync<PaymentApiException>(() => CreateGateway(handler).RefundAsync(
+            new RefundRequest(new ChargeRef("ch_1", "order-1"), null, null, new string('k', 256))));
+
+        Assert.Equal("idempotency_key_invalid", ex.ProviderCode);
+        Assert.Empty(handler.Requests);
+    }
+
+    private static CreateChargeRequest Request() => new()
+    {
+        Amount = Money.Thb(100000),
+        ReferenceId = "order-1",
+        AllowedMethods = [PaymentMethod.QrPromptPay],
+    };
+}

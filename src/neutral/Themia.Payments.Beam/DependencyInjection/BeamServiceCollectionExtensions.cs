@@ -1,0 +1,57 @@
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
+using Themia.Payments.Beam.Internal;
+using Themia.Payments.DependencyInjection;
+
+namespace Themia.Payments.Beam.DependencyInjection;
+
+/// <summary>DI entry point for the Beam adapter.</summary>
+public static class BeamServiceCollectionExtensions
+{
+    /// <summary>
+    /// Registers <see cref="BeamOptions"/> (validated with <c>ValidateOnStart</c>), the named
+    /// <see cref="HttpClient"/>, <see cref="BeamPaymentGateway"/> as <see cref="IPaymentGateway"/> and
+    /// <see cref="IPaymentGatewayCapabilities"/>, <see cref="BeamWebhookVerifier"/> as
+    /// <see cref="IPaymentWebhookVerifier"/>, and <see cref="BeamPaymentClient"/> for Beam-only features
+    /// (payment links, QR slip verification) that have no counterpart on <see cref="IPaymentGateway"/>.
+    /// </summary>
+    /// <param name="services">The service collection.</param>
+    /// <param name="configure">Sets the merchant id, API key and environment.</param>
+    /// <returns>The same <paramref name="services"/> for chaining.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="services"/> or <paramref name="configure"/> is null.</exception>
+    public static IServiceCollection AddThemiaPaymentsBeam(
+        this IServiceCollection services, Action<BeamOptions> configure)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(configure);
+
+        services.AddOptions<BeamOptions>()
+            .Configure(configure)
+            .Validate(o => !string.IsNullOrWhiteSpace(o.MerchantId), "BeamOptions.MerchantId must be set.")
+            .Validate(o => !string.IsNullOrWhiteSpace(o.ApiKey), "BeamOptions.ApiKey must be set.")
+            .Validate(o => o.Timeout > TimeSpan.Zero, "BeamOptions.Timeout must be positive.")
+            .Validate(
+                o => o.WebhookHmacKey is null || BeamWebhookKey.TryDecode(o.WebhookHmacKey, out _),
+                $"BeamOptions.WebhookHmacKey, when set, must be the base64 of at least {BeamWebhookKey.MinimumBytes} bytes.")
+            .ValidateOnStart();
+
+        services.AddHttpClient(BeamPaymentGateway.HttpClientName, (sp, client) =>
+        {
+            var options = sp.GetRequiredService<IOptions<BeamOptions>>().Value;
+            client.BaseAddress = BeamOptions.BaseAddressFor(options.Environment);
+            client.Timeout = options.Timeout;
+        });
+
+        services.TryAddSingleton<BeamPaymentGateway>();
+        services.TryAddSingleton<IPaymentGateway>(sp => sp.GetRequiredService<BeamPaymentGateway>());
+        services.TryAddSingleton<IPaymentGatewayCapabilities>(sp => sp.GetRequiredService<BeamPaymentGateway>());
+        services.TryAddSingleton<IPaymentWebhookVerifier, BeamWebhookVerifier>();
+        services.TryAddSingleton<BeamPaymentClient>();
+
+        // So the gate exists even when the host forgot the core call. AddThemiaPayments is idempotent:
+        // it uses TryAdd and TryAddEnumerable throughout.
+        services.AddThemiaPayments();
+        return services;
+    }
+}

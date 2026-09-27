@@ -1,0 +1,194 @@
+#nullable enable
+Themia.Payments.Money
+Themia.Payments.Money.Money() -> void
+Themia.Payments.Money.MinorUnits.get -> long
+Themia.Payments.Money.Currency.get -> string!
+static Themia.Payments.Money.Thb(long minorUnits) -> Themia.Payments.Money
+static Themia.Payments.Money.From(long minorUnits, string! currency) -> Themia.Payments.Money
+Themia.Payments.PaymentStatus
+Themia.Payments.PaymentStatus.Pending = 0 -> Themia.Payments.PaymentStatus
+Themia.Payments.PaymentStatus.Succeeded = 1 -> Themia.Payments.PaymentStatus
+Themia.Payments.PaymentStatus.Failed = 2 -> Themia.Payments.PaymentStatus
+Themia.Payments.FailureReason
+Themia.Payments.FailureReason.Unknown = 0 -> Themia.Payments.FailureReason
+Themia.Payments.FailureReason.ProcessingFailed = 1 -> Themia.Payments.FailureReason
+Themia.Payments.FailureReason.InsufficientFunds = 2 -> Themia.Payments.FailureReason
+Themia.Payments.FailureReason.AuthenticationFailed = 3 -> Themia.Payments.FailureReason
+Themia.Payments.FailureReason.Declined = 4 -> Themia.Payments.FailureReason
+Themia.Payments.FailureReason.Expired = 5 -> Themia.Payments.FailureReason
+Themia.Payments.FailureReason.Canceled = 6 -> Themia.Payments.FailureReason
+Themia.Payments.PaymentMethod
+Themia.Payments.PaymentMethod.QrPromptPay = 0 -> Themia.Payments.PaymentMethod
+Themia.Payments.PaymentMethod.Card = 1 -> Themia.Payments.PaymentMethod
+Themia.Payments.PaymentMethod.MobileBanking = 2 -> Themia.Payments.PaymentMethod
+Themia.Payments.PaymentMethod.Wallet = 3 -> Themia.Payments.PaymentMethod
+Themia.Payments.PaymentEventType
+Themia.Payments.PaymentEventType.ChargeSucceeded = 0 -> Themia.Payments.PaymentEventType
+Themia.Payments.PaymentEventType.ChargeFailed = 1 -> Themia.Payments.PaymentEventType
+Themia.Payments.PaymentEventType.RefundSucceeded = 2 -> Themia.Payments.PaymentEventType
+Themia.Payments.PaymentEventType.RefundFailed = 3 -> Themia.Payments.PaymentEventType
+Themia.Payments.PaymentEventType.Other = 4 -> Themia.Payments.PaymentEventType
+Themia.Payments.WebhookOutcome
+Themia.Payments.WebhookOutcome.Verified = 0 -> Themia.Payments.WebhookOutcome
+Themia.Payments.WebhookOutcome.SignatureMissing = 1 -> Themia.Payments.WebhookOutcome
+Themia.Payments.WebhookOutcome.SignatureMismatch = 2 -> Themia.Payments.WebhookOutcome
+Themia.Payments.WebhookOutcome.UnknownEvent = 3 -> Themia.Payments.WebhookOutcome
+Themia.Payments.WebhookOutcome.Malformed = 4 -> Themia.Payments.WebhookOutcome
+Themia.Payments.FailureKind
+Themia.Payments.FailureKind.Authentication = 0 -> Themia.Payments.FailureKind
+Themia.Payments.FailureKind.Validation = 1 -> Themia.Payments.FailureKind
+Themia.Payments.FailureKind.NotFound = 2 -> Themia.Payments.FailureKind
+Themia.Payments.FailureKind.Permission = 3 -> Themia.Payments.FailureKind
+Themia.Payments.FailureKind.RateLimited = 4 -> Themia.Payments.FailureKind
+Themia.Payments.FailureKind.Transient = 5 -> Themia.Payments.FailureKind
+Themia.Payments.FailureKind.Unknown = 6 -> Themia.Payments.FailureKind
+Themia.Payments.PaymentFailure
+Themia.Payments.PaymentFailure.PaymentFailure(Themia.Payments.FailureReason Reason, string! ProviderCode, string? ProviderMessage) -> void
+Themia.Payments.PaymentFailure.Reason.get -> Themia.Payments.FailureReason
+Themia.Payments.PaymentFailure.Reason.init -> void
+Themia.Payments.PaymentFailure.ProviderCode.get -> string!
+Themia.Payments.PaymentFailure.ProviderCode.init -> void
+Themia.Payments.PaymentFailure.ProviderMessage.get -> string?
+Themia.Payments.PaymentFailure.ProviderMessage.init -> void
+Themia.Payments.ChargeRef
+Themia.Payments.ChargeRef.ChargeRef() -> void
+Themia.Payments.ChargeRef.ChargeRef(string? ProviderChargeId, string! ReferenceId) -> void
+Themia.Payments.ChargeRef.ProviderChargeId.get -> string?
+Themia.Payments.ChargeRef.ProviderChargeId.init -> void
+Themia.Payments.ChargeRef.ReferenceId.get -> string!
+Themia.Payments.ChargeRef.ReferenceId.init -> void
+Themia.Payments.Charge
+Themia.Payments.Charge.Charge(string! ChargeId, string! ReferenceId, Themia.Payments.Money Amount, Themia.Payments.PaymentStatus Status, Themia.Payments.PaymentFailure? Failure, System.DateTimeOffset? CompletedAt) -> void
+Themia.Payments.Charge.ChargeId.get -> string!
+Themia.Payments.Charge.ChargeId.init -> void
+Themia.Payments.Charge.ReferenceId.get -> string!
+Themia.Payments.Charge.ReferenceId.init -> void
+Themia.Payments.Charge.Amount.get -> Themia.Payments.Money
+Themia.Payments.Charge.Amount.init -> void
+Themia.Payments.Charge.Status.get -> Themia.Payments.PaymentStatus
+Themia.Payments.Charge.Status.init -> void
+Themia.Payments.Charge.Failure.get -> Themia.Payments.PaymentFailure?
+Themia.Payments.Charge.Failure.init -> void
+Themia.Payments.Charge.CompletedAt.get -> System.DateTimeOffset?
+Themia.Payments.Charge.CompletedAt.init -> void
+Themia.Payments.NextAction
+Themia.Payments.NextAction.None
+Themia.Payments.NextAction.Redirect
+Themia.Payments.NextAction.Redirect.Redirect(System.Uri! Url) -> void
+Themia.Payments.NextAction.Redirect.Url.get -> System.Uri!
+Themia.Payments.NextAction.Redirect.Url.init -> void
+Themia.Payments.NextAction.ShowQr
+Themia.Payments.NextAction.ShowQr.ShowQr(byte[]! ImagePng, string? RawPayload, System.DateTimeOffset? Expiry) -> void
+Themia.Payments.NextAction.ShowQr.ImagePng.get -> byte[]!
+Themia.Payments.NextAction.ShowQr.ImagePng.init -> void
+Themia.Payments.NextAction.ShowQr.RawPayload.get -> string?
+Themia.Payments.NextAction.ShowQr.RawPayload.init -> void
+Themia.Payments.NextAction.ShowQr.Expiry.get -> System.DateTimeOffset?
+Themia.Payments.NextAction.ShowQr.Expiry.init -> void
+Themia.Payments.ChargeCreation
+Themia.Payments.ChargeCreation.ChargeCreation(string! ChargeId, Themia.Payments.PaymentStatus Status, Themia.Payments.NextAction! Action) -> void
+Themia.Payments.ChargeCreation.ChargeId.get -> string!
+Themia.Payments.ChargeCreation.ChargeId.init -> void
+Themia.Payments.ChargeCreation.Status.get -> Themia.Payments.PaymentStatus
+Themia.Payments.ChargeCreation.Status.init -> void
+Themia.Payments.ChargeCreation.Action.get -> Themia.Payments.NextAction!
+Themia.Payments.ChargeCreation.Action.init -> void
+Themia.Payments.CreateChargeRequest
+Themia.Payments.CreateChargeRequest.Amount.get -> Themia.Payments.Money
+Themia.Payments.CreateChargeRequest.Amount.init -> void
+Themia.Payments.CreateChargeRequest.ReferenceId.get -> string!
+Themia.Payments.CreateChargeRequest.ReferenceId.init -> void
+Themia.Payments.CreateChargeRequest.AllowedMethods.get -> System.Collections.Generic.IReadOnlyList<Themia.Payments.PaymentMethod>!
+Themia.Payments.CreateChargeRequest.AllowedMethods.init -> void
+Themia.Payments.CreateChargeRequest.ReturnUrl.get -> System.Uri?
+Themia.Payments.CreateChargeRequest.ReturnUrl.init -> void
+Themia.Payments.CreateChargeRequest.ExpiresAt.get -> System.DateTimeOffset?
+Themia.Payments.CreateChargeRequest.ExpiresAt.init -> void
+Themia.Payments.CreateChargeRequest.Description.get -> string?
+Themia.Payments.CreateChargeRequest.Description.init -> void
+Themia.Payments.CreateChargeRequest.IdempotencyKey.get -> string?
+Themia.Payments.CreateChargeRequest.IdempotencyKey.init -> void
+Themia.Payments.RefundRequest
+Themia.Payments.RefundRequest.RefundRequest(Themia.Payments.ChargeRef Charge, Themia.Payments.Money? Amount, string? Reason, string? IdempotencyKey) -> void
+Themia.Payments.RefundRequest.Charge.get -> Themia.Payments.ChargeRef
+Themia.Payments.RefundRequest.Charge.init -> void
+Themia.Payments.RefundRequest.Amount.get -> Themia.Payments.Money?
+Themia.Payments.RefundRequest.Amount.init -> void
+Themia.Payments.RefundRequest.Reason.get -> string?
+Themia.Payments.RefundRequest.Reason.init -> void
+Themia.Payments.RefundRequest.IdempotencyKey.get -> string?
+Themia.Payments.RefundRequest.IdempotencyKey.init -> void
+Themia.Payments.RefundCreation
+Themia.Payments.RefundCreation.RefundCreation(string? RefundId, Themia.Payments.PaymentStatus Status) -> void
+Themia.Payments.RefundCreation.RefundId.get -> string?
+Themia.Payments.RefundCreation.RefundId.init -> void
+Themia.Payments.RefundCreation.Status.get -> Themia.Payments.PaymentStatus
+Themia.Payments.RefundCreation.Status.init -> void
+Themia.Payments.IPaymentGateway
+Themia.Payments.IPaymentGateway.CreateChargeAsync(Themia.Payments.CreateChargeRequest! request, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Payments.ChargeCreation!>!
+Themia.Payments.IPaymentGateway.GetChargeAsync(Themia.Payments.ChargeRef charge, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Payments.Charge!>!
+Themia.Payments.IPaymentGateway.RefundAsync(Themia.Payments.RefundRequest! request, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Payments.RefundCreation!>!
+Themia.Payments.IPaymentGatewayCapabilities
+Themia.Payments.IPaymentGatewayCapabilities.SupportedMethods.get -> System.Collections.Generic.IReadOnlyList<Themia.Payments.PaymentMethod>!
+Themia.Payments.PaymentApiException
+Themia.Payments.PaymentApiException.PaymentApiException(Themia.Payments.FailureKind kind, string! providerCode, int httpStatus, string? message = null, System.Exception? innerException = null) -> void
+Themia.Payments.PaymentApiException.Kind.get -> Themia.Payments.FailureKind
+Themia.Payments.PaymentApiException.ProviderCode.get -> string!
+Themia.Payments.PaymentApiException.HttpStatus.get -> int
+Themia.Payments.CreateChargeRequestValidator
+static Themia.Payments.CreateChargeRequestValidator.Validate(Themia.Payments.CreateChargeRequest! request) -> void
+Themia.Payments.PaymentMethodBand
+Themia.Payments.PaymentMethodBand.PaymentMethodBand(long UpToMinorUnitsInclusive, System.Collections.Generic.IReadOnlyList<Themia.Payments.PaymentMethod>! Methods) -> void
+Themia.Payments.PaymentMethodBand.UpToMinorUnitsInclusive.get -> long
+Themia.Payments.PaymentMethodBand.UpToMinorUnitsInclusive.init -> void
+Themia.Payments.PaymentMethodBand.Methods.get -> System.Collections.Generic.IReadOnlyList<Themia.Payments.PaymentMethod>!
+Themia.Payments.PaymentMethodBand.Methods.init -> void
+Themia.Payments.PaymentMethodPolicy
+Themia.Payments.PaymentMethodPolicy.PaymentMethodPolicy() -> void
+Themia.Payments.PaymentMethodPolicy.Currency.get -> string!
+Themia.Payments.PaymentMethodPolicy.Currency.init -> void
+Themia.Payments.PaymentMethodPolicy.Bands.get -> System.Collections.Generic.IReadOnlyList<Themia.Payments.PaymentMethodBand!>!
+Themia.Payments.PaymentMethodPolicy.Bands.init -> void
+Themia.Payments.PaymentMethodPolicy.Above.get -> System.Collections.Generic.IReadOnlyList<Themia.Payments.PaymentMethod>!
+Themia.Payments.PaymentMethodPolicy.Above.init -> void
+Themia.Payments.PaymentMethodPolicy.Resolve(Themia.Payments.Money amount) -> System.Collections.Generic.IReadOnlyList<Themia.Payments.PaymentMethod>!
+Themia.Payments.PaymentMethodPolicy.Validate() -> System.Collections.Generic.IReadOnlyList<string!>!
+Themia.Payments.PaymentMethodPolicy.AllNamedMethods() -> System.Collections.Generic.IReadOnlyList<Themia.Payments.PaymentMethod>!
+Themia.Payments.ThemiaPaymentsOptions
+Themia.Payments.ThemiaPaymentsOptions.ThemiaPaymentsOptions() -> void
+Themia.Payments.ThemiaPaymentsOptions.MethodPolicy.get -> Themia.Payments.PaymentMethodPolicy?
+Themia.Payments.ThemiaPaymentsOptions.MethodPolicy.set -> void
+const Themia.Payments.ThemiaPaymentsOptions.SectionName = "Payments" -> string!
+Themia.Payments.PaymentMethodGate
+Themia.Payments.PaymentMethodGate.PaymentMethodGate(Microsoft.Extensions.Options.IOptions<Themia.Payments.ThemiaPaymentsOptions!>! options) -> void
+Themia.Payments.PaymentMethodGate.Apply(Themia.Payments.Money amount, System.Collections.Generic.IReadOnlyList<Themia.Payments.PaymentMethod>! requested) -> System.Collections.Generic.IReadOnlyList<Themia.Payments.PaymentMethod>!
+Themia.Payments.PaymentEvent
+Themia.Payments.PaymentEvent.PaymentEvent(Themia.Payments.PaymentEventType Type, string? ChargeId, string? ReferenceId, Themia.Payments.Money? Amount, Themia.Payments.PaymentStatus Status, System.DateTimeOffset OccurredAt, string! RawJson) -> void
+Themia.Payments.PaymentEvent.Type.get -> Themia.Payments.PaymentEventType
+Themia.Payments.PaymentEvent.Type.init -> void
+Themia.Payments.PaymentEvent.ChargeId.get -> string?
+Themia.Payments.PaymentEvent.ChargeId.init -> void
+Themia.Payments.PaymentEvent.ReferenceId.get -> string?
+Themia.Payments.PaymentEvent.ReferenceId.init -> void
+Themia.Payments.PaymentEvent.Amount.get -> Themia.Payments.Money?
+Themia.Payments.PaymentEvent.Amount.init -> void
+Themia.Payments.PaymentEvent.Status.get -> Themia.Payments.PaymentStatus
+Themia.Payments.PaymentEvent.Status.init -> void
+Themia.Payments.PaymentEvent.OccurredAt.get -> System.DateTimeOffset
+Themia.Payments.PaymentEvent.OccurredAt.init -> void
+Themia.Payments.PaymentEvent.RawJson.get -> string!
+Themia.Payments.PaymentEvent.RawJson.init -> void
+Themia.Payments.WebhookVerification
+Themia.Payments.WebhookVerification.WebhookVerification(Themia.Payments.WebhookOutcome Outcome, Themia.Payments.PaymentEvent? Event) -> void
+Themia.Payments.WebhookVerification.Outcome.get -> Themia.Payments.WebhookOutcome
+Themia.Payments.WebhookVerification.Outcome.init -> void
+Themia.Payments.WebhookVerification.Event.get -> Themia.Payments.PaymentEvent?
+Themia.Payments.WebhookVerification.Event.init -> void
+Themia.Payments.IPaymentWebhookVerifier
+Themia.Payments.IPaymentWebhookVerifier.Verify(System.ReadOnlySpan<byte> rawBody, System.Collections.Generic.IReadOnlyDictionary<string!, string!>! headers) -> Themia.Payments.WebhookVerification!
+Themia.Payments.DependencyInjection.PaymentsServiceCollectionExtensions
+static Themia.Payments.DependencyInjection.PaymentsServiceCollectionExtensions.AddThemiaPayments(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Themia.Payments.ThemiaPaymentsOptions!>? configure = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+Themia.Payments.ChargeRefValidator
+static Themia.Payments.ChargeRefValidator.Validate(Themia.Payments.ChargeRef charge) -> void
+Themia.Payments.RefundRequestValidator
+static Themia.Payments.RefundRequestValidator.Validate(Themia.Payments.RefundRequest! request) -> void

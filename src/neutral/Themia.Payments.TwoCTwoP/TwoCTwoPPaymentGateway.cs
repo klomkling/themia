@@ -1,0 +1,270 @@
+using System.Globalization;
+using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+
+using Microsoft.Extensions.Options;
+
+using Themia.Payments.TwoCTwoP.Internal;
+
+namespace Themia.Payments.TwoCTwoP;
+
+/// <summary>2C2P PGW 4.3 (Redirect API) <see cref="IPaymentGateway"/> adapter.</summary>
+/// <remarks>
+/// Every request and response body is <c>{"payload": "&lt;JWT&gt;"}</c>, HS256-signed with the merchant secret
+/// — there is no bearer or basic header. A signed <c>payload</c> is verified before any of it is trusted, and an
+/// unverified payload is never parsed into a result. The one unsigned body read is 2C2P's plain
+/// <c>{ "respCode", "respDesc" }</c> request-rejection shape, and only to raise a <see cref="PaymentApiException"/>
+/// carrying that code. 2C2P mints no charge id before payment, so
+/// <see cref="ChargeCreation.ChargeId"/> and <see cref="Charge.ChargeId"/> are always the caller's own
+/// <see cref="CreateChargeRequest.ReferenceId"/> — 2C2P's <c>invoiceNo</c>. Refunds are not supported in this
+/// version (see <see cref="RefundAsync"/>).
+/// </remarks>
+public sealed class TwoCTwoPPaymentGateway : IPaymentGateway, IPaymentGatewayCapabilities
+{
+    /// <summary>The name this adapter's <see cref="HttpClient"/> is registered under.</summary>
+    public const string HttpClientName = "themia-payments-2c2p";
+
+    private static readonly IReadOnlyList<PaymentMethod> AllChannels =
+    [
+        PaymentMethod.Card,
+        PaymentMethod.QrPromptPay,
+        PaymentMethod.MobileBanking,
+        PaymentMethod.Wallet,
+    ];
+
+    private readonly IHttpClientFactory httpClientFactory;
+    private readonly IOptions<TwoCTwoPOptions> options;
+    private readonly PaymentMethodGate gate;
+
+    /// <summary>Creates the gateway.</summary>
+    /// <param name="httpClientFactory">Used to create the named <see cref="HttpClient"/>.</param>
+    /// <param name="options">The 2C2P credentials and environment.</param>
+    /// <param name="gate">Applies the shared method policy before building a payload.</param>
+    /// <exception cref="ArgumentNullException">Any parameter is null.</exception>
+    public TwoCTwoPPaymentGateway(IHttpClientFactory httpClientFactory, IOptions<TwoCTwoPOptions> options, PaymentMethodGate gate)
+    {
+        ArgumentNullException.ThrowIfNull(httpClientFactory);
+        ArgumentNullException.ThrowIfNull(options);
+        ArgumentNullException.ThrowIfNull(gate);
+
+        this.httpClientFactory = httpClientFactory;
+        this.options = options;
+        this.gate = gate;
+    }
+
+    /// <summary>
+    /// The methods this merchant is enabled for with 2C2P: <see cref="TwoCTwoPOptions.PaymentChannels"/> when
+    /// configured, otherwise all four — 2C2P has no capability-discovery call, so an empty configuration is
+    /// read as "not restricted" rather than "none".
+    /// </summary>
+    public IReadOnlyList<PaymentMethod> SupportedMethods =>
+        options.Value.PaymentChannels.Count > 0 ? options.Value.PaymentChannels : AllChannels;
+
+    /// <inheritdoc />
+    /// <exception cref="PaymentApiException">
+    /// The request was refused locally (including a reference id over 20 characters, or a method this merchant
+    /// is not enabled for), or 2C2P rejected the call.
+    /// </exception>
+    public async Task<ChargeCreation> CreateChargeAsync(CreateChargeRequest request, CancellationToken cancellationToken = default)
+    {
+        CreateChargeRequestValidator.Validate(request);
+        if (request.ReferenceId.Length > 20)
+        {
+            throw Refuse("reference_id_too_long", "2C2P's invoiceNo is capped at 20 characters.");
+        }
+
+        var allowed = gate.Apply(request.Amount, request.AllowedMethods);
+        var supported = SupportedMethods;
+        var unsupported = allowed.Where(method => !supported.Contains(method)).ToArray();
+        if (unsupported.Length > 0)
+        {
+            throw Refuse("method_not_supported",
+                $"AllowedMethods contains [{string.Join(", ", unsupported)}], which this 2C2P merchant is not " +
+                $"enabled for (it supports [{string.Join(", ", supported)}]).");
+        }
+
+        var twoCTwoPOptions = options.Value;
+        var httpClient = httpClientFactory.CreateClient(HttpClientName);
+        var idempotencyKey = request.IdempotencyKey ?? Guid.NewGuid().ToString("N");
+
+        var claims = new Dictionary<string, object?>(StringComparer.Ordinal)
+        {
+            ["merchantID"] = twoCTwoPOptions.MerchantId,
+            ["invoiceNo"] = request.ReferenceId,
+            ["amount"] = TwoCTwoPMapping.ToDecimalAmount(request.Amount),
+            ["currencyCode"] = request.Amount.Currency,
+            ["paymentChannel"] = allowed.Select(TwoCTwoPMapping.ToChannelCode).ToArray(),
+            ["idempotencyID"] = idempotencyKey,
+        };
+        if (request.Description is { Length: > 0 } description)
+        {
+            claims["description"] = description;
+        }
+
+        if (request.ExpiresAt is { } expiresAt)
+        {
+            // 2C2P's paymentExpiry is a bare local timestamp, read in the same zone as its transactionDateTime.
+            claims["paymentExpiry"] = expiresAt.ToOffset(twoCTwoPOptions.TransactionTimeOffset)
+                .ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
+        }
+
+        if (request.ReturnUrl is { } returnUrl)
+        {
+            claims["frontendReturnUrl"] = returnUrl.ToString();
+        }
+
+        var body = JsonSerializer.Serialize(
+            new PayloadEnvelope { Payload = JwtHs256.Encode(claims, twoCTwoPOptions.SecretKey) });
+
+        using var response = await TwoCTwoPHttp.SendWithRetryAsync(
+            httpClient, "/payment/4.3/paymentToken",
+            () => new StringContent(body, Encoding.UTF8, "application/json"),
+            cancellationToken).ConfigureAwait(false);
+
+        var verified = await ReadVerifiedAsync(response, twoCTwoPOptions.SecretKey, cancellationToken).ConfigureAwait(false);
+        if (!TwoCTwoPMapping.TryGetNonEmptyString(verified, "respCode", out var respCode))
+        {
+            throw new PaymentApiException(FailureKind.Unknown, "malformed_response", (int)response.StatusCode);
+        }
+
+        if (respCode != "0000")
+        {
+            var respDesc = TwoCTwoPMapping.TryGetNonEmptyString(verified, "respDesc", out var desc) ? desc : null;
+            throw new PaymentApiException(
+                TwoCTwoPMapping.ToFailureKind((int)response.StatusCode, respCode), respCode, (int)response.StatusCode, respDesc);
+        }
+
+        if (!TwoCTwoPMapping.TryGetNonEmptyString(verified, "webPaymentUrl", out var webPaymentUrlText) ||
+            !TwoCTwoPMapping.TryParseHttpUrl(webPaymentUrlText, out var webPaymentUrl))
+        {
+            throw new PaymentApiException(FailureKind.Unknown, "malformed_response", (int)response.StatusCode);
+        }
+
+        return new ChargeCreation(request.ReferenceId, PaymentStatus.Pending, new NextAction.Redirect(webPaymentUrl));
+    }
+
+    /// <inheritdoc />
+    /// <exception cref="ArgumentException"><paramref name="charge"/> carries neither a reference id nor a provider charge id.</exception>
+    /// <exception cref="PaymentApiException">2C2P found no such transaction (<see cref="FailureKind.NotFound"/>),
+    /// answered with <c>0999</c> or a <c>respCode</c> this package does not know (<see cref="FailureKind.Transient"/>,
+    /// the raw code as <see cref="PaymentApiException.ProviderCode"/> — retry the read), or rejected the call.</exception>
+    /// <remarks>2C2P's Payment Inquiry reads by <c>invoiceNo</c>, which is the app's own reference id — the
+    /// provider charge id is only a fallback, and only because 2C2P's invoice number and charge id are the same value.</remarks>
+    public async Task<Charge> GetChargeAsync(ChargeRef charge, CancellationToken cancellationToken = default)
+    {
+        ChargeRefValidator.Validate(charge);
+        var invoiceNo = !string.IsNullOrWhiteSpace(charge.ReferenceId) ? charge.ReferenceId : charge.ProviderChargeId!;
+
+        var twoCTwoPOptions = options.Value;
+        var httpClient = httpClientFactory.CreateClient(HttpClientName);
+
+        var claims = new Dictionary<string, object?>(StringComparer.Ordinal)
+        {
+            ["merchantID"] = twoCTwoPOptions.MerchantId,
+            ["invoiceNo"] = invoiceNo,
+        };
+        var body = JsonSerializer.Serialize(
+            new PayloadEnvelope { Payload = JwtHs256.Encode(claims, twoCTwoPOptions.SecretKey) });
+
+        using var response = await TwoCTwoPHttp.SendWithRetryAsync(
+            httpClient, "/payment/4.3/paymentInquiry",
+            () => new StringContent(body, Encoding.UTF8, "application/json"),
+            cancellationToken).ConfigureAwait(false);
+
+        var verified = await ReadVerifiedAsync(response, twoCTwoPOptions.SecretKey, cancellationToken).ConfigureAwait(false);
+        if (!TwoCTwoPMapping.TryGetNonEmptyString(verified, "respCode", out var respCode))
+        {
+            throw new PaymentApiException(FailureKind.Unknown, "malformed_response", (int)response.StatusCode);
+        }
+
+        var respDesc = TwoCTwoPMapping.TryGetNonEmptyString(verified, "respDesc", out var desc) ? desc : null;
+        if (respCode == "2002")
+        {
+            throw new PaymentApiException(FailureKind.NotFound, respCode, (int)response.StatusCode, respDesc);
+        }
+
+        // 0999 (2C2P system error) or a code this package does not know: the inquiry did not say whether the
+        // shopper paid, so this is a failed call to retry, never a failed payment an app might act on.
+        if (!TwoCTwoPMapping.IsKnownRespCode(respCode))
+        {
+            throw new PaymentApiException(FailureKind.Transient, respCode, (int)response.StatusCode, respDesc);
+        }
+
+        return TwoCTwoPMapping.ToCharge(verified, invoiceNo, respCode, (int)response.StatusCode, twoCTwoPOptions.TransactionTimeOffset);
+    }
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// Not supported in this version: refund from the 2C2P merchant portal. 2C2P refunds go through the Payment
+    /// Maintenance API, which needs the merchant's RSA key pair and 2C2P's certificate (JWE inside JWS) rather
+    /// than the shared secret every other call here uses.
+    /// </remarks>
+    /// <exception cref="ArgumentNullException"><paramref name="request"/> is null (on the returned task).</exception>
+    /// <exception cref="ArgumentException">The request's charge reference names no charge (on the returned task).</exception>
+    /// <exception cref="PaymentApiException"><c>idempotency_key_invalid</c> for an invalid key;
+    /// otherwise always, with <see cref="FailureKind.Validation"/> and <c>refund_not_supported</c>. Nothing is sent to 2C2P.</exception>
+    public Task<RefundCreation> RefundAsync(RefundRequest request, CancellationToken cancellationToken = default)
+    {
+        // Validated like every adapter's refund, so an invalid request is refused the same way everywhere.
+        // Every exception goes on the returned Task, as with Beam's async RefundAsync.
+        try
+        {
+            RefundRequestValidator.Validate(request);
+        }
+        catch (Exception ex) when (ex is ArgumentException or PaymentApiException)
+        {
+            return Task.FromException<RefundCreation>(ex);
+        }
+
+        return Task.FromException<RefundCreation>(new PaymentApiException(FailureKind.Validation, "refund_not_supported", httpStatus: 0,
+            "The 2C2P adapter does not support refunds; refund from the 2C2P merchant portal."));
+    }
+
+    /// <summary>
+    /// Parses the response body and returns its verified <c>payload</c> contents. Throws for anything else: a
+    /// plain, unsigned <c>respCode</c> error body becomes that code; otherwise a non-2xx becomes
+    /// <c>HTTP_{status}</c> classified by status, and a 2xx with no verifiable <c>payload</c> is
+    /// <c>malformed_response</c> (ruling: never parse an unverified payload into a result).
+    /// </summary>
+    private static async Task<JsonElement> ReadVerifiedAsync(
+        HttpResponseMessage response, string secretKey, CancellationToken cancellationToken)
+    {
+        var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+        await using (stream.ConfigureAwait(false))
+        {
+            var (parsed, root) = await TwoCTwoPMapping.TryParseAsync(stream, cancellationToken).ConfigureAwait(false);
+            if (parsed && TwoCTwoPMapping.TryReadVerifiedPayload(root, secretKey, out var payload))
+            {
+                return payload;
+            }
+
+            // 2C2P reports some request-level rejections (bad merchant, bad signature) as a plain, unsigned
+            // { "respCode": .., "respDesc": .. } body instead of the usual signed payload envelope.
+            if (parsed && TwoCTwoPMapping.TryReadPlainError(root, out var respCode, out var respDesc))
+            {
+                throw new PaymentApiException(
+                    TwoCTwoPMapping.ToFailureKind((int)response.StatusCode, respCode), respCode, (int)response.StatusCode, respDesc);
+            }
+
+            // Nothing 2C2P-shaped (e.g. an HTML page from a proxy or load balancer): classify by the HTTP status,
+            // as Beam does for a body with no errorCode, rather than calling a 503 a malformed response.
+            var status = (int)response.StatusCode;
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new PaymentApiException(TwoCTwoPMapping.ToFailureKindForStatus(status), $"HTTP_{status}", status);
+            }
+
+            throw new PaymentApiException(FailureKind.Unknown, "malformed_response", status);
+        }
+    }
+
+    private static PaymentApiException Refuse(string code, string message) =>
+        new(FailureKind.Validation, code, httpStatus: 0, message);
+
+    private sealed class PayloadEnvelope
+    {
+        [JsonPropertyName("payload")]
+        public required string Payload { get; init; }
+    }
+}
