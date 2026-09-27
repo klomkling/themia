@@ -10,7 +10,7 @@ with the *why* and concrete upgrade steps.
 - Each entry states: **What changed**, **Why**, and **How to upgrade** (before → after).
 - Non-breaking changes are *not* listed here — see the CHANGELOG.
 
-## Unreleased
+## 0.30.1
 
 ### `IStorageProvider.PutAsync` throws when the key prefix and `Visibility` disagree (breaking for direct provider callers)
 

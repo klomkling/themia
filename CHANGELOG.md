@@ -27,6 +27,8 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.30.1] - 2026-09-27
+
 ### Fixed
 - **(breaking)** **`IStorageProvider.PutAsync` refuses a key whose prefix disagrees with
   `StoragePutOptions.Visibility`** (`Themia.Storage`, `Themia.Storage.S3`). Both providers place an object
