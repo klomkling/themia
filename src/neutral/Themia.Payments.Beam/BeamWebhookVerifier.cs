@@ -130,7 +130,8 @@ public sealed class BeamWebhookVerifier : IPaymentWebhookVerifier
 
             if (!TryReadAmount(root, out var amount) && IsModelled(type))
             {
-                // Present but not a value Money.From can accept (negative, or a malformed currency code).
+                // Claimed but not a value Money.From can accept (wrong JSON type, one side missing, negative,
+                // or a malformed currency code).
                 // Amount is part of what the consumer acts on for a modelled type, so treat it as tampered.
                 return new WebhookVerification(WebhookOutcome.Malformed, null);
             }
@@ -195,22 +196,26 @@ public sealed class BeamWebhookVerifier : IPaymentWebhookVerifier
         string.Equals(statusElement.GetString(), expectedStatus, StringComparison.Ordinal);
 
     /// <summary>
-    /// Reads <c>amount</c>/<c>currency</c> into a <see cref="Money"/>. Returns <see langword="false"/> only
-    /// when both properties are present but do not form a value <see cref="Money.From"/> can accept (a
-    /// negative amount, or a currency that is not three ASCII letters) — never lets that throw. When either
-    /// property is simply absent, no amount was claimed: that is not an error, so this returns
-    /// <see langword="true"/> with <paramref name="amount"/> left <see langword="null"/>.
+    /// Reads <c>amount</c>/<c>currency</c> into a <see cref="Money"/>, the same rule as the 2C2P verifier: returns
+    /// <see langword="false"/> when either is present with the wrong JSON type, only one of them is present, or
+    /// together they do not form a value <see cref="Money.From"/> can accept (a negative amount, or a currency that
+    /// is not three ASCII letters) — never lets that throw. Only when <b>both</b> are absent is nothing claimed,
+    /// which is not an error: this returns <see langword="true"/> with <paramref name="amount"/> left null.
     /// </summary>
     private static bool TryReadAmount(JsonElement root, out Money? amount)
     {
         amount = null;
-        if (!root.TryGetProperty("amount", out var amountElement) || amountElement.ValueKind != JsonValueKind.Number ||
-            !root.TryGetProperty("currency", out var currencyElement) || currencyElement.ValueKind != JsonValueKind.String)
+        var hasAmount = root.TryGetProperty("amount", out var amountElement);
+        var hasCurrency = root.TryGetProperty("currency", out var currencyElement);
+        if (!hasAmount && !hasCurrency)
         {
             return true;
         }
 
-        if (!amountElement.TryGetInt64(out var minorUnits) || !BeamMapping.TryMoney(minorUnits, currencyElement.GetString(), out var money))
+        if (!hasAmount || amountElement.ValueKind != JsonValueKind.Number ||
+            !hasCurrency || currencyElement.ValueKind != JsonValueKind.String ||
+            !amountElement.TryGetInt64(out var minorUnits) ||
+            !BeamMapping.TryMoney(minorUnits, currencyElement.GetString(), out var money))
         {
             return false;
         }

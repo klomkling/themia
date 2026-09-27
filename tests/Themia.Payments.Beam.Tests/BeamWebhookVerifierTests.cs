@@ -89,6 +89,22 @@ public class BeamWebhookVerifierTests
         Assert.Equal(WebhookOutcome.Malformed, result.Outcome);
     }
 
+    [Theory]
+    [InlineData("\"amount\":\"100\",\"currency\":\"THB\"")]   // amount as a string
+    [InlineData("\"amount\":100,\"currency\":764")]           // currency as a number
+    [InlineData("\"amount\":100")]                            // an amount with no currency
+    [InlineData("\"currency\":\"THB\"")]                       // a currency with no amount
+    public void A_signed_amount_of_the_wrong_shape_is_malformed_like_2c2p(string amountFields)
+    {
+        // Only when both are absent is no amount claimed; a claim that cannot form Money is never dropped silently.
+        var (body, signature) = Sign(
+            $$"""{"chargeId":"ch_1","status":"SUCCEEDED",{{amountFields}},"createdAt":"2025-01-01T00:00:00Z"}""");
+
+        var result = Verifier().Verify(body, Headers(signature));
+
+        Assert.Equal(WebhookOutcome.Malformed, result.Outcome);
+    }
+
     [Fact]
     public void An_invalid_signed_currency_code_is_malformed_not_an_exception()
     {
