@@ -45,6 +45,7 @@ public class TwoCTwoPWebhookVerifierTests
     [Theory]
     [InlineData("0999")]
     [InlineData("9999")]
+    [InlineData("2003")]
     public void A_notification_with_a_system_error_or_unknown_code_is_other_never_charge_failed(string respCode)
     {
         var body = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new

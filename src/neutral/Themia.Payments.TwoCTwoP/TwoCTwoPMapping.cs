@@ -27,12 +27,13 @@ internal static class TwoCTwoPMapping
 
     /// <summary>
     /// Whether this package knows what a <c>respCode</c> says about the payment: <c>0000</c>, <c>0001</c>,
-    /// <c>2001</c>, <c>2002</c>, <c>0003</c>, <c>0004</c>, <c>2003</c>, <c>4005</c>, <c>4051</c>. Anything else —
-    /// including <c>0999</c>, 2C2P's own system error — says nothing reliable about whether the shopper paid, so a
+    /// <c>2001</c>, <c>2002</c>, <c>0003</c>, <c>0004</c>, <c>4005</c>, <c>4051</c>. Anything else — including
+    /// <c>0999</c>, 2C2P's own system error, and <c>2003</c>, "Payment / Inquiry Failed", which may mean only
+    /// that the inquiry failed — says nothing reliable about whether the shopper paid, so a
     /// caller must never report it as a failed payment (an app could cancel an order that was in fact paid).
     /// </summary>
     public static bool IsKnownRespCode(string respCode) => respCode is
-        "0000" or "0001" or "2001" or "2002" or "0003" or "0004" or "2003" or "4005" or "4051";
+        "0000" or "0001" or "2001" or "2002" or "0003" or "0004" or "4005" or "4051";
 
     /// <summary>Maps a known 2C2P <c>respCode</c> (<see cref="IsKnownRespCode"/>) to a normalized
     /// <see cref="PaymentStatus"/>. Never reports an unrecognized code as succeeded; callers check
@@ -54,7 +55,6 @@ internal static class TwoCTwoPMapping
             "0000" or "0001" or "2001" => (FailureReason?)null,
             "0003" => FailureReason.Canceled,
             "0004" => FailureReason.AuthenticationFailed,
-            "2003" => FailureReason.ProcessingFailed,
             "4051" => FailureReason.InsufficientFunds,
             "4005" => FailureReason.Declined,
             _ => FailureReason.Unknown,

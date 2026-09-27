@@ -436,9 +436,8 @@ culture-dependent format was one `CurrentCulture` away.
 | `0003` | `Failed` + `Canceled` |
 | `0004` (soft decline, retry after 3DS) | `Failed` + `AuthenticationFailed` |
 | `2002` (not found) | throws `PaymentApiException(NotFound)` |
-| `2003` | `Failed` + `ProcessingFailed` |
 | `4005` (do not honor), `4051` (insufficient funds) | `Failed` + `Declined` / `InsufficientFunds`, raw code always carried |
-| `0999` (system error) and any code not listed above | inquiry: throws `PaymentApiException(Transient)` with the raw code; notification: `Verified` + `PaymentEventType.Other`, never `ChargeFailed` |
+| `0999` (system error), `2003` ("Payment / Inquiry Failed" — ambiguous: may be the inquiry that failed) and any code not listed above | inquiry: throws `PaymentApiException(Transient)` with the raw code; notification: `Verified` + `PaymentEventType.Other`, never `ChargeFailed` |
 
 The known table is exactly the codes above. `0999` and unrecognised codes (including other `4xxx` card
 codes) say nothing reliable about whether the shopper paid, so they are a failed *call* to retry, never

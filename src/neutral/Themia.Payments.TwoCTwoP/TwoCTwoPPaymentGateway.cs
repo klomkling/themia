@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -99,6 +100,13 @@ public sealed class TwoCTwoPPaymentGateway : IPaymentGateway, IPaymentGatewayCap
         if (request.Description is { Length: > 0 } description)
         {
             claims["description"] = description;
+        }
+
+        if (request.ExpiresAt is { } expiresAt)
+        {
+            // 2C2P's paymentExpiry is a bare local timestamp, read in the same zone as its transactionDateTime.
+            claims["paymentExpiry"] = expiresAt.ToOffset(twoCTwoPOptions.TransactionTimeOffset)
+                .ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
         }
 
         if (request.ReturnUrl is { } returnUrl)

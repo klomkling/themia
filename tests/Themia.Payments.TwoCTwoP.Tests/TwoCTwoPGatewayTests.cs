@@ -16,6 +16,28 @@ public class TwoCTwoPGatewayTests
     private const string Secret = "test-secret";
 
     [Fact]
+    public async Task An_expiry_is_sent_as_paymentExpiry_in_2c2ps_local_format()
+    {
+        var handler = new StubHandler().Enqueue(HttpStatusCode.OK, ResponseEnvelope(new Dictionary<string, object?>
+        {
+            ["webPaymentUrl"] = "https://sandbox-pgw-ui.2c2p.com/payment/4.3/#/token/abc",
+            ["paymentToken"] = "abc", ["respCode"] = "0000", ["respDesc"] = "Success",
+        }));
+        var gateway = BuildGateway(handler);
+
+        await gateway.CreateChargeAsync(new CreateChargeRequest
+        {
+            Amount = Money.Thb(100000),
+            ReferenceId = "order-1",
+            AllowedMethods = [PaymentMethod.QrPromptPay],
+            ExpiresAt = new DateTimeOffset(2099, 1, 2, 3, 4, 5, TimeSpan.Zero),
+        });
+
+        // TransactionTimeOffset defaults to +07:00, the same zone 2C2P's own timestamps are read in.
+        Assert.Equal("2099-01-02 10:04:05", PayloadOf(handler.Bodies[0]).GetProperty("paymentExpiry").GetString());
+    }
+
+    [Fact]
     public async Task Creating_a_charge_sends_a_jwt_payload_and_returns_the_hosted_url()
     {
         var handler = new StubHandler().Enqueue(HttpStatusCode.OK, ResponseEnvelope(new Dictionary<string, object?>
@@ -183,7 +205,6 @@ public class TwoCTwoPGatewayTests
     [InlineData("2001", PaymentStatus.Pending, FailureReason.Unknown)]
     [InlineData("0003", PaymentStatus.Failed, FailureReason.Canceled)]
     [InlineData("0004", PaymentStatus.Failed, FailureReason.AuthenticationFailed)]
-    [InlineData("2003", PaymentStatus.Failed, FailureReason.ProcessingFailed)]
     [InlineData("2002", PaymentStatus.Failed, FailureReason.Unknown)]
     [InlineData("4051", PaymentStatus.Failed, FailureReason.InsufficientFunds)]
     [InlineData("4005", PaymentStatus.Failed, FailureReason.Declined)]
@@ -200,6 +221,7 @@ public class TwoCTwoPGatewayTests
     [Theory]
     [InlineData("0999")]   // 2C2P's own "system error": says nothing about whether the shopper paid
     [InlineData("9999")]   // a code this package does not know
+    [InlineData("2003")]   // "Payment / Inquiry Failed": may mean the inquiry failed, not the payment
     public async Task An_inquiry_with_a_system_error_or_unknown_code_is_transient_not_a_failed_charge(string respCode)
     {
         var handler = new StubHandler().Enqueue(HttpStatusCode.OK, ResponseEnvelope(new Dictionary<string, object?>

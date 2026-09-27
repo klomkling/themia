@@ -62,11 +62,11 @@ invoice number and charge id are the same value.
 | --- | --- | --- |
 | `0000` | `Succeeded` | `ChargeSucceeded` |
 | `0001`, `2001` | `Pending` | `Other`, status `Pending` |
-| `0003` / `0004` / `2003` / `4005` / `4051` | `Failed` + `Canceled` / `AuthenticationFailed` / `ProcessingFailed` / `Declined` / `InsufficientFunds` | `ChargeFailed` |
+| `0003` / `0004` / `4005` / `4051` | `Failed` + `Canceled` / `AuthenticationFailed` / `Declined` / `InsufficientFunds` | `ChargeFailed` |
 | `2002` | throws `PaymentApiException(NotFound)` | `ChargeFailed` |
-| `0999` and any other code | throws `PaymentApiException(Transient)`, raw code as `ProviderCode` | `Other`, status `Pending` — never `ChargeFailed` |
+| `0999`, `2003` and any other code | throws `PaymentApiException(Transient)`, raw code as `ProviderCode` | `Other`, status `Pending` — never `ChargeFailed` |
 
-`0999` is 2C2P's own system error, and an unrecognised code says nothing reliable about whether the
+`0999` is 2C2P's own system error, `2003` ("Payment / Inquiry Failed") may mean only that the inquiry failed, and an unrecognised code says nothing reliable about whether the
 shopper paid: reporting either as a failed payment could get a paid order cancelled. Retry the inquiry
 instead. The raw code is always carried.
 
@@ -107,6 +107,8 @@ Confirm each against a real sandbox transaction before trusting it in production
    `yyyyMMddHHmmss` string with no timezone, and 2C2P does not document which zone it is in. The default
    assumes Thailand; if your merchant account settles elsewhere, set
    `TwoCTwoPOptions.TransactionTimeOffset` (validated to within ±14 hours) to match.
+   The same offset converts `CreateChargeRequest.ExpiresAt` into 2C2P's bare `paymentExpiry`
+   (`yyyy-MM-dd HH:mm:ss`); without an `ExpiresAt`, 2C2P's own default of 20 minutes applies.
 2. **The `THQR` group is not only PromptPay.** The group 2C2P calls `THQR` also carries TrueMoney,
    ShopeePay and GrabPay TH QR codes, not exclusively Thai QR PromptPay — a channel restriction meant to
    allow "PromptPay only" may admit more than that.
