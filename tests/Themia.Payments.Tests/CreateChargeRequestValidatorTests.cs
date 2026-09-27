@@ -75,6 +75,8 @@ public class CreateChargeRequestValidatorTests
         new string('k', 256),
         "order-1\nX-Injected: 1",
         "order-1\u0000",
+        "คำสั่ง-1",          // non-ASCII: refused by HttpClient at send time, which would look transient
+        "order 1",          // keys are restricted to visible ASCII, no spaces
     };
 
     [Theory]
