@@ -61,6 +61,17 @@ internal static class TwoCTwoPMapping
         _ => httpStatus >= 500 ? FailureKind.Transient : FailureKind.Unknown,
     };
 
+    /// <summary>Classifies a non-2xx response that carried no 2C2P body at all, by its HTTP status alone.</summary>
+    public static FailureKind ToFailureKindForStatus(int httpStatus) => httpStatus switch
+    {
+        401 => FailureKind.Authentication,
+        403 => FailureKind.Permission,
+        404 => FailureKind.NotFound,
+        429 => FailureKind.RateLimited,
+        >= 500 => FailureKind.Transient,
+        _ => FailureKind.Unknown,
+    };
+
     /// <summary>Minor units as the two-place decimal 2C2P expects, e.g. 100050 → 1000.50.</summary>
     /// <remarks>
     /// <c>minorUnits / 100m</c> alone is not enough: decimal division yields the smallest scale that is exact, so

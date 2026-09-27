@@ -192,8 +192,9 @@ public sealed class TwoCTwoPPaymentGateway : IPaymentGateway, IPaymentGatewayCap
 
     /// <summary>
     /// Parses the response body and returns its verified <c>payload</c> contents. Throws for anything else: a
-    /// body that does not parse, one whose <c>payload</c> JWT fails verification, or one with neither a
-    /// verifiable <c>payload</c> nor a plain <c>respCode</c> error shape (ruling: never parse an unverified payload).
+    /// plain, unsigned <c>respCode</c> error body becomes that code; otherwise a non-2xx becomes
+    /// <c>HTTP_{status}</c> classified by status, and a 2xx with no verifiable <c>payload</c> is
+    /// <c>malformed_response</c> (ruling: never parse an unverified payload into a result).
     /// </summary>
     private static async Task<JsonElement> ReadVerifiedAsync(
         HttpResponseMessage response, string secretKey, CancellationToken cancellationToken)
@@ -215,7 +216,15 @@ public sealed class TwoCTwoPPaymentGateway : IPaymentGateway, IPaymentGatewayCap
                     TwoCTwoPMapping.ToFailureKind((int)response.StatusCode, respCode), respCode, (int)response.StatusCode, respDesc);
             }
 
-            throw new PaymentApiException(FailureKind.Unknown, "malformed_response", (int)response.StatusCode);
+            // Nothing 2C2P-shaped (e.g. an HTML page from a proxy or load balancer): classify by the HTTP status,
+            // as Beam does for a body with no errorCode, rather than calling a 503 a malformed response.
+            var status = (int)response.StatusCode;
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new PaymentApiException(TwoCTwoPMapping.ToFailureKindForStatus(status), $"HTTP_{status}", status);
+            }
+
+            throw new PaymentApiException(FailureKind.Unknown, "malformed_response", status);
         }
     }
 

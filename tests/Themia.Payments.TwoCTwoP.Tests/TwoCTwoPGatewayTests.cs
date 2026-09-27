@@ -360,6 +360,28 @@ public class TwoCTwoPGatewayTests
         Assert.Equal("malformed_response", ex.ProviderCode);
     }
 
+    [Theory]
+    [InlineData(HttpStatusCode.ServiceUnavailable, FailureKind.Transient)]
+    [InlineData(HttpStatusCode.TooManyRequests, FailureKind.RateLimited)]
+    [InlineData(HttpStatusCode.Unauthorized, FailureKind.Authentication)]
+    [InlineData(HttpStatusCode.Forbidden, FailureKind.Permission)]
+    public async Task A_non_2xx_with_no_2c2p_body_is_classified_by_its_http_status(HttpStatusCode status, FailureKind expected)
+    {
+        var handler = new StubHandler();
+        for (var i = 0; i < 3; i++)
+        {
+            handler.Enqueue(status, "<html><body>Service Unavailable</body></html>");
+        }
+
+        var gateway = BuildGateway(handler);
+
+        var ex = await Assert.ThrowsAsync<PaymentApiException>(() => gateway.GetChargeAsync(new ChargeRef(null, "order-1")));
+
+        Assert.Equal(expected, ex.Kind);
+        Assert.Equal($"HTTP_{(int)status}", ex.ProviderCode);
+        Assert.Equal((int)status, ex.HttpStatus);
+    }
+
     private static TwoCTwoPPaymentGateway BuildGateway(StubHandler handler, Action<TwoCTwoPOptions>? configure = null)
     {
         var client = new HttpClient(handler) { BaseAddress = TwoCTwoPOptions.BaseAddressFor(TwoCTwoPEnvironment.Sandbox) };
