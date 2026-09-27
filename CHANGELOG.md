@@ -27,6 +27,8 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.30.0] - 2026-09-27
+
 ### Added
 - **A provider-agnostic payment seam, with Beam Checkout and 2C2P adapters** (`Themia.Payments`,
   `Themia.Payments.Beam`, `Themia.Payments.TwoCTwoP`). `IPaymentGateway` creates, reads and refunds a
