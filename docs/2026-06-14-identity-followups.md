@@ -4,10 +4,10 @@ Items deliberately deferred out of the 0.5.0 core slice. Surfaced during the PR 
 review; none is an active bug — they are hardening / consistency / architecture improvements.
 
 ## Hardening
-- **`VerifyPasswordAsync` timing side-channel.** The `NotFound`/`Inactive`/`LockedOut` paths return
-  before any argon2id work, so response latency distinguishes "user exists" from "does not exist".
-  Mitigation: hash a throwaway password on the not-found path to equalize timing. Belongs with the
-  **0.5.1 login endpoint** (the auth boundary), where uniform-message presentation also lives.
+- **`VerifyPasswordAsync` timing side-channel — DONE (0.5.1).** The `NotFound`/`Inactive`/`LockedOut`
+  paths returned before any argon2id work, so response latency distinguished "user exists" from "does
+  not exist". `AuthenticationFlow` now runs a timing-equalize step on the failure paths (see the
+  class summary in `Themia.Modules.Identity.AspNetCore/Authentication/AuthenticationFlow.cs`).
 - **Atomic normalization on `User`/`Role`.** `UserName`/`NormalizedUserName` (and the email/name pairs)
   are independently settable public properties; only `UserService.Normalize` keeps them in sync. Make
   the `Normalized*` setters non-public and expose `SetUserName`/`SetEmail`/`SetName` that set both
@@ -28,11 +28,10 @@ review; none is an active bug — they are hardening / consistency / architectur
   (Guid?) — two representations of the same value.
 
 ## Architecture
-- **Peer-coupling package split.** `Themia.Modules.Identity` references **both** `Framework.Data.EFCore`
-  and `Framework.Data.Dapper`, so a single-peer adopter drags in the other stack. Consider thin
-  `Themia.Modules.Identity.EFCore` (model config) and `…Dapper` (mappings) satellite packages so the
-  core stays peer-neutral, per the "selectable first-class peers" decision. Larger refactor; revisit if
-  package weight matters to adopters.
+- **Peer-coupling package split — DONE (coord #0058).** `Themia.Modules.Identity` referenced **both**
+  `Framework.Data.EFCore` and `Framework.Data.Dapper`, so a single-peer adopter dragged in the other
+  stack. `Themia.Modules.Identity.EFCore` and `Themia.Modules.Identity.Dapper` now exist as engine
+  packages.
 - **First-class framework global-record path + `IncludeGlobalRecordsForTenants` peer alignment
   (deferred from the 0.5.0 code review, deliberately).** The framework owns the *read* side of global
   records (`IncludeGlobalRecordsForTenants`: EF default **true**, Dapper default **false**) but has no
@@ -44,9 +43,9 @@ review; none is an active bug — they are hardening / consistency / architectur
   semantics for **every** adopter and module (Scheduling, Exceptional, apps), so it warrants its own
   spec → plan → review cycle rather than riding a feature PR. Identity is correct and peer-consistent
   today via its explicit platform specs; this is an altitude/consistency improvement, not a bug.
-- **Centralize the DI descriptor-scan** (`ContributeDapperMappings`) — duplicates
-  `SchedulingModule.GetRegisteredInstance<T>`; extract a shared `Themia.Framework.Core` helper so the
-  third module doesn't copy it again.
+- **Centralize the DI descriptor-scan — DONE.** `ContributeDapperMappings` now lives in
+  `Themia.Framework.Data.Dapper` (`Mapping/DapperMappingRegistration.cs`) and is shared by Storage,
+  Notifications and Messaging; `SchedulingModule.GetRegisteredInstance<T>` no longer exists.
 - **EF audit-user bridge.** EF audit reads `ThemiaDbContext.CurrentUserId` (a `virtual` defaulting to
   null), not `ICurrentUserAccessor`; adopters must override it (documented in the Identity README). A
   framework bridge from `ICurrentUserAccessor` → `CurrentUserId` would make audit correct by default on
