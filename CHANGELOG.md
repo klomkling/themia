@@ -27,6 +27,12 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+### Fixed
+- **`S3StorageProvider` presigned URLs now use the scheme of the endpoint** (`Themia.Storage.S3`). The SDK
+  signs an `https` URL unless `GetPreSignedUrlRequest.Protocol` is set, so a provider pointed at a plain-http
+  `ServiceUrl` (MinIO or Garage in development) handed out URLs that could not connect. An `http://`
+  endpoint now gets `http`; every other configuration, including S3 and R2, still gets `https`.
+
 ## [0.30.1] - 2026-09-27
 
 ### Fixed
