@@ -90,9 +90,24 @@ The constructor refuses (at construction, so before the host serves a request):
 - a public slot with no public container: it calls `publicSlot.GetPublicUrl("public/_probe")`, which the
   contract documents as pure composition with no I/O and which throws when no container is configured.
 
-`Dispose` disposes the slots that implement `IDisposable` (`S3StorageProvider` owns its client). The
-extension registers the router so the container disposes it, and throws if an `IStorageProvider` is
-already registered, the same "exactly one" guard `Themia.Modules.Storage`'s builder has.
+**Ownership (revised after review of PR #270).** A router built with the public constructor owns its slots:
+`Dispose` / `DisposeAsync` dispose both, the private one even if disposing the public one throws, and a slot with
+only `IAsyncDisposable` is disposed. `AddThemiaSplitStorage` does not use that. The instance form registers the
+router as an instance, so no container disposes it and the app that built the slots disposes them: every
+container built from the collection shares one router, and a temporary `BuildServiceProvider()` that was resolved
+and disposed during start-up must not take the slots from the real host. The factory form never disposes the
+slots, because a factory that returns a service the container already manages would otherwise see it disposed
+twice; a slot built with `new` inside a factory is the caller's to dispose, and one built before a later factory
+throws is not cleaned up.
+
+The registration throws if an unkeyed `IStorageProvider` is already registered, the same "exactly one" guard
+`Themia.Modules.Storage`'s builder has. Keyed registrations do not count, so slots held as keyed services (ezy-assets'
+registrar shape) work. The factory form's start-up check also fails if a later registration replaced the router.
+
+**The two slots cannot be checked for a swap.** Only the public slot is probed; a private slot may legitimately
+have a public container, and no pure call tells a private slot from a public one. With both slots fully configured
+a swap silently stores public objects on the private backend and identity documents on the public one. The
+remedy is at the call site, not in the type: pass the slots by name.
 
 Not in v1: a `Themia.Modules.Storage` `StorageBuilder.UseSplit`. Its tenant scoping already emits
 `public/<tenant>/<key>`, so the keys fit; the builder is added when a consumer asks, not before.

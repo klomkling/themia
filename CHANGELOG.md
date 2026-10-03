@@ -41,7 +41,9 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
   Things to know: the S3 provider does not normalise keys but the router does, so a key containing `\`, a
   `..` segment or a leading `/` that worked on a bare S3 provider is re-spelled or rejected behind it;
   `LocalStorageProvider`'s constructor does not call `LocalStorageOptions.Validate()`, so call it before
-  building a Local slot; `Themia.Modules.Storage` is not supported with the router. (coord #0152)
+  building a Local slot; `Themia.Modules.Storage` is not supported with the router; the router cannot tell a swapped
+  public/private pair from a right one, so name the arguments; with the instance form you dispose the slots you built.
+  (coord #0152)
 
 ### Fixed
 - **`S3StorageProvider` presigned URLs now use the scheme of the endpoint** (`Themia.Storage.S3`). The SDK
