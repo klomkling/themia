@@ -28,6 +28,13 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 ## [Unreleased]
 
 ### Fixed
+- **(breaking)** **`LocalStorageProvider` refuses a half-configured public container at construction**
+  (`Themia.Storage`). Setting only one of `LocalStorageOptions.PublicRootPath` / `PublicBaseUrl` used to construct
+  fine and then fail at request time: `GetPublicUrl` looked only at `PublicBaseUrl` and every read and write
+  only at `PublicRootPath`, so a `public/` key threw on every operation while `GetPublicUrl` still returned a URL.
+  The constructor now throws `ArgumentException` naming the missing half, as `S3StorageProvider` already did for
+  its public bucket. Only that pair is checked; the constructor still does not call `Validate()`, so a Local
+  provider with no `SigningKey` is unaffected. See [MIGRATION.md](MIGRATION.md).
 - **`S3StorageProvider` presigned URLs now use the scheme of the endpoint** (`Themia.Storage.S3`). The SDK
   signs an `https` URL unless `GetPreSignedUrlRequest.Protocol` is set, so a provider pointed at a plain-http
   `ServiceUrl` (MinIO or Garage in development) handed out URLs that could not connect. An `http://`
