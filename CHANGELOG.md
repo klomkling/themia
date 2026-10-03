@@ -48,6 +48,11 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
   signs an `https` URL unless `GetPreSignedUrlRequest.Protocol` is set, so a provider pointed at a plain-http
   `ServiceUrl` (MinIO or Garage in development) handed out URLs that could not connect. An `http://`
   endpoint now gets `http`; every other configuration, including S3 and R2, still gets `https`.
+- **`S3StorageProvider` built from `S3StorageOptions` can upload to a plain-http endpoint** (`Themia.Storage.S3`).
+  Over `http` the AWS SDK's default checksum is a *signed* CRC32 trailer, which S3-compatible servers such as
+  Garage reject with `Invalid payload signature`, so every `PutAsync` failed. For an `http://` `ServiceUrl` the
+  client now adds a checksum only where the service requires one; `https` endpoints, including S3 and R2, are
+  unchanged, and so is the `(client, bucketName)` constructor, which takes the client you configured.
 
 ## [0.30.1] - 2026-09-27
 
