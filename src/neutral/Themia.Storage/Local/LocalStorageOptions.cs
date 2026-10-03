@@ -20,6 +20,25 @@ public sealed class LocalStorageOptions
     /// frozen at upload time cannot survive a CDN swap or a domain change.</summary>
     public string PublicBaseUrl { get; set; } = string.Empty;
 
+    /// <summary>The public container is both-or-neither: a half-configured state (one set, the other empty) is a
+    /// silent trap where writes or URL composition break at runtime, so fail fast naming the missing half. Also run by
+    /// <see cref="LocalStorageProvider"/>'s constructor, which does not call <see cref="Validate"/>.</summary>
+    internal void ValidatePublicContainerIsAllOrNothing()
+    {
+        var hasRoot = !string.IsNullOrWhiteSpace(PublicRootPath);
+        var hasBaseUrl = !string.IsNullOrWhiteSpace(PublicBaseUrl);
+
+        if (hasBaseUrl && !hasRoot)
+        {
+            throw new ArgumentException("PublicRootPath must be set when PublicBaseUrl is set (the public container is both-or-neither).", nameof(PublicRootPath));
+        }
+
+        if (hasRoot && !hasBaseUrl)
+        {
+            throw new ArgumentException("PublicBaseUrl must be set when PublicRootPath is set (the public container is both-or-neither).", nameof(PublicBaseUrl));
+        }
+    }
+
     /// <summary>Validates that required options are set, failing fast at composition time.</summary>
     /// <exception cref="ArgumentException">Thrown when <see cref="RootPath"/> or <see cref="SigningKey"/> is
     /// null or whitespace, when only one of <see cref="PublicRootPath"/>/<see cref="PublicBaseUrl"/> is set,
@@ -30,24 +49,10 @@ public sealed class LocalStorageOptions
         if (string.IsNullOrWhiteSpace(RootPath)) throw new ArgumentException("RootPath must be set.", nameof(RootPath));
         if (string.IsNullOrWhiteSpace(SigningKey)) throw new ArgumentException("SigningKey must be set (required to issue/verify Local presigned download/upload URLs).", nameof(SigningKey));
 
-        var hasRoot = !string.IsNullOrWhiteSpace(PublicRootPath);
-        var hasBaseUrl = !string.IsNullOrWhiteSpace(PublicBaseUrl);
-
-        // The public container is both-or-neither: a half-configured state (one set, the other empty) is a
-        // silent trap where writes or URL composition break at runtime, so fail fast naming the missing half.
-        if (!hasRoot && !hasBaseUrl)
+        ValidatePublicContainerIsAllOrNothing();
+        if (string.IsNullOrWhiteSpace(PublicRootPath))
         {
-            return;
-        }
-
-        if (!hasRoot)
-        {
-            throw new ArgumentException("PublicRootPath must be set when PublicBaseUrl is set (the public container is both-or-neither).", nameof(PublicRootPath));
-        }
-
-        if (!hasBaseUrl)
-        {
-            throw new ArgumentException("PublicBaseUrl must be set when PublicRootPath is set (the public container is both-or-neither).", nameof(PublicBaseUrl));
+            return; // no public container
         }
 
         // A relative base URL is the ezy-assets bug in a bottle: it cannot be hot-linked cross-origin, and

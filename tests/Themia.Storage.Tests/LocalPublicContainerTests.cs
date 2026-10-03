@@ -97,6 +97,45 @@ public sealed class LocalPublicContainerTests : IDisposable
         Assert.DoesNotContain(' ', url);
     }
 
+    // The constructor does not call Validate() (that also requires a SigningKey, which a Local provider that never
+    // presigns legitimately lacks), but a half-configured public container cannot be made to work: GetPublicUrl
+    // looks only at PublicBaseUrl and every read and write only at PublicRootPath, so it must not construct.
+    [Fact]
+    public void The_constructor_refuses_a_public_base_url_without_a_public_root()
+    {
+        var ex = Assert.Throws<ArgumentException>(() => new LocalStorageProvider(new LocalStorageOptions
+        {
+            RootPath = root,
+            PublicBaseUrl = "https://cdn.example.com/media",
+        }));
+
+        Assert.Equal("PublicRootPath", ex.ParamName);
+    }
+
+    [Fact]
+    public void The_constructor_refuses_a_public_root_without_a_base_url()
+    {
+        var ex = Assert.Throws<ArgumentException>(() => new LocalStorageProvider(new LocalStorageOptions
+        {
+            RootPath = root,
+            PublicRootPath = publicRoot,
+        }));
+
+        Assert.Equal("PublicBaseUrl", ex.ParamName);
+    }
+
+    [Fact]
+    public void The_constructor_accepts_a_complete_public_container_and_no_public_container_without_a_signing_key()
+    {
+        _ = new LocalStorageProvider(new LocalStorageOptions { RootPath = root });
+        _ = new LocalStorageProvider(new LocalStorageOptions
+        {
+            RootPath = root,
+            PublicRootPath = publicRoot,
+            PublicBaseUrl = "https://cdn.example.com/media",
+        });
+    }
+
     [Fact]
     public void GetPublicUrl_throws_when_no_public_container_is_configured()
     {

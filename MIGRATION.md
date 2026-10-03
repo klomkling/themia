@@ -10,6 +10,36 @@ with the *why* and concrete upgrade steps.
 - Each entry states: **What changed**, **Why**, and **How to upgrade** (before → after).
 - Non-breaking changes are *not* listed here — see the CHANGELOG.
 
+## Unreleased
+
+### `LocalStorageProvider` throws at construction for a half-configured public container (breaking for such configs)
+
+**What changed:** `new LocalStorageProvider(options)` throws `ArgumentException` when exactly one of
+`LocalStorageOptions.PublicRootPath` and `PublicBaseUrl` is set.
+
+**Why:** the public container is both-or-neither, but only `LocalStorageOptions.Validate()` enforced it and the
+constructor does not call `Validate()`. A config with only `PublicBaseUrl` constructed, `GetPublicUrl` returned a URL,
+and every read or write of a `public/` key then threw `InvalidOperationException` at request time. A config with
+only `PublicRootPath` could store public objects that had no URL. `S3StorageProvider` already refused the same
+state at construction.
+
+**Who is affected:** a Local config that sets one of the two and never touched a `public/` key, which worked
+until now. A config that calls `Validate()` was already refused, and one that sets both or neither is unaffected.
+
+**How to upgrade:** set both, or neither.
+
+```csharp
+// before: constructs, then fails on the first public/ key
+new LocalStorageOptions { RootPath = root, PublicBaseUrl = "https://cdn.example.com/media" };
+
+// after: both...
+new LocalStorageOptions { RootPath = root, PublicRootPath = publicRoot, PublicBaseUrl = "https://cdn.example.com/media" };
+// ...or neither
+new LocalStorageOptions { RootPath = root };
+```
+
+Nothing else about the constructor changed: it still does not require a `SigningKey` or check the rest of `Validate()`.
+
 ## 0.30.1
 
 ### `IStorageProvider.PutAsync` throws when the key prefix and `Visibility` disagree (breaking for direct provider callers)
