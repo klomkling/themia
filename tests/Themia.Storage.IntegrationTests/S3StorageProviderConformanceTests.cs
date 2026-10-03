@@ -77,6 +77,20 @@ public sealed class S3StorageProviderConformanceTests : StorageProviderConforman
         provider = new S3StorageProvider(new AmazonS3Client(credentials, config), Bucket);
     }
 
+    [Fact]
+    public async Task Presigned_get_url_downloads_the_object_from_a_plain_http_endpoint()
+    {
+        // The SDK signs https unless told otherwise; Garage listens on plain http, so an https URL cannot connect.
+        var key = $"conf/{Guid.NewGuid():N}.txt";
+        await provider.PutAsync(key, new MemoryStream(Encoding.UTF8.GetBytes("presigned")), new StoragePutOptions("text/plain"));
+        var url = await provider.GetPresignedUrlAsync(key, new PresignedUrlRequest(PresignedUrlOperation.Get, TimeSpan.FromMinutes(5)));
+
+        using var http = new HttpClient();
+
+        Assert.Equal("http", url.Scheme);
+        Assert.Equal("presigned", await http.GetStringAsync(url));
+    }
+
     public async Task DisposeAsync()
     {
         provider.Dispose();
