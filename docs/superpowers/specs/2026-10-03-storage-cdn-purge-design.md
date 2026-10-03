@@ -72,6 +72,15 @@ HTTP 2xx whose body cannot be read as the Cloudflare envelope (success cannot be
 Cloudflare error code and message (first error only, length-capped), never the response body. The caller's
 recovery is the same for every exception out of `DeleteAsync`: repeat the delete and purge.
 
+The decorator enforces that meaning rather than trusting every `ICdnPurger`: `PurgingStorageProvider.DeleteAsync`
+reports any failure of the purge step after a successful delete as `CdnPurgeException` (the original exception
+kept as `InnerException`; the message names its type and the URL, never its text). So an app-wide `HttpClient`
+handler (a resilience or retry handler added with `ConfigureHttpClientDefaults` applies to this named client too)
+or a purger built without its named client cannot leak another exception type after the object is gone. A
+`CdnPurgeException` from the purger passes through as the same instance; the caller's own cancellation still
+propagates as `OperationCanceledException`; the delete itself is outside that catch. (Added during
+implementation, after the final review found the gap.)
+
 **Scope of that guarantee:** it holds for a caller that calls `IStorageProvider.DeleteAsync` on the decorated
 provider (propertiezy's queued job). It does **not** hold under `Themia.Modules.Storage`, which catches and logs
 it (§8). The README of the new package says so.
@@ -104,8 +113,9 @@ A `Themia.Modules.Storage` user registers `IStorageProvider` the same way (inste
 best-effort purging only (§8).
 
 `PurgingStorageProvider.DeleteAsync` normalises the key (`StorageKey.NormalizeAndValidate`, so `public\x` is
-treated as public and `Public/x` as private, as the router does), calls `inner.DeleteAsync`, and only then, for
-a `public/` key, calls `purger.PurgeAsync(inner.GetPublicUrl(key))`. Every other member forwards. No
+treated as public and `Public/x` as private, as the router does), and for a `public/` key builds
+`inner.GetPublicUrl(key)` first (so a public slot with no public container fails before anything is deleted),
+calls `inner.DeleteAsync`, and only then calls `purger.PurgeAsync(url)`. Every other member forwards. No
 `AddThemiaPurging…` convenience wrapper: the lambda above is the whole wiring and a helper would hide which
 slot is wrapped.
 
@@ -116,8 +126,10 @@ credential, scoped Zone → Cache Purge on one zone, and has no relation to the 
 `ZoneId` or `ApiToken` fails the host boot (`ValidateOnStart`, the Geo.Google pattern); `Enabled=false` with
 blanks boots. The token travels only in the `Authorization: Bearer` header, set per request, never in a URL, a
 message, an exception, or a default header. The named client calls `RedactLoggedHeaders` for `Authorization`
-explicitly rather than relying on `IHttpClientFactory`'s default (not confirmed from the documentation read for
-this design), and keeps request logging otherwise (useful to operators; the token is not in the URI). Test 5
+explicitly. The framework's default (Microsoft.Extensions.Http 10.0.9) already redacts header values: removing the
+explicit call left the no-leak test green when tried. So the call is defense in depth, kept so the token's safety
+does not depend on a default that can change, and pinned by its own test (that test makes the default
+non-redacting with `ConfigureAll`, so removing the call fails it). The client keeps request logging otherwise (useful to operators; the token is not in the URI). Test 5
 proves the token is absent from Trace-level output and fails if redaction is overridden, so the test can see a
 leak. `ZoneId` is escaped as a path segment (`Uri.EscapeDataString`) and not format-checked.
 
@@ -217,6 +229,12 @@ extension has no new dependency, no new service and no new HTTP call.
 9. **Characterisation of the module limit (§8).** `TenantStorage` over the decorator with a throwing purger:
    the logical delete completes and a warning is logged, no exception. This pins today's behaviour so changing
    it is a deliberate decision. *Falsifier:* narrow the module's catch so `CdnPurgeException` escapes and show this test fail.
+
+10. **A purger failure of any type after the delete** (added during implementation, §2(b)): an
+    `InvalidOperationException` from the purger arrives as `CdnPurgeException` with the original as
+    `InnerException`; a `CdnPurgeException` passes through as the same instance; caller cancellation stays
+    `OperationCanceledException`. *Falsifier:* remove the catch, wrap `CdnPurgeException` too, or drop the
+    cancellation guard; each fails a named test. Test 4 also pins the `ZoneId` path escaping (`zone/1 x`).
 
 Existing storage tests are the guard for §5 and are not edited.
 
