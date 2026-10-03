@@ -11,6 +11,7 @@ public sealed class S3StorageProvider : IStorageProvider, IDisposable
 {
     private readonly IAmazonS3 client;
     private readonly string bucket;
+    private readonly bool publicOnly;
     private readonly string publicBucket;
     private readonly string publicBaseUrl;
     private readonly bool ownsClient;
@@ -20,9 +21,14 @@ public sealed class S3StorageProvider : IStorageProvider, IDisposable
     public S3StorageProvider(S3StorageOptions options)
     {
         ArgumentNullException.ThrowIfNull(options);
-        ArgumentException.ThrowIfNullOrWhiteSpace(options.BucketName);
+        if (!options.PublicOnly)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(options.BucketName);
+        }
+
         bucket = options.BucketName;
         options.Validate();
+        publicOnly = options.PublicOnly;
         publicBucket = options.PublicBucketName;
         publicBaseUrl = options.PublicBaseUrl;
         client = BuildClient(options);
@@ -162,6 +168,13 @@ public sealed class S3StorageProvider : IStorageProvider, IDisposable
     {
         if (!Themia.Storage.StorageKey.IsPublic(key))
         {
+            if (publicOnly)
+            {
+                throw new InvalidOperationException(
+                    $"Object '{key}' is not a public object and this S3 provider is public-only (S3StorageOptions.PublicOnly); " +
+                    "it has no private bucket. Private keys belong to the other slot of the split.");
+            }
+
             return (bucket, key);
         }
 

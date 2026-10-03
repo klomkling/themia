@@ -1,6 +1,6 @@
 # Themia.Storage split — one app, a public slot and a private slot
 
-**Status:** design, revision 1
+**Status:** design, revision 1 — implemented (coord #0152)
 **Raised by:** coord #0152 (propertiezy); second consumer confirmed by ezy-assets on the same thread.
 **Precedent:** #0147 (key prefix and `Visibility` must agree on a single provider), #0134 (Local presigned downloads).
 
@@ -80,9 +80,9 @@ the static-files mount); ezy-assets as lazily resolved singletons in its registr
 would make each rebuild that outside DI at registration time. A factory defers construction to first resolve,
 which would bring back the validate-at-first-resolve gap, so the factory overload also forces construction at
 host start through the same `ValidateOnStart` mechanism `AddThemiaStorageUrls` already uses. That mechanism is
-to be confirmed in implementation by a test that boots a host with a half-configured slot and expects start-up
-to fail; if it cannot be made to work without a new package dependency, the overload ships with the caveat
-written in its remarks rather than the guarantee. Raised by propertiezy on PR #269.
+confirmed: `SplitStorageHostTests` boots a host whose slot factory throws and start-up fails, on net8.0 and
+net10.0 (falsifier: without `ValidateOnStart` the test fails, and a plain lazy registration of the same slot
+starts fine). It needs the generic host; without one nothing resolves the router until first use. Raised by propertiezy on PR #269.
 
 The constructor refuses (at construction, so before the host serves a request):
 

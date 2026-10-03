@@ -93,3 +93,16 @@ Themia.Storage.Urls.StorageUrlService.StorageUrlService(Themia.Storage.IStorageP
 Themia.Storage.Urls.StorageUrlServiceCollectionExtensions
 static Themia.Storage.Urls.StorageUrlServiceCollectionExtensions.AddThemiaStorageUrls(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Themia.Storage.Urls.StorageUrlOptions!>? configure = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
 static Themia.Storage.StorageKey.EnsureMatchesVisibility(string! key, Themia.Storage.StorageVisibility visibility) -> void
+Themia.Storage.SplitStorageProvider
+Themia.Storage.SplitStorageProvider.DeleteAsync(string! key, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Storage.SplitStorageProvider.Dispose() -> void
+Themia.Storage.SplitStorageProvider.ExistsAsync(string! key, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!
+Themia.Storage.SplitStorageProvider.GetAsync(string! key, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Storage.StorageReadResult?>!
+Themia.Storage.SplitStorageProvider.GetPresignedUrlAsync(string! key, Themia.Storage.PresignedUrlRequest request, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Uri!>!
+Themia.Storage.SplitStorageProvider.GetPublicUrl(string! key) -> System.Uri!
+Themia.Storage.SplitStorageProvider.PutAsync(string! key, System.IO.Stream! content, Themia.Storage.StoragePutOptions options, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Storage.StorageObjectInfo!>!
+Themia.Storage.SplitStorageProvider.SplitStorageProvider(Themia.Storage.IStorageProvider! publicSlot, Themia.Storage.IStorageProvider! privateSlot) -> void
+Themia.Storage.SplitStorageProvider.StatAsync(string! key, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Storage.StorageObjectInfo?>!
+Themia.Storage.SplitStorageServiceCollectionExtensions
+static Themia.Storage.SplitStorageServiceCollectionExtensions.AddThemiaSplitStorage(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, Themia.Storage.IStorageProvider! publicSlot, Themia.Storage.IStorageProvider! privateSlot) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static Themia.Storage.SplitStorageServiceCollectionExtensions.AddThemiaSplitStorage(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Func<System.IServiceProvider!, Themia.Storage.IStorageProvider!>! publicSlot, System.Func<System.IServiceProvider!, Themia.Storage.IStorageProvider!>! privateSlot) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
