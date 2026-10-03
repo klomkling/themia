@@ -198,6 +198,14 @@ public sealed class S3StorageProvider : IStorageProvider, IDisposable
         if (options.ServiceUrl is not null)
         {
             config.ServiceURL = options.ServiceUrl.AbsoluteUri;
+
+            // Over plain http the SDK's default checksum is a SIGNED CRC32 trailer, which S3-compatible servers such
+            // as Garage reject on upload ("Invalid payload signature"). https uses an unsigned trailer and is
+            // unaffected, so a checksum is added only where the service requires one, and only for http endpoints.
+            if (string.Equals(options.ServiceUrl.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase))
+            {
+                config.RequestChecksumCalculation = RequestChecksumCalculation.WHEN_REQUIRED;
+            }
         }
         else if (!string.IsNullOrWhiteSpace(options.Region))
         {

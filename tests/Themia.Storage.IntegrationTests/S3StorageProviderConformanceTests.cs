@@ -91,6 +91,31 @@ public sealed class S3StorageProviderConformanceTests : StorageProviderConforman
         Assert.Equal("presigned", await http.GetStringAsync(url));
     }
 
+    [Fact]
+    public async Task A_provider_built_from_options_writes_and_reads_over_a_plain_http_endpoint()
+    {
+        // The conformance provider above wraps a client this test configured itself, which hides what an app gets
+        // from S3StorageOptions: the SDK's default checksum is a signed CRC32 trailer on an http upload, which
+        // Garage rejects ("Invalid payload signature").
+        using var fromOptions = new S3StorageProvider(new S3StorageOptions
+        {
+            BucketName = Bucket,
+            ServiceUrl = new Uri($"http://{container.Hostname}:{container.GetMappedPublicPort(S3Port)}"),
+            ForcePathStyle = true,
+            AccessKey = AccessKey,
+            SecretKey = SecretKey,
+            Region = Region,
+        });
+        var key = $"conf/{Guid.NewGuid():N}.txt";
+
+        await fromOptions.PutAsync(key, new MemoryStream(Encoding.UTF8.GetBytes("from-options")), new StoragePutOptions("text/plain"));
+
+        var read = await fromOptions.GetAsync(key);
+        Assert.NotNull(read);
+        using var reader = new StreamReader(read.Content);
+        Assert.Equal("from-options", await reader.ReadToEndAsync());
+    }
+
     public async Task DisposeAsync()
     {
         provider.Dispose();
