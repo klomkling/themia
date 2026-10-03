@@ -41,6 +41,11 @@ Verified against source rather than taken on report:
 | `GetPresignedUrlAsync` | the key |
 | `GetPublicUrl` | public slot only; a non-`public/` key throws `InvalidOperationException` without consulting a slot |
 
+`GetPublicUrl` on a non-public key throws `InvalidOperationException` in single-provider mode too
+(`LocalStorageProvider` and `S3StorageProvider` both do), so the router adds no behaviour there. An app that
+calls it on a stored value of unknown shape (propertiezy: `ListingPhotoUrl.Resolve` over any stored
+non-http value) has that exposure today and keeps it unchanged.
+
 Public iff the **normalised** key starts with `public/`. Anything else is private — it fails closed.
 
 **Normalise before classifying.** `public/../x` starts with `public/`; a raw test sends it to the public
@@ -62,7 +67,22 @@ public sealed class SplitStorageProvider : IStorageProvider, IDisposable
 
 public static IServiceCollection AddThemiaSplitStorage(
     this IServiceCollection services, IStorageProvider publicSlot, IStorageProvider privateSlot);
+
+public static IServiceCollection AddThemiaSplitStorage(
+    this IServiceCollection services,
+    Func<IServiceProvider, IStorageProvider> publicSlot, Func<IServiceProvider, IStorageProvider> privateSlot);
 ```
+
+**Why a factory overload.** Both consumers build providers through DI, not by hand: propertiezy through the
+options pipeline (`Bind` + `PostConfigure` defaulting `RootPath`/`PublicRootPath`, a >=32-character
+`SigningKey` check, `ValidateOnStart`, the same `IOptions<LocalStorageOptions>` read again for the signer and
+the static-files mount); ezy-assets as lazily resolved singletons in its registrar. An instance-only form
+would make each rebuild that outside DI at registration time. A factory defers construction to first resolve,
+which would bring back the validate-at-first-resolve gap, so the factory overload also forces construction at
+host start through the same `ValidateOnStart` mechanism `AddThemiaStorageUrls` already uses. That mechanism is
+to be confirmed in implementation by a test that boots a host with a half-configured slot and expects start-up
+to fail; if it cannot be made to work without a new package dependency, the overload ships with the caveat
+written in its remarks rather than the guarantee. Raised by propertiezy on PR #269.
 
 The constructor refuses (at construction, so before the host serves a request):
 
@@ -117,9 +137,11 @@ Decision (agreed with both consumers, #0152 [9]), and a test:
    slot Local?" — which is false when the public slot is S3/R2. One condition does not cover both (raised by
    propertiezy, #0152 [8]). An app that serves Local presigned links must register the signer anyway —
    `MapThemiaLocalStorage` refuses to start without one — so the condition costs nothing and survives any
-   future wrapping of the provider. propertiezy registers the signer only in its Local branch (its own
-   statement; not verified here). ezy-assets registers no signer and does not use `MapThemiaLocalStorage`, so
-   it is a decision at its migration.
+   future wrapping of the provider. propertiezy registers the signer only in its Local branch (`Program.cs:417`), and gates its
+   Local PUBLIC static-files block (`:990-1007`) on a separate condition — checked by its session against its
+   own code on PR #269. ezy-assets registers no signer and does not use `MapThemiaLocalStorage` (no
+   `Themia.Storage*` reference in its `src`, tests or `Directory.Packages.props`), so it is a decision at its
+   migration.
 3. **A Themia test that fails if the link stops opening:** `WebApplicationFactory` host with a split
    provider (Local private, a fake absolute-URL public slot), `AddThemiaStorageUrls`, `MapThemiaLocalStorage`;
    mint a download URL for a private key through `IStorageUrlService`, `GET` it, expect 200 and the bytes.
@@ -140,7 +162,9 @@ consumers' proposed shape is a good convention and is documented as an example, 
 Fail-fast is delivered differently: the app builds both slot instances in `Program.cs`, and
 `SplitStorageProvider` validates in its own constructor. All of it runs before the host starts, so a
 half-configured side fails at boot rather than at first resolve. This is the gap ezy-assets flagged on
-#399 (validation at first resolution), closed by constructing eagerly rather than by `ValidateOnStart`.
+#399 (validation at first resolution), closed **for apps that construct their slots at boot, or use the
+factory overload of §3 which forces construction at start**. ezy-assets builds its adapters as lazily resolved
+singletons today, so at migration it must do one or the other; #399 itself keeps first-resolve validation.
 
 **The slot constructors do not all validate, and the earlier draft of this paragraph said they did.**
 `new S3StorageProvider(options)` does (blank `BucketName` and `Validate()`). `new LocalStorageProvider(options)`
@@ -188,25 +212,38 @@ LocalStorageProvider NewLocal(LocalStorageOptions local)
   different object). Consumers moving an existing bucket behind the router must confirm none of their
   stored keys contain `\`, a `..` **segment** or a leading `/`. `NormalizeAndValidate` rejects a `..`
   *segment* only (`normalized.Split('/').Contains("..")`, `StorageKey.cs`), not the substring, so a file name
-  such as `<guid>..webp` passes. Propertiezy answered on #0152 [8]: current keys are clean; legacy
-  `<guid>..webp` photos (pre their fix #220) are unaffected for that reason.
+  such as `<guid>..webp` passes. That is Themia's reading of the code, not a run. Propertiezy's
+  current key generation is clean; its legacy `<guid>..webp` photos (before its fix #220) should pass for the
+  reason above, but its staging count is pending and will include non-`public/` keys stored in public
+  listing rows. ezy-assets has never held an S3/R2 object (Local only), so it has no bucket to check. Its
+  S3 adapter builds the key extension from `Path.GetExtension(fileName)` trimmed only, so a hostile file name
+  could yield `<guid>.b\c`, which the router re-spells to the nested `<guid>.b/c` rather than rejecting. Keeping
+  a hostile extension out of a key is the key generator's job (ezy-assets will sanitise it), not the
+  router's.
 - **`Themia.Modules.Storage` is not supported with the router.** Its builder throws if an `IStorageProvider`
   is already registered, and `MapThemiaStorageEndpoints` reads `LocalStorageOptions` from DI
-  (`StorageEndpoints.cs:41`). Whether either consumer uses the module is unverified; #0152 says
-  propertiezy registers its provider directly at `Program.cs:337`.
+  (`StorageEndpoints.cs:41`). Neither consumer uses it, each verified by its own session
+  against its code: propertiezy references `Themia.Storage`, `.AspNetCore` and `.S3` directly; ezy-assets
+  references no `Themia.Storage*` package at all.
 
 ## 8. Tests (written failing first; each has a falsifier)
 
-1. **Wrong side, lifted from ezy-assets #399** and credited to it: two spy slots. A private write must not
-   touch the public spy and a public write must not touch the private spy; reads of `private/`, a flat key,
-   `public/../x`, and `private/x/public` must never reach the public spy. Falsifier: invert the routing —
-   #399 measured one test failing for inverted writes and eight for inverted reads; expect the same shape.
+1. **Wrong side, adapted from ezy-assets #399** and credited to it: two spy slots. A private write must not
+   touch the public spy and a public write must not touch the private spy; reads of `private/x`, a flat key
+   `x`, and `private/x/public` must never reach the public spy. #399's inputs are stored paths and URLs
+   (`/uploads/private/a.pdf`, `https://cdn/.../public/a.jpg`) and it asserts private-store bytes come back
+   for the flat and `public/../x` cases; this router takes keys and normalises first, so the inputs become
+   key-form and a normalise-first input (`public/../x`, a leading `/`) is expected to **throw with neither
+   spy touched**, not to return bytes. Falsifier: invert the routing and count the failures at implementation
+   time; #399's counts (one for inverted writes, eight for inverted reads) do not carry over.
 2. **Mismatch throws, and nothing is stored:** `Visibility=Private` + `public/x`, and `Visibility=Public` +
    `x`, each throw `ArgumentException` with both spies untouched. Falsifier: route writes on `Visibility`
    alone and show the object stored and then unreachable by key — the failure this rule exists to prevent.
 3. **Normalise first:** `public\x` classifies as public, `/public/x` and `public/../x` are rejected, `Public/x`
    is private. Falsifier: classify the raw key.
 4. **Construction refusals:** same instance twice, null slot, public slot with no public container.
+   **Factory overload:** a host booted with a half-configured slot (blank Local `SigningKey` with `Validate()` in the
+   factory) fails at start, not at first resolve. Falsifier: resolve lazily and show start succeeds.
 5. **`PublicOnly`:** constructs with a blank `BucketName`; a private key throws; `PublicOnly=false` with a
    blank `BucketName` still throws (the guard is preserved — this is the test that would fail if the flag
    were replaced by loosening the check); `PublicOnly=true` with a non-blank `BucketName` throws.
