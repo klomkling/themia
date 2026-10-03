@@ -29,3 +29,5 @@ Themia.Storage.S3.S3StorageOptions.PublicBaseUrl.get -> string!
 Themia.Storage.S3.S3StorageOptions.PublicBaseUrl.set -> void
 Themia.Storage.S3.S3StorageOptions.Validate() -> void
 Themia.Storage.S3.S3StorageProvider.GetPublicUrl(string! key) -> System.Uri!
+Themia.Storage.S3.S3StorageOptions.PublicOnly.get -> bool
+Themia.Storage.S3.S3StorageOptions.PublicOnly.set -> void

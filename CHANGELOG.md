@@ -27,11 +27,34 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+### Added
+- **One app, a public storage slot and a private one** (`Themia.Storage`, `Themia.Storage.S3`).
+  `SplitStorageProvider` is a single `IStorageProvider` over two backends: a key under `public/` goes to the
+  public slot, every other key to the private slot, so listing photos can live on S3/R2 while identity
+  documents stay on the Local provider. The key decides the slot; `StoragePutOptions.Visibility` only
+  cross-checks a write (a mismatch throws, as a single provider already does), and the key is normalised
+  before it is classified, so `public/../x` cannot reach the public slot. Register it with
+  `AddThemiaSplitStorage(publicSlot, privateSlot)`, or with the `Func<IServiceProvider, IStorageProvider>`
+  overload when the slots come from the options pipeline; the factory form is also resolved at host start,
+  so a slot that cannot be built stops the host. New `S3StorageOptions.PublicOnly` lets an S3 slot that
+  serves only `public/` keys run with no private bucket. Single-provider configurations are unchanged.
+  Things to know: the S3 provider does not normalise keys but the router does, so a key containing `\`, a
+  `..` segment or a leading `/` that worked on a bare S3 provider is re-spelled or rejected behind it;
+  `LocalStorageProvider`'s constructor does not call `LocalStorageOptions.Validate()`, so call it before
+  building a Local slot; `Themia.Modules.Storage` is not supported with the router; the router cannot tell a swapped
+  public/private pair from a right one, so name the arguments; with the instance form you dispose the slots you built.
+  (coord #0152)
+
 ### Fixed
 - **`S3StorageProvider` presigned URLs now use the scheme of the endpoint** (`Themia.Storage.S3`). The SDK
   signs an `https` URL unless `GetPreSignedUrlRequest.Protocol` is set, so a provider pointed at a plain-http
   `ServiceUrl` (MinIO or Garage in development) handed out URLs that could not connect. An `http://`
   endpoint now gets `http`; every other configuration, including S3 and R2, still gets `https`.
+- **`S3StorageProvider` built from `S3StorageOptions` can upload to a plain-http endpoint** (`Themia.Storage.S3`).
+  Over `http` the AWS SDK's default checksum is a *signed* CRC32 trailer, which S3-compatible servers such as
+  Garage reject with `Invalid payload signature`, so every `PutAsync` failed. For an `http://` `ServiceUrl` the
+  client now adds a checksum only where the service requires one; `https` endpoints, including S3 and R2, are
+  unchanged, and so is the `(client, bucketName)` constructor, which takes the client you configured.
 
 ## [0.30.1] - 2026-09-27
 

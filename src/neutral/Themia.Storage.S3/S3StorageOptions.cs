@@ -34,14 +34,40 @@ public sealed class S3StorageOptions
     /// in the request path.</summary>
     public string PublicBaseUrl { get; set; } = string.Empty;
 
+    /// <summary>Serves only <see cref="StorageKey.PublicPrefix"/> keys, so no private bucket is needed. For the
+    /// public slot of a <see cref="SplitStorageProvider"/> whose private slot is another provider. Requires
+    /// <see cref="PublicBucketName"/> and <see cref="PublicBaseUrl"/> and a <b>blank</b> <see cref="BucketName"/>;
+    /// any private key reaching the provider throws. It is an explicit flag rather than "a blank
+    /// <see cref="BucketName"/> is fine when a public bucket is set", because that would turn a forgotten
+    /// <see cref="BucketName"/> in an ordinary config from a boot failure into a failure at the first private write.</summary>
+    public bool PublicOnly { get; set; }
+
     /// <summary>Validates the public-container options, failing fast at composition time.</summary>
     /// <exception cref="ArgumentException">Only one of <see cref="PublicBucketName"/> /
-    /// <see cref="PublicBaseUrl"/> is set, the base URL is not an absolute http(s) URL, or the public
-    /// bucket equals the private one.</exception>
+    /// <see cref="PublicBaseUrl"/> is set, the base URL is not an absolute http(s) URL, the public
+    /// bucket equals the private one, or <see cref="PublicOnly"/> is set without the public container or
+    /// with a <see cref="BucketName"/>.</exception>
     public void Validate()
     {
         var hasBucket = !string.IsNullOrWhiteSpace(PublicBucketName);
         var hasBaseUrl = !string.IsNullOrWhiteSpace(PublicBaseUrl);
+
+        if (PublicOnly)
+        {
+            if (!hasBucket || !hasBaseUrl)
+            {
+                throw new ArgumentException(
+                    "PublicOnly serves only public objects, so PublicBucketName and PublicBaseUrl must both be set.",
+                    nameof(PublicOnly));
+            }
+
+            if (!string.IsNullOrWhiteSpace(BucketName))
+            {
+                throw new ArgumentException(
+                    "PublicOnly means there is no private bucket; leave BucketName blank, or clear PublicOnly.",
+                    nameof(BucketName));
+            }
+        }
 
         if (!hasBucket && !hasBaseUrl)
         {

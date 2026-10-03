@@ -11,6 +11,7 @@ public sealed class S3StorageProvider : IStorageProvider, IDisposable
 {
     private readonly IAmazonS3 client;
     private readonly string bucket;
+    private readonly bool publicOnly;
     private readonly string publicBucket;
     private readonly string publicBaseUrl;
     private readonly bool ownsClient;
@@ -20,9 +21,14 @@ public sealed class S3StorageProvider : IStorageProvider, IDisposable
     public S3StorageProvider(S3StorageOptions options)
     {
         ArgumentNullException.ThrowIfNull(options);
-        ArgumentException.ThrowIfNullOrWhiteSpace(options.BucketName);
+        if (!options.PublicOnly)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(options.BucketName);
+        }
+
         bucket = options.BucketName;
         options.Validate();
+        publicOnly = options.PublicOnly;
         publicBucket = options.PublicBucketName;
         publicBaseUrl = options.PublicBaseUrl;
         client = BuildClient(options);
@@ -170,6 +176,13 @@ public sealed class S3StorageProvider : IStorageProvider, IDisposable
     {
         if (!Themia.Storage.StorageKey.IsPublic(key))
         {
+            if (publicOnly)
+            {
+                throw new InvalidOperationException(
+                    $"Object '{key}' is not a public object and this S3 provider is public-only (S3StorageOptions.PublicOnly); " +
+                    "it has no private bucket. Private keys belong to the other slot of the split.");
+            }
+
             return (bucket, key);
         }
 
@@ -198,6 +211,14 @@ public sealed class S3StorageProvider : IStorageProvider, IDisposable
         if (options.ServiceUrl is not null)
         {
             config.ServiceURL = options.ServiceUrl.AbsoluteUri;
+
+            // Over plain http the SDK's default checksum is a SIGNED CRC32 trailer, which S3-compatible servers such
+            // as Garage reject on upload ("Invalid payload signature"). https uses an unsigned trailer and is
+            // unaffected, so a checksum is added only where the service requires one, and only for http endpoints.
+            if (string.Equals(options.ServiceUrl.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase))
+            {
+                config.RequestChecksumCalculation = RequestChecksumCalculation.WHEN_REQUIRED;
+            }
         }
         else if (!string.IsNullOrWhiteSpace(options.Region))
         {
