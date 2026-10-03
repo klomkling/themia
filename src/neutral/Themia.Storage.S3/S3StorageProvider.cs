@@ -132,9 +132,17 @@ public sealed class S3StorageProvider : IStorageProvider, IDisposable
             Verb = request.Operation == PresignedUrlOperation.Put ? HttpVerb.PUT : HttpVerb.GET,
             Expires = DateTime.UtcNow.Add(request.Expiry),
             ContentType = request.Operation == PresignedUrlOperation.Put ? request.ContentType : null,
+            Protocol = PresignProtocol,
         }).ConfigureAwait(false);
         return new Uri(url);
     }
+
+    // The SDK signs an https URL unless told otherwise, whatever the endpoint is. A plain-http endpoint (MinIO or
+    // Garage in development) would then be handed a URL that cannot connect, so follow the endpoint's own scheme.
+    private Amazon.S3.Protocol PresignProtocol =>
+        client.Config.ServiceURL is { } serviceUrl && serviceUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
+            ? Amazon.S3.Protocol.HTTP
+            : Amazon.S3.Protocol.HTTPS;
 
     /// <summary>Returns the permanent, absolute public URL for an object in the public container. The URL is
     /// composed at read time from <see cref="S3StorageOptions.PublicBaseUrl"/> and the key with its
