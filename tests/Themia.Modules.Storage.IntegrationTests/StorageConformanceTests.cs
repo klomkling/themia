@@ -50,6 +50,33 @@ file sealed class ThrowingStorageProvider(IStorageProvider inner, int throwOnPut
     public Uri GetPublicUrl(string key) => inner.GetPublicUrl(key);
 }
 
+/// <summary>Deletes for real, then reports a refused CDN purge, as a <c>PurgingStorageProvider</c> under the module would.</summary>
+file sealed class PurgeRefusingStorageProvider(IStorageProvider inner) : IStorageProvider
+{
+    public Task<StorageObjectInfo> PutAsync(string key, Stream content, StoragePutOptions options, CancellationToken cancellationToken = default) =>
+        inner.PutAsync(key, content, options, cancellationToken);
+
+    public Task<StorageReadResult?> GetAsync(string key, CancellationToken cancellationToken = default) =>
+        inner.GetAsync(key, cancellationToken);
+
+    public Task<bool> ExistsAsync(string key, CancellationToken cancellationToken = default) =>
+        inner.ExistsAsync(key, cancellationToken);
+
+    public Task<StorageObjectInfo?> StatAsync(string key, CancellationToken cancellationToken = default) =>
+        inner.StatAsync(key, cancellationToken);
+
+    public async Task DeleteAsync(string key, CancellationToken cancellationToken = default)
+    {
+        await inner.DeleteAsync(key, cancellationToken);
+        throw new CdnPurgeException(new Uri("https://cdn.example.com/x"), "Simulated refused purge.", httpStatus: 429);
+    }
+
+    public Task<Uri> GetPresignedUrlAsync(string key, PresignedUrlRequest request, CancellationToken cancellationToken = default) =>
+        inner.GetPresignedUrlAsync(key, request, cancellationToken);
+
+    public Uri GetPublicUrl(string key) => inner.GetPublicUrl(key);
+}
+
 /// <summary>An <see cref="IFileScanner"/> that always reports the content as a threat.</summary>
 file sealed class RejectingScanner : Themia.Modules.Storage.Scanning.IFileScanner
 {
@@ -142,6 +169,21 @@ public abstract class StorageConformanceTests
         await s.Storage.DeleteAsync("docs/a.txt");
         Assert.False(await s.Storage.ExistsAsync("docs/a.txt"));
         Assert.Null(await s.Storage.GetAsync("docs/a.txt"));
+    }
+
+    [Fact]
+    public async Task Delete_completes_when_the_provider_reports_a_refused_purge()
+    {
+        // Characterisation of TenantStorage's documented best-effort blob delete (coord #0153, spec section 8):
+        // the logical delete is committed first, then a provider failure is only logged. A CdnPurgeException from
+        // a decorated provider is therefore swallowed under this module. Changing that is a deliberate decision.
+        await ResetAsync();
+        await using var s = NewScope(new TenantId("acme"), providerOverride: inner => new PurgeRefusingStorageProvider(inner));
+        await s.Storage.PutAsync("docs/a.txt", Bytes("hello"), new StoragePutOptions("text/plain"));
+
+        await s.Storage.DeleteAsync("docs/a.txt");
+
+        Assert.False(await s.Storage.ExistsAsync("docs/a.txt"));
     }
 
     [Fact]

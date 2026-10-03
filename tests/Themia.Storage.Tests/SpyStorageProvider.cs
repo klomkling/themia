@@ -5,6 +5,8 @@ internal sealed class SpyStorageProvider(string name, bool hasPublicContainer = 
 {
     public bool ThrowOnDispose { get; init; }
 
+    public Exception? ThrowOnDelete { get; init; }
+
     public List<string> Calls { get; } = [];
 
     public int DisposeCount { get; private set; }
@@ -41,6 +43,11 @@ internal sealed class SpyStorageProvider(string name, bool hasPublicContainer = 
     {
         ThrowIfDisposed();
         Calls.Add($"Delete:{key}");
+        if (ThrowOnDelete is not null)
+        {
+            throw ThrowOnDelete;
+        }
+
         return Task.CompletedTask;
     }
 

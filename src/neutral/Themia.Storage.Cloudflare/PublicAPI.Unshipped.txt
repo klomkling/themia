@@ -1,0 +1,15 @@
+#nullable enable
+const Themia.Storage.Cloudflare.CloudflareCdnPurger.HttpClientName = "Themia.Storage.Cloudflare" -> string!
+Themia.Storage.Cloudflare.CloudflareCdnPurger
+Themia.Storage.Cloudflare.CloudflareCdnPurger.CloudflareCdnPurger(System.Net.Http.IHttpClientFactory! httpClientFactory, Microsoft.Extensions.Options.IOptions<Themia.Storage.Cloudflare.CloudflarePurgeOptions!>! options) -> void
+Themia.Storage.Cloudflare.CloudflareCdnPurger.PurgeAsync(System.Uri! url, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Storage.Cloudflare.CloudflarePurgeOptions
+Themia.Storage.Cloudflare.CloudflarePurgeOptions.ApiToken.get -> string!
+Themia.Storage.Cloudflare.CloudflarePurgeOptions.ApiToken.set -> void
+Themia.Storage.Cloudflare.CloudflarePurgeOptions.CloudflarePurgeOptions() -> void
+Themia.Storage.Cloudflare.CloudflarePurgeOptions.Enabled.get -> bool
+Themia.Storage.Cloudflare.CloudflarePurgeOptions.Enabled.set -> void
+Themia.Storage.Cloudflare.CloudflarePurgeOptions.ZoneId.get -> string!
+Themia.Storage.Cloudflare.CloudflarePurgeOptions.ZoneId.set -> void
+Themia.Storage.Cloudflare.StorageCloudflareServiceCollectionExtensions
+static Themia.Storage.Cloudflare.StorageCloudflareServiceCollectionExtensions.AddThemiaStorageCloudflarePurge(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Themia.Storage.Cloudflare.CloudflarePurgeOptions!>! configure) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!

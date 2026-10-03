@@ -27,6 +27,18 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+### Added
+- **Purge the CDN edge when a public object is deleted** (`Themia.Storage`, new `Themia.Storage.Cloudflare`,
+  coord #0153). `PurgingStorageProvider` wraps an `IStorageProvider` (the public slot of a split provider, or the
+  single provider): for a `public/` key it builds `GetPublicUrl(key)`, deletes the object, then purges that URL
+  through `ICdnPurger`; any other key is only deleted. Any failure of the purge step after the delete (a refusal,
+  a transport failure, a timeout, a resilience handler's exception) throws `CdnPurgeException`, meaning "deleted,
+  the edge may still serve it"; repeat the idempotent delete. `Themia.Storage.Cloudflare` supplies `CloudflareCdnPurger`
+  (`AddThemiaStorageCloudflarePurge`): off by default, its own Zone / Cache Purge token (never logged), and
+  `Enabled` with a blank `ZoneId` or `ApiToken` fails host start. No existing type, option or default changes.
+  Under `Themia.Modules.Storage` the purge is best-effort: `TenantStorage.DeleteAsync` logs and swallows a
+  provider-delete failure, and this release does not change that.
+
 ## [0.30.2] - 2026-10-03
 
 ### Added
