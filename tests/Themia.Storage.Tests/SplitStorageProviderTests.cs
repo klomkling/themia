@@ -212,6 +212,29 @@ public sealed class SplitStorageProviderTests
     }
 
     [Fact]
+    public void Dispose_still_disposes_the_private_slot_when_disposing_the_public_one_throws()
+    {
+        var throwing = new SpyStorageProvider("throws", hasPublicContainer: true) { ThrowOnDispose = true };
+        var provider = new SplitStorageProvider(throwing, privateSlot);
+
+        Assert.Throws<InvalidOperationException>(provider.Dispose);
+
+        Assert.Equal(1, privateSlot.DisposeCount);
+    }
+
+    [Fact]
+    public async Task DisposeAsync_disposes_a_slot_that_can_only_be_disposed_asynchronously()
+    {
+        var asyncOnly = new AsyncOnlyDisposableSlot();
+        var provider = new SplitStorageProvider(asyncOnly, privateSlot);
+
+        await provider.DisposeAsync();
+
+        Assert.Equal(1, asyncOnly.DisposeAsyncCount);
+        Assert.Equal(1, privateSlot.DisposeCount);
+    }
+
+    [Fact]
     public void Dispose_disposes_both_slots()
     {
         var provider = Create();

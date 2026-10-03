@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 using Themia.Storage.Local;
 using Themia.Storage.Urls;
 using Xunit;
@@ -99,13 +100,28 @@ public sealed class SplitStorageHostTests : IDisposable
         // The local options are validated inside the factory, as an app using the options pipeline would.
         var blankSigningKey = new LocalStorageOptions { RootPath = root };
 
-        await Assert.ThrowsAnyAsync<Exception>(() => StartAsync(s => s.AddThemiaSplitStorage(
+        var ex = await Assert.ThrowsAsync<ArgumentException>(() => StartAsync(s => s.AddThemiaSplitStorage(
             _ => new CdnPublicSlot(),
             _ =>
             {
                 blankSigningKey.Validate();
                 return new LocalStorageProvider(blankSigningKey);
             })));
+
+        // The SigningKey check from LocalStorageOptions.Validate, not some other start-up failure.
+        Assert.Equal("SigningKey", ex.ParamName);
+    }
+
+    [Fact]
+    public async Task A_provider_registered_after_the_factory_form_replaces_the_router_and_fails_host_start()
+    {
+        var ex = await Assert.ThrowsAsync<OptionsValidationException>(() => StartAsync(s =>
+        {
+            s.AddThemiaSplitStorage(_ => new CdnPublicSlot(), _ => NewLocal());
+            s.AddSingleton<IStorageProvider>(new CdnPublicSlot());
+        }));
+
+        Assert.Contains("replaced the split", ex.Message);
     }
 
     [Fact]

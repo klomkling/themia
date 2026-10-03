@@ -19,15 +19,28 @@ namespace Themia.Storage;
 /// </para>
 /// <para>
 /// The slot receives the key unchanged otherwise (still <c>public/</c>-prefixed for the public slot), so each
-/// slot's own prefix check and stripping keep working. This type owns both slots and disposes them.
+/// slot's own prefix check and stripping keep working.
+/// </para>
+/// <para>
+/// <b>Ownership.</b> A router created with this constructor owns its slots: disposing it disposes both.
+/// <c>AddThemiaSplitStorage</c> does not use that: the instance form leaves the slots to the app that built them,
+/// as with any instance given to the container, and the factory form never disposes them, because a factory that
+/// returns a service the container already manages would otherwise see it disposed twice.
+/// </para>
+/// <para>
+/// <b>The arguments are not interchangeable and nothing can check that you passed them the right way round.</b>
+/// Only the public slot can be probed (a private slot may legitimately have a public container too), and with
+/// both slots fully configured a swap silently stores public objects on the private backend and identity
+/// documents on the public one. Name the arguments at the call site.
 /// </para>
 /// </remarks>
-public sealed class SplitStorageProvider : IStorageProvider, IDisposable
+public sealed class SplitStorageProvider : IStorageProvider, IDisposable, IAsyncDisposable
 {
     private const string PublicContainerProbeKey = StorageKey.PublicPrefix + "_probe";
 
     private readonly IStorageProvider publicSlot;
     private readonly IStorageProvider privateSlot;
+    private readonly bool ownsSlots;
 
     /// <summary>Creates the router.</summary>
     /// <param name="publicSlot">Serves the keys under <see cref="StorageKey.PublicPrefix"/>. Must have a public container.</param>
@@ -36,6 +49,11 @@ public sealed class SplitStorageProvider : IStorageProvider, IDisposable
     /// <exception cref="ArgumentException">Both slots are the same instance, so the split would be a lie.</exception>
     /// <exception cref="InvalidOperationException">The public slot has no public container configured.</exception>
     public SplitStorageProvider(IStorageProvider publicSlot, IStorageProvider privateSlot)
+        : this(publicSlot, privateSlot, ownsSlots: true)
+    {
+    }
+
+    internal SplitStorageProvider(IStorageProvider publicSlot, IStorageProvider privateSlot, bool ownsSlots)
     {
         ArgumentNullException.ThrowIfNull(publicSlot);
         ArgumentNullException.ThrowIfNull(privateSlot);
@@ -47,6 +65,7 @@ public sealed class SplitStorageProvider : IStorageProvider, IDisposable
         ProbePublicContainer(publicSlot);
         this.publicSlot = publicSlot;
         this.privateSlot = privateSlot;
+        this.ownsSlots = ownsSlots;
     }
 
     /// <inheritdoc />
@@ -107,11 +126,53 @@ public sealed class SplitStorageProvider : IStorageProvider, IDisposable
         return publicSlot.GetPublicUrl(normalized);
     }
 
-    /// <inheritdoc />
+    /// <summary>Disposes both slots when this router owns them; the private slot is disposed even if disposing the
+    /// public one throws.</summary>
     public void Dispose()
     {
-        (publicSlot as IDisposable)?.Dispose();
-        (privateSlot as IDisposable)?.Dispose();
+        if (!ownsSlots)
+        {
+            return;
+        }
+
+        try
+        {
+            (publicSlot as IDisposable)?.Dispose();
+        }
+        finally
+        {
+            (privateSlot as IDisposable)?.Dispose();
+        }
+    }
+
+    /// <summary>As <see cref="Dispose"/>, using <see cref="IAsyncDisposable"/> where a slot has it.</summary>
+    /// <returns>A task that completes when both slots are disposed.</returns>
+    public async ValueTask DisposeAsync()
+    {
+        if (!ownsSlots)
+        {
+            return;
+        }
+
+        try
+        {
+            await DisposeSlotAsync(publicSlot).ConfigureAwait(false);
+        }
+        finally
+        {
+            await DisposeSlotAsync(privateSlot).ConfigureAwait(false);
+        }
+    }
+
+    private static ValueTask DisposeSlotAsync(IStorageProvider slot)
+    {
+        if (slot is IAsyncDisposable asyncDisposable)
+        {
+            return asyncDisposable.DisposeAsync();
+        }
+
+        (slot as IDisposable)?.Dispose();
+        return ValueTask.CompletedTask;
     }
 
     private IStorageProvider SlotFor(string normalizedKey) =>

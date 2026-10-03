@@ -1,9 +1,5 @@
-using System.Text;
-using Amazon.Runtime;
 using Amazon.S3;
 using Amazon.S3.Model;
-using DotNet.Testcontainers.Builders;
-using DotNet.Testcontainers.Containers;
 using Microsoft.Extensions.Options;
 using Themia.Storage.Local;
 using Themia.Storage.S3;
@@ -14,85 +10,39 @@ namespace Themia.Storage.IntegrationTests;
 
 /// <summary>
 /// The router over real backends (coord #0152): Garage, a real S3-compatible server, as the public slot and the
-/// Local provider as the private slot. Proves that a private key never reaches the bucket and that
-/// <see cref="IStorageUrlService"/> mints both kinds of link over the same seam, one of which really downloads.
+/// Local provider as the private slot. Proves that a private key never reaches the bucket, that a public write
+/// lands in it with the prefix stripped, and that <see cref="IStorageUrlService"/> mints both kinds of link over
+/// the same seam, one of which really downloads. Tests share the bucket, so every key carries its own id.
 /// </summary>
 [Trait("Category", "Integration")]
-public sealed class SplitStorageIntegrationTests : IAsyncLifetime
+public sealed class SplitStorageIntegrationTests : IClassFixture<GarageFixture>, IDisposable
 {
-    private const ushort S3Port = 3900;
-    private const ushort AdminPort = 3903;
-    private const string Region = "us-east-1";
-    private const string Bucket = "themia-split";
     private const string PublicBaseUrl = "https://cdn.example.com";
     private const string PresignedBaseUrl = "https://api.example.com/api/v1/storage";
 
-    // Garage requires an access key id of "GK" + 24 hex chars and a 64-hex-char secret; throwaway test values.
-    private const string AccessKey = "GK0123456789abcdef01234567";
-    private const string SecretKey = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
-
-    private static readonly string GarageToml = $"""
-        metadata_dir = "/var/lib/garage/meta"
-        data_dir = "/var/lib/garage/data"
-        db_engine = "sqlite"
-        replication_factor = 1
-        rpc_bind_addr = "[::]:3901"
-        rpc_public_addr = "127.0.0.1:3901"
-        rpc_secret = "0000000000000000000000000000000000000000000000000000000000000000"
-
-        [s3_api]
-        s3_region = "{Region}"
-        api_bind_addr = "[::]:{S3Port}"
-
-        [admin]
-        api_bind_addr = "[::]:{AdminPort}"
-        """;
-
+    private readonly GarageFixture garage;
     private readonly string localRoot = Path.Combine(Path.GetTempPath(), "themia-split-it-" + Guid.NewGuid().ToString("N"));
+    private readonly string id = Guid.NewGuid().ToString("N");
+    private readonly AmazonS3Client bucketClient;
+    private readonly SplitStorageProvider router;
+    private readonly StorageUrlService urls;
 
-    private readonly IContainer container = new ContainerBuilder("dxflrs/garage:v2.4.0")
-        .WithResourceMapping(Encoding.UTF8.GetBytes(GarageToml), FilePath.Of("/etc/garage.toml"))
-        .WithEnvironment("GARAGE_DEFAULT_ACCESS_KEY", AccessKey)
-        .WithEnvironment("GARAGE_DEFAULT_SECRET_KEY", SecretKey)
-        .WithEnvironment("GARAGE_DEFAULT_BUCKET", Bucket)
-        .WithCommand("/garage", "server", "--single-node", "--default-bucket")
-        .WithPortBinding(S3Port, true)
-        .WithPortBinding(AdminPort, true)
-        .WithWaitStrategy(Wait.ForUnixContainer()
-            .UntilHttpRequestIsSucceeded(request => request.ForPort(AdminPort).ForPath("/health")))
-        .Build();
-
-    private AmazonS3Client bucketClient = null!;
-    private SplitStorageProvider router = null!;
-    private StorageUrlService urls = null!;
-
-    public async Task InitializeAsync()
+    public SplitStorageIntegrationTests(GarageFixture garage)
     {
-        await container.StartAsync();
-        var serviceUrl = new Uri($"http://{container.Hostname}:{container.GetMappedPublicPort(S3Port)}");
+        this.garage = garage;
+        bucketClient = garage.CreateClient();
 
-        // A direct client seeds the bucket and inspects it. Garage v2.4 rejects the SDK's default CRC32 trailer on a
-        // signed streaming upload over plain HTTP, so checksums are sent only where S3 requires them.
-        var credentials = new BasicAWSCredentials(AccessKey, SecretKey);
-        bucketClient = new AmazonS3Client(credentials, new AmazonS3Config
-        {
-            ServiceURL = serviceUrl.AbsoluteUri,
-            ForcePathStyle = true,
-            AuthenticationRegion = Region,
-            DefaultAWSCredentials = credentials,
-            RequestChecksumCalculation = RequestChecksumCalculation.WHEN_REQUIRED,
-        });
-
+        // The slot builds its own client from options, as an app would: no test-only checksum setting.
         var publicSlot = new S3StorageProvider(new S3StorageOptions
         {
             PublicOnly = true,
-            PublicBucketName = Bucket,
+            PublicBucketName = GarageFixture.Bucket,
             PublicBaseUrl = PublicBaseUrl,
-            ServiceUrl = serviceUrl,
+            ServiceUrl = garage.ServiceUrl,
             ForcePathStyle = true,
-            AccessKey = AccessKey,
-            SecretKey = SecretKey,
-            Region = Region,
+            AccessKey = GarageFixture.AccessKey,
+            SecretKey = GarageFixture.SecretKey,
+            Region = GarageFixture.Region,
         });
         var privateSlot = new LocalStorageProvider(new LocalStorageOptions
         {
@@ -104,43 +54,60 @@ public sealed class SplitStorageIntegrationTests : IAsyncLifetime
         urls = new StorageUrlService(router, Options.Create(new StorageUrlOptions { PresignedBaseUrl = PresignedBaseUrl }));
     }
 
-    public async Task DisposeAsync()
+    public void Dispose()
     {
         router.Dispose();
         bucketClient.Dispose();
-        await container.DisposeAsync();
         if (Directory.Exists(localRoot))
         {
             Directory.Delete(localRoot, recursive: true);
         }
     }
 
-    private async Task SeedPublicObjectAsync(string bucketKey, byte[] bytes)
+    private async Task SeedBucketObjectAsync(string bucketKey, byte[] bytes)
     {
         using var body = new MemoryStream(bytes);
-        await bucketClient.PutObjectAsync(new PutObjectRequest { BucketName = Bucket, Key = bucketKey, InputStream = body });
+        await bucketClient.PutObjectAsync(new PutObjectRequest { BucketName = GarageFixture.Bucket, Key = bucketKey, InputStream = body });
     }
 
-    private async Task<List<string>> BucketKeysAsync() =>
-        (await bucketClient.ListObjectsV2Async(new ListObjectsV2Request { BucketName = Bucket })).S3Objects?.Select(o => o.Key).ToList() ?? [];
+    private async Task<List<string>> BucketKeysAsync(string prefix) =>
+        (await bucketClient.ListObjectsV2Async(new ListObjectsV2Request { BucketName = GarageFixture.Bucket, Prefix = prefix }))
+            .S3Objects?.Select(o => o.Key).ToList() ?? [];
 
     [Fact]
     public async Task A_private_key_is_stored_by_the_Local_slot_and_never_reaches_the_bucket()
     {
-        await router.PutAsync("verifications/1/id.pdf", new MemoryStream([9, 9, 9]), new StoragePutOptions("application/pdf"));
+        await router.PutAsync($"verifications/{id}/id.pdf", new MemoryStream([9, 9, 9]), new StoragePutOptions("application/pdf"));
 
-        Assert.True(await router.ExistsAsync("verifications/1/id.pdf"));
-        Assert.DoesNotContain(await BucketKeysAsync(), key => key.Contains("id.pdf"));
+        Assert.True(await router.ExistsAsync($"verifications/{id}/id.pdf"));
         Assert.True(Directory.EnumerateFiles(localRoot, "*", SearchOption.AllDirectories).Any());
+        Assert.Empty(await BucketKeysAsync($"verifications/{id}"));
+    }
+
+    [Fact]
+    public async Task A_public_object_written_through_the_router_lands_in_the_bucket_with_the_prefix_stripped()
+    {
+        var bucketKey = $"split-{id}/listings/1/a.jpg";
+
+        await router.PutAsync($"public/{bucketKey}", new MemoryStream([7, 7, 7]), new StoragePutOptions("image/jpeg", Visibility: StorageVisibility.Public));
+
+        using var stored = await bucketClient.GetObjectAsync(GarageFixture.Bucket, bucketKey);
+        using var ms = new MemoryStream();
+        await stored.ResponseStream.CopyToAsync(ms);
+        Assert.Equal([7, 7, 7], ms.ToArray());
+        Assert.Equal([bucketKey], await BucketKeysAsync($"split-{id}"));
+        Assert.Empty(await BucketKeysAsync($"public/split-{id}"));
+        Assert.False(Directory.Exists(localRoot) && Directory.EnumerateFiles(localRoot, "*", SearchOption.AllDirectories).Any());
     }
 
     [Fact]
     public async Task A_public_key_is_read_from_the_bucket_and_the_same_name_without_the_prefix_is_not()
     {
-        await SeedPublicObjectAsync("listings/1/a.jpg", [1, 2, 3]);
+        var bucketKey = $"split-{id}/listings/1/a.jpg";
+        await SeedBucketObjectAsync(bucketKey, [1, 2, 3]);
 
-        var publicRead = await router.GetAsync("public/listings/1/a.jpg");
-        var privateRead = await router.GetAsync("listings/1/a.jpg");
+        var publicRead = await router.GetAsync($"public/{bucketKey}");
+        var privateRead = await router.GetAsync(bucketKey);
 
         Assert.NotNull(publicRead);
         using (var ms = new MemoryStream())
@@ -155,21 +122,19 @@ public sealed class SplitStorageIntegrationTests : IAsyncLifetime
     [Fact]
     public async Task IStorageUrlService_mints_a_local_link_for_a_private_key_and_a_working_S3_link_for_a_public_one()
     {
-        await SeedPublicObjectAsync("listings/2/b.jpg", [4, 5, 6]);
+        var bucketKey = $"split-{id}/listings/2/b.jpg";
+        await SeedBucketObjectAsync(bucketKey, [4, 5, 6]);
 
-        var privateUrl = await urls.GetDownloadUrlAsync("verifications/1/id.pdf", TimeSpan.FromMinutes(5));
-        var publicUrl = await urls.GetDownloadUrlAsync("public/listings/2/b.jpg", TimeSpan.FromMinutes(5));
+        var privateUrl = await urls.GetDownloadUrlAsync($"verifications/{id}/id.pdf", TimeSpan.FromMinutes(5));
+        var publicUrl = await urls.GetDownloadUrlAsync($"public/{bucketKey}", TimeSpan.FromMinutes(5));
 
         Assert.StartsWith(PresignedBaseUrl + "/_local/get?", privateUrl.AbsoluteUri);
-        // S3StorageProvider does not set GetPreSignedUrlRequest.Protocol, so the SDK signs an https URL even for
-        // Garage's plain-HTTP endpoint. Right for S3 and R2; the scheme is not part of the signature, so the test
-        // downloads over http. (Pre-existing, unrelated to the router.)
-        var expectedStart = $"https://{container.Hostname}:{container.GetMappedPublicPort(S3Port)}/{Bucket}/listings/2/b.jpg?";
+        var expectedStart = $"{garage.ServiceUrl.AbsoluteUri}{GarageFixture.Bucket}/{bucketKey}?";
         Assert.True(publicUrl.AbsoluteUri.StartsWith(expectedStart, StringComparison.Ordinal), publicUrl.AbsoluteUri);
 
+        // Garage listens on plain http, and the presigned URL follows the endpoint's scheme: it opens as minted.
         using var http = new HttpClient();
-        var overHttp = new UriBuilder(publicUrl) { Scheme = Uri.UriSchemeHttp, Port = container.GetMappedPublicPort(S3Port) }.Uri;
-        Assert.Equal([4, 5, 6], await http.GetByteArrayAsync(overHttp));
+        Assert.Equal([4, 5, 6], await http.GetByteArrayAsync(publicUrl));
     }
 
     [Fact]

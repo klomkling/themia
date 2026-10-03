@@ -74,8 +74,9 @@ public sealed class SplitStorageRegistrationTests : IDisposable
     }
 
     [Fact]
-    public void The_container_disposes_the_router_and_through_it_both_slots()
+    public void The_instance_form_leaves_disposing_the_slots_to_the_app_that_built_them()
     {
+        // As with any instance given to the container: the app built the slots, so the app disposes them.
         var publicSlot = new SpyStorageProvider("public", hasPublicContainer: true);
         var privateSlot = new SpyStorageProvider("private");
         var services = new ServiceCollection();
@@ -85,8 +86,58 @@ public sealed class SplitStorageRegistrationTests : IDisposable
 
         provider.Dispose();
 
-        Assert.Equal(1, publicSlot.DisposeCount);
-        Assert.Equal(1, privateSlot.DisposeCount);
+        Assert.Equal(0, publicSlot.DisposeCount);
+        Assert.Equal(0, privateSlot.DisposeCount);
+    }
+
+    [Fact]
+    public async Task A_temporary_container_built_from_the_same_collection_does_not_break_the_next_one()
+    {
+        // BuildServiceProvider() during start-up, resolved and disposed, must not take the slots with it.
+        var services = new ServiceCollection();
+        services.AddThemiaSplitStorage(new SpyStorageProvider("public", hasPublicContainer: true), new SpyStorageProvider("private"));
+        using (var temporary = services.BuildServiceProvider())
+        {
+            _ = temporary.GetRequiredService<IStorageProvider>();
+        }
+
+        using var real = services.BuildServiceProvider();
+
+        Assert.False(await real.GetRequiredService<IStorageProvider>().ExistsAsync("public/a.jpg"));
+    }
+
+    [Fact]
+    public void The_factory_form_does_not_dispose_slots_the_container_already_owns()
+    {
+        // Slots resolved from the container are disposed by the container, once. A router that also disposed
+        // them would dispose each twice at shutdown.
+        var services = new ServiceCollection();
+        services.AddSingleton(new SpyStorageProvider("public", hasPublicContainer: true));
+        services.AddSingleton(new SpyStorageProvider("private"));
+        services.AddThemiaSplitStorage(
+            sp => sp.GetServices<SpyStorageProvider>().First(),
+            sp => sp.GetServices<SpyStorageProvider>().Last());
+        var provider = services.BuildServiceProvider();
+        _ = provider.GetRequiredService<IStorageProvider>();
+
+        provider.Dispose();
+
+        Assert.All(services.Select(d => d.ImplementationInstance).OfType<SpyStorageProvider>(), spy => Assert.Equal(0, spy.DisposeCount));
+    }
+
+    [Fact]
+    public void A_keyed_provider_registration_does_not_count_as_an_already_registered_provider()
+    {
+        var services = new ServiceCollection();
+        services.AddKeyedSingleton<IStorageProvider>("public", new SpyStorageProvider("public", hasPublicContainer: true));
+        services.AddKeyedSingleton<IStorageProvider>("private", new SpyStorageProvider("private"));
+
+        services.AddThemiaSplitStorage(
+            sp => sp.GetRequiredKeyedService<IStorageProvider>("public"),
+            sp => sp.GetRequiredKeyedService<IStorageProvider>("private"));
+
+        using var provider = services.BuildServiceProvider();
+        Assert.IsType<SplitStorageProvider>(provider.GetRequiredService<IStorageProvider>());
     }
 
     [Fact]

@@ -106,3 +106,4 @@ Themia.Storage.SplitStorageProvider.StatAsync(string! key, System.Threading.Canc
 Themia.Storage.SplitStorageServiceCollectionExtensions
 static Themia.Storage.SplitStorageServiceCollectionExtensions.AddThemiaSplitStorage(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, Themia.Storage.IStorageProvider! publicSlot, Themia.Storage.IStorageProvider! privateSlot) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
 static Themia.Storage.SplitStorageServiceCollectionExtensions.AddThemiaSplitStorage(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Func<System.IServiceProvider!, Themia.Storage.IStorageProvider!>! publicSlot, System.Func<System.IServiceProvider!, Themia.Storage.IStorageProvider!>! privateSlot) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+Themia.Storage.SplitStorageProvider.DisposeAsync() -> System.Threading.Tasks.ValueTask
