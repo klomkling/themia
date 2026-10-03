@@ -3,7 +3,9 @@ namespace Themia.Storage;
 /// <summary>
 /// An <see cref="IStorageProvider"/> that, after deleting a <c>public/</c> object, purges the CDN's copy of
 /// the URL <c>inner.GetPublicUrl(key)</c> (coord #0153). Wrap the public slot of a split provider, or the
-/// single provider. Every other member forwards unchanged, and a non-public key is never purged.
+/// single provider. Every member normalises the key first, as the split router does, and hands the inner
+/// provider that key, so a put, a read and a delete address the same object even over a provider that does
+/// not normalise (S3). A non-public key is never purged.
 /// This type never disposes <c>inner</c>: whoever constructs it owns it.
 /// </summary>
 public sealed class PurgingStorageProvider : IStorageProvider
@@ -24,26 +26,26 @@ public sealed class PurgingStorageProvider : IStorageProvider
 
     /// <inheritdoc />
     public Task<StorageObjectInfo> PutAsync(string key, Stream content, StoragePutOptions options, CancellationToken cancellationToken = default) =>
-        inner.PutAsync(key, content, options, cancellationToken);
+        inner.PutAsync(StorageKey.NormalizeAndValidate(key), content, options, cancellationToken);
 
     /// <inheritdoc />
     public Task<StorageReadResult?> GetAsync(string key, CancellationToken cancellationToken = default) =>
-        inner.GetAsync(key, cancellationToken);
+        inner.GetAsync(StorageKey.NormalizeAndValidate(key), cancellationToken);
 
     /// <inheritdoc />
     public Task<bool> ExistsAsync(string key, CancellationToken cancellationToken = default) =>
-        inner.ExistsAsync(key, cancellationToken);
+        inner.ExistsAsync(StorageKey.NormalizeAndValidate(key), cancellationToken);
 
     /// <inheritdoc />
     public Task<StorageObjectInfo?> StatAsync(string key, CancellationToken cancellationToken = default) =>
-        inner.StatAsync(key, cancellationToken);
+        inner.StatAsync(StorageKey.NormalizeAndValidate(key), cancellationToken);
 
     /// <inheritdoc />
     public Task<Uri> GetPresignedUrlAsync(string key, PresignedUrlRequest request, CancellationToken cancellationToken = default) =>
-        inner.GetPresignedUrlAsync(key, request, cancellationToken);
+        inner.GetPresignedUrlAsync(StorageKey.NormalizeAndValidate(key), request, cancellationToken);
 
     /// <inheritdoc />
-    public Uri GetPublicUrl(string key) => inner.GetPublicUrl(key);
+    public Uri GetPublicUrl(string key) => inner.GetPublicUrl(StorageKey.NormalizeAndValidate(key));
 
     /// <summary>
     /// Deletes the object, then, for a <c>public/</c> key, purges its public URL. The URL is built first so a

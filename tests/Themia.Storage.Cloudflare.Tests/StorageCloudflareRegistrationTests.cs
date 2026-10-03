@@ -64,6 +64,31 @@ public sealed class StorageCloudflareRegistrationTests : IDisposable
         Assert.Contains("ApiToken", thrown.Message);
     }
 
+    [Theory]
+    [InlineData("token\n")]
+    [InlineData("token\r\n")]
+    [InlineData("tok en")]
+    [InlineData("token\t")]
+    public void A_token_with_whitespace_or_control_characters_fails_host_start(string token)
+    {
+        // A trailing newline from a secret file passed the blank check and then threw FormatException
+        // ("New-line or NUL characters are not allowed in header values") on every purge.
+        using var provider = Build(o => { Enabled(o); o.ApiToken = token; });
+
+        var thrown = Assert.Throws<OptionsValidationException>(() => provider.GetRequiredService<IStartupValidator>().Validate());
+
+        Assert.Contains("ApiToken", thrown.Message);
+        Assert.DoesNotContain("token", thrown.Message.Replace("ApiToken", string.Empty, StringComparison.Ordinal), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_plain_token_passes_validation()
+    {
+        using var provider = Build(o => { Enabled(o); o.ApiToken = "abc.DEF_123-xyz"; });
+
+        provider.GetRequiredService<IStartupValidator>().Validate();
+    }
+
     [Fact]
     public void Disabled_with_blank_settings_starts_and_so_do_the_bare_defaults()
     {

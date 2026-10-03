@@ -29,6 +29,9 @@ public static class StorageCloudflareServiceCollectionExtensions
             .Configure(configure)
             .Validate(o => !o.Enabled || !string.IsNullOrWhiteSpace(o.ZoneId), "CloudflarePurgeOptions.ZoneId must be set when Enabled is true.")
             .Validate(o => !o.Enabled || !string.IsNullOrWhiteSpace(o.ApiToken), "CloudflarePurgeOptions.ApiToken must be set when Enabled is true.")
+            .Validate(
+                o => !o.Enabled || (o.ApiToken ?? string.Empty).All(c => !char.IsWhiteSpace(c) && !char.IsControl(c)),
+                "CloudflarePurgeOptions.ApiToken must not contain whitespace or control characters (trim a trailing newline read from a secret file).")
             .ValidateOnStart();
 
         // The token goes in a per-request Authorization header, never in a URL. Redact that header in the

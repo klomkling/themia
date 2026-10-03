@@ -35,7 +35,7 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
   a transport failure, a timeout, a resilience handler's exception) throws `CdnPurgeException`, meaning "deleted,
   the edge may still serve it"; repeat the idempotent delete. `Themia.Storage.Cloudflare` supplies `CloudflareCdnPurger`
   (`AddThemiaStorageCloudflarePurge`): off by default, its own Zone / Cache Purge token (never logged), and
-  `Enabled` with a blank `ZoneId` or `ApiToken` fails host start. No existing type, option or default changes.
+  `Enabled` with a blank `ZoneId`, or an `ApiToken` that is blank or has whitespace, fails host start. No existing type, option or default changes.
   Under `Themia.Modules.Storage` the purge is best-effort: `TenantStorage.DeleteAsync` logs and swallows a
   provider-delete failure, and this release does not change that.
 

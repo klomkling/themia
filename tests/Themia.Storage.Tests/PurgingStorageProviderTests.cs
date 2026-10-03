@@ -129,6 +129,45 @@ public sealed class PurgingStorageProviderTests
     }
 
     [Fact]
+    public async Task Every_member_hands_the_inner_provider_the_same_normalised_key()
+    {
+        // A wrapped S3StorageProvider does not normalise, so a member that forwarded the raw key would put
+        // 'public\a.jpg' but delete 'public/a.jpg': a different object.
+        var provider = Create();
+        var presign = new PresignedUrlRequest(PresignedUrlOperation.Get, TimeSpan.FromMinutes(1));
+        const string raw = @"public\a.jpg";
+
+        await provider.PutAsync(raw, new MemoryStream([1]), new StoragePutOptions("image/jpeg", Visibility: StorageVisibility.Public));
+        await provider.GetAsync(raw);
+        await provider.ExistsAsync(raw);
+        await provider.StatAsync(raw);
+        await provider.GetPresignedUrlAsync(raw, presign);
+        provider.GetPublicUrl(raw);
+        await provider.DeleteAsync(raw);
+
+        Assert.Equal(8, inner.Calls.Count);
+        Assert.All(inner.Calls, call => Assert.EndsWith(":public/a.jpg", call));
+    }
+
+    [Theory]
+    [InlineData("/public/a.jpg")]
+    [InlineData("public/../a.jpg")]
+    public async Task Every_member_rejects_an_invalid_key_before_touching_the_inner_provider(string key)
+    {
+        var provider = Create();
+        var presign = new PresignedUrlRequest(PresignedUrlOperation.Get, TimeSpan.FromMinutes(1));
+
+        await Assert.ThrowsAsync<ArgumentException>(() => provider.PutAsync(key, new MemoryStream([1]), new StoragePutOptions("image/jpeg")));
+        await Assert.ThrowsAsync<ArgumentException>(() => provider.GetAsync(key));
+        await Assert.ThrowsAsync<ArgumentException>(() => provider.ExistsAsync(key));
+        await Assert.ThrowsAsync<ArgumentException>(() => provider.StatAsync(key));
+        await Assert.ThrowsAsync<ArgumentException>(() => provider.GetPresignedUrlAsync(key, presign));
+        Assert.Throws<ArgumentException>(() => provider.GetPublicUrl(key));
+
+        Assert.Empty(inner.Calls);
+    }
+
+    [Fact]
     public async Task Every_other_member_forwards_and_never_purges()
     {
         var provider = Create();

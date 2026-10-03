@@ -38,7 +38,7 @@ instead: by concrete type the last registration wins and both slots resolve to t
 the `AddThemiaSplitStorage` lambda is never disposed by Themia, which is why the example registers the inner provider
 as its own factory-built singleton.
 
-Bind `CloudflarePurgeOptions` from configuration in your app. With `Enabled=true`, a blank `ZoneId` or `ApiToken`
+Bind `CloudflarePurgeOptions` from configuration in your app. With `Enabled=true`, a blank `ZoneId`, or an `ApiToken` that is blank or contains whitespace or control characters (trim a trailing newline read from a secret file),
 fails host start.
 
 ## What a delete does
