@@ -1,3 +1,5 @@
+using Themia.Storage.Local;
+using Themia.Storage.S3;
 using Xunit;
 
 namespace Themia.Storage.Tests;
@@ -158,6 +160,55 @@ public sealed class SplitStorageProviderTests
         var ex = Assert.Throws<InvalidOperationException>(() => new SplitStorageProvider(noPublicContainer, privateSlot));
 
         Assert.Contains("public container", ex.Message);
+    }
+
+    // The probe assumes a real provider with no public container throws InvalidOperationException from
+    // GetPublicUrl. The spy throws by construction, so these run the assumption against the real providers.
+    [Fact]
+    public void Construction_refuses_a_real_Local_public_slot_with_no_public_container()
+    {
+        var local = new LocalStorageProvider(new LocalStorageOptions
+        {
+            RootPath = Path.Combine(Path.GetTempPath(), "themia-split-probe-" + Guid.NewGuid().ToString("N")),
+            SigningKey = "k-long-enough-for-an-hmac-key-0123",
+        });
+
+        var ex = Assert.Throws<InvalidOperationException>(() => new SplitStorageProvider(local, privateSlot));
+
+        Assert.Contains("public container", ex.Message);
+    }
+
+    [Fact]
+    public void Construction_refuses_a_real_S3_public_slot_with_no_public_container()
+    {
+        using var s3 = new S3StorageProvider(new S3StorageOptions { BucketName = "private-bucket", Region = "us-east-1" });
+
+        var ex = Assert.Throws<InvalidOperationException>(() => new SplitStorageProvider(s3, privateSlot));
+
+        Assert.Contains("public container", ex.Message);
+    }
+
+    [Fact]
+    public void Construction_accepts_real_public_slots_that_have_a_public_container()
+    {
+        using var s3 = new S3StorageProvider(new S3StorageOptions
+        {
+            PublicOnly = true,
+            PublicBucketName = "public-bucket",
+            PublicBaseUrl = "https://cdn.example.com",
+            Region = "us-east-1",
+        });
+        var root = Path.Combine(Path.GetTempPath(), "themia-split-probe-" + Guid.NewGuid().ToString("N"));
+        var local = new LocalStorageProvider(new LocalStorageOptions
+        {
+            RootPath = root,
+            SigningKey = "k-long-enough-for-an-hmac-key-0123",
+            PublicRootPath = Path.Combine(root, "public"),
+            PublicBaseUrl = "https://cdn.example.com",
+        });
+
+        _ = new SplitStorageProvider(s3, privateSlot);
+        _ = new SplitStorageProvider(local, privateSlot);
     }
 
     [Fact]
