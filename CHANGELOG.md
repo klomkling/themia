@@ -27,6 +27,8 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.30.2] - 2026-10-03
+
 ### Added
 - **One app, a public storage slot and a private one** (`Themia.Storage`, `Themia.Storage.S3`).
   `SplitStorageProvider` is a single `IStorageProvider` over two backends: a key under `public/` goes to the
