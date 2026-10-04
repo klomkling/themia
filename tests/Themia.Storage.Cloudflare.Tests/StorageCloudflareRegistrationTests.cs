@@ -164,6 +164,24 @@ public sealed class StorageCloudflareRegistrationTests : IDisposable
     }
 
     [Fact]
+    public async Task The_token_stays_redacted_when_a_later_registration_turns_header_redaction_off()
+    {
+        // The redaction is applied after every ordinary Configure, so an app-wide ConfigureAll registered
+        // AFTER AddThemiaStorageCloudflarePurge cannot switch it off by accident.
+        var capture = new CapturingLoggerProvider();
+        using var provider = Build(Enabled, new RecordingHandler(HttpStatusCode.OK, SuccessBody), services =>
+        {
+            services.AddLogging(b => { b.AddProvider(capture); b.SetMinimumLevel(LogLevel.Trace); });
+            services.ConfigureAll<HttpClientFactoryOptions>(o => o.ShouldRedactHeaderValue = _ => false);
+        });
+
+        await provider.GetRequiredService<ICdnPurger>().PurgeAsync(Photo);
+
+        Assert.NotEmpty(capture.AllMessages);
+        Assert.DoesNotContain(capture.AllMessages, m => m.Contains(Token));
+    }
+
+    [Fact]
     public async Task Control_the_same_capture_does_see_the_token_once_redaction_is_overridden()
     {
         // If this fails, the log never carries request headers at all, which makes the test above vacuous:
@@ -172,7 +190,7 @@ public sealed class StorageCloudflareRegistrationTests : IDisposable
         using var provider = Build(Enabled, new RecordingHandler(HttpStatusCode.OK, SuccessBody), services =>
         {
             services.AddLogging(b => { b.AddProvider(capture); b.SetMinimumLevel(LogLevel.Trace); });
-            services.Configure<HttpClientFactoryOptions>(CloudflareCdnPurger.HttpClientName, o => o.ShouldRedactHeaderValue = _ => false);
+            services.PostConfigure<HttpClientFactoryOptions>(CloudflareCdnPurger.HttpClientName, o => o.ShouldRedactHeaderValue = _ => false);
         });
 
         await provider.GetRequiredService<ICdnPurger>().PurgeAsync(Photo);

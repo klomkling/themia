@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Http;
 using Microsoft.Extensions.Options;
 
 namespace Themia.Storage.Cloudflare;
@@ -40,8 +41,14 @@ public static class StorageCloudflareServiceCollectionExtensions
             {
                 client.BaseAddress = CloudflareCdnPurger.ApiBaseAddress;
                 client.Timeout = PurgeTimeout;
-            })
-            .RedactLoggedHeaders(["Authorization"]);
+            });
+
+        // PostConfigure, not RedactLoggedHeaders (an ordinary Configure): it runs after every Configure, so an
+        // app-wide ConfigureAll<HttpClientFactoryOptions> registered later cannot switch the redaction off by
+        // accident. An app that really wants it off can still PostConfigure after this call.
+        services.PostConfigure<HttpClientFactoryOptions>(
+            CloudflareCdnPurger.HttpClientName,
+            options => options.ShouldRedactHeaderValue = header => string.Equals(header, "Authorization", StringComparison.OrdinalIgnoreCase));
 
         services.TryAddSingleton<ICdnPurger>(sp =>
             sp.GetRequiredService<IOptions<CloudflarePurgeOptions>>().Value.Enabled

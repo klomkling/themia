@@ -63,6 +63,7 @@ There is no retry inside; the caller owns it (Cloudflare rate-limits purge per a
   objects under a custom cache key built from headers or cookies are not.
 - A `200` with `success:true` means Cloudflare accepted the request, not that removal was confirmed.
 - A request in flight across the purge can refill the edge for the full TTL.
+- Only a delete purges. Overwriting an object at an existing `public/` key leaves the old content at the edge for the full TTL, so use a new key per upload (propertiezy and ezy-assets do) or delete first.
 - The URL's host must be served by the zone. What Cloudflare answers for a host outside the zone is not documented in
   what Themia reviewed, so a mismatch is expected to surface as a `CdnPurgeException` on the first delete, carrying
   Cloudflare's code and message, but that is not verified.
