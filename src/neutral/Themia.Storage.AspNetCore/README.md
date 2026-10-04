@@ -37,6 +37,20 @@ for a file whose declared type is already dangerous. An uploaded SVG containing 
 for `text/html`. Sandboxed, the document gets a unique origin and no script; images and PDFs render as
 usual.
 
+## Serving the public container
+
+A Local provider with a public container hands out `PublicBaseUrl` links, but nothing serves them until you
+map this. Pass the `LocalStorageProvider` itself (behind a split, `IStorageProvider` is not it):
+
+```csharp
+app.MapThemiaLocalPublicStorage(localProvider);   // GET {path of PublicBaseUrl}/{key}
+```
+
+It mounts at the path of `PublicBaseUrl`, reads only the public container (a private object cannot be named
+through it; a traversal key is `404`), is anonymous, and answers with `nosniff` and `Content-Security-Policy:
+sandbox`. It sets no `Cache-Control` — that, and any CDN headers, are yours. A provider with no public
+container, or a `PublicBaseUrl` that is not an absolute `http(s)` URL, fails at startup.
+
 ## Anonymous by construction
 
 The token is the credential, exactly as an S3 presigned URL's signature is, and the link is opened by a

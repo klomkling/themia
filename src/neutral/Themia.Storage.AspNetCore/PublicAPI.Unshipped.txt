@@ -1,3 +1,4 @@
 #nullable enable
 Themia.Storage.AspNetCore.LocalStorageEndpoints
 static Themia.Storage.AspNetCore.LocalStorageEndpoints.MapThemiaLocalStorage(this Microsoft.AspNetCore.Routing.IEndpointRouteBuilder! endpoints, string! prefix) -> Microsoft.AspNetCore.Routing.IEndpointRouteBuilder!
+static Themia.Storage.AspNetCore.LocalStorageEndpoints.MapThemiaLocalPublicStorage(this Microsoft.AspNetCore.Routing.IEndpointRouteBuilder! endpoints, Themia.Storage.Local.LocalStorageProvider! provider) -> Microsoft.AspNetCore.Routing.IEndpointRouteBuilder!

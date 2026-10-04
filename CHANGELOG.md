@@ -27,6 +27,12 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+### Added
+- **`MapThemiaLocalPublicStorage`** (`Themia.Storage.AspNetCore`, coord #0154). Serves a Local provider's public
+  container at the path of its `PublicBaseUrl`, anonymously, with `nosniff` and a sandbox CSP, so a host no longer
+  hardcodes the provider's internal `blobs` directory. Public objects only; `Cache-Control` is the host's.
+  `LocalStorageProvider.PublicBaseUrl` exposes the configured base.
+
 ### Fixed
 - **`S3StorageOptions.Region` is now the signing region for a custom `ServiceUrl`** (`Themia.Storage.S3`, coord
   #0154). It was ignored, so an S3-compatible server configured with its own region (Garage) rejected every

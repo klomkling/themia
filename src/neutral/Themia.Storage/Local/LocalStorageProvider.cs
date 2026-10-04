@@ -27,6 +27,11 @@ public sealed class LocalStorageProvider : IStorageProvider
         this.signer = string.IsNullOrWhiteSpace(options.SigningKey) ? null : new LocalUrlSigner(options.SigningKey);
     }
 
+    /// <summary>The base URL public objects are served from, or <see langword="null"/> when no public container is
+    /// configured. <see cref="LocalStorageOptions.PublicBaseUrl"/>, exposed so a host can mount the route that
+    /// serves it without knowing where this provider writes.</summary>
+    public string? PublicBaseUrl => string.IsNullOrWhiteSpace(options.PublicBaseUrl) ? null : options.PublicBaseUrl;
+
     /// <inheritdoc />
     public async Task<StorageObjectInfo> PutAsync(string key, Stream content, StoragePutOptions options, CancellationToken cancellationToken = default)
     {

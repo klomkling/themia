@@ -92,6 +92,80 @@ public static class LocalStorageEndpoints
         return endpoints;
     }
 
+    /// <summary>
+    /// Maps <c>GET {path of PublicBaseUrl}/{key}</c>, which streams an object from the Local provider's public
+    /// container — the route <see cref="LocalStorageProvider.GetPublicUrl"/> links point at.
+    /// </summary>
+    /// <param name="endpoints">The endpoint route builder.</param>
+    /// <param name="provider">
+    /// The provider that owns the public container. Pass the <see cref="LocalStorageProvider"/> itself, not the
+    /// app's <see cref="IStorageProvider"/>: behind a split that one is not the Local provider.
+    /// </param>
+    /// <returns><paramref name="endpoints"/> — deliberately not the route, see remarks.</returns>
+    /// <remarks>
+    /// Anonymous by construction, as <see cref="MapThemiaLocalStorage"/> is: a public object has no credential.
+    /// Only the public container is reachable — the key is always read under the public prefix, so a private
+    /// object cannot be named through this route. Every response carries <c>nosniff</c> and
+    /// <c>Content-Security-Policy: sandbox</c>, so an uploaded SVG or HTML file cannot run script on this origin.
+    /// <c>Cache-Control</c> and any other header are the host's to add: public objects are meant to be cached.
+    /// </remarks>
+    /// <exception cref="InvalidOperationException">
+    /// At startup: <paramref name="provider"/> has no public container, or its
+    /// <see cref="LocalStorageProvider.PublicBaseUrl"/> is not an absolute url, so there is no path to mount.
+    /// </exception>
+    public static IEndpointRouteBuilder MapThemiaLocalPublicStorage(
+        this IEndpointRouteBuilder endpoints, LocalStorageProvider provider)
+    {
+        ArgumentNullException.ThrowIfNull(endpoints);
+        ArgumentNullException.ThrowIfNull(provider);
+
+        if (provider.PublicBaseUrl is null)
+        {
+            throw new InvalidOperationException(
+                "MapThemiaLocalPublicStorage needs a provider with a public container: set " +
+                "LocalStorageOptions.PublicRootPath and PublicBaseUrl.");
+        }
+
+        // The scheme is checked explicitly: on Unix "/media" parses as the absolute file:///media.
+        if (!Uri.TryCreate(provider.PublicBaseUrl, UriKind.Absolute, out var baseUrl) ||
+            (baseUrl.Scheme != Uri.UriSchemeHttp && baseUrl.Scheme != Uri.UriSchemeHttps))
+        {
+            throw new InvalidOperationException(
+                $"LocalStorageOptions.PublicBaseUrl ('{provider.PublicBaseUrl}') must be an ABSOLUTE http(s) url, " +
+                "e.g. https://api.example.com/media: its path is where the public container is mounted.");
+        }
+
+        var mount = baseUrl.AbsolutePath.TrimEnd('/');
+        endpoints.MapGroup(mount)
+            .MapGet("/{**key}", (HttpContext context, string? key) => ServePublicAsync(provider, context, key))
+            .AllowAnonymous();
+        return endpoints;
+    }
+
+    private static async Task<IResult> ServePublicAsync(LocalStorageProvider provider, HttpContext context, string? key)
+    {
+        context.Response.Headers["X-Content-Type-Options"] = "nosniff";
+        context.Response.Headers["Content-Security-Policy"] = "sandbox";
+
+        if (string.IsNullOrWhiteSpace(key))
+        {
+            return Results.NotFound();
+        }
+
+        StorageReadResult? read;
+        try
+        {
+            read = await provider.GetAsync(StorageKey.PublicPrefix + key, context.RequestAborted).ConfigureAwait(false);
+        }
+        catch (ArgumentException)
+        {
+            // A key the provider refuses (traversal, absolute) names nothing: the same answer as a missing object.
+            return Results.NotFound();
+        }
+
+        return read is null ? Results.NotFound() : Results.Stream(read.Content, read.ContentType);
+    }
+
     private static async Task<IResult> ServeAsync(HttpContext context, string? key, string? token)
     {
         foreach (var (name, value) in SecurityHeaders)
