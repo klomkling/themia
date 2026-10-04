@@ -203,6 +203,12 @@ public sealed class TenantStorage : ITenantStorage
         {
             await provider.DeleteAsync(physicalKey, cancellationToken).ConfigureAwait(false);
         }
+        catch (CdnPurgeException ex)
+        {
+            // The blob IS deleted; only the CDN purge was refused. The edge may keep serving the object, and
+            // nothing here retries the purge (the row is already gone), so say that instead of promising a sweep.
+            logger.LogWarning(ex, "Blob for key {Key} was deleted but the CDN purge failed; the edge may keep serving it until its cache expires, and nothing retries the purge from here.", key);
+        }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             logger.LogWarning(ex, "Best-effort blob delete failed for key {Key}; left for a future reconcile sweep.", key);

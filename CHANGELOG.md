@@ -44,6 +44,10 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
   database transaction.** `CompleteUploadAsync` deleted the orphaned blob from inside the transaction that then
   rolls back. A decorated provider (the CDN purge above) turns that delete into an HTTP call, so it now runs after
   the transaction has ended. The quota error, the rollback and the best-effort logging are unchanged.
+- **`Themia.Modules.Storage`: a refused CDN purge is logged as what it is.** When the provider is a
+  `PurgingStorageProvider` and the purge is refused, `TenantStorage.DeleteAsync` (still best-effort, still completing)
+  now logs that the blob was deleted and the edge may keep serving it, instead of the old message that promised a
+  reconcile sweep, which does not exist for this case.
 
 ## [0.30.2] - 2026-10-03
 
