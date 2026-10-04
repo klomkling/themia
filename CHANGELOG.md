@@ -27,6 +27,28 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+### Added
+- **Purge the CDN edge when a public object is deleted** (`Themia.Storage`, new `Themia.Storage.Cloudflare`,
+  coord #0153). `PurgingStorageProvider` wraps an `IStorageProvider` (the public slot of a split provider, or the
+  single provider): for a `public/` key it builds `GetPublicUrl(key)`, deletes the object, then purges that URL
+  through `ICdnPurger`; any other key is only deleted. Any failure of the purge step after the delete (a refusal,
+  a transport failure, a timeout, a resilience handler's exception) throws `CdnPurgeException`, meaning "deleted,
+  the edge may still serve it"; repeat the idempotent delete. `Themia.Storage.Cloudflare` supplies `CloudflareCdnPurger`
+  (`AddThemiaStorageCloudflarePurge`): off by default, its own Zone / Cache Purge token (never logged), and
+  `Enabled` with a blank `ZoneId`, or an `ApiToken` that is blank or has whitespace, fails host start. No existing type, option or default changes.
+  Under `Themia.Modules.Storage` the purge is best-effort: `TenantStorage.DeleteAsync` logs and swallows a
+  provider-delete failure, and this release does not change that.
+
+### Fixed
+- **`Themia.Modules.Storage`: the best-effort blob discard of an over-quota upload no longer runs inside the
+  database transaction.** `CompleteUploadAsync` deleted the orphaned blob from inside the transaction that then
+  rolls back. A decorated provider (the CDN purge above) turns that delete into an HTTP call, so it now runs after
+  the transaction has ended. The quota error, the rollback and the best-effort logging are unchanged.
+- **`Themia.Modules.Storage`: a refused CDN purge is logged as what it is.** When the provider is a
+  `PurgingStorageProvider` and the purge is refused, `TenantStorage.DeleteAsync` (still best-effort, still completing)
+  now logs that the blob was deleted and the edge may keep serving it, instead of the old message that promised a
+  reconcile sweep, which does not exist for this case.
+
 ## [0.30.2] - 2026-10-03
 
 ### Added
