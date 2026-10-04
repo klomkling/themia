@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Themia.Framework.Core.Abstractions.Tenancy;
 using Themia.Framework.Data.Abstractions.Auditing;
+using Themia.Framework.Data.Abstractions.UnitOfWork;
 using Themia.Modules.Storage;
 using Themia.Modules.Storage.DependencyInjection;
 using Themia.Storage;
@@ -82,6 +83,62 @@ file sealed class RejectingScanner : Themia.Modules.Storage.Scanning.IFileScanne
 {
     public Task<Themia.Modules.Storage.Scanning.FileScanResult> ScanAsync(Stream content, CancellationToken cancellationToken = default) =>
         Task.FromResult(new Themia.Modules.Storage.Scanning.FileScanResult(false, "EICAR"));
+}
+
+/// <summary>Records whether a unit-of-work transaction is open, so a test can tell where an external call ran.</summary>
+file sealed class TransactionTracker
+{
+    public bool InTransaction { get; set; }
+}
+
+/// <summary>Delegates to the real unit of work and flags the span of <c>ExecuteInTransactionAsync</c>.</summary>
+file sealed class TransactionTrackingUnitOfWork(IUnitOfWork inner, TransactionTracker tracker) : IUnitOfWork
+{
+    public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default) =>
+        inner.SaveChangesAsync(cancellationToken);
+
+    public Task<ITransactionScope> BeginTransactionAsync(CancellationToken cancellationToken = default) =>
+        inner.BeginTransactionAsync(cancellationToken);
+
+    public async Task ExecuteInTransactionAsync(Func<CancellationToken, Task> work, CancellationToken cancellationToken = default)
+    {
+        tracker.InTransaction = true;
+        try
+        {
+            await inner.ExecuteInTransactionAsync(work, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            tracker.InTransaction = false;
+        }
+    }
+}
+
+/// <summary>Calls <paramref name="onDelete"/> at every delete, then delegates; everything else delegates.</summary>
+file sealed class DeleteObservingStorageProvider(IStorageProvider inner, Action onDelete) : IStorageProvider
+{
+    public Task<StorageObjectInfo> PutAsync(string key, Stream content, StoragePutOptions options, CancellationToken cancellationToken = default) =>
+        inner.PutAsync(key, content, options, cancellationToken);
+
+    public Task<StorageReadResult?> GetAsync(string key, CancellationToken cancellationToken = default) =>
+        inner.GetAsync(key, cancellationToken);
+
+    public Task<bool> ExistsAsync(string key, CancellationToken cancellationToken = default) =>
+        inner.ExistsAsync(key, cancellationToken);
+
+    public Task<StorageObjectInfo?> StatAsync(string key, CancellationToken cancellationToken = default) =>
+        inner.StatAsync(key, cancellationToken);
+
+    public Task DeleteAsync(string key, CancellationToken cancellationToken = default)
+    {
+        onDelete();
+        return inner.DeleteAsync(key, cancellationToken);
+    }
+
+    public Task<Uri> GetPresignedUrlAsync(string key, PresignedUrlRequest request, CancellationToken cancellationToken = default) =>
+        inner.GetPresignedUrlAsync(key, request, cancellationToken);
+
+    public Uri GetPublicUrl(string key) => inner.GetPublicUrl(key);
 }
 
 public abstract class StorageConformanceTests
@@ -500,5 +557,44 @@ public abstract class StorageConformanceTests
             Assert.NotNull(read);
             Assert.Equal(5, read!.Length);
         }
+    }
+    [Fact]
+    public async Task Over_quota_discard_of_the_blob_runs_outside_the_transaction()
+    {
+        // The discard is an external call (a decorated provider may also purge a CDN over HTTP), and the
+        // repo rule is never to make one while a database transaction is open. The reservation rollback
+        // that follows the quota error is unchanged; only where the blob delete runs is pinned here.
+        await ResetAsync();
+        var tenant = new TenantId("acme");
+        var tracker = new TransactionTracker();
+        var deletes = new List<bool>();
+
+        await using var s = NewScope(
+            tenant,
+            quota: 8,
+            configureServices: services =>
+            {
+                var descriptor = services.Last(d => d.ServiceType == typeof(IUnitOfWork));
+                services.Remove(descriptor);
+                services.Add(new ServiceDescriptor(
+                    typeof(IUnitOfWork),
+                    sp =>
+                    {
+                        var real = descriptor.ImplementationFactory is { } factory ? (IUnitOfWork)factory(sp)
+                            : descriptor.ImplementationType is { } type ? (IUnitOfWork)ActivatorUtilities.CreateInstance(sp, type)
+                            : (IUnitOfWork)descriptor.ImplementationInstance!;
+                        return new TransactionTrackingUnitOfWork(real, tracker);
+                    },
+                    descriptor.Lifetime));
+            },
+            providerOverride: inner => new DeleteObservingStorageProvider(inner, () => deletes.Add(tracker.InTransaction)));
+        await s.Storage.GetUploadUrlAsync("k", "text/plain", 1, TimeSpan.FromMinutes(5)); // declare 1
+        var physicalKey = StorageScope.PhysicalKey(tenant, "k");
+        await s.Backend.PutAsync(physicalKey, Bytes("0123456789"), new StoragePutOptions("text/plain")); // actual 10
+
+        await Assert.ThrowsAsync<StorageQuotaExceededException>(() => s.Storage.CompleteUploadAsync("k")); // 10 > 8
+
+        Assert.Equal(new[] { false }, deletes); // exactly one discard, outside any transaction
+        Assert.Null(await s.Backend.StatAsync(physicalKey)); // and the blob is still discarded
     }
 }

@@ -39,6 +39,12 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
   Under `Themia.Modules.Storage` the purge is best-effort: `TenantStorage.DeleteAsync` logs and swallows a
   provider-delete failure, and this release does not change that.
 
+### Fixed
+- **`Themia.Modules.Storage`: the best-effort blob discard of an over-quota upload no longer runs inside the
+  database transaction.** `CompleteUploadAsync` deleted the orphaned blob from inside the transaction that then
+  rolls back. A decorated provider (the CDN purge above) turns that delete into an HTTP call, so it now runs after
+  the transaction has ended. The quota error, the rollback and the best-effort logging are unchanged.
+
 ## [0.30.2] - 2026-10-03
 
 ### Added

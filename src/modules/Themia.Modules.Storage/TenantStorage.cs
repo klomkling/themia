@@ -291,7 +291,7 @@ public sealed class TenantStorage : ITenantStorage
         var actualSize = stat.Length;
 
         StoredObject result = null!;
-        await unitOfWork.ExecuteInTransactionAsync(async ct =>
+        var completion = unitOfWork.ExecuteInTransactionAsync(async ct =>
         {
             // committedOnly: false — the reservation is still pending here; load it to reconcile.
             var existingRow = await objects.FirstOrDefaultAsync(new StorageObjectByKeySpec(key, tenantContext.CurrentTenantId, committedOnly: false), ct).ConfigureAwait(false);
@@ -314,17 +314,9 @@ public sealed class TenantStorage : ITenantStorage
             var usage = all.Where(InScope).Sum(o => o.SizeBytes) - row.SizeBytes + actualSize;
             if (usage > options.DefaultTenantQuotaBytes)
             {
-                // The actual upload overruns the quota: discard the orphaned blob (best-effort) and the
-                // reservation row, then surface the quota error.
-                try
-                {
-                    await provider.DeleteAsync(physicalKey, ct).ConfigureAwait(false);
-                }
-                catch (Exception ex) when (ex is not OperationCanceledException)
-                {
-                    logger.LogWarning(ex, "Best-effort blob delete of an over-quota upload failed for key {Key}; left for a future reconcile sweep.", key);
-                }
-
+                // The actual upload overruns the quota: discard the reservation row, then surface the quota
+                // error. The orphaned blob is discarded after this transaction ends (below): deleting it is an
+                // external call, and a decorated provider may also purge a CDN over HTTP.
                 objects.Remove(row);
                 await unitOfWork.SaveChangesAsync(ct).ConfigureAwait(false);
                 throw new StorageQuotaExceededException(
@@ -338,7 +330,28 @@ public sealed class TenantStorage : ITenantStorage
             await unitOfWork.SaveChangesAsync(ct).ConfigureAwait(false);
 
             result = new StoredObject(row.Id, row.Key, row.SizeBytes, row.ContentType);
-        }, cancellationToken).ConfigureAwait(false);
+        }, cancellationToken);
+
+        try
+        {
+            await completion.ConfigureAwait(false);
+        }
+        catch (StorageQuotaExceededException)
+        {
+            // The transaction has ended (rolled back), so no database transaction is open for this external call.
+            // Best-effort: an upload that overran the quota leaves an orphaned blob; failing to delete it must not
+            // replace the quota error the caller is about to get.
+            try
+            {
+                await provider.DeleteAsync(physicalKey, cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                logger.LogWarning(ex, "Best-effort blob delete of an over-quota upload failed for key {Key}; left for a future reconcile sweep.", key);
+            }
+
+            throw;
+        }
 
         return result;
     }
