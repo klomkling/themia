@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -53,8 +54,20 @@ public sealed class LocalPublicStorageEndpointsTests : IAsyncLifetime
             PublicBaseUrl = publicBaseUrl ?? string.Empty,
         });
 
+    // A provider over the SAME roots as `provider`, with a different public base url.
+    private LocalStorageProvider CreateProviderSharing(string publicBaseUrl) =>
+        new(new LocalStorageOptions
+        {
+            RootPath = Path.Combine(root, "private"),
+            PublicRootPath = Path.Combine(root, "public"),
+            PublicBaseUrl = publicBaseUrl,
+        });
+
     private static Task<IHost> StartAsync(
-        LocalStorageProvider local, Action<IServiceCollection>? services = null, Action<IApplicationBuilder>? pipeline = null) =>
+        LocalStorageProvider local,
+        Action<IServiceCollection>? services = null,
+        Action<IApplicationBuilder>? pipeline = null,
+        string? mount = null) =>
         new HostBuilder()
             .ConfigureWebHost(web => web
                 .UseTestServer()
@@ -67,7 +80,7 @@ public sealed class LocalPublicStorageEndpointsTests : IAsyncLifetime
                 {
                     app.UseRouting();
                     pipeline?.Invoke(app);
-                    app.UseEndpoints(e => e.MapThemiaLocalPublicStorage(local));
+                    app.UseEndpoints(e => e.MapThemiaLocalPublicStorage(local, mount));
                 }))
             .StartAsync();
 
@@ -110,7 +123,7 @@ public sealed class LocalPublicStorageEndpointsTests : IAsyncLifetime
 
         var response = await client.GetAsync($"{PublicPath}/x.svg");
 
-        Assert.Equal("sandbox", string.Join(",", response.Headers.GetValues("Content-Security-Policy")));
+        Assert.Equal("sandbox; default-src 'none'", string.Join(",", response.Headers.GetValues("Content-Security-Policy")));
         Assert.Equal("nosniff", string.Join(",", response.Headers.GetValues("X-Content-Type-Options")));
         Assert.Null(response.Headers.CacheControl);
     }
@@ -134,15 +147,24 @@ public sealed class LocalPublicStorageEndpointsTests : IAsyncLifetime
     }
 
     [Theory]
-    [InlineData("/../private/blobs/docs/secret.txt")]
-    [InlineData("/..%2fprivate%2fblobs%2fdocs%2fsecret.txt")]
-    public async Task A_traversal_key_is_404_and_never_reads_outside_the_public_container(string suffix)
+    [InlineData("/media/../../private/blobs/docs/secret.txt")]
+    [InlineData("/media/photos/../../../private/blobs/docs/secret.txt")]
+    public async Task A_traversal_key_is_404_and_never_reads_the_private_blob_it_names(string path)
     {
+        // HttpClient collapses ".." before sending, so the request is built on the server's HttpContext instead and
+        // the key reaches the handler as written. The secret really exists at the path the key walks to.
         await PutAsync("docs/secret.txt", "private", "text/plain");
+        Assert.True(File.Exists(Path.Combine(root, "private", "blobs", "docs", "secret.txt")));
 
-        var response = await client.GetAsync(PublicPath + suffix);
+        var context = await host.GetTestServer().SendAsync(c =>
+        {
+            c.Request.Method = HttpMethods.Get;
+            c.Request.Path = path;
+        });
 
-        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal(StatusCodes.Status404NotFound, context.Response.StatusCode);
+        using var body = new StreamReader(context.Response.Body);
+        Assert.DoesNotContain("private", await body.ReadToEndAsync());
     }
 
     [Fact]
@@ -175,12 +197,62 @@ public sealed class LocalPublicStorageEndpointsTests : IAsyncLifetime
         Assert.Contains("public container", error.Message);
     }
 
-    [Fact]
-    public async Task Mapping_a_provider_whose_public_base_url_is_not_absolute_fails_at_startup()
-    {
-        var error = await Assert.ThrowsAsync<InvalidOperationException>(() => StartAsync(CreateProvider(publicBaseUrl: "/media")));
+    // ---- the mount -------------------------------------------------------------------------------
 
-        Assert.Contains("PublicBaseUrl", error.Message);
+    [Fact]
+    public async Task A_public_base_url_with_no_path_needs_an_explicit_mount_rather_than_a_root_catch_all()
+    {
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => StartAsync(CreateProvider("https://cdn.example.com")));
+
+        Assert.Contains("mount", error.Message);
+    }
+
+    [Fact]
+    public async Task An_explicit_mount_serves_a_public_base_url_that_has_no_path()
+    {
+        var local = CreateProvider("https://cdn.example.com");
+        await local.PutAsync("public/a.txt", new MemoryStream("hello"u8.ToArray()), new StoragePutOptions("text/plain", Visibility: StorageVisibility.Public));
+        using var mounted = await StartAsync(local, mount: "/media");
+
+        var response = await mounted.GetTestClient().GetAsync("/media/a.txt");
+
+        Assert.Equal("hello", await response.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
+    public async Task An_explicit_mount_wins_over_the_path_of_the_public_base_url()
+    {
+        // Behind UsePathBase("/api") or a prefix-stripping proxy the link says /api/media but the app sees /media.
+        await PutAsync("public/a.txt", "hello", "text/plain");
+        using var mounted = await StartAsync(CreateProviderSharing("https://example.com/api/media"), mount: "media");
+
+        var response = await mounted.GetTestClient().GetAsync("/media/a.txt");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task A_public_base_url_path_with_a_space_is_matched_decoded()
+    {
+        // Uri.AbsolutePath is percent-encoded ("/my%20media"); routing matches the decoded request path.
+        var spaced = CreateProviderSharing("https://cdn.example.com/my media");
+        await PutAsync("public/a.txt", "hello", "text/plain");
+        using var mounted = await StartAsync(spaced);
+
+        var response = await mounted.GetTestClient().GetAsync("/my media/a.txt");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Theory]
+    [InlineData("/me{dia")]
+    [InlineData("/{tenant}/media")]
+    public async Task A_mount_that_is_a_route_template_is_refused_at_startup(string mount)
+    {
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() => StartAsync(provider, mount: mount));
+
+        Assert.Contains("mount", error.Message);
     }
 
     private sealed class NoUserHandler(

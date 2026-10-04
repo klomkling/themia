@@ -27,6 +27,14 @@ public static class LocalStorageEndpoints
         ("Content-Security-Policy", "sandbox"),
     ];
 
+    /// <summary>The headers the public route sends. The same pair the Storage module's public route sends, and no
+    /// <c>Cache-Control</c>: unlike a presigned download, a public object is meant to be cached.</summary>
+    internal static readonly (string Name, string Value)[] PublicSecurityHeaders =
+    [
+        ("X-Content-Type-Options", "nosniff"),
+        ("Content-Security-Policy", "sandbox; default-src 'none'"),
+    ];
+
     /// <summary>
     /// Maps <c>GET {prefix}/_local/get?key=…&amp;token=…</c>, which verifies the token a
     /// <see cref="LocalStorageProvider"/> signed and streams the object.
@@ -93,28 +101,42 @@ public static class LocalStorageEndpoints
     }
 
     /// <summary>
-    /// Maps <c>GET {path of PublicBaseUrl}/{key}</c>, which streams an object from the Local provider's public
-    /// container — the route <see cref="LocalStorageProvider.GetPublicUrl"/> links point at.
+    /// Maps <c>GET {mount}/{key}</c>, which streams an object from the Local provider's public container — the
+    /// route <see cref="LocalStorageProvider.GetPublicUrl"/> links point at.
     /// </summary>
     /// <param name="endpoints">The endpoint route builder.</param>
     /// <param name="provider">
     /// The provider that owns the public container. Pass the <see cref="LocalStorageProvider"/> itself, not the
     /// app's <see cref="IStorageProvider"/>: behind a split that one is not the Local provider.
     /// </param>
+    /// <param name="mount">
+    /// Where to mount, e.g. <c>/media</c>. Defaults to the path of <see cref="LocalStorageProvider.PublicBaseUrl"/>.
+    /// Pass it when the request path differs from the link's path (<c>UsePathBase</c>, a proxy that strips a
+    /// prefix) or when the base url has no path at all (a CDN host).
+    /// </param>
     /// <returns><paramref name="endpoints"/> — deliberately not the route, see remarks.</returns>
     /// <remarks>
     /// Anonymous by construction, as <see cref="MapThemiaLocalStorage"/> is: a public object has no credential.
-    /// Only the public container is reachable — the key is always read under the public prefix, so a private
-    /// object cannot be named through this route. Every response carries <c>nosniff</c> and
-    /// <c>Content-Security-Policy: sandbox</c>, so an uploaded SVG or HTML file cannot run script on this origin.
-    /// <c>Cache-Control</c> and any other header are the host's to add: public objects are meant to be cached.
+    /// Only the public container is reachable — the key is always read under the public prefix, and the provider
+    /// refuses a public root that equals its private root, so a private object cannot be named through this route.
+    /// Every response carries <c>nosniff</c> and <c>Content-Security-Policy: sandbox; default-src 'none'</c> (the
+    /// policy the Storage module's public route sends), so an uploaded SVG or HTML file cannot run script on this
+    /// origin. <c>Cache-Control</c> and any other header are the host's to add: public objects are meant to be cached.
+    /// <para>
+    /// Do not also map the Storage module's <c>/public/{**key}</c> route at the same path: both would match.
+    /// </para>
+    /// <para>
+    /// <b>Not a static-file server.</b> GET only: no <c>HEAD</c>, no <c>Range</c> (so no seeking in audio or
+    /// video), no <c>ETag</c> or <c>Last-Modified</c>.
+    /// </para>
     /// </remarks>
     /// <exception cref="InvalidOperationException">
-    /// At startup: <paramref name="provider"/> has no public container, or its
-    /// <see cref="LocalStorageProvider.PublicBaseUrl"/> is not an absolute url, so there is no path to mount.
+    /// At startup: <paramref name="provider"/> has no public container; the mount is empty (a base url with no
+    /// path and no <paramref name="mount"/> — it would answer every anonymous GET on the site); or the mount
+    /// contains a <c>{</c> or <c>}</c>, which routing would read as a template.
     /// </exception>
     public static IEndpointRouteBuilder MapThemiaLocalPublicStorage(
-        this IEndpointRouteBuilder endpoints, LocalStorageProvider provider)
+        this IEndpointRouteBuilder endpoints, LocalStorageProvider provider, string? mount = null)
     {
         ArgumentNullException.ThrowIfNull(endpoints);
         ArgumentNullException.ThrowIfNull(provider);
@@ -126,17 +148,25 @@ public static class LocalStorageEndpoints
                 "LocalStorageOptions.PublicRootPath and PublicBaseUrl.");
         }
 
-        // The scheme is checked explicitly: on Unix "/media" parses as the absolute file:///media.
-        if (!Uri.TryCreate(provider.PublicBaseUrl, UriKind.Absolute, out var baseUrl) ||
-            (baseUrl.Scheme != Uri.UriSchemeHttp && baseUrl.Scheme != Uri.UriSchemeHttps))
+        // The provider guarantees an absolute http(s) base url. AbsolutePath is percent-encoded and a route template
+        // is matched against the decoded request path, so it is decoded here.
+        var path = mount ?? Uri.UnescapeDataString(new Uri(provider.PublicBaseUrl).AbsolutePath);
+        var route = "/" + path.Trim('/');
+        if (route == "/")
         {
             throw new InvalidOperationException(
-                $"LocalStorageOptions.PublicBaseUrl ('{provider.PublicBaseUrl}') must be an ABSOLUTE http(s) url, " +
-                "e.g. https://api.example.com/media: its path is where the public container is mounted.");
+                $"MapThemiaLocalPublicStorage has no mount: PublicBaseUrl ('{provider.PublicBaseUrl}') has no path. " +
+                "Pass a mount, e.g. MapThemiaLocalPublicStorage(provider, \"/media\"); mounting at the root would " +
+                "answer every anonymous GET on the site.");
         }
 
-        var mount = baseUrl.AbsolutePath.TrimEnd('/');
-        endpoints.MapGroup(mount)
+        if (route.AsSpan().IndexOfAny('{', '}') >= 0)
+        {
+            throw new InvalidOperationException(
+                $"The mount '{route}' contains '{{' or '}}', which routing reads as a template, not a path.");
+        }
+
+        endpoints.MapGroup(route)
             .MapGet("/{**key}", (HttpContext context, string? key) => ServePublicAsync(provider, context, key))
             .AllowAnonymous();
         return endpoints;
@@ -144,8 +174,10 @@ public static class LocalStorageEndpoints
 
     private static async Task<IResult> ServePublicAsync(LocalStorageProvider provider, HttpContext context, string? key)
     {
-        context.Response.Headers["X-Content-Type-Options"] = "nosniff";
-        context.Response.Headers["Content-Security-Policy"] = "sandbox";
+        foreach (var (name, value) in PublicSecurityHeaders)
+        {
+            context.Response.Headers[name] = value;
+        }
 
         if (string.IsNullOrWhiteSpace(key))
         {
