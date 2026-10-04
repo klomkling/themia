@@ -27,6 +27,8 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.30.3] - 2026-10-04
+
 ### Added
 - **Purge the CDN edge when a public object is deleted** (`Themia.Storage`, new `Themia.Storage.Cloudflare`,
   coord #0153). `PurgingStorageProvider` wraps an `IStorageProvider` (the public slot of a split provider, or the
