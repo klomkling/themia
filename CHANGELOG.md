@@ -27,6 +27,8 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.30.4] - 2026-10-04
+
 ### Added
 - **`MapThemiaLocalPublicStorage`** (`Themia.Storage.AspNetCore`, coord #0154). Serves a Local provider's public
   container, anonymously, with `nosniff` and `Content-Security-Policy: sandbox; default-src 'none'` (the policy the
