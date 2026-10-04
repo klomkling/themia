@@ -12,7 +12,9 @@ namespace Themia.Storage.IntegrationTests;
 /// Tests share the bucket, so each must use keys of its own.</summary>
 public sealed class GarageFixture : IAsyncLifetime
 {
-    public const string Region = "us-east-1";
+    // Deliberately not the SDK's default (us-east-1): a client that ignores S3StorageOptions.Region signs for the wrong
+    // region and Garage refuses it, which is what coord #0154 fixed.
+    public const string Region = "garage";
     public const string Bucket = "themia-conf";
 
     // Garage requires an access key id of "GK" + 24 hex chars and a 64-hex-char secret; throwaway test values.
