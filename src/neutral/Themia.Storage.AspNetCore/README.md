@@ -37,6 +37,29 @@ for a file whose declared type is already dangerous. An uploaded SVG containing 
 for `text/html`. Sandboxed, the document gets a unique origin and no script; images and PDFs render as
 usual.
 
+## Serving the public container
+
+A Local provider with a public container hands out `PublicBaseUrl` links, but nothing serves them until you
+map this. Pass the `LocalStorageProvider` itself (behind a split, `IStorageProvider` is not it):
+
+```csharp
+app.MapThemiaLocalPublicStorage(localProvider);              // GET {path of PublicBaseUrl}/{key}
+app.MapThemiaLocalPublicStorage(localProvider, "/media");    // explicit mount
+```
+
+It reads only the public container (the key is always read under the public prefix, and the provider refuses a
+public root equal to its private root, so a private object cannot be named through it; a traversal key is `404`),
+is anonymous, and answers with `nosniff` and `Content-Security-Policy: sandbox; default-src 'none'`. It sets no
+`Cache-Control` — that, and any CDN headers, are yours.
+
+Pass the **mount** when the request path is not the link's path (`UsePathBase`, a proxy that strips a prefix), or
+when `PublicBaseUrl` has no path (`https://media.example.com`): that is refused at startup, because mounting at
+the root would answer every anonymous GET on the site and shadow your SPA fallback and static files. A mount
+containing `{` or `}` is refused too.
+
+It is **not a static-file server**: GET only, so no `HEAD`, no `Range` (audio and video will not seek) and no
+`ETag`/`Last-Modified` (no `304`). Do not also map the Storage module's `/public/{**key}` route at the same path.
+
 ## Anonymous by construction
 
 The token is the credential, exactly as an S3 presigned URL's signature is, and the link is opened by a

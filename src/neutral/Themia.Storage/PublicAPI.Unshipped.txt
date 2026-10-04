@@ -122,3 +122,4 @@ Themia.Storage.PurgingStorageProvider.GetPublicUrl(string! key) -> System.Uri!
 Themia.Storage.PurgingStorageProvider.PurgingStorageProvider(Themia.Storage.IStorageProvider! inner, Themia.Storage.ICdnPurger! purger) -> void
 Themia.Storage.PurgingStorageProvider.PutAsync(string! key, System.IO.Stream! content, Themia.Storage.StoragePutOptions options, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Storage.StorageObjectInfo!>!
 Themia.Storage.PurgingStorageProvider.StatAsync(string! key, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Storage.StorageObjectInfo?>!
+Themia.Storage.Local.LocalStorageProvider.PublicBaseUrl.get -> string?

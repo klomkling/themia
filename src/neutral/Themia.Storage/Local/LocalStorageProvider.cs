@@ -16,16 +16,22 @@ public sealed class LocalStorageProvider : IStorageProvider
     /// <summary>Creates the provider.</summary>
     /// <param name="options">The filesystem options.</param>
     /// <exception cref="ArgumentException"><see cref="LocalStorageOptions.RootPath"/> is blank, or only one of
-    /// <see cref="LocalStorageOptions.PublicRootPath"/> / <see cref="LocalStorageOptions.PublicBaseUrl"/> is set. The
-    /// rest of <see cref="LocalStorageOptions.Validate"/>, including the signing key, is not checked here.</exception>
+    /// <see cref="LocalStorageOptions.PublicRootPath"/> / <see cref="LocalStorageOptions.PublicBaseUrl"/> is set, the
+    /// public base url is not an absolute http(s) url, or the public root is the private root. The rest of
+    /// <see cref="LocalStorageOptions.Validate"/>, including the signing key, is not checked here.</exception>
     public LocalStorageProvider(LocalStorageOptions options)
     {
         ArgumentNullException.ThrowIfNull(options);
         ArgumentException.ThrowIfNullOrWhiteSpace(options.RootPath);
-        options.ValidatePublicContainerIsAllOrNothing();
+        options.ValidatePublicContainer();
         this.options = options;
         this.signer = string.IsNullOrWhiteSpace(options.SigningKey) ? null : new LocalUrlSigner(options.SigningKey);
     }
+
+    /// <summary>The base URL public objects are served from, or <see langword="null"/> when no public container is
+    /// configured. <see cref="LocalStorageOptions.PublicBaseUrl"/>, exposed so a host can mount the route that
+    /// serves it without knowing where this provider writes.</summary>
+    public string? PublicBaseUrl => string.IsNullOrWhiteSpace(options.PublicBaseUrl) ? null : options.PublicBaseUrl;
 
     /// <inheritdoc />
     public async Task<StorageObjectInfo> PutAsync(string key, Stream content, StoragePutOptions options, CancellationToken cancellationToken = default)

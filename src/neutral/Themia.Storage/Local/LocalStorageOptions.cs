@@ -39,16 +39,12 @@ public sealed class LocalStorageOptions
         }
     }
 
-    /// <summary>Validates that required options are set, failing fast at composition time.</summary>
-    /// <exception cref="ArgumentException">Thrown when <see cref="RootPath"/> or <see cref="SigningKey"/> is
-    /// null or whitespace, when only one of <see cref="PublicRootPath"/>/<see cref="PublicBaseUrl"/> is set,
-    /// when the configured <see cref="PublicBaseUrl"/> is not an absolute http/https url, or when the public
-    /// root resolves to the same directory as the private root.</exception>
-    public void Validate()
+    /// <summary>Everything that must hold for the public container: both-or-neither, an ABSOLUTE http(s)
+    /// <see cref="PublicBaseUrl"/>, and a <see cref="PublicRootPath"/> different from <see cref="RootPath"/>. Run by
+    /// <see cref="Validate"/> and by <see cref="LocalStorageProvider"/>'s constructor, which does not call it, so a
+    /// provider built the way an adopter builds one cannot serve private blobs as public ones.</summary>
+    internal void ValidatePublicContainer()
     {
-        if (string.IsNullOrWhiteSpace(RootPath)) throw new ArgumentException("RootPath must be set.", nameof(RootPath));
-        if (string.IsNullOrWhiteSpace(SigningKey)) throw new ArgumentException("SigningKey must be set (required to issue/verify Local presigned download/upload URLs).", nameof(SigningKey));
-
         ValidatePublicContainerIsAllOrNothing();
         if (string.IsNullOrWhiteSpace(PublicRootPath))
         {
@@ -75,5 +71,18 @@ public sealed class LocalStorageOptions
         {
             throw new ArgumentException("PublicRootPath must differ from RootPath; public and private objects cannot share a container.", nameof(PublicRootPath));
         }
+    }
+
+    /// <summary>Validates that required options are set, failing fast at composition time.</summary>
+    /// <exception cref="ArgumentException">Thrown when <see cref="RootPath"/> or <see cref="SigningKey"/> is
+    /// null or whitespace, when only one of <see cref="PublicRootPath"/>/<see cref="PublicBaseUrl"/> is set,
+    /// when the configured <see cref="PublicBaseUrl"/> is not an absolute http/https url, or when the public
+    /// root resolves to the same directory as the private root.</exception>
+    public void Validate()
+    {
+        if (string.IsNullOrWhiteSpace(RootPath)) throw new ArgumentException("RootPath must be set.", nameof(RootPath));
+        if (string.IsNullOrWhiteSpace(SigningKey)) throw new ArgumentException("SigningKey must be set (required to issue/verify Local presigned download/upload URLs).", nameof(SigningKey));
+
+        ValidatePublicContainer();
     }
 }

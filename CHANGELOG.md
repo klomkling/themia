@@ -27,6 +27,31 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+### Added
+- **`MapThemiaLocalPublicStorage`** (`Themia.Storage.AspNetCore`, coord #0154). Serves a Local provider's public
+  container, anonymously, with `nosniff` and `Content-Security-Policy: sandbox; default-src 'none'` (the policy the
+  Storage module's public route sends), so a host no longer hardcodes the provider's internal `blobs` directory.
+  Mounts at the path of `PublicBaseUrl`, or at an explicit `mount` (needed behind `UsePathBase` or a
+  prefix-stripping proxy, and for a CDN-style base url with no path, which is otherwise refused at startup rather
+  than mounted as a root catch-all). Public objects only; `Cache-Control` is the host's. GET only: no `HEAD`,
+  `Range`, `ETag` or `Last-Modified`. `LocalStorageProvider.PublicBaseUrl` exposes the configured base.
+
+### Changed
+- **`LocalStorageProvider`'s constructor now enforces the public-container invariants** that only
+  `LocalStorageOptions.Validate()` checked: `PublicBaseUrl` must be an absolute `http(s)` url and `PublicRootPath`
+  must differ from `RootPath`. A host that built the provider without calling `Validate()` and had either wrong
+  now fails at construction instead of serving private blobs as public ones (equal roots) or handing out
+  `file:///` links (relative base url).
+
+### Fixed
+- **`S3StorageOptions.Region` is now the signing region for a custom `ServiceUrl`** (`Themia.Storage.S3`, coord
+  #0154). It was ignored, so an S3-compatible server configured with its own region (Garage) rejected every
+  request with `SignatureDoesNotMatch`. A blank region still keeps the SDK default, which R2 accepts.
+  **Upgrade note:** if you set a `ServiceUrl` and left a `Region` in config that the server does not use (for
+  example `ap-southeast-1` against R2), requests are now signed for that region and a server that enforces it
+  rejects them. Clear `Region`, or set it to the region the server is configured with (`auto` for R2, the
+  `s3_region` for Garage).
+
 ## [0.30.3] - 2026-10-04
 
 ### Added
