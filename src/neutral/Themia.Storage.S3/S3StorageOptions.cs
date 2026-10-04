@@ -6,7 +6,9 @@ public sealed class S3StorageOptions
     /// <summary>The bucket objects are stored in.</summary>
     public string BucketName { get; set; } = string.Empty;
 
-    /// <summary>The AWS region system name (e.g. <c>us-east-1</c>). Ignored when <see cref="ServiceUrl"/> is set.</summary>
+    /// <summary>The AWS region system name (e.g. <c>us-east-1</c>). When <see cref="ServiceUrl"/> is set it is the
+    /// region requests are signed for, which an S3-compatible server such as Garage must match against its own
+    /// configured region; leave it blank to keep the SDK default (Cloudflare R2 accepts that).</summary>
     public string? Region { get; set; }
 
     /// <summary>The access key id. When null, the AWS default credential chain is used.</summary>

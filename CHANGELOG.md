@@ -27,6 +27,11 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+### Fixed
+- **`S3StorageOptions.Region` is now the signing region for a custom `ServiceUrl`** (`Themia.Storage.S3`, coord
+  #0154). It was ignored, so an S3-compatible server configured with its own region (Garage) rejected every
+  request with `SignatureDoesNotMatch`. A blank region still keeps the SDK default, which R2 accepts.
+
 ## [0.30.3] - 2026-10-04
 
 ### Added

@@ -212,6 +212,13 @@ public sealed class S3StorageProvider : IStorageProvider, IDisposable
         {
             config.ServiceURL = options.ServiceUrl.AbsoluteUri;
 
+            // The region only names the signing scope here, but a server such as Garage rejects a signature whose
+            // region is not the one it is configured with ("SignatureDoesNotMatch").
+            if (!string.IsNullOrWhiteSpace(options.Region))
+            {
+                config.AuthenticationRegion = options.Region;
+            }
+
             // Over plain http the SDK's default checksum is a SIGNED CRC32 trailer, which S3-compatible servers such
             // as Garage reject on upload ("Invalid payload signature"). https uses an unsigned trailer and is
             // unaffected, so a checksum is added only where the service requires one, and only for http endpoints.
