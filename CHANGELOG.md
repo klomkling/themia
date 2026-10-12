@@ -27,6 +27,8 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.30.5] - 2026-10-12
+
 ### Added
 - **`ITransactionalSequenceAllocator`** (`Themia.Framework.Data.Sequences`, coord #0155). Gapless sequence allocation
   inside the caller's open `DbTransaction`. Row-locks (`FOR UPDATE` / `UPDLOCK, HOLDLOCK`) the counter row until the caller
