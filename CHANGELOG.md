@@ -27,6 +27,14 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+### Added
+- **`ITransactionalSequenceAllocator`** (`Themia.Framework.Data.Sequences`, coord #0155). Gapless sequence allocation
+  inside the caller's open `DbTransaction`. Row-locks (`FOR UPDATE` / `UPDLOCK, HOLDLOCK`) the counter row until the caller
+  commits or rolls back, guaranteeing that a rolled-back transaction leaves no number gaps and concurrent callers on
+  the same key are strictly serialized. Supports tenant-scoped (`NextInTransactionAsync`) and host-level
+  (`NextHostInTransactionAsync`) numbering with race-free lazy seeding on first use across PostgreSQL, MySQL 8.0.13+,
+  and SQL Server.
+
 ## [0.30.4] - 2026-10-04
 
 ### Added

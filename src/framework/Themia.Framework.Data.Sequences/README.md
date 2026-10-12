@@ -28,3 +28,29 @@ genuinely what you want. This is deliberate: a job that lost its tenant scope wo
 tenant's numbers from one shared counter with nothing reporting it.
 
 Formatting (`INV-2026-00042`) is yours. The provider returns a `long`.
+
+## Gapless numbering inside caller's transaction (`ITransactionalSequenceAllocator`)
+
+When a regulator (such as the Thai Revenue Department for Tax Invoices, Receipts, Withholding Tax Certificates, and Credit Notes) requires an **unbroken, strictly gapless run of numbers**, use `ITransactionalSequenceAllocator`:
+
+```csharp
+// Inside your own transaction:
+await using var tx = await conn.BeginTransactionAsync(ct);
+
+// Allocates in the caller's transaction; rows on the same key lock until commit/rollback.
+var n = await allocator.NextHostInTransactionAsync(tx, $"DocNo:TaxInvoice:{period}", ct);
+
+// Do your document inserts here...
+// If anything fails or rolls back, the counter increment rolls back too -> no gap!
+await tx.CommitAsync(ct);
+```
+
+- **`NextInTransactionAsync(tx, key, ct)`**: Tenant-scoped inside the caller's transaction (requires ambient tenant).
+- **`NextHostInTransactionAsync(tx, key, ct)`**: Host-level inside the caller's transaction.
+- **Lazy seeding**: Seeds starting at 1 on first use race-free (unlike `ISequenceProvider`, which throws when an unseeded key is accessed). No prior `EnsureSequenceAsync` call required.
+- **Pre-seeding existing runs**: Calling `EnsureSequenceAsync(key, startValue)` (or `EnsureHostSequenceAsync`) beforehand is fully supported if you need an initial offset other than 1.
+- **Shared table caution**: Both mechanisms share `themia_sequences`. Never call `ISequenceProvider.Next*` on a key meant for gapless transactional numbering, as its separate transaction will cause skipped numbers.
+- **Database & connection**: The allocator ignores `SequenceOptions.ConnectionString` and runs directly on `tx.Connection`. Ensure `themia_sequences` exists in the caller's database (via `SequencesSchemaMigration`) and `SequenceOptions.Engine` matches the caller's database engine.
+- **Transaction isolation**: Caller transactions must use `ReadCommitted`. Under `RepeatableRead` or `Serializable` on PostgreSQL, queued callers fail with 40001 upon the previous holder's commit. On MySQL, default `REPEATABLE READ` risks gap-lock deadlocks during first-use inserts.
+
+

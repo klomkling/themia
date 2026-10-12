@@ -23,6 +23,20 @@ public sealed class AddThemiaSequencesTests
     }
 
     [Fact]
+    public void AddThemiaSequences_RegistersTheTransactionalSequenceAllocator()
+    {
+        var services = new ServiceCollection();
+
+        services.AddThemiaSequences(o =>
+        {
+            o.ConnectionString = "Host=localhost;Database=x;Username=u;Password=p";
+            o.Engine = SequenceEngine.Postgres;
+        });
+
+        Assert.Contains(services, d => d.ServiceType == typeof(ITransactionalSequenceAllocator));
+    }
+
+    [Fact]
     public void AddThemiaSequences_ValidatesEagerly_SoAMisconfigurationFailsAtStartup()
     {
         // Not at the first allocation: a connection string typo should stop the deploy, not surface as a

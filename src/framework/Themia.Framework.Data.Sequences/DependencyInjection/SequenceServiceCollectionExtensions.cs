@@ -80,6 +80,7 @@ public static class SequenceServiceCollectionExtensions
 
         services.AddSingleton(frozen);
         services.TryAddScoped<ISequenceProvider, SequenceProvider>();
+        services.TryAddScoped<ITransactionalSequenceAllocator, TransactionalSequenceAllocator>();
         return services;
     }
 }
