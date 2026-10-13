@@ -87,11 +87,14 @@ Themia.Audit.AuditQuery.PageSize.init -> void
 Themia.Audit.AuditQuery.TenantId.get -> string?
 Themia.Audit.AuditQuery.TenantId.init -> void
 Themia.Audit.AuditQuery.To.get -> System.DateTimeOffset?
+Themia.Audit.AuditPayload
+static Themia.Audit.AuditPayload.Diff(object? before, object? after) -> object!
+static Themia.Audit.AuditPayload.FromRawJson(string! rawJson) -> System.Text.Json.JsonDocument!
 Themia.Audit.AuditQuery.To.init -> void
 Themia.Audit.AuditRecorder
 Themia.Audit.AuditRecorder.AuditRecorder(Themia.Audit.IAuditStore! store, Themia.Audit.Redaction.IAuditRedactor! redactor, System.TimeProvider! timeProvider, Themia.Audit.IAuditDialect! dialect, Themia.Audit.AuditOptions! options) -> void
 Themia.Audit.AuditRecorder.RecordAsync(Themia.Audit.AuditEntry! entry, object? payload = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<System.Guid>
-Themia.Audit.AuditRecorder.RecordOnAsync(Themia.Audit.AuditEntry! entry, object? payload, System.Data.Common.DbConnection! connection, System.Data.Common.DbTransaction? transaction, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask<System.Guid>
+Themia.Audit.AuditRecorder.RecordOnAsync(Themia.Audit.AuditEntry! entry, object? payload, System.Data.Common.DbConnection! connection, System.Data.Common.DbTransaction? transaction = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<System.Guid>
 Themia.Audit.AuditStoreEngine
 Themia.Audit.AuditStoreEngine.AuditStoreEngine(Themia.Audit.IAuditDialect! dialect) -> void
 Themia.Audit.AuditStoreEngine.GetAsync(System.Guid eventUid, System.Data.Common.DbConnection! connection, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<Themia.Audit.AuditEntry?>!
@@ -111,6 +114,7 @@ Themia.Audit.IAuditDialect.PurgeSql.get -> string!
 Themia.Audit.IAuditDialect.SelectPageSql.get -> string!
 Themia.Audit.IAuditRecorder
 Themia.Audit.IAuditRecorder.RecordAsync(Themia.Audit.AuditEntry! entry, object? payload = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<System.Guid>
+Themia.Audit.IAuditRecorder.RecordOnAsync(Themia.Audit.AuditEntry! entry, object? payload, System.Data.Common.DbConnection! connection, System.Data.Common.DbTransaction? transaction = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<System.Guid>
 Themia.Audit.IAuditStore
 Themia.Audit.IAuditStore.GetAsync(System.Guid eventUid, System.Data.Common.DbConnection! connection, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<Themia.Audit.AuditEntry?>!
 Themia.Audit.IAuditStore.PurgeAsync(System.DateTimeOffset olderThan, System.Data.Common.DbConnection! connection, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<int>!
@@ -125,8 +129,10 @@ Themia.Audit.PagedResult<T>.PagedResult() -> void
 Themia.Audit.PagedResult<T>.Total.get -> int
 Themia.Audit.PagedResult<T>.Total.init -> void
 Themia.Audit.Redaction.AuditRedactionOptions
+Themia.Audit.Redaction.AuditRedactionOptions.AddExemption(string! jsonPath) -> void
 Themia.Audit.Redaction.AuditRedactionOptions.AddPattern(string! pattern) -> void
 Themia.Audit.Redaction.AuditRedactionOptions.AuditRedactionOptions() -> void
+Themia.Audit.Redaction.AuditRedactionOptions.IsExempt(string! jsonPath) -> bool
 Themia.Audit.Redaction.AuditRedactionOptions.IsSensitive(string! propertyName) -> bool
 Themia.Audit.Redaction.AuditRedactor
 Themia.Audit.Redaction.AuditRedactor.AuditRedactor(Themia.Audit.Redaction.AuditRedactionOptions! options) -> void

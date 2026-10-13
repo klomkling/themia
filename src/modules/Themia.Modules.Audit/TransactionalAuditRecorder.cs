@@ -79,6 +79,25 @@ public sealed class TransactionalAuditRecorder : IAuditRecorder
         return await inner.RecordAsync(withTenant, payload, cancellationToken).ConfigureAwait(false);
     }
 
+    /// <inheritdoc />
+    public ValueTask<Guid> RecordOnAsync(
+        AuditEntry entry,
+        object? payload,
+        System.Data.Common.DbConnection connection,
+        System.Data.Common.DbTransaction? transaction = null,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(entry);
+        ArgumentNullException.ThrowIfNull(connection);
+
+        var withTenant = entry.TenantId is null
+            ? entry with { TenantId = tenantContext.CurrentTenantId?.Value }
+            : entry;
+
+        return inner.RecordOnAsync(withTenant, payload, connection, transaction, cancellationToken);
+    }
+
+
     // Activity is the only adopter-configurable category (design §7's table); Authentication and
     // UserLifecycle are hardwired to Never because a failed login has no transaction to join and must be
     // recorded even when the surrounding request rolls back.

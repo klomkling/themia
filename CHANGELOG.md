@@ -27,6 +27,20 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+### Added
+- **Transactional Audit Recording & Structured Data** (`Themia.Audit`, coord #0156):
+  - **(breaking)** Added `RecordOnAsync` to `IAuditRecorder`:
+    ```csharp
+    ValueTask<Guid> RecordOnAsync(AuditEntry entry, object? payload, DbConnection connection, DbTransaction? transaction = null, CancellationToken cancellationToken = default);
+    ```
+    Allows callers to record audit entries directly inside their own open connection and transaction without depending on `Themia.Modules.Audit` or data peers.
+  - **Pre-serialized & Structured Payloads** (`AuditPayload`):
+    - `AuditPayload.FromRawJson(string)` parses and validates raw JSON AST to walk and redact fields without domain POCO deserialization.
+    - `AuditPayload.Diff(object? before, object? after)` helper for structured change payloads.
+    - Support for `JsonElement` and `JsonDocument` payloads directly in `AuditRecorder`.
+  - **Exact JSON Path Redaction Exemptions** (`AuditRedactionOptions`):
+    - `AddExemption(string jsonPath)` enables adopters to exempt specific fields by exact JSON path (e.g. `$.after.mobileVerified`) matched by parsed path segments without un-redacting properties elsewhere.
+
 ## [0.30.5] - 2026-10-12
 
 ### Added

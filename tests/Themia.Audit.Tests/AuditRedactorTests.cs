@@ -164,4 +164,111 @@ public class AuditRedactorTests
 
         Assert.True(options.IsSensitive(propertyName));
     }
+
+    [Fact]
+    public void AddExemption_rejects_invalid_path()
+    {
+        var options = new AuditRedactionOptions();
+        Assert.Throws<ArgumentException>(() => options.AddExemption(""));
+        Assert.Throws<ArgumentException>(() => options.AddExemption("   "));
+        Assert.Throws<ArgumentException>(() => options.AddExemption("mobileVerified")); // must start with $.
+    }
+
+    [Fact]
+    public void Exact_json_path_exemption_unredacts_exempt_field_verbatim()
+    {
+        var options = new AuditRedactionOptions();
+        options.AddExemption("$.after.mobileVerified");
+        options.AddExemption("$.tokenCount");
+
+        var redactor = new AuditRedactor(options);
+        var json = """
+            {
+              "tokenCount": 5,
+              "password": "secret",
+              "after": {
+                "mobileVerified": true,
+                "password": "nestedSecret"
+              }
+            }
+            """;
+
+        var result = redactor.Redact(json);
+
+        // Exempt fields preserved verbatim:
+        Assert.Contains(""""tokenCount":5"""", result, StringComparison.Ordinal);
+        Assert.Contains(""""mobileVerified":true"""", result, StringComparison.Ordinal);
+
+        // Sensitive non-exempt fields still redacted:
+        Assert.DoesNotContain("secret", result, StringComparison.Ordinal);
+        Assert.DoesNotContain("nestedSecret", result, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Exemption_does_not_unredact_different_path_with_same_property_name()
+    {
+        var options = new AuditRedactionOptions();
+        options.AddExemption("$.user.token");
+
+        var redactor = new AuditRedactor(options);
+        var json = """
+            {
+              "token": "rootSecret",
+              "user": {
+                "token": "userToken"
+              },
+              "other": {
+                "token": "otherSecret"
+              }
+            }
+            """;
+
+        var result = redactor.Redact(json);
+
+        // Only $.user.token is un-redacted
+        Assert.Contains(""""token":"userToken"""", result, StringComparison.Ordinal);
+        Assert.DoesNotContain("rootSecret", result, StringComparison.Ordinal);
+        Assert.DoesNotContain("otherSecret", result, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Key_containing_dot_cannot_forge_an_exempt_path()
+    {
+        // An exemption $.a.b.pin should only match object a -> property b -> pin,
+        // NEVER an object with property "a.b" containing pin.
+        var options = new AuditRedactionOptions();
+        options.AddExemption("$.a.b.pin");
+
+        var redactor = new AuditRedactor(options);
+        var forgedJson = """
+            {
+              "a.b": {
+                "pin": "1234"
+              }
+            }
+            """;
+
+        var result = redactor.Redact(forgedJson);
+
+        // pin under property "a.b" is NOT exempt and must remain redacted:
+        Assert.DoesNotContain("1234", result, StringComparison.Ordinal);
+        Assert.Contains("[redacted]", result, StringComparison.Ordinal);
+
+        // Real nested object a -> b -> pin IS exempt:
+        var validJson = """
+            {
+              "a": {
+                "b": {
+                  "pin": "1234"
+                }
+              }
+            }
+            """;
+
+        var validResult = redactor.Redact(validJson);
+        Assert.Contains("1234", validResult, StringComparison.Ordinal);
+        Assert.DoesNotContain("[redacted]", validResult, StringComparison.Ordinal);
+    }
 }
+
+

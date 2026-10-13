@@ -23,6 +23,11 @@ public sealed class AuditRedactor : IAuditRedactor
         this.options = options ?? throw new ArgumentNullException(nameof(options));
     }
 
+    private static readonly JsonWriterOptions WriterOptions = new()
+    {
+        Encoder = System.Text.Encodings.Web.JavaScriptEncoder.Create(System.Text.Unicode.UnicodeRanges.All),
+    };
+
     /// <inheritdoc />
     public string Redact(string json)
     {
@@ -30,15 +35,16 @@ public sealed class AuditRedactor : IAuditRedactor
 
         using var document = JsonDocument.Parse(json);
         using var buffer = new MemoryStream();
-        using (var writer = new Utf8JsonWriter(buffer))
+        using (var writer = new Utf8JsonWriter(buffer, WriterOptions))
         {
-            WriteElement(document.RootElement, writer);
+            var segments = new List<string>();
+            WriteElement(document.RootElement, writer, segments);
         }
 
         return Encoding.UTF8.GetString(buffer.ToArray());
     }
 
-    private void WriteElement(JsonElement element, Utf8JsonWriter writer)
+    private void WriteElement(JsonElement element, Utf8JsonWriter writer, List<string> segments)
     {
         switch (element.ValueKind)
         {
@@ -47,13 +53,30 @@ public sealed class AuditRedactor : IAuditRedactor
                 foreach (var property in element.EnumerateObject())
                 {
                     writer.WritePropertyName(property.Name);
-                    if (options.IsSensitive(property.Name))
+                    segments.Add(property.Name);
+                    try
                     {
-                        writer.WriteStringValue(RedactedValue);
+#if NET8_0_OR_GREATER
+                        var isExempt = options.IsExempt(System.Runtime.InteropServices.CollectionsMarshal.AsSpan(segments));
+#else
+                        var isExempt = options.IsExempt(segments.ToArray());
+#endif
+                        if (isExempt)
+                        {
+                            WriteElement(property.Value, writer, segments);
+                        }
+                        else if (options.IsSensitive(property.Name))
+                        {
+                            writer.WriteStringValue(RedactedValue);
+                        }
+                        else
+                        {
+                            WriteElement(property.Value, writer, segments);
+                        }
                     }
-                    else
+                    finally
                     {
-                        WriteElement(property.Value, writer);
+                        segments.RemoveAt(segments.Count - 1);
                     }
                 }
 
@@ -64,7 +87,7 @@ public sealed class AuditRedactor : IAuditRedactor
                 writer.WriteStartArray();
                 foreach (var item in element.EnumerateArray())
                 {
-                    WriteElement(item, writer);
+                    WriteElement(item, writer, segments);
                 }
 
                 writer.WriteEndArray();

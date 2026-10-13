@@ -27,4 +27,20 @@ public interface IAuditRecorder
     /// <see cref="string"/>.
     /// </exception>
     ValueTask<Guid> RecordAsync(AuditEntry entry, object? payload = null, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Records <paramref name="entry"/> on a connection the caller already owns, enlisting in
+    /// <paramref name="transaction"/> when supplied. Never opens a connection itself.
+    /// </summary>
+    /// <param name="entry">The event to record.</param>
+    /// <param name="payload">
+    /// An optional payload object, serialized and redacted before storage; <see langword="null"/> leaves
+    /// <see cref="AuditEntry.Data"/> <see langword="null"/>.
+    /// </param>
+    /// <param name="connection">The connection to write on. Must already be open.</param>
+    /// <param name="transaction">The transaction to enlist in, or <see langword="null"/> to write unenlisted.</param>
+    /// <param name="cancellationToken">Cancels the write.</param>
+    /// <returns>The recorded entry's <see cref="AuditEntry.EventUid"/>.</returns>
+    ValueTask<Guid> RecordOnAsync(AuditEntry entry, object? payload, System.Data.Common.DbConnection connection, System.Data.Common.DbTransaction? transaction = null, CancellationToken cancellationToken = default);
 }
+

@@ -69,7 +69,7 @@ public sealed class AuditRecorder : IAuditRecorder
     /// <paramref name="entry"/> fails <see cref="AuditEntry.Validate"/>, or <paramref name="payload"/> is a
     /// <see cref="string"/>.
     /// </exception>
-    public ValueTask<Guid> RecordOnAsync(AuditEntry entry, object? payload, DbConnection connection, DbTransaction? transaction, CancellationToken cancellationToken)
+    public ValueTask<Guid> RecordOnAsync(AuditEntry entry, object? payload, DbConnection connection, DbTransaction? transaction = null, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(connection);
         return RecordCoreAsync(entry, payload, connection, transaction, cancellationToken);
@@ -94,23 +94,45 @@ public sealed class AuditRecorder : IAuditRecorder
         // JSON string LITERAL (e.g. "\"already json\""), so AuditRedactor sees a bare-string root with no
         // property names to walk and returns it verbatim — the exact "callers never supply a JSON string"
         // hole this invariant exists to close (see AuditRedactorTests, bare-string-root case). A caller
-        // who already serialized their own payload is the natural way to hit this, and every field in it
-        // ships unredacted. Other primitives (bool/number/Guid/etc.) are not rejected: they have no named
-        // fields either, but they also cannot carry a secret under a field name, so there is nothing for
-        // redaction to miss.
+        // who already serialized their own payload can wrap it via AuditPayload.FromRawJson(json) or
+        // pass a JsonElement/JsonDocument. Other primitives (bool/number/Guid/etc.) are not rejected:
+        // they have no named fields either, but they also cannot carry a secret under a field name.
         if (payload is string)
         {
             throw new ArgumentException(
-                "payload must not be a string. Pass the object itself so the recorder can serialize it — "
-                + "a pre-serialized JSON string round-trips as an opaque string literal that redaction "
-                + "cannot walk, so any secret in it would be stored unredacted.",
+                "payload must not be a string. Pass the object itself or use AuditPayload.FromRawJson(json) / "
+                + "JsonDocument / JsonElement — a pre-serialized JSON string passed directly round-trips as an "
+                + "opaque string literal that redaction cannot walk, so any secret in it would be stored unredacted.",
                 nameof(payload));
         }
 
-        var data = payload is null ? null : redactor.Redact(JsonSerializer.Serialize(payload));
+        string? serialized;
+        if (payload is null)
+        {
+            serialized = null;
+        }
+        else if (payload is JsonDocument doc)
+        {
+            serialized = doc.RootElement.GetRawText();
+        }
+        else if (payload is JsonElement elem)
+        {
+            serialized = elem.GetRawText();
+        }
+        else
+        {
+            serialized = JsonSerializer.Serialize(payload, SerializerOptions);
+        }
+
+        var data = serialized is null ? null : redactor.Redact(serialized);
         var withData = normalized with { Data = data };
 
         await store.WriteAsync(withData, connection, transaction, cancellationToken).ConfigureAwait(false);
         return withData.EventUid;
     }
+
+    private static readonly JsonSerializerOptions SerializerOptions = new()
+    {
+        Encoder = System.Text.Encodings.Web.JavaScriptEncoder.Create(System.Text.Unicode.UnicodeRanges.All),
+    };
 }
