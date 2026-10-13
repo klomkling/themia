@@ -63,6 +63,23 @@ public enum PaymentMethod
     Wallet,
 }
 
+/// <summary>How a charge should be presented to the shopper.</summary>
+public enum PresentationMode
+{
+    /// <summary>
+    /// The default behavior: a single method that supports direct charging (such as QR PromptPay)
+    /// creates a direct charge returning its immediate action (e.g. <see cref="NextAction.ShowQr"/>);
+    /// two or more methods create a hosted page (<see cref="NextAction.Redirect"/>).
+    /// </summary>
+    Auto = 0,
+
+    /// <summary>
+    /// Forces the gateway to create a hosted payment link/page (<see cref="NextAction.Redirect"/>) even when
+    /// only a single method (such as QR PromptPay) is allowed.
+    /// </summary>
+    HostedPage = 1,
+}
+
 /// <summary>What a verified webhook announced.</summary>
 public enum PaymentEventType
 {

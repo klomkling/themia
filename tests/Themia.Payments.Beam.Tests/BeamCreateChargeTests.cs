@@ -209,4 +209,46 @@ public class BeamCreateChargeTests
         Assert.Equal("INVALID_CREDENTIALS_ERROR", ex.ProviderCode);
         Assert.Equal(401, ex.HttpStatus);
     }
+
+    [Fact]
+    public async Task PresentationMode_HostedPage_with_qr_only_becomes_a_hosted_payment_link()
+    {
+        var (gateway, handler) = BeamTestHost.Build(BeamTestHost.PaymentLinkResponse, HttpStatusCode.Created);
+
+        var creation = await gateway.CreateChargeAsync(new CreateChargeRequest
+        {
+            Amount = Money.Thb(50000),
+            ReferenceId = "order_qr_hosted",
+            AllowedMethods = [PaymentMethod.QrPromptPay],
+            PresentationMode = PresentationMode.HostedPage,
+        });
+
+        Assert.Equal("/api/v1/payment-links", handler.Requests[0].RequestUri!.AbsolutePath);
+        using var sent = JsonDocument.Parse(handler.Bodies[0]);
+        var settings = sent.RootElement.GetProperty("linkSettings");
+        Assert.True(settings.GetProperty("qrPromptPay").GetProperty("isEnabled").GetBoolean());
+        Assert.False(settings.GetProperty("card").GetProperty("isEnabled").GetBoolean());
+        Assert.False(settings.GetProperty("mobileBanking").GetProperty("isEnabled").GetBoolean());
+        Assert.False(settings.GetProperty("eWallets").GetProperty("isEnabled").GetBoolean());
+
+        var redirect = Assert.IsType<NextAction.Redirect>(creation.Action);
+        Assert.Equal(new Uri("https://playground-pay.beamcheckout.com/m/rGtqz6DafS"), redirect.Url);
+    }
+
+    [Fact]
+    public async Task PresentationMode_Auto_with_qr_only_stays_a_direct_charge()
+    {
+        var (gateway, handler) = BeamTestHost.Build(BeamTestHost.EncodedImageResponse);
+
+        var creation = await gateway.CreateChargeAsync(new CreateChargeRequest
+        {
+            Amount = Money.Thb(50000),
+            ReferenceId = "order_qr_auto",
+            AllowedMethods = [PaymentMethod.QrPromptPay],
+            PresentationMode = PresentationMode.Auto,
+        });
+
+        Assert.Equal("/api/v1/charges", handler.Requests[0].RequestUri!.AbsolutePath);
+        Assert.IsType<NextAction.ShowQr>(creation.Action);
+    }
 }
