@@ -27,6 +27,8 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.31.0] - 2026-10-13
+
 ### Added
 - **Transactional Audit Recording & Structured Data** (`Themia.Audit`, coord #0156):
   - **(breaking)** Added `RecordOnAsync` to `IAuditRecorder`:
