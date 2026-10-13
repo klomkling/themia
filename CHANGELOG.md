@@ -27,6 +27,8 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.31.2] - 2026-10-13
+
 ### Added
 - **Payment Presentation Mode (Hosted Page Override)** (`Themia.Payments`, `Themia.Payments.Beam`, coord #0161):
   - Added `PresentationMode` enum (`Auto`, `HostedPage`) and `PresentationMode` property to `CreateChargeRequest` (default `Auto`).
