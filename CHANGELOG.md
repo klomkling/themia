@@ -27,6 +27,10 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+### Added
+- **Chromium Launch Timeout Configuration** (`Themia.Pdf`, coord #0157):
+  - Expose `ThemiaPdfOptions.LaunchTimeout` (`TimeSpan`, defaults to 30 seconds) passed to PuppeteerSharp's `LaunchOptions.Timeout` when launching the Chromium browser instance. Enables callers in CPU-starved or cold-start environments (e.g. concurrent runner test suites) to tune timeout thresholds to avoid connection failures.
+
 ## [0.31.0] - 2026-10-13
 
 ### Added

@@ -35,6 +35,56 @@ public sealed class PuppeteerPdfRendererTests
         Assert.Contains(nameof(ThemiaPdfOptions.RenderTimeout), ex.Message);
     }
 
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1000)]
+    public void Ctor_NonPositiveLaunchTimeout_Throws(int milliseconds)
+    {
+        var options = new ThemiaPdfOptions { LaunchTimeout = TimeSpan.FromMilliseconds(milliseconds) };
+
+        var ex = Assert.Throws<ArgumentOutOfRangeException>(
+            () => new PuppeteerPdfRenderer(options, NullLogger<PuppeteerPdfRenderer>.Instance));
+
+        Assert.Contains(nameof(ThemiaPdfOptions.LaunchTimeout), ex.Message);
+    }
+
+    [Fact]
+    public void Ctor_LaunchTimeoutExceedingIntMaxMilliseconds_Throws()
+    {
+        var options = new ThemiaPdfOptions { LaunchTimeout = TimeSpan.FromMilliseconds((double)int.MaxValue + 1000) };
+
+        var ex = Assert.Throws<ArgumentOutOfRangeException>(
+            () => new PuppeteerPdfRenderer(options, NullLogger<PuppeteerPdfRenderer>.Instance));
+
+        Assert.Contains(nameof(ThemiaPdfOptions.LaunchTimeout), ex.Message);
+    }
+
+    [Fact]
+    public void LaunchTimeout_DefaultsTo30Seconds()
+    {
+        // 30 seconds default matches PuppeteerSharp's internal LaunchOptions default.
+        Assert.Equal(TimeSpan.FromSeconds(30), new ThemiaPdfOptions().LaunchTimeout);
+    }
+
+    [Fact]
+    public void ToLaunchOptions_MapsLaunchTimeoutToPuppeteerTimeout()
+    {
+        var options = new ThemiaPdfOptions
+        {
+            Headless = true,
+            ExecutablePath = "/usr/bin/chromium",
+        };
+        var args = new[] { "--no-sandbox" };
+        var launchTimeout = TimeSpan.FromSeconds(45);
+
+        var launchOptions = PuppeteerPdfRenderer.ToLaunchOptions(options, args, launchTimeout);
+
+        Assert.Equal(45000, launchOptions.Timeout);
+        Assert.True(launchOptions.Headless);
+        Assert.Equal("/usr/bin/chromium", launchOptions.ExecutablePath);
+        Assert.Equal(args, launchOptions.Args);
+    }
+
     [Fact]
     public void RenderTimeout_DefaultsToAFiniteDeadline()
     {

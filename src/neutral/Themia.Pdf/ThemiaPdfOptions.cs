@@ -78,10 +78,20 @@ public sealed class ThemiaPdfOptions
     /// </para>
     /// <para>
     /// Launching Chromium, including a first-run download, is not counted: it happens once and can
-    /// legitimately take minutes on a cold host.
+    /// legitimately take minutes on a cold host. See <see cref="LaunchTimeout"/> for Chromium launch timeout.
     /// </para>
     /// </remarks>
     public TimeSpan RenderTimeout { get; set; } = TimeSpan.FromSeconds(60);
+
+    /// <summary>
+    /// Maximum time allowed for Chromium to launch and connect over WebSocket. Default 30 seconds
+    /// (matching PuppeteerSharp's internal default); must be positive.
+    /// </summary>
+    /// <remarks>
+    /// On a CPU-starved host or when running test suites concurrently, cold-starting Chromium may
+    /// take longer than 30 seconds. Setting this higher allows busy environments to connect reliably.
+    /// </remarks>
+    public TimeSpan LaunchTimeout { get; set; } = TimeSpan.FromSeconds(30);
 
     /// <summary>
     /// Optional hook to register custom helpers or partials on the Handlebars engine at construction.

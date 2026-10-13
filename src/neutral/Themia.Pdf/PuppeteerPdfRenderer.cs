@@ -25,6 +25,7 @@ internal sealed class PuppeteerPdfRenderer : IPdfRenderer, IAsyncDisposable, IDi
     private readonly SemaphoreSlim _browserLock = new(1, 1);
     private readonly SemaphoreSlim _renderLock;
     private readonly TimeSpan _renderTimeout;
+    private readonly TimeSpan _launchTimeout;
     private int _inFlight;
     private int _peakInFlight;
     // volatile: the outer fast-path read in EnsureBrowserAsync runs outside the lock, so the
@@ -54,6 +55,14 @@ internal sealed class PuppeteerPdfRenderer : IPdfRenderer, IAsyncDisposable, IDi
                 $"{nameof(ThemiaPdfOptions)}.{nameof(ThemiaPdfOptions.RenderTimeout)} must be positive.");
 
         _renderTimeout = options.RenderTimeout;
+
+        // Snapshot for the same reason as MaxConcurrency.
+        if (options.LaunchTimeout <= TimeSpan.Zero || options.LaunchTimeout.TotalMilliseconds > int.MaxValue)
+            throw new ArgumentOutOfRangeException(
+                nameof(options), options.LaunchTimeout,
+                $"{nameof(ThemiaPdfOptions)}.{nameof(ThemiaPdfOptions.LaunchTimeout)} must be positive and not exceed {int.MaxValue} milliseconds.");
+
+        _launchTimeout = options.LaunchTimeout;
     }
 
     /// <summary>How long an abandoned render's page gets to close before the browser is killed instead.</summary>
@@ -226,28 +235,32 @@ internal sealed class PuppeteerPdfRenderer : IPdfRenderer, IAsyncDisposable, IDi
         }
     }
 
-    private async Task<IBrowser> LaunchAsync()
-    {
-        var launchOptions = new LaunchOptions
+    internal static LaunchOptions ToLaunchOptions(ThemiaPdfOptions options, string[] launchArgs, TimeSpan launchTimeout) =>
+        new()
         {
-            Headless = _options.Headless,
-            Args = _launchArgs,
+            Headless = options.Headless,
+            Args = launchArgs,
+            Timeout = (int)launchTimeout.TotalMilliseconds,
+            ExecutablePath = string.IsNullOrEmpty(options.ExecutablePath) ? null : options.ExecutablePath,
         };
 
-        if (!string.IsNullOrEmpty(_options.ExecutablePath))
+    private async Task<IBrowser> LaunchAsync()
+    {
+        var launchOptions = ToLaunchOptions(_options, _launchArgs, _launchTimeout);
+
+        if (string.IsNullOrEmpty(launchOptions.ExecutablePath))
         {
-            launchOptions.ExecutablePath = _options.ExecutablePath;
-        }
-        else if (!_options.DisableAutoDownload)
-        {
-            _logger.LogInformation("Themia.Pdf: downloading/launching Chromium…");
-            await new BrowserFetcher().DownloadAsync().ConfigureAwait(false);
-        }
-        else
-        {
-            throw new InvalidOperationException(
-                "Themia.Pdf: no Chromium available. Set ThemiaPdfOptions.ExecutablePath, or leave " +
-                "DisableAutoDownload=false to allow the runtime download.");
+            if (!_options.DisableAutoDownload)
+            {
+                _logger.LogInformation("Themia.Pdf: downloading/launching Chromium…");
+                await new BrowserFetcher().DownloadAsync().ConfigureAwait(false);
+            }
+            else
+            {
+                throw new InvalidOperationException(
+                    "Themia.Pdf: no Chromium available. Set ThemiaPdfOptions.ExecutablePath, or leave " +
+                    "DisableAutoDownload=false to allow the runtime download.");
+            }
         }
 
         var browser = await Puppeteer.LaunchAsync(launchOptions).ConfigureAwait(false);
