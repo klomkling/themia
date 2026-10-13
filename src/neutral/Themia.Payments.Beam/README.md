@@ -72,9 +72,8 @@ own deadline.
 | `CreateChargeAsync` | 1 |
 | `GetChargeAsync` by charge id / by reference | 1 |
 | `GetChargeAsync` by a paid link id | 3 (charge 404 → link → the link's charges), up to ~4.5 min |
-| `RefundAsync`, full, by charge id / by reference | 2 (resolve, then refund) |
-| `RefundAsync`, partial, by charge id / by reference | 3 (resolve, read the payment method, refund) |
-| `RefundAsync` by a link id | 4 full / 5 partial, up to ~7.5 min |
+| `RefundAsync` by charge id / by reference | 3 (resolve, read the payment method, refund) |
+| `RefundAsync` by a link id | 5 (resolve via link, read the payment method, refund), up to ~7.5 min |
 
 ## `BeamPaymentClient` — Beam-only features
 

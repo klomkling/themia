@@ -165,7 +165,11 @@ internal static class BeamMapping
     public static FailureKind ToFailureKind(int httpStatus, string errorCode) => errorCode switch
     {
         "INVALID_CREDENTIALS_ERROR" => FailureKind.Authentication,
-        "API_VALIDATION_ERROR" or "INVALID_JSON_ERROR" or "INVALID_XML_ERROR" => FailureKind.Validation,
+        "API_VALIDATION_ERROR" or "INVALID_JSON_ERROR" or "INVALID_XML_ERROR" or
+        // INSUFFICIENT_BALANCE is assumed (not confirmed against Beam); mapped to Validation
+        // so callers (e.g. propertiezy BoostPaymentReconcileJob) route to staff settlement
+        // rather than retrying indefinitely if received.
+        "INSUFFICIENT_BALANCE" => FailureKind.Validation,
         "NOT_FOUND_ERROR" => FailureKind.NotFound,
         "NO_PERMISSION_ERROR" or "OPERATION_NOT_ALLOWED_ERROR" => FailureKind.Permission,
         "TOO_MANY_REQUESTS_ERROR" => FailureKind.RateLimited,

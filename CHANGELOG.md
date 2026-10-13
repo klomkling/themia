@@ -27,6 +27,13 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+### Fixed
+- **Beam Refund Pre-flight Validation & FailureKind Mapping** (`Themia.Payments.Beam`, coord #0160):
+  - In `RefundAsync`, inspect the charge's payment method for full refunds as well as partial refunds via `GetByIdWithPaymentMethodAsync`, pre-flight refusing non-refundable methods (`KPLUS`, `SCB_EASY`, `KRUNGSRI_APP`, `BANGKOK_BANK_APP`, `MAKE`, e-wallets) with terminal `FailureKind.Validation` (`refund_method_unsupported`) rather than letting unserviceable refunds fail asynchronously or indefinitely.
+  - Behaviour change for adopters: a full refund whose charge has no `paymentMethod.paymentMethodType` in Beam's response (null or omitted) is now failed closed and refused locally with `FailureKind.Validation` (`refund_method_unsupported`) instead of being posted to Beam.
+  - Map `INSUFFICIENT_BALANCE` (assumed, not confirmed against Beam) to terminal `FailureKind.Validation` so caller retry queues route to staff settlement rather than retrying indefinitely if received.
+  - Updated README documentation for `RefundAsync` call counts (reading the payment method for full refunds brings call count to 3 by charge id and 5 by link id).
+
 ### Security
 - **Pinned `System.Security.Cryptography.Pkcs` to patched versions** (`GHSA-846f-f764-76mx` [High] and `GHSA-2fmv-rv2c-59x7` [Moderate]).
   Mitigates denial-of-service vulnerabilities in `EnvelopedCms`. Transitive pinning (`CentralPackageTransitivePinningEnabled`) promotes `System.Security.Cryptography.Pkcs` to `8.0.2` on `net8.0` and `10.0.13` on `net10.0` for all packages resolving `Microsoft.Data.SqlClient`. The pins can be dropped once upstream dependencies (e.g. `Microsoft.Data.SqlClient`) update their minimum `Pkcs` dependency floors to patched versions.
