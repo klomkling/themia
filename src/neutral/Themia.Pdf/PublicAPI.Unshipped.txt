@@ -41,3 +41,5 @@ Microsoft.Extensions.DependencyInjection.ThemiaPdfServiceCollectionExtensions
 static Microsoft.Extensions.DependencyInjection.ThemiaPdfServiceCollectionExtensions.AddThemiaPdf(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Themia.Pdf.ThemiaPdfOptions!>? configure = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
 Themia.Pdf.ThemiaPdfOptions.RenderTimeout.get -> System.TimeSpan
 Themia.Pdf.ThemiaPdfOptions.RenderTimeout.set -> void
+Themia.Pdf.ThemiaPdfOptions.LaunchTimeout.get -> System.TimeSpan
+Themia.Pdf.ThemiaPdfOptions.LaunchTimeout.set -> void
