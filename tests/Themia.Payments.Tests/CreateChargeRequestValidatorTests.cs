@@ -96,4 +96,16 @@ public class CreateChargeRequestValidatorTests
     {
         CreateChargeRequestValidator.Validate(Valid() with { IdempotencyKey = new string('k', 255) });
     }
+
+    [Fact]
+    public void An_undefined_presentation_mode_is_refused()
+    {
+        var request = Valid() with { PresentationMode = (PresentationMode)999 };
+
+        var ex = Assert.Throws<PaymentApiException>(() => CreateChargeRequestValidator.Validate(request));
+
+        Assert.Equal(FailureKind.Validation, ex.Kind);
+        Assert.Equal("presentation_mode_invalid", ex.ProviderCode);
+        Assert.Equal(0, ex.HttpStatus);
+    }
 }

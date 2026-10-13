@@ -40,6 +40,11 @@ public static class CreateChargeRequestValidator
             throw Refuse("expiry_in_the_past", "ExpiresAt is already past.");
         }
 
+        if (!Enum.IsDefined(request.PresentationMode))
+        {
+            throw Refuse("presentation_mode_invalid", $"PresentationMode value '{(int)request.PresentationMode}' is not defined.");
+        }
+
         IdempotencyKeyRule.Validate(request.IdempotencyKey);
     }
 

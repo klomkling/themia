@@ -22,6 +22,9 @@ Themia.Payments.PaymentMethod.QrPromptPay = 0 -> Themia.Payments.PaymentMethod
 Themia.Payments.PaymentMethod.Card = 1 -> Themia.Payments.PaymentMethod
 Themia.Payments.PaymentMethod.MobileBanking = 2 -> Themia.Payments.PaymentMethod
 Themia.Payments.PaymentMethod.Wallet = 3 -> Themia.Payments.PaymentMethod
+Themia.Payments.PresentationMode
+Themia.Payments.PresentationMode.Auto = 0 -> Themia.Payments.PresentationMode
+Themia.Payments.PresentationMode.HostedPage = 1 -> Themia.Payments.PresentationMode
 Themia.Payments.PaymentEventType
 Themia.Payments.PaymentEventType.ChargeSucceeded = 0 -> Themia.Payments.PaymentEventType
 Themia.Payments.PaymentEventType.ChargeFailed = 1 -> Themia.Payments.PaymentEventType
@@ -100,6 +103,8 @@ Themia.Payments.CreateChargeRequest.ReferenceId.get -> string!
 Themia.Payments.CreateChargeRequest.ReferenceId.init -> void
 Themia.Payments.CreateChargeRequest.AllowedMethods.get -> System.Collections.Generic.IReadOnlyList<Themia.Payments.PaymentMethod>!
 Themia.Payments.CreateChargeRequest.AllowedMethods.init -> void
+Themia.Payments.CreateChargeRequest.PresentationMode.get -> Themia.Payments.PresentationMode
+Themia.Payments.CreateChargeRequest.PresentationMode.init -> void
 Themia.Payments.CreateChargeRequest.ReturnUrl.get -> System.Uri?
 Themia.Payments.CreateChargeRequest.ReturnUrl.init -> void
 Themia.Payments.CreateChargeRequest.ExpiresAt.get -> System.DateTimeOffset?

@@ -10,8 +10,9 @@ namespace Themia.Payments.Beam;
 
 /// <summary>Beam Checkout's <see cref="IPaymentGateway"/> adapter.</summary>
 /// <remarks>
-/// Only a request whose sole allowed method is QR PromptPay is charged directly; everything else — card,
-/// mobile banking, wallet, or any two or more methods — goes through a Beam payment link, whose id is then
+/// Only a request whose sole allowed method is QR PromptPay is charged directly (unless requested with
+/// <see cref="PresentationMode.HostedPage"/>); everything else — card, mobile banking, wallet, hosted-page mode,
+/// or any two or more methods — goes through a Beam payment link, whose id is then
 /// what <see cref="ChargeCreation.ChargeId"/> carries. <see cref="GetChargeAsync"/> and <see cref="RefundAsync"/>
 /// both resolve a link id to the charge that paid it.
 /// </remarks>
@@ -64,10 +65,13 @@ public sealed class BeamPaymentGateway : IPaymentGateway, IPaymentGatewayCapabil
         var beamOptions = options.Value;
         var httpClient = httpClientFactory.CreateClient(HttpClientName);
 
-        // Exactly one method, and Beam names a charge type for it, goes straight to a charge. Everything
-        // else — two or more methods, or MobileBanking/Wallet alone, which have no direct charge type —
-        // goes through a payment link instead.
-        if (allowed.Count == 1 && BeamMapping.ToDirectChargeType(allowed[0]) is { } chargeType)
+        // Exactly one method, and Beam names a charge type for it, goes straight to a charge unless
+        // the caller explicitly asked for a hosted payment link (PresentationMode.HostedPage).
+        // Everything else — two or more methods, HostedPage mode, or MobileBanking/Wallet alone,
+        // which have no direct charge type — goes through a payment link instead.
+        if (request.PresentationMode != PresentationMode.HostedPage &&
+            allowed.Count == 1 &&
+            BeamMapping.ToDirectChargeType(allowed[0]) is { } chargeType)
         {
             return await CreateDirectChargeAsync(httpClient, beamOptions, request, chargeType, cancellationToken)
                 .ConfigureAwait(false);

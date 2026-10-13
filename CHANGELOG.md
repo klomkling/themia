@@ -27,6 +27,12 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+### Added
+- **Payment Presentation Mode (Hosted Page Override)** (`Themia.Payments`, `Themia.Payments.Beam`, coord #0161):
+  - Added `PresentationMode` enum (`Auto`, `HostedPage`) and `PresentationMode` property to `CreateChargeRequest` (default `Auto`).
+  - Validated defined enum values in `CreateChargeRequestValidator` (rejecting undefined values with `presentation_mode_invalid`).
+  - `Themia.Payments.Beam` respects `PresentationMode.HostedPage` to always create a hosted payment link (returning `NextAction.Redirect`) even when a single direct-chargeable method (such as `PaymentMethod.QrPromptPay`) is specified.
+
 ## [0.31.1] - 2026-10-13
 
 ### Added

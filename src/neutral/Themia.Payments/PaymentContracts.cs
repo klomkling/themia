@@ -71,9 +71,16 @@ public sealed record CreateChargeRequest
 
     /// <summary>
     /// The methods this charge may be paid with. <b>One</b> means a direct charge with that method; more
-    /// than one means a hosted page offering the choice.
+    /// than one means a hosted page offering the choice. See <see cref="PresentationMode"/> to override this.
     /// </summary>
     public required IReadOnlyList<PaymentMethod> AllowedMethods { get; init; }
+
+    /// <summary>
+    /// How the payment should be presented to the shopper. Defaults to <see cref="PresentationMode.Auto"/>.
+    /// Set to <see cref="PresentationMode.HostedPage"/> to force a hosted checkout link even when only a single
+    /// method is allowed.
+    /// </summary>
+    public PresentationMode PresentationMode { get; init; } = PresentationMode.Auto;
 
     /// <summary>Where the shopper lands after an off-site step.</summary>
     public Uri? ReturnUrl { get; init; }
