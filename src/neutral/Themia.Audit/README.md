@@ -49,6 +49,7 @@ the audit table yourself.
 ## Recording an event
 
 ```csharp
+// Unenlisted: opens a connection via dialect
 await recorder.RecordAsync(
     new AuditEntry
     {
@@ -60,11 +61,16 @@ await recorder.RecordAsync(
         EntityId  = proposal.Id.ToString(),
     },
     payload: new { proposal.Status, proposal.Amount });
+
+// Enlisted in caller transaction (without Themia.Modules.Audit):
+await recorder.RecordOnAsync(
+    entry,
+    payload: AuditPayload.Diff(beforeState, afterState),
+    connection: callerConnection,
+    transaction: callerTransaction);
 ```
 
-**You pass an object, never a JSON string.** The recorder serializes it and redacts it, so `data` is
-well-formed JSON by construction and the redactor always has something it can walk. `AuditEntry.Data`
-is `internal init` precisely so this cannot be bypassed.
+**Payloads**: You pass an object, `AuditPayload.FromRawJson(rawJson)` for pre-serialized JSON (returns a `JsonDocument` the caller must dispose), `AuditPayload.Diff(before, after)` for structured before/after changes, or `JsonElement`/`JsonDocument`. Direct `string` values are rejected by the recorder because bare string literals bypass property-level redaction. The recorder parses and redacts before persisting.
 
 ## Redaction
 
@@ -82,6 +88,14 @@ apikey, api_key, authorization, otp, pin, cvv, creditcard, card_number, privatek
 `IsSensitive(name)` to test membership; there is deliberately no public collection to enumerate,
 because no shape of one was safe to expose.
 
+### Exact JSON path exemptions
+
+Adopters can exempt specific fields by exact JSON path (e.g. `$.after.mobileVerified` or `$.tokenCount`):
+```csharp
+options.AddExemption("$.after.mobileVerified");
+```
+Exemptions match by **exact JSON path only** (starting with `$.`), never by bare property name, so an exemption cannot accidentally un-redact sensitive properties at other paths or depths.
+
 An adopter who genuinely needs a default gone supplies their own `IAuditRedactor` — a conspicuous act
 rather than a config line.
 
@@ -92,9 +106,7 @@ One table, `themia_audit_events`, **unqualified and identical on every engine**.
 so a qualified name means something different per engine — which is how two Themia modules once ended
 up with colliding table names there.
 
-`data` is `nvarchar(max)`/text on every engine, never `jsonb` or `JSON`. Those types validate on
-insert, and an adopter-supplied payload must never be able to fail the transaction it describes on
-some engines but not others.
+`data` is stored as `text` / `longtext` / `nvarchar(max)` on all engines. Adopters on PostgreSQL who query structured JSON can cast `data::jsonb` in their custom queries.
 
 `id` is a `bigint identity` clustered key; `event_uid` is the public `Guid`. A random Guid clustered
 key page-splits an append-only table on every insert.

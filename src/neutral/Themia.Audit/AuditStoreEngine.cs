@@ -163,6 +163,7 @@ public sealed class AuditStoreEngine : IAuditStore
         Data = row.Data,
     };
 
+
     /// <summary>
     /// Row mapping is BY NAME — every column in <see cref="GetByEventUidSql"/> and each dialect's
     /// <see cref="IAuditDialect.SelectPageSql"/> is aliased to match one of these property names exactly

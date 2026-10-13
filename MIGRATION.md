@@ -10,6 +10,27 @@ with the *why* and concrete upgrade steps.
 - Each entry states: **What changed**, **Why**, and **How to upgrade** (before → after).
 - Non-breaking changes are *not* listed here — see the CHANGELOG.
 
+## 0.31.0
+
+### `IAuditRecorder` added `RecordOnAsync` (breaking for external `IAuditRecorder` implementers)
+
+**What changed:** `IAuditRecorder` added a second member:
+```csharp
+ValueTask<Guid> RecordOnAsync(
+    AuditEntry entry,
+    object? payload,
+    DbConnection connection,
+    DbTransaction? transaction = null,
+    CancellationToken cancellationToken = default);
+```
+
+**Why:** Adopters needing transactional audit recording without taking `Themia.Modules.Audit` (such as `ezy-assets` under coord #0156) need to record directly on the caller's open `DbConnection` and ambient `DbTransaction`.
+
+**Who is affected:** Any consumer that directly implements `IAuditRecorder` (e.g. test mocks or custom recorders). Consumers who only consume `IAuditRecorder` are completely unaffected.
+
+**How to upgrade:** Implement `RecordOnAsync` on custom `IAuditRecorder` implementations or delegate to `AuditRecorder.RecordOnAsync`.
+
+
 ## 0.30.2
 
 ### `LocalStorageProvider` throws at construction for a half-configured public container (breaking for such configs)

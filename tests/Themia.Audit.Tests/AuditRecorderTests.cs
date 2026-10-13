@@ -41,6 +41,49 @@ public class AuditRecorderTests
     }
 
     [Fact]
+    public async Task Accepts_pre_serialized_json_via_AuditPayload_FromRawJson_and_redacts_it()
+    {
+        var store = new CapturingStore();
+        var recorder = CreateRecorder(store);
+
+        using var payload = AuditPayload.FromRawJson("""{"userId":42,"password":"rawSecret"}""");
+        await recorder.RecordAsync(Valid(), payload);
+
+        Assert.NotNull(store.Last);
+        Assert.Contains("\"userId\":42", store.Last!.Data, StringComparison.Ordinal);
+        Assert.DoesNotContain("rawSecret", store.Last.Data!, StringComparison.Ordinal);
+        Assert.Contains("[redacted]", store.Last.Data!, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Accepts_AuditPayload_Diff_and_redacts_before_and_after()
+    {
+        var store = new CapturingStore();
+        var recorder = CreateRecorder(store);
+
+        var payload = AuditPayload.Diff(
+            before: new { role = "user", password = "oldPassword" },
+            after: new { role = "admin", password = "newPassword" });
+
+        await recorder.RecordAsync(Valid(), payload);
+
+        Assert.NotNull(store.Last);
+        Assert.Contains("\"role\":\"user\"", store.Last!.Data, StringComparison.Ordinal);
+        Assert.Contains("\"role\":\"admin\"", store.Last.Data!, StringComparison.Ordinal);
+        Assert.DoesNotContain("oldPassword", store.Last.Data!, StringComparison.Ordinal);
+        Assert.DoesNotContain("newPassword", store.Last.Data!, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AuditPayload_FromRawJson_rejects_non_object_roots_and_malformed_json()
+    {
+        Assert.Throws<ArgumentException>(() => AuditPayload.FromRawJson(""));
+        Assert.Throws<ArgumentException>(() => AuditPayload.FromRawJson("not json"));
+        Assert.Throws<ArgumentException>(() => AuditPayload.FromRawJson("\"bare string\""));
+        Assert.Throws<ArgumentException>(() => AuditPayload.FromRawJson("42"));
+    }
+
+    [Fact]
     public async Task Null_payload_leaves_data_null()
     {
         var store = new CapturingStore();

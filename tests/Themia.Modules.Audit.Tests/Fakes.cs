@@ -181,4 +181,16 @@ internal sealed class FakeAuditRecorder : IAuditRecorder
         LastPayload = payload;
         return ValueTask.FromResult(entry.EventUid);
     }
+
+    public ValueTask<Guid> RecordOnAsync(
+        AuditEntry entry,
+        object? payload,
+        System.Data.Common.DbConnection connection,
+        System.Data.Common.DbTransaction? transaction = null,
+        CancellationToken cancellationToken = default)
+    {
+        LastEntry = entry;
+        LastPayload = payload;
+        return ValueTask.FromResult(entry.EventUid);
+    }
 }

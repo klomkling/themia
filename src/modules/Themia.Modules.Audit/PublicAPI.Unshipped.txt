@@ -40,4 +40,6 @@ Themia.Modules.Audit.TenantAuditReader.QueryAsync(Themia.Audit.AuditQuery! query
 Themia.Modules.Audit.TenantAuditReader.TenantAuditReader(Themia.Audit.IAuditStore! store, Themia.Audit.IAuditDialect! dialect, Themia.Audit.AuditOptions! options, Themia.Framework.Core.Abstractions.Tenancy.ITenantContext! tenantContext) -> void
 Themia.Modules.Audit.TransactionalAuditRecorder
 Themia.Modules.Audit.TransactionalAuditRecorder.RecordAsync(Themia.Audit.AuditEntry! entry, object? payload = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<System.Guid>
+Themia.Modules.Audit.TransactionalAuditRecorder.RecordOnAsync(Themia.Audit.AuditEntry! entry, object? payload, System.Data.Common.DbConnection! connection, System.Data.Common.DbTransaction? transaction = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<System.Guid>
 Themia.Modules.Audit.TransactionalAuditRecorder.TransactionalAuditRecorder(Themia.Audit.AuditRecorder! inner, Themia.Framework.Data.Abstractions.Connections.IAmbientConnectionAccessor! connectionAccessor, Themia.Framework.Core.Abstractions.Tenancy.ITenantContext! tenantContext, Themia.Modules.Audit.AuditModuleOptions! options) -> void
+
