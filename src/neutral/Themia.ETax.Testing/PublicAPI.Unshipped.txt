@@ -1,0 +1,46 @@
+#nullable enable
+Themia.ETax.Testing.ITaxDocumentStoreHarness
+Themia.ETax.Testing.ITaxDocumentStoreHarness.BeginTransactionAsync(System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Data.Common.DbTransaction!>!
+Themia.ETax.Testing.ITaxDocumentStoreHarness.Store.get -> Themia.ETax.ITaxDocumentStore!
+Themia.ETax.Testing.TaxDocumentStoreConformanceTests
+Themia.ETax.Testing.TaxDocumentStoreConformanceTests.TaxDocumentStoreConformanceTests() -> void
+abstract Themia.ETax.Testing.TaxDocumentStoreConformanceTests.CreateHarnessAsync() -> System.Threading.Tasks.Task<Themia.ETax.Testing.ITaxDocumentStoreHarness!>!
+Themia.ETax.Testing.TaxDocumentStoreConformanceTests.Insert_ShouldStoreEveryColumn_WhenCommitted() -> System.Threading.Tasks.Task!
+Themia.ETax.Testing.TaxDocumentStoreConformanceTests.Insert_ShouldPreserveTheSnapshotTextExactly() -> System.Threading.Tasks.Task!
+Themia.ETax.Testing.TaxDocumentStoreConformanceTests.Insert_ShouldLeaveNothing_WhenTheTransactionRollsBack() -> System.Threading.Tasks.Task!
+Themia.ETax.Testing.TaxDocumentStoreConformanceTests.Insert_ShouldBeVisibleInsideItsOwnTransaction() -> System.Threading.Tasks.Task!
+Themia.ETax.Testing.TaxDocumentStoreConformanceTests.Insert_ShouldRejectASecondDocumentWithTheSameKey() -> System.Threading.Tasks.Task!
+Themia.ETax.Testing.TaxDocumentStoreConformanceTests.FindByKey_ShouldMatchOnlyTheExactKey() -> System.Threading.Tasks.Task!
+Themia.ETax.Testing.TaxDocumentStoreConformanceTests.FindByKeyForIssue_ShouldSerialiseRacingIssuersOfTheSameKey() -> System.Threading.Tasks.Task!
+Themia.ETax.Testing.TaxDocumentStoreConformanceTests.ClaimDue_ShouldStampTheLease() -> System.Threading.Tasks.Task!
+Themia.ETax.Testing.TaxDocumentStoreConformanceTests.ClaimDue_ShouldNotClaimAgain_WhileTheLeaseIsLive() -> System.Threading.Tasks.Task!
+Themia.ETax.Testing.TaxDocumentStoreConformanceTests.ClaimDue_ShouldClaimAgain_AfterTheLeaseExpires() -> System.Threading.Tasks.Task!
+Themia.ETax.Testing.TaxDocumentStoreConformanceTests.ClaimDue_ShouldSkipARowUntilItsNextAttemptTime() -> System.Threading.Tasks.Task!
+Themia.ETax.Testing.TaxDocumentStoreConformanceTests.ClaimDue_ShouldNotClaimMoreThanMax() -> System.Threading.Tasks.Task!
+Themia.ETax.Testing.TaxDocumentStoreConformanceTests.ClaimDue_ShouldIgnoreSentFailedAndCancelledDocuments() -> System.Threading.Tasks.Task!
+Themia.ETax.Testing.TaxDocumentStoreConformanceTests.ClaimDue_ShouldGiveARowToExactlyOneOfTwoConcurrentWorkers() -> System.Threading.Tasks.Task!
+Themia.ETax.Testing.TaxDocumentStoreConformanceTests.RecordOriginal_ShouldMoveToOriginalPrepared_AndSetTheFirstValues() -> System.Threading.Tasks.Task!
+Themia.ETax.Testing.TaxDocumentStoreConformanceTests.RecordOriginal_ShouldAppendEvidenceWithoutOverwritingTheFirstValues() -> System.Threading.Tasks.Task!
+Themia.ETax.Testing.TaxDocumentStoreConformanceTests.GetEvidence_ShouldBeEmpty_WhenNothingWasRendered() -> System.Threading.Tasks.Task!
+Themia.ETax.Testing.TaxDocumentStoreConformanceTests.RecordOriginal_ShouldBeRefused_WhenTheTokenIsWrongOrTheLeaseHasLapsed() -> System.Threading.Tasks.Task!
+Themia.ETax.Testing.TaxDocumentStoreConformanceTests.BeginSend_ShouldExtendTheLease_WhenOriginalPreparedAndHeld() -> System.Threading.Tasks.Task!
+Themia.ETax.Testing.TaxDocumentStoreConformanceTests.BeginSend_ShouldBeRefused_WhenNotHeldOrNotOriginalPrepared() -> System.Threading.Tasks.Task!
+Themia.ETax.Testing.TaxDocumentStoreConformanceTests.BeginSend_ShouldBeRefused_WhenTheDocumentWasCancelledAfterTheLeaseLapsed() -> System.Threading.Tasks.Task!
+Themia.ETax.Testing.TaxDocumentStoreConformanceTests.MarkSent_ShouldRecordTheSendAndClearTheLease() -> System.Threading.Tasks.Task!
+Themia.ETax.Testing.TaxDocumentStoreConformanceTests.MarkSent_ShouldBeRefused_WhenTheTokenIsWrongOrTheStateIsNotOriginalPrepared() -> System.Threading.Tasks.Task!
+Themia.ETax.Testing.TaxDocumentStoreConformanceTests.Release_ShouldKeepTheStateAndRecordTheFailure() -> System.Threading.Tasks.Task!
+Themia.ETax.Testing.TaxDocumentStoreConformanceTests.Fail_ShouldMoveToFailed_AndBeTerminalForClaiming() -> System.Threading.Tasks.Task!
+Themia.ETax.Testing.TaxDocumentStoreConformanceTests.Requeue_ShouldReturnToIssuedOrOriginalPrepared_AndResetTheAttempts() -> System.Threading.Tasks.Task!
+Themia.ETax.Testing.TaxDocumentStoreConformanceTests.Requeue_ShouldBeRefused_WhenTheDocumentIsNotFailed() -> System.Threading.Tasks.Task!
+Themia.ETax.Testing.TaxDocumentStoreConformanceTests.UpdateBuyerEmail_ShouldWorkUntilSentOrCancelled() -> System.Threading.Tasks.Task!
+Themia.ETax.Testing.TaxDocumentStoreConformanceTests.CancelForReplacement_ShouldCancelAndRecordTheReplacement() -> System.Threading.Tasks.Task!
+Themia.ETax.Testing.TaxDocumentStoreConformanceTests.CancelForReplacement_ShouldCancelFromAnyOtherState(Themia.ETax.TaxDocumentState state) -> System.Threading.Tasks.Task!
+Themia.ETax.Testing.TaxDocumentStoreConformanceTests.CancelForReplacement_ShouldBeRefused_WhileALiveLeaseIsHeld() -> System.Threading.Tasks.Task!
+Themia.ETax.Testing.TaxDocumentStoreConformanceTests.CancelForReplacement_ShouldSucceed_AfterTheLeaseLapses() -> System.Threading.Tasks.Task!
+Themia.ETax.Testing.TaxDocumentStoreConformanceTests.CancelForReplacement_ShouldReportAlreadyCancelledNotFoundAndWrongSeller() -> System.Threading.Tasks.Task!
+Themia.ETax.Testing.TaxDocumentStoreConformanceTests.CancelForReplacement_ShouldBeUndone_WhenTheTransactionRollsBack() -> System.Threading.Tasks.Task!
+Themia.ETax.Testing.TaxDocumentStoreConformanceTests.Get_ShouldAnswerNotFound_ForAnotherSellersDocument() -> System.Threading.Tasks.Task!
+Themia.ETax.Testing.TaxDocumentStoreConformanceTests.Requeue_ShouldAnswerNotFound_ForAnotherSellersDocument() -> System.Threading.Tasks.Task!
+Themia.ETax.Testing.TaxDocumentStoreConformanceTests.UpdateBuyerEmail_ShouldAnswerNotFound_ForAnotherSellersDocument() -> System.Threading.Tasks.Task!
+Themia.ETax.Testing.TaxDocumentStoreConformanceTests.Release_ShouldLeaveTheLeaseToLapse_WhenAskedToKeepIt() -> System.Threading.Tasks.Task!
+Themia.ETax.Testing.TaxDocumentStoreConformanceTests.Fail_ShouldLeaveTheLeaseToLapse_WhenAskedToKeepIt() -> System.Threading.Tasks.Task!

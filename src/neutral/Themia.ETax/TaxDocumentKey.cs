@@ -9,6 +9,9 @@ namespace Themia.ETax;
 /// keyed by its payment id, a credit note by its refund id, a debit note by its own event id. Keying a credit
 /// note by the payment would make the second partial refund on one payment look like a duplicate of the first.
 /// A replacement for a cancelled document keeps the source event and takes the next revision.
+/// The key carries no seller, so <see cref="SourceEventId"/> must be globally unique across sellers (a payment, refund or event id from one
+/// id space). If two sellers ever issue under the same key, the second gets <see cref="TaxDocumentIssueOutcome.SourceConflict"/>, never the other
+/// seller's document id.
 /// </remarks>
 public readonly record struct TaxDocumentKey
 {

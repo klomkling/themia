@@ -178,3 +178,197 @@ Themia.ETax.TaxDocumentEvidence
 static Themia.ETax.TaxDocumentEvidence.Check(System.Collections.Generic.IReadOnlyList<Themia.ETax.TaxDocumentRenderEvidence>! history, Themia.ETax.TaxDocumentRender! render) -> Themia.ETax.TaxDocumentEvidenceOutcome
 Microsoft.Extensions.DependencyInjection.ThemiaETaxServiceCollectionExtensions
 static Microsoft.Extensions.DependencyInjection.ThemiaETaxServiceCollectionExtensions.AddThemiaETaxRendering(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Themia.Pdf.ThemiaPdfOptions!>? configurePdf = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+Themia.ETax.TaxDocumentState
+Themia.ETax.TaxDocumentState.Issued = 1 -> Themia.ETax.TaxDocumentState
+Themia.ETax.TaxDocumentState.OriginalPrepared = 2 -> Themia.ETax.TaxDocumentState
+Themia.ETax.TaxDocumentState.Sent = 3 -> Themia.ETax.TaxDocumentState
+Themia.ETax.TaxDocumentState.Failed = 4 -> Themia.ETax.TaxDocumentState
+Themia.ETax.TaxDocumentState.Cancelled = 5 -> Themia.ETax.TaxDocumentState
+Themia.ETax.TaxDocumentRecord
+Themia.ETax.TaxDocumentRecord.Id.get -> System.Guid
+Themia.ETax.TaxDocumentRecord.Id.init -> void
+Themia.ETax.TaxDocumentRecord.Kind.get -> Themia.ETax.TaxDocumentKind
+Themia.ETax.TaxDocumentRecord.Kind.init -> void
+Themia.ETax.TaxDocumentRecord.SourceEventId.get -> string!
+Themia.ETax.TaxDocumentRecord.SourceEventId.init -> void
+Themia.ETax.TaxDocumentRecord.Revision.get -> int
+Themia.ETax.TaxDocumentRecord.Revision.init -> void
+Themia.ETax.TaxDocumentRecord.SellerId.get -> string!
+Themia.ETax.TaxDocumentRecord.SellerId.init -> void
+Themia.ETax.TaxDocumentRecord.DocumentNumber.get -> string!
+Themia.ETax.TaxDocumentRecord.DocumentNumber.init -> void
+Themia.ETax.TaxDocumentRecord.IssueDate.get -> System.DateOnly
+Themia.ETax.TaxDocumentRecord.IssueDate.init -> void
+Themia.ETax.TaxDocumentRecord.SnapshotJson.get -> string!
+Themia.ETax.TaxDocumentRecord.SnapshotJson.init -> void
+Themia.ETax.TaxDocumentRecord.SnapshotSchemaVersion.get -> int
+Themia.ETax.TaxDocumentRecord.SnapshotSchemaVersion.init -> void
+Themia.ETax.TaxDocumentRecord.SnapshotSha256.get -> string!
+Themia.ETax.TaxDocumentRecord.SnapshotSha256.init -> void
+Themia.ETax.TaxDocumentRecord.TemplateVersion.get -> string!
+Themia.ETax.TaxDocumentRecord.TemplateVersion.init -> void
+Themia.ETax.TaxDocumentRecord.State.get -> Themia.ETax.TaxDocumentState
+Themia.ETax.TaxDocumentRecord.State.init -> void
+Themia.ETax.TaxDocumentRecord.BuyerEmail.get -> string?
+Themia.ETax.TaxDocumentRecord.BuyerEmail.init -> void
+Themia.ETax.TaxDocumentRecord.ClaimToken.get -> System.Guid?
+Themia.ETax.TaxDocumentRecord.ClaimToken.init -> void
+Themia.ETax.TaxDocumentRecord.ClaimExpiresAt.get -> System.DateTimeOffset?
+Themia.ETax.TaxDocumentRecord.ClaimExpiresAt.init -> void
+Themia.ETax.TaxDocumentRecord.Attempts.get -> int
+Themia.ETax.TaxDocumentRecord.Attempts.init -> void
+Themia.ETax.TaxDocumentRecord.NextAttemptAt.get -> System.DateTimeOffset?
+Themia.ETax.TaxDocumentRecord.NextAttemptAt.init -> void
+Themia.ETax.TaxDocumentRecord.LastErrorCode.get -> string?
+Themia.ETax.TaxDocumentRecord.LastErrorCode.init -> void
+Themia.ETax.TaxDocumentRecord.OriginalRenderedAt.get -> System.DateTimeOffset?
+Themia.ETax.TaxDocumentRecord.OriginalRenderedAt.init -> void
+Themia.ETax.TaxDocumentRecord.PdfSha256.get -> string?
+Themia.ETax.TaxDocumentRecord.PdfSha256.init -> void
+Themia.ETax.TaxDocumentRecord.SentAt.get -> System.DateTimeOffset?
+Themia.ETax.TaxDocumentRecord.SentAt.init -> void
+Themia.ETax.TaxDocumentRecord.MessageId.get -> string?
+Themia.ETax.TaxDocumentRecord.MessageId.init -> void
+Themia.ETax.TaxDocumentRecord.ReplacedByDocumentId.get -> System.Guid?
+Themia.ETax.TaxDocumentRecord.ReplacedByDocumentId.init -> void
+Themia.ETax.TaxDocumentRecord.CreatedAt.get -> System.DateTimeOffset
+Themia.ETax.TaxDocumentRecord.CreatedAt.init -> void
+Themia.ETax.TaxDocumentRecord.HasLiveLease(System.DateTimeOffset now) -> bool
+Themia.ETax.NewTaxDocument
+Themia.ETax.NewTaxDocument.Id.get -> System.Guid
+Themia.ETax.NewTaxDocument.Id.init -> void
+Themia.ETax.NewTaxDocument.Key.get -> Themia.ETax.TaxDocumentKey
+Themia.ETax.NewTaxDocument.Key.init -> void
+Themia.ETax.NewTaxDocument.SellerId.get -> string!
+Themia.ETax.NewTaxDocument.SellerId.init -> void
+Themia.ETax.NewTaxDocument.DocumentNumber.get -> string!
+Themia.ETax.NewTaxDocument.DocumentNumber.init -> void
+Themia.ETax.NewTaxDocument.IssueDate.get -> System.DateOnly
+Themia.ETax.NewTaxDocument.IssueDate.init -> void
+Themia.ETax.NewTaxDocument.SnapshotJson.get -> string!
+Themia.ETax.NewTaxDocument.SnapshotJson.init -> void
+Themia.ETax.NewTaxDocument.SnapshotSchemaVersion.get -> int
+Themia.ETax.NewTaxDocument.SnapshotSchemaVersion.init -> void
+Themia.ETax.NewTaxDocument.SnapshotSha256.get -> string!
+Themia.ETax.NewTaxDocument.SnapshotSha256.init -> void
+Themia.ETax.NewTaxDocument.TemplateVersion.get -> string!
+Themia.ETax.NewTaxDocument.TemplateVersion.init -> void
+Themia.ETax.NewTaxDocument.BuyerEmail.get -> string?
+Themia.ETax.NewTaxDocument.BuyerEmail.init -> void
+Themia.ETax.NewTaxDocument.CreatedAt.get -> System.DateTimeOffset
+Themia.ETax.NewTaxDocument.CreatedAt.init -> void
+Themia.ETax.TaxDocumentCancelOutcome
+Themia.ETax.TaxDocumentCancelOutcome.Cancelled = 0 -> Themia.ETax.TaxDocumentCancelOutcome
+Themia.ETax.TaxDocumentCancelOutcome.NotFound = 1 -> Themia.ETax.TaxDocumentCancelOutcome
+Themia.ETax.TaxDocumentCancelOutcome.LeaseHeld = 2 -> Themia.ETax.TaxDocumentCancelOutcome
+Themia.ETax.TaxDocumentCancelOutcome.AlreadyCancelled = 3 -> Themia.ETax.TaxDocumentCancelOutcome
+Themia.ETax.ITaxDocumentStore
+Themia.ETax.ITaxDocumentStore.FindByKeyForIssueAsync(System.Data.Common.DbTransaction! tx, Themia.ETax.TaxDocumentKey key, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.ETax.TaxDocumentRecord?>!
+Themia.ETax.ITaxDocumentStore.GetAsync(System.Data.Common.DbTransaction? tx, System.Guid id, string! sellerId, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.ETax.TaxDocumentRecord?>!
+Themia.ETax.ITaxDocumentStore.InsertAsync(System.Data.Common.DbTransaction! tx, Themia.ETax.NewTaxDocument! document, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.ETax.ITaxDocumentStore.CancelForReplacementAsync(System.Data.Common.DbTransaction! tx, System.Guid documentId, System.Guid replacedByDocumentId, string! sellerId, System.DateTimeOffset now, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.ETax.TaxDocumentCancelOutcome>!
+Themia.ETax.ITaxDocumentStore.ClaimDueAsync(int max, System.DateTimeOffset now, System.TimeSpan lease, System.Guid claimToken, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Themia.ETax.TaxDocumentRecord!>!>!
+Themia.ETax.ITaxDocumentStore.RecordOriginalAsync(System.Guid id, System.Guid claimToken, System.DateTimeOffset now, string! pdfSha256, string! rendererVersion, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!
+Themia.ETax.ITaxDocumentStore.GetEvidenceAsync(System.Guid id, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Themia.ETax.TaxDocumentRenderEvidence>!>!
+Themia.ETax.ITaxDocumentStore.BeginSendAsync(System.Guid id, System.Guid claimToken, System.DateTimeOffset now, System.TimeSpan lease, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!
+Themia.ETax.ITaxDocumentStore.MarkSentAsync(System.Guid id, System.Guid claimToken, System.DateTimeOffset now, string! messageId, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!
+Themia.ETax.ITaxDocumentStore.ReleaseAsync(System.Guid id, System.Guid claimToken, int attempts, System.DateTimeOffset nextAttemptAt, string! errorCode, Themia.ETax.TaxDocumentLeaseHandling leaseHandling = Themia.ETax.TaxDocumentLeaseHandling.Release, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!
+Themia.ETax.ITaxDocumentStore.FailAsync(System.Guid id, System.Guid claimToken, int attempts, string! errorCode, Themia.ETax.TaxDocumentLeaseHandling leaseHandling = Themia.ETax.TaxDocumentLeaseHandling.Release, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!
+Themia.ETax.ITaxDocumentStore.RequeueAsync(System.Guid id, string! sellerId, string! requestedBy, System.DateTimeOffset now, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!
+Themia.ETax.ITaxDocumentStore.UpdateBuyerEmailAsync(System.Guid id, string! sellerId, string! buyerEmail, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!
+Themia.ETax.TaxDocumentEmail
+Themia.ETax.TaxDocumentEmail.DocumentId.get -> System.Guid
+Themia.ETax.TaxDocumentEmail.DocumentId.init -> void
+Themia.ETax.TaxDocumentEmail.DocumentNumber.get -> string!
+Themia.ETax.TaxDocumentEmail.DocumentNumber.init -> void
+Themia.ETax.TaxDocumentEmail.Kind.get -> Themia.ETax.TaxDocumentKind
+Themia.ETax.TaxDocumentEmail.Kind.init -> void
+Themia.ETax.TaxDocumentEmail.To.get -> string!
+Themia.ETax.TaxDocumentEmail.To.init -> void
+Themia.ETax.TaxDocumentEmail.RevenueDepartmentAddress.get -> string!
+Themia.ETax.TaxDocumentEmail.RevenueDepartmentAddress.init -> void
+Themia.ETax.TaxDocumentEmail.Pdf.get -> byte[]!
+Themia.ETax.TaxDocumentEmail.Pdf.init -> void
+Themia.ETax.TaxDocumentEmail.ReplacesDocumentNumber.get -> string?
+Themia.ETax.TaxDocumentEmail.ReplacesDocumentNumber.init -> void
+Themia.ETax.TaxDocumentSendOutcome
+Themia.ETax.TaxDocumentSendOutcome.Sent = 0 -> Themia.ETax.TaxDocumentSendOutcome
+Themia.ETax.TaxDocumentSendOutcome.Transient = 1 -> Themia.ETax.TaxDocumentSendOutcome
+Themia.ETax.TaxDocumentSendOutcome.Permanent = 2 -> Themia.ETax.TaxDocumentSendOutcome
+Themia.ETax.TaxDocumentSendResult
+Themia.ETax.TaxDocumentSendResult.TaxDocumentSendResult(Themia.ETax.TaxDocumentSendOutcome Outcome, string? ErrorCode = null) -> void
+Themia.ETax.TaxDocumentSendResult.Outcome.get -> Themia.ETax.TaxDocumentSendOutcome
+Themia.ETax.TaxDocumentSendResult.Outcome.init -> void
+Themia.ETax.TaxDocumentSendResult.ErrorCode.get -> string?
+Themia.ETax.TaxDocumentSendResult.ErrorCode.init -> void
+static Themia.ETax.TaxDocumentSendResult.Sent.get -> Themia.ETax.TaxDocumentSendResult!
+static Themia.ETax.TaxDocumentSendResult.Transient(string! errorCode) -> Themia.ETax.TaxDocumentSendResult!
+static Themia.ETax.TaxDocumentSendResult.Permanent(string! errorCode) -> Themia.ETax.TaxDocumentSendResult!
+Themia.ETax.ITaxDocumentMailer
+Themia.ETax.ITaxDocumentMailer.SendAsync(Themia.ETax.TaxDocumentEmail! email, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.ETax.TaxDocumentSendResult!>!
+Themia.ETax.TaxDocumentFailure
+Themia.ETax.TaxDocumentFailure.TaxDocumentFailure(System.Guid DocumentId, Themia.ETax.TaxDocumentKind Kind, string! ErrorCode, int Attempts) -> void
+Themia.ETax.TaxDocumentFailure.DocumentId.get -> System.Guid
+Themia.ETax.TaxDocumentFailure.DocumentId.init -> void
+Themia.ETax.TaxDocumentFailure.Kind.get -> Themia.ETax.TaxDocumentKind
+Themia.ETax.TaxDocumentFailure.Kind.init -> void
+Themia.ETax.TaxDocumentFailure.ErrorCode.get -> string!
+Themia.ETax.TaxDocumentFailure.ErrorCode.init -> void
+Themia.ETax.TaxDocumentFailure.Attempts.get -> int
+Themia.ETax.TaxDocumentFailure.Attempts.init -> void
+Themia.ETax.ITaxDocumentFailureHandler
+Themia.ETax.ITaxDocumentFailureHandler.OnFailedAsync(Themia.ETax.TaxDocumentFailure! failure, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.ETax.ITaxDocumentNumberSource
+Themia.ETax.ITaxDocumentNumberSource.NextNumberAsync(System.Data.Common.DbTransaction! tx, string! sellerId, Themia.ETax.TaxDocumentKind kind, System.DateOnly issueDate, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<string!>!
+Themia.ETax.TaxDocumentSendOptions
+Themia.ETax.TaxDocumentSendOptions.TaxDocumentSendOptions() -> void
+Themia.ETax.TaxDocumentSendOptions.RevenueDepartmentAddress.get -> string!
+Themia.ETax.TaxDocumentSendOptions.RevenueDepartmentAddress.set -> void
+Themia.ETax.TaxDocumentSendOptions.Lease.get -> System.TimeSpan
+Themia.ETax.TaxDocumentSendOptions.Lease.set -> void
+Themia.ETax.TaxDocumentSendOptions.SendTimeout.get -> System.TimeSpan
+Themia.ETax.TaxDocumentSendOptions.SendTimeout.set -> void
+Themia.ETax.TaxDocumentSendOptions.MaxAttempts.get -> int
+Themia.ETax.TaxDocumentSendOptions.MaxAttempts.set -> void
+Themia.ETax.TaxDocumentSendOptions.InitialBackoff.get -> System.TimeSpan
+Themia.ETax.TaxDocumentSendOptions.InitialBackoff.set -> void
+Themia.ETax.TaxDocumentSendOptions.MaxBackoff.get -> System.TimeSpan
+Themia.ETax.TaxDocumentSendOptions.MaxBackoff.set -> void
+Themia.ETax.TaxDocumentSendOptions.BatchSize.get -> int
+Themia.ETax.TaxDocumentSendOptions.BatchSize.set -> void
+Themia.ETax.IssueTaxDocumentRequest
+Themia.ETax.IssueTaxDocumentRequest.Key.get -> Themia.ETax.TaxDocumentKey
+Themia.ETax.IssueTaxDocumentRequest.Key.init -> void
+Themia.ETax.IssueTaxDocumentRequest.SellerId.get -> string!
+Themia.ETax.IssueTaxDocumentRequest.SellerId.init -> void
+Themia.ETax.IssueTaxDocumentRequest.Snapshot.get -> Themia.ETax.TaxDocumentSnapshot!
+Themia.ETax.IssueTaxDocumentRequest.Snapshot.init -> void
+Themia.ETax.IssueTaxDocumentRequest.BuyerEmail.get -> string?
+Themia.ETax.IssueTaxDocumentRequest.BuyerEmail.init -> void
+Themia.ETax.TaxDocumentIssueOutcome
+Themia.ETax.TaxDocumentIssueOutcome.Issued = 0 -> Themia.ETax.TaxDocumentIssueOutcome
+Themia.ETax.TaxDocumentIssueOutcome.AlreadyIssued = 1 -> Themia.ETax.TaxDocumentIssueOutcome
+Themia.ETax.TaxDocumentIssueOutcome.ValidationFailed = 2 -> Themia.ETax.TaxDocumentIssueOutcome
+Themia.ETax.TaxDocumentIssueOutcome.NoteReferenceInvalid = 3 -> Themia.ETax.TaxDocumentIssueOutcome
+Themia.ETax.TaxDocumentIssueOutcome.ReplacementInvalid = 4 -> Themia.ETax.TaxDocumentIssueOutcome
+Themia.ETax.TaxDocumentIssueOutcome.ReplacedDocumentBusy = 5 -> Themia.ETax.TaxDocumentIssueOutcome
+Themia.ETax.TaxDocumentIssueResult
+Themia.ETax.TaxDocumentIssueResult.Outcome.get -> Themia.ETax.TaxDocumentIssueOutcome
+Themia.ETax.TaxDocumentIssueResult.Outcome.init -> void
+Themia.ETax.TaxDocumentIssueResult.DocumentId.get -> System.Guid?
+Themia.ETax.TaxDocumentIssueResult.DocumentId.init -> void
+Themia.ETax.TaxDocumentIssueResult.Errors.get -> System.Collections.Generic.IReadOnlyList<Themia.ETax.TaxDocumentValidationError>!
+Themia.ETax.TaxDocumentIssueResult.Errors.init -> void
+Themia.ETax.TaxDocumentService
+Themia.ETax.TaxDocumentService.TaxDocumentService(Themia.ETax.ITaxDocumentStore! store, Themia.ETax.ITaxDocumentNumberSource! numbers, Themia.ETax.TaxDocumentRenderer! renderer, Themia.ETax.TaxDocumentValidationOptions! validation, System.TimeProvider! clock, Microsoft.Extensions.Logging.ILogger<Themia.ETax.TaxDocumentService!>! logger) -> void
+Themia.ETax.TaxDocumentService.IssueAsync(System.Data.Common.DbTransaction! tx, Themia.ETax.IssueTaxDocumentRequest! request, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.ETax.TaxDocumentIssueResult!>!
+Themia.ETax.TaxDocumentService.RenderCopyAsync(System.Guid id, string! sellerId, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.ETax.TaxDocumentRender?>!
+Themia.ETax.TaxDocumentService.RequeueAsync(System.Guid id, string! sellerId, string! requestedBy, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!
+Themia.ETax.TaxDocumentSender
+Themia.ETax.TaxDocumentSender.TaxDocumentSender(Themia.ETax.ITaxDocumentStore! store, Themia.ETax.ITaxDocumentMailer! mailer, Themia.ETax.ITaxDocumentFailureHandler! failureHandler, Themia.ETax.TaxDocumentRenderer! renderer, Themia.ETax.TaxDocumentSendOptions! options, System.TimeProvider! clock, Microsoft.Extensions.Logging.ILogger<Themia.ETax.TaxDocumentSender!>! logger) -> void
+Themia.ETax.TaxDocumentSender.RunOnceAsync(System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<int>!
+static Microsoft.Extensions.DependencyInjection.ThemiaETaxServiceCollectionExtensions.AddThemiaETaxDocuments(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Themia.ETax.TaxDocumentSendOptions!>! configure, System.Action<Themia.ETax.TaxDocumentValidationOptions!>? configureValidation = null, System.Action<Themia.Pdf.ThemiaPdfOptions!>? configurePdf = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+Themia.ETax.TaxDocumentLeaseHandling
+Themia.ETax.TaxDocumentLeaseHandling.KeepUntilExpiry = 1 -> Themia.ETax.TaxDocumentLeaseHandling
+Themia.ETax.TaxDocumentLeaseHandling.Release = 0 -> Themia.ETax.TaxDocumentLeaseHandling
+Themia.ETax.TaxDocumentIssueOutcome.SourceConflict = 6 -> Themia.ETax.TaxDocumentIssueOutcome
