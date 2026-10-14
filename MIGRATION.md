@@ -10,6 +10,19 @@ with the *why* and concrete upgrade steps.
 - Each entry states: **What changed**, **Why**, and **How to upgrade** (before → after).
 - Non-breaking changes are *not* listed here — see the CHANGELOG.
 
+## 0.31.3
+
+### `Themia.Payments.Beam` pre-flights refunds and refuses non-refundable/missing payment methods (breaking for unserviceable refund attempts)
+
+**What changed:** `BeamPaymentGateway.RefundAsync` now reads the charge's payment method via `GetByIdWithPaymentMethodAsync` for full refunds as well as partial refunds, refusing methods outside `CARD`, `CARD_INSTALLMENTS`, `QR_PROMPT_PAY`, `ALIPAY`, and `WECHAT_PAY` locally with `PaymentApiException(FailureKind.Validation, "refund_method_unsupported", 0)`. A full refund on a charge whose Beam payload lacks `paymentMethod.paymentMethodType` (null or omitted) is failed closed and refused locally with `FailureKind.Validation` instead of being posted to Beam's `/api/v1/refunds`.
+
+**Why:** Non-refundable methods (bank apps, e-wallets) have no API refund on Beam. Previously, full refunds skipped the payment method check and posted directly to Beam, where failures were unmapped or asynchronous, causing caller retry loops (e.g. `propertiezy`'s `BoostPaymentReconcileJob`) to retry indefinitely. Failing closed locally ensures unserviceable refunds terminate immediately and route to manual staff settlement.
+
+**Who is affected:** Callers requesting refunds for charges paid with non-refundable methods, or charges where Beam does not report `paymentMethod.paymentMethodType`. Callers issuing legitimate refunds for refundable methods (`CARD`, `QR_PROMPT_PAY`, etc.) are unaffected, though full refunds now perform an additional `GET /api/v1/charges/{id}` call (bringing total calls to 3 by charge ID, 5 by link ID).
+
+**How to upgrade:** Ensure callers treat `PaymentApiException` with `FailureKind.Validation` as terminal (routing to staff review) rather than retrying.
+
+
 ## 0.31.0
 
 ### `IAuditRecorder` added `RecordOnAsync` (breaking for external `IAuditRecorder` implementers)
