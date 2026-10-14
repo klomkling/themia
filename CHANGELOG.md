@@ -27,6 +27,10 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+### Security
+- **Pinned `System.Security.Cryptography.Pkcs` to patched versions** (`GHSA-846f-f764-76mx` [High] and `GHSA-2fmv-rv2c-59x7` [Moderate]).
+  Mitigates denial-of-service vulnerabilities in `EnvelopedCms`. Transitive pinning (`CentralPackageTransitivePinningEnabled`) promotes `System.Security.Cryptography.Pkcs` to `8.0.2` on `net8.0` and `10.0.13` on `net10.0` for all packages resolving `Microsoft.Data.SqlClient`. The pins can be dropped once upstream dependencies (e.g. `Microsoft.Data.SqlClient`) update their minimum `Pkcs` dependency floors to patched versions.
+
 ## [0.31.2] - 2026-10-13
 
 ### Added
