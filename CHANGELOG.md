@@ -27,6 +27,13 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+### Added
+- **`Themia.ETax` core (PR1 of coord #0158)** (new neutral package, `net8.0;net10.0`): `TaxDocumentSnapshot` with a
+  deterministic versioned-JSON serializer and SHA-256 integrity hash (store as `text`, not `jsonb`), snapshot validator
+  (totals, VAT arithmetic, customer-withheld tax, credit/debit note and replacement references), `TaxDocumentKey`
+  idempotency key keyed by the triggering event, `VatMath` in satang/basis points with decimal-baht parity vectors, and
+  `ThaiTaxId` (13 digits, optional mod-11 check) / `ThaiBranchCode`. Rendering, state machine and trigger helper follow in later PRs.
+
 ## [0.31.3] - 2026-10-14
 
 ### Fixed

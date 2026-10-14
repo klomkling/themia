@@ -1,0 +1,141 @@
+#nullable enable
+Themia.ETax.TaxDocumentKind
+Themia.ETax.TaxDocumentKind.CreditNote = 2 -> Themia.ETax.TaxDocumentKind
+Themia.ETax.TaxDocumentKind.DebitNote = 3 -> Themia.ETax.TaxDocumentKind
+Themia.ETax.TaxDocumentKind.TaxInvoiceReceipt = 1 -> Themia.ETax.TaxDocumentKind
+Themia.ETax.TaxNoteMode
+Themia.ETax.TaxNoteMode.Adjustment = 2 -> Themia.ETax.TaxNoteMode
+Themia.ETax.TaxNoteMode.FullCancellation = 1 -> Themia.ETax.TaxNoteMode
+Themia.ETax.TaxDocumentSnapshotFailure
+Themia.ETax.TaxDocumentSnapshotFailure.HashMismatch = 0 -> Themia.ETax.TaxDocumentSnapshotFailure
+Themia.ETax.TaxDocumentSnapshotFailure.Malformed = 2 -> Themia.ETax.TaxDocumentSnapshotFailure
+Themia.ETax.TaxDocumentSnapshotFailure.UnsupportedSchemaVersion = 1 -> Themia.ETax.TaxDocumentSnapshotFailure
+Themia.ETax.TaxDocumentValidationCode
+Themia.ETax.TaxDocumentValidationCode.InvalidChecksum = 2 -> Themia.ETax.TaxDocumentValidationCode
+Themia.ETax.TaxDocumentValidationCode.Malformed = 1 -> Themia.ETax.TaxDocumentValidationCode
+Themia.ETax.TaxDocumentValidationCode.NotAllowed = 3 -> Themia.ETax.TaxDocumentValidationCode
+Themia.ETax.TaxDocumentValidationCode.Required = 0 -> Themia.ETax.TaxDocumentValidationCode
+Themia.ETax.TaxDocumentValidationCode.TotalsInconsistent = 4 -> Themia.ETax.TaxDocumentValidationCode
+Themia.ETax.TaxDocumentValidationCode.WithheldExceedsTotal = 5 -> Themia.ETax.TaxDocumentValidationCode
+Themia.ETax.VatAmounts
+Themia.ETax.VatAmounts.VatAmounts() -> void
+Themia.ETax.VatAmounts.VatAmounts(long ExVatSatang, long VatSatang) -> void
+Themia.ETax.VatAmounts.ExVatSatang.get -> long
+Themia.ETax.VatAmounts.ExVatSatang.init -> void
+Themia.ETax.VatAmounts.VatSatang.get -> long
+Themia.ETax.VatAmounts.VatSatang.init -> void
+Themia.ETax.VatAmounts.InclVatSatang.get -> long
+Themia.ETax.VatMath
+const Themia.ETax.VatMath.MaxRateBasisPoints = 10000 -> int
+static Themia.ETax.VatMath.AddVat(long exVatSatang, int rateBasisPoints) -> Themia.ETax.VatAmounts
+static Themia.ETax.VatMath.Split(long inclVatSatang, int rateBasisPoints) -> Themia.ETax.VatAmounts
+Themia.ETax.ThaiTaxId
+const Themia.ETax.ThaiTaxId.Length = 13 -> int
+static Themia.ETax.ThaiTaxId.HasValidChecksum(string? value) -> bool
+static Themia.ETax.ThaiTaxId.IsWellFormed(string? value) -> bool
+Themia.ETax.ThaiBranchCode
+const Themia.ETax.ThaiBranchCode.Length = 5 -> int
+static Themia.ETax.ThaiBranchCode.IsWellFormed(string? value) -> bool
+Themia.ETax.TaxDocumentKey
+Themia.ETax.TaxDocumentKey.TaxDocumentKey() -> void
+Themia.ETax.TaxDocumentKey.TaxDocumentKey(Themia.ETax.TaxDocumentKind kind, string! sourceEventId, int revision = 1) -> void
+Themia.ETax.TaxDocumentKey.Kind.get -> Themia.ETax.TaxDocumentKind
+Themia.ETax.TaxDocumentKey.SourceEventId.get -> string!
+Themia.ETax.TaxDocumentKey.Revision.get -> int
+Themia.ETax.TaxParty
+Themia.ETax.TaxParty.Name.get -> string!
+Themia.ETax.TaxParty.Name.init -> void
+Themia.ETax.TaxParty.TaxId.get -> string?
+Themia.ETax.TaxParty.TaxId.init -> void
+Themia.ETax.TaxParty.Branch.get -> string?
+Themia.ETax.TaxParty.Branch.init -> void
+Themia.ETax.TaxParty.Address.get -> string?
+Themia.ETax.TaxParty.Address.init -> void
+Themia.ETax.TaxDocumentLine
+Themia.ETax.TaxDocumentLine.Description.get -> string!
+Themia.ETax.TaxDocumentLine.Description.init -> void
+Themia.ETax.TaxDocumentLine.AmountExVatSatang.get -> long
+Themia.ETax.TaxDocumentLine.AmountExVatSatang.init -> void
+Themia.ETax.TaxDocumentTotals
+Themia.ETax.TaxDocumentTotals.ExVatSatang.get -> long
+Themia.ETax.TaxDocumentTotals.ExVatSatang.init -> void
+Themia.ETax.TaxDocumentTotals.VatSatang.get -> long
+Themia.ETax.TaxDocumentTotals.VatSatang.init -> void
+Themia.ETax.TaxDocumentTotals.InclVatSatang.get -> long
+Themia.ETax.TaxDocumentTotals.InclVatSatang.init -> void
+Themia.ETax.TaxDocumentTotals.WithheldSatang.get -> long
+Themia.ETax.TaxDocumentTotals.WithheldSatang.init -> void
+Themia.ETax.TaxDocumentTotals.NetReceivedSatang.get -> long
+Themia.ETax.TaxDocumentTotals.NetReceivedSatang.init -> void
+Themia.ETax.TaxDocumentTotals.VatRateBasisPoints.get -> int
+Themia.ETax.TaxDocumentTotals.VatRateBasisPoints.init -> void
+Themia.ETax.TaxNoteReference
+Themia.ETax.TaxNoteReference.OriginalDocumentId.get -> System.Guid
+Themia.ETax.TaxNoteReference.OriginalDocumentId.init -> void
+Themia.ETax.TaxNoteReference.OriginalDocumentNumber.get -> string!
+Themia.ETax.TaxNoteReference.OriginalDocumentNumber.init -> void
+Themia.ETax.TaxNoteReference.OriginalIssueDate.get -> System.DateOnly
+Themia.ETax.TaxNoteReference.OriginalIssueDate.init -> void
+Themia.ETax.TaxNoteReference.Mode.get -> Themia.ETax.TaxNoteMode
+Themia.ETax.TaxNoteReference.Mode.init -> void
+Themia.ETax.TaxNoteReference.ReasonCode.get -> string?
+Themia.ETax.TaxNoteReference.ReasonCode.init -> void
+Themia.ETax.TaxNoteReference.Reason.get -> string!
+Themia.ETax.TaxNoteReference.Reason.init -> void
+Themia.ETax.TaxNoteReference.RefundedNetSatang.get -> long?
+Themia.ETax.TaxNoteReference.RefundedNetSatang.init -> void
+Themia.ETax.TaxNoteReference.OriginalValueSatang.get -> long?
+Themia.ETax.TaxNoteReference.OriginalValueSatang.init -> void
+Themia.ETax.TaxNoteReference.CorrectedValueSatang.get -> long?
+Themia.ETax.TaxNoteReference.CorrectedValueSatang.init -> void
+Themia.ETax.TaxDocumentReplacement
+Themia.ETax.TaxDocumentReplacement.ReplacesDocumentId.get -> System.Guid
+Themia.ETax.TaxDocumentReplacement.ReplacesDocumentId.init -> void
+Themia.ETax.TaxDocumentReplacement.OriginalDocumentNumber.get -> string!
+Themia.ETax.TaxDocumentReplacement.OriginalDocumentNumber.init -> void
+Themia.ETax.TaxDocumentReplacement.OriginalIssueDate.get -> System.DateOnly
+Themia.ETax.TaxDocumentReplacement.OriginalIssueDate.init -> void
+Themia.ETax.TaxDocumentReplacement.Reason.get -> string!
+Themia.ETax.TaxDocumentReplacement.Reason.init -> void
+Themia.ETax.TaxDocumentSnapshot
+const Themia.ETax.TaxDocumentSnapshot.CurrentSchemaVersion = 1 -> int
+Themia.ETax.TaxDocumentSnapshot.SchemaVersion.get -> int
+Themia.ETax.TaxDocumentSnapshot.SchemaVersion.init -> void
+Themia.ETax.TaxDocumentSnapshot.Kind.get -> Themia.ETax.TaxDocumentKind
+Themia.ETax.TaxDocumentSnapshot.Kind.init -> void
+Themia.ETax.TaxDocumentSnapshot.DocumentNumber.get -> string!
+Themia.ETax.TaxDocumentSnapshot.DocumentNumber.init -> void
+Themia.ETax.TaxDocumentSnapshot.IssueDate.get -> System.DateOnly
+Themia.ETax.TaxDocumentSnapshot.IssueDate.init -> void
+Themia.ETax.TaxDocumentSnapshot.Seller.get -> Themia.ETax.TaxParty!
+Themia.ETax.TaxDocumentSnapshot.Seller.init -> void
+Themia.ETax.TaxDocumentSnapshot.Buyer.get -> Themia.ETax.TaxParty!
+Themia.ETax.TaxDocumentSnapshot.Buyer.init -> void
+Themia.ETax.TaxDocumentSnapshot.Lines.get -> System.Collections.Generic.IReadOnlyList<Themia.ETax.TaxDocumentLine!>!
+Themia.ETax.TaxDocumentSnapshot.Lines.init -> void
+Themia.ETax.TaxDocumentSnapshot.Totals.get -> Themia.ETax.TaxDocumentTotals!
+Themia.ETax.TaxDocumentSnapshot.Totals.init -> void
+Themia.ETax.TaxDocumentSnapshot.Note.get -> Themia.ETax.TaxNoteReference?
+Themia.ETax.TaxDocumentSnapshot.Note.init -> void
+Themia.ETax.TaxDocumentSnapshot.Replacement.get -> Themia.ETax.TaxDocumentReplacement?
+Themia.ETax.TaxDocumentSnapshot.Replacement.init -> void
+Themia.ETax.TaxDocumentSnapshotException
+Themia.ETax.TaxDocumentSnapshotException.TaxDocumentSnapshotException(Themia.ETax.TaxDocumentSnapshotFailure failure, System.Exception? innerException = null) -> void
+Themia.ETax.TaxDocumentSnapshotException.Failure.get -> Themia.ETax.TaxDocumentSnapshotFailure
+Themia.ETax.TaxDocumentSnapshotSerializer
+static Themia.ETax.TaxDocumentSnapshotSerializer.ComputeHash(string! snapshotJson) -> string!
+static Themia.ETax.TaxDocumentSnapshotSerializer.Deserialize(string! snapshotJson, string! expectedSha256) -> Themia.ETax.TaxDocumentSnapshot!
+static Themia.ETax.TaxDocumentSnapshotSerializer.Serialize(Themia.ETax.TaxDocumentSnapshot! snapshot) -> string!
+Themia.ETax.TaxDocumentSnapshotValidator
+static Themia.ETax.TaxDocumentSnapshotValidator.Validate(Themia.ETax.TaxDocumentSnapshot! snapshot, Themia.ETax.TaxDocumentValidationOptions? options = null) -> System.Collections.Generic.IReadOnlyList<Themia.ETax.TaxDocumentValidationError>!
+Themia.ETax.TaxDocumentValidationError
+Themia.ETax.TaxDocumentValidationError.TaxDocumentValidationError() -> void
+Themia.ETax.TaxDocumentValidationError.TaxDocumentValidationError(Themia.ETax.TaxDocumentValidationCode Code, string! Field) -> void
+Themia.ETax.TaxDocumentValidationError.Code.get -> Themia.ETax.TaxDocumentValidationCode
+Themia.ETax.TaxDocumentValidationError.Code.init -> void
+Themia.ETax.TaxDocumentValidationError.Field.get -> string!
+Themia.ETax.TaxDocumentValidationError.Field.init -> void
+Themia.ETax.TaxDocumentValidationOptions
+Themia.ETax.TaxDocumentValidationOptions.TaxDocumentValidationOptions() -> void
+Themia.ETax.TaxDocumentValidationOptions.ValidateTaxIdChecksum.get -> bool
+Themia.ETax.TaxDocumentValidationOptions.ValidateTaxIdChecksum.set -> void
