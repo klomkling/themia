@@ -431,6 +431,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Themia.ETax.Tests", "tests\
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Themia.ETax.IntegrationTests", "tests\Themia.ETax.IntegrationTests\Themia.ETax.IntegrationTests.csproj", "{BFBFAE4E-AA27-4199-BF08-4E019C98CC36}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Themia.ETax.Testing", "src\neutral\Themia.ETax.Testing\Themia.ETax.Testing.csproj", "{3C6D2712-F492-49C7-9F19-AD6DFF8D6E06}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -2913,6 +2915,18 @@ Global
 		{BFBFAE4E-AA27-4199-BF08-4E019C98CC36}.Release|x64.Build.0 = Release|Any CPU
 		{BFBFAE4E-AA27-4199-BF08-4E019C98CC36}.Release|x86.ActiveCfg = Release|Any CPU
 		{BFBFAE4E-AA27-4199-BF08-4E019C98CC36}.Release|x86.Build.0 = Release|Any CPU
+		{3C6D2712-F492-49C7-9F19-AD6DFF8D6E06}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3C6D2712-F492-49C7-9F19-AD6DFF8D6E06}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3C6D2712-F492-49C7-9F19-AD6DFF8D6E06}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{3C6D2712-F492-49C7-9F19-AD6DFF8D6E06}.Debug|x64.Build.0 = Debug|Any CPU
+		{3C6D2712-F492-49C7-9F19-AD6DFF8D6E06}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{3C6D2712-F492-49C7-9F19-AD6DFF8D6E06}.Debug|x86.Build.0 = Debug|Any CPU
+		{3C6D2712-F492-49C7-9F19-AD6DFF8D6E06}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3C6D2712-F492-49C7-9F19-AD6DFF8D6E06}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3C6D2712-F492-49C7-9F19-AD6DFF8D6E06}.Release|x64.ActiveCfg = Release|Any CPU
+		{3C6D2712-F492-49C7-9F19-AD6DFF8D6E06}.Release|x64.Build.0 = Release|Any CPU
+		{3C6D2712-F492-49C7-9F19-AD6DFF8D6E06}.Release|x86.ActiveCfg = Release|Any CPU
+		{3C6D2712-F492-49C7-9F19-AD6DFF8D6E06}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -3128,5 +3142,6 @@ Global
 		{CC952845-1318-4640-878C-25AEB72082FD} = {1F655D57-935D-D295-E882-5052ED9A6376}
 		{19C487E5-64D8-4331-9300-CA573701C889} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 		{BFBFAE4E-AA27-4199-BF08-4E019C98CC36} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
+		{3C6D2712-F492-49C7-9F19-AD6DFF8D6E06} = {1F655D57-935D-D295-E882-5052ED9A6376}
 	EndGlobalSection
 EndGlobal

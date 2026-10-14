@@ -42,3 +42,32 @@ Never log snapshot contents: they hold names and tax ids. Errors from this packa
 - **Proof:** `tests/Themia.ETax.IntegrationTests` (Category=Integration) re-renders on Chromium across time, fresh
   browsers, multiple pages, images and concurrency. An app that points `ThemiaPdfOptions.ExecutablePath` at its own
   Chromium runs a build CI does not cover; `RendererVersion` records which one rendered.
+
+## Issuing and sending
+
+Apps own their tables, migrations and the persistence port; Themia owns the rules.
+
+- **Ports the app implements:** `ITaxDocumentStore` (every transition is one conditional write), `ITaxDocumentNumberSource`
+  (gapless number inside the caller's transaction), `ITaxDocumentMailer` (route A transport, returns a code, never a message),
+  and optionally `ITaxDocumentFailureHandler` (alert when a document enters Failed). Prove your store with
+  `Themia.ETax.Testing`: inherit `TaxDocumentStoreConformanceTests`, override `CreateHarnessAsync`, done.
+- **`TaxDocumentService.IssueAsync(tx, request)`** runs in the caller's READ COMMITTED transaction: a duplicate key answers
+  `AlreadyIssued` before any number is allocated (on PostgreSQL the store's `FindByKeyForIssueAsync` must take `pg_advisory_xact_lock`
+  and run its SELECT as SEPARATE statements under READ COMMITTED: one statement keeps its pre-wait snapshot and misses the row the lock
+  holder just committed); validation, the credit/debit-note precondition (the original was prepared, is not
+  cancelled, same seller, same number) and a replacement's cancel all run before the number is taken. Only `Issued` and
+  `AlreadyIssued` mean commit; every other outcome means roll back. `SourceEventId` is the triggering event and must be globally unique across sellers: the key carries no seller, so a second seller reusing a key gets `SourceConflict`, never the other seller's document id.
+- **`TaxDocumentSender.RunOnceAsync()`** (call it on a schedule; it is also the sweeper) claims due documents under a lease
+  (`Issued` or `OriginalPrepared`, no live lease, backoff elapsed), renders the ORIGINAL from the stored snapshot, records its
+  evidence, **re-checks in a conditional write that the document is still sendable (and extends the lease)** and only then sends.
+  A cancel (`CancelForReplacementAsync`) is refused while a live lease is held, so a cancelled document is never sent as ORIGINAL.
+  The mailer runs under `SendTimeout` (default 60 s, must be shorter than the 2-minute lease) and must honour its cancellation token; a timeout is a transient `send_timeout` and the lease is deliberately NOT released (the next attempt is due no earlier than the lease's end), because a mailer that ignored its token may still be delivering and the lease is what keeps a cancel out; and an abandoned send that later faults or finishes is observed and logged (type and outcome only). A replacement must be the next revision of the same source event and kind. Delivery is at-least-once with exactly one ORIGINAL: if the process dies after sending, the lease lapses and the same ORIGINAL is
+  re-rendered, checked against the evidence history, and resent with the same Message-ID (the document id).
+- **Seller scope, fail closed:** everything an app can expose by document id (`ITaxDocumentStore.GetAsync`, `RequeueAsync`, `UpdateBuyerEmailAsync`, and the service's `RenderCopyAsync` / `RequeueAsync`) takes the caller's `sellerId`; the store looks the document up by (id, seller) and another seller's id answers exactly like a missing one. The app still authorizes first; this is the second lock.
+- **Failure:** permanent errors (and snapshot or template problems) fail at once; transient ones back off exponentially with jitter
+  and fail at `MaxAttempts` (default 5). Failed is terminal for automation; `RequeueAsync` is the only way back and logs the actor
+  id. One ERROR log per entry into Failed, then `ITaxDocumentFailureHandler`.
+- **Logging:** ids, kinds, states, attempt counts and error codes only. A capturing-logger test proves no snapshot value, address or
+  transport message reaches a log or an exception.
+- **Register:** `services.AddThemiaETaxDocuments(o => o.RevenueDepartmentAddress = "...")` after registering your store, number source
+  and mailer.
