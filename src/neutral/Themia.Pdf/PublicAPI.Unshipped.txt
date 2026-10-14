@@ -43,3 +43,13 @@ Themia.Pdf.ThemiaPdfOptions.RenderTimeout.get -> System.TimeSpan
 Themia.Pdf.ThemiaPdfOptions.RenderTimeout.set -> void
 Themia.Pdf.ThemiaPdfOptions.LaunchTimeout.get -> System.TimeSpan
 Themia.Pdf.ThemiaPdfOptions.LaunchTimeout.set -> void
+Themia.Pdf.IVersionedPdfRenderer
+Themia.Pdf.IVersionedPdfRenderer.RenderHtmlWithVersionAsync(string! html, Themia.Pdf.PdfRenderOptions? options = null, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Pdf.PdfRenderResult!>!
+Themia.Pdf.PdfRenderResult
+Themia.Pdf.PdfRenderResult.PdfRenderResult(byte[]! Bytes, string! RendererVersion) -> void
+Themia.Pdf.PdfRenderResult.Bytes.get -> byte[]!
+Themia.Pdf.PdfRenderResult.Bytes.init -> void
+Themia.Pdf.PdfRenderResult.RendererVersion.get -> string!
+Themia.Pdf.PdfRenderResult.RendererVersion.init -> void
+Themia.Pdf.PdfRenderOptions.Tagged.get -> bool?
+Themia.Pdf.PdfRenderOptions.Tagged.init -> void

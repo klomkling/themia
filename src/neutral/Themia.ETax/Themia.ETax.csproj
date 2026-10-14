@@ -3,13 +3,27 @@
     <!-- Neutral cross-framework package: MUST include net8.0 (cross-framework reuse). -->
     <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
     <PackageId>Themia.ETax</PackageId>
-    <Description>Neutral Thai tax invoice / e-Tax core: document snapshot with integrity hash, VAT math in satang, and Thai tax-id and branch validation.</Description>
+    <Description>Neutral Thai tax invoice / e-Tax core: document snapshot with integrity hash, VAT math in satang, Thai tax-id and branch validation, and deterministic PDF rendering with embedded Sarabun.</Description>
     <!-- Version is inherited from Directory.Build.props (shared). Do not set it here. -->
   </PropertyGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="Themia.ETax.Tests" />
+    <InternalsVisibleTo Include="Themia.ETax.IntegrationTests" />
   </ItemGroup>
   <ItemGroup>
+    <!-- Sarabun (SIL OFL 1.1): Thai + basic Latin + Latin Extended. The licence text must travel with the font. -->
+    <EmbeddedResource Include="Fonts/Sarabun-Regular.ttf" LogicalName="Fonts.Sarabun-Regular.ttf" />
+    <EmbeddedResource Include="Fonts/Sarabun-Bold.ttf" LogicalName="Fonts.Sarabun-Bold.ttf" />
+    <EmbeddedResource Include="Fonts/OFL.txt" LogicalName="Fonts.OFL.txt" />
+    <EmbeddedResource Include="Templates/tax-document.v1.hbs" LogicalName="Templates.tax-document.v1.hbs" />
+    <None Include="Fonts/OFL.txt" Pack="true" PackagePath="licenses/Sarabun-OFL.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Themia.Pdf/Themia.Pdf.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Handlebars.Net" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
     <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>

@@ -23,6 +23,7 @@ public static class TaxDocumentSnapshotValidator
         ValidateTotals(snapshot, errors);
         ValidateNote(snapshot, errors);
         ValidateReplacement(snapshot.Replacement, errors);
+        ValidateCharacters(snapshot, errors);
         return errors;
     }
 
@@ -237,6 +238,45 @@ public static class TaxDocumentSnapshotValidator
             Add(errors, TaxDocumentValidationCode.Required, "replacement.original_issue_date");
         if (string.IsNullOrWhiteSpace(r.Reason))
             Add(errors, TaxDocumentValidationCode.Required, "replacement.reason");
+    }
+
+    // The embedded fonts cover Thai, basic Latin and Latin Extended. Anything else would render in a host-dependent
+    // fallback font and break byte-identical re-rendering, so it is refused here. The error carries the path only.
+    private static void ValidateCharacters(TaxDocumentSnapshot s, List<TaxDocumentValidationError> errors)
+    {
+        CheckText(s.DocumentNumber, "document_number", errors);
+        CheckParty(s.Seller, "seller", errors);
+        CheckParty(s.Buyer, "buyer", errors);
+        for (var i = 0; s.Lines is not null && i < s.Lines.Count; i++)
+            CheckText(s.Lines[i]?.Description, $"lines[{i}].description", errors);
+
+        if (s.Note is { } n)
+        {
+            CheckText(n.OriginalDocumentNumber, "note.original_document_number", errors);
+            CheckText(n.ReasonCode, "note.reason_code", errors);
+            CheckText(n.Reason, "note.reason", errors);
+        }
+
+        if (s.Replacement is { } r)
+        {
+            CheckText(r.OriginalDocumentNumber, "replacement.original_document_number", errors);
+            CheckText(r.Reason, "replacement.reason", errors);
+        }
+    }
+
+    private static void CheckParty(TaxParty? party, string path, List<TaxDocumentValidationError> errors)
+    {
+        if (party is null)
+            return;
+
+        CheckText(party.Name, $"{path}.name", errors);
+        CheckText(party.Address, $"{path}.address", errors);
+    }
+
+    private static void CheckText(string? text, string path, List<TaxDocumentValidationError> errors)
+    {
+        if (!TaxDocumentFontCoverage.Covers(text))
+            Add(errors, TaxDocumentValidationCode.UnsupportedCharacter, path);
     }
 
     private static void Add(List<TaxDocumentValidationError> errors, TaxDocumentValidationCode code, string field) =>

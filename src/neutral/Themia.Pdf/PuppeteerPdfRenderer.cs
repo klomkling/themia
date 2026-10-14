@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using Microsoft.Extensions.Logging;
 using PuppeteerSharp;
 using PuppeteerSharp.Media;
@@ -15,7 +16,7 @@ namespace Themia.Pdf;
 /// run at once (<see cref="ThemiaPdfOptions.MaxConcurrency"/>). Only the second one limits memory — each
 /// concurrent render opens its own page in the shared browser process.
 /// </remarks>
-internal sealed class PuppeteerPdfRenderer : IPdfRenderer, IAsyncDisposable, IDisposable
+internal sealed class PuppeteerPdfRenderer : IVersionedPdfRenderer, IAsyncDisposable, IDisposable
 {
     private readonly ThemiaPdfOptions _options;
     // Snapshot of the launch args so a post-construction mutation of the caller's (mutable) array
@@ -74,7 +75,14 @@ internal sealed class PuppeteerPdfRenderer : IPdfRenderer, IAsyncDisposable, IDi
     /// </summary>
     internal int PeakInFlight => Volatile.Read(ref _peakInFlight);
 
-    public async Task<byte[]> RenderHtmlAsync(string html, PdfRenderOptions? options = null, CancellationToken ct = default)
+    public async Task<byte[]> RenderHtmlAsync(string html, PdfRenderOptions? options = null, CancellationToken ct = default) =>
+        (await RenderCoreAsync(html, options, readVersion: false, ct).ConfigureAwait(false)).Bytes;
+
+    public Task<PdfRenderResult> RenderHtmlWithVersionAsync(string html, PdfRenderOptions? options = null, CancellationToken ct = default) =>
+        RenderCoreAsync(html, options, readVersion: true, ct);
+
+    // readVersion is false on the plain IPdfRenderer path so existing consumers never depend on the extra CDP call.
+    private async Task<PdfRenderResult> RenderCoreAsync(string html, PdfRenderOptions? options, bool readVersion, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(html);
         ct.ThrowIfCancellationRequested();
@@ -96,7 +104,7 @@ internal sealed class PuppeteerPdfRenderer : IPdfRenderer, IAsyncDisposable, IDi
             // and the abandoned page is closed (or the browser killed) so the stuck work cannot pile up.
             // Render failures propagate untouched to the top-level handler (THEMIA101: no log-and-rethrow).
             var page = new PageHolder();
-            var work = RenderPageAsync(browser, html, opts, page);
+            var work = RenderPageAsync(browser, html, opts, readVersion, page);
             try
             {
                 return await work.WaitAsync(_renderTimeout, ct).ConfigureAwait(false);
@@ -127,12 +135,26 @@ internal sealed class PuppeteerPdfRenderer : IPdfRenderer, IAsyncDisposable, IDi
         public volatile IPage? Page;
     }
 
-    private static async Task<byte[]> RenderPageAsync(IBrowser browser, string html, PdfRenderOptions opts, PageHolder holder)
+    // Browser version per browser instance: a CDP round trip that never changes for the life of the process.
+    private readonly ConditionalWeakTable<IBrowser, string> _browserVersions = new();
+
+    private async Task<PdfRenderResult> RenderPageAsync(IBrowser browser, string html, PdfRenderOptions opts, bool readVersion, PageHolder holder)
     {
         await using var page = await browser.NewPageAsync().ConfigureAwait(false);
         holder.Page = page;
         await page.SetContentAsync(html).ConfigureAwait(false);
-        return await page.PdfDataAsync(ToPdfOptions(opts)).ConfigureAwait(false);
+        var bytes = await page.PdfDataAsync(ToPdfOptions(opts)).ConfigureAwait(false);
+        return new PdfRenderResult(bytes, readVersion ? await GetBrowserVersionAsync(browser).ConfigureAwait(false) : string.Empty);
+    }
+
+    private async Task<string> GetBrowserVersionAsync(IBrowser browser)
+    {
+        if (_browserVersions.TryGetValue(browser, out var cached))
+            return cached;
+
+        var version = await browser.GetVersionAsync().ConfigureAwait(false);
+        _browserVersions.TryAdd(browser, version);
+        return version;
     }
 
     /// <summary>
@@ -140,7 +162,7 @@ internal sealed class PuppeteerPdfRenderer : IPdfRenderer, IAsyncDisposable, IDi
     /// within <see cref="PageCloseGrace"/> — or the page was never created, meaning NewPage itself is what hung —
     /// kill the browser so the next render launches a fresh one.
     /// </summary>
-    private async Task AbandonAsync(IBrowser browser, PageHolder holder, Task<byte[]> work)
+    private async Task AbandonAsync(IBrowser browser, PageHolder holder, Task work)
     {
         // The abandoned task may still fault later (its page closed underneath it, or the browser killed);
         // observe that so it never surfaces as an unobserved task exception.
@@ -269,7 +291,15 @@ internal sealed class PuppeteerPdfRenderer : IPdfRenderer, IAsyncDisposable, IDi
     }
 
     // internal (not private) so the pure format/margin mapping can be unit-tested without Chromium.
-    internal static PdfOptions ToPdfOptions(PdfRenderOptions o) => new()
+    internal static PdfOptions ToPdfOptions(PdfRenderOptions o)
+    {
+        var options = ToBasePdfOptions(o);
+        if (o.Tagged is { } tagged)
+            options.Tagged = tagged;
+        return options;
+    }
+
+    private static PdfOptions ToBasePdfOptions(PdfRenderOptions o) => new()
     {
         Format = o.PaperFormat switch
         {

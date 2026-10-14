@@ -43,6 +43,14 @@ public sealed class ThemiaPdfServiceCollectionExtensionsTests
     }
 
     [Fact]
+    public void AddThemiaPdf_RegistersTheVersionedRendererAsTheSameInstance()
+    {
+        using var sp = Build();
+
+        Assert.Same(sp.GetRequiredService<IPdfRenderer>(), sp.GetRequiredService<IVersionedPdfRenderer>());
+    }
+
+    [Fact]
     public void AddThemiaPdf_IsIdempotent()
     {
         var services = new ServiceCollection();
