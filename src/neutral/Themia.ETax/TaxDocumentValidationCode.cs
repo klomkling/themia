@@ -20,4 +20,7 @@ public enum TaxDocumentValidationCode
 
     /// <summary>The withheld tax is larger than the document total.</summary>
     WithheldExceedsTotal,
+
+    /// <summary>The text holds a character the embedded fonts cannot print (e.g. CJK), so it would render in a host-dependent fallback font.</summary>
+    UnsupportedCharacter,
 }

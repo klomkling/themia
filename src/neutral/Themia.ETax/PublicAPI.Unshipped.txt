@@ -139,3 +139,42 @@ Themia.ETax.TaxDocumentValidationOptions
 Themia.ETax.TaxDocumentValidationOptions.TaxDocumentValidationOptions() -> void
 Themia.ETax.TaxDocumentValidationOptions.ValidateTaxIdChecksum.get -> bool
 Themia.ETax.TaxDocumentValidationOptions.ValidateTaxIdChecksum.set -> void
+Themia.ETax.TaxDocumentValidationCode.UnsupportedCharacter = 6 -> Themia.ETax.TaxDocumentValidationCode
+Themia.ETax.TaxDocumentFontCoverage
+static Themia.ETax.TaxDocumentFontCoverage.Covers(string? text) -> bool
+Themia.ETax.TaxDocumentMarker
+Themia.ETax.TaxDocumentMarker.CancelledCopy = 2 -> Themia.ETax.TaxDocumentMarker
+Themia.ETax.TaxDocumentMarker.Copy = 1 -> Themia.ETax.TaxDocumentMarker
+Themia.ETax.TaxDocumentMarker.Original = 0 -> Themia.ETax.TaxDocumentMarker
+Themia.ETax.TaxDocumentTemplates
+const Themia.ETax.TaxDocumentTemplates.CurrentVersion = "1" -> string!
+static Themia.ETax.TaxDocumentTemplates.IsSupported(string? templateVersion) -> bool
+Themia.ETax.TaxDocumentRender
+Themia.ETax.TaxDocumentRender.TaxDocumentRender(byte[]! Pdf, string! PdfSha256, string! RendererVersion) -> void
+Themia.ETax.TaxDocumentRender.Pdf.get -> byte[]!
+Themia.ETax.TaxDocumentRender.Pdf.init -> void
+Themia.ETax.TaxDocumentRender.PdfSha256.get -> string!
+Themia.ETax.TaxDocumentRender.PdfSha256.init -> void
+Themia.ETax.TaxDocumentRender.RendererVersion.get -> string!
+Themia.ETax.TaxDocumentRender.RendererVersion.init -> void
+Themia.ETax.TaxDocumentRenderer
+Themia.ETax.TaxDocumentRenderer.TaxDocumentRenderer(Themia.Pdf.IVersionedPdfRenderer! pdf) -> void
+Themia.ETax.TaxDocumentRenderer.RenderAsync(Themia.ETax.TaxDocumentSnapshot! snapshot, string! templateVersion, Themia.ETax.TaxDocumentMarker marker, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.ETax.TaxDocumentRender!>!
+Themia.ETax.TaxDocumentRenderEvidence
+Themia.ETax.TaxDocumentRenderEvidence.TaxDocumentRenderEvidence() -> void
+Themia.ETax.TaxDocumentRenderEvidence.TaxDocumentRenderEvidence(string! PdfSha256, string! RendererVersion) -> void
+Themia.ETax.TaxDocumentRenderEvidence.PdfSha256.get -> string!
+Themia.ETax.TaxDocumentRenderEvidence.PdfSha256.init -> void
+Themia.ETax.TaxDocumentRenderEvidence.RendererVersion.get -> string!
+Themia.ETax.TaxDocumentRenderEvidence.RendererVersion.init -> void
+Themia.ETax.TaxDocumentEvidenceOutcome
+Themia.ETax.TaxDocumentEvidenceOutcome.FirstRender = 0 -> Themia.ETax.TaxDocumentEvidenceOutcome
+Themia.ETax.TaxDocumentEvidenceOutcome.Identical = 1 -> Themia.ETax.TaxDocumentEvidenceOutcome
+Themia.ETax.TaxDocumentEvidenceOutcome.NewRendererVersion = 2 -> Themia.ETax.TaxDocumentEvidenceOutcome
+Themia.ETax.TaxDocumentRenderMismatchException
+Themia.ETax.TaxDocumentRenderMismatchException.TaxDocumentRenderMismatchException(string! rendererVersion) -> void
+Themia.ETax.TaxDocumentRenderMismatchException.RendererVersion.get -> string!
+Themia.ETax.TaxDocumentEvidence
+static Themia.ETax.TaxDocumentEvidence.Check(System.Collections.Generic.IReadOnlyList<Themia.ETax.TaxDocumentRenderEvidence>! history, Themia.ETax.TaxDocumentRender! render) -> Themia.ETax.TaxDocumentEvidenceOutcome
+Microsoft.Extensions.DependencyInjection.ThemiaETaxServiceCollectionExtensions
+static Microsoft.Extensions.DependencyInjection.ThemiaETaxServiceCollectionExtensions.AddThemiaETaxRendering(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Themia.Pdf.ThemiaPdfOptions!>? configurePdf = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!

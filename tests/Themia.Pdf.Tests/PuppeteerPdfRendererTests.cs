@@ -167,6 +167,18 @@ public sealed class PuppeteerPdfRendererTests
     }
 
     [Fact]
+    public void ToPdfOptions_KeepsTheLibraryDefaultTagging_WhenTaggedIsNotSet() =>
+        Assert.Equal(new PuppeteerSharp.PdfOptions().Tagged, PuppeteerPdfRenderer.ToPdfOptions(new PdfRenderOptions()).Tagged);
+
+    [Fact]
+    public void ToPdfOptions_TurnsTaggingOff_WhenTaggedIsFalse() =>
+        Assert.False(PuppeteerPdfRenderer.ToPdfOptions(new PdfRenderOptions { Tagged = false }).Tagged);
+
+    [Fact]
+    public void ToPdfOptions_TurnsTaggingOn_WhenTaggedIsTrue() =>
+        Assert.True(PuppeteerPdfRenderer.ToPdfOptions(new PdfRenderOptions { Tagged = true }).Tagged);
+
+    [Fact]
     public async Task Dispose_WhenNeverLaunched_IsIdempotentAcrossBothPaths()
     {
         var sut = new PuppeteerPdfRenderer(new ThemiaPdfOptions(), NullLogger<PuppeteerPdfRenderer>.Instance);

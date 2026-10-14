@@ -26,4 +26,11 @@ public sealed class PdfRenderOptions
 
     /// <summary>Right margin (CSS length). Default "15mm".</summary>
     public string MarginRight { get; init; } = "15mm";
+
+    /// <summary>
+    /// Whether Chromium writes a tagged (accessible) PDF. <see langword="null"/> keeps the PuppeteerSharp default.
+    /// Set <see langword="false"/> when the bytes must be reproducible: a tagged PDF carries structure-element ids
+    /// (<c>/ID (node00000034)</c>) taken from a counter that advances with every render in the same browser process.
+    /// </summary>
+    public bool? Tagged { get; init; }
 }

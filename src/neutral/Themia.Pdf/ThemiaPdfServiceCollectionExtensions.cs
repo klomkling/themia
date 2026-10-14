@@ -24,7 +24,9 @@ public static class ThemiaPdfServiceCollectionExtensions
 
         services.TryAddSingleton(options);
         services.TryAddSingleton<IHtmlTemplateRenderer, HandlebarsHtmlTemplateRenderer>();
-        services.TryAddSingleton<IPdfRenderer, PuppeteerPdfRenderer>();
+        services.TryAddSingleton<PuppeteerPdfRenderer>();
+        services.TryAddSingleton<IPdfRenderer>(sp => sp.GetRequiredService<PuppeteerPdfRenderer>());
+        services.TryAddSingleton<IVersionedPdfRenderer>(sp => sp.GetRequiredService<PuppeteerPdfRenderer>());
 
         return services;
     }

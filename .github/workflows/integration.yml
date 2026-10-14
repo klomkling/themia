@@ -78,6 +78,15 @@ jobs:
         timeout-minutes: 40
         run: dotnet test --configuration Release --no-build --verbosity normal --filter "Category=Integration" --blame-hang-timeout 10m --blame-hang-dump-type none
 
+      # Themia.ETax.IntegrationTests writes both PDFs of a failed byte-equality check here (coord #0158).
+      - name: Upload PDF diff evidence
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: etax-pdf-diff
+          path: TestResults/etax-pdf-diff
+          if-no-files-found: ignore
+
       # The two steps below only track state in an issue — they are best-effort and must never
       # flip the job's result (only the test step decides that), so gh errors are swallowed.
       - name: Open or update the nightly-failure issue
