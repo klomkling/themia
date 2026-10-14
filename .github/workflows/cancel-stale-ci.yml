@@ -1,0 +1,88 @@
+name: Cancel Stale CI
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Print what would be cancelled without cancelling'
+        required: false
+        default: 'true'
+        type: boolean
+
+permissions:
+  actions: write
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: cancel-stale-ci
+  cancel-in-progress: true
+
+jobs:
+  cancel-stale-ci:
+    name: Cancel stale PR runs
+    runs-on: ubuntu-latest
+    env:
+      GH_REPO: ${{ github.repository }}
+      GH_TOKEN: ${{ github.token }}
+      DRY_RUN: ${{ inputs.dry_run == true && 'true' || 'false' }}
+    steps:
+      - name: Find and cancel stale CI runs
+        run: |
+          set -e
+          
+          echo "=== Finding stale PRs for $GH_REPO (dry_run=$DRY_RUN) ==="
+          
+          # Fetch all open PRs targeting main (limit 100)
+          prs=$(gh pr list --base main --state open --limit 100 --json number,headRefOid --jq '.[] | "\(.number) \(.headRefOid)"')
+          
+          if [ -z "$prs" ]; then
+            echo "No open PRs found"
+            exit 0
+          fi
+          
+          # Query all queued ci runs (limit 200, filter in jq)
+          queued_runs=$(gh run list --workflow ci.yml --status queued --limit 200 --json databaseId,headSha,event --jq '.[] | select(.event == "pull_request") | {id: .databaseId, sha: .headSha}')
+          
+          # Query all in_progress ci runs (limit 200, filter in jq)
+          in_progress_runs=$(gh run list --workflow ci.yml --status in_progress --limit 200 --json databaseId,headSha,event --jq '.[] | select(.event == "pull_request") | {id: .databaseId, sha: .headSha}')
+          
+          while read pr_num head_sha; do
+            echo ""
+            echo "PR #$pr_num"
+            
+            # Check if PR is stale using compare API: behind_by = commits in main not in head
+            behind=$(gh api "repos/$GH_REPO/compare/main...$head_sha" --jq '.behind_by // 0' 2>/dev/null || echo 0)
+            # An API error or a non-numeric answer counts as up to date: never cancel on doubt.
+            case "$behind" in ''|*[!0-9]*) behind=0 ;; esac
+            echo "  behind_by: $behind"
+            
+            if [ "$behind" -gt 0 ]; then
+              echo "  ✓ STALE (main is ahead)"
+              
+              # Find runs for this PR in the pre-fetched queued and in_progress lists
+              runs_to_cancel=$(echo -e "$queued_runs\n$in_progress_runs" | jq -s ".[] | select(.sha == \"$head_sha\") | .id" | sort -u)
+              
+              if [ -z "$runs_to_cancel" ]; then
+                echo "  No queued/in_progress ci runs for PR #$pr_num"
+              else
+                while read run_id; do
+                  if [ -z "$run_id" ]; then continue; fi
+                  if [ "$DRY_RUN" = "true" ]; then
+                    echo "  [DRY RUN] Would cancel run $run_id"
+                  else
+                    echo "  Cancelling run $run_id"
+                    gh run cancel "$run_id" || echo "    Failed to cancel run $run_id"
+                  fi
+                done <<< "$runs_to_cancel"
+              fi
+            else
+              echo "  ✓ UP-TO-DATE (not behind)"
+            fi
+          done <<< "$prs"
+          
+          echo ""
+          echo "Done"
