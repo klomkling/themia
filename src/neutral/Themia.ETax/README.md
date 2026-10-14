@@ -70,4 +70,5 @@ Apps own their tables, migrations and the persistence port; Themia owns the rule
 - **Logging:** ids, kinds, states, attempt counts and error codes only. A capturing-logger test proves no snapshot value, address or
   transport message reaches a log or an exception.
 - **Register:** `services.AddThemiaETaxDocuments(o => o.RevenueDepartmentAddress = "...")` after registering your store, number source
-  and mailer.
+  and mailer. `TaxDocumentService` and `TaxDocumentSender` are **scoped** (your store and number source normally are): resolve them from a
+  scope, and in a scheduled job create one scope per `RunOnceAsync`.

@@ -201,7 +201,7 @@ internal sealed class InMemoryTaxDocumentStore : ITaxDocumentStore
 
     public Task<bool> ReleaseAsync(
         Guid id, Guid claimToken, int attempts, DateTimeOffset nextAttemptAt, string errorCode,
-        TaxDocumentLeaseHandling leaseHandling = TaxDocumentLeaseHandling.Release, CancellationToken ct = default) =>
+        TaxDocumentLeaseHandling leaseHandling, CancellationToken ct = default) =>
         Update(id, claimToken, r => WithLease(r with
         {
             Attempts = attempts,
@@ -211,7 +211,7 @@ internal sealed class InMemoryTaxDocumentStore : ITaxDocumentStore
 
     public Task<bool> FailAsync(
         Guid id, Guid claimToken, int attempts, string errorCode,
-        TaxDocumentLeaseHandling leaseHandling = TaxDocumentLeaseHandling.Release, CancellationToken ct = default) =>
+        TaxDocumentLeaseHandling leaseHandling, CancellationToken ct = default) =>
         Update(id, claimToken, r => WithLease(r with
         {
             State = TaxDocumentState.Failed,

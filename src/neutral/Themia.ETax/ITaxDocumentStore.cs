@@ -131,28 +131,31 @@ public interface ITaxDocumentStore
     Task<bool> MarkSentAsync(Guid id, Guid claimToken, DateTimeOffset now, string messageId, CancellationToken ct = default);
 
     /// <summary>
-    /// Ends a failed attempt that will be retried: keeps the state, stores the attempt count, the error code and
+    /// Ends a failed attempt that will be retried (there is deliberately no default for <paramref name="leaseHandling"/>: a default would
+    /// bind at the caller's static type and let a future call pick the unsafe release without saying so): keeps the state, stores the attempt count, the error code and
     /// <paramref name="nextAttemptAt"/>, and clears the lease unless <paramref name="leaseHandling"/> is
     /// <see cref="TaxDocumentLeaseHandling.KeepUntilExpiry"/> (then the token and expiry are left untouched). Conditional on state
     /// Issued/OriginalPrepared and the token.
     /// </summary>
     Task<bool> ReleaseAsync(
         Guid id, Guid claimToken, int attempts, DateTimeOffset nextAttemptAt, string errorCode,
-        TaxDocumentLeaseHandling leaseHandling = TaxDocumentLeaseHandling.Release, CancellationToken ct = default);
+        TaxDocumentLeaseHandling leaseHandling, CancellationToken ct = default);
 
     /// <summary>
-    /// Moves the document to <see cref="TaxDocumentState.Failed"/>, clearing the lease unless <paramref name="leaseHandling"/> is
+    /// Moves the document to <see cref="TaxDocumentState.Failed"/> (no default for <paramref name="leaseHandling"/>, see
+    /// <see cref="ReleaseAsync"/>), clearing the lease unless <paramref name="leaseHandling"/> is
     /// <see cref="TaxDocumentLeaseHandling.KeepUntilExpiry"/>. A kept lease still blocks <see cref="CancelForReplacementAsync"/> until it lapses.
     /// Conditional on state Issued/OriginalPrepared and the token.
     /// </summary>
     Task<bool> FailAsync(
         Guid id, Guid claimToken, int attempts, string errorCode,
-        TaxDocumentLeaseHandling leaseHandling = TaxDocumentLeaseHandling.Release, CancellationToken ct = default);
+        TaxDocumentLeaseHandling leaseHandling, CancellationToken ct = default);
 
     /// <summary>
     /// Returns a <see cref="TaxDocumentState.Failed"/> document to automation: <see cref="TaxDocumentState.OriginalPrepared"/> when an
     /// ORIGINAL was already rendered, otherwise <see cref="TaxDocumentState.Issued"/>; resets attempts, backoff and the error code, and records
-    /// who and when. Conditional on state Failed.
+    /// who and when. Conditional on state Failed. It leaves any claim (token and expiry) untouched: a lease kept by
+    /// <see cref="TaxDocumentLeaseHandling.KeepUntilExpiry"/> still blocks claiming and <see cref="CancelForReplacementAsync"/> until it lapses.
     /// </summary>
     /// <param name="id">The document id.</param>
     /// <param name="sellerId">The caller's seller; a document of another seller returns <see langword="false"/> like a missing one.</param>

@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <!-- Framework side of Themia.ETax: needs the net10-only sequence allocator, so no net8 leg. The neutral core stays framework-free. -->
+    <TargetFramework>net10.0</TargetFramework>
+    <PackageId>Themia.ETax.Data</PackageId>
+    <Description>Database helpers for Themia.ETax: the required immutability trigger and same-seller replacement key (FluentMigrator, PostgreSQL) for an app's own tax document table, and the gapless document-number source over Themia's transactional sequence allocator.</Description>
+    <PackageTags>themia;etax;tax-invoice;migrations;postgresql;sequences</PackageTags>
+    <!-- Version is inherited from Directory.Build.props (shared). Do not set it here. -->
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../neutral/Themia.ETax/Themia.ETax.csproj" />
+    <ProjectReference Include="../Themia.Framework.Data.Sequences/Themia.Framework.Data.Sequences.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="FluentMigrator" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+    <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+  <ItemGroup>
+    <AdditionalFiles Include="PublicAPI.Shipped.txt" />
+    <AdditionalFiles Include="PublicAPI.Unshipped.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Themia.ETax.Data.Tests" />
+    <InternalsVisibleTo Include="Themia.ETax.Data.IntegrationTests" />
+  </ItemGroup>
+</Project>

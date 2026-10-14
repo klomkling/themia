@@ -1,0 +1,46 @@
+#nullable enable
+Themia.ETax.Data.TaxDocumentTableMap
+Themia.ETax.Data.TaxDocumentTableMap.Table.get -> string!
+Themia.ETax.Data.TaxDocumentTableMap.Table.init -> void
+Themia.ETax.Data.TaxDocumentTableMap.Schema.get -> string?
+Themia.ETax.Data.TaxDocumentTableMap.Schema.init -> void
+Themia.ETax.Data.TaxDocumentTableMap.IdColumn.get -> string!
+Themia.ETax.Data.TaxDocumentTableMap.IdColumn.init -> void
+Themia.ETax.Data.TaxDocumentTableMap.SellerIdColumn.get -> string!
+Themia.ETax.Data.TaxDocumentTableMap.SellerIdColumn.init -> void
+Themia.ETax.Data.TaxDocumentTableMap.StateColumn.get -> string!
+Themia.ETax.Data.TaxDocumentTableMap.StateColumn.init -> void
+Themia.ETax.Data.TaxDocumentTableMap.ReplacedByColumn.get -> string!
+Themia.ETax.Data.TaxDocumentTableMap.ReplacedByColumn.init -> void
+Themia.ETax.Data.TaxDocumentTableMap.SnapshotJsonColumn.get -> string!
+Themia.ETax.Data.TaxDocumentTableMap.SnapshotJsonColumn.init -> void
+Themia.ETax.Data.TaxDocumentTableMap.ImmutableColumns.get -> System.Collections.Generic.IReadOnlyList<string!>!
+Themia.ETax.Data.TaxDocumentTableMap.ImmutableColumns.init -> void
+Themia.ETax.Data.TaxDocumentTableMap.SentStateValue.get -> object!
+Themia.ETax.Data.TaxDocumentTableMap.SentStateValue.init -> void
+Themia.ETax.Data.TaxDocumentTableMap.CancelledStateValue.get -> object!
+Themia.ETax.Data.TaxDocumentTableMap.CancelledStateValue.init -> void
+Themia.ETax.Data.TaxDocumentGuards
+static Themia.ETax.Data.TaxDocumentGuards.ApplyImmutability(FluentMigrator.MigrationBase! migration, Themia.ETax.Data.TaxDocumentTableMap! map) -> void
+static Themia.ETax.Data.TaxDocumentGuards.ApplySameSellerReplacementKey(FluentMigrator.MigrationBase! migration, Themia.ETax.Data.TaxDocumentTableMap! map) -> void
+Themia.ETax.Data.TaxDocumentNumberPeriod
+Themia.ETax.Data.TaxDocumentNumberPeriod.Never = 0 -> Themia.ETax.Data.TaxDocumentNumberPeriod
+Themia.ETax.Data.TaxDocumentNumberPeriod.Yearly = 1 -> Themia.ETax.Data.TaxDocumentNumberPeriod
+Themia.ETax.Data.TaxDocumentNumberPeriod.Monthly = 2 -> Themia.ETax.Data.TaxDocumentNumberPeriod
+Themia.ETax.Data.TaxDocumentNumberScope
+Themia.ETax.Data.TaxDocumentNumberScope.Tenant = 0 -> Themia.ETax.Data.TaxDocumentNumberScope
+Themia.ETax.Data.TaxDocumentNumberScope.Host = 1 -> Themia.ETax.Data.TaxDocumentNumberScope
+Themia.ETax.Data.TaxDocumentNumberOptions
+Themia.ETax.Data.TaxDocumentNumberOptions.TaxDocumentNumberOptions() -> void
+Themia.ETax.Data.TaxDocumentNumberOptions.Prefixes.get -> System.Collections.Generic.IDictionary<Themia.ETax.TaxDocumentKind, string!>!
+Themia.ETax.Data.TaxDocumentNumberOptions.Period.get -> Themia.ETax.Data.TaxDocumentNumberPeriod
+Themia.ETax.Data.TaxDocumentNumberOptions.Period.set -> void
+Themia.ETax.Data.TaxDocumentNumberOptions.Padding.get -> int
+Themia.ETax.Data.TaxDocumentNumberOptions.Padding.set -> void
+Themia.ETax.Data.TaxDocumentNumberOptions.Scope.get -> Themia.ETax.Data.TaxDocumentNumberScope
+Themia.ETax.Data.TaxDocumentNumberOptions.Scope.set -> void
+Themia.ETax.Data.SequenceTaxDocumentNumberSource
+Themia.ETax.Data.SequenceTaxDocumentNumberSource.SequenceTaxDocumentNumberSource(Themia.Framework.Data.Sequences.ITransactionalSequenceAllocator! allocator, Themia.ETax.Data.TaxDocumentNumberOptions! options) -> void
+Themia.ETax.Data.SequenceTaxDocumentNumberSource.NextNumberAsync(System.Data.Common.DbTransaction! tx, string! sellerId, Themia.ETax.TaxDocumentKind kind, System.DateOnly issueDate, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<string!>!
+Microsoft.Extensions.DependencyInjection.ETaxDataServiceCollectionExtensions
+static Microsoft.Extensions.DependencyInjection.ETaxDataServiceCollectionExtensions.AddThemiaETaxSequenceNumbers(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Themia.ETax.Data.TaxDocumentNumberOptions!>? configure = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!

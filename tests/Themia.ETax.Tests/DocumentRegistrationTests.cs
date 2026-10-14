@@ -33,6 +33,25 @@ public sealed class DocumentRegistrationTests
     }
 
     [Fact]
+    public void AddThemiaETaxDocuments_ShouldResolveFromAScope_WhenTheAppsStoreAndNumbersAreScoped_WithScopeValidationOn()
+    {
+        // A real app's store and number source hang off the request's connection or the ambient tenant, so they are scoped. A singleton
+        // service holding them would be a captive dependency (and fails under ValidateScopes).
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddScoped<ITaxDocumentStore>(_ => new InMemoryTaxDocumentStore());
+        services.AddScoped<ITaxDocumentNumberSource, StubNumbers>();
+        services.AddScoped<ITaxDocumentMailer, StubMailer>();
+        services.AddThemiaETaxDocuments(o => o.RevenueDepartmentAddress = "rd@example.test");
+        using var provider = services.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true, ValidateOnBuild = true });
+        using var scope = provider.CreateScope();
+
+        Assert.NotNull(scope.ServiceProvider.GetRequiredService<TaxDocumentService>());
+        Assert.NotNull(scope.ServiceProvider.GetRequiredService<TaxDocumentSender>());
+        Assert.Throws<InvalidOperationException>(() => provider.GetRequiredService<TaxDocumentService>());
+    }
+
+    [Fact]
     public void AddThemiaETaxDocuments_ShouldFailAtRegistration_WhenTheRevenueDepartmentAddressIsMissing() =>
         Assert.Throws<InvalidOperationException>(() => new ServiceCollection().AddThemiaETaxDocuments(_ => { }));
 

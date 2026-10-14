@@ -44,3 +44,6 @@ Themia.ETax.Testing.TaxDocumentStoreConformanceTests.Requeue_ShouldAnswerNotFoun
 Themia.ETax.Testing.TaxDocumentStoreConformanceTests.UpdateBuyerEmail_ShouldAnswerNotFound_ForAnotherSellersDocument() -> System.Threading.Tasks.Task!
 Themia.ETax.Testing.TaxDocumentStoreConformanceTests.Release_ShouldLeaveTheLeaseToLapse_WhenAskedToKeepIt() -> System.Threading.Tasks.Task!
 Themia.ETax.Testing.TaxDocumentStoreConformanceTests.Fail_ShouldLeaveTheLeaseToLapse_WhenAskedToKeepIt() -> System.Threading.Tasks.Task!
+Themia.ETax.Testing.TaxDocumentStoreConformanceTests.Requeue_ShouldLeaveAKeptLeaseInPlace_SoNeitherClaimNorCancelWorksBeforeItLapses() -> System.Threading.Tasks.Task!
+Themia.ETax.Testing.TaxDocumentStoreConformanceTests.Requeue_ShouldMakeTheDocumentClaimable_OnceTheKeptLeaseLapses() -> System.Threading.Tasks.Task!
+Themia.ETax.Testing.TaxDocumentStoreConformanceTests.Requeue_ShouldAllowCancelling_OnceTheKeptLeaseLapses() -> System.Threading.Tasks.Task!
