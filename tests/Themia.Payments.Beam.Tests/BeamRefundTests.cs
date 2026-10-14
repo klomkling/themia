@@ -37,6 +37,7 @@ public class BeamRefundTests
             .Enqueue(HttpStatusCode.NotFound, NotFound)
             .Enqueue(HttpStatusCode.OK, PaidLink)
             .Enqueue(HttpStatusCode.OK, ChargesForLink)
+            .Enqueue(HttpStatusCode.OK, CardCharge.Replace("ch_1", "ch_9", StringComparison.Ordinal))
             .Enqueue(HttpStatusCode.OK, """{ "refundId": "re_1" }""");
         var gateway = BuildWith(handler);
 
@@ -87,12 +88,13 @@ public class BeamRefundTests
     {
         var handler = new StubHandler()
             .Enqueue(HttpStatusCode.OK, CardCharge)
+            .Enqueue(HttpStatusCode.OK, CardCharge)
             .Enqueue(HttpStatusCode.OK, """{ "refundId": "re_1" }""");
         var gateway = BuildWith(handler);
 
         var refund = await gateway.RefundAsync(new RefundRequest(new ChargeRef("ch_1", "order-1"), Amount: null, Reason: "duplicate", IdempotencyKey: "r-1"));
 
-        using var sent = JsonDocument.Parse(handler.Bodies[1]);
+        using var sent = JsonDocument.Parse(handler.Bodies[2]);
         Assert.Equal("ch_1", sent.RootElement.GetProperty("chargeId").GetString());
         Assert.False(sent.RootElement.TryGetProperty("amount", out _));
         Assert.Equal("re_1", refund.RefundId);
@@ -141,6 +143,7 @@ public class BeamRefundTests
             .Enqueue(HttpStatusCode.OK, """
             { "data": [ { "chargeId": "ch_5", "referenceId": "order-9", "status": "SUCCEEDED", "currency": "THB", "amount": 500 } ] }
             """)
+            .Enqueue(HttpStatusCode.OK, CardCharge.Replace("ch_1", "ch_5", StringComparison.Ordinal))
             .Enqueue(HttpStatusCode.Created, """{ "refundId": "re_9" }""");
         var gateway = BuildWith(handler);
 
@@ -148,7 +151,7 @@ public class BeamRefundTests
 
         Assert.Equal("/api/v1/charges", handler.Requests[0].RequestUri!.AbsolutePath);
         Assert.Contains("referenceId=order-9", handler.Requests[0].RequestUri!.Query, StringComparison.Ordinal);
-        using var sent = JsonDocument.Parse(handler.Bodies[1]);
+        using var sent = JsonDocument.Parse(handler.Bodies[2]);
         Assert.Equal("ch_5", sent.RootElement.GetProperty("chargeId").GetString());
         Assert.Equal("re_9", refund.RefundId);
     }
@@ -178,5 +181,95 @@ public class BeamRefundTests
         Assert.Equal(FailureKind.Validation, ex.Kind);
         Assert.Equal("refund_currency_mismatch", ex.ProviderCode);
         Assert.All(handler.Requests, r => Assert.Equal(HttpMethod.Get, r.Method)); // no refund was attempted
+    }
+
+    [Fact]
+    public async Task A_refund_with_insufficient_balance_returns_validation_failure()
+    {
+        var handler = new StubHandler()
+            .Enqueue(HttpStatusCode.OK, CardCharge)
+            .Enqueue(HttpStatusCode.OK, CardCharge)
+            .Enqueue(HttpStatusCode.UnprocessableEntity, """
+            { "error": { "errorCode": "INSUFFICIENT_BALANCE" } }
+            """);
+        var gateway = BuildWith(handler);
+
+        var ex = await Assert.ThrowsAsync<PaymentApiException>(() => gateway.RefundAsync(
+            new RefundRequest(new ChargeRef("ch_1", "order-1"), null, null, null)));
+
+        Assert.Equal(FailureKind.Validation, ex.Kind);
+        Assert.Equal("INSUFFICIENT_BALANCE", ex.ProviderCode);
+        Assert.Equal((int)HttpStatusCode.UnprocessableEntity, ex.HttpStatus);
+    }
+
+    [Theory]
+    [InlineData("KPLUS")]
+    [InlineData("SCB_EASY")]
+    [InlineData("KRUNGSRI_APP")]
+    [InlineData("BANGKOK_BANK_APP")]
+    [InlineData("MAKE")]
+    [InlineData("SHOPEEPAY")]
+    [InlineData("TRUEMONEY")]
+    [InlineData(null)]
+    public async Task A_full_refund_of_non_refundable_method_is_refused_before_refund_call(string? methodType)
+    {
+        var chargeJson = methodType is null
+            ? """{ "chargeId": "ch_1", "referenceId": "order-1", "status": "SUCCEEDED", "currency": "THB", "amount": 10000 }"""
+            : $$"""
+            { "chargeId": "ch_1", "referenceId": "order-1", "status": "SUCCEEDED", "currency": "THB", "amount": 10000,
+              "paymentMethod": { "paymentMethodType": "{{methodType}}" } }
+            """;
+
+        var handler = new StubHandler()
+            .Enqueue(HttpStatusCode.OK, chargeJson)
+            .Enqueue(HttpStatusCode.OK, chargeJson);
+        var gateway = BuildWith(handler);
+
+        var ex = await Assert.ThrowsAsync<PaymentApiException>(() => gateway.RefundAsync(
+            new RefundRequest(new ChargeRef("ch_1", "order-1"), null, null, null)));
+
+        Assert.Equal(FailureKind.Validation, ex.Kind);
+        Assert.Equal("refund_method_unsupported", ex.ProviderCode);
+        Assert.All(handler.Requests, r => Assert.Equal(HttpMethod.Get, r.Method)); // no refund was attempted
+    }
+
+    [Fact]
+    public async Task A_full_refund_of_qr_promptpay_posts_and_succeeds()
+    {
+        const string QrCharge = """
+        { "chargeId": "ch_qr", "referenceId": "order-1", "status": "SUCCEEDED", "currency": "THB", "amount": 10000,
+          "paymentMethod": { "paymentMethodType": "QR_PROMPT_PAY" } }
+        """;
+
+        var handler = new StubHandler()
+            .Enqueue(HttpStatusCode.OK, QrCharge)
+            .Enqueue(HttpStatusCode.OK, QrCharge)
+            .Enqueue(HttpStatusCode.OK, """{ "refundId": "re_qr" }""");
+        var gateway = BuildWith(handler);
+
+        var refund = await gateway.RefundAsync(new RefundRequest(new ChargeRef("ch_qr", "order-1"), null, null, null));
+
+        Assert.Equal(3, handler.Requests.Count);
+        Assert.Equal("/api/v1/refunds", handler.Requests[2].RequestUri!.AbsolutePath);
+        Assert.Equal("re_qr", refund.RefundId);
+    }
+
+    [Fact]
+    public async Task A_refund_rejected_by_api_validation_error_returns_validation_failure()
+    {
+        var handler = new StubHandler()
+            .Enqueue(HttpStatusCode.OK, CardCharge)
+            .Enqueue(HttpStatusCode.OK, CardCharge)
+            .Enqueue(HttpStatusCode.BadRequest, """
+            { "error": { "errorCode": "API_VALIDATION_ERROR" } }
+            """);
+        var gateway = BuildWith(handler);
+
+        var ex = await Assert.ThrowsAsync<PaymentApiException>(() => gateway.RefundAsync(
+            new RefundRequest(new ChargeRef("ch_1", "order-1"), null, null, null)));
+
+        Assert.Equal(FailureKind.Validation, ex.Kind);
+        Assert.Equal("API_VALIDATION_ERROR", ex.ProviderCode);
+        Assert.Equal((int)HttpStatusCode.BadRequest, ex.HttpStatus);
     }
 }

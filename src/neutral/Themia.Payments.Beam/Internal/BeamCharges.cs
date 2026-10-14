@@ -57,11 +57,12 @@ internal static class BeamCharges
     }
 
     /// <summary>
-    /// Reads a charge by id together with its <c>paymentMethod.paymentMethodType</c> — the only caller that
-    /// needs the method type is the refund partial-amount guard, so it is not carried on the shared
-    /// <see cref="Charge"/> type. Reuses <see cref="ToCharge"/> rather than parsing the body twice. Unlike
-    /// <see cref="TryGetByIdAsync"/>, a 404 here is not special-cased — it throws like any other non-2xx,
-    /// because by the time a refund needs this, the charge id is already known to exist.
+    /// Reads a charge by id together with its <c>paymentMethod.paymentMethodType</c> — used by
+    /// <c>BeamPaymentGateway.RefundAsync</c> to validate refundable payment methods for all refunds and restrict
+    /// partial refunds to CARD charges; not carried on the shared <see cref="Charge"/> type. Reuses
+    /// <see cref="ToCharge"/> rather than parsing the body twice. Unlike <see cref="TryGetByIdAsync"/>, a 404 here
+    /// is not special-cased — it throws like any other non-2xx, because by the time a refund needs this, the
+    /// charge id is already known to exist.
     /// </summary>
     public static async Task<(Charge Charge, string? PaymentMethodType)> GetByIdWithPaymentMethodAsync(
         HttpClient httpClient, BeamOptions beamOptions, string chargeId, CancellationToken cancellationToken)

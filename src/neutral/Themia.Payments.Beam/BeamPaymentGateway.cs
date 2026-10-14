@@ -128,11 +128,17 @@ public sealed class BeamPaymentGateway : IPaymentGateway, IPaymentGatewayCapabil
 
         var chargeId = resolved.ChargeId;
 
+        var (charge, paymentMethodType) = await BeamCharges.GetByIdWithPaymentMethodAsync(
+            httpClient, beamOptions, chargeId, cancellationToken).ConfigureAwait(false);
+
+        if (!IsRefundableMethod(paymentMethodType))
+        {
+            throw new PaymentApiException(FailureKind.Validation, "refund_method_unsupported", 0,
+                $"Beam does not support refunds for {paymentMethodType ?? "an unknown method"}; it can only be settled manually.");
+        }
+
         if (request.Amount is { } amount)
         {
-            var (charge, paymentMethodType) = await BeamCharges.GetByIdWithPaymentMethodAsync(
-                httpClient, beamOptions, chargeId, cancellationToken).ConfigureAwait(false);
-
             if (paymentMethodType != "CARD")
             {
                 throw new PaymentApiException(FailureKind.Validation, "partial_refund_unsupported", 0,
@@ -147,6 +153,12 @@ public sealed class BeamPaymentGateway : IPaymentGateway, IPaymentGatewayCapabil
 
         return await CreateRefundAsync(httpClient, beamOptions, chargeId, request, cancellationToken).ConfigureAwait(false);
     }
+
+    private static bool IsRefundableMethod(string? paymentMethodType) => paymentMethodType switch
+    {
+        "CARD" or "CARD_INSTALLMENTS" or "QR_PROMPT_PAY" or "ALIPAY" or "WECHAT_PAY" => true,
+        _ => false,
+    };
 
     private static async Task<RefundCreation> CreateRefundAsync(
         HttpClient httpClient, BeamOptions beamOptions, string chargeId, RefundRequest request,
