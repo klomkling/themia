@@ -1,0 +1,49 @@
+Themia.ETax.Withholding.Data.WithholdingCertificateTableMap
+Themia.ETax.Withholding.Data.WithholdingCertificateTableMap.Table.get -> string!
+Themia.ETax.Withholding.Data.WithholdingCertificateTableMap.Table.init -> void
+Themia.ETax.Withholding.Data.WithholdingCertificateTableMap.Schema.get -> string?
+Themia.ETax.Withholding.Data.WithholdingCertificateTableMap.Schema.init -> void
+Themia.ETax.Withholding.Data.WithholdingCertificateTableMap.IdColumn.get -> string!
+Themia.ETax.Withholding.Data.WithholdingCertificateTableMap.IdColumn.init -> void
+Themia.ETax.Withholding.Data.WithholdingCertificateTableMap.SourceEventIdColumn.get -> string!
+Themia.ETax.Withholding.Data.WithholdingCertificateTableMap.SourceEventIdColumn.init -> void
+Themia.ETax.Withholding.Data.WithholdingCertificateTableMap.RevisionColumn.get -> string!
+Themia.ETax.Withholding.Data.WithholdingCertificateTableMap.RevisionColumn.init -> void
+Themia.ETax.Withholding.Data.WithholdingCertificateTableMap.PayerIdColumn.get -> string!
+Themia.ETax.Withholding.Data.WithholdingCertificateTableMap.PayerIdColumn.init -> void
+Themia.ETax.Withholding.Data.WithholdingCertificateTableMap.StateColumn.get -> string!
+Themia.ETax.Withholding.Data.WithholdingCertificateTableMap.StateColumn.init -> void
+Themia.ETax.Withholding.Data.WithholdingCertificateTableMap.ReplacedByColumn.get -> string!
+Themia.ETax.Withholding.Data.WithholdingCertificateTableMap.ReplacedByColumn.init -> void
+Themia.ETax.Withholding.Data.WithholdingCertificateTableMap.SnapshotJsonColumn.get -> string!
+Themia.ETax.Withholding.Data.WithholdingCertificateTableMap.SnapshotJsonColumn.init -> void
+Themia.ETax.Withholding.Data.WithholdingCertificateTableMap.ImmutableColumns.get -> System.Collections.Generic.IReadOnlyList<string!>?
+Themia.ETax.Withholding.Data.WithholdingCertificateTableMap.ImmutableColumns.init -> void
+Themia.ETax.Withholding.Data.WithholdingCertificateTableMap.IssuedStateValue.get -> object!
+Themia.ETax.Withholding.Data.WithholdingCertificateTableMap.IssuedStateValue.init -> void
+Themia.ETax.Withholding.Data.WithholdingCertificateTableMap.CancelledStateValue.get -> object!
+Themia.ETax.Withholding.Data.WithholdingCertificateTableMap.CancelledStateValue.init -> void
+Themia.ETax.Withholding.Data.WithholdingCertificateGuards
+static Themia.ETax.Withholding.Data.WithholdingCertificateGuards.ApplyImmutability(FluentMigrator.MigrationBase! migration, Themia.ETax.Withholding.Data.WithholdingCertificateTableMap! map) -> void
+static Themia.ETax.Withholding.Data.WithholdingCertificateGuards.ApplySamePayerReplacementKey(FluentMigrator.MigrationBase! migration, Themia.ETax.Withholding.Data.WithholdingCertificateTableMap! map) -> void
+static Themia.ETax.Withholding.Data.WithholdingCertificateGuards.ApplyIssueKey(FluentMigrator.MigrationBase! migration, Themia.ETax.Withholding.Data.WithholdingCertificateTableMap! map) -> void
+Themia.ETax.Withholding.Data.WithholdingNumberYear
+Themia.ETax.Withholding.Data.WithholdingNumberYear.BuddhistEra = 0 -> Themia.ETax.Withholding.Data.WithholdingNumberYear
+Themia.ETax.Withholding.Data.WithholdingNumberYear.Gregorian = 1 -> Themia.ETax.Withholding.Data.WithholdingNumberYear
+Themia.ETax.Withholding.Data.WithholdingNumberOptions
+Themia.ETax.Withholding.Data.WithholdingNumberOptions.WithholdingNumberOptions() -> void
+Themia.ETax.Withholding.Data.WithholdingNumberOptions.Prefix.get -> string!
+Themia.ETax.Withholding.Data.WithholdingNumberOptions.Prefix.set -> void
+Themia.ETax.Withholding.Data.WithholdingNumberOptions.Period.get -> Themia.ETax.Data.TaxDocumentNumberPeriod
+Themia.ETax.Withholding.Data.WithholdingNumberOptions.Period.set -> void
+Themia.ETax.Withholding.Data.WithholdingNumberOptions.Padding.get -> int
+Themia.ETax.Withholding.Data.WithholdingNumberOptions.Padding.set -> void
+Themia.ETax.Withholding.Data.WithholdingNumberOptions.Scope.get -> Themia.ETax.Data.TaxDocumentNumberScope
+Themia.ETax.Withholding.Data.WithholdingNumberOptions.Scope.set -> void
+Themia.ETax.Withholding.Data.WithholdingNumberOptions.Year.get -> Themia.ETax.Withholding.Data.WithholdingNumberYear
+Themia.ETax.Withholding.Data.WithholdingNumberOptions.Year.set -> void
+Themia.ETax.Withholding.Data.SequenceWithholdingNumberSource
+Themia.ETax.Withholding.Data.SequenceWithholdingNumberSource.NextNumberAsync(System.Data.Common.DbTransaction! tx, string! payerId, System.DateOnly issueDate, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<string!>!
+Themia.ETax.Withholding.Data.SequenceWithholdingNumberSource.SequenceWithholdingNumberSource(Themia.Framework.Data.Sequences.ITransactionalSequenceAllocator! allocator, Themia.ETax.Withholding.Data.WithholdingNumberOptions! options) -> void
+Microsoft.Extensions.DependencyInjection.ETaxWithholdingDataServiceCollectionExtensions
+static Microsoft.Extensions.DependencyInjection.ETaxWithholdingDataServiceCollectionExtensions.AddThemiaETaxWithholdingSequenceNumbers(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Themia.ETax.Withholding.Data.WithholdingNumberOptions!>? configure = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
