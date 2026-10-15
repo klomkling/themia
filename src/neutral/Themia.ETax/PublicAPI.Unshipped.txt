@@ -372,3 +372,8 @@ Themia.ETax.TaxDocumentLeaseHandling
 Themia.ETax.TaxDocumentLeaseHandling.KeepUntilExpiry = 1 -> Themia.ETax.TaxDocumentLeaseHandling
 Themia.ETax.TaxDocumentLeaseHandling.Release = 0 -> Themia.ETax.TaxDocumentLeaseHandling
 Themia.ETax.TaxDocumentIssueOutcome.SourceConflict = 6 -> Themia.ETax.TaxDocumentIssueOutcome
+Themia.ETax.ThaiBahtText
+static Themia.ETax.ThaiBahtText.Format(long satang, Themia.ETax.ThaiBahtTextEtMode etMode = Themia.ETax.ThaiBahtTextEtMode.Always) -> string!
+Themia.ETax.ThaiBahtTextEtMode
+Themia.ETax.ThaiBahtTextEtMode.Always = 0 -> Themia.ETax.ThaiBahtTextEtMode
+Themia.ETax.ThaiBahtTextEtMode.TensOnly = 1 -> Themia.ETax.ThaiBahtTextEtMode

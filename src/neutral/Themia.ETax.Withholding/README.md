@@ -19,7 +19,7 @@ service with its ports. The renderer, the database guards and the real catalogue
   filing forms and payee kinds) the app selects from by `Code`. A certificate stores a copy of what is printed, so it renders the
   same after the catalogue changes. `ContentHash` is independent of entry order: pin it in a test for every version you ship, and
   publish a change as a new `Version`, never an edit. **No real entries are shipped yet** (#0164 Q1/Q2).
-- **`ThaiBahtText.Format(satang)`**: the amount in Thai words ("หนึ่งพันสองร้อยสามสิบสี่บาทห้าสิบหกสตางค์", "…บาทถ้วน").
+- **Amount in words:** the total tax is printed in Thai words with `Themia.ETax.ThaiBahtText` (see that package).
 
 Dates are supplied by the caller (the Bangkok business date). Never log snapshot contents.
 
