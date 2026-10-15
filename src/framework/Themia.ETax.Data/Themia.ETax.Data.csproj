@@ -26,5 +26,7 @@
   <ItemGroup>
     <InternalsVisibleTo Include="Themia.ETax.Data.Tests" />
     <InternalsVisibleTo Include="Themia.ETax.Data.IntegrationTests" />
+    <!-- Lets the withholding data tests check that its table map still passes the shared guards' own validation. -->
+    <InternalsVisibleTo Include="Themia.ETax.Withholding.Data.Tests" />
   </ItemGroup>
 </Project>

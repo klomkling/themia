@@ -41,7 +41,14 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
   `IWithholdingNumberSource`, with the same duplicate / other-payer (`SourceConflict`) / cancel-for-replacement rules as the tax
   invoice service. The snapshot is copied on entry, so what is validated is exactly what is stored. The app implements
   `IWithholdingCertificateStore`; register with `AddThemiaETaxWithholding(catalogue)`. New package
-  **`Themia.ETax.Withholding.Testing`** holds the store conformance tests. The renderer and database guards follow in later PRs.
+  **`Themia.ETax.Withholding.Testing`** holds the store conformance tests. The renderer follows in a later PR.
+- **`Themia.ETax.Withholding.Data` (new framework package, `net10.0`; PR-D):** the database helpers for the app's withholding certificate table,
+  kept out of `Themia.ETax.Data` so tax-invoice-only apps do not pull the withholding package. `WithholdingCertificateGuards` /
+  `WithholdingCertificateTableMap` apply the PostgreSQL immutability trigger and same-payer replacement key (an Issued certificate leaves
+  Issued only by cancel-with-replacement, Cancelled is final, the replacement is write-once, no delete or truncate) and, with `ApplyIssueKey`,
+  a unique index on (source event, revision) so the idempotency key is a database fact. `SequenceWithholdingNumberSource` allocates gapless
+  `WHT-{พ.ศ.}-{counter}` numbers per payer and year (`AddThemiaETaxWithholdingSequenceNumbers`). Refusal messages come from the shared guards and
+  still say "tax document" / "sent".
 
 ## [0.32.0] - 2026-10-15
 

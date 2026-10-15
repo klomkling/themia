@@ -25,15 +25,18 @@ Dates are supplied by the caller (the Bangkok business date). Never log snapshot
 
 ## Issuing
 
-`WithholdingCertificateService.IssueAsync(tx, request)` issues inside **your** transaction (READ COMMITTED) and commits nothing:
-roll back unless the outcome is `Issued` or `AlreadyIssued`.
+`WithholdingCertificateService.IssueAsync(tx, request)` issues inside **your** transaction (READ COMMITTED) and commits nothing.
+**Adopter checklist: roll back on every outcome except `Issued` / `AlreadyIssued`; a refused replacement may already have written in
+your transaction** (the replaced certificate is cancelled before the new number and the final validation, so a later refusal leaves that
+cancel pending until you roll back).
 
 - **Key:** `WithholdingCertificateKey(SourceEventId, Revision)`. The source event is the payout the tax was withheld from and must be
   unique across payers (a key found for another payer answers `SourceConflict`, never that payer's id). A duplicate is answered
   before a number is consumed.
 - **Ports you implement:** `IWithholdingCertificateStore` (your tables; payer-scoped reads that fail closed; `FindByKeyForIssueAsync`
   must serialise racing issuers of one key) and `IWithholdingNumberSource` (gapless, inside the transaction). Run the store through
-  `Themia.ETax.Withholding.Testing`.
+  `Themia.ETax.Withholding.Testing`. On PostgreSQL, the table's immutability trigger, same-payer replacement key and unique issue key come from
+  `Themia.ETax.Withholding.Data` (`WithholdingCertificateGuards`), together with a gapless `IWithholdingNumberSource`.
 - **Replace, never edit:** a wrong certificate is cancelled by issuing revision N+1 with `Replacement` set; the old one becomes
   `Cancelled` (final) and points at its replacement. Revision 1 may not carry a replacement; later revisions must.
 - **Same snapshot in, same snapshot stored:** the service copies the snapshot through the persisted format first, so changes to your
