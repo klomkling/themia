@@ -23,12 +23,7 @@
       this value. Bump here to cut a release. Split per-package later only if
       release cadences genuinely diverge.
     -->
-    <Version>0.31.3</Version>
-  </PropertyGroup>
-
-  <PropertyGroup Label="Held packages">
-    <!-- held until Themia.ETax PR3b (coord #0158); remove in the release PR -->
-    <IsPackable Condition="$(MSBuildProjectName.StartsWith('Themia.ETax'))">false</IsPackable>
+    <Version>0.32.0</Version>
   </PropertyGroup>
 
   <PropertyGroup Label="Package metadata">
