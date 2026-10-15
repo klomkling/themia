@@ -8,11 +8,16 @@
   </PropertyGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="Themia.ETax.Withholding.Tests" />
+    <InternalsVisibleTo Include="Themia.ETax.IntegrationTests" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Templates/withholding-certificate.v1.hbs" LogicalName="Templates.withholding-certificate.v1.hbs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../Themia.ETax/Themia.ETax.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <PackageReference Include="Handlebars.Net" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
     <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers">

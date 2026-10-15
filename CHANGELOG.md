@@ -36,20 +36,29 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
   hashes are unchanged); template 2 has its own golden hashes. Version `"2"` reads a units digit of 1 as "เอ็ด", version `"3"` as "หนึ่ง" (same layout), so the convention is frozen
   with each issued document. Adopters opt in for new documents with `ConfigureThemiaETaxTemplates(o => o.TemplateVersion = "3")`; the default stays `"1"`.
   `TaxDocumentService` gains a constructor taking `TaxDocumentTemplateOptions` (the old constructor remains).
-- **`Themia.ETax.Withholding` (new neutral package, `net8.0;net10.0`; coord #0164 Phase 2, PR-A: core only, not yet adoptable):**
+- **`Themia.ETax.Withholding` (new neutral package, `net8.0;net10.0`; coord #0164 Phase 2):**
   `WithholdingCertificateSnapshot` (withholding certificate, form 50 bis) with a deterministic versioned-JSON serializer and
   SHA-256 hash (same storage rules as the tax invoice snapshot), `WithholdingSnapshotValidator` (parties, catalogue
   agreement, payee kind and filing form against the income type, per-row rate recomputation, totals, characters the embedded
   fonts cannot print), `WithholdingMath.Withhold` in satang/basis points with half-up rounding (**pending accountant
   confirmation**, #0164 Q8), and the structure of the versioned income-type catalogue
   (`IncomeTypeCatalogue` / `IncomeTypeEntry` with an order-independent `ContentHash` for pinning a shipped version).
-  **No catalogue entries ship yet**: they wait for the accountant's answers (#0164 Q1/Q2).
+  **Themia ships no catalogue content and no rates**: the adopter supplies its own `IncomeTypeCatalogue` and passes the rate per payment;
+  Themia ships only what the official form fixes, the numbered lines of its income table (`WithholdingFormRow`) and its seven filing forms.
 - **`Themia.ETax.Withholding` issue service (PR-C):** `WithholdingCertificateService.IssueAsync` issues in the caller's transaction,
   idempotent by `WithholdingCertificateKey(SourceEventId, Revision)`, numbered through the app's gapless
   `IWithholdingNumberSource`, with the same duplicate / other-payer (`SourceConflict`) / cancel-for-replacement rules as the tax
   invoice service. The snapshot is copied on entry, so what is validated is exactly what is stored. The app implements
   `IWithholdingCertificateStore`; register with `AddThemiaETaxWithholding(catalogue)`. New package
-  **`Themia.ETax.Withholding.Testing`** holds the store conformance tests. The renderer follows in a later PR.
+  **`Themia.ETax.Withholding.Testing`** holds the store conformance tests.
+- **`Themia.ETax.Withholding` renderer (PR-B):** `WithholdingCertificateRenderer` prints the official 50 bis layout (both copy lines, payer and
+  payee blocks with the 13-digit and old 10-digit tax id boxes, the filing-form boxes, the form's income lines, totals, the tax in Thai words,
+  funds line, the four payer conditions, signature and issue date, stamp optional, the tax id footnote) on one A4 page, template `"1"` frozen by
+  golden hashes, byte-stable on Chromium (`AddThemiaETaxWithholdingRendering`). Render-time markings, never stored: Copy 1, Copy 2, a
+  cancelled watermark and "ใบแทน" (replacement copy of a lost certificate, same number). The snapshot follows the form: lines are the typed
+  `WithholdingFormRow` (was a number). The tax in words reads a units digit of 1 as "หนึ่ง" (fixed by the template version). The snapshot
+  follows the form: `WithholdingPartyKind` (the five kinds the form asks for) replaces the two-value payee kind and is also
+  recorded for the payer, optional 10-digit `PayerLegacyTaxId` / `PayeeLegacyTaxId`, and one income per form line.
 - **`Themia.ETax.Withholding.Data` (new framework package, `net10.0`; PR-D):** the database helpers for the app's withholding certificate table,
   kept out of `Themia.ETax.Data` so tax-invoice-only apps do not pull the withholding package. `WithholdingCertificateGuards` /
   `WithholdingCertificateTableMap` apply the PostgreSQL immutability trigger and same-payer replacement key (an Issued certificate leaves

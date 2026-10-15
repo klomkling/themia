@@ -16,9 +16,12 @@ public sealed record WithholdingIncomeRow
     public required string LabelTh { get; init; }
 
     /// <summary>Copy of <see cref="IncomeTypeEntry.FormRow"/> at issue.</summary>
-    public required int FormRow { get; init; }
+    public required WithholdingFormRow FormRow { get; init; }
 
-    /// <summary>Free text for rows that ask the payer to specify the income (e.g. the "other" row).</summary>
+    /// <summary>
+    /// What is printed on the dotted line of the rows that ask the payer to specify (the section 3 tredecim row, the "other" row and the two
+    /// other-dividend rows). When <see langword="null"/> the printed <see cref="LabelTh"/> is used.
+    /// </summary>
     public string? Description { get; init; }
 
     /// <summary>The date the income was paid (stored Gregorian, printed Buddhist era). Never after the issue date.</summary>

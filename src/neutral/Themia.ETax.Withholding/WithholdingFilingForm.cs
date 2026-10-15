@@ -4,7 +4,7 @@ namespace Themia.ETax.Withholding;
 
 /// <summary>
 /// The monthly return a certificate belongs to: the form boxes of the certificate (ลำดับที่ ... ในแบบ). Persisted by name, so
-/// renaming a member is a breaking change. The set is PENDING confirmation against the current official form (coord #0164 Q1/Q2).
+/// renaming a member is a breaking change. The seven members are the seven forms the official certificate lists, in its order and numbering.
 /// </summary>
 [JsonConverter(typeof(JsonStringEnumConverter<WithholdingFilingForm>))]
 public enum WithholdingFilingForm

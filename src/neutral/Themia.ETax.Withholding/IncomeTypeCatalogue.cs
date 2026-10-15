@@ -78,8 +78,8 @@ public sealed partial class IncomeTypeCatalogue
             throw new ArgumentException($"Income type '{e.Code}' needs a section and a label.", nameof(e));
         if (e.SubItem is not null && string.IsNullOrWhiteSpace(e.SubItem))
             throw new ArgumentException($"Income type '{e.Code}' has a blank sub-item; use null for none.", nameof(e));
-        if (e.FormRow < 1)
-            throw new ArgumentException($"Income type '{e.Code}' needs a form row of 1 or more.", nameof(e));
+        if (!Enum.IsDefined(e.FormRow))
+            throw new ArgumentException($"Income type '{e.Code}' needs a defined form row.", nameof(e));
         if (e.AllowedFilingForms is not { Count: > 0 } || !e.AllowedFilingForms.All(f => Enum.IsDefined(f)))
             throw new ArgumentException($"Income type '{e.Code}' needs at least one defined filing form.", nameof(e));
         if (e.AllowedPayeeKinds is not { Count: > 0 } || !e.AllowedPayeeKinds.All(k => Enum.IsDefined(k)))
@@ -95,7 +95,7 @@ public sealed partial class IncomeTypeCatalogue
                 .Append(Escape(e.Section)).Append('|')
                 .Append(Escape(e.SubItem ?? string.Empty)).Append('|')
                 .Append(Escape(e.LabelTh)).Append('|')
-                .Append(e.FormRow.ToString(CultureInfo.InvariantCulture)).Append('|')
+                .Append(e.FormRow.ToString()).Append('|')
                 .Append(string.Join(',', e.AllowedFilingForms.Distinct().OrderBy(f => (int)f).Select(f => f.ToString()))).Append('|')
                 .Append(string.Join(',', e.AllowedPayeeKinds.Distinct().OrderBy(k => (int)k).Select(k => k.ToString())))
                 .Append('\n');

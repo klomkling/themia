@@ -92,11 +92,13 @@ public class SnapshotValidatorTests
     {
         var errors = Validate(Samples.Valid() with
         {
-            PayeeKind = (WithholdingPayeeKind)99,
+            PayerKind = (WithholdingPartyKind)99,
+            PayeeKind = (WithholdingPartyKind)99,
             FilingForm = (WithholdingFilingForm)99,
             Condition = (WithholdingCondition)99,
         });
 
+        Assert.Contains(new WithholdingValidationError(WithholdingValidationCode.Malformed, "payer_kind"), errors);
         Assert.Contains(new WithholdingValidationError(WithholdingValidationCode.Malformed, "payee_kind"), errors);
         Assert.Contains(new WithholdingValidationError(WithholdingValidationCode.Malformed, "filing_form"), errors);
         Assert.Contains(new WithholdingValidationError(WithholdingValidationCode.Malformed, "condition"), errors);
@@ -126,7 +128,7 @@ public class SnapshotValidatorTests
             "section" => row with { Section = "40(1)" },
             "sub_item" => row with { SubItem = "ข" },
             "label_th" => row with { LabelTh = "อย่างอื่น" },
-            _ => row with { FormRow = 5 },
+            _ => row with { FormRow = WithholdingFormRow.DividendCredit30 },
         };
 
         AssertSingle(Validate(WithRow(row)), WithholdingValidationCode.CatalogueMismatch, $"rows[0].{field}");
@@ -142,7 +144,7 @@ public class SnapshotValidatorTests
             Section = "40(8)",
             SubItem = "ก",
             LabelTh = "อื่นๆ",
-            FormRow = 6,
+            FormRow = WithholdingFormRow.Other,
             DatePaid = Row(s).DatePaid,
             AmountPaidSatang = 1_000_000,
             RateBasisPoints = 300,
@@ -152,8 +154,48 @@ public class SnapshotValidatorTests
 
         Assert.Contains(new WithholdingValidationError(WithholdingValidationCode.NotAllowed, "filing_form"), errors);
         Assert.Contains(new WithholdingValidationError(WithholdingValidationCode.NotAllowed, "payee_kind"), errors);
-        Assert.Empty(Validate(WithRow(other) with { FilingForm = WithholdingFilingForm.Pnd53, PayeeKind = WithholdingPayeeKind.Juristic }));
+        Assert.Empty(Validate(WithRow(other) with { FilingForm = WithholdingFilingForm.Pnd53, PayeeKind = WithholdingPartyKind.Company }));
     }
+
+    [Fact]
+    public void Validate_ShouldRefuse_TwoIncomesOnTheSameFormRow_BecauseTheCertificateHasOneLinePerRow()
+    {
+        var s = Samples.Valid();
+        var second = Row(s) with { DatePaid = new DateOnly(2026, 10, 13) };
+
+        var errors = Validate(s with
+        {
+            Rows = [Row(s), second],
+            Totals = new WithholdingTotals { PaidSatang = 2_000_000, WithheldSatang = 60_000 },
+        });
+
+        AssertSingle(errors, WithholdingValidationCode.NotAllowed, "rows[1].form_row");
+    }
+
+    [Fact]
+    public void Validate_ShouldRefuse_AnUndefinedFormRow()
+    {
+        var errors = Validate(WithRow(Row(Samples.Valid()) with { FormRow = (WithholdingFormRow)99 }));
+
+        Assert.Contains(new WithholdingValidationError(WithholdingValidationCode.Malformed, "rows[0].form_row"), errors);
+    }
+
+    [Theory]
+    [InlineData("123456789")]
+    [InlineData("12345678901")]
+    [InlineData("12345abcde")]
+    [InlineData("")]
+    public void Validate_ShouldRefuse_ALegacyTaxIdThatIsNotTenDigits(string legacy)
+    {
+        var errors = Validate(Samples.Valid() with { PayerLegacyTaxId = legacy, PayeeLegacyTaxId = legacy });
+
+        Assert.Contains(new WithholdingValidationError(WithholdingValidationCode.Malformed, "payer_legacy_tax_id"), errors);
+        Assert.Contains(new WithholdingValidationError(WithholdingValidationCode.Malformed, "payee_legacy_tax_id"), errors);
+    }
+
+    [Fact]
+    public void Validate_ShouldAccept_TenDigitLegacyTaxIds() =>
+        Assert.Empty(Validate(Samples.Valid() with { PayerLegacyTaxId = "0123456789", PayeeLegacyTaxId = "9876543210" }));
 
     [Fact]
     public void Validate_ShouldRequireAtLeastOneRow() =>
@@ -229,7 +271,15 @@ public class SnapshotValidatorTests
     public void Validate_ShouldSumSeveralRows()
     {
         var s = Samples.Valid();
-        var second = Row(s) with { AmountPaidSatang = 50, TaxWithheldSatang = 2 }; // 1.5 satang rounds to 2
+        var second = Row(s) with
+        {
+            IncomeTypeCode = "fixture-royalty",
+            Section = "40(3)",
+            LabelTh = "ค่าแห่งลิขสิทธิ์",
+            FormRow = WithholdingFormRow.Royalty40_3,
+            AmountPaidSatang = 50,
+            TaxWithheldSatang = 2, // 1.5 satang rounds to 2
+        };
 
         Assert.Empty(Validate(s with
         {

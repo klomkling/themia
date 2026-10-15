@@ -27,8 +27,17 @@ public sealed record WithholdingCertificateSnapshot
     /// <summary>The person withheld from (ผู้ถูกหักภาษี). Tax id and address are required.</summary>
     public required TaxParty Payee { get; init; }
 
-    /// <summary>Whether the payee is a natural or a juristic person.</summary>
-    public required WithholdingPayeeKind PayeeKind { get; init; }
+    /// <summary>What the payer is, as written next to its name on the certificate.</summary>
+    public required WithholdingPartyKind PayerKind { get; init; }
+
+    /// <summary>The payer's old 10-digit tax id (the second tax id box of the certificate), if it has one.</summary>
+    public string? PayerLegacyTaxId { get; init; }
+
+    /// <summary>What the payee is, as written next to its name on the certificate.</summary>
+    public required WithholdingPartyKind PayeeKind { get; init; }
+
+    /// <summary>The payee's old 10-digit tax id (the second tax id box of the certificate), if it has one.</summary>
+    public string? PayeeLegacyTaxId { get; init; }
 
     /// <summary>The return the certificate belongs to.</summary>
     public required WithholdingFilingForm FilingForm { get; init; }

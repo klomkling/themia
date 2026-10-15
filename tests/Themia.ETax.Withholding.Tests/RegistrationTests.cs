@@ -43,4 +43,20 @@ public sealed class RegistrationTests
         Assert.Throws<ArgumentNullException>(() => ((IServiceCollection)null!).AddThemiaETaxWithholding(Samples.Catalogue()));
         Assert.Throws<ArgumentNullException>(() => new ServiceCollection().AddThemiaETaxWithholding(null!));
     }
+
+    [Fact]
+    public void AddThemiaETaxWithholdingRendering_ShouldResolveTheRenderer_AndThePdfRendererItPrintsThrough()
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddThemiaETaxWithholdingRendering();
+        using var provider = services.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true, ValidateOnBuild = true });
+
+        Assert.NotNull(provider.GetRequiredService<WithholdingCertificateRenderer>());
+        Assert.NotNull(provider.GetRequiredService<Themia.Pdf.IVersionedPdfRenderer>());
+    }
+
+    [Fact]
+    public void AddThemiaETaxWithholdingRendering_ShouldRejectANullCollection() =>
+        Assert.Throws<ArgumentNullException>(() => ((IServiceCollection)null!).AddThemiaETaxWithholdingRendering());
 }

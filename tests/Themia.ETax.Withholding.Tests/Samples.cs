@@ -16,9 +16,19 @@ internal static class Samples
                 Section = "40(2)",
                 SubItem = null,
                 LabelTh = "ค่าธรรมเนียม ค่านายหน้า",
-                FormRow = 2,
+                FormRow = WithholdingFormRow.Fees40_2,
                 AllowedFilingForms = [WithholdingFilingForm.Pnd3, WithholdingFilingForm.Pnd53],
-                AllowedPayeeKinds = [WithholdingPayeeKind.Individual, WithholdingPayeeKind.Juristic],
+                AllowedPayeeKinds = [WithholdingPartyKind.Individual, WithholdingPartyKind.Company],
+            },
+            new IncomeTypeEntry
+            {
+                Code = "fixture-royalty",
+                Section = "40(3)",
+                SubItem = null,
+                LabelTh = "ค่าแห่งลิขสิทธิ์",
+                FormRow = WithholdingFormRow.Royalty40_3,
+                AllowedFilingForms = [WithholdingFilingForm.Pnd3, WithholdingFilingForm.Pnd53],
+                AllowedPayeeKinds = [WithholdingPartyKind.Individual, WithholdingPartyKind.Company],
             },
             new IncomeTypeEntry
             {
@@ -26,9 +36,9 @@ internal static class Samples
                 Section = "40(8)",
                 SubItem = "ก",
                 LabelTh = "อื่นๆ",
-                FormRow = 6,
+                FormRow = WithholdingFormRow.Other,
                 AllowedFilingForms = [WithholdingFilingForm.Pnd53],
-                AllowedPayeeKinds = [WithholdingPayeeKind.Juristic],
+                AllowedPayeeKinds = [WithholdingPartyKind.Company],
             },
         ]);
 
@@ -38,7 +48,8 @@ internal static class Samples
         IssueDate = new DateOnly(2026, 10, 15),
         Payer = new TaxParty { Name = "บริษัท ตัวอย่าง จำกัด", TaxId = ValidPayerTaxId, Branch = "00000", Address = "1 ถนนสุขุมวิท กรุงเทพฯ" },
         Payee = new TaxParty { Name = "สมชาย ใจดี", TaxId = ValidPayeeTaxId, Address = "2 ถนนพระราม 4 กรุงเทพฯ" },
-        PayeeKind = WithholdingPayeeKind.Individual,
+        PayerKind = WithholdingPartyKind.Company,
+        PayeeKind = WithholdingPartyKind.Individual,
         FilingForm = WithholdingFilingForm.Pnd3,
         IncomeCatalogueVersion = "test-1",
         Rows =
@@ -48,7 +59,7 @@ internal static class Samples
                 IncomeTypeCode = "fixture-fee",
                 Section = "40(2)",
                 LabelTh = "ค่าธรรมเนียม ค่านายหน้า",
-                FormRow = 2,
+                FormRow = WithholdingFormRow.Fees40_2,
                 DatePaid = new DateOnly(2026, 10, 14),
                 AmountPaidSatang = 1_000_000,
                 RateBasisPoints = 300,

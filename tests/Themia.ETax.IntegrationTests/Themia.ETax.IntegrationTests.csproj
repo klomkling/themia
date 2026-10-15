@@ -27,5 +27,6 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/neutral/Themia.ETax/Themia.ETax.csproj" />
+    <ProjectReference Include="../../src/neutral/Themia.ETax.Withholding/Themia.ETax.Withholding.csproj" />
   </ItemGroup>
 </Project>

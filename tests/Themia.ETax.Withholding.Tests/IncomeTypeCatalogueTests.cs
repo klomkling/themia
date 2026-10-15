@@ -6,7 +6,7 @@ public class IncomeTypeCatalogueTests
 {
     // Changing how the catalogue is canonicalised (or any fixture entry) changes this value. A shipped catalogue version
     // is immutable: edit nothing in place, publish a new Version, and pin the new hash beside the old one.
-    private const string FixtureHash = "40dad525460359d4b53f636e9c41a691c2b79a5e1fb2b1e28308a839d92b7fd7";
+    private const string FixtureHash = "67e96738a53bde2390d5c31ca1fe403a2c751af178d3e7b9e113b4509b5424aa";
 
     [Fact]
     public void ContentHash_ShouldBePinned_ForTheFixtureCatalogue() =>
@@ -31,7 +31,7 @@ public class IncomeTypeCatalogueTests
     public void ContentHash_ShouldChange_WhenAnEntryOrTheVersionChanges()
     {
         var original = Samples.Catalogue();
-        var edited = original.Entries.Select(e => e.Code == "fixture-fee" ? e with { FormRow = 3 } : e).ToArray();
+        var edited = original.Entries.Select(e => e.Code == "fixture-fee" ? e with { FormRow = WithholdingFormRow.Royalty40_3 } : e).ToArray();
 
         Assert.NotEqual(original.ContentHash, new IncomeTypeCatalogue(original.Version, edited).ContentHash);
         Assert.NotEqual(original.ContentHash, new IncomeTypeCatalogue("test-2", original.Entries).ContentHash);
@@ -86,7 +86,7 @@ public class IncomeTypeCatalogueTests
     public void Constructor_ShouldRejectAnUnprintableRowOrBlankLabel()
     {
         var entry = Samples.Catalogue().Entries[0];
-        Assert.Throws<ArgumentException>(() => new IncomeTypeCatalogue("v", [entry with { FormRow = 0 }]));
+        Assert.Throws<ArgumentException>(() => new IncomeTypeCatalogue("v", [entry with { FormRow = (WithholdingFormRow)0 }]));
         Assert.Throws<ArgumentException>(() => new IncomeTypeCatalogue("v", [entry with { LabelTh = " " }]));
         Assert.Throws<ArgumentException>(() => new IncomeTypeCatalogue("v", [entry with { Section = "" }]));
     }
@@ -96,6 +96,6 @@ public class IncomeTypeCatalogueTests
     {
         var entry = Samples.Catalogue().Entries[0];
         Assert.Throws<ArgumentException>(() => new IncomeTypeCatalogue("v", [entry with { AllowedFilingForms = [(WithholdingFilingForm)99] }]));
-        Assert.Throws<ArgumentException>(() => new IncomeTypeCatalogue("v", [entry with { AllowedPayeeKinds = [(WithholdingPayeeKind)99] }]));
+        Assert.Throws<ArgumentException>(() => new IncomeTypeCatalogue("v", [entry with { AllowedPayeeKinds = [(WithholdingPartyKind)99] }]));
     }
 }
