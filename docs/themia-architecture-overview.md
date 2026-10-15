@@ -48,7 +48,7 @@ Neutral cores     Themia.AspNetCore(.DataProtection.{SqlServer/MySql/PostgreSql}
                   Themia.Storage(.S3/.AspNetCore/.Cloudflare) | Themia.Export(.Excel) | Themia.Geo(.Google) | Themia.AI(.Gemini/.OpenAiCompatible)
                   Themia.Challenges(+3 engines) | Themia.Totp | Themia.WebAuthn | Themia.PromptPay | Themia.Imaging
                   Themia.Data.Migrations(+3 engines) | Themia.Data.Probes | Themia.DependencyInjection
-                  Themia.Content(+3 engines/.AspNetCore) | Themia.ETax(.Testing; framework side: Themia.ETax.Data)
+                  Themia.Content(+3 engines/.AspNetCore) | Themia.ETax(.Testing, .Withholding; framework side: Themia.ETax.Data)
                   → consumable by BOTH Themia apps and Serenity (PowerACC)
 ─────────────────────────────────────────────────────────────────────────────────────────────
 Modules           Themia.Modules.* (Scheduling, Identity(+.Abstractions/.EFCore/.Dapper/.AspNetCore/

@@ -27,6 +27,17 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+### Added
+- **`Themia.ETax.Withholding` (new neutral package, `net8.0;net10.0`; coord #0164 Phase 2, PR-A: core only, not yet adoptable):**
+  `WithholdingCertificateSnapshot` (withholding certificate, form 50 bis) with a deterministic versioned-JSON serializer and
+  SHA-256 hash (same storage rules as the tax invoice snapshot), `WithholdingSnapshotValidator` (parties, catalogue
+  agreement, payee kind and filing form against the income type, per-row rate recomputation, totals, characters the embedded
+  fonts cannot print), `WithholdingMath.Withhold` in satang/basis points with half-up rounding (**pending accountant
+  confirmation**, #0164 Q8), `ThaiBahtText.Format`, and the structure of the versioned income-type catalogue
+  (`IncomeTypeCatalogue` / `IncomeTypeEntry` with an order-independent `ContentHash` for pinning a shipped version).
+  **No catalogue entries ship yet**: they wait for the accountant's answers (#0164 Q1/Q2). The renderer, issue service, store
+  port and database guards follow in later PRs.
+
 ## [0.32.0] - 2026-10-15
 
 First release of the Thai tax invoice / e-Tax packages (coord #0158), and the `Themia.Pdf` additions they print through.
