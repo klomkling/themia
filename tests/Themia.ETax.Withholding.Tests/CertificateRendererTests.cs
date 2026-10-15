@@ -253,6 +253,15 @@ public sealed partial class CertificateRendererTests
     }
 
     [Fact]
+    public async Task RenderAsync_ShouldLeaveTheBookNumberEmpty_UnlessTheAdopterSuppliesOne()
+    {
+        var html = await HtmlOf(Samples.Valid() with { BookNumber = null });
+
+        Assert.Contains("เล่มที่ <b></b>", html);
+        Assert.Contains("เลขที่ <b>WHT-2569-000123</b>", html);
+    }
+
+    [Fact]
     public async Task RenderAsync_ShouldNotPrintASignature_AndKeepTheStampOptional()
     {
         var html = await HtmlOf();

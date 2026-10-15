@@ -33,5 +33,6 @@ WithholdingCertificateGuards.ApplyIssueKey(this, map);
 
 `services.AddThemiaETaxWithholdingSequenceNumbers()` registers the `IWithholdingNumberSource`: `WHT-{year}-{counter}`, one gapless run per
 payer and year over Themia's transactional sequence allocator (key `DocNo:ETax:Withholding:{payer}:{yyyy}`, separate from every tax document
-run). The printed year is the Buddhist-era year by default (`WHT-2569-000123`); the counter key always uses the Gregorian year, so changing the
-style never restarts a run. Needs `AddThemiaSequences`.
+run). The printed shape is `{prefix}-{year}-{counter}` with the Buddhist-era year by default (`WHT-2569-000123`). Prefix, padding and year style are
+the adopter's options: `o.Prefix = "ES"; o.Padding = 4; o.Year = WithholdingNumberYear.Gregorian;` gives `ES-2026-0001`. The run is gapless per payer
+and per year of the issue date; the counter key always uses the Gregorian year, so changing the style never restarts a run. Needs `AddThemiaSequences`.

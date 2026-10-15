@@ -14,9 +14,9 @@ namespace Themia.ETax.Withholding.Data.IntegrationTests;
 [Collection(PostgresCollection.Name)]
 public sealed class WithholdingNumberSourceTests(PostgresFixture postgres)
 {
-    private async Task<(ServiceProvider Provider, string ConnectionString)> BuildAsync(Action<WithholdingNumberOptions>? configure = null)
+    private async Task<(ServiceProvider Provider, string ConnectionString)> BuildAsync(Action<WithholdingNumberOptions>? configure = null, string? existing = null)
     {
-        var connectionString = await postgres.CreateDatabaseAsync();
+        var connectionString = existing ?? await postgres.CreateDatabaseAsync();
         ThemiaMigrations.Run(MigrationEngine.Postgres, connectionString, typeof(SequencesSchemaMigration).Assembly);
         var services = new ServiceCollection();
         services.AddSingleton<ITenantContext>(new TenantContext(new TenantId("acme")));
@@ -91,17 +91,17 @@ public sealed class WithholdingNumberSourceTests(PostgresFixture postgres)
     [Fact]
     public async Task Numbers_ShouldContinueTheSameRun_WhenTheYearStyleChanges()
     {
-        var (buddhist, cs1) = await BuildAsync();
+        var (buddhist, cs) = await BuildAsync();
         await using (buddhist)
         {
-            Assert.Equal("WHT-2569-000001", await NextAsync(buddhist, cs1, true));
-            Assert.Equal("WHT-2569-000002", await NextAsync(buddhist, cs1, true));
+            Assert.Equal("WHT-2569-000001", await NextAsync(buddhist, cs, true));
+            Assert.Equal("WHT-2569-000002", await NextAsync(buddhist, cs, true));
         }
 
-        var (gregorian, cs2) = await BuildAsync(o => o.Year = WithholdingNumberYear.Gregorian);
+        var (gregorian, _) = await BuildAsync(o => o.Year = WithholdingNumberYear.Gregorian, cs);
         await using (gregorian)
         {
-            Assert.Equal("WHT-2026-000001", await NextAsync(gregorian, cs2, true));
+            Assert.Equal("WHT-2026-000003", await NextAsync(gregorian, cs, true));
         }
     }
 

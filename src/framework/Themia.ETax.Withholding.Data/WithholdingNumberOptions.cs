@@ -21,13 +21,13 @@ public sealed class WithholdingNumberOptions
     /// <summary>When the run restarts: yearly by default.</summary>
     public TaxDocumentNumberPeriod Period { get; set; } = TaxDocumentNumberPeriod.Yearly;
 
-    /// <summary>Minimum digits of the counter, zero-padded. Default 6.</summary>
+    /// <summary>Minimum digits of the counter, zero-padded. Default 6; the adopter's choice (e.g. 4 for <c>ES-2026-0001</c>).</summary>
     public int Padding { get; set; } = 6;
 
     /// <summary>Tenant counters (default) or host-level counters.</summary>
     public TaxDocumentNumberScope Scope { get; set; } = TaxDocumentNumberScope.Tenant;
 
-    /// <summary>How the year is printed. Default Buddhist era. It changes the printed text only, never the counter's key, so switching it does not restart a run.</summary>
+    /// <summary>How the year is printed. Default Buddhist era; Gregorian is an option (a shape such as <c>ES-2026-0001</c> is an app choice: prefix, padding and year style). It changes the printed text only, never the counter's key, so switching it does not restart a run.</summary>
     public WithholdingNumberYear Year { get; set; } = WithholdingNumberYear.BuddhistEra;
 
     internal void Validate()

@@ -12,9 +12,10 @@ renderer for the official layout.
   byte-preserving column, **never `jsonb` or MySQL `JSON`**.
 - **`WithholdingSnapshotValidator`**: checks NEW input against an `IncomeTypeCatalogue`. Stored snapshots are never re-validated.
   Errors carry codes and field paths only (names and tax ids are never echoed).
-- **`WithholdingMath.Withhold(baseSatang, rateBasisPoints)`**: half-up to the satang, the same rule as `VatMath`. The rounding rule
-  and the base the rate applies to are pending accountant confirmation (#0164 Q8, Q10). Which rate applies to a payment is the
-  caller's business rule; this package only multiplies.
+- **`WithholdingMath.Withhold(baseSatang, rateBasisPoints)`**: ceiling to the satang, looking at every digit after the second decimal
+  (the Revenue Department's rule: 10.115, 10.114 and 10.1101 all become 10.12; an exact 10.11 stays). This is NOT the rule of `VatMath`.
+  Which base the rate applies to and which rate applies to a payment are the caller's business rules (the base is still an open accountant
+  question, #0164 Q10); this package only multiplies.
 - **`IncomeTypeCatalogue`**: a versioned, immutable set of `IncomeTypeEntry` (section, sub-item, printed label, form row, allowed
   filing forms and payee kinds) the app selects from by `Code`. A certificate stores a copy of what is printed, so it renders the
   same after the catalogue changes. `ContentHash` is independent of entry order: pin it in a test for every version you ship, and
@@ -40,7 +41,11 @@ cancel pending until you roll back).
   `Themia.ETax.Withholding.Testing`. On PostgreSQL, the table's immutability trigger, same-payer replacement key and unique issue key come from
   `Themia.ETax.Withholding.Data` (`WithholdingCertificateGuards`), together with a gapless `IWithholdingNumberSource`.
 - **Replace, never edit:** a wrong certificate is cancelled by issuing revision N+1 with `Replacement` set; the old one becomes
-  `Cancelled` (final) and points at its replacement. Revision 1 may not carry a replacement; later revisions must.
+  `Cancelled` (final) and points at its replacement. Cancel-and-reissue under a new number that cites the old one is acceptable (a 50 ทวิ is not a
+  tax invoice, so no rule fixes how it is corrected; the corrected certificate only has to carry what Director-General Notice on income tax No. 62
+  requires). If the tax was already filed and the filed data is wrong too, the filing is corrected separately with the Revenue Department's form
+  ป.ป.01, and the certificate and the filed data must agree: nothing here amends a filing automatically, so the app uses the cancelled and
+  replacement certificates of a period to raise it. (Secondary sources; an accountant confirms.) Revision 1 may not carry a replacement; later revisions must.
 - **Same snapshot in, same snapshot stored:** the service copies the snapshot through the persisted format first, so changes to your
   lists while it runs cannot reach what was validated.
 - Register with `services.AddThemiaETaxWithholding(catalogue)`. Logs hold ids and states only.
@@ -59,6 +64,8 @@ bytes: no clock, no culture, PDF dates pinned to the issue date, dates printed i
   version, not an option, so a re-render of an issued certificate never changes its words.
 - `RenderStoredAsync(record, copy, mode)` verifies the stored snapshot against its hash first and prints a cancelled certificate as
   cancelled whatever mode is asked.
+- The book number (เล่มที่) prints empty unless the adopter supplies `BookNumber`; the certificate number is the adopter's number source's
+  (default `WHT-2569-000123`; a shape such as `ES-2026-0001` is the adopter's choice, see `Themia.ETax.Withholding.Data`).
 - Each income goes on the line of its `WithholdingFormRow`; the lines that say "(ระบุ)" (the section 3 เตรส line, "other", and the two
   other-dividend lines) print the row's `Description`, or the catalogue label when there is none. A certificate has at most one income per
   line. The form's two tax id boxes are the 13-digit id and the old 10-digit id (`PayerLegacyTaxId` / `PayeeLegacyTaxId`); the form has
