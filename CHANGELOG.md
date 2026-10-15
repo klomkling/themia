@@ -35,8 +35,13 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
   fonts cannot print), `WithholdingMath.Withhold` in satang/basis points with half-up rounding (**pending accountant
   confirmation**, #0164 Q8), `ThaiBahtText.Format`, and the structure of the versioned income-type catalogue
   (`IncomeTypeCatalogue` / `IncomeTypeEntry` with an order-independent `ContentHash` for pinning a shipped version).
-  **No catalogue entries ship yet**: they wait for the accountant's answers (#0164 Q1/Q2). The renderer, issue service, store
-  port and database guards follow in later PRs.
+  **No catalogue entries ship yet**: they wait for the accountant's answers (#0164 Q1/Q2).
+- **`Themia.ETax.Withholding` issue service (PR-C):** `WithholdingCertificateService.IssueAsync` issues in the caller's transaction,
+  idempotent by `WithholdingCertificateKey(SourceEventId, Revision)`, numbered through the app's gapless
+  `IWithholdingNumberSource`, with the same duplicate / other-payer (`SourceConflict`) / cancel-for-replacement rules as the tax
+  invoice service. The snapshot is copied on entry, so what is validated is exactly what is stored. The app implements
+  `IWithholdingCertificateStore`; register with `AddThemiaETaxWithholding(catalogue)`. New package
+  **`Themia.ETax.Withholding.Testing`** holds the store conformance tests. The renderer and database guards follow in later PRs.
 
 ## [0.32.0] - 2026-10-15
 

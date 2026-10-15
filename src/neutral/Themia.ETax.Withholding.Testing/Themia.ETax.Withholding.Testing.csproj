@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <PackageId>Themia.ETax.Withholding.Testing</PackageId>
+    <Description>Conformance tests for Themia.ETax.Withholding's IWithholdingCertificateStore: inherit the abstract class from your own xUnit project, supply a store factory, and your store gets the same key, cancel and payer-scope semantics as every other adopter's.</Description>
+    <PackageTags>themia;etax;withholding;testing;xunit</PackageTags>
+    <!-- Version is inherited from Directory.Build.props (shared). Do not set it here. -->
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- Deliberately NOT the 'xunit' metapackage: that drags in the runner and analyzers. A test class only needs the
+         attribute types (xunit.extensibility.core) and Assert (xunit.assert); the adopter's own project brings the runner. -->
+    <PackageReference Include="xunit.extensibility.core" />
+    <PackageReference Include="xunit.assert" />
+    <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Themia.ETax.Withholding/Themia.ETax.Withholding.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <AdditionalFiles Include="PublicAPI.Shipped.txt" />
+    <AdditionalFiles Include="PublicAPI.Unshipped.txt" />
+  </ItemGroup>
+</Project>
