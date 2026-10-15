@@ -10,7 +10,21 @@ public sealed record IssueWithholdingCertificateRequest
     public required string PayerId { get; init; }
 
     /// <summary>
-    /// The certificate content. Its <see cref="WithholdingCertificateSnapshot.DocumentNumber"/> is ignored: the number is allocated here.
+    /// The series (the form's เล่มที่ used as a short code such as <c>CR</c> or <c>SF</c>), or <see langword="null"/> for none. Each series has its
+    /// own gapless run per payer and period, and is printed as เล่มที่ (it is stored as the snapshot's <see cref="WithholdingCertificateSnapshot.BookNumber"/>).
+    /// 1 to 20 letters, digits, hyphens or underscores. A <see cref="WithholdingCertificateSnapshot.BookNumber"/> in the snapshot must be empty or equal.
+    /// </summary>
+    public string? Series { get; init; }
+
+    /// <summary>
+    /// The signature image this certificate is issued with, or <see langword="null"/> for none. Only its SHA-256 is recorded (next to the snapshot,
+    /// outside its hash, immutable); the app keeps the image. Every later render of the certificate must use exactly this image, so an old certificate
+    /// is never re-rendered with a new signature if the signer changes.
+    /// </summary>
+    public WithholdingSignatureImage? Signature { get; init; }
+
+    /// <summary>
+    /// The certificate content. Its <see cref="WithholdingCertificateSnapshot.DocumentNumber"/> and <see cref="WithholdingCertificateSnapshot.IssueDate"/> are ignored: the number is allocated here and the issue date is today's date in Bangkok from the service's clock.
     /// The service copies the snapshot on entry, so later changes to the caller's lists do not reach what is validated or stored.
     /// </summary>
     public required WithholdingCertificateSnapshot Snapshot { get; init; }

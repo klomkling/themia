@@ -36,8 +36,6 @@ Themia.ETax.Withholding.Data.WithholdingNumberOptions.Prefix.get -> string!
 Themia.ETax.Withholding.Data.WithholdingNumberOptions.Prefix.set -> void
 Themia.ETax.Withholding.Data.WithholdingNumberOptions.Period.get -> Themia.ETax.Data.TaxDocumentNumberPeriod
 Themia.ETax.Withholding.Data.WithholdingNumberOptions.Period.set -> void
-Themia.ETax.Withholding.Data.WithholdingNumberOptions.Padding.get -> int
-Themia.ETax.Withholding.Data.WithholdingNumberOptions.Padding.set -> void
 Themia.ETax.Withholding.Data.WithholdingNumberOptions.Scope.get -> Themia.ETax.Data.TaxDocumentNumberScope
 Themia.ETax.Withholding.Data.WithholdingNumberOptions.Scope.set -> void
 Themia.ETax.Withholding.Data.WithholdingNumberOptions.Year.get -> Themia.ETax.Withholding.Data.WithholdingNumberYear
@@ -47,3 +45,13 @@ Themia.ETax.Withholding.Data.SequenceWithholdingNumberSource.NextNumberAsync(Sys
 Themia.ETax.Withholding.Data.SequenceWithholdingNumberSource.SequenceWithholdingNumberSource(Themia.Framework.Data.Sequences.ITransactionalSequenceAllocator! allocator, Themia.ETax.Withholding.Data.WithholdingNumberOptions! options) -> void
 Microsoft.Extensions.DependencyInjection.ETaxWithholdingDataServiceCollectionExtensions
 static Microsoft.Extensions.DependencyInjection.ETaxWithholdingDataServiceCollectionExtensions.AddThemiaETaxWithholdingSequenceNumbers(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Themia.ETax.Withholding.Data.WithholdingNumberOptions!>? configure = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+Themia.ETax.Withholding.Data.SequenceWithholdingNumberSource.NextNumberInSeriesAsync(System.Data.Common.DbTransaction! tx, string! payerId, string? series, System.DateOnly issueDate, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<string!>!
+Themia.ETax.Withholding.Data.WithholdingNumberShape
+Themia.ETax.Withholding.Data.WithholdingNumberShape.PrefixYearSeq = 0 -> Themia.ETax.Withholding.Data.WithholdingNumberShape
+Themia.ETax.Withholding.Data.WithholdingNumberShape.PrefixYearMonthSeq = 3 -> Themia.ETax.Withholding.Data.WithholdingNumberShape
+Themia.ETax.Withholding.Data.WithholdingNumberShape.SeqSlashYear2 = 1 -> Themia.ETax.Withholding.Data.WithholdingNumberShape
+Themia.ETax.Withholding.Data.WithholdingNumberShape.YearSeq = 2 -> Themia.ETax.Withholding.Data.WithholdingNumberShape
+Themia.ETax.Withholding.Data.WithholdingNumberOptions.Shape.get -> Themia.ETax.Withholding.Data.WithholdingNumberShape
+Themia.ETax.Withholding.Data.WithholdingNumberOptions.Shape.set -> void
+Themia.ETax.Withholding.Data.WithholdingCertificateTableMap.SignatureSha256Column.get -> string!
+Themia.ETax.Withholding.Data.WithholdingCertificateTableMap.SignatureSha256Column.init -> void

@@ -12,6 +12,8 @@ public sealed class WithholdingCertificateService
 {
     private const string PendingNumber = "PENDING";
     private const string SnapshotField = "snapshot";
+    private const int MaxSeriesLength = 20;
+    private static readonly TimeSpan BangkokOffset = TimeSpan.FromHours(7);
 
     private readonly IWithholdingCertificateStore _store;
     private readonly IWithholdingNumberSource _numbers;
@@ -75,7 +77,13 @@ public sealed class WithholdingCertificateService
         if (!TryDetach(request.Snapshot, out var detached))
             return Failed(WithholdingIssueOutcome.ValidationFailed, [new WithholdingValidationError(WithholdingValidationCode.Malformed, SnapshotField)]);
 
-        var draft = detached with { DocumentNumber = PendingNumber };
+        if (!SeriesIsValid(request.Series) || (request.Series is not null && detached.BookNumber is not null && detached.BookNumber != request.Series))
+        {
+            var field = SeriesIsValid(request.Series) ? "book_number" : "series";
+            return Failed(WithholdingIssueOutcome.ValidationFailed, [new WithholdingValidationError(WithholdingValidationCode.Malformed, field)]);
+        }
+
+        var draft = detached with { DocumentNumber = PendingNumber, BookNumber = request.Series ?? detached.BookNumber, IssueDate = BangkokDateOf(_clock.GetUtcNow()) };
         var errors = WithholdingSnapshotValidator.Validate(draft, _catalogue, _validation);
         if (errors.Count > 0)
             return Failed(WithholdingIssueOutcome.ValidationFailed, errors);
@@ -85,7 +93,7 @@ public sealed class WithholdingCertificateService
         if (replacementError is not null)
             return replacementError;
 
-        var number = await _numbers.NextNumberAsync(tx, request.PayerId, draft.IssueDate, ct).ConfigureAwait(false);
+        var number = await _numbers.NextNumberInSeriesAsync(tx, request.PayerId, request.Series, draft.IssueDate, ct).ConfigureAwait(false);
         var snapshot = draft with { DocumentNumber = number };
         errors = WithholdingSnapshotValidator.Validate(snapshot, _catalogue, _validation);
         if (errors.Count > 0)
@@ -103,12 +111,19 @@ public sealed class WithholdingCertificateService
             SnapshotSchemaVersion = snapshot.SchemaVersion,
             SnapshotSha256 = WithholdingSnapshotSerializer.ComputeHash(json),
             TemplateVersion = WithholdingTemplates.CurrentVersion,
+            SignatureSha256 = request.Signature?.Sha256,
             CreatedAt = _clock.GetUtcNow(),
         }, ct).ConfigureAwait(false);
 
         _logger.LogInformation("Withholding certificate {DocumentId} issued.", id);
         return new WithholdingIssueResult { Outcome = WithholdingIssueOutcome.Issued, DocumentId = id };
     }
+
+    // Bangkok has no daylight saving: a fixed UTC+7. The issue date is the date of the instant the record is created.
+    private static DateOnly BangkokDateOf(DateTimeOffset utcNow) => DateOnly.FromDateTime(utcNow.ToOffset(BangkokOffset).DateTime);
+
+    private static bool SeriesIsValid(string? series) =>
+        series is null || (series.Length is >= 1 and <= MaxSeriesLength && char.IsAsciiLetterOrDigit(series[0]) && series.All(c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_'));
 
     // The snapshot is written and read back through the one persisted format: the copy shares nothing with the caller's objects.
     private static bool TryDetach(WithholdingCertificateSnapshot snapshot, out WithholdingCertificateSnapshot detached)

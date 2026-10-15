@@ -28,6 +28,7 @@ public sealed class WithholdingGuardTests(PostgresFixture postgres)
     [InlineData("snapshot_sha256 = 'zzz'")]
     [InlineData("snapshot_schema_version = 2")]
     [InlineData("template_version = '2'")]
+    [InlineData("signature_sha256 = 'zzz'")]
     [InlineData("id = gen_random_uuid()")]
     [InlineData("snapshot_json = NULL")]
     public async Task Update_ShouldBeRefused_ForEveryImmutableColumn(string assignment)
@@ -38,6 +39,25 @@ public sealed class WithholdingGuardTests(PostgresFixture postgres)
         var ex = await db.RefusedAsync($"UPDATE withholding_certificates SET {assignment} WHERE id = '{id}'");
 
         Assert.Equal(IntegrityViolation, ex.SqlState);
+    }
+
+    [Fact]
+    public async Task SignatureHash_ShouldBeWriteOnce_NeverChangedOrClearedAfterIssue()
+    {
+        var db = await MigratedAsync();
+        var id = await WithholdingCertificateDb.InsertAsync(db);
+
+        await db.RefusedAsync($"UPDATE withholding_certificates SET signature_sha256 = 'abc' WHERE id = '{id}'"); // NULL -> value
+        var signed = Guid.NewGuid();
+        await db.ExecuteAsync($"""
+            INSERT INTO withholding_certificates (id, source_event_id, revision, payer_id, document_number, issue_date,
+                snapshot_json, snapshot_sha256, snapshot_schema_version, template_version, signature_sha256, state, created_at)
+            VALUES ('{signed}', 'pay_s', 1, 'payer-1', 'WHT-2569-000009', DATE '2026-10-14', '{WithholdingCertificateDb.Json}', 'abc', 1, '1', 'sig-1', 1, now())
+            """);
+
+        await db.RefusedAsync($"UPDATE withholding_certificates SET signature_sha256 = 'sig-2' WHERE id = '{signed}'");
+        await db.RefusedAsync($"UPDATE withholding_certificates SET signature_sha256 = NULL WHERE id = '{signed}'");
+        Assert.Equal("sig-1", await db.ScalarAsync<string>($"SELECT signature_sha256 FROM withholding_certificates WHERE id = '{signed}'"));
     }
 
     [Fact]

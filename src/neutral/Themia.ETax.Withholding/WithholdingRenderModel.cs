@@ -9,6 +9,13 @@ namespace Themia.ETax.Withholding;
 internal static class WithholdingRenderModel
 {
     private const int BuddhistEraOffset = 543;
+    // The issue date is written under the signature as day / month name / Buddhist-era year, as the certificates in use do.
+    private static readonly string[] ThaiMonths =
+    [
+        "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
+        "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม",
+    ];
+
     private static readonly int[] TaxIdGroups = [1, 4, 5, 2, 1];
     private static readonly int[] LegacyTaxIdGroups = [1, 4, 4, 1];
 
@@ -52,7 +59,8 @@ internal static class WithholdingRenderModel
     // issued certificates when it changed. Any other convention ships as a new template version.
     private const ThaiBahtTextEtMode WordsEtMode = ThaiBahtTextEtMode.TensOnly;
 
-    public static object Build(WithholdingCertificateSnapshot s, WithholdingCopy copy, WithholdingRenderMode mode, string fontCss)
+    public static object Build(
+        WithholdingCertificateSnapshot s, WithholdingCopy copy, WithholdingRenderMode mode, string fontCss, WithholdingSignatureImage? signature)
     {
         var byRow = new Dictionary<WithholdingFormRow, WithholdingIncomeRow>();
         foreach (var row in s.Rows)
@@ -92,10 +100,11 @@ internal static class WithholdingRenderModel
                 Condition("3", "ออกให้ครั้งเดียว", s.Condition == WithholdingCondition.PaidOnBehalfOnce, null),
                 Condition("4", "อื่น ๆ (ระบุ)", s.Condition == WithholdingCondition.Other, s.ConditionOther),
             },
+            signature = signature?.ToDataUri(),
             issued = new
             {
                 day = s.IssueDate.Day.ToString("00", CultureInfo.InvariantCulture),
-                month = s.IssueDate.Month.ToString("00", CultureInfo.InvariantCulture),
+                month = ThaiMonths[s.IssueDate.Month - 1],
                 year = (s.IssueDate.Year + BuddhistEraOffset).ToString("0000", CultureInfo.InvariantCulture),
             },
         };

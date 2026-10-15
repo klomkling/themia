@@ -53,20 +53,24 @@ public sealed class TemplateVersion1GoldenTests
 
     public static TheoryData<string, string> Documents => new()
     {
-        { "single-copy1", "266d95adde4a89eb990c6b66e5f6426d05b296b0296d2701ab94b0b89221ba11" },
-        { "single-copy2", "6af766ec627f626c8fbb05392dba8373319f3ff402cb4c19f63009addef4552d" },
-        { "everything-copy1", "c5ac29e50e5c6acf8ebb754931074728c876119d79aa1d3fe2c4ec71b7092181" },
-        { "single-replacement-copy", "7167760fee410da89f811d7b1133942fa6ba2bdc71fbbf42689116800cdd2291" },
-        { "single-cancelled", "aff17d9bf95f6dbb8be32d61e3050fa695f2c980b9f7571461fcbf5c22f9777c" },
+        { "single-copy1", "f3c15c2bddffab846515e29abfd5243d6a32e11a8a7540aa29b00ba6dfdb8e1f" },
+        { "single-copy2", "142329ebd8733c0427537f5ddd936abda0bc631cee53555027202909cc23f796" },
+        { "everything-copy1", "40a4df81e9fee8e3f306a556879d304843a00b2db6b625d5221a01988b7962c0" },
+        { "single-replacement-copy", "37cde4a2419ad9dc2306b770629fd63bbe1aee63c929e98df261643e10a66057" },
+        { "single-cancelled", "af6c555cab693ff47ef838c9f4cd501a9f9ad76357c3faf0907f90fa619e5acd" },
+        { "single-signed-png", "89f399f1fd376fe51e38d7ee7978e42412480e03ed347b66dcee70e76700e273" },
+        { "everything-signed-jpeg", "29c59a3a504d804f21c3bbd249f5c69a2516250724893645cd944fd14074c93f" },
     };
 
-    private static (WithholdingCertificateSnapshot Snapshot, WithholdingCopy Copy, WithholdingRenderMode Mode) Fixture(string name) => name switch
+    private static (WithholdingCertificateSnapshot Snapshot, WithholdingCopy Copy, WithholdingRenderMode Mode, WithholdingSignatureImage? Signature) Fixture(string name) => name switch
     {
-        "single-copy1" => (Samples.Valid(), WithholdingCopy.Copy1, WithholdingRenderMode.Issued),
-        "single-copy2" => (Samples.Valid(), WithholdingCopy.Copy2, WithholdingRenderMode.Issued),
-        "everything-copy1" => (Everything(), WithholdingCopy.Copy1, WithholdingRenderMode.Issued),
-        "single-replacement-copy" => (Samples.Valid(), WithholdingCopy.Copy1, WithholdingRenderMode.ReplacementCopy),
-        "single-cancelled" => (Samples.Valid(), WithholdingCopy.Copy2, WithholdingRenderMode.Cancelled),
+        "single-copy1" => (Samples.Valid(), WithholdingCopy.Copy1, WithholdingRenderMode.Issued, null),
+        "single-copy2" => (Samples.Valid(), WithholdingCopy.Copy2, WithholdingRenderMode.Issued, null),
+        "everything-copy1" => (Everything(), WithholdingCopy.Copy1, WithholdingRenderMode.Issued, null),
+        "single-replacement-copy" => (Samples.Valid(), WithholdingCopy.Copy1, WithholdingRenderMode.ReplacementCopy, null),
+        "single-cancelled" => (Samples.Valid(), WithholdingCopy.Copy2, WithholdingRenderMode.Cancelled, null),
+        "single-signed-png" => (Samples.Valid(), WithholdingCopy.Copy1, WithholdingRenderMode.Issued, new WithholdingSignatureImage(SignatureFixtures.Png)),
+        "everything-signed-jpeg" => (Everything(), WithholdingCopy.Copy2, WithholdingRenderMode.Issued, new WithholdingSignatureImage(SignatureFixtures.Jpeg)),
         _ => throw new ArgumentOutOfRangeException(nameof(name)),
     };
 
@@ -74,8 +78,8 @@ public sealed class TemplateVersion1GoldenTests
     [MemberData(nameof(Documents))]
     public void Html_ShouldMatchTheGolden_BecauseVersion1MustNeverChange(string name, string expectedSha256)
     {
-        var (snapshot, copy, mode) = Fixture(name);
-        var html = new WithholdingCertificateRenderer(new NoPdf()).RenderHtml(snapshot, WithholdingTemplates.CurrentVersion, copy, mode);
+        var (snapshot, copy, mode, signature) = Fixture(name);
+        var html = new WithholdingCertificateRenderer(new NoPdf()).RenderHtml(snapshot, WithholdingTemplates.CurrentVersion, copy, mode, signature);
 
         Assert.Equal(expectedSha256, Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(html))).ToLowerInvariant());
     }

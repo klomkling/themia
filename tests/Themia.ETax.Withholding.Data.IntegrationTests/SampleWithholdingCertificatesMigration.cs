@@ -22,6 +22,7 @@ public sealed class SampleWithholdingCertificatesMigration : Migration
                 .WithColumn("snapshot_sha256").AsString().NotNullable()
                 .WithColumn("snapshot_schema_version").AsInt32().NotNullable()
                 .WithColumn("template_version").AsString().NotNullable()
+                .WithColumn("signature_sha256").AsString().Nullable()
                 .WithColumn("state").AsInt32().NotNullable()
                 .WithColumn("replaced_by_certificate_id").AsGuid().Nullable()
                 .WithColumn("created_at").AsDateTimeOffset().NotNullable();

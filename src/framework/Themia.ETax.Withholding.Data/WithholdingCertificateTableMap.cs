@@ -37,6 +37,9 @@ public sealed partial record WithholdingCertificateTableMap
     /// <summary>The revision column (part of the idempotency key). Default <c>revision</c>.</summary>
     public string RevisionColumn { get; init; } = "revision";
 
+    /// <summary>The column holding the SHA-256 of the signature image the certificate was issued with (nullable). Default <c>signature_sha256</c>.</summary>
+    public string SignatureSha256Column { get; init; } = "signature_sha256";
+
     /// <summary>The payer column. Default <c>payer_id</c>.</summary>
     public string PayerIdColumn { get; init; } = "payer_id";
 
@@ -50,7 +53,7 @@ public sealed partial record WithholdingCertificateTableMap
     public string SnapshotJsonColumn { get; init; } = "snapshot_json";
 
     /// <summary>
-    /// Columns that may never change once a snapshot exists. When <see langword="null"/> (the default): the id, payer, source event, revision and snapshot
+    /// Columns that may never change once a snapshot exists. When <see langword="null"/> (the default): the id, payer, source event, revision, snapshot and signature-hash
     /// columns as configured here, plus <c>document_number</c>, <c>issue_date</c>, <c>snapshot_sha256</c>, <c>snapshot_schema_version</c> and
     /// <c>template_version</c>. A table that names those differently must list its own columns here, and the
     /// list must contain <see cref="SnapshotJsonColumn"/>.
@@ -74,7 +77,7 @@ public sealed partial record WithholdingCertificateTableMap
         StateColumn = StateColumn,
         ReplacedByColumn = ReplacedByColumn,
         SnapshotJsonColumn = SnapshotJsonColumn,
-        ImmutableColumns = ImmutableColumns ?? [IdColumn, PayerIdColumn, SourceEventIdColumn, RevisionColumn, SnapshotJsonColumn, .. FixedImmutableColumns],
+        ImmutableColumns = ImmutableColumns ?? [IdColumn, PayerIdColumn, SourceEventIdColumn, RevisionColumn, SnapshotJsonColumn, SignatureSha256Column, .. FixedImmutableColumns],
         SentStateValue = IssuedStateValue,
         CancelledStateValue = CancelledStateValue,
     };

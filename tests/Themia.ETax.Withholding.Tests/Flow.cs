@@ -9,10 +9,11 @@ internal sealed class Flow
 {
     public const string Payer = "payer-1";
 
-    public Flow(WithholdingValidationOptions? validation = null)
+    public Flow(WithholdingValidationOptions? validation = null, IWithholdingNumberSource? numbers = null, DateTimeOffset? now = null)
     {
+        Clock = new FixedClock(now ?? new DateTimeOffset(2026, 10, 15, 3, 0, 0, TimeSpan.Zero));
         Service = new WithholdingCertificateService(
-            Store, Numbers, Samples.Catalogue(), validation ?? new WithholdingValidationOptions(), Clock, Logs);
+            Store, numbers ?? Numbers, Samples.Catalogue(), validation ?? new WithholdingValidationOptions(), Clock, Logs);
     }
 
     public InMemoryWithholdingCertificateStore Store { get; } = new();
@@ -21,7 +22,7 @@ internal sealed class Flow
 
     public CapturingLogger<WithholdingCertificateService> Logs { get; } = new();
 
-    public TimeProvider Clock { get; } = new FixedClock(new DateTimeOffset(2026, 10, 15, 3, 0, 0, TimeSpan.Zero));
+    public TimeProvider Clock { get; }
 
     public WithholdingCertificateService Service { get; }
 
@@ -71,6 +72,26 @@ internal sealed class Flow
             var number = ++_last;
             ((InMemoryWithholdingCertificateStore.FakeTransaction)tx).OnRollback(() => _last--);
             return Task.FromResult($"WHT-{issueDate.Year + 543}-{number:D6}");
+        }
+    }
+
+    /// <summary>A number source that supports series: one gapless run per series, printed as <c>{series}-{n}</c>.</summary>
+    internal sealed class SeriesNumbers : IWithholdingNumberSource
+    {
+        private readonly Dictionary<string, int> _last = [];
+
+        public List<string?> Requested { get; } = [];
+
+        public Task<string> NextNumberAsync(DbTransaction tx, string payerId, DateOnly issueDate, CancellationToken ct = default) =>
+            NextNumberInSeriesAsync(tx, payerId, null, issueDate, ct);
+
+        public Task<string> NextNumberInSeriesAsync(DbTransaction tx, string payerId, string? series, DateOnly issueDate, CancellationToken ct = default)
+        {
+            Requested.Add(series);
+            var key = series ?? string.Empty;
+            _last[key] = _last.GetValueOrDefault(key) + 1;
+            ((InMemoryWithholdingCertificateStore.FakeTransaction)tx).OnRollback(() => _last[key]--);
+            return Task.FromResult($"{series ?? "N"}-{_last[key]:D3}/{(issueDate.Year + 543) % 100}");
         }
     }
 

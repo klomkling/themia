@@ -59,6 +59,16 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
   `WithholdingFormRow` (was a number). The tax in words reads a units digit of 1 as "หนึ่ง" (fixed by the template version). The snapshot
   follows the form: `WithholdingPartyKind` (the five kinds the form asks for) replaces the two-value payee kind and is also
   recorded for the payer, optional 10-digit `PayerLegacyTaxId` / `PayeeLegacyTaxId`, and one income per form line.
+- **Withholding certificate numbers, series, signature and issue date (coord #0164 [12], [13]):** `WithholdingNumberOptions.Shape` chooses one of three
+  shapes with a 6-digit running number (`PrefixYearSeq` `WHT-2569-000123` by default, `SeqSlashYear2` `000010/69`, `YearSeq` `2569-000123`, `PrefixYearMonthSeq` `WHT-6910-000001`, the only shape that accepts `Period = Monthly` (any other shape with Monthly fails at startup, because it prints the year only and two months would print the same number); Buddhist-era
+  year by default, Gregorian an option). `IssueWithholdingCertificateRequest.Series` (the form's เล่มที่ as a short code, empty by default) gives each
+  series its own gapless run per payer and year and is printed as เล่มที่; `IWithholdingNumberSource.NextNumberInSeriesAsync` carries it. The renderer
+  accepts an optional `WithholdingSignatureImage` (PNG or JPEG bytes up to 256 KiB) on the signature line, outside the snapshot hash; the SHA-256 of the
+  image used at issue is recorded in an immutable column (`signature_sha256`) and a later `RenderStoredAsync` with any other image is refused with a
+  `WithholdingSignatureException`, so an old certificate is never re-rendered with a new signature. The tax in words is printed in parentheses and defaults
+  to the `TensOnly` convention (`Always` is an option). The issue date is set by `WithholdingCertificateService` from its `TimeProvider` (Bangkok date),
+  never by the caller, and prints as day / Thai month name / Buddhist-era year. (The layout and golden hashes of the not yet released certificate
+  template `"1"` were updated accordingly.)
 - **`Themia.ETax.Withholding.Data` (new framework package, `net10.0`; PR-D):** the database helpers for the app's withholding certificate table,
   kept out of `Themia.ETax.Data` so tax-invoice-only apps do not pull the withholding package. `WithholdingCertificateGuards` /
   `WithholdingCertificateTableMap` apply the PostgreSQL immutability trigger and same-payer replacement key (an Issued certificate leaves

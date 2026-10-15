@@ -114,4 +114,47 @@ public sealed class WithholdingNumberSourceTests(PostgresFixture postgres)
         Assert.Equal("WHT-2569-000001", await NextAsync(provider, cs, true));
         Assert.Equal("WHT-2569-000002", await NextAsync(provider, cs, true));
     }
+
+    private static async Task<string> NextInSeriesAsync(
+        IServiceProvider provider, string connectionString, bool commit, string? series, string payer = "payer-1", DateOnly? date = null)
+    {
+        await using var scope = provider.CreateAsyncScope();
+        var source = scope.ServiceProvider.GetRequiredService<IWithholdingNumberSource>();
+        await using var connection = new NpgsqlConnection(connectionString);
+        await connection.OpenAsync();
+        await using var tx = await connection.BeginTransactionAsync(IsolationLevel.ReadCommitted);
+        var number = await source.NextNumberInSeriesAsync(tx, payer, series, date ?? new DateOnly(2024, 6, 1));
+        if (commit)
+            await tx.CommitAsync();
+        else
+            await tx.RollbackAsync();
+        return number;
+    }
+
+    [Fact]
+    public async Task Series_ShouldEachHaveTheirOwnGaplessRunPerPayerAndYear_AndPrintTheHouseShape()
+    {
+        var (provider, cs) = await BuildAsync(o => o.Shape = WithholdingNumberShape.SeqSlashYear2);
+        await using var _ = provider;
+
+        Assert.Equal("000001/67", await NextInSeriesAsync(provider, cs, true, "CR"));
+        Assert.Equal("000002/67", await NextInSeriesAsync(provider, cs, false, "CR"));      // rolled back: returned
+        Assert.Equal("000002/67", await NextInSeriesAsync(provider, cs, true, "CR"));
+        Assert.Equal("000001/67", await NextInSeriesAsync(provider, cs, true, "SF"));
+        Assert.Equal("000001/67", await NextInSeriesAsync(provider, cs, true, null));          // the unseries run is separate too
+        Assert.Equal("000001/67", await NextInSeriesAsync(provider, cs, true, "CR", "payer-2"));
+        Assert.Equal("000001/68", await NextInSeriesAsync(provider, cs, true, "CR", date: new DateOnly(2025, 1, 1)));
+        Assert.Equal("000003/67", await NextInSeriesAsync(provider, cs, true, "CR"));
+    }
+
+    [Fact]
+    public async Task Series_ShouldNeverRepeatOrSkip_WhenIssuedConcurrently()
+    {
+        var (provider, cs) = await BuildAsync();
+        await using var _ = provider;
+
+        var numbers = await Task.WhenAll(Enumerable.Range(0, 10).Select(_ => NextInSeriesAsync(provider, cs, true, "CR")));
+
+        Assert.Equal(Enumerable.Range(1, 10).Select(n => $"WHT-2567-{n:D6}"), numbers.OrderBy(n => n, StringComparer.Ordinal));
+    }
 }

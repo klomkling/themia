@@ -38,9 +38,24 @@ public abstract class WithholdingCertificateStoreConformanceTests
         Assert.Equal(doc.SnapshotSchemaVersion, row.SnapshotSchemaVersion);
         Assert.Equal(doc.SnapshotSha256, row.SnapshotSha256);
         Assert.Equal(doc.TemplateVersion, row.TemplateVersion);
+        Assert.Equal(doc.SignatureSha256, row.SignatureSha256);
         Assert.Equal(doc.CreatedAt, row.CreatedAt);
         Assert.Equal(WithholdingCertificateState.Issued, row.State);
         Assert.Null(row.ReplacedByCertificateId);
+    }
+
+    /// <summary>The signature hash recorded at issue comes back as given, and is null for a certificate issued without a signature.</summary>
+    [Fact]
+    public async Task Insert_ShouldStoreTheSignatureHash_AndLeaveItNullWhenThereIsNone()
+    {
+        await using var h = await CreateHarnessAsync();
+        var signed = NewDoc(source: "signed", number: "WHT-S") with { SignatureSha256 = new string('b', 64) };
+        var plain = NewDoc(source: "plain", number: "WHT-P") with { SignatureSha256 = null };
+        await InsertAsync(h, signed);
+        await InsertAsync(h, plain);
+
+        Assert.Equal(new string('b', 64), (await h.Store.GetAsync(null, signed.Id, Payer))!.SignatureSha256);
+        Assert.Null((await h.Store.GetAsync(null, plain.Id, Payer))!.SignatureSha256);
     }
 
     /// <summary>The snapshot text comes back byte for byte, including non-ASCII.</summary>
@@ -220,6 +235,7 @@ public abstract class WithholdingCertificateStoreConformanceTests
         SnapshotSchemaVersion = 1,
         SnapshotSha256 = new string('a', 64),
         TemplateVersion = "1",
+        SignatureSha256 = new string('a', 64),
         CreatedAt = Now,
     };
 
