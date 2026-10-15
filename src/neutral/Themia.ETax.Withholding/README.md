@@ -4,8 +4,8 @@ Neutral core for issuing Thai withholding tax certificates (หนังสื�
 `net10.0`. No database, no HTTP. Builds on `Themia.ETax` (tax id and branch validation, party and replacement records, the
 snapshot exception types). Phase 2 of coord #0158 / request #0164.
 
-**This release holds the core only**: snapshot, validator, math, Thai baht text and the catalogue structure. The renderer, issue
-service, store port and database guards are separate PRs; there is nothing to adopt yet.
+**Not adoptable yet**: this release holds the snapshot, validator, math, Thai baht text, the catalogue structure and the issue
+service with its ports. The renderer, the database guards and the real catalogue entries are separate PRs.
 
 - **`WithholdingCertificateSnapshot`**: everything the certificate prints, frozen at issue (money in satang, rates in basis
   points). `WithholdingSnapshotSerializer` writes deterministic, ASCII-only versioned JSON and hashes the exact text. Store it in a
@@ -22,3 +22,20 @@ service, store port and database guards are separate PRs; there is nothing to ad
 - **`ThaiBahtText.Format(satang)`**: the amount in Thai words ("หนึ่งพันสองร้อยสามสิบสี่บาทห้าสิบหกสตางค์", "…บาทถ้วน").
 
 Dates are supplied by the caller (the Bangkok business date). Never log snapshot contents.
+
+## Issuing
+
+`WithholdingCertificateService.IssueAsync(tx, request)` issues inside **your** transaction (READ COMMITTED) and commits nothing:
+roll back unless the outcome is `Issued` or `AlreadyIssued`.
+
+- **Key:** `WithholdingCertificateKey(SourceEventId, Revision)`. The source event is the payout the tax was withheld from and must be
+  unique across payers (a key found for another payer answers `SourceConflict`, never that payer's id). A duplicate is answered
+  before a number is consumed.
+- **Ports you implement:** `IWithholdingCertificateStore` (your tables; payer-scoped reads that fail closed; `FindByKeyForIssueAsync`
+  must serialise racing issuers of one key) and `IWithholdingNumberSource` (gapless, inside the transaction). Run the store through
+  `Themia.ETax.Withholding.Testing`.
+- **Replace, never edit:** a wrong certificate is cancelled by issuing revision N+1 with `Replacement` set; the old one becomes
+  `Cancelled` (final) and points at its replacement. Revision 1 may not carry a replacement; later revisions must.
+- **Same snapshot in, same snapshot stored:** the service copies the snapshot through the persisted format first, so changes to your
+  lists while it runs cannot reach what was validated.
+- Register with `services.AddThemiaETaxWithholding(catalogue)`. Logs hold ids and states only.

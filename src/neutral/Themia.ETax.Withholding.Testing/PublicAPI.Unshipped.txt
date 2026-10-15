@@ -1,0 +1,17 @@
+Themia.ETax.Withholding.Testing.IWithholdingCertificateStoreHarness
+Themia.ETax.Withholding.Testing.IWithholdingCertificateStoreHarness.BeginTransactionAsync(System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Data.Common.DbTransaction!>!
+Themia.ETax.Withholding.Testing.IWithholdingCertificateStoreHarness.Store.get -> Themia.ETax.Withholding.IWithholdingCertificateStore!
+Themia.ETax.Withholding.Testing.WithholdingCertificateStoreConformanceTests
+Themia.ETax.Withholding.Testing.WithholdingCertificateStoreConformanceTests.CancelForReplacement_ShouldBeUndone_WhenTheTransactionRollsBack() -> System.Threading.Tasks.Task!
+Themia.ETax.Withholding.Testing.WithholdingCertificateStoreConformanceTests.CancelForReplacement_ShouldCancelAndRecordTheReplacement() -> System.Threading.Tasks.Task!
+Themia.ETax.Withholding.Testing.WithholdingCertificateStoreConformanceTests.CancelForReplacement_ShouldReportAlreadyCancelledNotFoundAndWrongPayer() -> System.Threading.Tasks.Task!
+Themia.ETax.Withholding.Testing.WithholdingCertificateStoreConformanceTests.FindByKey_ShouldMatchOnlyTheExactKey() -> System.Threading.Tasks.Task!
+Themia.ETax.Withholding.Testing.WithholdingCertificateStoreConformanceTests.FindByKeyForIssue_ShouldSerialiseRacingIssuersOfTheSameKey() -> System.Threading.Tasks.Task!
+Themia.ETax.Withholding.Testing.WithholdingCertificateStoreConformanceTests.Get_ShouldAnswerNotFound_ForAnotherPayersCertificate() -> System.Threading.Tasks.Task!
+Themia.ETax.Withholding.Testing.WithholdingCertificateStoreConformanceTests.Insert_ShouldBeVisibleInsideItsOwnTransaction() -> System.Threading.Tasks.Task!
+Themia.ETax.Withholding.Testing.WithholdingCertificateStoreConformanceTests.Insert_ShouldLeaveNothing_WhenTheTransactionRollsBack() -> System.Threading.Tasks.Task!
+Themia.ETax.Withholding.Testing.WithholdingCertificateStoreConformanceTests.Insert_ShouldPreserveTheSnapshotTextExactly() -> System.Threading.Tasks.Task!
+Themia.ETax.Withholding.Testing.WithholdingCertificateStoreConformanceTests.Insert_ShouldRejectASecondCertificateWithTheSameKey() -> System.Threading.Tasks.Task!
+Themia.ETax.Withholding.Testing.WithholdingCertificateStoreConformanceTests.Insert_ShouldStoreEveryColumn_WhenCommitted() -> System.Threading.Tasks.Task!
+abstract Themia.ETax.Withholding.Testing.WithholdingCertificateStoreConformanceTests.CreateHarnessAsync() -> System.Threading.Tasks.Task<Themia.ETax.Withholding.Testing.IWithholdingCertificateStoreHarness!>!
+Themia.ETax.Withholding.Testing.WithholdingCertificateStoreConformanceTests.WithholdingCertificateStoreConformanceTests() -> void

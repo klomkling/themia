@@ -6,6 +6,10 @@
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
   </PropertyGroup>
   <ItemGroup>
+    <!-- Logging/DI for the registration and no-PII tests, matching Themia.ETax.Tests. -->
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+  <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="xunit" />
     <PackageReference Include="xunit.runner.visualstudio">
@@ -19,5 +23,6 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/neutral/Themia.ETax.Withholding/Themia.ETax.Withholding.csproj" />
+    <ProjectReference Include="../../src/neutral/Themia.ETax.Withholding.Testing/Themia.ETax.Withholding.Testing.csproj" />
   </ItemGroup>
 </Project>

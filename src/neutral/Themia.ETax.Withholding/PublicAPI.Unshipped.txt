@@ -133,3 +133,97 @@ Themia.ETax.Withholding.WithholdingValidationOptions.ValidateTaxIdChecksum.set -
 Themia.ETax.Withholding.WithholdingValidationOptions.WithholdingValidationOptions() -> void
 Themia.ETax.Withholding.WithholdingSnapshotValidator
 static Themia.ETax.Withholding.WithholdingSnapshotValidator.Validate(Themia.ETax.Withholding.WithholdingCertificateSnapshot! snapshot, Themia.ETax.Withholding.IncomeTypeCatalogue! catalogue, Themia.ETax.Withholding.WithholdingValidationOptions? options = null) -> System.Collections.Generic.IReadOnlyList<Themia.ETax.Withholding.WithholdingValidationError>!
+Themia.ETax.Withholding.WithholdingCertificateState
+Themia.ETax.Withholding.WithholdingCertificateState.Issued = 1 -> Themia.ETax.Withholding.WithholdingCertificateState
+Themia.ETax.Withholding.WithholdingCertificateState.Cancelled = 2 -> Themia.ETax.Withholding.WithholdingCertificateState
+Themia.ETax.Withholding.WithholdingCancelOutcome
+Themia.ETax.Withholding.WithholdingCancelOutcome.Cancelled = 0 -> Themia.ETax.Withholding.WithholdingCancelOutcome
+Themia.ETax.Withholding.WithholdingCancelOutcome.NotFound = 1 -> Themia.ETax.Withholding.WithholdingCancelOutcome
+Themia.ETax.Withholding.WithholdingCancelOutcome.AlreadyCancelled = 2 -> Themia.ETax.Withholding.WithholdingCancelOutcome
+Themia.ETax.Withholding.WithholdingIssueOutcome
+Themia.ETax.Withholding.WithholdingIssueOutcome.Issued = 0 -> Themia.ETax.Withholding.WithholdingIssueOutcome
+Themia.ETax.Withholding.WithholdingIssueOutcome.AlreadyIssued = 1 -> Themia.ETax.Withholding.WithholdingIssueOutcome
+Themia.ETax.Withholding.WithholdingIssueOutcome.ValidationFailed = 2 -> Themia.ETax.Withholding.WithholdingIssueOutcome
+Themia.ETax.Withholding.WithholdingIssueOutcome.ReplacementInvalid = 3 -> Themia.ETax.Withholding.WithholdingIssueOutcome
+Themia.ETax.Withholding.WithholdingIssueOutcome.SourceConflict = 4 -> Themia.ETax.Withholding.WithholdingIssueOutcome
+Themia.ETax.Withholding.WithholdingCertificateKey
+Themia.ETax.Withholding.WithholdingCertificateKey.Revision.get -> int
+Themia.ETax.Withholding.WithholdingCertificateKey.SourceEventId.get -> string!
+Themia.ETax.Withholding.WithholdingCertificateKey.WithholdingCertificateKey() -> void
+Themia.ETax.Withholding.WithholdingCertificateKey.WithholdingCertificateKey(string! sourceEventId, int revision = 1) -> void
+Themia.ETax.Withholding.WithholdingCertificateRecord
+Themia.ETax.Withholding.WithholdingCertificateRecord.Id.get -> System.Guid
+Themia.ETax.Withholding.WithholdingCertificateRecord.Id.init -> void
+Themia.ETax.Withholding.WithholdingCertificateRecord.SourceEventId.get -> string!
+Themia.ETax.Withholding.WithholdingCertificateRecord.SourceEventId.init -> void
+Themia.ETax.Withholding.WithholdingCertificateRecord.Revision.get -> int
+Themia.ETax.Withholding.WithholdingCertificateRecord.Revision.init -> void
+Themia.ETax.Withholding.WithholdingCertificateRecord.PayerId.get -> string!
+Themia.ETax.Withholding.WithholdingCertificateRecord.PayerId.init -> void
+Themia.ETax.Withholding.WithholdingCertificateRecord.DocumentNumber.get -> string!
+Themia.ETax.Withholding.WithholdingCertificateRecord.DocumentNumber.init -> void
+Themia.ETax.Withholding.WithholdingCertificateRecord.IssueDate.get -> System.DateOnly
+Themia.ETax.Withholding.WithholdingCertificateRecord.IssueDate.init -> void
+Themia.ETax.Withholding.WithholdingCertificateRecord.SnapshotJson.get -> string!
+Themia.ETax.Withholding.WithholdingCertificateRecord.SnapshotJson.init -> void
+Themia.ETax.Withholding.WithholdingCertificateRecord.SnapshotSchemaVersion.get -> int
+Themia.ETax.Withholding.WithholdingCertificateRecord.SnapshotSchemaVersion.init -> void
+Themia.ETax.Withholding.WithholdingCertificateRecord.SnapshotSha256.get -> string!
+Themia.ETax.Withholding.WithholdingCertificateRecord.SnapshotSha256.init -> void
+Themia.ETax.Withholding.WithholdingCertificateRecord.TemplateVersion.get -> string!
+Themia.ETax.Withholding.WithholdingCertificateRecord.TemplateVersion.init -> void
+Themia.ETax.Withholding.WithholdingCertificateRecord.State.get -> Themia.ETax.Withholding.WithholdingCertificateState
+Themia.ETax.Withholding.WithholdingCertificateRecord.State.init -> void
+Themia.ETax.Withholding.WithholdingCertificateRecord.ReplacedByCertificateId.get -> System.Guid?
+Themia.ETax.Withholding.WithholdingCertificateRecord.ReplacedByCertificateId.init -> void
+Themia.ETax.Withholding.WithholdingCertificateRecord.CreatedAt.get -> System.DateTimeOffset
+Themia.ETax.Withholding.WithholdingCertificateRecord.CreatedAt.init -> void
+Themia.ETax.Withholding.NewWithholdingCertificate
+Themia.ETax.Withholding.NewWithholdingCertificate.Id.get -> System.Guid
+Themia.ETax.Withholding.NewWithholdingCertificate.Id.init -> void
+Themia.ETax.Withholding.NewWithholdingCertificate.Key.get -> Themia.ETax.Withholding.WithholdingCertificateKey
+Themia.ETax.Withholding.NewWithholdingCertificate.Key.init -> void
+Themia.ETax.Withholding.NewWithholdingCertificate.PayerId.get -> string!
+Themia.ETax.Withholding.NewWithholdingCertificate.PayerId.init -> void
+Themia.ETax.Withholding.NewWithholdingCertificate.DocumentNumber.get -> string!
+Themia.ETax.Withholding.NewWithholdingCertificate.DocumentNumber.init -> void
+Themia.ETax.Withholding.NewWithholdingCertificate.IssueDate.get -> System.DateOnly
+Themia.ETax.Withholding.NewWithholdingCertificate.IssueDate.init -> void
+Themia.ETax.Withholding.NewWithholdingCertificate.SnapshotJson.get -> string!
+Themia.ETax.Withholding.NewWithholdingCertificate.SnapshotJson.init -> void
+Themia.ETax.Withholding.NewWithholdingCertificate.SnapshotSchemaVersion.get -> int
+Themia.ETax.Withholding.NewWithholdingCertificate.SnapshotSchemaVersion.init -> void
+Themia.ETax.Withholding.NewWithholdingCertificate.SnapshotSha256.get -> string!
+Themia.ETax.Withholding.NewWithholdingCertificate.SnapshotSha256.init -> void
+Themia.ETax.Withholding.NewWithholdingCertificate.TemplateVersion.get -> string!
+Themia.ETax.Withholding.NewWithholdingCertificate.TemplateVersion.init -> void
+Themia.ETax.Withholding.NewWithholdingCertificate.CreatedAt.get -> System.DateTimeOffset
+Themia.ETax.Withholding.NewWithholdingCertificate.CreatedAt.init -> void
+Themia.ETax.Withholding.IWithholdingNumberSource
+Themia.ETax.Withholding.IWithholdingNumberSource.NextNumberAsync(System.Data.Common.DbTransaction! tx, string! payerId, System.DateOnly issueDate, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<string!>!
+Themia.ETax.Withholding.IWithholdingCertificateStore
+Themia.ETax.Withholding.IWithholdingCertificateStore.CancelForReplacementAsync(System.Data.Common.DbTransaction! tx, System.Guid certificateId, System.Guid replacedByCertificateId, string! payerId, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.ETax.Withholding.WithholdingCancelOutcome>!
+Themia.ETax.Withholding.IWithholdingCertificateStore.FindByKeyForIssueAsync(System.Data.Common.DbTransaction! tx, Themia.ETax.Withholding.WithholdingCertificateKey key, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.ETax.Withholding.WithholdingCertificateRecord?>!
+Themia.ETax.Withholding.IWithholdingCertificateStore.GetAsync(System.Data.Common.DbTransaction? tx, System.Guid id, string! payerId, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.ETax.Withholding.WithholdingCertificateRecord?>!
+Themia.ETax.Withholding.IWithholdingCertificateStore.InsertAsync(System.Data.Common.DbTransaction! tx, Themia.ETax.Withholding.NewWithholdingCertificate! document, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.ETax.Withholding.WithholdingTemplates
+const Themia.ETax.Withholding.WithholdingTemplates.CurrentVersion = "1" -> string!
+Themia.ETax.Withholding.IssueWithholdingCertificateRequest
+Themia.ETax.Withholding.IssueWithholdingCertificateRequest.Key.get -> Themia.ETax.Withholding.WithholdingCertificateKey
+Themia.ETax.Withholding.IssueWithholdingCertificateRequest.Key.init -> void
+Themia.ETax.Withholding.IssueWithholdingCertificateRequest.PayerId.get -> string!
+Themia.ETax.Withholding.IssueWithholdingCertificateRequest.PayerId.init -> void
+Themia.ETax.Withholding.IssueWithholdingCertificateRequest.Snapshot.get -> Themia.ETax.Withholding.WithholdingCertificateSnapshot!
+Themia.ETax.Withholding.IssueWithholdingCertificateRequest.Snapshot.init -> void
+Themia.ETax.Withholding.WithholdingIssueResult
+Themia.ETax.Withholding.WithholdingIssueResult.Outcome.get -> Themia.ETax.Withholding.WithholdingIssueOutcome
+Themia.ETax.Withholding.WithholdingIssueResult.Outcome.init -> void
+Themia.ETax.Withholding.WithholdingIssueResult.DocumentId.get -> System.Guid?
+Themia.ETax.Withholding.WithholdingIssueResult.DocumentId.init -> void
+Themia.ETax.Withholding.WithholdingIssueResult.Errors.get -> System.Collections.Generic.IReadOnlyList<Themia.ETax.Withholding.WithholdingValidationError>!
+Themia.ETax.Withholding.WithholdingIssueResult.Errors.init -> void
+Themia.ETax.Withholding.WithholdingCertificateService
+Themia.ETax.Withholding.WithholdingCertificateService.IssueAsync(System.Data.Common.DbTransaction! tx, Themia.ETax.Withholding.IssueWithholdingCertificateRequest! request, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.ETax.Withholding.WithholdingIssueResult!>!
+Themia.ETax.Withholding.WithholdingCertificateService.WithholdingCertificateService(Themia.ETax.Withholding.IWithholdingCertificateStore! store, Themia.ETax.Withholding.IWithholdingNumberSource! numbers, Themia.ETax.Withholding.IncomeTypeCatalogue! catalogue, Themia.ETax.Withholding.WithholdingValidationOptions! validation, System.TimeProvider! clock, Microsoft.Extensions.Logging.ILogger<Themia.ETax.Withholding.WithholdingCertificateService!>! logger) -> void
+Microsoft.Extensions.DependencyInjection.ThemiaETaxWithholdingServiceCollectionExtensions
+static Microsoft.Extensions.DependencyInjection.ThemiaETaxWithholdingServiceCollectionExtensions.AddThemiaETaxWithholding(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, Themia.ETax.Withholding.IncomeTypeCatalogue! catalogue, System.Action<Themia.ETax.Withholding.WithholdingValidationOptions!>? configureValidation = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
