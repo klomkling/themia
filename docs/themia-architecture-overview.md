@@ -48,7 +48,7 @@ Neutral cores     Themia.AspNetCore(.DataProtection.{SqlServer/MySql/PostgreSql}
                   Themia.Storage(.S3/.AspNetCore/.Cloudflare) | Themia.Export(.Excel) | Themia.Geo(.Google) | Themia.AI(.Gemini/.OpenAiCompatible)
                   Themia.Challenges(+3 engines) | Themia.Totp | Themia.WebAuthn | Themia.PromptPay | Themia.Imaging
                   Themia.Data.Migrations(+3 engines) | Themia.Data.Probes | Themia.DependencyInjection
-                  Themia.Content(+3 engines/.AspNetCore)
+                  Themia.Content(+3 engines/.AspNetCore) | Themia.ETax(.Testing; framework side: Themia.ETax.Data)
                   → consumable by BOTH Themia apps and Serenity (PowerACC)
 ─────────────────────────────────────────────────────────────────────────────────────────────
 Modules           Themia.Modules.* (Scheduling, Identity(+.Abstractions/.EFCore/.Dapper/.AspNetCore/
@@ -413,7 +413,7 @@ are relative to `docs/superpowers/specs/`. A version in parentheses is the relea
   (**deferred** — builds only on the trigger in its header; no plan written yet)
 
 **Shipped without a standalone spec** — `Themia.AspNetCore.DataProtection` (0.10.0, coord #0042),
-`Themia.PromptPay` (0.14.0), `Themia.Totp` (0.18.0), `Themia.WebAuthn` (0.20.0), `Themia.Imaging` (0.21.0).
+`Themia.PromptPay` (0.14.0), `Themia.Totp` (0.18.0), `Themia.WebAuthn` (0.20.0), `Themia.Imaging` (0.21.0), `Themia.ETax` / `Themia.ETax.Testing` / `Themia.ETax.Data` (0.32.0, coord #0158).
 
 ## Identity JWT slice (0.5.1 — 2026-06-15)
 

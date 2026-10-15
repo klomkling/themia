@@ -27,12 +27,60 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.32.0] - 2026-10-15
+
+First release of the Thai tax invoice / e-Tax packages (coord #0158), and the `Themia.Pdf` additions they print through.
+`Themia.ETax`, `Themia.ETax.Testing` and `Themia.ETax.Data` are new packages; nothing existing is changed incompatibly.
+
 ### Added
-- **`Themia.ETax` core (PR1 of coord #0158)** (new neutral package, `net8.0;net10.0`): `TaxDocumentSnapshot` with a
-  deterministic versioned-JSON serializer and SHA-256 integrity hash (store as `text`, not `jsonb`), snapshot validator
-  (totals, VAT arithmetic, customer-withheld tax, credit/debit note and replacement references), `TaxDocumentKey`
-  idempotency key keyed by the triggering event, `VatMath` in satang/basis points with decimal-baht parity vectors, and
-  `ThaiTaxId` (13 digits, optional mod-11 check) / `ThaiBranchCode`. Rendering, state machine and trigger helper follow in later PRs.
+- **`Themia.ETax` core** (new neutral package, `net8.0;net10.0`): `TaxDocumentSnapshot` with a deterministic versioned-JSON
+  serializer and SHA-256 integrity hash (store as `text`, not `jsonb`), snapshot validator (totals, VAT arithmetic,
+  customer-withheld tax, credit/debit note and replacement references), `TaxDocumentKey` idempotency key keyed by the
+  triggering event (`SourceEventId` must be globally unique across sellers), `VatMath` in satang/basis points with
+  decimal-baht parity vectors, and `ThaiTaxId` (13 digits, optional mod-11 check) / `ThaiBranchCode`.
+- **`Themia.ETax` rendering:** `TaxDocumentRenderer` prints a stored snapshot with its pinned template version
+  (template `"1"`, frozen by golden-hash tests; a template change ships as a new version). Embedded Sarabun (Thai, basic
+  Latin, Latin Extended) with the SIL OFL 1.1 licence in the package; text with a character the fonts cannot print is
+  rejected at Issue with a field-path-only error (`TaxDocumentValidationCode.UnsupportedCharacter`); zero-width
+  default-ignorables are accepted. Dates print with the Buddhist-era year (`14/10/2569`), computed without any Thai
+  culture so renders are byte-stable across hosts. PDFs are printed untagged and their two date fields pinned, so
+  re-renders are byte-identical; `TaxDocumentEvidence.Check` is the resend rule (same renderer version, different
+  hash: fail loud). Proven on Chromium by `Themia.ETax.IntegrationTests` (`Category=Integration`, nightly
+  `integration.yml`; dispatch it by hand before merging a rendering change).
+- **`Themia.ETax` issue and send path:** `TaxDocumentService` (issue inside the caller's transaction: duplicate keys answer
+  `AlreadyIssued`/`SourceConflict` before any number is taken, credit/debit-note and replacement preconditions, copies,
+  requeue) and `TaxDocumentSender` (leased claim, ORIGINAL evidence, a conditional pre-send re-check so a cancelled
+  document is never sent as ORIGINAL, `SendTimeout` shorter than the lease with the lease kept after a timeout, exponential
+  backoff, Failed after `MaxAttempts`, alert hook). Ports the app implements: `ITaxDocumentStore` (seller-scoped,
+  every transition one conditional write), `ITaxDocumentMailer`, `ITaxDocumentNumberSource`,
+  `ITaxDocumentFailureHandler`. Register with `AddThemiaETaxDocuments` (scoped).
+- **`Themia.ETax.Testing`** (new package): the abstract `TaxDocumentStoreConformanceTests` every `ITaxDocumentStore` must pass
+  (inherit it and override `CreateHarnessAsync`; depends on `xunit.extensibility.core` and `xunit.assert` only).
+- **`Themia.ETax.Data`** (new package, `net10.0`, PostgreSQL): the required database guards for an app's own tax document
+  table, called from its migration: `TaxDocumentGuards.ApplyImmutability` (snapshot, number, kind, date, seller and key can
+  never change, including by setting the snapshot to NULL; no delete or truncate on any row, legacy rows included; a Sent
+  document can only become Cancelled together with a replacement id; **hardened 2026-10-15:** a Cancelled document never
+  changes state again; the replacement id, once set, cannot change (a Cancelled document with none may still gain one, same seller)) and `ApplySameSellerReplacementKey` (deferred composite foreign key). Parametrised
+  by table and column names, idempotent so it adopts existing objects, follows `search_path`, and fails the migration if
+  the state column cannot hold the configured state values. Also `SequenceTaxDocumentNumberSource`, gapless numbers over
+  `ITransactionalSequenceAllocator` inside the issue transaction.
+- **`Themia.Pdf`:** `IVersionedPdfRenderer` / `PdfRenderResult` (the PDF plus the version of the browser instance that printed it;
+  `IPdfRenderer` is unchanged, so adopters' own test doubles keep compiling) and `PdfRenderOptions.Tagged` (`null` keeps the
+  PuppeteerSharp default; a tagged PDF embeds a per-browser id counter and cannot be byte-reproducible).
+- **CI:** a `cancel-stale-ci` workflow cancels queued or running CI for pull requests that fall behind `main`.
+
+### Changed
+- Bumped `Microsoft.AspNetCore.TestHost` to `8.0.32` (test-only).
+
+### Security
+- **Accepted residual of the ETax guards:** the immutability trigger stops application bugs, not someone with DDL rights. A table owner
+  or superuser can disable or drop it, and a mailer that ignores its cancellation token can still deliver after `SendTimeout`
+  (the lease is kept for that window). Run the application as a database role that does not own the tax document table (see the
+  `Themia.ETax.Data` README for the grant shape) and never as a superuser.
+- **Further accepted residuals of `ApplyImmutability`:** the trigger stops any state change out of Cancelled and locks `replaced_by` only
+  once it is NOT NULL. A document cancelled while unsent (Issued, OriginalPrepared or Failed to Cancelled needs no replacement) can therefore
+  still gain a `replaced_by` later (NULL to a value), kept within the same seller by the deferred composite foreign key. Rows without a snapshot
+  (legacy, issued before `Themia.ETax`) are guarded against delete only; they stay updatable until they gain a snapshot.
 
 ## [0.31.3] - 2026-10-14
 
