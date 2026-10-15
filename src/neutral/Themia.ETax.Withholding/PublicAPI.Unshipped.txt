@@ -1,0 +1,135 @@
+Themia.ETax.Withholding.WithholdingFilingForm
+Themia.ETax.Withholding.WithholdingFilingForm.Pnd1A = 1 -> Themia.ETax.Withholding.WithholdingFilingForm
+Themia.ETax.Withholding.WithholdingFilingForm.Pnd1ASpecial = 2 -> Themia.ETax.Withholding.WithholdingFilingForm
+Themia.ETax.Withholding.WithholdingFilingForm.Pnd2 = 3 -> Themia.ETax.Withholding.WithholdingFilingForm
+Themia.ETax.Withholding.WithholdingFilingForm.Pnd3 = 4 -> Themia.ETax.Withholding.WithholdingFilingForm
+Themia.ETax.Withholding.WithholdingFilingForm.Pnd2A = 5 -> Themia.ETax.Withholding.WithholdingFilingForm
+Themia.ETax.Withholding.WithholdingFilingForm.Pnd3A = 6 -> Themia.ETax.Withholding.WithholdingFilingForm
+Themia.ETax.Withholding.WithholdingFilingForm.Pnd53 = 7 -> Themia.ETax.Withholding.WithholdingFilingForm
+Themia.ETax.Withholding.WithholdingPayeeKind
+Themia.ETax.Withholding.WithholdingPayeeKind.Individual = 1 -> Themia.ETax.Withholding.WithholdingPayeeKind
+Themia.ETax.Withholding.WithholdingPayeeKind.Juristic = 2 -> Themia.ETax.Withholding.WithholdingPayeeKind
+Themia.ETax.Withholding.WithholdingCondition
+Themia.ETax.Withholding.WithholdingCondition.WithheldAtSource = 1 -> Themia.ETax.Withholding.WithholdingCondition
+Themia.ETax.Withholding.WithholdingCondition.PaidOnBehalfForever = 2 -> Themia.ETax.Withholding.WithholdingCondition
+Themia.ETax.Withholding.WithholdingCondition.PaidOnBehalfOnce = 3 -> Themia.ETax.Withholding.WithholdingCondition
+Themia.ETax.Withholding.WithholdingCondition.Other = 4 -> Themia.ETax.Withholding.WithholdingCondition
+Themia.ETax.Withholding.WithholdingValidationCode
+Themia.ETax.Withholding.WithholdingValidationCode.Required = 0 -> Themia.ETax.Withholding.WithholdingValidationCode
+Themia.ETax.Withholding.WithholdingValidationCode.Malformed = 1 -> Themia.ETax.Withholding.WithholdingValidationCode
+Themia.ETax.Withholding.WithholdingValidationCode.InvalidChecksum = 2 -> Themia.ETax.Withholding.WithholdingValidationCode
+Themia.ETax.Withholding.WithholdingValidationCode.NotAllowed = 3 -> Themia.ETax.Withholding.WithholdingValidationCode
+Themia.ETax.Withholding.WithholdingValidationCode.CatalogueMismatch = 4 -> Themia.ETax.Withholding.WithholdingValidationCode
+Themia.ETax.Withholding.WithholdingValidationCode.AmountsInconsistent = 5 -> Themia.ETax.Withholding.WithholdingValidationCode
+Themia.ETax.Withholding.WithholdingValidationCode.WithheldExceedsPaid = 6 -> Themia.ETax.Withholding.WithholdingValidationCode
+Themia.ETax.Withholding.WithholdingValidationCode.UnsupportedCharacter = 7 -> Themia.ETax.Withholding.WithholdingValidationCode
+Themia.ETax.Withholding.WithholdingMath
+const Themia.ETax.Withholding.WithholdingMath.MaxRateBasisPoints = 10000 -> int
+static Themia.ETax.Withholding.WithholdingMath.Withhold(long baseSatang, int rateBasisPoints) -> long
+Themia.ETax.Withholding.ThaiBahtText
+static Themia.ETax.Withholding.ThaiBahtText.Format(long satang) -> string!
+Themia.ETax.Withholding.IncomeTypeEntry
+Themia.ETax.Withholding.IncomeTypeEntry.Code.get -> string!
+Themia.ETax.Withholding.IncomeTypeEntry.Code.init -> void
+Themia.ETax.Withholding.IncomeTypeEntry.Section.get -> string!
+Themia.ETax.Withholding.IncomeTypeEntry.Section.init -> void
+Themia.ETax.Withholding.IncomeTypeEntry.SubItem.get -> string?
+Themia.ETax.Withholding.IncomeTypeEntry.SubItem.init -> void
+Themia.ETax.Withholding.IncomeTypeEntry.LabelTh.get -> string!
+Themia.ETax.Withholding.IncomeTypeEntry.LabelTh.init -> void
+Themia.ETax.Withholding.IncomeTypeEntry.FormRow.get -> int
+Themia.ETax.Withholding.IncomeTypeEntry.FormRow.init -> void
+Themia.ETax.Withholding.IncomeTypeEntry.AllowedFilingForms.get -> System.Collections.Generic.IReadOnlyList<Themia.ETax.Withholding.WithholdingFilingForm>!
+Themia.ETax.Withholding.IncomeTypeEntry.AllowedFilingForms.init -> void
+Themia.ETax.Withholding.IncomeTypeEntry.AllowedPayeeKinds.get -> System.Collections.Generic.IReadOnlyList<Themia.ETax.Withholding.WithholdingPayeeKind>!
+Themia.ETax.Withholding.IncomeTypeEntry.AllowedPayeeKinds.init -> void
+Themia.ETax.Withholding.IncomeTypeCatalogue
+Themia.ETax.Withholding.IncomeTypeCatalogue.ContentHash.get -> string!
+Themia.ETax.Withholding.IncomeTypeCatalogue.Entries.get -> System.Collections.Generic.IReadOnlyList<Themia.ETax.Withholding.IncomeTypeEntry!>!
+Themia.ETax.Withholding.IncomeTypeCatalogue.IncomeTypeCatalogue(string! version, System.Collections.Generic.IEnumerable<Themia.ETax.Withholding.IncomeTypeEntry!>! entries) -> void
+Themia.ETax.Withholding.IncomeTypeCatalogue.TryGet(string? code, out Themia.ETax.Withholding.IncomeTypeEntry? entry) -> bool
+Themia.ETax.Withholding.IncomeTypeCatalogue.Version.get -> string!
+Themia.ETax.Withholding.WithholdingIncomeRow
+Themia.ETax.Withholding.WithholdingIncomeRow.IncomeTypeCode.get -> string!
+Themia.ETax.Withholding.WithholdingIncomeRow.IncomeTypeCode.init -> void
+Themia.ETax.Withholding.WithholdingIncomeRow.Section.get -> string!
+Themia.ETax.Withholding.WithholdingIncomeRow.Section.init -> void
+Themia.ETax.Withholding.WithholdingIncomeRow.SubItem.get -> string?
+Themia.ETax.Withholding.WithholdingIncomeRow.SubItem.init -> void
+Themia.ETax.Withholding.WithholdingIncomeRow.LabelTh.get -> string!
+Themia.ETax.Withholding.WithholdingIncomeRow.LabelTh.init -> void
+Themia.ETax.Withholding.WithholdingIncomeRow.FormRow.get -> int
+Themia.ETax.Withholding.WithholdingIncomeRow.FormRow.init -> void
+Themia.ETax.Withholding.WithholdingIncomeRow.Description.get -> string?
+Themia.ETax.Withholding.WithholdingIncomeRow.Description.init -> void
+Themia.ETax.Withholding.WithholdingIncomeRow.DatePaid.get -> System.DateOnly
+Themia.ETax.Withholding.WithholdingIncomeRow.DatePaid.init -> void
+Themia.ETax.Withholding.WithholdingIncomeRow.AmountPaidSatang.get -> long
+Themia.ETax.Withholding.WithholdingIncomeRow.AmountPaidSatang.init -> void
+Themia.ETax.Withholding.WithholdingIncomeRow.RateBasisPoints.get -> int?
+Themia.ETax.Withholding.WithholdingIncomeRow.RateBasisPoints.init -> void
+Themia.ETax.Withholding.WithholdingIncomeRow.TaxWithheldSatang.get -> long
+Themia.ETax.Withholding.WithholdingIncomeRow.TaxWithheldSatang.init -> void
+Themia.ETax.Withholding.WithholdingTotals
+Themia.ETax.Withholding.WithholdingTotals.PaidSatang.get -> long
+Themia.ETax.Withholding.WithholdingTotals.PaidSatang.init -> void
+Themia.ETax.Withholding.WithholdingTotals.WithheldSatang.get -> long
+Themia.ETax.Withholding.WithholdingTotals.WithheldSatang.init -> void
+Themia.ETax.Withholding.WithholdingFunds
+Themia.ETax.Withholding.WithholdingFunds.SocialSecuritySatang.get -> long?
+Themia.ETax.Withholding.WithholdingFunds.SocialSecuritySatang.init -> void
+Themia.ETax.Withholding.WithholdingFunds.ProvidentFundSatang.get -> long?
+Themia.ETax.Withholding.WithholdingFunds.ProvidentFundSatang.init -> void
+Themia.ETax.Withholding.WithholdingFunds.GovernmentPensionSatang.get -> long?
+Themia.ETax.Withholding.WithholdingFunds.GovernmentPensionSatang.init -> void
+Themia.ETax.Withholding.WithholdingCertificateSnapshot
+const Themia.ETax.Withholding.WithholdingCertificateSnapshot.CurrentSchemaVersion = 1 -> int
+Themia.ETax.Withholding.WithholdingCertificateSnapshot.SchemaVersion.get -> int
+Themia.ETax.Withholding.WithholdingCertificateSnapshot.SchemaVersion.init -> void
+Themia.ETax.Withholding.WithholdingCertificateSnapshot.DocumentNumber.get -> string!
+Themia.ETax.Withholding.WithholdingCertificateSnapshot.DocumentNumber.init -> void
+Themia.ETax.Withholding.WithholdingCertificateSnapshot.BookNumber.get -> string?
+Themia.ETax.Withholding.WithholdingCertificateSnapshot.BookNumber.init -> void
+Themia.ETax.Withholding.WithholdingCertificateSnapshot.IssueDate.get -> System.DateOnly
+Themia.ETax.Withholding.WithholdingCertificateSnapshot.IssueDate.init -> void
+Themia.ETax.Withholding.WithholdingCertificateSnapshot.Payer.get -> Themia.ETax.TaxParty!
+Themia.ETax.Withholding.WithholdingCertificateSnapshot.Payer.init -> void
+Themia.ETax.Withholding.WithholdingCertificateSnapshot.Payee.get -> Themia.ETax.TaxParty!
+Themia.ETax.Withholding.WithholdingCertificateSnapshot.Payee.init -> void
+Themia.ETax.Withholding.WithholdingCertificateSnapshot.PayeeKind.get -> Themia.ETax.Withholding.WithholdingPayeeKind
+Themia.ETax.Withholding.WithholdingCertificateSnapshot.PayeeKind.init -> void
+Themia.ETax.Withholding.WithholdingCertificateSnapshot.FilingForm.get -> Themia.ETax.Withholding.WithholdingFilingForm
+Themia.ETax.Withholding.WithholdingCertificateSnapshot.FilingForm.init -> void
+Themia.ETax.Withholding.WithholdingCertificateSnapshot.FilingSequence.get -> int?
+Themia.ETax.Withholding.WithholdingCertificateSnapshot.FilingSequence.init -> void
+Themia.ETax.Withholding.WithholdingCertificateSnapshot.IncomeCatalogueVersion.get -> string!
+Themia.ETax.Withholding.WithholdingCertificateSnapshot.IncomeCatalogueVersion.init -> void
+Themia.ETax.Withholding.WithholdingCertificateSnapshot.Rows.get -> System.Collections.Generic.IReadOnlyList<Themia.ETax.Withholding.WithholdingIncomeRow!>!
+Themia.ETax.Withholding.WithholdingCertificateSnapshot.Rows.init -> void
+Themia.ETax.Withholding.WithholdingCertificateSnapshot.Totals.get -> Themia.ETax.Withholding.WithholdingTotals!
+Themia.ETax.Withholding.WithholdingCertificateSnapshot.Totals.init -> void
+Themia.ETax.Withholding.WithholdingCertificateSnapshot.Funds.get -> Themia.ETax.Withholding.WithholdingFunds?
+Themia.ETax.Withholding.WithholdingCertificateSnapshot.Funds.init -> void
+Themia.ETax.Withholding.WithholdingCertificateSnapshot.Condition.get -> Themia.ETax.Withholding.WithholdingCondition
+Themia.ETax.Withholding.WithholdingCertificateSnapshot.Condition.init -> void
+Themia.ETax.Withholding.WithholdingCertificateSnapshot.ConditionOther.get -> string?
+Themia.ETax.Withholding.WithholdingCertificateSnapshot.ConditionOther.init -> void
+Themia.ETax.Withholding.WithholdingCertificateSnapshot.Replacement.get -> Themia.ETax.TaxDocumentReplacement?
+Themia.ETax.Withholding.WithholdingCertificateSnapshot.Replacement.init -> void
+Themia.ETax.Withholding.WithholdingSnapshotSerializer
+static Themia.ETax.Withholding.WithholdingSnapshotSerializer.ComputeHash(string! snapshotJson) -> string!
+static Themia.ETax.Withholding.WithholdingSnapshotSerializer.Deserialize(string! snapshotJson, string! expectedSha256) -> Themia.ETax.Withholding.WithholdingCertificateSnapshot!
+static Themia.ETax.Withholding.WithholdingSnapshotSerializer.Serialize(Themia.ETax.Withholding.WithholdingCertificateSnapshot! snapshot) -> string!
+Themia.ETax.Withholding.WithholdingValidationError
+Themia.ETax.Withholding.WithholdingValidationError.WithholdingValidationError() -> void
+Themia.ETax.Withholding.WithholdingValidationError.WithholdingValidationError(Themia.ETax.Withholding.WithholdingValidationCode Code, string! Field) -> void
+Themia.ETax.Withholding.WithholdingValidationError.Code.get -> Themia.ETax.Withholding.WithholdingValidationCode
+Themia.ETax.Withholding.WithholdingValidationError.Code.init -> void
+Themia.ETax.Withholding.WithholdingValidationError.Field.get -> string!
+Themia.ETax.Withholding.WithholdingValidationError.Field.init -> void
+Themia.ETax.Withholding.WithholdingValidationOptions
+Themia.ETax.Withholding.WithholdingValidationOptions.ValidateTaxIdChecksum.get -> bool
+Themia.ETax.Withholding.WithholdingValidationOptions.ValidateTaxIdChecksum.set -> void
+Themia.ETax.Withholding.WithholdingValidationOptions.WithholdingValidationOptions() -> void
+Themia.ETax.Withholding.WithholdingSnapshotValidator
+static Themia.ETax.Withholding.WithholdingSnapshotValidator.Validate(Themia.ETax.Withholding.WithholdingCertificateSnapshot! snapshot, Themia.ETax.Withholding.IncomeTypeCatalogue! catalogue, Themia.ETax.Withholding.WithholdingValidationOptions? options = null) -> System.Collections.Generic.IReadOnlyList<Themia.ETax.Withholding.WithholdingValidationError>!

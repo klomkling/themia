@@ -1,0 +1,32 @@
+using System.Text.Json.Serialization;
+
+namespace Themia.ETax.Withholding;
+
+/// <summary>
+/// The monthly return a certificate belongs to: the form boxes of the certificate (ลำดับที่ ... ในแบบ). Persisted by name, so
+/// renaming a member is a breaking change. The set is PENDING confirmation against the current official form (coord #0164 Q1/Q2).
+/// </summary>
+[JsonConverter(typeof(JsonStringEnumConverter<WithholdingFilingForm>))]
+public enum WithholdingFilingForm
+{
+    /// <summary>ภ.ง.ด.1ก.</summary>
+    Pnd1A = 1,
+
+    /// <summary>ภ.ง.ด.1ก พิเศษ.</summary>
+    Pnd1ASpecial = 2,
+
+    /// <summary>ภ.ง.ด.2.</summary>
+    Pnd2 = 3,
+
+    /// <summary>ภ.ง.ด.3.</summary>
+    Pnd3 = 4,
+
+    /// <summary>ภ.ง.ด.2ก.</summary>
+    Pnd2A = 5,
+
+    /// <summary>ภ.ง.ด.3ก.</summary>
+    Pnd3A = 6,
+
+    /// <summary>ภ.ง.ด.53.</summary>
+    Pnd53 = 7,
+}

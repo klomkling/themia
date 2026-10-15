@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <!-- Neutral cross-framework package: MUST include net8.0 (cross-framework reuse). -->
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <PackageId>Themia.ETax.Withholding</PackageId>
+    <Description>Neutral Thai withholding tax certificate (50 bis) core: withholding math in satang, certificate snapshot with integrity hash, validator, versioned income-type catalogue structure and Thai baht text.</Description>
+    <!-- Version is inherited from Directory.Build.props (shared). Do not set it here. -->
+  </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Themia.ETax.Withholding.Tests" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Themia.ETax/Themia.ETax.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+  <ItemGroup>
+    <AdditionalFiles Include="PublicAPI.Shipped.txt" />
+    <AdditionalFiles Include="PublicAPI.Unshipped.txt" />
+  </ItemGroup>
+</Project>
