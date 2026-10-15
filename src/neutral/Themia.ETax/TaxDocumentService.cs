@@ -15,6 +15,7 @@ public sealed class TaxDocumentService
     private readonly ITaxDocumentNumberSource _numbers;
     private readonly TaxDocumentRenderer _renderer;
     private readonly TaxDocumentValidationOptions _validation;
+    private readonly string _templateVersion;
     private readonly TimeProvider _clock;
     private readonly ILogger<TaxDocumentService> _logger;
 
@@ -32,7 +33,30 @@ public sealed class TaxDocumentService
         TaxDocumentValidationOptions validation,
         TimeProvider clock,
         ILogger<TaxDocumentService> logger)
+        : this(store, numbers, renderer, validation, new TaxDocumentTemplateOptions(), clock, logger)
     {
+    }
+
+    /// <summary>Creates the service.</summary>
+    /// <param name="store">The app's store.</param>
+    /// <param name="numbers">The gapless number source.</param>
+    /// <param name="renderer">Renders copies.</param>
+    /// <param name="validation">Validation options for new input.</param>
+    /// <param name="templates">The adopter's template options; the service reads <see cref="TaxDocumentTemplateOptions.TemplateVersion"/> for new documents.</param>
+    /// <param name="clock">The clock.</param>
+    /// <param name="logger">The logger.</param>
+    public TaxDocumentService(
+        ITaxDocumentStore store,
+        ITaxDocumentNumberSource numbers,
+        TaxDocumentRenderer renderer,
+        TaxDocumentValidationOptions validation,
+        TaxDocumentTemplateOptions templates,
+        TimeProvider clock,
+        ILogger<TaxDocumentService> logger)
+    {
+        ArgumentNullException.ThrowIfNull(templates);
+        templates.Validate();
+        _templateVersion = templates.TemplateVersion;
         _store = store ?? throw new ArgumentNullException(nameof(store));
         _numbers = numbers ?? throw new ArgumentNullException(nameof(numbers));
         _renderer = renderer ?? throw new ArgumentNullException(nameof(renderer));
@@ -100,7 +124,7 @@ public sealed class TaxDocumentService
             SnapshotJson = json,
             SnapshotSchemaVersion = snapshot.SchemaVersion,
             SnapshotSha256 = TaxDocumentSnapshotSerializer.ComputeHash(json),
-            TemplateVersion = TaxDocumentTemplates.CurrentVersion,
+            TemplateVersion = _templateVersion,
             BuyerEmail = request.BuyerEmail,
             CreatedAt = _clock.GetUtcNow(),
         }, ct).ConfigureAwait(false);

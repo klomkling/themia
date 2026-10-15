@@ -18,9 +18,8 @@ No database, no HTTP: it holds the parts every issuing app must agree on, and it
 - **`ThaiBahtText.Format(satang, etMode)`**: the amount in Thai words ("หนึ่งพันสองร้อยสามสิบสี่บาทห้าสิบหกสตางค์", "…บาทถ้วน"; under one baht
   omits the baht part). Both conventions for "เอ็ด" are in use, so the adopter chooses with `ThaiBahtTextEtMode`: `Always` (default:
   หนึ่งร้อยเอ็ด, หนึ่งพันเอ็ดล้าน) or `TensOnly` (เอ็ดเฉพาะหลังหลักสิบ: สิบเอ็ด but หนึ่งร้อยหนึ่ง, หนึ่งพันหนึ่งล้าน). Pinned by the documented
-  examples of the ThaiBahtText package (11, 101, 211, 1001, 1,001,000,000 in both modes); that package is not a dependency. It is available
-  for receipts, tax invoices and credit notes, but template version `"1"` of those documents is frozen and does not print it: printing the
-  amount in words there would be template `"2"`.
+  examples of the ThaiBahtText package (11, 101, 211, 1001, 1,001,000,000 in both modes); that package is not a dependency. Tax documents
+  print it from template version `"2"` (below).
 - **`ThaiTaxId` / `ThaiBranchCode`**: 13-digit id with optional mod-11 check digit, 5-digit branch.
 
 The `issue_date` is always supplied by the caller (the Bangkok business date of the payment or refund), never derived from UTC.
@@ -78,3 +77,25 @@ Apps own their tables, migrations and the persistence port; Themia owns the rule
 - **Register:** `services.AddThemiaETaxDocuments(o => o.RevenueDepartmentAddress = "...")` after registering your store, number source
   and mailer. `TaxDocumentService` and `TaxDocumentSender` are **scoped** (your store and number source normally are): resolve them from a
   scope, and in a scheduled job create one scope per `RunOnceAsync`.
+
+## Template version 2: the amount in Thai words
+
+Template `"1"` stays frozen and renders every document issued under it byte-identically. Template `"2"` is template 1 plus a line under the totals,
+`ตัวอักษร / In words: หนึ่งพันเจ็ดสิบบาทถ้วน`. The words are the document total: the grand total including VAT on a tax invoice/receipt, and the
+credited (or debited) amount on a credit (debit) note. A document records the template version it was issued under, as before, and is always
+rendered with it.
+
+The adopter opts in for NEW documents; the version also fixes the "เอ็ด" convention, so it is frozen with each document: `"2"` reads a units digit of 1 as
+"เอ็ด" (หนึ่งร้อยเอ็ด), `"3"` as "หนึ่ง" (หนึ่งร้อยหนึ่ง). The layout is the same.
+
+```csharp
+services.AddThemiaETaxDocuments(...);
+services.ConfigureThemiaETaxTemplates(o =>
+{
+    o.TemplateVersion = TaxDocumentTemplates.LatestVersion;     // "3" (หนึ่ง); "2" is เอ็ด; the default stays "1", so upgrading changes nothing by itself
+});
+```
+
+`ConfigureThemiaETaxTemplates` may be called before or after the other `AddThemiaETax*` methods and validates at registration.
+Changing `TemplateVersion` later only affects documents issued after the change: an issued document is always rendered under the version recorded on it,
+so its words never change.

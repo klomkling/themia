@@ -29,8 +29,13 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ### Added
 - **`Themia.ETax.ThaiBahtText`** (coord #0164 Q15): the amount in Thai words, moved here from the unreleased `Themia.ETax.Withholding` so that
-  receipts, tax invoices and credit notes can use it too (template `"1"` of those documents is frozen and does not print it; that would be
-  template `"2"`). New `ThaiBahtTextEtMode` chooses the "เอ็ด" convention: `Always` (default, the previous behaviour) or `TensOnly`.
+  receipts, tax invoices and credit notes can use it too. New `ThaiBahtTextEtMode` chooses the "เอ็ด" convention: `Always` (default, the previous
+  behaviour) or `TensOnly`.
+- **Tax document template version 2** (coord #0158 [27]): template 1 plus the amount in Thai words under the totals (the grand total including VAT; the
+  credited or debited amount on a credit or debit note). Template 1 is untouched and keeps rendering issued documents byte-identically (its golden
+  hashes are unchanged); template 2 has its own golden hashes. Version `"2"` reads a units digit of 1 as "เอ็ด", version `"3"` as "หนึ่ง" (same layout), so the convention is frozen
+  with each issued document. Adopters opt in for new documents with `ConfigureThemiaETaxTemplates(o => o.TemplateVersion = "3")`; the default stays `"1"`.
+  `TaxDocumentService` gains a constructor taking `TaxDocumentTemplateOptions` (the old constructor remains).
 - **`Themia.ETax.Withholding` (new neutral package, `net8.0;net10.0`; coord #0164 Phase 2, PR-A: core only, not yet adoptable):**
   `WithholdingCertificateSnapshot` (withholding certificate, form 50 bis) with a deterministic versioned-JSON serializer and
   SHA-256 hash (same storage rules as the tax invoice snapshot), `WithholdingSnapshotValidator` (parties, catalogue

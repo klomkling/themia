@@ -20,8 +20,41 @@ public static class ThemiaETaxServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(services);
 
         services.AddThemiaPdf(configurePdf);
+        _ = TemplateOptionsOf(services);
         services.TryAddSingleton<TaxDocumentRenderer>();
         return services;
+    }
+
+    /// <summary>
+    /// Chooses the template version new documents are issued under (opt into <c>"2"</c> or <c>"3"</c>, which print the amount in Thai words, reading a
+    /// units digit of 1 as "เอ็ด" or "หนึ่ง"). Documents already issued keep the version they were issued under. Call in any order relative to
+    /// <see cref="AddThemiaETaxRendering"/> and <see cref="AddThemiaETaxDocuments"/>.
+    /// </summary>
+    /// <param name="services">The service collection.</param>
+    /// <param name="configure">Changes the <see cref="TaxDocumentTemplateOptions"/>.</param>
+    /// <exception cref="InvalidOperationException">The template version is not supported.</exception>
+    public static IServiceCollection ConfigureThemiaETaxTemplates(
+        this IServiceCollection services, Action<TaxDocumentTemplateOptions> configure)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(configure);
+
+        var options = TemplateOptionsOf(services);
+        configure(options);
+        options.Validate();    // fail at registration, not at the first invoice
+        return services;
+    }
+
+    // One shared options instance per collection, whichever method registers it first.
+    private static TaxDocumentTemplateOptions TemplateOptionsOf(IServiceCollection services)
+    {
+        var existing = services.LastOrDefault(d => d.ServiceType == typeof(TaxDocumentTemplateOptions))?.ImplementationInstance as TaxDocumentTemplateOptions;
+        if (existing is not null)
+            return existing;
+
+        var created = new TaxDocumentTemplateOptions();
+        services.AddSingleton(created);
+        return created;
     }
 
     /// <summary>

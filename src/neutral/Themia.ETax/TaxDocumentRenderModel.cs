@@ -9,7 +9,7 @@ internal static class TaxDocumentRenderModel
     private const string HeadOfficeBranch = "00000";
     private const int BuddhistEraOffset = 543;
 
-    public static object Build(TaxDocumentSnapshot s, TaxDocumentMarker marker, string fontCss)
+    public static object Build(TaxDocumentSnapshot s, TaxDocumentMarker marker, string fontCss, ThaiBahtTextEtMode etMode)
     {
         var (titleTh, titleEn) = Title(s.Kind);
         var (markerTh, markerEn, markerKey) = Mark(marker);
@@ -41,6 +41,8 @@ internal static class TaxDocumentRenderModel
                 withheld = s.Totals.WithheldSatang > 0 ? Money(s.Totals.WithheldSatang) : null,
                 netReceived = Money(s.Totals.NetReceivedSatang),
             },
+            // The document total: the grand total including VAT; for a credit or debit note, the amount credited or debited. Printed by template 2 only.
+            amountInWords = ThaiBahtText.Format(s.Totals.InclVatSatang, etMode),
             note = s.Note is { } n ? Note(s.Kind, n) : null,
             replacement = s.Replacement is { } r
                 ? new { originalNumber = r.OriginalDocumentNumber, originalDate = Date(r.OriginalIssueDate), reason = r.Reason }
