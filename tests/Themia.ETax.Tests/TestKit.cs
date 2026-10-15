@@ -175,12 +175,12 @@ internal sealed class HookedStore(ITaxDocumentStore inner) : ITaxDocumentStore
 
     public Task<bool> ReleaseAsync(
         Guid id, Guid claimToken, int attempts, DateTimeOffset nextAttemptAt, string errorCode,
-        TaxDocumentLeaseHandling leaseHandling = TaxDocumentLeaseHandling.Release, CancellationToken ct = default) =>
+        TaxDocumentLeaseHandling leaseHandling, CancellationToken ct = default) =>
         inner.ReleaseAsync(id, claimToken, attempts, nextAttemptAt, errorCode, leaseHandling, ct);
 
     public Task<bool> FailAsync(
         Guid id, Guid claimToken, int attempts, string errorCode,
-        TaxDocumentLeaseHandling leaseHandling = TaxDocumentLeaseHandling.Release, CancellationToken ct = default) =>
+        TaxDocumentLeaseHandling leaseHandling, CancellationToken ct = default) =>
         inner.FailAsync(id, claimToken, attempts, errorCode, leaseHandling, ct);
 
     public Task<bool> RequeueAsync(Guid id, string sellerId, string requestedBy, DateTimeOffset now, CancellationToken ct = default) =>

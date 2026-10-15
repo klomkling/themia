@@ -28,7 +28,7 @@ public static class ThemiaETaxServiceCollectionExtensions
     /// Registers issuing and sending on top of <see cref="AddThemiaETaxRendering"/>: <see cref="TaxDocumentService"/>,
     /// <see cref="TaxDocumentSender"/> and their options. The app registers <see cref="ITaxDocumentStore"/>,
     /// <see cref="ITaxDocumentNumberSource"/> and <see cref="ITaxDocumentMailer"/>; an <see cref="ITaxDocumentFailureHandler"/> is optional
-    /// (the default does nothing beyond the ERROR log). The host adds logging. Run the sender with <see cref="TaxDocumentSender.RunOnceAsync"/> on a schedule.
+    /// (the default does nothing beyond the ERROR log). The host adds logging. The service and the sender are scoped, because the app's store and number source hang off a request or tenant scope: create a scope per run and call <see cref="TaxDocumentSender.RunOnceAsync"/> on a schedule.
     /// </summary>
     /// <param name="services">The service collection.</param>
     /// <param name="configure">Configures <see cref="TaxDocumentSendOptions"/>; <see cref="TaxDocumentSendOptions.RevenueDepartmentAddress"/> is required.</param>
@@ -55,8 +55,8 @@ public static class ThemiaETaxServiceCollectionExtensions
         services.TryAddSingleton(validation);
         services.TryAddSingleton(TimeProvider.System);
         services.TryAddSingleton<ITaxDocumentFailureHandler, NullTaxDocumentFailureHandler>();
-        services.TryAddSingleton<TaxDocumentService>();
-        services.TryAddSingleton<TaxDocumentSender>();
+        services.TryAddScoped<TaxDocumentService>();
+        services.TryAddScoped<TaxDocumentSender>();
         return services;
     }
 

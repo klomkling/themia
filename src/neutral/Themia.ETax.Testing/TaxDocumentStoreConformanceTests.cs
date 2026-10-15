@@ -194,7 +194,7 @@ public abstract class TaxDocumentStoreConformanceTests
         await InsertAsync(h, doc);
         var token = Guid.NewGuid();
         await h.Store.ClaimDueAsync(10, Now, Lease, token);
-        Assert.True(await h.Store.ReleaseAsync(doc.Id, token, 1, Now + TimeSpan.FromMinutes(10), "send_transient"));
+        Assert.True(await h.Store.ReleaseAsync(doc.Id, token, 1, Now + TimeSpan.FromMinutes(10), "send_transient", TaxDocumentLeaseHandling.Release));
 
         Assert.Empty(await h.Store.ClaimDueAsync(10, Now + TimeSpan.FromMinutes(9), Lease, Guid.NewGuid()));
         Assert.Single(await h.Store.ClaimDueAsync(10, Now + TimeSpan.FromMinutes(10), Lease, Guid.NewGuid()));
@@ -270,7 +270,7 @@ public abstract class TaxDocumentStoreConformanceTests
         var first = Guid.NewGuid();
         await h.Store.ClaimDueAsync(10, Now, Lease, first);
         await h.Store.RecordOriginalAsync(doc.Id, first, Now, "hash-1", "chrome-1|n1");
-        await h.Store.ReleaseAsync(doc.Id, first, 1, Now, "send_transient");
+        await h.Store.ReleaseAsync(doc.Id, first, 1, Now, "send_transient", TaxDocumentLeaseHandling.Release);
         var second = Guid.NewGuid();
         var later = Now + TimeSpan.FromHours(1);
         await h.Store.ClaimDueAsync(10, later, Lease, second);
@@ -396,7 +396,7 @@ public abstract class TaxDocumentStoreConformanceTests
         var doc = await PrepareOriginalAsync(h);
         var next = Now + TimeSpan.FromMinutes(5);
 
-        Assert.True(await h.Store.ReleaseAsync(doc.Id, doc.Token, 2, next, "send_transient"));
+        Assert.True(await h.Store.ReleaseAsync(doc.Id, doc.Token, 2, next, "send_transient", TaxDocumentLeaseHandling.Release));
 
         var row = (await h.Store.GetAsync(null, doc.Id, Seller))!;
         Assert.Equal(TaxDocumentState.OriginalPrepared, row.State);
@@ -404,7 +404,7 @@ public abstract class TaxDocumentStoreConformanceTests
         Assert.Equal(next, row.NextAttemptAt);
         Assert.Equal("send_transient", row.LastErrorCode);
         Assert.Null(row.ClaimToken);
-        Assert.False(await h.Store.ReleaseAsync(doc.Id, doc.Token, 3, next, "x"), "The lease is gone, so a second release must be refused.");
+        Assert.False(await h.Store.ReleaseAsync(doc.Id, doc.Token, 3, next, "x", TaxDocumentLeaseHandling.Release), "The lease is gone, so a second release must be refused.");
     }
 
     /// <summary>
@@ -447,6 +447,51 @@ public abstract class TaxDocumentStoreConformanceTests
         Assert.Equal(TaxDocumentCancelOutcome.Cancelled, await CancelAsync(h, doc.Id, Now + Lease));
     }
 
+    /// <summary>
+    /// Requeue returns a Failed document to automation but leaves any claim alone: a lease kept after a send timeout still blocks claiming and
+    /// cancelling until it lapses, even though the document is no longer Failed.
+    /// </summary>
+    [Fact]
+    public async Task Requeue_ShouldLeaveAKeptLeaseInPlace_SoNeitherClaimNorCancelWorksBeforeItLapses()
+    {
+        await using var h = await CreateHarnessAsync();
+        var doc = await PrepareOriginalAsync(h);
+        Assert.True(await h.Store.FailAsync(doc.Id, doc.Token, 5, "send_timeout", TaxDocumentLeaseHandling.KeepUntilExpiry));
+        Assert.True(await h.Store.RequeueAsync(doc.Id, Seller, "operator-1", Now));
+        var beforeExpiry = Now + TimeSpan.FromSeconds(30);
+
+        var row = (await h.Store.GetAsync(null, doc.Id, Seller))!;
+        Assert.Equal(TaxDocumentState.OriginalPrepared, row.State);
+        Assert.Equal(doc.Token, row.ClaimToken);
+        Assert.Equal(Now + Lease, row.ClaimExpiresAt);
+        Assert.Empty(await h.Store.ClaimDueAsync(10, beforeExpiry, Lease, Guid.NewGuid()));
+        Assert.Equal(TaxDocumentCancelOutcome.LeaseHeld, await CancelAsync(h, doc.Id, beforeExpiry));
+    }
+
+    /// <summary>Once the kept lease lapses, a requeued document is claimable again.</summary>
+    [Fact]
+    public async Task Requeue_ShouldMakeTheDocumentClaimable_OnceTheKeptLeaseLapses()
+    {
+        await using var h = await CreateHarnessAsync();
+        var doc = await PrepareOriginalAsync(h);
+        await h.Store.FailAsync(doc.Id, doc.Token, 5, "send_timeout", TaxDocumentLeaseHandling.KeepUntilExpiry);
+        await h.Store.RequeueAsync(doc.Id, Seller, "operator-1", Now);
+
+        Assert.Single(await h.Store.ClaimDueAsync(10, Now + Lease, Lease, Guid.NewGuid()));
+    }
+
+    /// <summary>Once the kept lease lapses, a requeued document can be cancelled for a replacement.</summary>
+    [Fact]
+    public async Task Requeue_ShouldAllowCancelling_OnceTheKeptLeaseLapses()
+    {
+        await using var h = await CreateHarnessAsync();
+        var doc = await PrepareOriginalAsync(h);
+        await h.Store.FailAsync(doc.Id, doc.Token, 5, "send_timeout", TaxDocumentLeaseHandling.KeepUntilExpiry);
+        await h.Store.RequeueAsync(doc.Id, Seller, "operator-1", Now);
+
+        Assert.Equal(TaxDocumentCancelOutcome.Cancelled, await CancelAsync(h, doc.Id, Now + Lease));
+    }
+
     /// <summary>Failing is terminal for automation.</summary>
     [Fact]
     public async Task Fail_ShouldMoveToFailed_AndBeTerminalForClaiming()
@@ -454,7 +499,7 @@ public abstract class TaxDocumentStoreConformanceTests
         await using var h = await CreateHarnessAsync();
         var doc = await PrepareOriginalAsync(h);
 
-        Assert.True(await h.Store.FailAsync(doc.Id, doc.Token, 5, "send_permanent"));
+        Assert.True(await h.Store.FailAsync(doc.Id, doc.Token, 5, "send_permanent", TaxDocumentLeaseHandling.Release));
 
         var row = (await h.Store.GetAsync(null, doc.Id, Seller))!;
         Assert.Equal(TaxDocumentState.Failed, row.State);
@@ -462,7 +507,7 @@ public abstract class TaxDocumentStoreConformanceTests
         Assert.Equal("send_permanent", row.LastErrorCode);
         Assert.Null(row.ClaimToken);
         Assert.Empty(await h.Store.ClaimDueAsync(10, Now + TimeSpan.FromDays(1), Lease, Guid.NewGuid()));
-        Assert.False(await h.Store.FailAsync(doc.Id, doc.Token, 6, "again"));
+        Assert.False(await h.Store.FailAsync(doc.Id, doc.Token, 6, "again", TaxDocumentLeaseHandling.Release));
     }
 
     /// <summary>A failed document with no ORIGINAL goes back to Issued; one with an ORIGINAL keeps it (not burned).</summary>
@@ -471,7 +516,7 @@ public abstract class TaxDocumentStoreConformanceTests
     {
         await using var h = await CreateHarnessAsync();
         var withOriginal = await PrepareOriginalAsync(h);
-        await h.Store.FailAsync(withOriginal.Id, withOriginal.Token, 5, "send_transient");
+        await h.Store.FailAsync(withOriginal.Id, withOriginal.Token, 5, "send_transient", TaxDocumentLeaseHandling.Release);
         var withoutOriginal = await InsertDrivenAsync(h, NewDoc(source: "noorig", number: "B"), TaxDocumentState.Failed);
 
         Assert.True(await h.Store.RequeueAsync(withOriginal.Id, Seller, "operator-1", Now));
@@ -707,7 +752,7 @@ public abstract class TaxDocumentStoreConformanceTests
         {
             case TaxDocumentState.OriginalPrepared:
                 Assert.True(await h.Store.RecordOriginalAsync(id, token, at, "hash-1", "chrome-1|n1"));
-                Assert.True(await h.Store.ReleaseAsync(id, token, 1, at, "send_transient"));
+                Assert.True(await h.Store.ReleaseAsync(id, token, 1, at, "send_transient", TaxDocumentLeaseHandling.Release));
                 break;
             case TaxDocumentState.Sent:
                 Assert.True(await h.Store.RecordOriginalAsync(id, token, at, "hash-1", "chrome-1|n1"));
@@ -715,7 +760,7 @@ public abstract class TaxDocumentStoreConformanceTests
                 Assert.True(await h.Store.MarkSentAsync(id, token, at, id.ToString()));
                 break;
             case TaxDocumentState.Failed:
-                Assert.True(await h.Store.FailAsync(id, token, 5, "send_permanent"));
+                Assert.True(await h.Store.FailAsync(id, token, 5, "send_permanent", TaxDocumentLeaseHandling.Release));
                 break;
             default:
                 throw new ArgumentOutOfRangeException(nameof(state));
