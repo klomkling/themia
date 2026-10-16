@@ -102,7 +102,7 @@
     <PackageVersion Include="FluentValidation" Version="12.1.1" />
     <!-- Caching providers -->
     <PackageVersion Include="StackExchange.Redis" Version="3.0.0" />
-    <PackageVersion Include="MessagePack" Version="3.1.7" />
+    <PackageVersion Include="MessagePack" Version="3.1.9" />
     <!-- Logging (Serilog) -->
     <PackageVersion Include="Serilog" Version="4.4.0" />
     <PackageVersion Include="Serilog.Extensions.Logging" Version="10.0.0" />
