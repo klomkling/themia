@@ -26,8 +26,6 @@ Themia.ETax.Withholding.WithholdingValidationCode.UnsupportedCharacter = 7 -> Th
 Themia.ETax.Withholding.WithholdingMath
 const Themia.ETax.Withholding.WithholdingMath.MaxRateBasisPoints = 10000 -> int
 static Themia.ETax.Withholding.WithholdingMath.Withhold(long baseSatang, int rateBasisPoints) -> long
-Themia.ETax.Withholding.ThaiBahtText
-static Themia.ETax.Withholding.ThaiBahtText.Format(long satang) -> string!
 Themia.ETax.Withholding.IncomeTypeEntry
 Themia.ETax.Withholding.IncomeTypeEntry.Code.get -> string!
 Themia.ETax.Withholding.IncomeTypeEntry.Code.init -> void

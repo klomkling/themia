@@ -28,12 +28,15 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 ## [Unreleased]
 
 ### Added
+- **`Themia.ETax.ThaiBahtText`** (coord #0164 Q15): the amount in Thai words, moved here from the unreleased `Themia.ETax.Withholding` so that
+  receipts, tax invoices and credit notes can use it too (template `"1"` of those documents is frozen and does not print it; that would be
+  template `"2"`). New `ThaiBahtTextEtMode` chooses the "เอ็ด" convention: `Always` (default, the previous behaviour) or `TensOnly`.
 - **`Themia.ETax.Withholding` (new neutral package, `net8.0;net10.0`; coord #0164 Phase 2, PR-A: core only, not yet adoptable):**
   `WithholdingCertificateSnapshot` (withholding certificate, form 50 bis) with a deterministic versioned-JSON serializer and
   SHA-256 hash (same storage rules as the tax invoice snapshot), `WithholdingSnapshotValidator` (parties, catalogue
   agreement, payee kind and filing form against the income type, per-row rate recomputation, totals, characters the embedded
   fonts cannot print), `WithholdingMath.Withhold` in satang/basis points with half-up rounding (**pending accountant
-  confirmation**, #0164 Q8), `ThaiBahtText.Format`, and the structure of the versioned income-type catalogue
+  confirmation**, #0164 Q8), and the structure of the versioned income-type catalogue
   (`IncomeTypeCatalogue` / `IncomeTypeEntry` with an order-independent `ContentHash` for pinning a shipped version).
   **No catalogue entries ship yet**: they wait for the accountant's answers (#0164 Q1/Q2).
 - **`Themia.ETax.Withholding` issue service (PR-C):** `WithholdingCertificateService.IssueAsync` issues in the caller's transaction,

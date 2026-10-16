@@ -15,6 +15,12 @@ No database, no HTTP: it holds the parts every issuing app must agree on, and it
 - **`VatMath`**: `AddVat` / `Split` in satang and basis points, midpoints away from zero, identical to the decimal-baht
   algorithm it was promoted from. `tests/Themia.ETax.Tests/Vectors/vatmath-parity.json` holds parity vectors
   (midpoints included) that any decimal-baht adapter can run.
+- **`ThaiBahtText.Format(satang, etMode)`**: the amount in Thai words ("หนึ่งพันสองร้อยสามสิบสี่บาทห้าสิบหกสตางค์", "…บาทถ้วน"; under one baht
+  omits the baht part). Both conventions for "เอ็ด" are in use, so the adopter chooses with `ThaiBahtTextEtMode`: `Always` (default:
+  หนึ่งร้อยเอ็ด, หนึ่งพันเอ็ดล้าน) or `TensOnly` (เอ็ดเฉพาะหลังหลักสิบ: สิบเอ็ด but หนึ่งร้อยหนึ่ง, หนึ่งพันหนึ่งล้าน). Pinned by the documented
+  examples of the ThaiBahtText package (11, 101, 211, 1001, 1,001,000,000 in both modes); that package is not a dependency. It is available
+  for receipts, tax invoices and credit notes, but template version `"1"` of those documents is frozen and does not print it: printing the
+  amount in words there would be template `"2"`.
 - **`ThaiTaxId` / `ThaiBranchCode`**: 13-digit id with optional mod-11 check digit, 5-digit branch.
 
 The `issue_date` is always supplied by the caller (the Bangkok business date of the payment or refund), never derived from UTC.
