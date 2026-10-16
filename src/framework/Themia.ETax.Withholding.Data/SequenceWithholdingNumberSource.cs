@@ -8,7 +8,7 @@ namespace Themia.ETax.Withholding.Data;
 /// <summary>
 /// Gapless withholding certificate numbers over Themia's <see cref="ITransactionalSequenceAllocator"/>: the counter row is locked inside the
 /// caller's issue transaction, so a rollback returns the number. One run per payer and period, keyed <c>DocNo:ETax:Withholding:{payer}[:{period}]</c>
-/// with the Gregorian period; the printed number is <c>{prefix}-{year}-{counter}</c> (Buddhist-era year by default).
+/// with the Gregorian period; the printed number is <c>{prefix}-{year}-{counter}</c> (Buddhist-era year by default, Gregorian as an option).
 /// </summary>
 /// <remarks>Never use <c>ISequenceProvider</c> on these keys: it allocates on its own transaction and would open a gap.</remarks>
 public sealed class SequenceWithholdingNumberSource : IWithholdingNumberSource

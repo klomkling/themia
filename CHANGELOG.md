@@ -40,8 +40,8 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
   `WithholdingCertificateSnapshot` (withholding certificate, form 50 bis) with a deterministic versioned-JSON serializer and
   SHA-256 hash (same storage rules as the tax invoice snapshot), `WithholdingSnapshotValidator` (parties, catalogue
   agreement, payee kind and filing form against the income type, per-row rate recomputation, totals, characters the embedded
-  fonts cannot print), `WithholdingMath.Withhold` in satang/basis points with half-up rounding (**pending accountant
-  confirmation**, #0164 Q8), and the structure of the versioned income-type catalogue
+  fonts cannot print), `WithholdingMath.Withhold` in satang/basis points rounding up to the satang (ceiling, the Revenue Department's rule:
+  10.115, 10.114 and 10.1101 all become 10.12; not the rule of `VatMath`; #0164 [9]), and the structure of the versioned income-type catalogue
   (`IncomeTypeCatalogue` / `IncomeTypeEntry` with an order-independent `ContentHash` for pinning a shipped version).
   **Themia ships no catalogue content and no rates**: the adopter supplies its own `IncomeTypeCatalogue` and passes the rate per payment;
   Themia ships only what the official form fixes, the numbered lines of its income table (`WithholdingFormRow`) and its seven filing forms.
@@ -64,7 +64,7 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
   `WithholdingCertificateTableMap` apply the PostgreSQL immutability trigger and same-payer replacement key (an Issued certificate leaves
   Issued only by cancel-with-replacement, Cancelled is final, the replacement is write-once, no delete or truncate) and, with `ApplyIssueKey`,
   a unique index on (source event, revision) so the idempotency key is a database fact. `SequenceWithholdingNumberSource` allocates gapless
-  `WHT-{พ.ศ.}-{counter}` numbers per payer and year (`AddThemiaETaxWithholdingSequenceNumbers`). Refusal messages come from the shared guards and
+  `{prefix}-{year}-{counter}` numbers (default `WHT-2569-000123`; prefix, padding and the Gregorian year style are the adopter's options) per payer and year (`AddThemiaETaxWithholdingSequenceNumbers`). Refusal messages come from the shared guards and
   still say "tax document" / "sent".
 
 ## [0.32.0] - 2026-10-15

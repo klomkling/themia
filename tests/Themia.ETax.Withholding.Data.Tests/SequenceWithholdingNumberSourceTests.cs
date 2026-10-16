@@ -115,6 +115,25 @@ public sealed class SequenceWithholdingNumberSourceTests
     }
 
     [Fact]
+    public async Task NextNumberAsync_ShouldBuildAnyPrefixYearRunningShape_TheAdopterChooses()
+    {
+        var number = await Sut(o => { o.Prefix = "ES"; o.Padding = 4; o.Year = WithholdingNumberYear.Gregorian; })
+            .NextNumberAsync(new NoTx(), "p", new DateOnly(2026, 3, 1));
+
+        Assert.Equal("ES-2026-0001", number);
+    }
+
+    [Fact]
+    public async Task NextNumberAsync_ShouldRunPerYearOfTheIssueDate_NotOfTheCallDate()
+    {
+        _allocator.Next = 1;
+        await Sut().NextNumberAsync(new NoTx(), "p", new DateOnly(2026, 12, 31));
+        await Sut().NextNumberAsync(new NoTx(), "p", new DateOnly(2027, 1, 1));
+
+        Assert.Equal(["DocNo:ETax:Withholding:p:2026", "DocNo:ETax:Withholding:p:2027"], _allocator.Calls.Select(c => c.Key));
+    }
+
+    [Fact]
     public async Task NextNumberAsync_ShouldNotShareARunWithTaxDocuments()
     {
         await Sut().NextNumberAsync(new NoTx(), "payer-1", Date);
