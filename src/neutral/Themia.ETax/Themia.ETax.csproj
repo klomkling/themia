@@ -9,6 +9,8 @@
   <ItemGroup>
     <InternalsVisibleTo Include="Themia.ETax.Tests" />
     <InternalsVisibleTo Include="Themia.ETax.IntegrationTests" />
+    <!-- The withholding certificate renderer prints through the same fonts, number/date formatting, print options and PDF normaliser. -->
+    <InternalsVisibleTo Include="Themia.ETax.Withholding" />
   </ItemGroup>
   <ItemGroup>
     <!-- Sarabun (SIL OFL 1.1): Thai + basic Latin + Latin Extended. The licence text must travel with the font. -->

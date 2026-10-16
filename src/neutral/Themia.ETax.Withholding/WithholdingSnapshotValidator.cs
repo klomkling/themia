@@ -6,6 +6,8 @@ namespace Themia.ETax.Withholding;
 /// </summary>
 public static class WithholdingSnapshotValidator
 {
+    private const int LegacyTaxIdLength = 10;
+
     /// <summary>Returns every failed check; an empty list means the snapshot may be issued.</summary>
     /// <param name="snapshot">The snapshot to check.</param>
     /// <param name="catalogue">The income-type catalogue the rows were selected from.</param>
@@ -40,13 +42,22 @@ public static class WithholdingSnapshotValidator
             Add(errors, WithholdingValidationCode.Malformed, "book_number");
         if (s.IssueDate == default)
             Add(errors, WithholdingValidationCode.Required, "issue_date");
+        if (!Enum.IsDefined(s.PayerKind))
+            Add(errors, WithholdingValidationCode.Malformed, "payer_kind");
         if (!Enum.IsDefined(s.PayeeKind))
             Add(errors, WithholdingValidationCode.Malformed, "payee_kind");
+        if (s.PayerLegacyTaxId is not null && !IsLegacyTaxId(s.PayerLegacyTaxId))
+            Add(errors, WithholdingValidationCode.Malformed, "payer_legacy_tax_id");
+        if (s.PayeeLegacyTaxId is not null && !IsLegacyTaxId(s.PayeeLegacyTaxId))
+            Add(errors, WithholdingValidationCode.Malformed, "payee_legacy_tax_id");
         if (!Enum.IsDefined(s.FilingForm))
             Add(errors, WithholdingValidationCode.Malformed, "filing_form");
         if (s.FilingSequence is < 1)
             Add(errors, WithholdingValidationCode.Malformed, "filing_sequence");
     }
+
+    private static bool IsLegacyTaxId(string value) =>
+        value.Length == LegacyTaxIdLength && value.All(char.IsAsciiDigit);
 
     private static void ValidateParty(
         TaxParty? party, string path, bool isPayer, bool checksum, List<WithholdingValidationError> errors)
@@ -91,6 +102,7 @@ public static class WithholdingSnapshotValidator
             return;
         }
 
+        var seenRows = new HashSet<WithholdingFormRow>();
         var formNotAllowed = false;
         var kindNotAllowed = false;
         for (var i = 0; i < s.Rows.Count; i++)
@@ -101,6 +113,12 @@ public static class WithholdingSnapshotValidator
                 Add(errors, WithholdingValidationCode.Required, $"rows[{i}]");
                 continue;
             }
+
+            // The certificate has one line per form row, so a second income of the same row has nowhere to be printed.
+            if (!Enum.IsDefined(row.FormRow))
+                Add(errors, WithholdingValidationCode.Malformed, $"rows[{i}].form_row");
+            else if (!seenRows.Add(row.FormRow))
+                Add(errors, WithholdingValidationCode.NotAllowed, $"rows[{i}].form_row");
 
             ValidateRowCatalogue(row, i, catalogue, errors, s, ref formNotAllowed, ref kindNotAllowed);
             ValidateRowAmounts(row, i, s.IssueDate, errors);

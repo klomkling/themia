@@ -20,12 +20,12 @@ public sealed record IncomeTypeEntry
     /// <summary>The label as printed on the certificate.</summary>
     public required string LabelTh { get; init; }
 
-    /// <summary>The numbered row of the income table on the certificate (1-based).</summary>
-    public required int FormRow { get; init; }
+    /// <summary>The line of the income table on the certificate that this income type is printed on.</summary>
+    public required WithholdingFormRow FormRow { get; init; }
 
     /// <summary>The returns this income type may be filed in.</summary>
     public required IReadOnlyList<WithholdingFilingForm> AllowedFilingForms { get; init; }
 
     /// <summary>The kinds of payee this income type may be paid to.</summary>
-    public required IReadOnlyList<WithholdingPayeeKind> AllowedPayeeKinds { get; init; }
+    public required IReadOnlyList<WithholdingPartyKind> AllowedPayeeKinds { get; init; }
 }
