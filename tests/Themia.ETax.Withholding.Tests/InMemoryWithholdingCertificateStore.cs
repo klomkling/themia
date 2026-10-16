@@ -75,6 +75,7 @@ internal sealed class InMemoryWithholdingCertificateStore : IWithholdingCertific
                 SnapshotJson = document.SnapshotJson,
                 SnapshotSchemaVersion = document.SnapshotSchemaVersion,
                 SnapshotSha256 = document.SnapshotSha256,
+                SignatureSha256 = document.SignatureSha256,
                 TemplateVersion = document.TemplateVersion,
                 State = WithholdingCertificateState.Issued,
                 CreatedAt = document.CreatedAt,

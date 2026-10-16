@@ -259,8 +259,30 @@ Themia.ETax.Withholding.WithholdingCertificateSnapshot.PayeeLegacyTaxId.get -> s
 Themia.ETax.Withholding.WithholdingCertificateSnapshot.PayeeLegacyTaxId.init -> void
 static Themia.ETax.Withholding.WithholdingTemplates.IsSupported(string? templateVersion) -> bool
 Themia.ETax.Withholding.WithholdingCertificateRenderer
-Themia.ETax.Withholding.WithholdingCertificateRenderer.RenderAsync(Themia.ETax.Withholding.WithholdingCertificateSnapshot! snapshot, string! templateVersion, Themia.ETax.Withholding.WithholdingCopy copy, Themia.ETax.Withholding.WithholdingRenderMode mode, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.ETax.TaxDocumentRender!>!
-Themia.ETax.Withholding.WithholdingCertificateRenderer.RenderStoredAsync(Themia.ETax.Withholding.WithholdingCertificateRecord! record, Themia.ETax.Withholding.WithholdingCopy copy, Themia.ETax.Withholding.WithholdingRenderMode mode = Themia.ETax.Withholding.WithholdingRenderMode.Issued, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.ETax.TaxDocumentRender!>!
+Themia.ETax.Withholding.WithholdingCertificateRenderer.RenderAsync(Themia.ETax.Withholding.WithholdingCertificateSnapshot! snapshot, string! templateVersion, Themia.ETax.Withholding.WithholdingCopy copy, Themia.ETax.Withholding.WithholdingRenderMode mode, Themia.ETax.Withholding.WithholdingSignatureImage? signature = null, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.ETax.TaxDocumentRender!>!
+Themia.ETax.Withholding.WithholdingCertificateRenderer.RenderStoredAsync(Themia.ETax.Withholding.WithholdingCertificateRecord! record, Themia.ETax.Withholding.WithholdingCopy copy, Themia.ETax.Withholding.WithholdingRenderMode mode = Themia.ETax.Withholding.WithholdingRenderMode.Issued, Themia.ETax.Withholding.WithholdingSignatureImage? signature = null, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.ETax.TaxDocumentRender!>!
 Themia.ETax.Withholding.WithholdingCertificateRenderer.WithholdingCertificateRenderer(Themia.Pdf.IVersionedPdfRenderer! pdf) -> void
 Microsoft.Extensions.DependencyInjection.ThemiaETaxWithholdingRenderingExtensions
 static Microsoft.Extensions.DependencyInjection.ThemiaETaxWithholdingRenderingExtensions.AddThemiaETaxWithholdingRendering(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Themia.Pdf.ThemiaPdfOptions!>? configurePdf = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+Themia.ETax.Withholding.IWithholdingNumberSource.NextNumberInSeriesAsync(System.Data.Common.DbTransaction! tx, string! payerId, string? series, System.DateOnly issueDate, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<string!>!
+Themia.ETax.Withholding.IssueWithholdingCertificateRequest.Series.get -> string?
+Themia.ETax.Withholding.IssueWithholdingCertificateRequest.Series.init -> void
+Themia.ETax.Withholding.WithholdingSignatureImage
+const Themia.ETax.Withholding.WithholdingSignatureImage.MaxBytes = 262144 -> int
+Themia.ETax.Withholding.WithholdingSignatureImage.Length.get -> int
+Themia.ETax.Withholding.WithholdingSignatureImage.MediaType.get -> string!
+Themia.ETax.Withholding.WithholdingSignatureImage.WithholdingSignatureImage(byte[]! bytes) -> void
+Themia.ETax.Withholding.WithholdingCertificateRecord.SignatureSha256.get -> string?
+Themia.ETax.Withholding.WithholdingCertificateRecord.SignatureSha256.init -> void
+Themia.ETax.Withholding.NewWithholdingCertificate.SignatureSha256.get -> string?
+Themia.ETax.Withholding.NewWithholdingCertificate.SignatureSha256.init -> void
+Themia.ETax.Withholding.IssueWithholdingCertificateRequest.Signature.get -> Themia.ETax.Withholding.WithholdingSignatureImage?
+Themia.ETax.Withholding.IssueWithholdingCertificateRequest.Signature.init -> void
+Themia.ETax.Withholding.WithholdingSignatureImage.Sha256.get -> string!
+Themia.ETax.Withholding.WithholdingSignatureFailure
+Themia.ETax.Withholding.WithholdingSignatureFailure.DifferentImage = 0 -> Themia.ETax.Withholding.WithholdingSignatureFailure
+Themia.ETax.Withholding.WithholdingSignatureFailure.MissingImage = 1 -> Themia.ETax.Withholding.WithholdingSignatureFailure
+Themia.ETax.Withholding.WithholdingSignatureFailure.NotIssuedWithOne = 2 -> Themia.ETax.Withholding.WithholdingSignatureFailure
+Themia.ETax.Withholding.WithholdingSignatureException
+Themia.ETax.Withholding.WithholdingSignatureException.Failure.get -> Themia.ETax.Withholding.WithholdingSignatureFailure
+Themia.ETax.Withholding.WithholdingSignatureException.WithholdingSignatureException(Themia.ETax.Withholding.WithholdingSignatureFailure failure) -> void

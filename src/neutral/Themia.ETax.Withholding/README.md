@@ -40,6 +40,9 @@ cancel pending until you roll back).
   must serialise racing issuers of one key) and `IWithholdingNumberSource` (gapless, inside the transaction). Run the store through
   `Themia.ETax.Withholding.Testing`. On PostgreSQL, the table's immutability trigger, same-payer replacement key and unique issue key come from
   `Themia.ETax.Withholding.Data` (`WithholdingCertificateGuards`), together with a gapless `IWithholdingNumberSource`.
+- **Series:** `IssueWithholdingCertificateRequest.Series` (the form's เล่มที่ used as a short code such as `CR` or `SF`) gives each series its own
+  gapless run per payer and year and is stored and printed as เล่มที่ (`BookNumber`). The number source must implement
+  `IWithholdingNumberSource.NextNumberInSeriesAsync` (the default implementation refuses a series); `Themia.ETax.Withholding.Data` does.
 - **Replace, never edit:** a wrong certificate is cancelled by issuing revision N+1 with `Replacement` set; the old one becomes
   `Cancelled` (final) and points at its replacement. Cancel-and-reissue under a new number that cites the old one is acceptable (a 50 ทวิ is not a
   tax invoice, so no rule fixes how it is corrected; the corrected certificate only has to carry what Director-General Notice on income tax No. 62
@@ -60,15 +63,25 @@ bytes: no clock, no culture, PDF dates pinned to the issue date, dates printed i
 - **Markings are chosen when rendering and never stored:** `WithholdingCopy.Copy1` / `Copy2` (both copy lines are printed as on the form and the
   rendered copy is marked), `WithholdingRenderMode.ReplacementCopy` ("ใบแทน" at the top: a copy of the same certificate and number for a lost
   or damaged one, not a new certificate; the certifying signature is the issuer's, outside this document) and `Cancelled` (watermark).
-- The tax in words uses `Themia.ETax.ThaiBahtText` and always reads a units digit of 1 as "หนึ่ง" (หนึ่งร้อยหนึ่ง). It is fixed by the template
-  version, not an option, so a re-render of an issued certificate never changes its words.
+- The tax in words is printed in parentheses, as on the certificates in use, with `Themia.ETax.ThaiBahtText`, and always reads a units digit of 1 as
+  "หนึ่ง" (หนึ่งร้อยหนึ่ง). That is fixed by the template version, not an option, so a re-render of an issued certificate never changes its words.
 - `RenderStoredAsync(record, copy, mode)` verifies the stored snapshot against its hash first and prints a cancelled certificate as
   cancelled whatever mode is asked.
-- The book number (เล่มที่) prints empty unless the adopter supplies `BookNumber`; the certificate number is the adopter's number source's
-  (default `WHT-2569-000123`; a shape such as `ES-2026-0001` is the adopter's choice, see `Themia.ETax.Withholding.Data`).
+- The book number (เล่มที่) is empty by default and prints empty unless the adopter supplies a series (or `BookNumber`); the certificate number is the adopter's number source's
+  (default `WHT-2569-000123`; four shapes and the year style are the adopter's options, see `Themia.ETax.Withholding.Data`).
 - Each income goes on the line of its `WithholdingFormRow`; the lines that say "(ระบุ)" (the section 3 เตรส line, "other", and the two
   other-dividend lines) print the row's `Description`, or the catalogue label when there is none. A certificate has at most one income per
   line. The form's two tax id boxes are the 13-digit id and the old 10-digit id (`PayerLegacyTaxId` / `PayeeLegacyTaxId`); the form has
   no branch box, so the branch is kept in the snapshot (the monthly return attachments ask for it) but not printed.
-- No signature is printed: the form asks for the payer's signature and an optional stamp, and whether an electronic copy needs either is
-  an open accountant question (#0164 Q9).
+- **Signature:** the adopter passes the image BYTES as a `WithholdingSignatureImage` (PNG or JPEG, at most 256 KiB, checked on construction); there is
+  no URL and no fetch. Pass it at issue (`IssueWithholdingCertificateRequest.Signature`): only its SHA-256 is recorded, in an immutable column next to
+  the snapshot and outside its hash, and the **app keeps the image**. `RenderStoredAsync(record, …, signature)` then refuses any other image with a
+  `WithholdingSignatureException` (`DifferentImage`, `MissingImage` if the certificate was signed and none is supplied, `NotIssuedWithOne` if it was
+  issued without), so an old certificate is never re-rendered with a new signer's signature, without its own, or with one it never had. A preview from a
+  snapshot (`RenderAsync`) has no record to check against and prints what it is given. The image is printed on the "ลงชื่อ … ผู้จ่ายเงิน" line; the
+  company stamp is optional on the form and is never printed. Whether an electronic copy needs a signature or stamp at all is an open accountant
+  question (#0164 Q9).
+- **Dates:** the issue date is the date the certificate record is created, set by `WithholdingCertificateService` from its `TimeProvider` in Bangkok time
+  (UTC+7), never supplied by the caller (a caller's `IssueDate` is ignored, so a certificate cannot be back- or post-dated; a date paid after today is
+  refused). The date paid prints `dd/MM/BE-year` (`22/01/2567`); the issue date under the signature prints `dd / Thai month name / BE year`
+  (`22 / พฤศจิกายน / 2567`).

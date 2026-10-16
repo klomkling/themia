@@ -34,7 +34,7 @@ public sealed class WithholdingCertificateTableMapTests
             new[]
             {
                 "id", "payer_id", "snapshot_json", "source_event_id", "revision", "document_number", "issue_date",
-                "snapshot_sha256", "snapshot_schema_version", "template_version",
+                "snapshot_sha256", "snapshot_schema_version", "template_version", "signature_sha256",
             }.Order(),
             columns.Order());
         Assert.DoesNotContain("kind", columns);

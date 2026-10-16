@@ -67,10 +67,12 @@ tr.total td.label { text-align: right; padding-right: 3mm; }
 .warn { width: 39%; border: 0.6pt solid #000; border-radius: 2.4mm; padding: 1mm 2mm; margin-right: 1.5mm; }
 .warn b { font-weight: 700; }
 .sign { flex: 1; border: 0.6pt solid #000; border-radius: 2.4mm; padding: 1mm 2mm; position: relative; text-align: center; }
-.sign .line { display: flex; align-items: flex-end; justify-content: center; margin-top: 4mm; padding-right: 22mm; }
-.sign .line .dots { width: 62mm; border-bottom: 0.4pt dotted #000; height: 4mm; }
+.sign .line { display: flex; align-items: flex-end; justify-content: center; margin-top: 10mm; padding-right: 22mm; }
+.sign .line .dots { position: relative; width: 62mm; border-bottom: 0.4pt dotted #000; height: 4mm; }
+.sign .line .dots img.signature { position: absolute; left: 50%; bottom: 0.4mm; transform: translateX(-50%); max-height: 11mm; max-width: 56mm; }
 .sign .date { margin-top: 1mm; padding-right: 22mm; }
 .sign .date span.d { display: inline-block; min-width: 12mm; border-bottom: 0.4pt dotted #000; }
+.sign .date span.d.m { min-width: 22mm; }
 .sign .cap2 { font-style: italic; padding-right: 22mm; }
 .stamp { position: absolute; right: 4mm; top: 8mm; width: 17mm; height: 17mm; border: 0.5pt solid #000; border-radius: 50%; text-align: center; font-size: 6.4pt; line-height: 1.1; padding-top: 4.6mm; }
 .note { margin-top: 1mm; font-size: 7.8pt; display: flex; }
@@ -134,7 +136,7 @@ tr.total td.label { text-align: right; padding-right: 3mm; }
         <td class="baht">{{totals.paid.baht}}</td><td class="satang">{{totals.paid.satang}}</td><td class="baht">{{totals.withheld.baht}}</td><td class="satang">{{totals.withheld.satang}}</td></tr>
     </tbody>
   </table>
-  <div class="words"><span class="lbl">รวมเงินภาษีที่หักนำส่ง <i>(ตัวอักษร)</i></span><span class="val">{{totals.withheldInWords}}</span></div>
+  <div class="words"><span class="lbl">รวมเงินภาษีที่หักนำส่ง <i>(ตัวอักษร)</i></span><span class="val">({{totals.withheldInWords}})</span></div>
 
   <div class="funds">
     <span class="item">เงินที่จ่ายเข้า กบข./กสจ./กองทุนสงเคราะห์ครูโรงเรียนเอกชน <span class="v">{{funds.governmentPension}}</span> บาท</span>
@@ -150,8 +152,8 @@ tr.total td.label { text-align: right; padding-right: 3mm; }
     <div class="warn"><b>คำเตือน</b> ผู้มีหน้าที่ออกหนังสือรับรองการหักภาษี ณ ที่จ่าย ฝ่าฝืนไม่ปฏิบัติตามมาตรา 50 ทวิ แห่งประมวลรัษฎากร ต้องรับโทษทางอาญาตามมาตรา 35 แห่งประมวลรัษฎากร</div>
     <div class="sign">
       <div>ขอรับรองว่าข้อความและตัวเลขดังกล่าวข้างต้นถูกต้องตรงกับความจริงทุกประการ</div>
-      <div class="line"><span>ลงชื่อ</span><span class="dots"></span><span>ผู้จ่ายเงิน</span></div>
-      <div class="date"><span class="d">{{issued.day}}</span> / <span class="d">{{issued.month}}</span> / <span class="d">{{issued.year}}</span></div>
+      <div class="line"><span>ลงชื่อ</span><span class="dots">{{#if signature}}<img class="signature" src="{{{signature}}}">{{/if}}</span><span>ผู้จ่ายเงิน</span></div>
+      <div class="date"><span class="d">{{issued.day}}</span> / <span class="d m">{{issued.month}}</span> / <span class="d">{{issued.year}}</span></div>
       <div class="cap2">(วัน เดือน ปี ที่ออกหนังสือรับรองฯ)</div>
       <div class="stamp">ประทับตรา<br>นิติบุคคล<br>(ถ้ามี)</div>
     </div>

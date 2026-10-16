@@ -217,6 +217,144 @@ public class ServiceTests
             (await flow.IssueAsync(Flow.Request("pay_9", Replacing(firstId, "WHT-2569-000001")))).Outcome);
     }
 
+    private static IssueWithholdingCertificateRequest InSeries(string source, string? series, WithholdingCertificateSnapshot? snapshot = null, int revision = 1) =>
+        Flow.Request(source, snapshot, revision) with { Series = series };
+
+    [Fact]
+    public async Task Issue_ShouldNumberEachSeriesOnItsOwnRun_AndPrintTheSeriesAsTheBookNumber()
+    {
+        var numbers = new Flow.SeriesNumbers();
+        var flow = new Flow(numbers: numbers);
+
+        var cr1 = await flow.IssueAsync(InSeries("pay_1", "CR"));
+        var sf1 = await flow.IssueAsync(InSeries("pay_2", "SF"));
+        var cr2 = await flow.IssueAsync(InSeries("pay_3", "CR"));
+
+        Assert.Equal("CR-001/69", flow.Row(cr1.DocumentId!.Value).DocumentNumber);
+        Assert.Equal("SF-001/69", flow.Row(sf1.DocumentId!.Value).DocumentNumber);
+        Assert.Equal("CR-002/69", flow.Row(cr2.DocumentId!.Value).DocumentNumber);
+        var row = flow.Row(cr1.DocumentId!.Value);
+        Assert.Equal("CR", WithholdingSnapshotSerializer.Deserialize(row.SnapshotJson, row.SnapshotSha256).BookNumber);
+        Assert.Equal(["CR", "SF", "CR"], numbers.Requested);
+    }
+
+    [Fact]
+    public async Task Issue_ShouldAcceptABookNumberThatEqualsTheSeries_AndKeepTheBookNumberOfAnUnseriesCertificate()
+    {
+        var flow = new Flow(numbers: new Flow.SeriesNumbers());
+
+        var same = await flow.IssueAsync(InSeries("pay_1", "CR", Samples.Valid() with { BookNumber = "CR" }));
+        var plain = await flow.IssueAsync(InSeries("pay_2", null, Samples.Valid() with { BookNumber = "12" }));
+
+        var plainRow = flow.Row(plain.DocumentId!.Value);
+        Assert.Equal(WithholdingIssueOutcome.Issued, same.Outcome);
+        Assert.Equal("12", WithholdingSnapshotSerializer.Deserialize(plainRow.SnapshotJson, plainRow.SnapshotSha256).BookNumber);
+        Assert.Equal("N-001/69", plainRow.DocumentNumber);
+    }
+
+    [Fact]
+    public async Task Issue_ShouldRefuseABookNumberThatContradictsTheSeries_AndAMalformedSeries_WithoutConsumingANumber()
+    {
+        var numbers = new Flow.SeriesNumbers();
+        var flow = new Flow(numbers: numbers);
+
+        var clash = await flow.IssueAsync(InSeries("pay_1", "CR", Samples.Valid() with { BookNumber = "SF" }));
+        Assert.Equal(WithholdingIssueOutcome.ValidationFailed, clash.Outcome);
+        Assert.Equal([new WithholdingValidationError(WithholdingValidationCode.Malformed, "book_number")], clash.Errors);
+
+        foreach (var bad in new[] { "", "C:R", "-CR", new string('x', 21), "ก" })
+        {
+            var result = await flow.IssueAsync(InSeries("pay_2", bad));
+            Assert.Equal(WithholdingIssueOutcome.ValidationFailed, result.Outcome);
+            Assert.Equal([new WithholdingValidationError(WithholdingValidationCode.Malformed, "series")], result.Errors);
+        }
+
+        Assert.Empty(numbers.Requested);
+        Assert.Empty(flow.Store.Rows);
+    }
+
+    [Fact]
+    public async Task Issue_ShouldGiveTheSeriesNumberBack_WhenTheCallerRollsBack()
+    {
+        var flow = new Flow(numbers: new Flow.SeriesNumbers());
+        await using (var tx = new InMemoryWithholdingCertificateStore.FakeTransaction())
+        {
+            await flow.Service.IssueAsync(tx, InSeries("pay_1", "CR"));
+            await tx.RollbackAsync();
+        }
+
+        var again = await flow.IssueAsync(InSeries("pay_1", "CR"));
+
+        Assert.Equal("CR-001/69", flow.Row(again.DocumentId!.Value).DocumentNumber);
+    }
+
+    [Fact]
+    public async Task Issue_ShouldFailLoudly_WhenTheNumberSourceDoesNotSupportSeries()
+    {
+        var flow = new Flow(); // CountingNumbers implements only the unseries method
+
+        await Assert.ThrowsAsync<NotSupportedException>(() => flow.IssueAsync(InSeries("pay_1", "CR")));
+        Assert.Equal(WithholdingIssueOutcome.Issued, (await flow.IssueAsync(InSeries("pay_2", null))).Outcome);
+    }
+
+    [Fact]
+    public async Task Issue_ShouldSetTheIssueDateToTheCreationDateInBangkok_IgnoringTheCallers()
+    {
+        var flow = new Flow();
+
+        var result = await flow.IssueAsync(Flow.Request("pay_1", Samples.Valid() with { IssueDate = new DateOnly(2020, 1, 1) }));
+
+        var row = flow.Row(result.DocumentId!.Value);
+        Assert.Equal(WithholdingIssueOutcome.Issued, result.Outcome);
+        Assert.Equal(new DateOnly(2026, 10, 15), row.IssueDate);
+        Assert.Equal(row.IssueDate, WithholdingSnapshotSerializer.Deserialize(row.SnapshotJson, row.SnapshotSha256).IssueDate);
+    }
+
+    [Theory]
+    [InlineData("2026-10-14T16:59:59Z", "2026-10-14")] // 23:59:59 in Bangkok
+    [InlineData("2026-10-14T17:00:00Z", "2026-10-15")] // midnight in Bangkok
+    [InlineData("2026-12-31T17:00:00Z", "2027-01-01")] // the turn of the year
+    public async Task Issue_ShouldUseTheBangkokDate_NotTheUtcDate(string utcNow, string expected)
+    {
+        var flow = new Flow(now: DateTimeOffset.Parse(utcNow, System.Globalization.CultureInfo.InvariantCulture));
+
+        // A payment made today (Bangkok) must not be rejected as "after the issue date".
+        var s = Samples.Valid();
+        var date = DateOnly.Parse(expected, System.Globalization.CultureInfo.InvariantCulture);
+        var result = await flow.IssueAsync(Flow.Request("pay_1", s with { Rows = [s.Rows[0] with { DatePaid = date }] }));
+
+        Assert.Equal(WithholdingIssueOutcome.Issued, result.Outcome);
+        Assert.Equal(date, flow.Row(result.DocumentId!.Value).IssueDate);
+    }
+
+    [Fact]
+    public async Task Issue_ShouldRefuseADatePaidAfterToday_BecauseTheIssueDateIsTheClocks()
+    {
+        var flow = new Flow(); // today in Bangkok: 2026-10-15
+        var s = Samples.Valid();
+
+        var result = await flow.IssueAsync(Flow.Request("pay_1", s with { Rows = [s.Rows[0] with { DatePaid = new DateOnly(2026, 10, 16) }] }));
+
+        Assert.Equal(WithholdingIssueOutcome.ValidationFailed, result.Outcome);
+        Assert.Contains(new WithholdingValidationError(WithholdingValidationCode.Malformed, "rows[0].date_paid"), result.Errors);
+    }
+
+    [Fact]
+    public async Task Issue_ShouldRecordTheSignatureHash_OutsideTheSnapshot_AndNothingWhenThereIsNone()
+    {
+        var flow = new Flow();
+        var png = new WithholdingSignatureImage(SignatureFixtures.Png);
+
+        var signed = await flow.IssueAsync(Flow.Request("pay_1") with { Signature = png });
+        var plain = await flow.IssueAsync(Flow.Request("pay_2"));
+
+        var row = flow.Row(signed.DocumentId!.Value);
+        Assert.Equal(png.Sha256, row.SignatureSha256);
+        Assert.Equal(64, row.SignatureSha256!.Length);
+        Assert.DoesNotContain(png.Sha256, row.SnapshotJson, StringComparison.Ordinal);
+        Assert.Null(flow.Row(plain.DocumentId!.Value).SignatureSha256);
+    }
+
     [Fact]
     public async Task Issue_ShouldRejectBadArguments()
     {

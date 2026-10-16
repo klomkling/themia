@@ -31,8 +31,26 @@ WithholdingCertificateGuards.ApplyIssueKey(this, map);
 
 ## Certificate numbers (`SequenceWithholdingNumberSource`)
 
-`services.AddThemiaETaxWithholdingSequenceNumbers()` registers the `IWithholdingNumberSource`: `WHT-{year}-{counter}`, one gapless run per
-payer and year over Themia's transactional sequence allocator (key `DocNo:ETax:Withholding:{payer}:{yyyy}`, separate from every tax document
-run). The printed shape is `{prefix}-{year}-{counter}` with the Buddhist-era year by default (`WHT-2569-000123`). Prefix, padding and year style are
-the adopter's options: `o.Prefix = "ES"; o.Padding = 4; o.Year = WithholdingNumberYear.Gregorian;` gives `ES-2026-0001`. The run is gapless per payer
-and per year of the issue date; the counter key always uses the Gregorian year, so changing the style never restarts a run. Needs `AddThemiaSequences`.
+`services.AddThemiaETaxWithholdingSequenceNumbers()` registers the `IWithholdingNumberSource`: one gapless run per payer and per year of the issue
+date over Themia's transactional sequence allocator (key `DocNo:ETax:Withholding:{payer}:{yyyy}`, separate from every tax document run). The printed
+shape, the prefix and the year style are the adopter's options (below); the counter key always uses the Gregorian year, so changing the printed style
+never restarts a run. Needs `AddThemiaSequences`.
+
+### Number shape and series
+
+`WithholdingNumberOptions.Shape` chooses one of four shapes; the running number is always 6 digits, and `Year` chooses the year style
+(Buddhist era by default, Gregorian an option):
+
+| `Shape` | Prints (issue date in 2026, 10th number) |
+|---|---|
+| `PrefixYearSeq` (default) | `WHT-2569-000010` (`Prefix` is `WHT` unless you set it) |
+| `SeqSlashYear2` | `000010/69` |
+| `PrefixYearMonthSeq` | `WHT-6910-000010` (2-digit year of the era, 2-digit month; the only shape that allows `Period = Monthly`) |
+| `YearSeq` | `2569-000010` |
+
+The run restarts yearly by default (`Period`). `Period = Monthly` restarts it each month and is valid only with `PrefixYearMonthSeq`: every other shape
+prints the year only, so a monthly run would print the same number in two months, and the options fail at startup instead.
+
+A **series** is the form's เล่มที่ used as a short code (`CR`, `SF`). It is **empty by default**. Pass `Series` in the issue request and that series has
+its own gapless run per payer and per year of the issue date; it is printed as เล่มที่ (not inside the number). The series is part of the run key
+(`…:series=CR:2026`), so the run of a payer that never uses a series keeps its key. 1 to 20 letters, digits, hyphens or underscores.

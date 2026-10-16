@@ -18,8 +18,11 @@ public sealed record WithholdingCertificateSnapshot
     /// <summary>The book number as printed (เล่มที่), if the payer uses one.</summary>
     public string? BookNumber { get; init; }
 
-    /// <summary>The date of issue, supplied by the caller (the Bangkok business date), never derived from UTC.</summary>
-    public required DateOnly IssueDate { get; init; }
+    /// <summary>
+    /// The date of issue: the date the certificate record is created, in Bangkok time. <see cref="WithholdingCertificateService"/> sets it from its
+    /// <see cref="TimeProvider"/> and ignores whatever the caller put here, so an issuer cannot back- or post-date a certificate.
+    /// </summary>
+    public DateOnly IssueDate { get; init; }
 
     /// <summary>The withholder (ผู้มีหน้าที่หักภาษี ณ ที่จ่าย). Tax id, branch and address are required.</summary>
     public required TaxParty Payer { get; init; }

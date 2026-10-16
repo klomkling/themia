@@ -11,7 +11,7 @@ public sealed class RegistrationTests
     {
         var services = new ServiceCollection();
         services.AddScoped<ITransactionalSequenceAllocator, NullAllocator>();
-        services.AddThemiaETaxWithholdingSequenceNumbers(o => o.Padding = 4);
+        services.AddThemiaETaxWithholdingSequenceNumbers(o => o.Shape = WithholdingNumberShape.YearSeq);
         using var provider = services.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true, ValidateOnBuild = true });
         using var scope = provider.CreateScope();
 
@@ -22,7 +22,7 @@ public sealed class RegistrationTests
 
     [Fact]
     public void AddThemiaETaxWithholdingSequenceNumbers_ShouldFailAtRegistration_WhenTheOptionsAreInvalid() =>
-        Assert.Throws<InvalidOperationException>(() => new ServiceCollection().AddThemiaETaxWithholdingSequenceNumbers(o => o.Padding = 0));
+        Assert.Throws<InvalidOperationException>(() => new ServiceCollection().AddThemiaETaxWithholdingSequenceNumbers(o => o.Prefix = " "));
 
     [Fact]
     public void AddThemiaETaxWithholdingSequenceNumbers_ShouldRejectANullCollection() =>

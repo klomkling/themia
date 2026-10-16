@@ -15,3 +15,4 @@ Themia.ETax.Withholding.Testing.WithholdingCertificateStoreConformanceTests.Inse
 Themia.ETax.Withholding.Testing.WithholdingCertificateStoreConformanceTests.Insert_ShouldStoreEveryColumn_WhenCommitted() -> System.Threading.Tasks.Task!
 abstract Themia.ETax.Withholding.Testing.WithholdingCertificateStoreConformanceTests.CreateHarnessAsync() -> System.Threading.Tasks.Task<Themia.ETax.Withholding.Testing.IWithholdingCertificateStoreHarness!>!
 Themia.ETax.Withholding.Testing.WithholdingCertificateStoreConformanceTests.WithholdingCertificateStoreConformanceTests() -> void
+Themia.ETax.Withholding.Testing.WithholdingCertificateStoreConformanceTests.Insert_ShouldStoreTheSignatureHash_AndLeaveItNullWhenThereIsNone() -> System.Threading.Tasks.Task!

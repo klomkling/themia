@@ -33,6 +33,12 @@ public sealed record WithholdingCertificateRecord
     /// <summary>The template version the certificate was issued under.</summary>
     public required string TemplateVersion { get; init; }
 
+    /// <summary>
+    /// The SHA-256 of the signature image the certificate was issued with, or <see langword="null"/> when it was issued without one. Immutable and outside
+    /// the snapshot hash: a later render must use exactly this image (see <see cref="WithholdingCertificateRenderer.RenderStoredAsync"/>).
+    /// </summary>
+    public string? SignatureSha256 { get; init; }
+
     /// <summary>Issued or Cancelled.</summary>
     public required WithholdingCertificateState State { get; init; }
 
@@ -72,6 +78,9 @@ public sealed record NewWithholdingCertificate
 
     /// <summary>The template version the certificate is issued under.</summary>
     public required string TemplateVersion { get; init; }
+
+    /// <summary>The SHA-256 of the signature image the certificate is issued with, or <see langword="null"/> for none. Stored once and never changed.</summary>
+    public string? SignatureSha256 { get; init; }
 
     /// <summary>When the row is created.</summary>
     public required DateTimeOffset CreatedAt { get; init; }

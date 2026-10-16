@@ -165,7 +165,7 @@ public sealed partial class CertificateRendererTests
         var html = await HtmlOf();
 
         Assert.Contains("<td class=\"baht\">10,000</td><td class=\"satang\">00</td><td class=\"baht\">300</td><td class=\"satang\">00</td>", html);
-        Assert.Contains("<span class=\"val\">สามร้อยบาทถ้วน</span>", html);
+        Assert.Contains("<span class=\"val\">(สามร้อยบาทถ้วน)</span>", html);
     }
 
     private static WithholdingCertificateSnapshot WithTaxOf101Baht()
@@ -179,9 +179,9 @@ public sealed partial class CertificateRendererTests
     }
 
     [Fact]
-    public async Task RenderAsync_ShouldReadAUnitsDigitOfOneAsNeung_BecauseTheConventionIsFixedByTheTemplate()
+    public async Task RenderAsync_ShouldReadAUnitsDigitOfOneAsNeung_AndPrintTheWordsInParentheses()
     {
-        Assert.Contains("<span class=\"val\">หนึ่งร้อยหนึ่งบาทถ้วน</span>", await HtmlOf(WithTaxOf101Baht()));
+        Assert.Contains("<span class=\"val\">(หนึ่งร้อยหนึ่งบาทถ้วน)</span>", await HtmlOf(WithTaxOf101Baht()));
         Assert.Throws<ArgumentNullException>(() => new WithholdingCertificateRenderer(null!));
     }
 
@@ -249,7 +249,7 @@ public sealed partial class CertificateRendererTests
 
         Assert.Contains("เล่มที่ <b>12</b>", html);
         Assert.Contains("เลขที่ <b>WHT-2569-000123</b>", html);
-        Assert.Contains("<span class=\"d\">15</span> / <span class=\"d\">10</span> / <span class=\"d\">2569</span>", html);
+        Assert.Contains("<span class=\"d\">15</span> / <span class=\"d m\">ตุลาคม</span> / <span class=\"d\">2569</span>", html);
     }
 
     [Fact]
@@ -259,6 +259,55 @@ public sealed partial class CertificateRendererTests
 
         Assert.Contains("เล่มที่ <b></b>", html);
         Assert.Contains("เลขที่ <b>WHT-2569-000123</b>", html);
+    }
+
+    [Theory]
+    [InlineData(1, "มกราคม")]
+    [InlineData(2, "กุมภาพันธ์")]
+    [InlineData(3, "มีนาคม")]
+    [InlineData(4, "เมษายน")]
+    [InlineData(5, "พฤษภาคม")]
+    [InlineData(6, "มิถุนายน")]
+    [InlineData(7, "กรกฎาคม")]
+    [InlineData(8, "สิงหาคม")]
+    [InlineData(9, "กันยายน")]
+    [InlineData(10, "ตุลาคม")]
+    [InlineData(11, "พฤศจิกายน")]
+    [InlineData(12, "ธันวาคม")]
+    public async Task RenderAsync_ShouldWriteTheIssueDateWithTheThaiMonthName(int month, string name)
+    {
+        var s = Samples.Valid();
+        var html = await HtmlOf(s with { IssueDate = new DateOnly(2024, month, 3), Rows = [s.Rows[0] with { DatePaid = new DateOnly(2024, month, 2) }] });
+
+        Assert.Contains($"<span class=\"d\">03</span> / <span class=\"d m\">{name}</span> / <span class=\"d\">2567</span>", html);
+        Assert.Contains($"02/{month:00}/2567", html); // the date paid stays dd/MM/BE-year
+    }
+
+    [Fact]
+    public async Task RenderAsync_ShouldPlaceTheSignatureImageOnTheSignatureLine_WhenTheAdopterSuppliesOne()
+    {
+        var png = new WithholdingSignatureImage(SignatureFixtures.Png);
+
+        await Sut().RenderAsync(Samples.Valid(), "1", WithholdingCopy.Copy1, WithholdingRenderMode.Issued, png);
+        var html = Decoded(_pdf.Html!);
+
+        Assert.Contains($"<span class=\"dots\"><img class=\"signature\" src=\"data:image/png;base64,{Convert.ToBase64String(SignatureFixtures.Png)}\"></span>", html);
+        Assert.Single(Regex.Matches(html, "<img"));
+    }
+
+    [Fact]
+    public async Task RenderAsync_ShouldPrintNoImage_WithoutASignature_AndKeepTheSnapshotHashOutOfIt()
+    {
+        Assert.Contains("<span class=\"dots\"></span>", await HtmlOf());
+
+        var jpeg = new WithholdingSignatureImage(SignatureFixtures.Jpeg);
+        var record = Stored() with { SignatureSha256 = jpeg.Sha256 };
+        var before = record.SnapshotSha256;
+        await Sut().RenderStoredAsync(record, WithholdingCopy.Copy1, WithholdingRenderMode.Issued, jpeg);
+
+        Assert.Contains("data:image/jpeg;base64,", Decoded(_pdf.Html!));
+        Assert.Equal(before, record.SnapshotSha256);
+        Assert.Equal(before, WithholdingSnapshotSerializer.ComputeHash(record.SnapshotJson));
     }
 
     [Fact]
@@ -380,6 +429,58 @@ public sealed partial class CertificateRendererTests
         await Sut().RenderStoredAsync(Stored(), WithholdingCopy.Copy1, WithholdingRenderMode.ReplacementCopy);
 
         Assert.Contains("<span>ใบแทน</span>", Decoded(_pdf.Html!));
+    }
+
+    [Fact]
+    public async Task RenderStoredAsync_ShouldPrintTheSignatureRecordedAtIssue_AndRefuseAnyOtherImage()
+    {
+        var png = new WithholdingSignatureImage(SignatureFixtures.Png);
+        var other = new WithholdingSignatureImage(SignatureFixtures.Jpeg);
+        var record = Stored() with { SignatureSha256 = png.Sha256 };
+
+        await Sut().RenderStoredAsync(record, WithholdingCopy.Copy1, WithholdingRenderMode.Issued, png);
+        Assert.Contains("data:image/png;base64,", Decoded(_pdf.Html!));
+
+        var different = await Assert.ThrowsAsync<WithholdingSignatureException>(
+            () => new WithholdingCertificateRenderer(new RecordingPdfRenderer()).RenderStoredAsync(record, WithholdingCopy.Copy1, WithholdingRenderMode.Issued, other));
+        var missing = await Assert.ThrowsAsync<WithholdingSignatureException>(
+            () => new WithholdingCertificateRenderer(new RecordingPdfRenderer()).RenderStoredAsync(record, WithholdingCopy.Copy1));
+        Assert.Equal(WithholdingSignatureFailure.DifferentImage, different.Failure);
+        Assert.Equal(WithholdingSignatureFailure.MissingImage, missing.Failure);
+    }
+
+    [Fact]
+    public async Task RenderStoredAsync_ShouldRefuseASignatureForACertificateIssuedWithoutOne_AndRenderNothing()
+    {
+        var spy = new RecordingPdfRenderer();
+
+        var ex = await Assert.ThrowsAsync<WithholdingSignatureException>(
+            () => new WithholdingCertificateRenderer(spy).RenderStoredAsync(Stored(), WithholdingCopy.Copy1, WithholdingRenderMode.Issued, new WithholdingSignatureImage(SignatureFixtures.Png)));
+
+        Assert.Equal(WithholdingSignatureFailure.NotIssuedWithOne, ex.Failure);
+        Assert.Null(spy.Html);
+        Assert.DoesNotContain("Stored", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task RenderStoredAsync_ShouldCheckTheSignatureAlsoForACancelledCertificateAndAReplacementCopy()
+    {
+        var png = new WithholdingSignatureImage(SignatureFixtures.Png);
+        var record = Stored(WithholdingCertificateState.Cancelled) with { SignatureSha256 = png.Sha256 };
+
+        await Assert.ThrowsAsync<WithholdingSignatureException>(
+            () => Sut().RenderStoredAsync(record, WithholdingCopy.Copy2, WithholdingRenderMode.ReplacementCopy, new WithholdingSignatureImage(SignatureFixtures.Jpeg)));
+        await Sut().RenderStoredAsync(record, WithholdingCopy.Copy2, WithholdingRenderMode.ReplacementCopy, png);
+        Assert.Contains("class=\"cancelled-watermark\"", Decoded(_pdf.Html!));
+    }
+
+    [Fact]
+    public async Task RenderAsync_ShouldNotCheckTheSignature_BecauseThereIsNoRecordToCheckAgainst()
+    {
+        // A preview from a snapshot (no stored record) prints whatever image it is given.
+        await Sut().RenderAsync(Samples.Valid(), "1", WithholdingCopy.Copy1, WithholdingRenderMode.Issued, new WithholdingSignatureImage(SignatureFixtures.Jpeg));
+
+        Assert.Contains("data:image/jpeg;base64,", Decoded(_pdf.Html!));
     }
 
     [Fact]

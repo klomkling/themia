@@ -141,4 +141,44 @@ public sealed partial class WithholdingChromiumEqualityTests(ITestOutputHelper o
         Assert.NotEmpty(fonts);
         Assert.All(fonts, f => Assert.Contains("Sarabun", f, StringComparison.Ordinal));
     }
+
+    [Theory]
+    [InlineData("Fixtures.logo.png")]
+    [InlineData("Fixtures.logo.jpg")]
+    public async Task SignatureImage_ShouldBeIdenticalAcrossFreshBrowsers_AndStayOnOnePage(string resource)
+    {
+        var signature = new WithholdingSignatureImage(Fixtures.Resource(resource));
+
+        await using var first = NewBrowserHost();
+        var a = await first.GetRequiredService<WithholdingCertificateRenderer>()
+            .RenderAsync(WithholdingFixtures.Full(), WithholdingTemplates.CurrentVersion, WithholdingCopy.Copy1, WithholdingRenderMode.Issued, signature);
+        var unsigned = await Render(first, WithholdingFixtures.Full());
+        await Task.Delay(ClockGap);
+        await using var second = NewBrowserHost();
+        var b = await second.GetRequiredService<WithholdingCertificateRenderer>()
+            .RenderAsync(WithholdingFixtures.Full(), WithholdingTemplates.CurrentVersion, WithholdingCopy.Copy1, WithholdingRenderMode.Issued, signature);
+
+        Assert.Equal(1, PdfDiff.PageCount(a.Pdf));
+        Assert.Contains("/Subtype /Image", Fixtures.Latin1(a.Pdf));
+        PdfDiff.AssertIdentical($"withholding-signature-{resource}", a.Pdf, b.Pdf, a.RendererVersion);
+        Assert.NotEqual(unsigned.PdfSha256, a.PdfSha256);
+    }
+
+    [Fact]
+    public async Task IssueDateWithAThaiMonthName_ShouldPrintInTheEmbeddedFontOnly_ForEveryMonth()
+    {
+        await using var host = NewBrowserHost();
+        foreach (var month in Enumerable.Range(1, 12))
+        {
+            var snapshot = WithholdingFixtures.Single() with { IssueDate = new DateOnly(2026, month, 1) };
+            var render = await Render(host, snapshot);
+
+            Assert.Equal(1, PdfDiff.PageCount(render.Pdf));
+        }
+
+        var fonts = System.Text.RegularExpressions.Regex.Matches(
+            Fixtures.Latin1((await Render(host, WithholdingFixtures.Single() with { IssueDate = new DateOnly(2026, 12, 1) })).Pdf), @"/BaseFont\s*/([^\s/>\]]+)")
+            .Select(m => m.Groups[1].Value).Distinct().ToArray();
+        Assert.All(fonts, f => Assert.Contains("Sarabun", f, StringComparison.Ordinal));
+    }
 }
