@@ -377,3 +377,10 @@ static Themia.ETax.ThaiBahtText.Format(long satang, Themia.ETax.ThaiBahtTextEtMo
 Themia.ETax.ThaiBahtTextEtMode
 Themia.ETax.ThaiBahtTextEtMode.Always = 0 -> Themia.ETax.ThaiBahtTextEtMode
 Themia.ETax.ThaiBahtTextEtMode.TensOnly = 1 -> Themia.ETax.ThaiBahtTextEtMode
+const Themia.ETax.TaxDocumentTemplates.LatestVersion = "3" -> string!
+Themia.ETax.TaxDocumentService.TaxDocumentService(Themia.ETax.ITaxDocumentStore! store, Themia.ETax.ITaxDocumentNumberSource! numbers, Themia.ETax.TaxDocumentRenderer! renderer, Themia.ETax.TaxDocumentValidationOptions! validation, Themia.ETax.TaxDocumentTemplateOptions! templates, System.TimeProvider! clock, Microsoft.Extensions.Logging.ILogger<Themia.ETax.TaxDocumentService!>! logger) -> void
+Themia.ETax.TaxDocumentTemplateOptions
+Themia.ETax.TaxDocumentTemplateOptions.TaxDocumentTemplateOptions() -> void
+Themia.ETax.TaxDocumentTemplateOptions.TemplateVersion.get -> string!
+Themia.ETax.TaxDocumentTemplateOptions.TemplateVersion.set -> void
+static Microsoft.Extensions.DependencyInjection.ThemiaETaxServiceCollectionExtensions.ConfigureThemiaETaxTemplates(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Themia.ETax.TaxDocumentTemplateOptions!>! configure) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!

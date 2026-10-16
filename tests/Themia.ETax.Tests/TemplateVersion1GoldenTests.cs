@@ -13,7 +13,7 @@ namespace Themia.ETax.Tests;
 /// </summary>
 public sealed class TemplateVersion1GoldenTests
 {
-    private sealed class NoPdf : IVersionedPdfRenderer
+    internal sealed class NoPdf : IVersionedPdfRenderer
     {
         public Task<byte[]> RenderHtmlAsync(string html, PdfRenderOptions? options = null, CancellationToken ct = default) =>
             throw new NotSupportedException();
@@ -55,7 +55,7 @@ public sealed class TemplateVersion1GoldenTests
         { "receipt-cancelled-copy", "87ab7e8024aa5d36862a55512666ba20faaffbef8702efbd237770793a94ae50" },
     };
 
-    private static (TaxDocumentSnapshot Snapshot, TaxDocumentMarker Marker) Fixture(string name) => name switch
+    internal static (TaxDocumentSnapshot Snapshot, TaxDocumentMarker Marker) Fixture(string name) => name switch
     {
         "receipt-withheld-original" => (Samples.Receipt(), TaxDocumentMarker.Original),
         "receipt-copy" => (ReceiptWithoutWithholding(), TaxDocumentMarker.Copy),

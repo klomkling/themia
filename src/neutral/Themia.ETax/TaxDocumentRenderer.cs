@@ -61,5 +61,5 @@ public sealed class TaxDocumentRenderer
     }
 
     internal string RenderHtml(TaxDocumentSnapshot snapshot, string templateVersion, TaxDocumentMarker marker) =>
-        Handlebars.Compile(TaxDocumentTemplates.Get(templateVersion))(TaxDocumentRenderModel.Build(snapshot, marker, FontCss.Value));
+        Handlebars.Compile(TaxDocumentTemplates.Get(templateVersion))(TaxDocumentRenderModel.Build(snapshot, marker, FontCss.Value, TaxDocumentTemplates.EtModeOf(templateVersion)));
 }

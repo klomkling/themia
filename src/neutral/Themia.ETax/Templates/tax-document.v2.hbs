@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<title>{{documentNumber}}</title>
+<style>
+{{{fontCss}}}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body { font-family: 'Sarabun'; font-size: 10.5pt; line-height: 1.35; color: #111; }
+h1 { font-size: 16pt; margin: 0; }
+h1 small { display: block; font-size: 10.5pt; font-weight: 400; }
+.header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10pt; }
+.marker { border: 1.5pt solid #111; padding: 3pt 10pt; font-weight: 700; white-space: nowrap; }
+.meta { text-align: right; }
+.parties { display: flex; gap: 12pt; margin-bottom: 10pt; }
+.party { flex: 1; border: 0.75pt solid #888; padding: 6pt 8pt; }
+.party h2 { font-size: 10.5pt; margin: 0 0 3pt 0; }
+.party .address { white-space: pre-line; }
+table { width: 100%; border-collapse: collapse; }
+thead { display: table-header-group; }
+tr { page-break-inside: avoid; break-inside: avoid; }
+th, td { border: 0.75pt solid #888; padding: 3pt 6pt; vertical-align: top; }
+th { background: #eee; text-align: left; }
+td.num, th.num { text-align: right; white-space: nowrap; }
+td.desc { white-space: pre-line; }
+.totals { width: 55%; margin: 8pt 0 0 auto; break-inside: avoid; page-break-inside: avoid; }
+.totals td { border: 0; border-bottom: 0.75pt solid #ccc; }
+.totals tr.grand td { font-weight: 700; border-top: 1.5pt solid #111; }
+.note, .replacement { border: 0.75pt solid #888; padding: 6pt 8pt; margin-top: 10pt; break-inside: avoid; page-break-inside: avoid; }
+.note h2, .replacement h2 { font-size: 10.5pt; margin: 0 0 3pt 0; }
+.note .reason, .replacement .reason { white-space: pre-line; }
+.in-words { width: 100%; margin: 4pt 0 0 auto; padding: 3pt 6pt; border: 0.75pt solid #888; background: #f3f3f3; font-weight: 700; break-inside: avoid; page-break-inside: avoid; }
+.cancelled-watermark { position: fixed; top: 38%; left: 0; width: 100%; text-align: center; font-size: 80pt; font-weight: 700; color: rgba(200, 0, 0, 0.18); transform: rotate(-30deg); z-index: -1; }
+</style>
+</head>
+<body>
+{{#if cancelled}}<div class="cancelled-watermark">ยกเลิก CANCELLED</div>{{/if}}
+<div class="header">
+  <h1>{{titleTh}}<small>{{titleEn}}</small></h1>
+  <div class="meta">
+    <div class="marker" data-marker="{{marker}}">{{markerTh}} ({{markerEn}})</div>
+    <div>เลขที่ / No. <strong>{{documentNumber}}</strong></div>
+    <div>วันที่ / Date <strong>{{issueDate}}</strong></div>
+  </div>
+</div>
+<div class="parties">
+  <div class="party">
+    <h2>ผู้ขาย / Seller</h2>
+    <div><strong>{{seller.name}}</strong></div>
+    <div class="address">{{seller.address}}</div>
+    <div>เลขประจำตัวผู้เสียภาษี / Tax ID: {{seller.taxId}}</div>
+    <div>{{seller.branch}}</div>
+  </div>
+  <div class="party">
+    <h2>ผู้ซื้อ / Buyer</h2>
+    <div><strong>{{buyer.name}}</strong></div>
+    {{#if buyer.address}}<div class="address">{{buyer.address}}</div>{{/if}}
+    {{#if buyer.taxId}}<div>เลขประจำตัวผู้เสียภาษี / Tax ID: {{buyer.taxId}}</div>{{/if}}
+    {{#if buyer.branch}}<div>{{buyer.branch}}</div>{{/if}}
+  </div>
+</div>
+{{#if note}}
+<div class="note">
+  <h2>{{note.heading}}</h2>
+  <div>เอกสารอ้างอิง / Refers to: <strong>{{note.originalNumber}}</strong> ({{note.originalDate}})</div>
+  {{#if note.reasonCode}}<div>รหัสเหตุผล / Reason code: {{note.reasonCode}}</div>{{/if}}
+  <div class="reason">เหตุผล / Reason: {{note.reason}}</div>
+  {{#if note.refundedNet}}<div>เงินที่คืนจริง / Refunded: <strong>{{note.refundedNet}}</strong></div>{{/if}}
+  {{#if note.originalValue}}<div>มูลค่าเดิม / Original value: {{note.originalValue}}</div>{{/if}}
+  {{#if note.correctedValue}}<div>มูลค่าที่ถูกต้อง / Corrected value: {{note.correctedValue}}</div>{{/if}}
+</div>
+{{/if}}
+<table>
+  <thead>
+    <tr><th style="width: 8%">#</th><th>รายการ / Description</th><th class="num" style="width: 22%">จำนวนเงิน / Amount</th></tr>
+  </thead>
+  <tbody>
+    {{#each lines}}
+    <tr><td>{{number}}</td><td class="desc">{{description}}</td><td class="num">{{amount}}</td></tr>
+    {{/each}}
+  </tbody>
+</table>
+<table class="totals">
+  <tr><td>มูลค่าก่อนภาษี / Subtotal</td><td class="num">{{totals.exVat}}</td></tr>
+  <tr><td>ภาษีมูลค่าเพิ่ม / VAT {{totals.rate}}</td><td class="num">{{totals.vat}}</td></tr>
+  <tr class="grand"><td>รวมทั้งสิ้น / Total</td><td class="num">{{totals.inclVat}}</td></tr>
+  {{#if totals.withheld}}
+  <tr class="withheld"><td>หักภาษี ณ ที่จ่าย / Tax withheld</td><td class="num">{{totals.withheld}}</td></tr>
+  <tr class="grand"><td>ยอดสุทธิที่ได้รับ / Net received</td><td class="num">{{totals.netReceived}}</td></tr>
+  {{/if}}
+</table>
+<div class="in-words">ตัวอักษร / In words: {{amountInWords}}</div>
+{{#if replacement}}
+<div class="replacement">
+  <h2>เอกสารนี้ออกแทนฉบับเดิม / This document replaces</h2>
+  <div><strong>{{replacement.originalNumber}}</strong> ({{replacement.originalDate}})</div>
+  <div class="reason">เหตุผล / Reason: {{replacement.reason}}</div>
+</div>
+{{/if}}
+</body>
+</html>

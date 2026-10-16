@@ -196,14 +196,15 @@ internal sealed class Flow
     public static readonly DateTimeOffset Start = new(2026, 10, 14, 5, 0, 0, TimeSpan.Zero);
     public const string Seller = "seller-1";
 
-    public Flow(TaxDocumentSendOptions? options = null)
+    public Flow(TaxDocumentSendOptions? options = null, TaxDocumentTemplateOptions? templates = null)
     {
         Options = options ?? new TaxDocumentSendOptions { RevenueDepartmentAddress = "rd@example.test" };
         Clock = new ManualTimeProvider(Start);
         InMemory = new InMemoryTaxDocumentStore();
         Store = new HookedStore(InMemory);
+        templates ??= new TaxDocumentTemplateOptions();
         Renderer = new TaxDocumentRenderer(Pdf);
-        Service = new TaxDocumentService(Store, Numbers, Renderer, new TaxDocumentValidationOptions(), Clock, new CapturingLogger<TaxDocumentService>(Logs));
+        Service = new TaxDocumentService(Store, Numbers, Renderer, new TaxDocumentValidationOptions(), templates, Clock, new CapturingLogger<TaxDocumentService>(Logs));
         Sender = new TaxDocumentSender(Store, Mailer, Failures, Renderer, Options, Clock, new CapturingLogger<TaxDocumentSender>(Logs));
     }
 

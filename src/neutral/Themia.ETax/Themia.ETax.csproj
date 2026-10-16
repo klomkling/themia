@@ -16,6 +16,7 @@
     <EmbeddedResource Include="Fonts/Sarabun-Bold.ttf" LogicalName="Fonts.Sarabun-Bold.ttf" />
     <EmbeddedResource Include="Fonts/OFL.txt" LogicalName="Fonts.OFL.txt" />
     <EmbeddedResource Include="Templates/tax-document.v1.hbs" LogicalName="Templates.tax-document.v1.hbs" />
+    <EmbeddedResource Include="Templates/tax-document.v2.hbs" LogicalName="Templates.tax-document.v2.hbs" />
     <None Include="Fonts/OFL.txt" Pack="true" PackagePath="licenses/Sarabun-OFL.txt" />
   </ItemGroup>
   <ItemGroup>
