@@ -27,13 +27,19 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.33.0] - 2026-10-17
+
+First release of the Thai withholding tax certificate (หนังสือรับรองการหักภาษี ณ ที่จ่าย, form 50 ทวิ) packages (coord #0164), and the Thai baht text
+and tax document template 2 that `Themia.ETax` gains with them. `Themia.ETax.Withholding`, `Themia.ETax.Withholding.Data` and
+`Themia.ETax.Withholding.Testing` are new packages; nothing existing is changed incompatibly.
+
 ### Added
 - **`Themia.ETax.ThaiBahtText`** (coord #0164 Q15): the amount in Thai words, moved here from the unreleased `Themia.ETax.Withholding` so that
   receipts, tax invoices and credit notes can use it too. New `ThaiBahtTextEtMode` chooses the "เอ็ด" convention: `Always` (default, the previous
   behaviour) or `TensOnly`.
 - **Tax document template version 2** (coord #0158 [27]): template 1 plus the amount in Thai words under the totals (the grand total including VAT; the
   credited or debited amount on a credit or debit note). Template 1 is untouched and keeps rendering issued documents byte-identically (its golden
-  hashes are unchanged); template 2 has its own golden hashes. Version `"2"` reads a units digit of 1 as "เอ็ด", version `"3"` as "หนึ่ง" (same layout), so the convention is frozen
+  hashes are unchanged); template 2 has its own golden hashes. Version `"2"` reads a units digit of 1 as "เอ็ด", version `"3"` is `TensOnly` (หนึ่งร้อยหนึ่ง but ยี่สิบเอ็ด; same layout), so the convention is frozen
   with each issued document. Adopters opt in for new documents with `ConfigureThemiaETaxTemplates(o => o.TemplateVersion = "3")`; the default stays `"1"`.
   `TaxDocumentService` gains a constructor taking `TaxDocumentTemplateOptions` (the old constructor remains).
 - **`Themia.ETax.Withholding` (new neutral package, `net8.0;net10.0`; coord #0164 Phase 2):**
@@ -56,17 +62,16 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
   funds line, the four payer conditions, signature and issue date, stamp optional, the tax id footnote) on one A4 page, template `"1"` frozen by
   golden hashes, byte-stable on Chromium (`AddThemiaETaxWithholdingRendering`). Render-time markings, never stored: Copy 1, Copy 2, a
   cancelled watermark and "ใบแทน" (replacement copy of a lost certificate, same number). The snapshot follows the form: lines are the typed
-  `WithholdingFormRow` (was a number). The tax in words reads a units digit of 1 as "หนึ่ง" (fixed by the template version). The snapshot
+  `WithholdingFormRow` (was a number). The tax in words is `TensOnly`: หนึ่งร้อยหนึ่ง but ยี่สิบเอ็ด, fixed by the template version. The snapshot
   follows the form: `WithholdingPartyKind` (the five kinds the form asks for) replaces the two-value payee kind and is also
   recorded for the payer, optional 10-digit `PayerLegacyTaxId` / `PayeeLegacyTaxId`, and one income per form line.
-- **Withholding certificate numbers, series, signature and issue date (coord #0164 [12], [13]):** `WithholdingNumberOptions.Shape` chooses one of three
+- **Withholding certificate numbers, series, signature and issue date (coord #0164 [12], [13]):** `WithholdingNumberOptions.Shape` chooses one of four
   shapes with a 6-digit running number (`PrefixYearSeq` `WHT-2569-000123` by default, `SeqSlashYear2` `000010/69`, `YearSeq` `2569-000123`, `PrefixYearMonthSeq` `WHT-6910-000001`, the only shape that accepts `Period = Monthly` (any other shape with Monthly fails at startup, because it prints the year only and two months would print the same number); Buddhist-era
   year by default, Gregorian an option). `IssueWithholdingCertificateRequest.Series` (the form's เล่มที่ as a short code, empty by default) gives each
   series its own gapless run per payer and year and is printed as เล่มที่; `IWithholdingNumberSource.NextNumberInSeriesAsync` carries it. The renderer
   accepts an optional `WithholdingSignatureImage` (PNG or JPEG bytes up to 256 KiB) on the signature line, outside the snapshot hash; the SHA-256 of the
   image used at issue is recorded in an immutable column (`signature_sha256`) and a later `RenderStoredAsync` with any other image is refused with a
-  `WithholdingSignatureException`, so an old certificate is never re-rendered with a new signature. The tax in words is printed in parentheses and defaults
-  to the `TensOnly` convention (`Always` is an option). The issue date is set by `WithholdingCertificateService` from its `TimeProvider` (Bangkok date),
+  `WithholdingSignatureException`, so an old certificate is never re-rendered with a new signature. The tax in words is printed in parentheses and is `TensOnly`: หนึ่งร้อยหนึ่ง but ยี่สิบเอ็ด, fixed by the template version (not an option). The issue date is set by `WithholdingCertificateService` from its `TimeProvider` (Bangkok date),
   never by the caller, and prints as day / Thai month name / Buddhist-era year. (The layout and golden hashes of the not yet released certificate
   template `"1"` were updated accordingly.)
 - **`Themia.ETax.Withholding.Data` (new framework package, `net10.0`; PR-D):** the database helpers for the app's withholding certificate table,
@@ -74,8 +79,12 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
   `WithholdingCertificateTableMap` apply the PostgreSQL immutability trigger and same-payer replacement key (an Issued certificate leaves
   Issued only by cancel-with-replacement, Cancelled is final, the replacement is write-once, no delete or truncate) and, with `ApplyIssueKey`,
   a unique index on (source event, revision) so the idempotency key is a database fact. `SequenceWithholdingNumberSource` allocates gapless
-  `{prefix}-{year}-{counter}` numbers (default `WHT-2569-000123`; prefix, padding and the Gregorian year style are the adopter's options) per payer and year (`AddThemiaETaxWithholdingSequenceNumbers`). Refusal messages come from the shared guards and
+  `{prefix}-{year}-{counter}` numbers (default `WHT-2569-000123`; the shape, prefix, series and Gregorian year style are the adopter's options) per payer and year (`AddThemiaETaxWithholdingSequenceNumbers`). Refusal messages come from the shared guards and
   still say "tax document" / "sent".
+
+### Security
+- **Updated `MessagePack` to `3.1.9`** (`GHSA-qhrr-8q5h-9q3h`, published 2026-10-15); `Themia.Caching` depends on it. Apps that pinned `3.1.9` themselves in the
+  meantime can drop the pin.
 
 ## [0.32.0] - 2026-10-15
 
