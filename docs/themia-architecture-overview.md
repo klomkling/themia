@@ -413,7 +413,7 @@ are relative to `docs/superpowers/specs/`. A version in parentheses is the relea
   (**deferred** — builds only on the trigger in its header; no plan written yet)
 
 **Shipped without a standalone spec** — `Themia.AspNetCore.DataProtection` (0.10.0, coord #0042),
-`Themia.PromptPay` (0.14.0), `Themia.Totp` (0.18.0), `Themia.WebAuthn` (0.20.0), `Themia.Imaging` (0.21.0), `Themia.ETax` / `Themia.ETax.Testing` / `Themia.ETax.Data` (0.32.0, coord #0158).
+`Themia.PromptPay` (0.14.0), `Themia.Totp` (0.18.0), `Themia.WebAuthn` (0.20.0), `Themia.Imaging` (0.21.0), `Themia.ETax` / `Themia.ETax.Testing` / `Themia.ETax.Data` (0.32.0, coord #0158). `Themia.ETax.Withholding` / `Themia.ETax.Withholding.Testing` / `Themia.ETax.Withholding.Data` (0.33.0, coord #0164).
 
 ## Identity JWT slice (0.5.1 — 2026-06-15)
 

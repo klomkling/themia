@@ -10,7 +10,7 @@ public static class TaxDocumentTemplates
     public const string CurrentVersion = "1";
 
     /// <summary>
-    /// The newest version, which prints the amount in Thai words under the total with the units digit 1 read "หนึ่ง" (<see cref="ThaiBahtTextEtMode.TensOnly"/>).
+    /// The newest version, which prints the amount in Thai words under the total in <see cref="ThaiBahtTextEtMode.TensOnly"/> (หนึ่งร้อยหนึ่ง but ยี่สิบเอ็ด).
     /// Version <c>"2"</c> prints the same words with "เอ็ด" (<see cref="ThaiBahtTextEtMode.Always"/>). The convention is part of the version, so a document
     /// issued under either re-renders to the same bytes whatever the adopter configures later. Adopters opt into either for new documents.
     /// </summary>

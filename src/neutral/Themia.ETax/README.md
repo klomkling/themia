@@ -86,7 +86,7 @@ credited (or debited) amount on a credit (debit) note. A document records the te
 rendered with it.
 
 The adopter opts in for NEW documents; the version also fixes the "เอ็ด" convention, so it is frozen with each document: `"2"` reads a units digit of 1 as
-"เอ็ด" (หนึ่งร้อยเอ็ด), `"3"` as "หนึ่ง" (หนึ่งร้อยหนึ่ง). The layout is the same.
+"เอ็ด" (หนึ่งร้อยเอ็ด), `"3"` is `TensOnly` (หนึ่งร้อยหนึ่ง but ยี่สิบเอ็ด). The layout is the same.
 
 ```csharp
 services.AddThemiaETaxDocuments(...);

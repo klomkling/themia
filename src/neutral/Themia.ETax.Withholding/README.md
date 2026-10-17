@@ -63,8 +63,8 @@ bytes: no clock, no culture, PDF dates pinned to the issue date, dates printed i
 - **Markings are chosen when rendering and never stored:** `WithholdingCopy.Copy1` / `Copy2` (both copy lines are printed as on the form and the
   rendered copy is marked), `WithholdingRenderMode.ReplacementCopy` ("ใบแทน" at the top: a copy of the same certificate and number for a lost
   or damaged one, not a new certificate; the certifying signature is the issuer's, outside this document) and `Cancelled` (watermark).
-- The tax in words is printed in parentheses, as on the certificates in use, with `Themia.ETax.ThaiBahtText`, and always reads a units digit of 1 as
-  "หนึ่ง" (หนึ่งร้อยหนึ่ง). That is fixed by the template version, not an option, so a re-render of an issued certificate never changes its words.
+- The tax in words is printed in parentheses, as on the certificates in use, with `Themia.ETax.ThaiBahtText`, and is `TensOnly`: หนึ่งร้อยหนึ่ง but ยี่สิบเอ็ด.
+  That is fixed by the template version, not an option, so a re-render of an issued certificate never changes its words.
 - `RenderStoredAsync(record, copy, mode)` verifies the stored snapshot against its hash first and prints a cancelled certificate as
   cancelled whatever mode is asked.
 - The book number (เล่มที่) is empty by default and prints empty unless the adopter supplies a series (or `BookNumber`); the certificate number is the adopter's number source's

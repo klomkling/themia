@@ -55,7 +55,7 @@ internal static class WithholdingRenderModel
         (WithholdingFormRow.Other, 0, "6. อื่น ๆ (ระบุ)", true),
     ];
 
-    // Fixed for the certificate (หนึ่งร้อยหนึ่ง, not หนึ่งร้อยเอ็ด), not an adopter option: an option read at render time would change the bytes of
+    // Fixed for the certificate (TensOnly: หนึ่งร้อยหนึ่ง but ยี่สิบเอ็ด), not an adopter option: an option read at render time would change the bytes of
     // issued certificates when it changed. Any other convention ships as a new template version.
     private const ThaiBahtTextEtMode WordsEtMode = ThaiBahtTextEtMode.TensOnly;
 
