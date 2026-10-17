@@ -1,6 +1,8 @@
+using Microsoft.AspNetCore.Http;
 using Serilog.Core;
 using Serilog.Debugging;
 using Serilog.Events;
+using Themia.Exceptional.Middleware;
 
 namespace Themia.Exceptional.Serilog;
 
@@ -16,14 +18,26 @@ public sealed class ExceptionalSerilogSink : ILogEventSink
 {
     private readonly IExceptionStore store;
     private readonly ExceptionalOptions options;
+    private readonly IHttpContextAccessor? accessor;
 
-    /// <summary>Creates the sink.</summary>
+    /// <summary>Creates the sink without access to the current request: the stored entry carries only what the
+    /// log event's own properties supply.</summary>
     public ExceptionalSerilogSink(IExceptionStore store, ExceptionalOptions options)
+        : this(store, options, null)
+    {
+    }
+
+    /// <summary>Creates the sink. With an <paramref name="accessor"/> it reads the caller address, the captured
+    /// request body and (when <see cref="ExceptionalOptions.CaptureRequestContext"/> is on) the redacted request
+    /// context from the current request while it stores an exception. They are never log-event properties, so
+    /// no other sink sees them.</summary>
+    public ExceptionalSerilogSink(IExceptionStore store, ExceptionalOptions options, IHttpContextAccessor? accessor)
     {
         ArgumentNullException.ThrowIfNull(store);
         ArgumentNullException.ThrowIfNull(options);
         this.store = store;
         this.options = options;
+        this.accessor = accessor;
     }
 
     /// <inheritdoc />
@@ -36,6 +50,7 @@ public sealed class ExceptionalSerilogSink : ILogEventSink
         {
             var entry = ExceptionEntryFactory.FromException(logEvent.Exception, options.ApplicationName);
             ApplyContext(entry, logEvent);
+            ApplyRequest(entry);
             store.LogAsync(entry).GetAwaiter().GetResult();
         }
         catch (Exception ex)
@@ -58,6 +73,30 @@ public sealed class ExceptionalSerilogSink : ILogEventSink
         entry.RequestContext = Read(logEvent, "RequestContext");
         if (logEvent.Properties.TryGetValue("StatusCode", out var sc) && sc is ScalarValue { Value: int code })
             entry.StatusCode = code;
+    }
+
+    // Read from the request here rather than from enriched log properties: a property would be written to every
+    // sink, and these (caller IP, body, headers/cookies/form) must reach only the exception store. A value the
+    // event already carries (a host's own enricher) wins.
+    private void ApplyRequest(ExceptionEntry entry)
+    {
+        var http = accessor?.HttpContext;
+        if (http is null)
+            return;
+
+        entry.IpAddress ??= http.Connection.RemoteIpAddress?.ToString();
+        if (entry.RequestBody is null && http.Items.TryGetValue(RequestBodyLoggingMiddleware.BodyItemKey, out var body) && body is string bodyText)
+            entry.RequestBody = bodyText;
+        if (entry.RequestContext is null && options.CaptureRequestContext)
+        {
+            try { entry.RequestContext = RequestContextCapture.Build(http, options.Redactor); }
+            catch (Exception ex)
+            {
+                // Logging path: never throw. A buggy custom Redactor or serialization edge must not drop
+                // the error being logged; omit RequestContext only.
+                SelfLog.WriteLine("Themia.Exceptional: RequestContext capture failed: {0}", ex);
+            }
+        }
     }
 
     private static string? Read(LogEvent logEvent, string name)
