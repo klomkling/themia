@@ -494,7 +494,9 @@ Themia.Modules.Identity.Abstractions.OtpRecipient.UserId.init -> void
 Themia.Modules.Identity.Abstractions.IOtpRecipientResolver
 Themia.Modules.Identity.Abstractions.IOtpRecipientResolver.ResolveAsync(string! normalizedPhoneNumber, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Identity.Abstractions.OtpRecipient?>!
 Themia.Modules.Identity.Abstractions.Authentication.RefreshTokenOwner
-Themia.Modules.Identity.Abstractions.Authentication.RefreshTokenOwner.RefreshTokenOwner(System.Guid UserId, Themia.Framework.Core.Abstractions.Tenancy.TenantId? TenantId) -> void
+Themia.Modules.Identity.Abstractions.Authentication.RefreshTokenOwner.RefreshTokenOwner(System.Guid UserId, Themia.Framework.Core.Abstractions.Tenancy.TenantId? TenantId, bool TenantKnown = true) -> void
+Themia.Modules.Identity.Abstractions.Authentication.RefreshTokenOwner.TenantKnown.get -> bool
+Themia.Modules.Identity.Abstractions.Authentication.RefreshTokenOwner.TenantKnown.init -> void
 Themia.Modules.Identity.Abstractions.Authentication.RefreshTokenOwner.TenantId.get -> Themia.Framework.Core.Abstractions.Tenancy.TenantId?
 Themia.Modules.Identity.Abstractions.Authentication.RefreshTokenOwner.TenantId.init -> void
 Themia.Modules.Identity.Abstractions.Authentication.RefreshTokenOwner.UserId.get -> System.Guid

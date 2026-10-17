@@ -64,12 +64,19 @@ public readonly record struct RefreshValidationResult
 
 /// <summary>The user a refresh token belongs to and the tenant that user lives in.</summary>
 /// <param name="UserId">The owner.</param>
-/// <param name="TenantId">The owner's tenant; <see langword="null"/> for a platform user.</param>
-public sealed record RefreshTokenOwner(Guid UserId, Themia.Framework.Core.Abstractions.Tenancy.TenantId? TenantId);
+/// <param name="TenantId">The owner's tenant; <see langword="null"/> for a platform user when <paramref name="TenantKnown"/> is
+/// <see langword="true"/>.</param>
+/// <param name="TenantKnown"><see langword="false"/> when the implementation could name the owner but not the tenant (the
+/// default <see cref="IRefreshTokenService.FindOwnerAsync"/>, which only knows <see cref="IRefreshTokenService.ResolveOwnerAsync"/>);
+/// callers then keep the caller's tenant scope instead of switching to <paramref name="TenantId"/>.</param>
+public sealed record RefreshTokenOwner(Guid UserId, Themia.Framework.Core.Abstractions.Tenancy.TenantId? TenantId, bool TenantKnown = true);
 
-/// <summary>Issues, rotates, and revokes refresh tokens. All operations resolve the owning user in the
-/// ambient tenant (else genuine platform) scope before acting on a token, so cross-tenant tokens can
-/// never be rotated, revoked, or accepted.</summary>
+/// <summary>Issues, rotates, and revokes refresh tokens. Issuing, <c>RevokeAllForUserAsync</c> and the
+/// user-id based operations resolve the user in the caller's ambient tenant (else genuine platform) scope. A
+/// presented token is itself the proof of its owner: <c>ValidateAndRotateAsync</c>, <c>RevokeAsync</c>,
+/// <c>ResolveOwnerAsync</c> and <c>FindOwnerAsync</c> find the owner in whatever tenant it belongs to, whatever
+/// the caller's scope, so a refresh with no JWT works under a claims-only tenant strategy. A token can only ever
+/// act as its own user in its own tenant.</summary>
 public interface IRefreshTokenService
 {
     /// <summary>Issues a new refresh token for a user, always starting a new rotation family.</summary>
@@ -133,8 +140,12 @@ public interface IRefreshTokenService
     /// <param name="rawToken">The presented raw refresh token.</param>
     /// <param name="cancellationToken">A cancellation token.</param>
     /// <returns>The owner, or <see langword="null"/> when the token is unknown or its owner is gone.</returns>
-    /// <remarks>Default implementation returns <see langword="null"/>, like <see cref="ResolveOwnerAsync"/>, so an
-    /// existing custom implementation keeps compiling; the logout hooks then run in the caller's scope.</remarks>
-    Task<RefreshTokenOwner?> FindOwnerAsync(string rawToken, CancellationToken cancellationToken = default) =>
-        Task.FromResult<RefreshTokenOwner?>(null);
+    /// <remarks>The default implementation answers from <see cref="ResolveOwnerAsync"/> with
+    /// <see cref="RefreshTokenOwner.TenantKnown"/> <see langword="false"/>, so an existing custom implementation keeps
+    /// compiling and is looked up once; the logout hooks then run in the caller's scope.</remarks>
+    async Task<RefreshTokenOwner?> FindOwnerAsync(string rawToken, CancellationToken cancellationToken = default)
+    {
+        var userId = await ResolveOwnerAsync(rawToken, cancellationToken).ConfigureAwait(false);
+        return userId is null ? null : new RefreshTokenOwner(userId.Value, null, TenantKnown: false);
+    }
 }

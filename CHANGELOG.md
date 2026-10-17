@@ -33,6 +33,8 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 - `IUserLifecycleHooks.OnUserMutatedAsync` and the user-mutation observers now run in the mutated user's own tenant scope (the caller's scope is restored afterwards, even if a hook throws), so a hook that revokes the user's sessions reaches them when a platform admin or an anonymous reset or confirm request mutates a tenant user.
 - `OtpRecipientResolver` and `OtpLoginFlow.VerifyAsync` honour `IdentityModuleOptions.AllowPlatformLogin`: with it off a platform user can neither be sent a code nor redeem one (the resolver bypassed the gate that `IUserService.FindBy*` applies).
 - A refresh for a deactivated user is refused before the token is rotated (it was only refused afterwards, with the token already consumed).
+- Refresh honours `IdentityModuleOptions.AllowPlatformLogin`: with it off, a platform user's refresh token is refused (and not consumed). Sessions opened while the option was on no longer outlive turning it off by the refresh lifetime.
+- The default `IRefreshTokenService.FindOwnerAsync` now answers from `ResolveOwnerAsync` (new `RefreshTokenOwner.TenantKnown`, `false` for that default), so `LogoutAsync` looks the owner up once instead of twice when an implementation reports no tenant. Such an implementation still keeps the caller's scope for the logout hooks.
 
 ### Added
 

@@ -355,11 +355,12 @@ public sealed class AuthenticationFlow : IAuthenticationFlow
 
         // The token proved who the owner is, so the logout hooks and observers run as the owner's tenant, like
         // the rest of a refresh. An implementation that cannot report the tenant falls back to the caller's scope.
+        // One lookup: FindOwnerAsync also covers implementations that only know ResolveOwnerAsync.
         var owner = await TryFindOwnerAsync(refreshToken, cancellationToken).ConfigureAwait(false);
-        var userId = owner?.UserId ?? await TryResolveOwnerAsync(refreshToken, cancellationToken).ConfigureAwait(false);
+        var userId = owner?.UserId;
         logger.LogInformation("Logout for refresh token (allSessions={AllSessions}, revoked={Revoked}).", allSessions, revoked);
 
-        using (owner is null ? null : TenantContextAccessor.BeginScope(owner.TenantId))
+        using (owner is { TenantKnown: true } ? TenantContextAccessor.BeginScope(owner.TenantId) : null)
         {
             await hooks.OnLogoutAsync(new LogoutContext(userId, allSessions), cancellationToken).ConfigureAwait(false);
             await RaiseAsync((o, ct) => o.OnLogoutAsync(userId, allSessions, ct), cancellationToken).ConfigureAwait(false);
