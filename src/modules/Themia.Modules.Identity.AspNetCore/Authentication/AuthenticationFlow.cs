@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using Themia.Framework.Core.Abstractions.Tenancy;
 using Themia.Modules.Identity.Abstractions;
 using Themia.Modules.Identity.Abstractions.Authentication;
 using Themia.Modules.Identity.Abstractions.Entities;
@@ -110,6 +111,19 @@ public sealed class AuthenticationFlow : IAuthenticationFlow
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             logger.LogError(ex, "Failed to resolve the owner of a reused refresh token for audit attribution.");
+            return null;
+        }
+    }
+
+    private async Task<RefreshTokenOwner?> TryFindOwnerAsync(string rawToken, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await refreshTokens.FindOwnerAsync(rawToken, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogError(ex, "Failed to find the owner of a revoked refresh token for audit attribution.");
             return null;
         }
     }
@@ -273,6 +287,18 @@ public sealed class AuthenticationFlow : IAuthenticationFlow
             };
         }
 
+        // The refresh token has proved who the owner is, whatever scope the request arrived in (a refresh
+        // carries no JWT, so under a claims-only tenant strategy that scope is null). Everything from here,
+        // the principal factory and the hooks included, runs as the owner's tenant, so a tenant user's roles
+        // and claims resolve and an app hook sees the right tenant. The scope ends with this call.
+        using (TenantContextAccessor.BeginScope(user.TenantId))
+        {
+            return await CompleteRefreshAsync(user, replacement, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    private async Task<RefreshRotationResult> CompleteRefreshAsync(User user, RefreshIssue replacement, CancellationToken cancellationToken)
+    {
         // A deactivated or locked-out account must not keep minting tokens via refresh — otherwise
         // deactivation/lockout only takes effect when the refresh token finally expires (up to its full
         // lifetime). Mirrors the login gate (IUserService.VerifyPasswordAsync) and the external-login
@@ -308,7 +334,7 @@ public sealed class AuthenticationFlow : IAuthenticationFlow
     }
 
     /// <inheritdoc />
-    public async Task LogoutAsync(string refreshToken, bool allSessions, CancellationToken cancellationToken = default)
+    public async Task<LogoutOutcome> LogoutAsync(string refreshToken, bool allSessions, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(refreshToken);
 
@@ -319,11 +345,27 @@ public sealed class AuthenticationFlow : IAuthenticationFlow
         // leaving the refresh token valid. RevokeAsync looks the token up by hash and only stamps
         // RevokedAt (see RefreshTokenService) — the row is never deleted — so the owner is still
         // resolvable afterward and attribution is not lost by reordering.
-        await refreshTokens.RevokeAsync(refreshToken, allSessions, cancellationToken).ConfigureAwait(false);
-        var userId = await TryResolveOwnerAsync(refreshToken, cancellationToken).ConfigureAwait(false);
-        logger.LogInformation("Logout for refresh token (allSessions={AllSessions}).", allSessions);
-        await hooks.OnLogoutAsync(new LogoutContext(userId, allSessions), cancellationToken).ConfigureAwait(false);
-        await RaiseAsync((o, ct) => o.OnLogoutAsync(userId, allSessions, ct), cancellationToken).ConfigureAwait(false);
+        var revoked = await refreshTokens.RevokeAsync(refreshToken, allSessions, cancellationToken).ConfigureAwait(false);
+        if (revoked == 0)
+        {
+            // Nothing changed, so there is no logout to audit and none to report as done.
+            logger.LogWarning("Logout revoked nothing (allSessions={AllSessions}): unknown or already-revoked refresh token.", allSessions);
+            return LogoutOutcome.NotFound;
+        }
+
+        // The token proved who the owner is, so the logout hooks and observers run as the owner's tenant, like
+        // the rest of a refresh. An implementation that cannot report the tenant falls back to the caller's scope.
+        var owner = await TryFindOwnerAsync(refreshToken, cancellationToken).ConfigureAwait(false);
+        var userId = owner?.UserId ?? await TryResolveOwnerAsync(refreshToken, cancellationToken).ConfigureAwait(false);
+        logger.LogInformation("Logout for refresh token (allSessions={AllSessions}, revoked={Revoked}).", allSessions, revoked);
+
+        using (owner is null ? null : TenantContextAccessor.BeginScope(owner.TenantId))
+        {
+            await hooks.OnLogoutAsync(new LogoutContext(userId, allSessions), cancellationToken).ConfigureAwait(false);
+            await RaiseAsync((o, ct) => o.OnLogoutAsync(userId, allSessions, ct), cancellationToken).ConfigureAwait(false);
+        }
+
+        return LogoutOutcome.Revoked;
     }
 
     private Task<AuthTokens> IssueAsync(User user, CancellationToken cancellationToken) =>

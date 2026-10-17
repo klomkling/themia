@@ -74,9 +74,11 @@ public sealed class RefreshTokenService : IRefreshTokenService
             return RefreshValidationResult.Invalid();
         }
 
-        // Resolve the owning user in scope BEFORE acting on the token, so a token whose owner is not in
-        // the caller's tenant/platform scope is never read-acted-upon or written (no cross-tenant revoke).
-        var user = await IdentityScope.ResolveUserAsync(users, match.UserId, cancellationToken).ConfigureAwait(false);
+        // The presented hash IS the proof (256 random bits), so the owner is the token row's own user, found
+        // in whatever tenant it belongs to. A refresh request has no JWT, so under a claims-only tenant
+        // strategy the ambient scope is null and a scoped lookup would never find a tenant user. Nothing
+        // here accepts a tenant or a user id from the caller; the caller's scope is not consulted.
+        var user = await IdentityScope.ResolveUserAnyTenantAsync(users, match.UserId, cancellationToken).ConfigureAwait(false);
         if (user is null)
         {
             return RefreshValidationResult.Invalid();
@@ -95,6 +97,14 @@ public sealed class RefreshTokenService : IRefreshTokenService
 
         if (match.ExpiresAt <= now)
         {
+            return RefreshValidationResult.Invalid();
+        }
+
+        // A deactivated user's token is useless even if a revoke was missed. Refused before rotating, so the
+        // token is not consumed and no successor exists.
+        if (!user.IsActive)
+        {
+            logger.LogWarning("Refresh refused for user {UserId}: account inactive.", user.Id);
             return RefreshValidationResult.Invalid();
         }
 
@@ -126,7 +136,11 @@ public sealed class RefreshTokenService : IRefreshTokenService
     }
 
     /// <inheritdoc />
-    public async Task<Guid?> ResolveOwnerAsync(string rawToken, CancellationToken cancellationToken = default)
+    public async Task<Guid?> ResolveOwnerAsync(string rawToken, CancellationToken cancellationToken = default) =>
+        (await FindOwnerAsync(rawToken, cancellationToken).ConfigureAwait(false))?.UserId;
+
+    /// <inheritdoc />
+    public async Task<RefreshTokenOwner?> FindOwnerAsync(string rawToken, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(rawToken);
 
@@ -137,12 +151,12 @@ public sealed class RefreshTokenService : IRefreshTokenService
             return null;
         }
 
-        var user = await IdentityScope.ResolveUserAsync(users, match.UserId, cancellationToken).ConfigureAwait(false);
-        return user?.Id;
+        var user = await IdentityScope.ResolveUserAnyTenantAsync(users, match.UserId, cancellationToken).ConfigureAwait(false);
+        return user is null ? null : new RefreshTokenOwner(user.Id, user.TenantId);
     }
 
     /// <inheritdoc />
-    public async Task RevokeAsync(string rawToken, bool allForUser, CancellationToken cancellationToken = default)
+    public async Task<int> RevokeAsync(string rawToken, bool allForUser, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(rawToken);
 
@@ -150,13 +164,15 @@ public sealed class RefreshTokenService : IRefreshTokenService
         var match = await tokens.FirstOrDefaultAsync(new RefreshTokenByHashSpec(hash), cancellationToken).ConfigureAwait(false);
         if (match is null)
         {
-            return;
+            return 0;
         }
 
-        var user = await IdentityScope.ResolveUserAsync(users, match.UserId, cancellationToken).ConfigureAwait(false);
+        // Token-proven, like rotation: the owner is found without the caller's scope, so a logout request
+        // with no JWT revokes a tenant user's session instead of silently doing nothing.
+        var user = await IdentityScope.ResolveUserAnyTenantAsync(users, match.UserId, cancellationToken).ConfigureAwait(false);
         if (user is null)
         {
-            return;
+            return 0;
         }
 
         var now = timeProvider.GetUtcNow();
@@ -169,11 +185,10 @@ public sealed class RefreshTokenService : IRefreshTokenService
                 set => set.Set(t => t.RevokedAt, now),
                 cancellationToken).ConfigureAwait(false);
             logger.LogInformation("Revoked all active refresh tokens for user {UserId} ({Count} tokens).", match.UserId, revoked);
+            return revoked;
         }
-        else
-        {
-            await RevokeFamilyAsync(match.FamilyId, now, cancellationToken).ConfigureAwait(false);
-        }
+
+        return await RevokeFamilyAsync(match.FamilyId, now, cancellationToken).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -184,6 +199,11 @@ public sealed class RefreshTokenService : IRefreshTokenService
         var user = await IdentityScope.ResolveUserAsync(users, userId, cancellationToken).ConfigureAwait(false);
         if (user is null)
         {
+            // Not an error and not a success: 0 here can mean "no such user" or "a user in another tenant's
+            // scope". Callers that mean to end a session (a user-mutation hook, an admin action) must not
+            // read it as done, so it is loud. Token-proven logout does not come through here.
+            logger.LogWarning(
+                "RevokeAllForUser revoked nothing: user {UserId} is not visible in the current tenant scope.", userId);
             return 0;
         }
 
@@ -196,11 +216,11 @@ public sealed class RefreshTokenService : IRefreshTokenService
         return revoked;
     }
 
-    private async Task RevokeFamilyAsync(Guid familyId, DateTimeOffset now, CancellationToken cancellationToken)
+    private async Task<int> RevokeFamilyAsync(Guid familyId, DateTimeOffset now, CancellationToken cancellationToken)
     {
         // One set-based UPDATE over the family's not-yet-revoked tokens — the spec's RevokedAt == null
         // predicate means already-revoked rows are not needlessly rewritten.
-        await tokens.UpdateWhereAsync(
+        return await tokens.UpdateWhereAsync(
             new ActiveRefreshTokensByFamilySpec(familyId),
             set => set.Set(t => t.RevokedAt, now),
             cancellationToken).ConfigureAwait(false);

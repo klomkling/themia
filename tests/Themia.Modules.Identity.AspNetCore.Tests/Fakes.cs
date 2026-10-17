@@ -41,7 +41,14 @@ internal sealed class FakeUserService : IUserService
         return Task.FromResult(UserToReturn);
     }
 
-    public Task<User?> FindByIdAsync(Guid id, CancellationToken cancellationToken = default) => Task.FromResult(UserToReturn);
+    /// <summary>The ambient tenant when <see cref="FindByIdAsync"/> ran: which scope a flow looked the user up in.</summary>
+    public Themia.Framework.Core.Abstractions.Tenancy.TenantId? TenantSeenOnFindById { get; private set; }
+
+    public Task<User?> FindByIdAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        TenantSeenOnFindById = Themia.Framework.Core.Abstractions.Tenancy.TenantContextAccessor.CurrentTenantId;
+        return Task.FromResult(UserToReturn);
+    }
 
     public Task<User?> FindByEmailAsync(string email, CancellationToken cancellationToken = default)
     {
@@ -67,9 +74,18 @@ internal sealed class FakeUserService : IUserService
 
 internal sealed class FakeClaimsPrincipalFactory : IClaimsPrincipalFactory
 {
-    public Task<ClaimsPrincipal> CreateAsync(User user, string authenticationType, CancellationToken cancellationToken = default) =>
-        Task.FromResult(new ClaimsPrincipal(new ClaimsIdentity(
+    /// <summary>The ambient tenant at the moment the principal was built: proves which scope a flow ran it in.</summary>
+    public Themia.Framework.Core.Abstractions.Tenancy.TenantId? TenantSeen { get; private set; }
+
+    public bool Called { get; private set; }
+
+    public Task<ClaimsPrincipal> CreateAsync(User user, string authenticationType, CancellationToken cancellationToken = default)
+    {
+        Called = true;
+        TenantSeen = Themia.Framework.Core.Abstractions.Tenancy.TenantContextAccessor.CurrentTenantId;
+        return Task.FromResult(new ClaimsPrincipal(new ClaimsIdentity(
             [new Claim(ClaimTypes.NameIdentifier, user.Id.ToString())], authenticationType)));
+    }
 }
 
 internal sealed class FakeAccessTokenService(TimeProvider? clock = null) : IAccessTokenService
@@ -117,6 +133,15 @@ internal sealed class FakeRefreshTokenService : IRefreshTokenService
     public Task<RefreshValidationResult> ValidateAndRotateAsync(string rawToken, CancellationToken cancellationToken = default) =>
         Task.FromResult(RotateResult);
 
+    /// <summary>The tenant <see cref="FindOwnerAsync"/> reports for <see cref="OwnerId"/>.</summary>
+    public Themia.Framework.Core.Abstractions.Tenancy.TenantId? OwnerTenant { get; set; }
+
+    public async Task<RefreshTokenOwner?> FindOwnerAsync(string rawToken, CancellationToken cancellationToken = default)
+    {
+        var id = await ResolveOwnerAsync(rawToken, cancellationToken);
+        return id is null ? null : new RefreshTokenOwner(id.Value, OwnerTenant);
+    }
+
     public Task<Guid?> ResolveOwnerAsync(string rawToken, CancellationToken cancellationToken = default)
     {
         ResolveOwnerCalls++;
@@ -131,11 +156,14 @@ internal sealed class FakeRefreshTokenService : IRefreshTokenService
         return Task.FromResult(OwnerId);
     }
 
-    public Task RevokeAsync(string rawToken, bool allForUser, CancellationToken cancellationToken = default)
+    /// <summary>What <see cref="RevokeAsync"/> reports: how many tokens it revoked. 1 by default, the common case.</summary>
+    public int RevokeResult { get; set; } = 1;
+
+    public Task<int> RevokeAsync(string rawToken, bool allForUser, CancellationToken cancellationToken = default)
     {
         RevokeCalls++;
         LastRevokeAllForUser = allForUser;
-        return Task.CompletedTask;
+        return Task.FromResult(RevokeResult);
     }
 
     public Task<int> RevokeAllForUserAsync(Guid userId, CancellationToken cancellationToken = default)

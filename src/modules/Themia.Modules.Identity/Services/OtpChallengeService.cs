@@ -65,7 +65,8 @@ public sealed class OtpChallengeService : IOtpChallengeService
 
         await PurgeExpiredAsync(now, cancellationToken).ConfigureAwait(false);
 
-        var id = Guid.CreateVersion7();
+        // Random (version 4, 122 bits), not time-ordered: this id now selects a row across tenants.
+        var id = Guid.NewGuid();
         var code = GenerateCode(options.CodeLength);
         var challenge = new OtpLoginChallenge
         {
@@ -107,7 +108,7 @@ public sealed class OtpChallengeService : IOtpChallengeService
         ArgumentNullException.ThrowIfNull(code);
 
         var now = timeProvider.GetUtcNow();
-        var challenge = await challenges.GetByIdAsync(challengeId, cancellationToken).ConfigureAwait(false);
+        var challenge = await challenges.FirstOrDefaultAsync(new OtpChallengeByIdSpec(challengeId), cancellationToken).ConfigureAwait(false);
         if (challenge is null)
         {
             // Same HMAC work as a real guess, so an unknown id costs the same as a wrong code.
@@ -147,14 +148,14 @@ public sealed class OtpChallengeService : IOtpChallengeService
                 if (matches)
                 {
                     await OnVerifiedAsync(challenge, now, cancellationToken).ConfigureAwait(false);
-                    return new OtpVerifyResult(OtpVerifyOutcome.Verified, challenge.UserId, challenge.NormalizedPhoneNumber);
+                    return new OtpVerifyResult(OtpVerifyOutcome.Verified, challenge.UserId, challenge.NormalizedPhoneNumber) { TenantId = challenge.TenantId };
                 }
 
                 return used + 1 >= allowed ? LockedOut() : Invalid();
             }
 
             // Lost the slot to a parallel guess: re-read and decide again on the new count.
-            var reloaded = await challenges.GetByIdAsync(challengeId, cancellationToken).ConfigureAwait(false);
+            var reloaded = await challenges.FirstOrDefaultAsync(new OtpChallengeByIdSpec(challengeId), cancellationToken).ConfigureAwait(false);
             if (reloaded is null)
             {
                 return Invalid();

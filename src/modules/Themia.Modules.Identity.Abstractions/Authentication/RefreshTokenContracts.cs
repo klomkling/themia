@@ -62,6 +62,11 @@ public readonly record struct RefreshValidationResult
     public static RefreshValidationResult ReuseDetected() => new(RefreshOutcome.ReuseDetected, null, null);
 }
 
+/// <summary>The user a refresh token belongs to and the tenant that user lives in.</summary>
+/// <param name="UserId">The owner.</param>
+/// <param name="TenantId">The owner's tenant; <see langword="null"/> for a platform user.</param>
+public sealed record RefreshTokenOwner(Guid UserId, Themia.Framework.Core.Abstractions.Tenancy.TenantId? TenantId);
+
 /// <summary>Issues, rotates, and revokes refresh tokens. All operations resolve the owning user in the
 /// ambient tenant (else genuine platform) scope before acting on a token, so cross-tenant tokens can
 /// never be rotated, revoked, or accepted.</summary>
@@ -80,11 +85,16 @@ public interface IRefreshTokenService
     /// <returns>The validation result.</returns>
     Task<RefreshValidationResult> ValidateAndRotateAsync(string rawToken, CancellationToken cancellationToken = default);
 
-    /// <summary>Revokes the presented token's family, or all non-expired tokens for its owner.</summary>
+    /// <summary>
+    /// Revokes the presented token's family, or all non-expired tokens for its owner. The token is the proof:
+    /// the owner is found in whatever tenant it belongs to, independent of the caller's tenant scope.
+    /// </summary>
     /// <param name="rawToken">The presented raw refresh token.</param>
     /// <param name="allForUser">When true, revoke every non-expired token for the owner.</param>
     /// <param name="cancellationToken">A cancellation token.</param>
-    Task RevokeAsync(string rawToken, bool allForUser, CancellationToken cancellationToken = default);
+    /// <returns>How many tokens were revoked. 0 means nothing changed: the token is unknown, its owner is
+    /// gone, or its family was already revoked. Do not report a logout as done on 0.</returns>
+    Task<int> RevokeAsync(string rawToken, bool allForUser, CancellationToken cancellationToken = default);
 
     /// <summary>Revokes every active refresh token a user holds, without needing one of them in hand.</summary>
     /// <param name="userId">The owning user (must resolve in scope).</param>
@@ -114,4 +124,17 @@ public interface IRefreshTokenService
     /// does not attribute a user id to <see cref="LogoutContext"/> until it implements this method.</remarks>
     Task<Guid?> ResolveOwnerAsync(string rawToken, CancellationToken cancellationToken = default) =>
         Task.FromResult<Guid?>(null);
+
+    /// <summary>
+    /// Like <see cref="ResolveOwnerAsync"/>, but also reports the owner's tenant, so a caller can run what
+    /// follows (logout hooks, audit) in that tenant's scope. The token is the proof; the lookup ignores the
+    /// caller's tenant scope.
+    /// </summary>
+    /// <param name="rawToken">The presented raw refresh token.</param>
+    /// <param name="cancellationToken">A cancellation token.</param>
+    /// <returns>The owner, or <see langword="null"/> when the token is unknown or its owner is gone.</returns>
+    /// <remarks>Default implementation returns <see langword="null"/>, like <see cref="ResolveOwnerAsync"/>, so an
+    /// existing custom implementation keeps compiling; the logout hooks then run in the caller's scope.</remarks>
+    Task<RefreshTokenOwner?> FindOwnerAsync(string rawToken, CancellationToken cancellationToken = default) =>
+        Task.FromResult<RefreshTokenOwner?>(null);
 }

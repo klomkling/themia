@@ -17,6 +17,12 @@
     </PackageReference>
   </ItemGroup>
   <ItemGroup>
+    <!-- TenantContextAccessor.BeginScope is the tenant switch behind the token-proven identity flows. -->
+    <InternalsVisibleTo Include="Themia.Modules.Identity" />
+    <InternalsVisibleTo Include="Themia.Modules.Identity.AspNetCore" />
+    <InternalsVisibleTo Include="Themia.Framework.Core.Tests" />
+  </ItemGroup>
+  <ItemGroup>
     <AdditionalFiles Include="PublicAPI.Shipped.txt" />
     <AdditionalFiles Include="PublicAPI.Unshipped.txt" />
   </ItemGroup>

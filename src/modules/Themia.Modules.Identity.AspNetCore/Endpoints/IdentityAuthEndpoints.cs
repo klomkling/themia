@@ -81,7 +81,13 @@ public static class IdentityAuthEndpointRouteBuilderExtensions
             throw new ValidationException(nameof(LogoutRequest), "Refresh token is required.");
         }
 
-        await flow.LogoutAsync(request.RefreshToken, request.All, cancellationToken).ConfigureAwait(false);
-        return Results.NoContent();
+        var outcome = await flow.LogoutAsync(request.RefreshToken, request.All, cancellationToken).ConfigureAwait(false);
+
+        // 204 only when a session was actually ended. An unknown or already-revoked token gets the same
+        // generic 401 as refresh: the token is the secret, and telling a caller their session ended when
+        // nothing changed is the failure this replaces.
+        return outcome == LogoutOutcome.Revoked
+            ? Results.NoContent()
+            : throw new UnauthorizedException(GenericAuthFailure);
     }
 }

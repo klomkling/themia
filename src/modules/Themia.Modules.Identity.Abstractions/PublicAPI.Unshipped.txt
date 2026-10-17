@@ -100,7 +100,7 @@ Themia.Modules.Identity.Abstractions.Authentication.IAccessTokenService
 Themia.Modules.Identity.Abstractions.Authentication.IAccessTokenService.Issue(System.Security.Claims.ClaimsPrincipal! principal) -> Themia.Modules.Identity.Abstractions.Authentication.AccessToken
 Themia.Modules.Identity.Abstractions.Authentication.IAuthenticationFlow
 Themia.Modules.Identity.Abstractions.Authentication.IAuthenticationFlow.LoginAsync(string! identifier, string! password, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Identity.Abstractions.Authentication.LoginResult>!
-Themia.Modules.Identity.Abstractions.Authentication.IAuthenticationFlow.LogoutAsync(string! refreshToken, bool allSessions, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Modules.Identity.Abstractions.Authentication.IAuthenticationFlow.LogoutAsync(string! refreshToken, bool allSessions, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Identity.Abstractions.Authentication.LogoutOutcome>!
 Themia.Modules.Identity.Abstractions.Authentication.IAuthenticationFlow.RefreshAsync(string! refreshToken, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Identity.Abstractions.Authentication.RefreshRotationResult>!
 Themia.Modules.Identity.Abstractions.Authentication.IAuthenticationHooks
 Themia.Modules.Identity.Abstractions.Authentication.IAuthenticationHooks.OnBeforeLoginAsync(Themia.Modules.Identity.Abstractions.Authentication.BeforeLoginContext! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
@@ -122,7 +122,7 @@ Themia.Modules.Identity.Abstractions.Authentication.IExternalLoginService
 Themia.Modules.Identity.Abstractions.Authentication.IExternalLoginService.ResolveOrProvisionAsync(Themia.Modules.Identity.Abstractions.Authentication.ExternalIdentity identity, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Identity.Abstractions.Authentication.ExternalLoginResult>!
 Themia.Modules.Identity.Abstractions.Authentication.IRefreshTokenService
 Themia.Modules.Identity.Abstractions.Authentication.IRefreshTokenService.IssueAsync(System.Guid userId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Identity.Abstractions.Authentication.RefreshIssue>!
-Themia.Modules.Identity.Abstractions.Authentication.IRefreshTokenService.RevokeAsync(string! rawToken, bool allForUser, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Modules.Identity.Abstractions.Authentication.IRefreshTokenService.RevokeAsync(string! rawToken, bool allForUser, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<int>!
 Themia.Modules.Identity.Abstractions.Authentication.IRefreshTokenService.ValidateAndRotateAsync(string! rawToken, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Identity.Abstractions.Authentication.RefreshValidationResult>!
 Themia.Modules.Identity.Abstractions.Authentication.LoginFailedContext
 Themia.Modules.Identity.Abstractions.Authentication.LoginFailedContext.LoginFailedContext(string! userName, Themia.Modules.Identity.Abstractions.Authentication.LoginFailureReason reason) -> void
@@ -475,3 +475,28 @@ Themia.Modules.Identity.Abstractions.IOtpChallengeService.IssueAsync(string! nor
 Themia.Modules.Identity.Abstractions.IOtpChallengeService.VerifyAsync(System.Guid challengeId, string! code, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Identity.Abstractions.OtpVerifyResult>!
 Themia.Modules.Identity.Abstractions.Authentication.LoginFailureReason.InvalidOtp = 6 -> Themia.Modules.Identity.Abstractions.Authentication.LoginFailureReason
 Themia.Modules.Identity.Abstractions.Authentication.LoginFailureReason.OtpAttemptsExceeded = 7 -> Themia.Modules.Identity.Abstractions.Authentication.LoginFailureReason
+const Themia.Modules.Identity.Abstractions.IdentityModuleOptions.PhoneNumberInAnotherTenantRefusalCode = "phone_number_in_another_tenant" -> string!
+Themia.Modules.Identity.Abstractions.IdentityModuleOptions.RejectPhoneNumberHeldInAnotherTenant.get -> bool
+Themia.Modules.Identity.Abstractions.IdentityModuleOptions.RejectPhoneNumberHeldInAnotherTenant.set -> void
+Themia.Modules.Identity.Abstractions.Authentication.LogoutOutcome
+Themia.Modules.Identity.Abstractions.Authentication.LogoutOutcome.NotFound = 1 -> Themia.Modules.Identity.Abstractions.Authentication.LogoutOutcome
+Themia.Modules.Identity.Abstractions.Authentication.LogoutOutcome.Revoked = 0 -> Themia.Modules.Identity.Abstractions.Authentication.LogoutOutcome
+Themia.Modules.Identity.Abstractions.OtpVerifyResult.TenantId.get -> Themia.Framework.Core.Abstractions.Tenancy.TenantId?
+Themia.Modules.Identity.Abstractions.OtpVerifyResult.TenantId.init -> void
+Themia.Modules.Identity.Abstractions.OtpRecipient
+Themia.Modules.Identity.Abstractions.OtpRecipient.OtpRecipient(System.Guid UserId, Themia.Framework.Core.Abstractions.Tenancy.TenantId? TenantId, string! PhoneNumber) -> void
+Themia.Modules.Identity.Abstractions.OtpRecipient.PhoneNumber.get -> string!
+Themia.Modules.Identity.Abstractions.OtpRecipient.PhoneNumber.init -> void
+Themia.Modules.Identity.Abstractions.OtpRecipient.TenantId.get -> Themia.Framework.Core.Abstractions.Tenancy.TenantId?
+Themia.Modules.Identity.Abstractions.OtpRecipient.TenantId.init -> void
+Themia.Modules.Identity.Abstractions.OtpRecipient.UserId.get -> System.Guid
+Themia.Modules.Identity.Abstractions.OtpRecipient.UserId.init -> void
+Themia.Modules.Identity.Abstractions.IOtpRecipientResolver
+Themia.Modules.Identity.Abstractions.IOtpRecipientResolver.ResolveAsync(string! normalizedPhoneNumber, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Identity.Abstractions.OtpRecipient?>!
+Themia.Modules.Identity.Abstractions.Authentication.RefreshTokenOwner
+Themia.Modules.Identity.Abstractions.Authentication.RefreshTokenOwner.RefreshTokenOwner(System.Guid UserId, Themia.Framework.Core.Abstractions.Tenancy.TenantId? TenantId) -> void
+Themia.Modules.Identity.Abstractions.Authentication.RefreshTokenOwner.TenantId.get -> Themia.Framework.Core.Abstractions.Tenancy.TenantId?
+Themia.Modules.Identity.Abstractions.Authentication.RefreshTokenOwner.TenantId.init -> void
+Themia.Modules.Identity.Abstractions.Authentication.RefreshTokenOwner.UserId.get -> System.Guid
+Themia.Modules.Identity.Abstractions.Authentication.RefreshTokenOwner.UserId.init -> void
+Themia.Modules.Identity.Abstractions.Authentication.IRefreshTokenService.FindOwnerAsync(string! rawToken, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Identity.Abstractions.Authentication.RefreshTokenOwner?>!

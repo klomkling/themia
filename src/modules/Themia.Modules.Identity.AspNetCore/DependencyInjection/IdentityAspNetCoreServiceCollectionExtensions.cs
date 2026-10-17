@@ -94,6 +94,7 @@ public static class IdentityAspNetCoreServiceCollectionExtensions
         options.Validate();
         services.TryAddSingleton(options);
 
+        services.TryAddScoped<IOtpRecipientResolver, OtpRecipientResolver>();
         services.TryAddScoped<IOtpChallengeService, OtpChallengeService>();
         services.TryAddScoped<IOtpLoginFlow, OtpLoginFlow>();
         return services;

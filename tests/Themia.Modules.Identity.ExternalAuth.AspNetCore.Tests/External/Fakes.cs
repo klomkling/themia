@@ -39,11 +39,11 @@ internal sealed class FakeRefreshTokenService : IRefreshTokenService
     public Task<RefreshValidationResult> ValidateAndRotateAsync(string rawToken, CancellationToken cancellationToken = default) =>
         Task.FromResult(RotateResult);
 
-    public Task RevokeAsync(string rawToken, bool allForUser, CancellationToken cancellationToken = default)
+    public Task<int> RevokeAsync(string rawToken, bool allForUser, CancellationToken cancellationToken = default)
     {
         RevokeCalls++;
         LastRevokeAllForUser = allForUser;
-        return Task.CompletedTask;
+        return Task.FromResult(1);
     }
 
     public Task<int> RevokeAllForUserAsync(Guid userId, CancellationToken cancellationToken = default)

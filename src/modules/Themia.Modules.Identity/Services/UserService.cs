@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using Themia.Framework.Core.Abstractions.Tenancy;
 using Themia.Framework.Data.Abstractions.Filtering;
 using Themia.Framework.Data.Abstractions.Repositories;
 using Themia.Framework.Data.Abstractions.UnitOfWork;
@@ -83,6 +84,22 @@ public sealed class UserService : IUserService
     {
     }
 
+    /// <summary>
+    /// Announces a committed mutation to the lifecycle hook and the observers, running as the mutated user's
+    /// own tenant. The caller's scope is whoever is calling (a platform admin, an anonymous reset or confirm
+    /// request); a hook that revokes the user's sessions or writes tenant data must act on the user's tenant,
+    /// not the caller's. The tenant comes from the user row this service just loaded and changed, and the
+    /// caller's scope is restored afterwards even if a hook throws.
+    /// </summary>
+    private async ValueTask NotifyMutatedAsync(User user, UserMutation mutation, CancellationToken cancellationToken)
+    {
+        using (TenantContextAccessor.BeginScope(user.TenantId))
+        {
+            await hooks.OnUserMutatedAsync(user.Id, mutation, cancellationToken).ConfigureAwait(false);
+            await RaiseAsync((o, ct) => o.OnUserMutatedAsync(user.Id, mutation, ct), cancellationToken).ConfigureAwait(false);
+        }
+    }
+
     /// <summary>Invokes <paramref name="invoke"/> against every registered observer. A throwing observer
     /// must not change the flow it observes, so each invocation is individually caught and logged at
     /// <c>Error</c> — including <see cref="OperationCanceledException"/>. By the time this runs, the
@@ -138,8 +155,7 @@ public sealed class UserService : IUserService
 
         await users.AddAsync(user, cancellationToken).ConfigureAwait(false);
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-        await hooks.OnUserMutatedAsync(user.Id, UserMutation.Created, cancellationToken).ConfigureAwait(false);
-        await RaiseAsync((o, ct) => o.OnUserMutatedAsync(user.Id, UserMutation.Created, ct), cancellationToken).ConfigureAwait(false);
+        await NotifyMutatedAsync(user, UserMutation.Created, cancellationToken).ConfigureAwait(false);
         return UserCreationResult.Success(user.Id);
     }
 
@@ -178,8 +194,7 @@ public sealed class UserService : IUserService
 
         await users.AddAsync(user, cancellationToken).ConfigureAwait(false);
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-        await hooks.OnUserMutatedAsync(user.Id, UserMutation.Created, cancellationToken).ConfigureAwait(false);
-        await RaiseAsync((o, ct) => o.OnUserMutatedAsync(user.Id, UserMutation.Created, ct), cancellationToken).ConfigureAwait(false);
+        await NotifyMutatedAsync(user, UserMutation.Created, cancellationToken).ConfigureAwait(false);
         return UserCreationResult.Success(user.Id);
     }
 
@@ -294,8 +309,7 @@ public sealed class UserService : IUserService
 
         users.Update(user);
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-        await hooks.OnUserMutatedAsync(userId, UserMutation.Email, cancellationToken).ConfigureAwait(false);
-        await RaiseAsync((o, ct) => o.OnUserMutatedAsync(userId, UserMutation.Email, ct), cancellationToken).ConfigureAwait(false);
+        await NotifyMutatedAsync(user, UserMutation.Email, cancellationToken).ConfigureAwait(false);
         return UserMutationResult.Success();
     }
 
@@ -318,8 +332,7 @@ public sealed class UserService : IUserService
         user.EmailConfirmed = true;
         users.Update(user);
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-        await hooks.OnUserMutatedAsync(userId, UserMutation.EmailConfirmation, cancellationToken).ConfigureAwait(false);
-        await RaiseAsync((o, ct) => o.OnUserMutatedAsync(userId, UserMutation.EmailConfirmation, ct), cancellationToken).ConfigureAwait(false);
+        await NotifyMutatedAsync(user, UserMutation.EmailConfirmation, cancellationToken).ConfigureAwait(false);
         return UserMutationResult.Success();
     }
 
@@ -347,6 +360,17 @@ public sealed class UserService : IUserService
             {
                 return UserMutationResult.Duplicate();
             }
+
+            if (options.RejectPhoneNumberHeldInAnotherTenant)
+            {
+                var elsewhere = await users.ListAsync(new ActiveUsersByNormalizedPhoneAnyTenantSpec(normalized), cancellationToken).ConfigureAwait(false);
+                if (elsewhere.Any(u => u.Id != user.Id && !Equals(u.TenantId, user.TenantId)))
+                {
+                    return UserMutationResult.Refused(
+                        "That phone number is already in use by an active user in another tenant.",
+                        IdentityModuleOptions.PhoneNumberInAnotherTenantRefusalCode);
+                }
+            }
         }
 
         user.PhoneNumber = string.IsNullOrWhiteSpace(phoneNumber) ? null : phoneNumber.Trim();
@@ -359,8 +383,7 @@ public sealed class UserService : IUserService
 
         users.Update(user);
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-        await hooks.OnUserMutatedAsync(userId, UserMutation.Phone, cancellationToken).ConfigureAwait(false);
-        await RaiseAsync((o, ct) => o.OnUserMutatedAsync(userId, UserMutation.Phone, ct), cancellationToken).ConfigureAwait(false);
+        await NotifyMutatedAsync(user, UserMutation.Phone, cancellationToken).ConfigureAwait(false);
         return UserMutationResult.Success();
     }
 
@@ -383,8 +406,7 @@ public sealed class UserService : IUserService
         user.PhoneNumberConfirmed = true;
         users.Update(user);
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-        await hooks.OnUserMutatedAsync(userId, UserMutation.PhoneConfirmation, cancellationToken).ConfigureAwait(false);
-        await RaiseAsync((o, ct) => o.OnUserMutatedAsync(userId, UserMutation.PhoneConfirmation, ct), cancellationToken).ConfigureAwait(false);
+        await NotifyMutatedAsync(user, UserMutation.PhoneConfirmation, cancellationToken).ConfigureAwait(false);
         return UserMutationResult.Success();
     }
 
@@ -409,8 +431,7 @@ public sealed class UserService : IUserService
         user.SecurityStamp = Guid.NewGuid().ToString("N");
         users.Update(user);
         await IdentityScope.SaveScopedAsync(unitOfWork, filterScope, user.TenantId is null, cancellationToken).ConfigureAwait(false);
-        await hooks.OnUserMutatedAsync(userId, UserMutation.Password, cancellationToken).ConfigureAwait(false);
-        await RaiseAsync((o, ct) => o.OnUserMutatedAsync(userId, UserMutation.Password, ct), cancellationToken).ConfigureAwait(false);
+        await NotifyMutatedAsync(user, UserMutation.Password, cancellationToken).ConfigureAwait(false);
         return UserMutationResult.Success();
     }
 
@@ -501,8 +522,7 @@ public sealed class UserService : IUserService
         user.IsActive = isActive;
         users.Update(user);
         await IdentityScope.SaveScopedAsync(unitOfWork, filterScope, user.TenantId is null, cancellationToken).ConfigureAwait(false);
-        await hooks.OnUserMutatedAsync(userId, UserMutation.Active, cancellationToken).ConfigureAwait(false);
-        await RaiseAsync((o, ct) => o.OnUserMutatedAsync(userId, UserMutation.Active, ct), cancellationToken).ConfigureAwait(false);
+        await NotifyMutatedAsync(user, UserMutation.Active, cancellationToken).ConfigureAwait(false);
         return UserMutationResult.Success();
     }
 
@@ -524,8 +544,7 @@ public sealed class UserService : IUserService
 
         users.Remove(user);
         await IdentityScope.SaveScopedAsync(unitOfWork, filterScope, user.TenantId is null, cancellationToken).ConfigureAwait(false);
-        await hooks.OnUserMutatedAsync(userId, UserMutation.Deleted, cancellationToken).ConfigureAwait(false);
-        await RaiseAsync((o, ct) => o.OnUserMutatedAsync(userId, UserMutation.Deleted, ct), cancellationToken).ConfigureAwait(false);
+        await NotifyMutatedAsync(user, UserMutation.Deleted, cancellationToken).ConfigureAwait(false);
         return UserMutationResult.Success();
     }
 }

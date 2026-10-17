@@ -10,6 +10,40 @@ with the *why* and concrete upgrade steps.
 - Each entry states: **What changed**, **Why**, and **How to upgrade** (before → after).
 - Non-breaking changes are *not* listed here — see the CHANGELOG.
 
+## Unreleased (rename to the release version)
+
+### `IRefreshTokenService.RevokeAsync` and `IAuthenticationFlow.LogoutAsync` report whether anything was revoked (breaking for implementers and test doubles)
+
+**What changed:** `IRefreshTokenService.RevokeAsync(rawToken, allForUser, ct)` now returns `Task<int>` (the number of tokens revoked) instead of `Task`, and `IAuthenticationFlow.LogoutAsync(refreshToken, allSessions, ct)` returns `Task<LogoutOutcome>` (`Revoked` or `NotFound`). The mounted `logout` endpoint answers 204 only for `Revoked`, otherwise the generic 401.
+
+**Why:** with a claims-only tenant strategy the logout request has no tenant scope, the owner lookup found nobody, nothing was revoked, and the endpoint still said 204, so a caller believed a session had ended when its token still refreshed. An enum or a count that every caller must read cannot be ignored the way a silent `Task` could (coord #0166).
+
+**Who is affected:** classes that implement `IRefreshTokenService` or `IAuthenticationFlow` (decorators, test doubles), and code that awaits `LogoutAsync` or `RevokeAsync` and assumes success. Callers that only `await` the call still compile.
+
+**How to upgrade:**
+
+```csharp
+// before
+public Task RevokeAsync(string rawToken, bool allForUser, CancellationToken ct) { ...; return Task.CompletedTask; }
+public Task LogoutAsync(string refreshToken, bool allSessions, CancellationToken ct) { ... }
+
+// after
+public Task<int> RevokeAsync(string rawToken, bool allForUser, CancellationToken ct) { ...; return Task.FromResult(revokedCount); }
+public Task<LogoutOutcome> LogoutAsync(string refreshToken, bool allSessions, CancellationToken ct) { ...; return Task.FromResult(LogoutOutcome.Revoked); }
+```
+
+Treat `0` and `LogoutOutcome.NotFound` as "nothing happened", not as a completed logout.
+
+### A refresh token now rotates as its own owner whatever tenant scope the request has (breaking for code that relied on the old rejection)
+
+**What changed:** `IRefreshTokenService.ValidateAndRotateAsync` used to return `Invalid` for a token whose owner was not visible in the caller's tenant scope. The token hash is now the proof: the owner is found in whatever tenant it belongs to and the rotated pair is that owner's, in that owner's tenant.
+
+**Why:** a refresh request has no JWT, so under a claims-only strategy the scope is null and every tenant user's refresh was rejected (coord #0166). The token can still only act as the user it was issued to.
+
+**Who is affected:** anyone who depended on "a token presented in another tenant's scope is rejected" as an isolation check. It is not one anymore; the 256-bit token is the credential. `RevokeAllForUserAsync(userId)` and `IUserService` are unchanged and still resolve in the caller's scope.
+
+**How to upgrade:** nothing to change for hosts that already set the tenant scope. Hosts with a claims-only strategy can drop their own scope-setting endpoints for refresh and logout.
+
 ## 0.31.3
 
 ### `Themia.Payments.Beam` pre-flights refunds and refuses non-refundable/missing payment methods (breaking for unserviceable refund attempts)

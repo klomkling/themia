@@ -161,14 +161,14 @@ public abstract partial class AuthFlowConformanceTests
         Assert.True((await users.SetActiveAsync(userId, active)).Succeeded);
     }
 
-    private ServiceProvider BuildSeedProvider()
+    private ServiceProvider BuildSeedProvider(TenantId? tenant = null)
     {
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?> { ["ConnectionStrings:Default"] = ConnectionString })
             .Build();
         var services = new ServiceCollection();
         services.AddSingleton<IConfiguration>(configuration);
-        services.AddScoped<ITenantContext>(_ => new TenantContext(new TenantId("acme")));
+        services.AddScoped<ITenantContext>(_ => new TenantContext(tenant ?? new TenantId("acme")));
         ConfigurePeer(services, configuration);
         RegisterIdentity(services, o => o.AllowPlatformLogin = false);
         services.RemoveAll<ICurrentUserAccessor>();
