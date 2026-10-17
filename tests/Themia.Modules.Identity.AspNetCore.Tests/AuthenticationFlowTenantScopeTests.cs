@@ -112,6 +112,18 @@ public sealed class AuthenticationFlowTenantScopeTests : IDisposable
     }
 
     [Fact]
+    public async Task Logout_LooksTheOwnerUpOnce_EvenWhenNoOwnerIsFound()
+    {
+        refresh.RevokeResult = 1;
+        refresh.OwnerId = null;
+
+        await Flow().LogoutAsync("token", allSessions: false);
+
+        Assert.Equal(1, refresh.ResolveOwnerCalls);
+        Assert.True(hooks.LogoutCalled);
+    }
+
+    [Fact]
     public async Task Logout_RunsTheLogoutHooksAndObserversAsTheTokenOwnersTenant_ThenRestoresTheScope()
     {
         refresh.RevokeResult = 1;

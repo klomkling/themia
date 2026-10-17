@@ -101,10 +101,12 @@ public sealed class RefreshTokenService : IRefreshTokenService
         }
 
         // A deactivated user's token is useless even if a revoke was missed. Refused before rotating, so the
-        // token is not consumed and no successor exists.
-        if (!user.IsActive)
+        // token is not consumed and no successor exists. A platform user is refused the same way when platform
+        // login is off, so turning the option off ends sessions opened while it was on (they live for the refresh
+        // lifetime otherwise).
+        if (!user.IsActive || (user.TenantId is null && !options.AllowPlatformLogin))
         {
-            logger.LogWarning("Refresh refused for user {UserId}: account inactive.", user.Id);
+            logger.LogWarning("Refresh refused for user {UserId}: account inactive or platform login disabled.", user.Id);
             return RefreshValidationResult.Invalid();
         }
 

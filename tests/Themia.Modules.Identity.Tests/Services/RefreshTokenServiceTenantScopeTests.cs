@@ -22,10 +22,10 @@ public class RefreshTokenServiceTenantScopeTests
     private readonly FakeTimeProvider clock = new(DateTimeOffset.Parse("2026-10-17T10:00:00Z"));
     private readonly CapturingLogger logger = new();
 
-    private RefreshTokenService ServiceInScope(TenantId? ambient) => new(
+    private RefreshTokenService ServiceInScope(TenantId? ambient, IdentityModuleOptions? options = null) => new(
         new FakeRepository<User>(users, u => u.Id) { AmbientTenant = ambient },
         new FakeRepository<RefreshToken>(tokens, t => t.Id) { AmbientTenant = ambient },
-        new FakeUnitOfWork(), clock, new IdentityModuleOptions(), logger);
+        new FakeUnitOfWork(), clock, options ?? new IdentityModuleOptions(), logger);
 
     private User AddUser(string name, TenantId? tenant, bool active = true)
     {
@@ -65,6 +65,42 @@ public class RefreshTokenServiceTenantScopeTests
         Assert.Equal(RefreshOutcome.Invalid, result.Outcome);
         Assert.All(tokens, t => Assert.Null(t.ConsumedAt));
         Assert.Single(tokens);
+    }
+
+    [Fact]
+    public async Task ValidateAndRotate_RefusesAPlatformUserWhenPlatformLoginIsOff_WithoutConsumingTheToken()
+    {
+        var user = AddUser("root", null);
+        var raw = await IssueAsync(user);
+
+        var result = await ServiceInScope(null, new IdentityModuleOptions { AllowPlatformLogin = false }).ValidateAndRotateAsync(raw);
+
+        Assert.Equal(RefreshOutcome.Invalid, result.Outcome);
+        Assert.All(tokens, t => Assert.Null(t.ConsumedAt));
+        Assert.Single(tokens);
+    }
+
+    [Fact]
+    public async Task ValidateAndRotate_RotatesAPlatformUserWhenPlatformLoginIsOn()
+    {
+        var user = AddUser("root", null);
+        var raw = await IssueAsync(user);
+
+        var result = await ServiceInScope(null, new IdentityModuleOptions { AllowPlatformLogin = true }).ValidateAndRotateAsync(raw);
+
+        Assert.True(result.TryGetSuccess(out var owner, out _));
+        Assert.Equal(user.Id, owner.Id);
+    }
+
+    [Fact]
+    public async Task ValidateAndRotate_IgnoresAllowPlatformLoginForATenantUser()
+    {
+        var user = AddUser("alice", Acme);
+        var raw = await IssueAsync(user);
+
+        var result = await ServiceInScope(null, new IdentityModuleOptions { AllowPlatformLogin = false }).ValidateAndRotateAsync(raw);
+
+        Assert.True(result.TryGetSuccess(out _, out _));
     }
 
     [Fact]
