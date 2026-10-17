@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using Themia.Framework.Core.Abstractions.Tenancy;
 using Themia.Modules.Identity.Abstractions;
 using Themia.Modules.Identity.Abstractions.Authentication;
 using Themia.Modules.Identity.Abstractions.Entities;
@@ -17,6 +18,7 @@ public sealed class OtpLoginFlow : IOtpLoginFlow
     private const string AuthenticationType = "Bearer";
 
     private readonly IUserService users;
+    private readonly IOtpRecipientResolver recipients;
     private readonly IOtpChallengeService challenges;
     private readonly IOtpCodeSender sender;
     private readonly IPhoneNumberNormalizer phoneNormalizer;
@@ -25,12 +27,14 @@ public sealed class OtpLoginFlow : IOtpLoginFlow
     private readonly IRefreshTokenService refreshTokens;
     private readonly IAuthenticationHooks hooks;
     private readonly IIdentityEventObserver[] observers;
+    private readonly IdentityModuleOptions identityOptions;
     private readonly TimeProvider timeProvider;
     private readonly ILogger<OtpLoginFlow> logger;
 
     /// <summary>Creates the flow.</summary>
     public OtpLoginFlow(
         IUserService users,
+        IOtpRecipientResolver recipients,
         IOtpChallengeService challenges,
         IOtpCodeSender sender,
         IPhoneNumberNormalizer phoneNormalizer,
@@ -39,10 +43,12 @@ public sealed class OtpLoginFlow : IOtpLoginFlow
         IRefreshTokenService refreshTokens,
         IAuthenticationHooks hooks,
         IEnumerable<IIdentityEventObserver> observers,
+        IdentityModuleOptions identityOptions,
         TimeProvider timeProvider,
         ILogger<OtpLoginFlow> logger)
     {
         ArgumentNullException.ThrowIfNull(users);
+        ArgumentNullException.ThrowIfNull(recipients);
         ArgumentNullException.ThrowIfNull(challenges);
         ArgumentNullException.ThrowIfNull(sender);
         ArgumentNullException.ThrowIfNull(phoneNormalizer);
@@ -51,9 +57,11 @@ public sealed class OtpLoginFlow : IOtpLoginFlow
         ArgumentNullException.ThrowIfNull(refreshTokens);
         ArgumentNullException.ThrowIfNull(hooks);
         ArgumentNullException.ThrowIfNull(observers);
+        ArgumentNullException.ThrowIfNull(identityOptions);
         ArgumentNullException.ThrowIfNull(timeProvider);
         ArgumentNullException.ThrowIfNull(logger);
         this.users = users;
+        this.recipients = recipients;
         this.challenges = challenges;
         this.sender = sender;
         this.phoneNormalizer = phoneNormalizer;
@@ -62,6 +70,7 @@ public sealed class OtpLoginFlow : IOtpLoginFlow
         this.refreshTokens = refreshTokens;
         this.hooks = hooks;
         this.observers = observers as IIdentityEventObserver[] ?? observers.ToArray();
+        this.identityOptions = identityOptions;
         this.timeProvider = timeProvider;
         this.logger = logger;
     }
@@ -76,21 +85,34 @@ public sealed class OtpLoginFlow : IOtpLoginFlow
         var key = phoneNormalizer.Normalize(phoneNumber) ?? phoneNumber.Trim();
 
         // Looked up before the throttle check and whatever its answer, so the work done does not depend on
-        // whether the phone has an account. An unconfirmed phone is a claim, not proof of control, and an
-        // inactive or locked-out account must not be able to start a login: all three become a decoy.
-        var candidate = await users.FindByPhoneAsync(phoneNumber, cancellationToken).ConfigureAwait(false);
-        var recipient = candidate is not null && CanLogIn(candidate) ? candidate : null;
+        // whether the phone has an account. The resolver looks across tenants (a start request has no JWT,
+        // so under a claims-only strategy the ambient scope is null) and answers only for exactly one
+        // active, confirmed, unlocked holder; no match, an unconfirmed or locked holder and an ambiguous
+        // number all become the same decoy.
+        var recipient = await recipients.ResolveAsync(key, cancellationToken).ConfigureAwait(false);
 
-        var issued = await challenges.IssueAsync(key, recipient?.Id, cancellationToken).ConfigureAwait(false);
+        OtpIssueResult issued;
+        if (recipient is null)
+        {
+            issued = await challenges.IssueAsync(key, null, cancellationToken).ConfigureAwait(false);
+        }
+        else
+        {
+            // As the recipient's tenant, so the challenge row is stamped with it and the sender runs in it.
+            using (TenantContextAccessor.BeginScope(recipient.TenantId))
+            {
+                issued = await challenges.IssueAsync(key, recipient.UserId, cancellationToken).ConfigureAwait(false);
+                if (issued.Outcome == OtpIssueOutcome.Issued)
+                {
+                    await DeliverAsync(recipient, issued, cancellationToken).ConfigureAwait(false);
+                }
+            }
+        }
+
         if (issued.Outcome == OtpIssueOutcome.Throttled)
         {
             logger.LogWarning("OTP start throttled for {Phone}.", Mask(key));
             return new OtpStartResult(OtpStartOutcome.Throttled, Guid.Empty, default);
-        }
-
-        if (recipient is not null)
-        {
-            await DeliverAsync(recipient, issued, cancellationToken).ConfigureAwait(false);
         }
 
         return new OtpStartResult(OtpStartOutcome.Issued, issued.ChallengeId, issued.ExpiresAt);
@@ -113,8 +135,20 @@ public sealed class OtpLoginFlow : IOtpLoginFlow
                 cancellationToken).ConfigureAwait(false);
         }
 
-        // The code is right. Everything below is the password flow's gate, re-evaluated NOW: the account may
-        // have been deactivated, locked or lost its confirmed phone since the code was sent.
+        // The code is right, and it was proved against a challenge issued in a specific tenant. The request
+        // carries no tenant scope under a claims-only strategy, so everything from here runs as the
+        // challenge's own tenant, and the user must belong to that tenant.
+        using (TenantContextAccessor.BeginScope(check.TenantId))
+        {
+            return await CompleteVerifyAsync(check, userId, identifier, challengeId, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    private async Task<LoginResult> CompleteVerifyAsync(
+        OtpVerifyResult check, Guid userId, string identifier, Guid challengeId, CancellationToken cancellationToken)
+    {
+        // The password flow's gate, re-evaluated NOW: the account may have been deactivated, locked or lost its
+        // confirmed phone since the code was sent.
         var phone = check.NormalizedPhoneNumber ?? identifier;
         var before = new BeforeLoginContext(phone);
         await hooks.OnBeforeLoginAsync(before, cancellationToken).ConfigureAwait(false);
@@ -127,6 +161,19 @@ public sealed class OtpLoginFlow : IOtpLoginFlow
         if (user is null)
         {
             return await FailAsync(phone, LoginFailureReason.NotFound, LoginResult.InvalidCredentials(), cancellationToken).ConfigureAwait(false);
+        }
+
+        // Re-checked here as well as in the resolver: a challenge issued before platform login was switched off
+        // must not be redeemable for a platform user afterwards.
+        if (user.TenantId is null && !identityOptions.AllowPlatformLogin)
+        {
+            return await FailAsync(phone, LoginFailureReason.InvalidOtp, LoginResult.InvalidCredentials(), cancellationToken).ConfigureAwait(false);
+        }
+
+        // A challenge can only ever log in a user of its own tenant.
+        if (!Equals(user.TenantId, check.TenantId))
+        {
+            return await FailAsync(phone, LoginFailureReason.InvalidOtp, LoginResult.InvalidCredentials(), cancellationToken).ConfigureAwait(false);
         }
 
         if (!user.IsActive)
@@ -160,15 +207,12 @@ public sealed class OtpLoginFlow : IOtpLoginFlow
         return LoginResult.Success(tokens);
     }
 
-    private bool CanLogIn(User user) =>
-        user.IsActive && user.PhoneNumberConfirmed && !user.IsLockedOut(timeProvider.GetUtcNow());
-
-    private async Task DeliverAsync(User recipient, OtpIssueResult issued, CancellationToken cancellationToken)
+    private async Task DeliverAsync(OtpRecipient recipient, OtpIssueResult issued, CancellationToken cancellationToken)
     {
         try
         {
             await sender.SendAsync(
-                new OtpDelivery(recipient.PhoneNumber ?? string.Empty, issued.Code!, issued.ExpiresAt, issued.ChallengeId),
+                new OtpDelivery(recipient.PhoneNumber, issued.Code!, issued.ExpiresAt, issued.ChallengeId),
                 cancellationToken).ConfigureAwait(false);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)

@@ -96,6 +96,7 @@ public sealed class ServiceRegistrationTests
 
         Assert.Contains(services, d => d.ServiceType == typeof(IOtpLoginFlow));
         Assert.Contains(services, d => d.ServiceType == typeof(IOtpChallengeService));
+        Assert.Contains(services, d => d.ServiceType == typeof(IOtpRecipientResolver));
         Assert.Contains(services, d => d.ServiceType == typeof(OtpLoginOptions));
     }
 

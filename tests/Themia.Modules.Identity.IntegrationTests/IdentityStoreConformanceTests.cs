@@ -447,20 +447,35 @@ public abstract class IdentityStoreConformanceTests
         Assert.Equal(RefreshOutcome.Invalid, result.Outcome);
     }
 
+    // coord #0166 replaces the old "a token presented in another tenant's scope is Invalid" rule. A refresh request
+    // has no JWT, so under a claims-only strategy its scope is null and that rule made every tenant user's refresh
+    // fail. The token hash is now the proof: the token acts as its own owner in its own tenant whatever scope the
+    // request arrived in, and never as anyone in the scope it was presented in.
     [Fact]
-    public async Task Refresh_token_of_another_tenant_is_invalid()
+    public async Task Refresh_token_acts_only_as_its_own_tenants_user_whatever_the_scope()
     {
         await ResetAsync();
         string raw;
+        Guid ownerId;
         await using (var a = NewScope(new TenantId("a")))
         {
             var u = await a.Users.CreateAsync("rt-iso", "pw");
-            raw = (await a.RefreshTokens.IssueAsync(u.UserId!.Value)).RawToken;
+            ownerId = u.UserId!.Value;
+            raw = (await a.RefreshTokens.IssueAsync(ownerId)).RawToken;
         }
+        Guid bystanderId;
         await using (var b = NewScope(new TenantId("b"), allowPlatformLogin: false))
         {
+            bystanderId = (await b.Users.CreateAsync("rt-bystander-b", "pw")).UserId!.Value;
+            var bystanderToken = (await b.RefreshTokens.IssueAsync(bystanderId)).RawToken;
+
             var result = await b.RefreshTokens.ValidateAndRotateAsync(raw);
-            Assert.Equal(RefreshOutcome.Invalid, result.Outcome);
+
+            Assert.True(result.TryGetSuccess(out var user, out _));
+            Assert.Equal(ownerId, user.Id);
+            Assert.Equal(new TenantId("a"), user.TenantId);
+            Assert.NotEqual(bystanderId, user.Id);
+            Assert.True((await b.RefreshTokens.ValidateAndRotateAsync(bystanderToken)).Outcome == RefreshOutcome.Success);
         }
     }
 

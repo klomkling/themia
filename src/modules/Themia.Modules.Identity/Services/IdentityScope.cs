@@ -26,6 +26,14 @@ internal static class IdentityScope
         return u ?? await users.FirstOrDefaultAsync(new PlatformUserByIdSpec(id), ct).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Finds a user by id in ANY tenant. Only for paths where a secret has already proved the right to the
+    /// row (a refresh-token hash match): the id comes from that row, never from the caller. The soft-delete
+    /// filter still applies.
+    /// </summary>
+    public static Task<User?> ResolveUserAnyTenantAsync(IReadRepository<User, Guid> users, Guid id, CancellationToken ct)
+        => users.FirstOrDefaultAsync(new UserByIdAnyTenantSpec(id), ct);
+
     /// <summary>True if the user resolves in the ambient tenant or as a genuine platform user.</summary>
     public static async Task<bool> UserExistsAsync(IReadRepository<User, Guid> users, Guid id, CancellationToken ct)
         => await ResolveUserAsync(users, id, ct).ConfigureAwait(false) is not null;

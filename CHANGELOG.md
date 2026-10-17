@@ -27,6 +27,25 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+### Fixed
+
+- `Themia.Modules.Identity` (coord #0166): under a claims-only tenant strategy the mounted `refresh`, `logout` and `otp/start` / `otp/verify` carry no JWT, so their tenant scope was null and a tenant user's refresh returned Invalid, logout revoked nothing and still answered 204, and an OTP start for a tenant user issued a challenge but sent no code. The refresh-token hash and the OTP challenge id plus code are now the proof. The owner is found without the tenant filter and the rest of the flow (principal factory, hooks, observers, user lookup, token issue) runs in the owner's own tenant scope, which ends with the call. A token or challenge can only ever act as its own user in its own tenant. `RevokeAllForUserAsync(userId)` and the `IUserService` methods stay scoped to the caller, and `RevokeAllForUserAsync` now logs a warning when it revokes nothing because the user is not visible in the caller's scope.
+- `IUserLifecycleHooks.OnUserMutatedAsync` and the user-mutation observers now run in the mutated user's own tenant scope (the caller's scope is restored afterwards, even if a hook throws), so a hook that revokes the user's sessions reaches them when a platform admin or an anonymous reset or confirm request mutates a tenant user.
+- `OtpRecipientResolver` and `OtpLoginFlow.VerifyAsync` honour `IdentityModuleOptions.AllowPlatformLogin`: with it off a platform user can neither be sent a code nor redeem one (the resolver bypassed the gate that `IUserService.FindBy*` applies).
+- A refresh for a deactivated user is refused before the token is rotated (it was only refused afterwards, with the token already consumed).
+
+### Added
+
+- `IdentityModuleOptions.RejectPhoneNumberHeldInAnotherTenant` (default `false`): when on, `SetPhoneNumberAsync` refuses a number an active user in another tenant, or a platform user, already holds, with `UserMutationOutcome.Refused` and refusal code `IdentityModuleOptions.PhoneNumberInAnotherTenantRefusalCode`. Turn it on when you log in by one-time code with no tenant hint: a number active in two tenants is ambiguous and gets no code. New `IOtpRecipientResolver` (default `OtpRecipientResolver`) and `OtpVerifyResult.TenantId`. `OtpLoginFlow` takes the resolver as a constructor argument.
+- `LogoutOutcome` (`Revoked`, `NotFound`); `IRefreshTokenService.FindOwnerAsync` / `RefreshTokenOwner` (default implementation returns null, so existing implementers compile); the logout hooks and observers run in the token owner's tenant scope when it is implemented.
+
+### Changed
+
+- **(breaking)** `IRefreshTokenService.RevokeAsync` returns `Task<int>` (tokens revoked) and `IAuthenticationFlow.LogoutAsync` returns `Task<LogoutOutcome>`, so a caller can no longer ignore a logout that revoked nothing. The `logout` endpoint answers 204 only when a session was revoked, and 401 (the same generic failure as refresh) for an unknown or already-revoked token. Implementers and test doubles of these two interfaces must change the return type; see [MIGRATION.md](MIGRATION.md).
+- **(breaking)** A refresh token presented in another tenant's scope used to be Invalid; it now rotates as its own owner, in the owner's tenant. The old rule made every tenant user's refresh fail whenever the request had no tenant scope.
+- OTP challenge ids are now random version-4 GUIDs (122 random bits) instead of time-ordered version-7 ones, because the id now selects a row across tenants. Challenges in flight at upgrade are unaffected.
+- The OTP throttles, failure cap and expired-row purge were already keyed on the phone across tenants; the challenge lookup and the guess counter now are too.
+
 ## [0.34.0] - 2026-10-17
 
 Passwordless phone-code login for `Themia.Modules.Identity` (coord #0165), opt in; nothing existing changes behaviour. No new packages.

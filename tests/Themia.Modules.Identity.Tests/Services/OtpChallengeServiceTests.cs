@@ -289,16 +289,62 @@ public class OtpChallengeServiceTests
         var tenant = new Themia.Framework.Core.Abstractions.Tenancy.TenantId("acme");
         var repo = new FakeRepository<OtpLoginChallenge>(rows, c => c.Id) { AmbientTenant = tenant };
         var service = new OtpChallengeService(repo, new FakeUnitOfWork(), clock, options);
-        var issued = await service.IssueAsync(Phone, userId);
+
+        await service.IssueAsync(Phone, userId);
 
         Assert.Equal(tenant, rows.Single().TenantId);
+    }
 
-        var otherTenant = new FakeRepository<OtpLoginChallenge>(rows, c => c.Id)
+    [Fact]
+    public async Task Verify_FindsTheChallengeInAnyTenantScope_AndReportsItsTenant()
+    {
+        // coord #0166: a verify request has no JWT, so the ambient scope is not the challenge's tenant.
+        var acme = new Themia.Framework.Core.Abstractions.Tenancy.TenantId("acme");
+        var issuing = new OtpChallengeService(
+            new FakeRepository<OtpLoginChallenge>(rows, c => c.Id) { AmbientTenant = acme }, new FakeUnitOfWork(), clock, options);
+        var issued = await issuing.IssueAsync(Phone, userId);
+
+        foreach (Themia.Framework.Core.Abstractions.Tenancy.TenantId? scope in new Themia.Framework.Core.Abstractions.Tenancy.TenantId?[] { null, new("other") })
         {
-            AmbientTenant = new Themia.Framework.Core.Abstractions.Tenancy.TenantId("other"),
-        };
-        var crossTenant = new OtpChallengeService(otherTenant, new FakeUnitOfWork(), clock, options);
-        Assert.Equal(OtpVerifyOutcome.Invalid, (await crossTenant.VerifyAsync(issued.ChallengeId, issued.Code!)).Outcome);
+            rows.Single().ClosedAt = null;
+            rows.Single().AttemptCount = 0;
+            var verifying = new OtpChallengeService(
+                new FakeRepository<OtpLoginChallenge>(rows, c => c.Id) { AmbientTenant = scope }, new FakeUnitOfWork(), clock, options);
+
+            var result = await verifying.VerifyAsync(issued.ChallengeId, issued.Code!);
+
+            Assert.True(result.Verified);
+            Assert.Equal(acme, result.TenantId);
+            Assert.Equal(userId, result.UserId);
+        }
+    }
+
+    [Fact]
+    public async Task Verify_CountsGuessesAgainstTheChallengeFromAnyScope()
+    {
+        var acme = new Themia.Framework.Core.Abstractions.Tenancy.TenantId("acme");
+        var issuing = new OtpChallengeService(
+            new FakeRepository<OtpLoginChallenge>(rows, c => c.Id) { AmbientTenant = acme }, new FakeUnitOfWork(), clock, options);
+        var issued = await issuing.IssueAsync(Phone, userId);
+        var nullScope = new OtpChallengeService(
+            new FakeRepository<OtpLoginChallenge>(rows, c => c.Id), new FakeUnitOfWork(), clock, options);
+
+        await Fail(nullScope, issued.ChallengeId, options.MaxAttempts);
+
+        Assert.Equal(options.MaxAttempts, rows.Single().AttemptCount);
+        Assert.Equal(OtpVerifyOutcome.LockedOut, (await nullScope.VerifyAsync(issued.ChallengeId, issued.Code!)).Outcome);
+    }
+
+    [Fact]
+    public async Task Issue_ChallengeIdIsRandomNotTimeOrdered()
+    {
+        // The id now selects a row across tenants, so it carries the most random bits a Guid can: version 4.
+        var first = await NewService().IssueAsync(Phone, userId);
+        clock.Advance(TimeSpan.FromMinutes(10));
+        var second = await NewService().IssueAsync(Phone, userId);
+
+        Assert.Equal(4, first.ChallengeId.Version);
+        Assert.Equal(4, second.ChallengeId.Version);
     }
 
     [Fact]

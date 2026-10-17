@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
+using Themia.Framework.Core.Abstractions.Tenancy;
 using Themia.Modules.Identity.Abstractions;
 using Themia.Modules.Identity.Abstractions.Authentication;
 using Themia.Modules.Identity.Abstractions.Entities;
@@ -9,12 +10,15 @@ using Xunit;
 
 namespace Themia.Modules.Identity.AspNetCore.Tests;
 
-public sealed class OtpLoginFlowTests
+public sealed class OtpLoginFlowTests : IDisposable
 {
     private const string RawPhone = "081-234-5678";
     private const string NormalizedPhone = "0812345678";
     private const string Code = "123456";
 
+    private readonly TenantId? originalTenant = TenantContextAccessor.CurrentTenantId;
+    private readonly FakeOtpRecipientResolver resolver = new();
+    private readonly IdentityModuleOptions identityOptions = new();
     private readonly FakeTimeProvider clock = new(DateTimeOffset.Parse("2026-10-17T10:00:00Z"));
     private readonly FakeUserService users = new();
     private readonly FakeOtpChallengeService challenges = new();
@@ -23,14 +27,17 @@ public sealed class OtpLoginFlowTests
     private readonly RecordingHooks hooks = new();
     private readonly RecordingObserver observer = new();
     private readonly FakeAccessTokenService access;
+    private readonly FakeClaimsPrincipalFactory principals = new();
     private readonly OtpLoginFlow flow;
+
+    public void Dispose() => TenantContextAccessor.CurrentTenantId = originalTenant;
 
     public OtpLoginFlowTests()
     {
         access = new FakeAccessTokenService(clock);
         hooks.Refresh = refresh;
-        flow = new OtpLoginFlow(users, challenges, sender, new FormattingOnlyPhoneNumberNormalizer(),
-            new FakeClaimsPrincipalFactory(), access, refresh, hooks, [observer], clock, NullLogger<OtpLoginFlow>.Instance);
+        flow = new OtpLoginFlow(users, resolver, challenges, sender, new FormattingOnlyPhoneNumberNormalizer(),
+            principals, access, refresh, hooks, [observer], identityOptions, clock, NullLogger<OtpLoginFlow>.Instance);
     }
 
     private static User Eligible() => new()
@@ -41,9 +48,9 @@ public sealed class OtpLoginFlowTests
     private void GivenAccount(User? user = null)
     {
         var u = user ?? Eligible();
-        users.PhoneUserToReturn = u;
+        resolver.Recipient = new OtpRecipient(u.Id, u.TenantId, RawPhone);
         users.UserToReturn = u;
-        challenges.VerifyResult = new OtpVerifyResult(OtpVerifyOutcome.Verified, u.Id, NormalizedPhone);
+        challenges.VerifyResult = new OtpVerifyResult(OtpVerifyOutcome.Verified, u.Id, NormalizedPhone) { TenantId = u.TenantId };
     }
 
     [Fact]
@@ -73,26 +80,29 @@ public sealed class OtpLoginFlowTests
         Assert.Empty(sender.Sent);
     }
 
-    [Theory]
-    [InlineData("unconfirmed")]
-    [InlineData("inactive")]
-    [InlineData("locked")]
-    public async Task Start_ForAnIneligibleAccountIsADecoyAndSendsNothing(string kind)
+    [Fact]
+    public async Task Start_IssuesTheChallengeAsTheRecipientsTenant_AndRestoresTheCallersScope()
     {
         var user = Eligible();
-        switch (kind)
-        {
-            case "unconfirmed": user.PhoneNumberConfirmed = false; break;
-            case "inactive": user.IsActive = false; break;
-            default: user.LockoutEnd = clock.GetUtcNow().AddMinutes(5); break;
-        }
-
+        user.TenantId = new TenantId("acme");
         GivenAccount(user);
-        var result = await flow.StartAsync(RawPhone);
+        TenantContextAccessor.CurrentTenantId = null;
 
-        Assert.True(result.Issued);
-        Assert.Null(challenges.LastIssueUserId);
-        Assert.Empty(sender.Sent);
+        await flow.StartAsync(RawPhone);
+
+        Assert.Equal(new TenantId("acme"), challenges.TenantSeenOnIssue);
+        Assert.Null(TenantContextAccessor.CurrentTenantId);
+    }
+
+    [Fact]
+    public async Task Start_ForADecoyKeepsTheCallersScope()
+    {
+        TenantContextAccessor.CurrentTenantId = new TenantId("beta");
+
+        await flow.StartAsync(RawPhone);
+
+        Assert.Equal(new TenantId("beta"), challenges.TenantSeenOnIssue);
+        Assert.Equal(new TenantId("beta"), TenantContextAccessor.CurrentTenantId);
     }
 
     [Fact]
@@ -124,8 +134,8 @@ public sealed class OtpLoginFlowTests
         GivenAccount();
         sender.Throw = true;
         var log = new ListLogger<OtpLoginFlow>();
-        var logging = new OtpLoginFlow(users, challenges, sender, new FormattingOnlyPhoneNumberNormalizer(),
-            new FakeClaimsPrincipalFactory(), access, refresh, hooks, [], clock, log);
+        var logging = new OtpLoginFlow(users, resolver, challenges, sender, new FormattingOnlyPhoneNumberNormalizer(),
+            new FakeClaimsPrincipalFactory(), access, refresh, hooks, [], identityOptions, clock, log);
 
         await logging.StartAsync(RawPhone);
 
@@ -250,6 +260,84 @@ public sealed class OtpLoginFlowTests
     }
 
     [Fact]
+    public async Task Verify_RunsTheUserLookupPrincipalAndHooksAsTheChallengesTenant_ThenRestoresTheScope()
+    {
+        var user = Eligible();
+        user.TenantId = new TenantId("acme");
+        GivenAccount(user);
+        TenantContextAccessor.CurrentTenantId = null;
+        var seen = new List<TenantId?>();
+        var probing = new OtpLoginFlow(users, resolver, challenges, sender, new FormattingOnlyPhoneNumberNormalizer(),
+            principals, access, refresh, new CapturingBeforeLoginHooks(_ => seen.Add(TenantContextAccessor.CurrentTenantId)), [],
+            identityOptions, clock, NullLogger<OtpLoginFlow>.Instance);
+
+        var result = await probing.VerifyAsync(Guid.NewGuid(), Code);
+
+        Assert.True(result.Succeeded);
+        Assert.Equal(new TenantId("acme"), Assert.Single(seen));
+        Assert.Equal(new TenantId("acme"), users.TenantSeenOnFindById);
+        Assert.Equal(new TenantId("acme"), principals.TenantSeen);
+        Assert.Null(TenantContextAccessor.CurrentTenantId);
+    }
+
+    [Fact]
+    public async Task Verify_GetsNoTokensWhenTheUserBelongsToAnotherTenantThanTheChallenge()
+    {
+        var user = Eligible();
+        user.TenantId = new TenantId("beta");
+        GivenAccount(user);
+        challenges.VerifyResult = new OtpVerifyResult(OtpVerifyOutcome.Verified, user.Id, NormalizedPhone) { TenantId = new TenantId("acme") };
+
+        var result = await flow.VerifyAsync(Guid.NewGuid(), Code);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(0, refresh.IssueCalls);
+        Assert.False(principals.Called);
+        Assert.Equal(LoginFailureReason.InvalidOtp, hooks.FailedReason);
+    }
+
+    [Fact]
+    public async Task Verify_RestoresTheCallersScopeWhenAHookThrows()
+    {
+        var user = Eligible();
+        user.TenantId = new TenantId("acme");
+        GivenAccount(user);
+        TenantContextAccessor.CurrentTenantId = new TenantId("beta");
+        var throwing = new OtpLoginFlow(users, resolver, challenges, sender, new FormattingOnlyPhoneNumberNormalizer(),
+            principals, access, refresh, new ThrowingBeforeLoginHooks(), [], identityOptions, clock, NullLogger<OtpLoginFlow>.Instance);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => throwing.VerifyAsync(Guid.NewGuid(), Code));
+
+        Assert.Equal(new TenantId("beta"), TenantContextAccessor.CurrentTenantId);
+    }
+
+    [Fact]
+    public async Task Verify_RefusesAPlatformUser_WhenPlatformLoginIsOff_EvenForAChallengeIssuedBeforeItWasTurnedOff()
+    {
+        var platformUser = Eligible();
+        platformUser.TenantId = null;
+        GivenAccount(platformUser);
+        identityOptions.AllowPlatformLogin = false;
+
+        var result = await flow.VerifyAsync(Guid.NewGuid(), Code);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(0, refresh.IssueCalls);
+        Assert.False(principals.Called);
+    }
+
+    [Fact]
+    public async Task Verify_AcceptsAPlatformUser_WhenPlatformLoginIsOn()
+    {
+        var platformUser = Eligible();
+        platformUser.TenantId = null;
+        GivenAccount(platformUser);
+        identityOptions.AllowPlatformLogin = true;
+
+        Assert.True((await flow.VerifyAsync(Guid.NewGuid(), Code)).Succeeded);
+    }
+
+    [Fact]
     public async Task Verify_GetsNoTokensWhenTheUserIsGone()
     {
         GivenAccount();
@@ -292,8 +380,8 @@ public sealed class OtpLoginFlowTests
         GivenAccount();
         string? seen = null;
         var capturing = new CapturingBeforeLoginHooks(identifier => seen = identifier);
-        var capturingFlow = new OtpLoginFlow(users, challenges, sender, new FormattingOnlyPhoneNumberNormalizer(),
-            new FakeClaimsPrincipalFactory(), access, refresh, capturing, [], clock, NullLogger<OtpLoginFlow>.Instance);
+        var capturingFlow = new OtpLoginFlow(users, resolver, challenges, sender, new FormattingOnlyPhoneNumberNormalizer(),
+            new FakeClaimsPrincipalFactory(), access, refresh, capturing, [], identityOptions, clock, NullLogger<OtpLoginFlow>.Instance);
 
         await capturingFlow.VerifyAsync(Guid.NewGuid(), Code);
 
@@ -306,6 +394,12 @@ public sealed class OtpLoginFlowTests
         await Assert.ThrowsAsync<ArgumentException>(() => flow.StartAsync("  "));
     }
 
+    private sealed class ThrowingBeforeLoginHooks : AuthenticationHooksBase
+    {
+        public override Task OnBeforeLoginAsync(BeforeLoginContext context, CancellationToken cancellationToken = default) =>
+            throw new InvalidOperationException("hook failed");
+    }
+
     private sealed class CapturingBeforeLoginHooks(Action<string> capture) : AuthenticationHooksBase
     {
         public override Task OnBeforeLoginAsync(BeforeLoginContext context, CancellationToken cancellationToken = default)
@@ -316,8 +410,18 @@ public sealed class OtpLoginFlowTests
     }
 }
 
+internal sealed class FakeOtpRecipientResolver : IOtpRecipientResolver
+{
+    public OtpRecipient? Recipient { get; set; }
+
+    public Task<OtpRecipient?> ResolveAsync(string normalizedPhoneNumber, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Recipient);
+}
+
 internal sealed class FakeOtpChallengeService : IOtpChallengeService
 {
+    public TenantId? TenantSeenOnIssue { get; private set; }
+
     public OtpIssueOutcome IssueOutcome { get; set; } = OtpIssueOutcome.Issued;
     public OtpVerifyResult VerifyResult { get; set; } = new(OtpVerifyOutcome.Invalid, null, null);
     public string? LastIssuePhone { get; private set; }
@@ -325,6 +429,7 @@ internal sealed class FakeOtpChallengeService : IOtpChallengeService
 
     public Task<OtpIssueResult> IssueAsync(string normalizedPhoneNumber, Guid? userId, CancellationToken cancellationToken = default)
     {
+        TenantSeenOnIssue = TenantContextAccessor.CurrentTenantId;
         LastIssuePhone = normalizedPhoneNumber;
         LastIssueUserId = userId;
         return Task.FromResult(IssueOutcome == OtpIssueOutcome.Issued

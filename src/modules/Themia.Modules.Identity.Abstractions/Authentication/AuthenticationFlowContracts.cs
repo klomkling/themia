@@ -134,6 +134,16 @@ public readonly record struct RefreshRotationResult
     public static RefreshRotationResult Denied() => new(RefreshRotationOutcome.Denied, null);
 }
 
+/// <summary>What <see cref="IAuthenticationFlow.LogoutAsync"/> did.</summary>
+public enum LogoutOutcome
+{
+    /// <summary>At least one refresh token was revoked.</summary>
+    Revoked,
+
+    /// <summary>Nothing was revoked: the token is unknown, already revoked, or its owner is gone.</summary>
+    NotFound,
+}
+
 /// <summary>Orchestrates the security-critical login/refresh/logout sequence. The default
 /// implementation lives in <c>Themia.Modules.Identity.AspNetCore</c> and is replaceable via DI.</summary>
 public interface IAuthenticationFlow
@@ -176,9 +186,16 @@ public interface IAuthenticationFlow
     /// <returns>The rotation result.</returns>
     Task<RefreshRotationResult> RefreshAsync(string refreshToken, CancellationToken cancellationToken = default);
 
-    /// <summary>Revokes the presented token's family (or all of the user's sessions). Idempotent.</summary>
+    /// <summary>
+    /// Revokes the presented token's family (or all of the user's sessions). The token is the proof: it is
+    /// found, and its owner with it, in whatever tenant it belongs to, so this works for a request that
+    /// carries no JWT and no tenant scope.
+    /// </summary>
     /// <param name="refreshToken">The presented refresh token.</param>
     /// <param name="allSessions">When true, revoke all of the user's sessions.</param>
     /// <param name="cancellationToken">A cancellation token.</param>
-    Task LogoutAsync(string refreshToken, bool allSessions, CancellationToken cancellationToken = default);
+    /// <returns><see cref="LogoutOutcome.Revoked"/> only when at least one token was revoked. An unknown or
+    /// already-revoked token is <see cref="LogoutOutcome.NotFound"/>: do not tell a caller their session
+    /// ended when nothing changed.</returns>
+    Task<LogoutOutcome> LogoutAsync(string refreshToken, bool allSessions, CancellationToken cancellationToken = default);
 }

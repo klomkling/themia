@@ -80,6 +80,12 @@ public abstract partial class AuthFlowConformanceTests : IAsyncLifetime
     public async Task DisposeAsync()
     {
         _client?.Dispose();
+        foreach (var extra in extraHosts)
+        {
+            await extra.StopAsync();
+            extra.Dispose();
+        }
+
         if (_host is not null)
         {
             await _host.StopAsync();
@@ -103,7 +109,7 @@ public abstract partial class AuthFlowConformanceTests : IAsyncLifetime
     /// both would register an <see cref="ITenantContext"/> that reads from request headers, conflicting
     /// with the fixed context. Only <c>UseThemiaProblemDetails()</c> is needed from the pipeline.
     /// </summary>
-    private Task<IHost> BuildHostAsync(TenantId? tenant, bool allowPlatformLogin)
+    private Task<IHost> BuildHostAsync(TenantId? tenant, bool allowPlatformLogin, bool accessorBackedTenant = false)
     {
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
@@ -156,7 +162,16 @@ public abstract partial class AuthFlowConformanceTests : IAsyncLifetime
 
                     // Fixed ITenantContext registered LAST so it overrides any prior registration.
                     services.RemoveAll<ITenantContext>();
-                    services.AddScoped<ITenantContext>(_ => new TenantContext(tenant));
+                    if (accessorBackedTenant)
+                    {
+                        // What the real host registers: the tenant is the ambient accessor, which a claims-only
+                        // strategy leaves null for an anonymous request such as refresh or logout.
+                        services.AddScoped<ITenantContext, AccessorBackedTenantContext>();
+                    }
+                    else
+                    {
+                        services.AddScoped<ITenantContext>(_ => new TenantContext(tenant));
+                    }
                 });
 
                 web.Configure(app =>

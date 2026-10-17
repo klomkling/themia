@@ -21,6 +21,22 @@ public sealed class IdentityModuleOptions
     /// <summary>The lifetime of an issued refresh token. Default 14 days.</summary>
     public TimeSpan RefreshTokenLifetime { get; set; } = TimeSpan.FromDays(14);
 
+    /// <summary>The <see cref="UserMutationResult.RefusalCode"/> of a phone number refused because an
+    /// active user in another tenant already holds it (see <see cref="RejectPhoneNumberHeldInAnotherTenant"/>).</summary>
+    public const string PhoneNumberInAnotherTenantRefusalCode = "phone_number_in_another_tenant";
+
+    /// <summary>
+    /// When <see langword="true"/>, <c>IUserService.SetPhoneNumberAsync</c> refuses a number that an active user
+    /// in another tenant (or a platform user) already holds, with <see cref="PhoneNumberInAnotherTenantRefusalCode"/>.
+    /// Off by default: tenants may legitimately share a number. Turn it on when you log in by one-time code with
+    /// no tenant hint, where a number active in two tenants cannot be told apart and gets no code at all.
+    /// Only blocks new assignments; numbers already shared are not touched. The check reads then writes, so two
+    /// tenants setting the same number at the same instant can both pass; no portable constraint can say "unique
+    /// across tenants among active users". The one-time-code login fails closed on any duplicate that slips
+    /// through (it is a decoy for every holder) rather than guessing which tenant is meant.
+    /// </summary>
+    public bool RejectPhoneNumberHeldInAnotherTenant { get; set; }
+
     /// <summary>
     /// Validates that the configured policy values are internally consistent, throwing if any would
     /// produce a broken runtime (for example a zero lockout threshold that locks an account on the

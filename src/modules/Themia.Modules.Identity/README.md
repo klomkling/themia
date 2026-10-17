@@ -342,6 +342,42 @@ Known limits, so you can decide what to add:
 - **Expired rows** are purged in small batches on later starts; there is no background job.
 - **Which login methods are enabled** per tenant or user is not modelled here. Enforce it in `OnBeforeLoginAsync` for now.
 
+## Refresh, logout and one-time-code login with no tenant scope
+
+With a claims-only tenant strategy the tenant comes from the JWT, but `refresh`, `logout`, `otp/start` and `otp/verify` carry no JWT, so
+their ambient tenant is **null**. Identity handles that without trusting the caller: the proof is a secret, and the tenant is read from the
+row the secret proves.
+
+- **Refresh / logout.** The refresh-token hash (256 random bits) finds the token; its owner is that row's own user, in whatever tenant it
+  lives. Rotation, the lockout check, the claims principal, `OnRefreshSucceededAsync` and the observers run in the owner's tenant. A token only
+  ever acts as its own user. `LogoutAsync` returns `LogoutOutcome.Revoked` only when a token was revoked; the `logout` endpoint answers 204 for
+  that and 401 otherwise (unknown or already-revoked token).
+- **`OnBeforeRefreshAsync` sees a null scope.** It runs before the token is looked up, so no owner is known yet. Do not read "no tenant" as
+  "platform user" or as "allowed" in that hook; make the decision after the owner is known (`OnRefreshSucceededAsync`).
+- **OTP start.** `IOtpRecipientResolver` finds the holder of the phone across tenants. Exactly one active user with a confirmed phone and no
+  lockout is a recipient; none, or several (the same number active in two tenants), is a decoy with the same response and no message. If the
+  host does set an ambient tenant, only that tenant and platform users are candidates.
+- **OTP verify.** The challenge is found by its id (a random GUID) in any tenant, the guess is counted and the code consumed there, and the
+  login runs in the challenge's tenant. The user must belong to that same tenant.
+- **Same number in two tenants.** With no tenant hint such a number cannot receive a code. To stop it arising, set
+  `IdentityModuleOptions.RejectPhoneNumberHeldInAnotherTenant = true`: `SetPhoneNumberAsync` then refuses a number an active user in another
+  tenant (or the platform) holds, with refusal code `IdentityModuleOptions.PhoneNumberInAnotherTenantRefusalCode`. It only blocks new
+  assignments; numbers already shared are untouched.
+- **The tenant switch needs the accessor-backed `ITenantContext`.** Identity switches the ambient tenant through
+  `TenantContextAccessor`. EF Core's runtime tenant filter and Dapper behind the `ITenantContext` that `AddThemiaAspNetCore` registers both read
+  it, so they follow the switch. A custom `ITenantContext` that returns its own fixed value is not switched, and a claims-only host using one
+  would still see a null scope. The switch is internal and shared across `Themia.Framework.Core`, `Themia.Modules.Identity` and
+  `Themia.Modules.Identity.AspNetCore` through `InternalsVisibleTo`, so install those at the same version (all Themia packages share one).
+- **The cross-tenant phone option is not atomic.** `RejectPhoneNumberHeldInAnotherTenant` reads, then writes: two tenants setting the same number
+  at the same instant can both pass, and no portable constraint can express "unique across tenants among active users". The one-time-code
+  login fails closed on any duplicate that gets through (a decoy for every holder).
+- **Logout hooks.** `OnLogoutAsync` and the logout observers run in the token owner's tenant scope (via `IRefreshTokenService.FindOwnerAsync`);
+  a custom `IRefreshTokenService` that does not implement it keeps the caller's scope.
+- **Mutation hooks.** `OnUserMutatedAsync` and the observers run in the mutated user's tenant, so a hook that calls
+  `IRefreshTokenService.RevokeAllForUserAsync(userId)` reaches the user's tokens whoever made the change. `RevokeAllForUserAsync` itself stays
+  caller-scoped (a tenant's code cannot revoke another tenant's sessions by id) and logs a warning when it revokes nothing because the user is
+  not visible.
+
 ## Notes / gotchas
 
 - **Dapper: register the data peer first.** Call `AddThemiaDapper*(...)` **before**

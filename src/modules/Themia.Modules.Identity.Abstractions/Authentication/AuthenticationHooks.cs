@@ -144,6 +144,12 @@ public interface IAuthenticationHooks
     Task OnLoginFailedAsync(LoginFailedContext context, CancellationToken cancellationToken = default);
 
     /// <summary>Early refresh gate.</summary>
+    /// <remarks>
+    /// Runs before the refresh token is looked up, so no owner is known yet. A refresh request carries no
+    /// JWT, so under a claims-only tenant strategy the ambient tenant here is <b>null</b>: do not read "no
+    /// tenant" as "platform user" or as "allowed". The rest of the refresh (lockout check, principal factory,
+    /// <see cref="OnRefreshSucceededAsync"/>) runs in the token owner's tenant scope.
+    /// </remarks>
     /// <param name="context">The before-refresh context.</param>
     /// <param name="cancellationToken">A cancellation token.</param>
     Task OnBeforeRefreshAsync(BeforeRefreshContext context, CancellationToken cancellationToken = default);

@@ -110,6 +110,10 @@ public enum OtpVerifyOutcome
 /// <param name="NormalizedPhoneNumber">The phone the challenge was issued for; set only when verified.</param>
 public readonly record struct OtpVerifyResult(OtpVerifyOutcome Outcome, Guid? UserId, string? NormalizedPhoneNumber)
 {
+    /// <summary>The tenant the challenge was issued in (<see langword="null"/> for a platform user); set only
+    /// when verified. The login flow runs as this tenant and requires the user to belong to it.</summary>
+    public Themia.Framework.Core.Abstractions.Tenancy.TenantId? TenantId { get; init; }
+
     /// <summary>Whether the code was accepted.</summary>
     public bool Verified => Outcome == OtpVerifyOutcome.Verified;
 }
@@ -126,4 +130,26 @@ public interface IOtpChallengeService
 
     /// <summary>Counts one guess against the challenge and compares it, in one conditional update.</summary>
     Task<OtpVerifyResult> VerifyAsync(Guid challengeId, string code, CancellationToken cancellationToken = default);
+}
+
+/// <summary>Who a one-time code may be sent to: the single eligible user holding a phone number.</summary>
+/// <param name="UserId">The user.</param>
+/// <param name="TenantId">The user's tenant; <see langword="null"/> for a platform user.</param>
+/// <param name="PhoneNumber">The number as the user is registered with it.</param>
+public sealed record OtpRecipient(Guid UserId, Themia.Framework.Core.Abstractions.Tenancy.TenantId? TenantId, string PhoneNumber);
+
+/// <summary>
+/// Finds the one user a phone number belongs to, across tenants, for <see cref="IOtpLoginFlow.StartAsync"/>.
+/// A start request carries no JWT, so under a claims-only tenant strategy the ambient scope is null and a
+/// scoped lookup would never find a tenant user.
+/// </summary>
+public interface IOtpRecipientResolver
+{
+    /// <summary>
+    /// Returns the recipient when exactly one active user with a confirmed phone and no lockout holds
+    /// <paramref name="normalizedPhoneNumber"/>; <see langword="null"/> for none or for several (ambiguous,
+    /// fail closed). When an ambient tenant exists, only that tenant's users and platform users are
+    /// candidates. Returns identifiers only, never the user.
+    /// </summary>
+    Task<OtpRecipient?> ResolveAsync(string normalizedPhoneNumber, CancellationToken cancellationToken = default);
 }

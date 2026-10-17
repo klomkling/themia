@@ -17,13 +17,27 @@ internal sealed class OtpChallengesByPhoneSinceSpec : Specification<OtpLoginChal
     }
 }
 
+/// <summary>A challenge by id in any tenant. The id is a secret (122 random bits) and a verify request carries
+/// no tenant scope, so the row is found by it alone; the login then runs as the row's own tenant.</summary>
+internal sealed class OtpChallengeByIdSpec : Specification<OtpLoginChallenge>
+{
+    public OtpChallengeByIdSpec(Guid id)
+    {
+        Where(c => c.Id == id);
+        WithoutTenantFilter();
+    }
+}
+
 /// <summary>The compare-and-set gate of one guess: matches only while the challenge is still open, unexpired
 /// and has exactly <c>expectedAttempts</c> guesses recorded. Two parallel guesses read the same count and
 /// only one of them matches, so the counter can never be overrun and a code can never be used twice.</summary>
 internal sealed class OtpChallengeAttemptGateSpec : Specification<OtpLoginChallenge>
 {
-    public OtpChallengeAttemptGateSpec(Guid id, int expectedAttempts, DateTimeOffset now) =>
+    public OtpChallengeAttemptGateSpec(Guid id, int expectedAttempts, DateTimeOffset now)
+    {
         Where(c => c.Id == id && c.ClosedAt == null && c.ExpiresAt > now && c.AttemptCount == expectedAttempts);
+        WithoutTenantFilter();
+    }
 }
 
 /// <summary>Every still-open challenge for a phone except one.</summary>

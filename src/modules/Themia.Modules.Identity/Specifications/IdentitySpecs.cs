@@ -4,6 +4,29 @@ using Themia.Modules.Identity.Abstractions.Entities;
 
 namespace Themia.Modules.Identity.Specifications;
 
+/// <summary>Finds a user by id in any tenant. Reserved for paths a secret has already proved (see
+/// <c>IdentityScope.ResolveUserAnyTenantAsync</c>).</summary>
+internal sealed class UserByIdAnyTenantSpec : Specification<User>
+{
+    public UserByIdAnyTenantSpec(Guid id)
+    {
+        Where(u => u.Id == id);
+        WithoutTenantFilter();
+    }
+}
+
+/// <summary>Active users holding a normalized phone number, in every tenant and the platform. Only for the
+/// opt-in cross-tenant uniqueness check and by the OTP recipient resolver (exactly one match proceeds); both
+/// callers read only ids, tenants and the phone number from the result.</summary>
+internal sealed class ActiveUsersByNormalizedPhoneAnyTenantSpec : Specification<User>
+{
+    public ActiveUsersByNormalizedPhoneAnyTenantSpec(string normalizedPhone)
+    {
+        Where(u => u.NormalizedPhoneNumber == normalizedPhone && u.IsActive);
+        WithoutTenantFilter();
+    }
+}
+
 /// <summary>Finds a user by normalized user name within the ambient tenant.</summary>
 internal sealed class UserByNormalizedNameSpec : Specification<User>
 {
