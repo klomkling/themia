@@ -10,7 +10,7 @@ with the *why* and concrete upgrade steps.
 - Each entry states: **What changed**, **Why**, and **How to upgrade** (before → after).
 - Non-breaking changes are *not* listed here — see the CHANGELOG.
 
-## Unreleased (rename to the release version)
+## 0.35.0
 
 ### `IRefreshTokenService.RevokeAsync` and `IAuthenticationFlow.LogoutAsync` report whether anything was revoked (breaking for implementers and test doubles)
 
@@ -34,6 +34,10 @@ public Task<LogoutOutcome> LogoutAsync(string refreshToken, bool allSessions, Ca
 
 Treat `0` and `LogoutOutcome.NotFound` as "nothing happened", not as a completed logout.
 
+**Decorators:** a class that wraps `IRefreshTokenService` must also forward the new `FindOwnerAsync`. Without it the default answers from `ResolveOwnerAsync` with `RefreshTokenOwner.TenantKnown` false, the owner's tenant is lost, and the logout hooks run in the caller's scope.
+
+**HTTP clients:** `POST logout` now answers 401 (it was 204) when nothing was revoked, that is for an unknown or already-revoked refresh token. A client that treated any logout response as success should treat 401 as "already signed out" and clear its local session.
+
 ### A refresh token now rotates as its own owner whatever tenant scope the request has (breaking for code that relied on the old rejection)
 
 **What changed:** `IRefreshTokenService.ValidateAndRotateAsync` used to return `Invalid` for a token whose owner was not visible in the caller's tenant scope. The token hash is now the proof: the owner is found in whatever tenant it belongs to and the rotated pair is that owner's, in that owner's tenant.
@@ -42,7 +46,27 @@ Treat `0` and `LogoutOutcome.NotFound` as "nothing happened", not as a completed
 
 **Who is affected:** anyone who depended on "a token presented in another tenant's scope is rejected" as an isolation check. It is not one anymore; the 256-bit token is the credential. `RevokeAllForUserAsync(userId)` and `IUserService` are unchanged and still resolve in the caller's scope.
 
+**Platform users:** refresh also refuses a platform user's token (without consuming it) when `IdentityModuleOptions.AllowPlatformLogin` is `false`, so a platform session opened while the option was on ends at its next refresh once it is turned off.
+
 **How to upgrade:** nothing to change for hosts that already set the tenant scope. Hosts with a claims-only strategy can drop their own scope-setting endpoints for refresh and logout.
+
+### `OtpLoginFlow` constructor gained `IOtpRecipientResolver` and `IdentityModuleOptions` (breaking for hand-construction of the 0.34.0 type)
+
+**What changed:** the 0.34.0 `OtpLoginFlow` constructor gained two parameters: `IOtpRecipientResolver recipients` as the 2nd argument (after `users`) and `IdentityModuleOptions identityOptions` just before `timeProvider`. `OtpRecipientResolver` is new in this release and takes the same options. One-time-code login now honours `AllowPlatformLogin`.
+
+**Who is affected:** only code that calls `new OtpLoginFlow(...)` itself (tests, custom composition). Hosts that use `AddThemiaIdentityOtpLogin` need no change.
+
+**How to upgrade:**
+
+```csharp
+// before (0.34.0)
+new OtpLoginFlow(users, challenges, sender, phoneNormalizer, principalFactory, accessTokens,
+    refreshTokens, hooks, observers, timeProvider, logger);
+
+// after
+new OtpLoginFlow(users, recipients, challenges, sender, phoneNormalizer, principalFactory, accessTokens,
+    refreshTokens, hooks, observers, identityOptions, timeProvider, logger);
+```
 
 ## 0.31.3
 

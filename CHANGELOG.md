@@ -27,6 +27,12 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.35.0] - 2026-10-17
+
+Tenant-scope fix for the mounted `refresh`, `logout` and one-time-code endpoints of `Themia.Modules.Identity` (coord #0166). No new packages, no new migration.
+
+**Breaking, for implementers and test doubles.** `IRefreshTokenService.RevokeAsync` now returns `Task<int>` and `IAuthenticationFlow.LogoutAsync` returns `Task<LogoutOutcome>`; the `logout` endpoint answers 401 for an unknown or already-revoked token instead of 204. Change the return type in your own implementations and fakes (see [MIGRATION.md](MIGRATION.md)). `IRefreshTokenService.FindOwnerAsync` is new but has a default implementation (it answers from `ResolveOwnerAsync` with `RefreshTokenOwner.TenantKnown` false), so nothing else needs to change, except that a decorator of `IRefreshTokenService` must forward `FindOwnerAsync` or the owner's tenant is lost and the logout hooks keep the caller's scope. `OtpLoginFlow` and `OtpRecipientResolver` take new constructor arguments, which only matters if you construct them by hand. New opt-in option `IdentityModuleOptions.RejectPhoneNumberHeldInAnotherTenant`; one-time-code login now honours `AllowPlatformLogin`.
+
 ### Fixed
 
 - `Themia.Modules.Identity` (coord #0166): under a claims-only tenant strategy the mounted `refresh`, `logout` and `otp/start` / `otp/verify` carry no JWT, so their tenant scope was null and a tenant user's refresh returned Invalid, logout revoked nothing and still answered 204, and an OTP start for a tenant user issued a challenge but sent no code. The refresh-token hash and the OTP challenge id plus code are now the proof. The owner is found without the tenant filter and the rest of the flow (principal factory, hooks, observers, user lookup, token issue) runs in the owner's own tenant scope, which ends with the call. A token or challenge can only ever act as its own user in its own tenant. `RevokeAllForUserAsync(userId)` and the `IUserService` methods stay scoped to the caller, and `RevokeAllForUserAsync` now logs a warning when it revokes nothing because the user is not visible in the caller's scope.
@@ -34,12 +40,12 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 - `OtpRecipientResolver` and `OtpLoginFlow.VerifyAsync` honour `IdentityModuleOptions.AllowPlatformLogin`: with it off a platform user can neither be sent a code nor redeem one (the resolver bypassed the gate that `IUserService.FindBy*` applies).
 - A refresh for a deactivated user is refused before the token is rotated (it was only refused afterwards, with the token already consumed).
 - Refresh honours `IdentityModuleOptions.AllowPlatformLogin`: with it off, a platform user's refresh token is refused (and not consumed). Sessions opened while the option was on no longer outlive turning it off by the refresh lifetime.
-- The default `IRefreshTokenService.FindOwnerAsync` now answers from `ResolveOwnerAsync` (new `RefreshTokenOwner.TenantKnown`, `false` for that default), so `LogoutAsync` looks the owner up once instead of twice when an implementation reports no tenant. Such an implementation still keeps the caller's scope for the logout hooks.
+- `LogoutAsync` looks the token owner up once: `FindOwnerAsync` also covers implementations that only know `ResolveOwnerAsync` (its default answers from it with `RefreshTokenOwner.TenantKnown` false), so there is no second fallback lookup.
 
 ### Added
 
 - `IdentityModuleOptions.RejectPhoneNumberHeldInAnotherTenant` (default `false`): when on, `SetPhoneNumberAsync` refuses a number an active user in another tenant, or a platform user, already holds, with `UserMutationOutcome.Refused` and refusal code `IdentityModuleOptions.PhoneNumberInAnotherTenantRefusalCode`. Turn it on when you log in by one-time code with no tenant hint: a number active in two tenants is ambiguous and gets no code. New `IOtpRecipientResolver` (default `OtpRecipientResolver`) and `OtpVerifyResult.TenantId`. `OtpLoginFlow` takes the resolver as a constructor argument.
-- `LogoutOutcome` (`Revoked`, `NotFound`); `IRefreshTokenService.FindOwnerAsync` / `RefreshTokenOwner` (default implementation returns null, so existing implementers compile); the logout hooks and observers run in the token owner's tenant scope when it is implemented.
+- `LogoutOutcome` (`Revoked`, `NotFound`); `IRefreshTokenService.FindOwnerAsync` / `RefreshTokenOwner(UserId, TenantId, TenantKnown)`; the default implementation answers from `ResolveOwnerAsync` with `TenantKnown` false, so existing implementers compile. The logout hooks and observers run in the token owner's tenant scope when `FindOwnerAsync` reports it, and keep the caller's scope otherwise. A decorator of `IRefreshTokenService` must forward `FindOwnerAsync`.
 
 ### Changed
 
