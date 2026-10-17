@@ -23,6 +23,7 @@ public static class ModelBuilderExtensions
         modelBuilder.ApplyConfiguration(new UserTokenConfiguration());
         modelBuilder.ApplyConfiguration(new RefreshTokenConfiguration());
         modelBuilder.ApplyConfiguration(new ExternalLoginLinkConfiguration());
+        modelBuilder.ApplyConfiguration(new OtpLoginChallengeConfiguration());
         return modelBuilder;
     }
 
@@ -147,6 +148,24 @@ public static class ModelBuilderExtensions
             b.Property(l => l.Provider).HasColumnName("provider").HasMaxLength(64).IsRequired();
             b.Property(l => l.ExternalId).HasColumnName("external_id").HasMaxLength(256).IsRequired();
             b.Property(l => l.CreatedAt).HasColumnName("created_at");
+        }
+    }
+
+    private sealed class OtpLoginChallengeConfiguration : IEntityTypeConfiguration<OtpLoginChallenge>
+    {
+        public void Configure(EntityTypeBuilder<OtpLoginChallenge> b)
+        {
+            b.ToTable("otp_login_challenges", Schema);
+            b.HasKey(c => c.Id);
+            b.Property(c => c.Id).HasColumnName("id");
+            // Framework maps tenant_id (tenant entity); map the challenge-specific columns here.
+            b.Property(c => c.UserId).HasColumnName("user_id");
+            b.Property(c => c.NormalizedPhoneNumber).HasColumnName("normalized_phone_number").HasMaxLength(64).IsRequired();
+            b.Property(c => c.CodeHash).HasColumnName("code_hash").HasMaxLength(64).IsRequired();
+            b.Property(c => c.CreatedAt).HasColumnName("created_at");
+            b.Property(c => c.ExpiresAt).HasColumnName("expires_at");
+            b.Property(c => c.AttemptCount).HasColumnName("attempt_count");
+            b.Property(c => c.ClosedAt).HasColumnName("closed_at");
         }
     }
 }

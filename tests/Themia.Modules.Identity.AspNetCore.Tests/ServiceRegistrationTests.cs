@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Themia.Modules.Identity.Abstractions;
 using Themia.Modules.Identity.Abstractions.Authentication;
 using Themia.Modules.Identity.AspNetCore.Authentication;
 using Themia.Modules.Identity.AspNetCore.DependencyInjection;
@@ -75,5 +76,57 @@ public sealed class ServiceRegistrationTests
 
         using var provider = services.BuildServiceProvider();
         Assert.NotNull(provider.GetRequiredService<IAccessTokenService>());
+    }
+
+    private sealed class NoopOtpSender : IOtpCodeSender
+    {
+        public Task SendAsync(OtpDelivery delivery, CancellationToken cancellationToken = default) => Task.CompletedTask;
+    }
+
+    private static byte[] Key() => Enumerable.Range(1, 32).Select(i => (byte)i).ToArray();
+
+    [Fact]
+    public void AddThemiaIdentityOtpLogin_registers_the_flow_and_challenge_service()
+    {
+        var services = WithCoreIdentity();
+        services.AddThemiaIdentityAspNetCore(Configure);
+        services.AddSingleton<IOtpCodeSender, NoopOtpSender>();
+
+        services.AddThemiaIdentityOtpLogin(o => o.CodeHashKey = Key());
+
+        Assert.Contains(services, d => d.ServiceType == typeof(IOtpLoginFlow));
+        Assert.Contains(services, d => d.ServiceType == typeof(IOtpChallengeService));
+        Assert.Contains(services, d => d.ServiceType == typeof(OtpLoginOptions));
+    }
+
+    [Fact]
+    public void AddThemiaIdentityOtpLogin_fails_at_registration_without_a_sender()
+    {
+        var services = WithCoreIdentity();
+        services.AddThemiaIdentityAspNetCore(Configure);
+
+        var ex = Assert.Throws<InvalidOperationException>(() => services.AddThemiaIdentityOtpLogin(o => o.CodeHashKey = Key()));
+
+        Assert.Contains("IOtpCodeSender", ex.Message);
+    }
+
+    [Fact]
+    public void AddThemiaIdentityOtpLogin_fails_at_registration_without_the_authentication_flow()
+    {
+        var services = WithCoreIdentity();
+        services.AddSingleton<IOtpCodeSender, NoopOtpSender>();
+
+        Assert.Throws<InvalidOperationException>(() => services.AddThemiaIdentityOtpLogin(o => o.CodeHashKey = Key()));
+    }
+
+    [Fact]
+    public void AddThemiaIdentityOtpLogin_fails_at_registration_with_a_short_or_missing_key()
+    {
+        var services = WithCoreIdentity();
+        services.AddThemiaIdentityAspNetCore(Configure);
+        services.AddSingleton<IOtpCodeSender, NoopOtpSender>();
+
+        Assert.Throws<ArgumentException>(() => services.AddThemiaIdentityOtpLogin(_ => { }));
+        Assert.Throws<ArgumentException>(() => services.AddThemiaIdentityOtpLogin(o => o.CodeHashKey = new byte[16]));
     }
 }

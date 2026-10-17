@@ -280,6 +280,68 @@ internal sealed class ChannelRules : IUserLifecycleHooks
 The list is read before the write, not locked: two concurrent links for one user each see the other's
 absent, so a rule that must hold under concurrency needs a constraint of its own.
 
+## Passwordless phone-code login
+
+`IOtpLoginFlow` signs a user in with a short numeric code sent to their confirmed phone, and issues the same tokens as
+`IAuthenticationFlow.LoginAsync`, so `refresh`, `logout` and your hooks and observers work unchanged. It is opt in.
+
+```csharp
+services.AddThemiaIdentityAspNetCore(/* jwt */);
+services.AddScoped<IOtpCodeSender, SmsCodeSender>();          // yours: delivery stays in the application
+services.AddThemiaIdentityOtpLogin(o =>
+{
+    o.CodeHashKey = Convert.FromBase64String(config["Otp:HashKey"]!);   // required, at least 32 random bytes
+});
+
+app.MapGroup("/auth").MapIdentityAuthEndpoints()
+   .MapIdentityOtpEndpoints(b => b.RequireRateLimiting("otp"));         // POST otp/start, POST otp/verify
+```
+
+`StartAsync(phone)` returns a `ChallengeId` and `ExpiresAt`, the same shape whether or not the phone has an account (an unknown, unconfirmed,
+inactive or locked-out phone gets a decoy challenge and no message). `VerifyAsync(challengeId, code)` returns the usual `LoginResult`:
+`InvalidCredentials` for a wrong, expired, used or unknown code, `LockedOut` once the attempt cap is hit (hooks and observers see
+`LoginFailureReason.OtpAttemptsExceeded`, not `LockedOut`, which means the account is locked), `Denied` when a hook refuses. The
+HTTP endpoints answer every failure with the same 401, and 429 when a start is throttled.
+
+| Option | Default | |
+|---|---|---|
+| `CodeHashKey` | none, required | HMAC key for the stored code hash, at least 32 random bytes. You supply it (user secrets, key vault, environment); Themia generates and stores nothing. Every instance must get the same key. Never logged. Rotating it ends the codes in flight. |
+| `CodeLength` | 6 | 6 to 9 digits. |
+| `Lifetime` | 5 min | |
+| `MaxAttempts` | 5 | Guesses per challenge. |
+| `MaxFailedAttemptsPerWindow` | 10 | Failed guesses per phone across all challenges inside `FailureWindow`. A new start never resets it. |
+| `FailureWindow` | 1 h | Rolling window for the failure cap and the start cap. |
+| `ResendCooldown` | 60 s | Minimum time between two starts for one phone. |
+| `MaxStartsPerWindow` | 5 | Starts per phone inside `FailureWindow`. |
+
+What is guaranteed: the code is random (`RandomNumberGenerator`), stored only as an HMAC and compared in constant time. A guess is counted
+and the code consumed in one conditional UPDATE, so parallel guesses cannot exceed the cap and a code cannot log in twice. Only the newest
+challenge for a phone is open. After the code is right, `VerifyAsync` re-checks that the user is active, not locked out and still has a
+confirmed phone, runs `OnBeforeLoginAsync` (identifier is the normalized phone) and `OnLoginSucceededAsync`, then issues tokens. The OTP
+failure counter is separate from `AccessFailedCount`, so guessing codes cannot lock a user out of password login.
+
+Known limits, so you can decide what to add:
+
+- **Delivery latency.** `StartAsync` awaits `IOtpCodeSender` only for a phone that can log in, so a slow gateway makes that response slower than
+  the unknown-phone case. Implement the sender to enqueue and return quickly. The start and failure throttles bound how often this can be probed.
+- **The host app must add a per-IP rate limiter on `otp/start` and `otp/verify`.** The library cannot see the caller. Pass
+  `RequireRateLimiting` to `MapIdentityOtpEndpoints`, or limit in your own endpoints. Without it one client can spread starts over many phone
+  numbers and run up SMS cost.
+- **The phone budget can be used against its owner.** Anyone who knows a number can spend its start and failure budget (5 starts, 10 failed
+  guesses per window) and so block that person's one-time-code login until the window slides. Password login is not affected. This is the
+  price of a cap that does not reset per challenge; the per-IP limiter above is what makes it expensive to do at scale.
+- **Options are read once, at registration.** `AddThemiaIdentityOtpLogin` takes the values when it runs and validates them there; they are not
+  `IOptions`, do not reload, and a bad or missing `CodeHashKey` stops the application at startup.
+- **Phone uniqueness.** A phone shared by two users in scope resolves to whichever `IUserService.FindByPhoneAsync` returns; keep phone numbers
+  unique per tenant (the module's normalized-phone index does).
+- **Throttles are keyed on the phone across tenants.** A platform user is reachable from any tenant context, so tenants that share a number
+  share its start and failure budget.
+- **A successful login clears the phone's recent failure count**, so a user who logs in regularly gives a guesser fresh budget; the
+  per-challenge cap and the start cap still bound it (at most `MaxFailedAttemptsPerWindow` guesses of 10^6 per success).
+- **Parallel starts** are re-checked after the insert, so a burst cannot all send; racing starts may all be refused and the user retries.
+- **Expired rows** are purged in small batches on later starts; there is no background job.
+- **Which login methods are enabled** per tenant or user is not modelled here. Enforce it in `OnBeforeLoginAsync` for now.
+
 ## Notes / gotchas
 
 - **Dapper: register the data peer first.** Call `AddThemiaDapper*(...)` **before**

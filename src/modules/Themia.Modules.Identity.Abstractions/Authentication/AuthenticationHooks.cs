@@ -32,6 +32,13 @@ public enum LoginFailureReason
     /// credential problem; surfacing it outward would confirm that a second account holds that string.
     /// </remarks>
     AmbiguousIdentifier,
+
+    /// <summary>The one-time phone code was wrong, expired, used or unknown.</summary>
+    InvalidOtp,
+
+    /// <summary>The one-time phone code's attempt cap was reached (per challenge, or per phone across
+    /// challenges). Distinct from <see cref="LockedOut"/>, which means the account itself is locked.</summary>
+    OtpAttemptsExceeded,
 }
 
 /// <summary>Base for hook contexts that can short-circuit the flow to a uniform 401 via

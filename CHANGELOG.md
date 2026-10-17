@@ -27,6 +27,18 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+### Added
+
+- `Themia.Modules.Identity`: passwordless phone-code login (coord #0165). `IOtpLoginFlow.StartAsync` sends a numeric one-time code to
+  a confirmed phone through the application's `IOtpCodeSender`; `VerifyAsync` exchanges it for the same session and refresh tokens as
+  password login (through `IAuthenticationHooks`, `IIdentityEventObserver` and `IClaimsPrincipalFactory`). Opt in with
+  `AddThemiaIdentityOtpLogin` and `MapIdentityOtpEndpoints` (`otp/start`, `otp/verify`). The code is stored as an HMAC under a required
+  `OtpLoginOptions.CodeHashKey`. Guesses are counted and the code consumed in one conditional UPDATE, capped per challenge (5) and per
+  phone across challenges in a rolling window (10 per hour), so starting a new challenge never resets the cap. An unknown phone gets a
+  decoy challenge indistinguishable from a real one. New table `identity.otp_login_challenges` (additive migration,
+  PostgreSQL and SQL Server); new `LoginFailureReason.InvalidOtp` and `OtpAttemptsExceeded`. `CodeLength` is 6 to 9. The host app must add a per-IP rate limiter on the
+  endpoints, and the options are read once at registration; see the Identity README.
+
 ## [0.33.0] - 2026-10-17
 
 First release of the Thai withholding tax certificate (หนังสือรับรองการหักภาษี ณ ที่จ่าย, form 50 ทวิ) packages (coord #0164), and the Thai baht text

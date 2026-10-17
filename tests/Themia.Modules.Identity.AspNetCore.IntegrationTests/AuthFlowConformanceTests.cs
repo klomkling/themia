@@ -34,7 +34,7 @@ public sealed record MeResponse(Guid? UserId, bool IsAuthenticated, string? Tena
 /// Abstract base for in-process HTTP integration tests covering the full JWT auth flow.
 /// Concrete subclasses supply the data peer (EF or Dapper, PG or SqlServer).
 /// </summary>
-public abstract class AuthFlowConformanceTests : IAsyncLifetime
+public abstract partial class AuthFlowConformanceTests : IAsyncLifetime
 {
     private const string TestIssuer = "themia-tests";
     private const string TestAudience = "themia-tests";
@@ -137,6 +137,15 @@ public abstract class AuthFlowConformanceTests : IAsyncLifetime
                         o.AccessTokenLifetime = TimeSpan.FromMinutes(15);
                     });
 
+                    // Passwordless phone code (AuthFlowConformanceTests.Otp.cs): the sender records every code.
+                    services.AddSingleton<IOtpCodeSender>(otpSender);
+                    services.AddThemiaIdentityOtpLogin(o =>
+                    {
+                        o.CodeHashKey = Enumerable.Range(1, 32).Select(i => (byte)i).ToArray();
+                        o.ResendCooldown = TimeSpan.Zero;
+                        o.MaxStartsPerWindow = 100;
+                    });
+
                     // JwtBearer validation.
                     services
                         .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -160,7 +169,7 @@ public abstract class AuthFlowConformanceTests : IAsyncLifetime
                     app.UseAuthorization();
                     app.UseEndpoints(endpoints =>
                     {
-                        endpoints.MapGroup("/auth").MapIdentityAuthEndpoints();
+                        endpoints.MapGroup("/auth").MapIdentityAuthEndpoints().MapIdentityOtpEndpoints();
 
                         endpoints.MapGet("/me", (ICurrentUser u) =>
                                 Results.Ok(new MeResponse(u.UserId, u.IsAuthenticated, u.TenantId, u.IsPlatform)))
