@@ -27,6 +27,10 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+### Fixed
+
+- `Themia.Exceptional`: `HttpContextEnricher` no longer puts `IpAddress`, `RequestBody` or `RequestContext` on log events. A host that attaches the enricher to its whole Serilog logger (as the registration docs show) got the caller address and, with `CaptureRequestContext` on, a JSON blob of every request header, cookie, query and form value on every log line of every sink, which breaks a no-PII log policy. `ExceptionalSerilogSink` now reads the three from the current request itself, only while it stores an exception, so the stored `ExceptionEntry` and the dashboard are unchanged and the other sinks never see them. `Url`, `HttpMethod`, `Host` and `StatusCode` are still enriched. The sink gains a constructor taking `IHttpContextAccessor` (the DI registration uses it); the two-argument constructor keeps working but then has no request to read. A custom sink or enricher that read those three properties from the log event must read them from the request instead.
+
 ## [0.35.0] - 2026-10-17
 
 Tenant-scope fix for the mounted `refresh`, `logout` and one-time-code endpoints of `Themia.Modules.Identity` (coord #0166). No new packages, no new migration.

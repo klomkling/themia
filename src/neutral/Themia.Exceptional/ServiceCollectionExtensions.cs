@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Themia.Data.Migrations;
@@ -75,7 +76,8 @@ public static class ServiceCollectionExtensions
         services.TryAddSingleton<ExceptionalSerilogSink>(sp =>
             new ExceptionalSerilogSink(
                 sp.GetRequiredService<IExceptionStore>(),
-                sp.GetRequiredService<ExceptionalOptions>()));
+                sp.GetRequiredService<ExceptionalOptions>(),
+                sp.GetRequiredService<IHttpContextAccessor>()));
 
         if (runMigration)
         {

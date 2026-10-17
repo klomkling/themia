@@ -96,22 +96,6 @@ public class HttpContextEnricherTests
     }
 
     [Fact]
-    public void Enrich_AddsRequestBody_WhenPresentInItems()
-    {
-        var (enricher, evt) = Setup(http =>
-        {
-            http.Request.Method = "POST";
-            http.Items[RequestBodyLoggingMiddleware.BodyItemKey] = "{\"key\":\"value\"}";
-        });
-
-        enricher.Enrich(evt, new LogEventPropertyFactory());
-
-        Assert.True(evt.Properties.TryGetValue("RequestBody", out var bodyProp));
-        var raw = Assert.IsType<ScalarValue>(bodyProp).Value;
-        Assert.Equal("{\"key\":\"value\"}", raw);
-    }
-
-    [Fact]
     public void Enrich_CapturesStatusCode_WhenSetButResponseNotStarted()
     {
         var (enricher, evt) = Setup(http =>
@@ -141,67 +125,27 @@ public class HttpContextEnricherTests
         Assert.False(evt.Properties.ContainsKey("StatusCode"));
     }
 
+    // The caller address, request body and request context reach the exception store through
+    // ExceptionalSerilogSink (see ExceptionalSerilogSinkRequestContextTests). The enricher must never put
+    // them on a log event, because every sink on the logger would then write them to its output.
     [Fact]
-    public void Captures_Headers_Redacted_WhenEnabled()
+    public void Enrich_NeverAddsCallerOrRequestData_EvenWhenEverythingIsEnabled()
     {
         var http = new DefaultHttpContext();
+        http.Connection.RemoteIpAddress = System.Net.IPAddress.Parse("203.0.113.9");
+        http.Request.Headers["Cf-Connecting-Ip"] = "203.0.113.9";
         http.Request.Headers["User-Agent"] = "Edge";
-        http.Request.Headers["Authorization"] = "Bearer secret";
-        var accessor = new HttpContextAccessor { HttpContext = http };
-        var options = new ExceptionalOptions { ApplicationName = "App", CaptureRequestContext = true };
-        var enricher = new HttpContextEnricher(accessor, options);
+        http.Items[RequestBodyLoggingMiddleware.BodyItemKey] = "{\"key\":\"value\"}";
+        var options = new ExceptionalOptions { ApplicationName = "App", CaptureRequestContext = true, CaptureRequestBody = true };
+        var enricher = new HttpContextEnricher(new HttpContextAccessor { HttpContext = http }, options);
         var evt = NewEvent();
 
         enricher.Enrich(evt, new LogEventPropertyFactory());
 
-        Assert.True(evt.Properties.TryGetValue("RequestContext", out var prop));
-        var json = Assert.IsType<ScalarValue>(prop).Value as string;
-        Assert.NotNull(json);
-        using var doc = JsonDocument.Parse(json!);
-        var headers = doc.RootElement.GetProperty("headers");
-        Assert.Equal("Edge", headers.GetProperty("User-Agent").GetString());
-        Assert.Equal("***", headers.GetProperty("Authorization").GetString());
-    }
-
-    [Fact]
-    public void Enricher_DropsEntry_WhenRedactorReturnsNull()
-    {
-        var http = new DefaultHttpContext();
-        http.Request.Headers["drop-me"] = "x";
-        http.Request.Headers["keep-me"] = "y";
-        var accessor = new HttpContextAccessor { HttpContext = http };
-        var options = new ExceptionalOptions
-        {
-            ApplicationName = "App",
-            CaptureRequestContext = true,
-            Redactor = (key, value) => key == "drop-me" ? null : value,
-        };
-        var enricher = new HttpContextEnricher(accessor, options);
-        var evt = NewEvent();
-
-        enricher.Enrich(evt, new LogEventPropertyFactory());
-
-        var json = Assert.IsType<ScalarValue>(evt.Properties["RequestContext"]).Value as string;
-        Assert.NotNull(json);
-        using var doc = JsonDocument.Parse(json!);
-        var headers = doc.RootElement.GetProperty("headers");
-        Assert.False(headers.TryGetProperty("drop-me", out _));
-        Assert.Equal("y", headers.GetProperty("keep-me").GetString());
-    }
-
-    [Fact]
-    public void NoRequestContext_WhenDisabled()
-    {
-        var http = new DefaultHttpContext();
-        http.Request.Headers["User-Agent"] = "Edge";
-        var accessor = new HttpContextAccessor { HttpContext = http };
-        var enricher = new HttpContextEnricher(accessor,
-            new ExceptionalOptions { ApplicationName = "App", CaptureRequestContext = false });
-        var evt = NewEvent();
-
-        enricher.Enrich(evt, new LogEventPropertyFactory());
-
+        Assert.False(evt.Properties.ContainsKey("IpAddress"));
+        Assert.False(evt.Properties.ContainsKey("RequestBody"));
         Assert.False(evt.Properties.ContainsKey("RequestContext"));
+        Assert.True(evt.Properties.ContainsKey("Url"));
     }
 
     [Fact]

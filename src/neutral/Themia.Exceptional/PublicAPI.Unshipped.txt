@@ -150,6 +150,7 @@ Themia.Exceptional.PagedResult<T>.Total.init -> void
 Themia.Exceptional.Serilog.ExceptionalSerilogSink
 Themia.Exceptional.Serilog.ExceptionalSerilogSink.Emit(Serilog.Events.LogEvent! logEvent) -> void
 Themia.Exceptional.Serilog.ExceptionalSerilogSink.ExceptionalSerilogSink(Themia.Exceptional.IExceptionStore! store, Themia.Exceptional.ExceptionalOptions! options) -> void
+Themia.Exceptional.Serilog.ExceptionalSerilogSink.ExceptionalSerilogSink(Themia.Exceptional.IExceptionStore! store, Themia.Exceptional.ExceptionalOptions! options, Microsoft.AspNetCore.Http.IHttpContextAccessor? accessor) -> void
 Themia.Exceptional.Serilog.HttpContextEnricher
 Themia.Exceptional.Serilog.HttpContextEnricher.Enrich(Serilog.Events.LogEvent! logEvent, Serilog.Core.ILogEventPropertyFactory! propertyFactory) -> void
 Themia.Exceptional.Serilog.HttpContextEnricher.HttpContextEnricher(Microsoft.AspNetCore.Http.IHttpContextAccessor! accessor, Themia.Exceptional.ExceptionalOptions! options) -> void
