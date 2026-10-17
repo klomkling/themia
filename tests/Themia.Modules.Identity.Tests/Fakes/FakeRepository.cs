@@ -78,15 +78,20 @@ internal sealed class FakeRepository<T>(List<T> store, Func<T, Guid> idSelector)
         if (setters.Assignments.Count == 0)
             throw new InvalidOperationException("UpdateWhereAsync requires at least one Set(...) call.");
 
-        var matched = Query(specification).ToList();
-        foreach (var entity in matched)
+        // One lock around match + write: a real set-based UPDATE is atomic per row, and the compare-and-set
+        // callers (OTP attempt counting) depend on that to be tested under parallel load.
+        lock (store)
         {
-            foreach (var (property, value) in setters.Assignments)
+            var matched = Query(specification).ToList();
+            foreach (var entity in matched)
             {
-                property.SetValue(entity, value);
+                foreach (var (property, value) in setters.Assignments)
+                {
+                    property.SetValue(entity, value);
+                }
             }
+            return Task.FromResult(matched.Count);
         }
-        return Task.FromResult(matched.Count);
     }
 
     private sealed class FakeBulkUpdateSetters : IBulkUpdateSetters<T>

@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
 using Themia.Modules.Identity.Abstractions;
 using Themia.Modules.Identity.Abstractions.Authentication;
+using Themia.Modules.Identity.Services;
 using Themia.Modules.Identity.AspNetCore.Authentication;
 using Themia.Modules.Identity.Tokens.AspNetCore.DependencyInjection;
 using Themia.Modules.Identity.Tokens.AspNetCore.Options;
@@ -63,6 +64,41 @@ public static class IdentityAspNetCoreServiceCollectionExtensions
 
         return services;
     }
+
+    /// <summary>
+    /// Adds the passwordless phone-code login (<see cref="IOtpLoginFlow"/>). Call after
+    /// <c>AddThemiaIdentityAspNetCore</c> and after registering your <see cref="IOtpCodeSender"/>. The
+    /// options are validated here, so a missing or short <see cref="OtpLoginOptions.CodeHashKey"/> fails
+    /// application start rather than the first login.
+    /// </summary>
+    /// <param name="services">The service collection.</param>
+    /// <param name="configure">Sets the options; <see cref="OtpLoginOptions.CodeHashKey"/> is required.</param>
+    /// <returns>The same collection.</returns>
+    public static IServiceCollection AddThemiaIdentityOtpLogin(
+        this IServiceCollection services,
+        Action<OtpLoginOptions> configure)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(configure);
+
+        static bool IsRegistered(IServiceCollection s, Type t) => s.Any(d => d.ServiceType == t);
+        if (!IsRegistered(services, typeof(IAuthenticationFlow)) || !IsRegistered(services, typeof(IOtpCodeSender)))
+        {
+            throw new InvalidOperationException(
+                "AddThemiaIdentityOtpLogin requires AddThemiaIdentityAspNetCore() and an IOtpCodeSender " +
+                "registration to come first (IAuthenticationFlow and IOtpCodeSender must be registered).");
+        }
+
+        var options = new OtpLoginOptions();
+        configure(options);
+        options.Validate();
+        services.TryAddSingleton(options);
+
+        services.TryAddScoped<IOtpChallengeService, OtpChallengeService>();
+        services.TryAddScoped<IOtpLoginFlow, OtpLoginFlow>();
+        return services;
+    }
+
 
     /// <summary>Adds the JwtBearer validation scheme wired to <see cref="JwtOptions"/> and the registered
     /// <see cref="IJwtSigningCredentialsProvider"/>. Call after <c>AddAuthentication(...)</c>.</summary>

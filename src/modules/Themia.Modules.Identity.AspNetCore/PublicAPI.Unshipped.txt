@@ -34,3 +34,26 @@ virtual Themia.Modules.Identity.AspNetCore.Authentication.AuthenticationHooksBas
 virtual Themia.Modules.Identity.AspNetCore.Authentication.AuthenticationHooksBase.OnLoginSucceededAsync(Themia.Modules.Identity.Abstractions.Authentication.LoginSucceededContext! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
 virtual Themia.Modules.Identity.AspNetCore.Authentication.AuthenticationHooksBase.OnLogoutAsync(Themia.Modules.Identity.Abstractions.Authentication.LogoutContext! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
 virtual Themia.Modules.Identity.AspNetCore.Authentication.AuthenticationHooksBase.OnRefreshSucceededAsync(Themia.Modules.Identity.Abstractions.Authentication.RefreshSucceededContext! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Modules.Identity.AspNetCore.Authentication.OtpLoginFlow
+Themia.Modules.Identity.AspNetCore.Authentication.OtpLoginFlow.OtpLoginFlow(Themia.Modules.Identity.Abstractions.IUserService! users, Themia.Modules.Identity.Abstractions.IOtpChallengeService! challenges, Themia.Modules.Identity.Abstractions.IOtpCodeSender! sender, Themia.Modules.Identity.Abstractions.IPhoneNumberNormalizer! phoneNormalizer, Themia.Modules.Identity.Abstractions.IClaimsPrincipalFactory! principalFactory, Themia.Modules.Identity.Abstractions.Authentication.IAccessTokenService! accessTokens, Themia.Modules.Identity.Abstractions.Authentication.IRefreshTokenService! refreshTokens, Themia.Modules.Identity.Abstractions.Authentication.IAuthenticationHooks! hooks, System.Collections.Generic.IEnumerable<Themia.Modules.Identity.Abstractions.Authentication.IIdentityEventObserver!>! observers, System.TimeProvider! timeProvider, Microsoft.Extensions.Logging.ILogger<Themia.Modules.Identity.AspNetCore.Authentication.OtpLoginFlow!>! logger) -> void
+Themia.Modules.Identity.AspNetCore.Authentication.OtpLoginFlow.StartAsync(string! phoneNumber, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Identity.Abstractions.OtpStartResult>!
+Themia.Modules.Identity.AspNetCore.Authentication.OtpLoginFlow.VerifyAsync(System.Guid challengeId, string! code, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Identity.Abstractions.Authentication.LoginResult>!
+Themia.Modules.Identity.AspNetCore.Endpoints.IdentityOtpEndpointRouteBuilderExtensions
+Themia.Modules.Identity.AspNetCore.Endpoints.OtpStartRequest
+Themia.Modules.Identity.AspNetCore.Endpoints.OtpStartRequest.OtpStartRequest(string! PhoneNumber) -> void
+Themia.Modules.Identity.AspNetCore.Endpoints.OtpStartRequest.PhoneNumber.get -> string!
+Themia.Modules.Identity.AspNetCore.Endpoints.OtpStartRequest.PhoneNumber.init -> void
+Themia.Modules.Identity.AspNetCore.Endpoints.OtpStartResponse
+Themia.Modules.Identity.AspNetCore.Endpoints.OtpStartResponse.ChallengeId.get -> System.Guid
+Themia.Modules.Identity.AspNetCore.Endpoints.OtpStartResponse.ChallengeId.init -> void
+Themia.Modules.Identity.AspNetCore.Endpoints.OtpStartResponse.ExpiresAt.get -> System.DateTimeOffset
+Themia.Modules.Identity.AspNetCore.Endpoints.OtpStartResponse.ExpiresAt.init -> void
+Themia.Modules.Identity.AspNetCore.Endpoints.OtpStartResponse.OtpStartResponse(System.Guid ChallengeId, System.DateTimeOffset ExpiresAt) -> void
+Themia.Modules.Identity.AspNetCore.Endpoints.OtpVerifyRequest
+Themia.Modules.Identity.AspNetCore.Endpoints.OtpVerifyRequest.ChallengeId.get -> System.Guid
+Themia.Modules.Identity.AspNetCore.Endpoints.OtpVerifyRequest.ChallengeId.init -> void
+Themia.Modules.Identity.AspNetCore.Endpoints.OtpVerifyRequest.Code.get -> string!
+Themia.Modules.Identity.AspNetCore.Endpoints.OtpVerifyRequest.Code.init -> void
+Themia.Modules.Identity.AspNetCore.Endpoints.OtpVerifyRequest.OtpVerifyRequest(System.Guid ChallengeId, string! Code) -> void
+static Themia.Modules.Identity.AspNetCore.DependencyInjection.IdentityAspNetCoreServiceCollectionExtensions.AddThemiaIdentityOtpLogin(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Themia.Modules.Identity.Abstractions.OtpLoginOptions!>! configure) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static Themia.Modules.Identity.AspNetCore.Endpoints.IdentityOtpEndpointRouteBuilderExtensions.MapIdentityOtpEndpoints(this Microsoft.AspNetCore.Routing.IEndpointRouteBuilder! endpoints, System.Action<Microsoft.AspNetCore.Builder.RouteHandlerBuilder!>? configure = null) -> Microsoft.AspNetCore.Routing.IEndpointRouteBuilder!

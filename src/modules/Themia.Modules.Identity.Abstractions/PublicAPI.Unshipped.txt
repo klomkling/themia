@@ -371,3 +371,107 @@ Themia.Modules.Identity.Abstractions.IUserLifecycleHooks.OnBeforeLinkExternalLog
 Themia.Modules.Identity.Abstractions.IUserLifecycleHooks.OnBeforeUnlinkExternalLoginAsync(System.Guid userId, string! provider, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask<Themia.Modules.Identity.Abstractions.UserMutationDecision>
 Themia.Modules.Identity.Abstractions.IUserLifecycleHooks.OnBeforeUnlinkExternalLoginAsync(System.Guid userId, string! provider, System.Collections.Generic.IReadOnlyList<Themia.Modules.Identity.Abstractions.Authentication.ExternalLoginInfo!>! currentLogins, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<Themia.Modules.Identity.Abstractions.UserMutationDecision>
 Themia.Modules.Identity.Abstractions.UserMutation.ExternalLogin = 256 -> Themia.Modules.Identity.Abstractions.UserMutation
+Themia.Modules.Identity.Abstractions.Entities.OtpLoginChallenge
+Themia.Modules.Identity.Abstractions.Entities.OtpLoginChallenge.OtpLoginChallenge() -> void
+Themia.Modules.Identity.Abstractions.Entities.OtpLoginChallenge.Id.get -> System.Guid
+Themia.Modules.Identity.Abstractions.Entities.OtpLoginChallenge.Id.set -> void
+Themia.Modules.Identity.Abstractions.Entities.OtpLoginChallenge.TenantId.get -> Themia.Framework.Core.Abstractions.Tenancy.TenantId?
+Themia.Modules.Identity.Abstractions.Entities.OtpLoginChallenge.TenantId.set -> void
+Themia.Modules.Identity.Abstractions.Entities.OtpLoginChallenge.UserId.get -> System.Guid?
+Themia.Modules.Identity.Abstractions.Entities.OtpLoginChallenge.UserId.set -> void
+Themia.Modules.Identity.Abstractions.Entities.OtpLoginChallenge.NormalizedPhoneNumber.get -> string!
+Themia.Modules.Identity.Abstractions.Entities.OtpLoginChallenge.NormalizedPhoneNumber.set -> void
+Themia.Modules.Identity.Abstractions.Entities.OtpLoginChallenge.CodeHash.get -> string!
+Themia.Modules.Identity.Abstractions.Entities.OtpLoginChallenge.CodeHash.set -> void
+Themia.Modules.Identity.Abstractions.Entities.OtpLoginChallenge.CreatedAt.get -> System.DateTimeOffset
+Themia.Modules.Identity.Abstractions.Entities.OtpLoginChallenge.CreatedAt.set -> void
+Themia.Modules.Identity.Abstractions.Entities.OtpLoginChallenge.ExpiresAt.get -> System.DateTimeOffset
+Themia.Modules.Identity.Abstractions.Entities.OtpLoginChallenge.ExpiresAt.set -> void
+Themia.Modules.Identity.Abstractions.Entities.OtpLoginChallenge.AttemptCount.get -> int
+Themia.Modules.Identity.Abstractions.Entities.OtpLoginChallenge.AttemptCount.set -> void
+Themia.Modules.Identity.Abstractions.Entities.OtpLoginChallenge.ClosedAt.get -> System.DateTimeOffset?
+Themia.Modules.Identity.Abstractions.Entities.OtpLoginChallenge.ClosedAt.set -> void
+Themia.Modules.Identity.Abstractions.OtpLoginOptions
+const Themia.Modules.Identity.Abstractions.OtpLoginOptions.MaximumCodeLength = 9 -> int
+const Themia.Modules.Identity.Abstractions.OtpLoginOptions.MinimumCodeLength = 6 -> int
+const Themia.Modules.Identity.Abstractions.OtpLoginOptions.MinimumCodeHashKeyLength = 32 -> int
+Themia.Modules.Identity.Abstractions.OtpLoginOptions.OtpLoginOptions() -> void
+Themia.Modules.Identity.Abstractions.OtpLoginOptions.CodeHashKey.get -> byte[]!
+Themia.Modules.Identity.Abstractions.OtpLoginOptions.CodeHashKey.set -> void
+Themia.Modules.Identity.Abstractions.OtpLoginOptions.CodeLength.get -> int
+Themia.Modules.Identity.Abstractions.OtpLoginOptions.CodeLength.set -> void
+Themia.Modules.Identity.Abstractions.OtpLoginOptions.FailureWindow.get -> System.TimeSpan
+Themia.Modules.Identity.Abstractions.OtpLoginOptions.FailureWindow.set -> void
+Themia.Modules.Identity.Abstractions.OtpLoginOptions.Lifetime.get -> System.TimeSpan
+Themia.Modules.Identity.Abstractions.OtpLoginOptions.Lifetime.set -> void
+Themia.Modules.Identity.Abstractions.OtpLoginOptions.MaxAttempts.get -> int
+Themia.Modules.Identity.Abstractions.OtpLoginOptions.MaxAttempts.set -> void
+Themia.Modules.Identity.Abstractions.OtpLoginOptions.MaxFailedAttemptsPerWindow.get -> int
+Themia.Modules.Identity.Abstractions.OtpLoginOptions.MaxFailedAttemptsPerWindow.set -> void
+Themia.Modules.Identity.Abstractions.OtpLoginOptions.MaxStartsPerWindow.get -> int
+Themia.Modules.Identity.Abstractions.OtpLoginOptions.MaxStartsPerWindow.set -> void
+Themia.Modules.Identity.Abstractions.OtpLoginOptions.ResendCooldown.get -> System.TimeSpan
+Themia.Modules.Identity.Abstractions.OtpLoginOptions.ResendCooldown.set -> void
+Themia.Modules.Identity.Abstractions.OtpLoginOptions.Validate() -> void
+override Themia.Modules.Identity.Abstractions.OtpLoginOptions.ToString() -> string!
+Themia.Modules.Identity.Abstractions.OtpStartOutcome
+Themia.Modules.Identity.Abstractions.OtpStartOutcome.Issued = 0 -> Themia.Modules.Identity.Abstractions.OtpStartOutcome
+Themia.Modules.Identity.Abstractions.OtpStartOutcome.Throttled = 1 -> Themia.Modules.Identity.Abstractions.OtpStartOutcome
+Themia.Modules.Identity.Abstractions.OtpIssueOutcome
+Themia.Modules.Identity.Abstractions.OtpIssueOutcome.Issued = 0 -> Themia.Modules.Identity.Abstractions.OtpIssueOutcome
+Themia.Modules.Identity.Abstractions.OtpIssueOutcome.Throttled = 1 -> Themia.Modules.Identity.Abstractions.OtpIssueOutcome
+Themia.Modules.Identity.Abstractions.OtpVerifyOutcome
+Themia.Modules.Identity.Abstractions.OtpVerifyOutcome.Verified = 0 -> Themia.Modules.Identity.Abstractions.OtpVerifyOutcome
+Themia.Modules.Identity.Abstractions.OtpVerifyOutcome.Invalid = 1 -> Themia.Modules.Identity.Abstractions.OtpVerifyOutcome
+Themia.Modules.Identity.Abstractions.OtpVerifyOutcome.LockedOut = 2 -> Themia.Modules.Identity.Abstractions.OtpVerifyOutcome
+Themia.Modules.Identity.Abstractions.OtpStartResult
+Themia.Modules.Identity.Abstractions.OtpStartResult.OtpStartResult() -> void
+Themia.Modules.Identity.Abstractions.OtpStartResult.OtpStartResult(Themia.Modules.Identity.Abstractions.OtpStartOutcome Outcome, System.Guid ChallengeId, System.DateTimeOffset ExpiresAt) -> void
+Themia.Modules.Identity.Abstractions.OtpStartResult.Outcome.get -> Themia.Modules.Identity.Abstractions.OtpStartOutcome
+Themia.Modules.Identity.Abstractions.OtpStartResult.Outcome.init -> void
+Themia.Modules.Identity.Abstractions.OtpStartResult.ChallengeId.get -> System.Guid
+Themia.Modules.Identity.Abstractions.OtpStartResult.ChallengeId.init -> void
+Themia.Modules.Identity.Abstractions.OtpStartResult.ExpiresAt.get -> System.DateTimeOffset
+Themia.Modules.Identity.Abstractions.OtpStartResult.ExpiresAt.init -> void
+Themia.Modules.Identity.Abstractions.OtpStartResult.Issued.get -> bool
+Themia.Modules.Identity.Abstractions.OtpIssueResult
+Themia.Modules.Identity.Abstractions.OtpIssueResult.OtpIssueResult() -> void
+Themia.Modules.Identity.Abstractions.OtpIssueResult.OtpIssueResult(Themia.Modules.Identity.Abstractions.OtpIssueOutcome Outcome, System.Guid ChallengeId, System.DateTimeOffset ExpiresAt, string? Code) -> void
+Themia.Modules.Identity.Abstractions.OtpIssueResult.Outcome.get -> Themia.Modules.Identity.Abstractions.OtpIssueOutcome
+Themia.Modules.Identity.Abstractions.OtpIssueResult.Outcome.init -> void
+Themia.Modules.Identity.Abstractions.OtpIssueResult.ChallengeId.get -> System.Guid
+Themia.Modules.Identity.Abstractions.OtpIssueResult.ChallengeId.init -> void
+Themia.Modules.Identity.Abstractions.OtpIssueResult.ExpiresAt.get -> System.DateTimeOffset
+Themia.Modules.Identity.Abstractions.OtpIssueResult.ExpiresAt.init -> void
+Themia.Modules.Identity.Abstractions.OtpIssueResult.Code.get -> string?
+Themia.Modules.Identity.Abstractions.OtpIssueResult.Code.init -> void
+Themia.Modules.Identity.Abstractions.OtpVerifyResult
+Themia.Modules.Identity.Abstractions.OtpVerifyResult.OtpVerifyResult() -> void
+Themia.Modules.Identity.Abstractions.OtpVerifyResult.OtpVerifyResult(Themia.Modules.Identity.Abstractions.OtpVerifyOutcome Outcome, System.Guid? UserId, string? NormalizedPhoneNumber) -> void
+Themia.Modules.Identity.Abstractions.OtpVerifyResult.Outcome.get -> Themia.Modules.Identity.Abstractions.OtpVerifyOutcome
+Themia.Modules.Identity.Abstractions.OtpVerifyResult.Outcome.init -> void
+Themia.Modules.Identity.Abstractions.OtpVerifyResult.UserId.get -> System.Guid?
+Themia.Modules.Identity.Abstractions.OtpVerifyResult.UserId.init -> void
+Themia.Modules.Identity.Abstractions.OtpVerifyResult.NormalizedPhoneNumber.get -> string?
+Themia.Modules.Identity.Abstractions.OtpVerifyResult.NormalizedPhoneNumber.init -> void
+Themia.Modules.Identity.Abstractions.OtpVerifyResult.Verified.get -> bool
+Themia.Modules.Identity.Abstractions.OtpDelivery
+Themia.Modules.Identity.Abstractions.OtpDelivery.OtpDelivery(string! PhoneNumber, string! Code, System.DateTimeOffset ExpiresAt, System.Guid ChallengeId) -> void
+Themia.Modules.Identity.Abstractions.OtpDelivery.PhoneNumber.get -> string!
+Themia.Modules.Identity.Abstractions.OtpDelivery.PhoneNumber.init -> void
+Themia.Modules.Identity.Abstractions.OtpDelivery.Code.get -> string!
+Themia.Modules.Identity.Abstractions.OtpDelivery.Code.init -> void
+Themia.Modules.Identity.Abstractions.OtpDelivery.ExpiresAt.get -> System.DateTimeOffset
+Themia.Modules.Identity.Abstractions.OtpDelivery.ExpiresAt.init -> void
+Themia.Modules.Identity.Abstractions.OtpDelivery.ChallengeId.get -> System.Guid
+Themia.Modules.Identity.Abstractions.OtpDelivery.ChallengeId.init -> void
+Themia.Modules.Identity.Abstractions.IOtpLoginFlow
+Themia.Modules.Identity.Abstractions.IOtpLoginFlow.StartAsync(string! phoneNumber, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Identity.Abstractions.OtpStartResult>!
+Themia.Modules.Identity.Abstractions.IOtpLoginFlow.VerifyAsync(System.Guid challengeId, string! code, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Identity.Abstractions.Authentication.LoginResult>!
+Themia.Modules.Identity.Abstractions.IOtpCodeSender
+Themia.Modules.Identity.Abstractions.IOtpCodeSender.SendAsync(Themia.Modules.Identity.Abstractions.OtpDelivery! delivery, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Modules.Identity.Abstractions.IOtpChallengeService
+Themia.Modules.Identity.Abstractions.IOtpChallengeService.IssueAsync(string! normalizedPhoneNumber, System.Guid? userId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Identity.Abstractions.OtpIssueResult>!
+Themia.Modules.Identity.Abstractions.IOtpChallengeService.VerifyAsync(System.Guid challengeId, string! code, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Identity.Abstractions.OtpVerifyResult>!
+Themia.Modules.Identity.Abstractions.Authentication.LoginFailureReason.InvalidOtp = 6 -> Themia.Modules.Identity.Abstractions.Authentication.LoginFailureReason
+Themia.Modules.Identity.Abstractions.Authentication.LoginFailureReason.OtpAttemptsExceeded = 7 -> Themia.Modules.Identity.Abstractions.Authentication.LoginFailureReason
