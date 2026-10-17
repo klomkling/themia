@@ -1,4 +1,9 @@
+using System.Net;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
+using Serilog;
+using Serilog.Core;
+using Serilog.Events;
 using Themia.Data.Migrations;
 using Themia.Data.Migrations.PostgreSql;
 using Themia.Exceptional;
@@ -41,6 +46,62 @@ public class AddThemiaExceptionalProviderTests
         Assert.NotNull(sp.GetService<ExceptionalOptions>());
         Assert.NotNull(sp.GetService<ExceptionalSerilogSink>());
         Assert.NotNull(sp.GetService<HttpContextEnricher>());
+    }
+
+    private sealed class RecordingStore : IExceptionStore
+    {
+        public ExceptionEntry? Last;
+        public Task LogAsync(ExceptionEntry e, CancellationToken ct = default) { Last = e; return Task.CompletedTask; }
+        public Task<ExceptionEntry?> GetAsync(Guid g, CancellationToken ct = default) => Task.FromResult<ExceptionEntry?>(null);
+        public Task<PagedResult<ExceptionEntry>> ListAsync(ExceptionFilter f, CancellationToken ct = default) => Task.FromResult(new PagedResult<ExceptionEntry>());
+        public Task<int> CountAsync(ExceptionFilter f, CancellationToken ct = default) => Task.FromResult(0);
+        public Task<bool> ProtectAsync(Guid g, CancellationToken ct = default) => Task.FromResult(true);
+        public Task<bool> DeleteAsync(Guid g, CancellationToken ct = default) => Task.FromResult(true);
+        public Task<bool> HardDeleteAsync(Guid g, CancellationToken ct = default) => Task.FromResult(true);
+        public Task<int> PurgeAsync(DateTime o, CancellationToken ct = default) => Task.FromResult(0);
+    }
+
+    private sealed class RecordingSink : ILogEventSink
+    {
+        public List<LogEvent> Events { get; } = [];
+        public void Emit(LogEvent logEvent) => Events.Add(logEvent);
+    }
+
+    [Fact]
+    public void ContainerBuiltSink_StoresCallerIpAndContext_WhileOtherSinksSeeNeither()
+    {
+        // The path a host takes: resolve the sink and the enricher from the container and attach them to
+        // its Serilog logger. The sink is wired to the container's IHttpContextAccessor, so it can read the
+        // request while it stores the exception; the other sink on the same logger never gets the data.
+        var store = new RecordingStore();
+        var services = new ServiceCollection();
+        services.AddThemiaExceptionalProvider(
+            dialect: new SqliteExceptionalDialect("Data Source=:memory:"),
+            configure: o => { o.ApplicationName = "App"; o.CaptureRequestContext = true; },
+            engine: MigrationEngine.Postgres,
+            runMigration: false);
+        services.AddSingleton<IExceptionStore>(store);
+        using var sp = services.BuildServiceProvider();
+
+        var http = new DefaultHttpContext();
+        http.Connection.RemoteIpAddress = IPAddress.Parse("203.0.113.9");
+        http.Request.Headers["User-Agent"] = "Edge";
+        sp.GetRequiredService<IHttpContextAccessor>().HttpContext = http;
+
+        var other = new RecordingSink();
+        using var logger = new LoggerConfiguration()
+            .Enrich.With(sp.GetRequiredService<HttpContextEnricher>())
+            .WriteTo.Sink(other)
+            .WriteTo.Sink(sp.GetRequiredService<ExceptionalSerilogSink>())
+            .CreateLogger();
+
+        logger.Error(new InvalidOperationException("boom"), "err");
+
+        Assert.Equal("203.0.113.9", store.Last!.IpAddress);
+        Assert.Contains("Edge", store.Last.RequestContext);
+        var routed = Assert.Single(other.Events);
+        Assert.False(routed.Properties.ContainsKey("IpAddress"));
+        Assert.False(routed.Properties.ContainsKey("RequestContext"));
     }
 
     [Fact]
