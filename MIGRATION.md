@@ -10,6 +10,30 @@ with the *why* and concrete upgrade steps.
 - Each entry states: **What changed**, **Why**, and **How to upgrade** (before → after).
 - Non-breaking changes are *not* listed here — see the CHANGELOG.
 
+## 0.35.1
+
+### Log events no longer carry `IpAddress`, `RequestBody` or `RequestContext` (behaviour change for custom sinks and for async-wrapped Exceptional sinks)
+
+**What changed:** `HttpContextEnricher` used to add `IpAddress`, `RequestBody` and (with `CaptureRequestContext` on) `RequestContext` to every log event, so a host that attached it to its whole Serilog logger wrote the caller's address and a JSON blob of every request header, cookie, query and form value on every line of every sink. It now adds only `Url`, `HttpMethod`, `Host` and `StatusCode`. `ExceptionalSerilogSink` reads the other three from the current request itself while it stores an exception, so the stored `ExceptionEntry` and the dashboard are unchanged.
+
+**Why:** the first version broke a no-PII log policy for any host that followed the registration docs (found in the ezy-assets production logs).
+
+**Who is affected:**
+- Hosts that wrap `ExceptionalSerilogSink` in `Serilog.Sinks.Async` (or any batching or background-queue wrapper). The wrapper emits on its own thread, where `IHttpContextAccessor.HttpContext` is null, so the sink has no request to read and the stored `IpAddress`, `RequestBody` and `RequestContext` are empty.
+- Custom sinks or enrichers that read `IpAddress`, `RequestBody` or `RequestContext` from the log event.
+
+**How to upgrade:**
+
+```csharp
+// before: wrapped, which now loses the request data
+.WriteTo.Async(a => a.Sink(sp.GetRequiredService<ExceptionalSerilogSink>()))
+
+// after: register the sink directly
+.WriteTo.Sink(sp.GetRequiredService<ExceptionalSerilogSink>())
+```
+
+A host that must not block the logging thread on the store should queue inside its own `IExceptionStore` decorator. A custom sink that needs the caller address reads it from `IHttpContextAccessor` while it emits. Hosts that attach the enricher and the sink as documented need no change.
+
 ## 0.35.0
 
 ### `IRefreshTokenService.RevokeAsync` and `IAuthenticationFlow.LogoutAsync` report whether anything was revoked (breaking for implementers and test doubles)

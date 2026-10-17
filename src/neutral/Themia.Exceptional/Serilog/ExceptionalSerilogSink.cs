@@ -11,8 +11,13 @@ namespace Themia.Exceptional.Serilog;
 /// Failures are isolated to <see cref="SelfLog"/> — a store outage never breaks the application.
 /// </summary>
 /// <remarks>
-/// <see cref="Emit"/> writes synchronously (one or two DB round-trips per error (a rollup UPDATE, plus an INSERT for first occurrences)). High-throughput hosts should
-/// wrap this sink with <c>Serilog.Sinks.Async</c> to avoid blocking the logging path under error storms.
+/// <see cref="Emit"/> writes synchronously (one or two DB round-trips per error (a rollup UPDATE, plus an INSERT for first occurrences)).
+/// <para>
+/// Register it directly on the logger, not behind <c>Serilog.Sinks.Async</c> or another batching wrapper: it reads the
+/// caller address, request body and request context from the current request while it emits, and a wrapper emits
+/// on its own thread where there is no <c>HttpContext</c>, so those three would be stored empty. A host that must not
+/// block on the store writes through its own bounded queue inside an <see cref="IExceptionStore"/> decorator instead.
+/// </para>
 /// </remarks>
 public sealed class ExceptionalSerilogSink : ILogEventSink
 {
