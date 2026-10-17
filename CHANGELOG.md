@@ -27,6 +27,15 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.34.0] - 2026-10-17
+
+Passwordless phone-code login for `Themia.Modules.Identity` (coord #0165), opt in; nothing existing changes behaviour. No new packages.
+
+**Heads-up for consumers with exhaustive switches.** `LoginFailureReason` gains two members, `InvalidOtp` (6) and `OtpAttemptsExceeded` (7). A
+`switch` over it in an `IAuthenticationHooks.OnLoginFailedAsync` or `IIdentityEventObserver.OnLoginFailedAsync` implementation needs a case
+for each, or a default, to stay exhaustive. Neither value is produced unless `AddThemiaIdentityOtpLogin` is called. A new migration also
+creates `identity.otp_login_challenges` the next time the Identity migrations run.
+
 ### Added
 
 - `Themia.Modules.Identity`: passwordless phone-code login (coord #0165). `IOtpLoginFlow.StartAsync` sends a numeric one-time code to
