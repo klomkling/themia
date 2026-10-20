@@ -61,6 +61,21 @@ jobs:
       - name: Build
         run: dotnet build --configuration Release --no-restore
 
+      # Themia.ETax.IntegrationTests renders in several classes that xunit runs in parallel; each used to
+      # download Chromium on its own and they raced on the same chrome-linux64.zip ("IOException: ... being
+      # used by another process", five red nights). Install it once here and hand the path to the tests.
+      # The build is the one the repo's PuppeteerSharp version pins, so the cache key is that file's hash.
+      - name: Cache Chromium
+        uses: actions/cache@v6
+        with:
+          path: ${{ runner.temp }}/chromium
+          key: ${{ runner.os }}-chromium-${{ hashFiles('Directory.Packages.props') }}
+
+      - name: Install Chromium once
+        run: |
+          chrome="$(bash eng/fetch-chrome.sh "$RUNNER_TEMP/chromium")"
+          echo "PUPPETEER_EXECUTABLE_PATH=${chrome}" >> "$GITHUB_ENV"
+
       - name: Integration tests
         # Inverse of ci.yml: Category=Integration only. Re-runnable from the
         # Actions tab if a DB image pull fails at fixture init.

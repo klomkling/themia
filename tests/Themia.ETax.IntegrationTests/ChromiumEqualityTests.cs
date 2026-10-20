@@ -21,7 +21,11 @@ public sealed partial class ChromiumEqualityTests(ITestOutputHelper output)
     {
         var services = new ServiceCollection();
         services.AddLogging();
-        services.AddThemiaETaxRendering(o => o.MaxConcurrency = maxConcurrency);
+        services.AddThemiaETaxRendering(o =>
+        {
+            o.MaxConcurrency = maxConcurrency;
+            ChromiumPath.Apply(o);
+        });
         return services.BuildServiceProvider();
     }
 

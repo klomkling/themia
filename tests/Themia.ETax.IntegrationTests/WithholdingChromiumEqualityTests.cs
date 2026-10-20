@@ -21,7 +21,11 @@ public sealed partial class WithholdingChromiumEqualityTests(ITestOutputHelper o
     {
         var services = new ServiceCollection();
         services.AddLogging();
-        services.AddThemiaETaxWithholdingRendering(o => o.MaxConcurrency = maxConcurrency);
+        services.AddThemiaETaxWithholdingRendering(o =>
+        {
+            o.MaxConcurrency = maxConcurrency;
+            ChromiumPath.Apply(o);
+        });
         return services.BuildServiceProvider();
     }
 
