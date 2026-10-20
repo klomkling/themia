@@ -10,6 +10,32 @@ with the *why* and concrete upgrade steps.
 - Each entry states: **What changed**, **Why**, and **How to upgrade** (before → after).
 - Non-breaking changes are *not* listed here — see the CHANGELOG.
 
+## 0.35.2
+
+### `ThemiaMigrations.Run` retries a dropped lock connection (behaviour change, opt out with `LockConnectRetries = 0`)
+
+**What changed:** opening the connection that takes the migration lock, and taking the lock on a session that dropped, are retried on a fresh connection when the failure is transient: a socket or stream error, a connect timeout, or on PostgreSQL a connection-class server state (SQLSTATE 08xxx, 57P01, 57P03). Defaults are 3 retries with a 1 s doubling backoff, each logged as a Warning with the exception type only.
+
+**Why:** nothing has been applied when that connection drops, so a retry is safe, and without it a busy host (load average 40-80 behind a Docker port forward) failed opsezy's test gate 4 runs in 5 with `MigrationLockException`.
+
+**Who is affected:**
+- Any host that calls `ThemiaMigrations.Run`: a database that is really unreachable now throws after about 7 s of retries instead of at once.
+- Hosts that wrapped `Run` in their own retry for this failure.
+- Custom `IMigrationEngineAdapter` implementations: the new `IsTransientFailure(Exception)` member has a default body (`false`), so nothing breaks. The runner no longer trusts `DbException.IsTransient`, because Npgsql also sets it for server errors (55P03, 40001, 40P01, 53300) that a new connection does not cure. Only the PostgreSQL adapter classifies driver errors so far; MySQL and SQL Server retry socket, IO and connect-timeout failures only.
+
+**How to upgrade:**
+
+```csharp
+// before: a local retry around Run
+Retry(() => ThemiaMigrations.Run(MigrationEngine.Postgres, connectionString, assemblies));
+
+// after: drop the wrapper; tune or disable the built-in retry if needed
+ThemiaMigrations.Run(MigrationEngine.Postgres, connectionString,
+    new ThemiaMigrationOptions { LockConnectRetries = 0 }, assemblies); // 0 = fail at once, as before
+```
+
+A genuine lock wait timeout and any failure inside a migration are never retried.
+
 ## 0.35.1
 
 ### Log events no longer carry `IpAddress`, `RequestBody` or `RequestContext` (behaviour change for custom sinks and for async-wrapped Exceptional sinks)
