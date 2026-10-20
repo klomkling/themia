@@ -10,6 +10,43 @@ public sealed class PostgresMigrationEngineAdapter : IMigrationEngineAdapter
     /// <summary>PostgreSQL's error code for a statement cancelled by <c>statement_timeout</c>.</summary>
     private const string QueryCanceled = "57014";
 
+    /// <summary>SQLSTATE class 08, connection exceptions.</summary>
+    private const string ConnectionExceptionClass = "08";
+
+    /// <summary>The server is shutting down (57P01 admin_shutdown).</summary>
+    private const string AdminShutdown = "57P01";
+
+    /// <summary>The server is starting up or recovering (57P03 cannot_connect_now).</summary>
+    private const string CannotConnectNow = "57P03";
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// A <see cref="PostgresException"/> is a server answer, and Npgsql flags several as transient that a new
+    /// connection would not cure (55P03 lock_not_available, 40001, 40P01, 53300). Only the class 08
+    /// connection exceptions and the 57P01/57P03 shutdown and cannot-connect-now states are retried. Any
+    /// other <see cref="NpgsqlException"/> counts when the driver flags it transient.
+    /// </remarks>
+    public bool IsTransientFailure(Exception failure)
+    {
+        for (var cause = failure; cause is not null; cause = cause.InnerException)
+        {
+            if (cause is PostgresException server)
+                return IsRetryableServerState(server.SqlState);
+        }
+
+        for (var cause = failure; cause is not null; cause = cause.InnerException)
+        {
+            if (cause is NpgsqlException { IsTransient: true })
+                return true;
+        }
+
+        return false;
+    }
+
+    private static bool IsRetryableServerState(string sqlState) =>
+        sqlState.StartsWith(ConnectionExceptionClass, StringComparison.Ordinal)
+        || sqlState is AdminShutdown or CannotConnectNow;
+
     /// <inheritdoc />
     public MigrationEngine Engine => MigrationEngine.Postgres;
 

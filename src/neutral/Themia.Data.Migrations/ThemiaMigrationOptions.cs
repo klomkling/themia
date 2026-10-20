@@ -28,4 +28,27 @@ public sealed class ThemiaMigrationOptions
     /// waiting for another instance leaves no trace.
     /// </summary>
     public ILogger? Logger { get; init; }
+
+    /// <summary>The default <see cref="LockConnectRetries"/>.</summary>
+    public const int DefaultLockConnectRetries = 3;
+
+    /// <summary>
+    /// How many times to retry opening the lock connection, or taking the lock on a session that dropped,
+    /// after a transient failure (a dropped socket, a stream read error, a driver-flagged transient error).
+    /// Defaults to <see cref="DefaultLockConnectRetries"/>; <c>0</c> disables retrying.
+    /// </summary>
+    /// <remarks>
+    /// Retrying here is safe because nothing has been applied yet: the lock is taken before the first
+    /// migration runs. A genuine lock wait timeout and any failure inside a migration are never retried.
+    /// </remarks>
+    public int LockConnectRetries { get; init; } = DefaultLockConnectRetries;
+
+    /// <summary>
+    /// Delay before the first retry; each further retry waits twice as long as the previous one.
+    /// Defaults to one second.
+    /// </summary>
+    public TimeSpan LockConnectBackoff { get; init; } = TimeSpan.FromSeconds(1);
+
+    /// <summary>Test seam for the backoff delay.</summary>
+    internal Action<TimeSpan> Sleep { get; init; } = Thread.Sleep;
 }
