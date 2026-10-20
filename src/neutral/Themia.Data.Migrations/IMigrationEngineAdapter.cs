@@ -80,4 +80,18 @@ public interface IMigrationEngineAdapter
     /// <param name="connection">The connection the lock was acquired on.</param>
     /// <param name="scope">The lock's identity — see <see cref="MigrationLock"/>.</param>
     void ReleaseLock(DbConnection connection, string scope);
+
+    /// <summary>
+    /// Whether <paramref name="failure"/> (or anything it wraps) is a transient fault in reaching the server
+    /// that is safe to retry before the lock is held. Socket and stream failures and a connect timeout are
+    /// recognised by the runner itself; this hook is for driver-specific errors on top of those.
+    /// </summary>
+    /// <remarks>
+    /// Defaults to <see langword="false"/>. A driver's own <c>IsTransient</c> flag is deliberately not
+    /// trusted by the runner: Npgsql, for one, also sets it for server-side errors such as a lock that is
+    /// not available or a deadlock, which a retry on a new connection would not cure.
+    /// </remarks>
+    /// <param name="failure">The exception raised while opening the connection or taking the lock.</param>
+    /// <returns><see langword="true"/> when retrying on a fresh connection may succeed.</returns>
+    bool IsTransientFailure(Exception failure) => false;
 }

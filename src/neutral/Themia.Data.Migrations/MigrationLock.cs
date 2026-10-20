@@ -1,5 +1,6 @@
 using System.Buffers.Binary;
 using System.Data.Common;
+using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.Extensions.Logging;
@@ -59,26 +60,8 @@ internal static class MigrationLock
     internal static void RunExclusive(
         IMigrationEngineAdapter adapter, string connectionString, ThemiaMigrationOptions options, Action migrate)
     {
-        using var connection = adapter.CreateUnpooledConnection(connectionString);
+        using var connection = OpenAndAcquire(adapter, connectionString, options, out var scope);
 
-        try
-        {
-            connection.Open();
-        }
-        catch (Exception ex)
-        {
-            // Distinct from a migration failure: nothing has touched the schema yet. Note that Run now needs
-            // TWO concurrent connections (this one, held for the duration, plus the runner's) where one used
-            // to suffice — hence the explicit hint, since a server-side connection cap surfaces here.
-            throw new MigrationLockException(
-                "Themia.Data.Migrations: could not open the connection used to take the migration lock. " +
-                "Applying migrations needs two concurrent connections — one holds the lock while the runner " +
-                "uses its own — so verify the server's connection limit is at least two for this principal.", ex);
-        }
-
-        var scope = LockScope(connection, options.Logger);
-
-        Acquire(adapter, connection, scope, options);
         try
         {
             migrate();
@@ -93,6 +76,95 @@ internal static class MigrationLock
         }
 
         TryRelease(adapter, connection, scope, options.Logger);
+    }
+
+    /// <summary>
+    /// Opens the lock connection and takes the lock, retrying on a fresh connection when a transient fault
+    /// drops either step. Nothing has been applied before the lock is held, so a retry cannot repeat work.
+    /// </summary>
+    private static DbConnection OpenAndAcquire(
+        IMigrationEngineAdapter adapter, string connectionString, ThemiaMigrationOptions options, out string scope)
+    {
+        var backoff = options.LockConnectBackoff;
+        for (var attempt = 0; ; attempt++)
+        {
+            var connection = adapter.CreateUnpooledConnection(connectionString);
+            try
+            {
+                Open(adapter, connection);
+                scope = LockScope(connection, options.Logger);
+                Acquire(adapter, connection, scope, options);
+                return connection;
+            }
+            catch (MigrationLockException ex) when (ex.Retryable && attempt < options.LockConnectRetries)
+            {
+                connection.Dispose();
+                options.Logger?.LogWarning(
+                    "Themia.Data.Migrations: the migration lock connection failed with {ExceptionType}; retrying in " +
+                    "{Backoff} (attempt {Attempt} of {Retries}). Nothing has been applied yet.",
+                    ex.InnerException?.GetType().Name, backoff, attempt + 1, options.LockConnectRetries);
+                options.Sleep(backoff);
+                backoff *= 2;
+            }
+            catch
+            {
+                connection.Dispose();
+                throw;
+            }
+        }
+    }
+
+    private static void Open(IMigrationEngineAdapter adapter, DbConnection connection)
+    {
+        try
+        {
+            connection.Open();
+        }
+        catch (Exception ex)
+        {
+            // Distinct from a migration failure: nothing has touched the schema yet. Note that Run now needs
+            // TWO concurrent connections (this one, held for the duration, plus the runner's) where one used
+            // to suffice — hence the explicit hint, since a server-side connection cap surfaces here.
+            throw new MigrationLockException(
+                "Themia.Data.Migrations: could not open the connection used to take the migration lock. " +
+                "Applying migrations needs two concurrent connections — one holds the lock while the runner " +
+                "uses its own — so verify the server's connection limit is at least two for this principal.", ex)
+            {
+                Retryable = IsTransient(adapter, ex, includeTimeouts: true),
+            };
+        }
+    }
+
+    /// <summary>
+    /// Whether <paramref name="ex"/> or anything it wraps is a dropped-connection fault: a socket or stream
+    /// failure, a connect timeout, or whatever the engine adapter itself recognises.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="DbException.IsTransient"/> is not consulted: Npgsql sets it for some server errors too
+    /// (lock not available, serialization failure, deadlock, too many connections), none of which a new
+    /// connection fixes.
+    /// </remarks>
+    /// <param name="adapter">The engine adapter, for driver-specific classification.</param>
+    /// <param name="ex">The failure to classify.</param>
+    /// <param name="includeTimeouts">
+    /// True while opening, where a <see cref="TimeoutException"/> is a connect timeout. False while
+    /// acquiring, where it is a command timeout, meaning the wait bound itself ran out and retrying would
+    /// wait again.
+    /// </param>
+    private static bool IsTransient(IMigrationEngineAdapter adapter, Exception ex, bool includeTimeouts)
+    {
+        var timedOut = false;
+        var dropped = false;
+        for (var cause = ex; cause is not null; cause = cause.InnerException)
+        {
+            timedOut |= cause is TimeoutException;
+            dropped |= cause is SocketException or IOException;
+        }
+
+        if (timedOut)
+            return includeTimeouts;
+
+        return dropped || adapter.IsTransientFailure(ex);
     }
 
     /// <summary>
@@ -147,7 +219,10 @@ internal static class MigrationLock
         catch (Exception ex)
         {
             throw new MigrationLockException(
-                $"Themia.Data.Migrations: failed to acquire the migration lock for scope '{scope}'.", ex);
+                $"Themia.Data.Migrations: failed to acquire the migration lock for scope '{scope}'.", ex)
+            {
+                Retryable = IsTransient(adapter, ex, includeTimeouts: false),
+            };
         }
 
         if (!acquired)
