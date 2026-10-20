@@ -27,6 +27,12 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.35.2] - 2026-10-21
+
+Migration-runner fix for `Themia.Data.Migrations`: a dropped lock connection no longer fails a boot or a test run that has applied nothing yet (coord #0167). No new packages, no migration, no API removed; `IMigrationEngineAdapter` gains one member with a default body, so existing adapters keep compiling.
+
+**Heads-up.** `ThemiaMigrations.Run` now retries a transient connection failure up to 3 times (1 s, 2 s, 4 s) before it throws, so a database that is really down fails about 7 s later than before. Set `ThemiaMigrationOptions.LockConnectRetries = 0` to get the old behaviour (see [MIGRATION.md](MIGRATION.md)). An app that wrapped `Run` in its own retry can drop the wrapper.
+
 ### Fixed
 
 - `Themia.Data.Migrations`: `ThemiaMigrations.Run` retries opening the migration lock connection, and taking the lock on a session that dropped, when the failure is transient (a socket or stream error, a connect timeout, or, on PostgreSQL, a connection-class server state: SQLSTATE 08xxx, 57P01, 57P03). Nothing has been applied at that point, so the retry is safe; a genuine lock wait timeout and any failure inside a migration still throw at once; so do server errors Npgsql also flags transient (55P03 lock not available, 40001, 40P01, 53300) and a command timeout. `IMigrationEngineAdapter` gained a default `IsTransientFailure` hook for engine-specific classification (the runner no longer trusts `DbException.IsTransient`). Defaults to 3 retries with a 1 s doubling backoff; tune with `ThemiaMigrationOptions.LockConnectRetries` / `LockConnectBackoff`, or set retries to `0` to turn it off. Each retry logs a Warning with the exception type only (coord #0167).
