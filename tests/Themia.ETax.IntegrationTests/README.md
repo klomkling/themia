@@ -8,6 +8,9 @@ Each case compares the SHA-256 of **normalised bytes from renders made in the sa
 committed golden PDF: the bytes are bound to the Chromium build, so a golden file would only test the build.
 
 Run: `dotnet test tests/Themia.ETax.IntegrationTests` (needs network on first run for Chromium, ~150 MB).
+CI installs Chromium once (`eng/fetch-chrome.sh`) and exports `PUPPETEER_EXECUTABLE_PATH`, which the tests pass to
+`ThemiaPdfOptions.ExecutablePath`; test classes run in parallel and would otherwise race on one download. With the
+variable unset (a local run) the renderer fetches its own.
 CI: the nightly `integration.yml` picks it up through `Category=Integration`; before merging a change to
 Themia.ETax or Themia.Pdf rendering, dispatch that workflow by hand on the branch.
 

@@ -14,7 +14,11 @@ public sealed class TemplateVersion2ChromiumTests(ITestOutputHelper output)
     {
         var services = new ServiceCollection();
         services.AddLogging();
-        services.AddThemiaETaxRendering(o => o.MaxConcurrency = 2);
+        services.AddThemiaETaxRendering(o =>
+        {
+            o.MaxConcurrency = 2;
+            ChromiumPath.Apply(o);
+        });
         services.ConfigureThemiaETaxTemplates(o => { o.TemplateVersion = "3"; });
         return services.BuildServiceProvider();
     }
