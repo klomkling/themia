@@ -114,7 +114,8 @@ public interface IUserService
     /// <returns><see langword="true"/> when the user was found and has a phone number to confirm.</returns>
     Task<UserMutationResult> ConfirmPhoneNumberAsync(Guid userId, CancellationToken cancellationToken = default);
 
-    /// <summary>Sets (or replaces) a user's password and reissues the security stamp.</summary>
+    /// <summary>Sets (or replaces) a user's password and reissues the security stamp. Also clears the failed-attempt
+    /// count and any lockout, so a reset lifts a lock whatever the <see cref="LockoutPolicy"/>.</summary>
     /// <param name="userId">The user id.</param>
     /// <param name="password">The new plaintext password.</param>
     /// <param name="cancellationToken">A cancellation token.</param>

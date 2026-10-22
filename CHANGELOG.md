@@ -27,6 +27,14 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+### Added
+
+- `Themia.Modules.Identity`: `IdentityModuleOptions.LockoutPolicy` (`ResetCountOnLock` default, `KeepCount`, `Progressive`) and `MaxLockoutDuration` (24 h). Until now `AccessFailedCount` was zeroed at lock, so each expired lock gave `MaxFailedAccessAttempts` fresh guesses; `KeepCount` re-locks on the first wrong password after expiry, and `Progressive` also doubles the lock per consecutive lock up to the cap, with no new column or migration (the lock number is derived from the kept `AccessFailedCount`). The default behaves as before (coord #0168). `Progressive` lets someone who knows an account name keep it locked for up to the cap, so it is opt-in. Under `Progressive`, `MaxLockoutDuration` must be at most 365 days (checked at startup).
+
+### Changed
+
+- `Themia.Modules.Identity`: `IUserService.SetPasswordAsync` now also clears `AccessFailedCount` and `LockoutEnd`, so an owner who resets a password is not left locked out by someone else's guesses.
+
 ## [0.35.2] - 2026-10-21
 
 Migration-runner fix for `Themia.Data.Migrations`: a dropped lock connection no longer fails a boot or a test run that has applied nothing yet (coord #0167). No new packages, no migration, no API removed; `IMigrationEngineAdapter` gains one member with a default body, so existing adapters keep compiling.

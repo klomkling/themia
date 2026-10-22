@@ -22,6 +22,61 @@ public class IdentityModuleOptionsTests
     }
 
     [Fact]
+    public void Validate_throws_when_progressive_cap_is_below_base_lockout_duration()
+    {
+        var options = new IdentityModuleOptions
+        {
+            LockoutPolicy = LockoutPolicy.Progressive,
+            LockoutDuration = TimeSpan.FromMinutes(15),
+            MaxLockoutDuration = TimeSpan.FromMinutes(5),
+        };
+        var ex = Assert.Throws<ArgumentOutOfRangeException>(options.Validate);
+        Assert.Equal(nameof(IdentityModuleOptions.MaxLockoutDuration), ex.ParamName);
+    }
+
+    [Fact]
+    public void Validate_throws_when_progressive_cap_exceeds_one_year()
+    {
+        var options = new IdentityModuleOptions
+        {
+            LockoutPolicy = LockoutPolicy.Progressive,
+            MaxLockoutDuration = TimeSpan.MaxValue,
+        };
+        var ex = Assert.Throws<ArgumentOutOfRangeException>(options.Validate);
+        Assert.Equal(nameof(IdentityModuleOptions.MaxLockoutDuration), ex.ParamName);
+    }
+
+    [Fact]
+    public void Validate_accepts_progressive_cap_of_exactly_one_year()
+    {
+        var options = new IdentityModuleOptions
+        {
+            LockoutPolicy = LockoutPolicy.Progressive,
+            MaxLockoutDuration = TimeSpan.FromDays(365),
+        };
+        options.Validate();
+    }
+
+    [Fact]
+    public void Validate_ignores_lockout_cap_when_policy_is_not_progressive()
+    {
+        var options = new IdentityModuleOptions
+        {
+            LockoutPolicy = LockoutPolicy.KeepCount,
+            LockoutDuration = TimeSpan.FromMinutes(15),
+            MaxLockoutDuration = TimeSpan.FromMinutes(5),
+        };
+        options.Validate();
+    }
+
+    [Fact]
+    public void Lockout_policy_defaults_to_reset_count_on_lock()
+    {
+        Assert.Equal(LockoutPolicy.ResetCountOnLock, new IdentityModuleOptions().LockoutPolicy);
+        Assert.Equal(TimeSpan.FromHours(24), new IdentityModuleOptions().MaxLockoutDuration);
+    }
+
+    [Fact]
     public void Validate_throws_when_token_lifetime_not_positive()
     {
         var options = new IdentityModuleOptions { DefaultTokenLifetime = TimeSpan.FromSeconds(-1) };

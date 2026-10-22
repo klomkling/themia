@@ -3,6 +3,8 @@ namespace Themia.Modules.Identity.Abstractions;
 /// <summary>Tunable policy for the Identity module.</summary>
 public sealed class IdentityModuleOptions
 {
+    private static readonly TimeSpan LongestAllowedMaxLockoutDuration = TimeSpan.FromDays(365);
+
     /// <summary>The configuration connection-string name the schema migration runs against. Defaults to <c>"Default"</c>.</summary>
     public string ConnectionStringName { get; set; } = "Default";
 
@@ -11,6 +13,14 @@ public sealed class IdentityModuleOptions
 
     /// <summary>How long an account stays locked out once the threshold is hit. Defaults to 15 minutes.</summary>
     public TimeSpan LockoutDuration { get; set; } = TimeSpan.FromMinutes(15);
+
+    /// <summary>How the failed-attempt count and lock length behave when the threshold is hit.
+    /// Defaults to <see cref="LockoutPolicy.ResetCountOnLock"/>.</summary>
+    public LockoutPolicy LockoutPolicy { get; set; } = LockoutPolicy.ResetCountOnLock;
+
+    /// <summary>The longest a single lock may last under <see cref="LockoutPolicy.Progressive"/>. Defaults to 24 hours.
+    /// Ignored by the other policies.</summary>
+    public TimeSpan MaxLockoutDuration { get; set; } = TimeSpan.FromHours(24);
 
     /// <summary>Whether a platform (global) user may authenticate against a tenant entry point. Defaults to true.</summary>
     public bool AllowPlatformLogin { get; set; } = true;
@@ -43,7 +53,8 @@ public sealed class IdentityModuleOptions
     /// first wrong password). Called once at registration so a misconfiguration fails fast at startup.
     /// </summary>
     /// <exception cref="ArgumentOutOfRangeException">
-    /// <see cref="MaxFailedAccessAttempts"/> is below 1, or <see cref="LockoutDuration"/>,
+    /// <see cref="MaxFailedAccessAttempts"/> is below 1, <see cref="MaxLockoutDuration"/> is below
+    /// <see cref="LockoutDuration"/> or above 365 days under <see cref="LockoutPolicy.Progressive"/>, or <see cref="LockoutDuration"/>,
     /// <see cref="DefaultTokenLifetime"/>, or <see cref="RefreshTokenLifetime"/> is not strictly positive.
     /// </exception>
     /// <exception cref="ArgumentException"><see cref="ConnectionStringName"/> is null, empty, or whitespace.</exception>
@@ -59,6 +70,20 @@ public sealed class IdentityModuleOptions
         {
             throw new ArgumentOutOfRangeException(
                 nameof(LockoutDuration), LockoutDuration, "Must be a positive duration.");
+        }
+
+        if (LockoutPolicy == LockoutPolicy.Progressive && MaxLockoutDuration < LockoutDuration)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(MaxLockoutDuration), MaxLockoutDuration, "Must be at least LockoutDuration.");
+        }
+
+        // Without a ceiling a huge cap (TimeSpan.MaxValue) overflows DateTimeOffset when a lock is set, failing a
+        // login attempt instead of startup.
+        if (LockoutPolicy == LockoutPolicy.Progressive && MaxLockoutDuration > LongestAllowedMaxLockoutDuration)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(MaxLockoutDuration), MaxLockoutDuration, "Must be at most 365 days.");
         }
 
         if (DefaultTokenLifetime <= TimeSpan.Zero)
