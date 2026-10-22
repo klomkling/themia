@@ -502,3 +502,11 @@ Themia.Modules.Identity.Abstractions.Authentication.RefreshTokenOwner.TenantId.i
 Themia.Modules.Identity.Abstractions.Authentication.RefreshTokenOwner.UserId.get -> System.Guid
 Themia.Modules.Identity.Abstractions.Authentication.RefreshTokenOwner.UserId.init -> void
 Themia.Modules.Identity.Abstractions.Authentication.IRefreshTokenService.FindOwnerAsync(string! rawToken, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Identity.Abstractions.Authentication.RefreshTokenOwner?>!
+Themia.Modules.Identity.Abstractions.LockoutPolicy
+Themia.Modules.Identity.Abstractions.LockoutPolicy.KeepCount = 1 -> Themia.Modules.Identity.Abstractions.LockoutPolicy
+Themia.Modules.Identity.Abstractions.LockoutPolicy.Progressive = 2 -> Themia.Modules.Identity.Abstractions.LockoutPolicy
+Themia.Modules.Identity.Abstractions.LockoutPolicy.ResetCountOnLock = 0 -> Themia.Modules.Identity.Abstractions.LockoutPolicy
+Themia.Modules.Identity.Abstractions.IdentityModuleOptions.LockoutPolicy.get -> Themia.Modules.Identity.Abstractions.LockoutPolicy
+Themia.Modules.Identity.Abstractions.IdentityModuleOptions.LockoutPolicy.set -> void
+Themia.Modules.Identity.Abstractions.IdentityModuleOptions.MaxLockoutDuration.get -> System.TimeSpan
+Themia.Modules.Identity.Abstractions.IdentityModuleOptions.MaxLockoutDuration.set -> void

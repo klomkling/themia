@@ -429,6 +429,10 @@ public sealed class UserService : IUserService
 
         user.PasswordHash = passwordHasher.Hash(password);
         user.SecurityStamp = Guid.NewGuid().ToString("N");
+        // A reset proves ownership, so it also lifts a lock: otherwise a victim whose account was locked by someone
+        // else's guesses would wait out the full (possibly progressive) lock after recovering.
+        user.AccessFailedCount = 0;
+        user.LockoutEnd = null;
         users.Update(user);
         await IdentityScope.SaveScopedAsync(unitOfWork, filterScope, user.TenantId is null, cancellationToken).ConfigureAwait(false);
         await NotifyMutatedAsync(user, UserMutation.Password, cancellationToken).ConfigureAwait(false);
@@ -463,8 +467,11 @@ public sealed class UserService : IUserService
                 var justLockedOut = false;
                 if (user.AccessFailedCount >= options.MaxFailedAccessAttempts)
                 {
-                    user.LockoutEnd = now.Add(options.LockoutDuration);
-                    user.AccessFailedCount = 0;
+                    user.LockoutEnd = now.Add(ComputeLockoutDuration(user.AccessFailedCount));
+                    if (options.LockoutPolicy == LockoutPolicy.ResetCountOnLock)
+                    {
+                        user.AccessFailedCount = 0;
+                    }
                     justLockedOut = true;
                 }
                 users.Update(user);
@@ -501,6 +508,20 @@ public sealed class UserService : IUserService
         }
 
         return PasswordVerificationResult.Success;
+    }
+
+    // Under Progressive the lock number is derived from the kept failure count (count - threshold + 1), so the
+    // sequence needs no column of its own. Math.Min on doubles keeps a huge count from overflowing the ticks.
+    private TimeSpan ComputeLockoutDuration(int failedCount)
+    {
+        if (options.LockoutPolicy != LockoutPolicy.Progressive)
+        {
+            return options.LockoutDuration;
+        }
+
+        var doublings = failedCount - options.MaxFailedAccessAttempts;
+        var scaledTicks = options.LockoutDuration.Ticks * Math.Pow(2, doublings);
+        return TimeSpan.FromTicks((long)Math.Min(scaledTicks, options.MaxLockoutDuration.Ticks));
     }
 
     /// <inheritdoc />

@@ -124,6 +124,88 @@ public class UserServiceTests
     }
 
     [Fact]
+    public async Task VerifyPasswordAsync_zeroes_failure_count_at_lock_by_default()
+    {
+        options.MaxFailedAccessAttempts = 2;
+        await sut.CreateAsync("kate", "right");
+
+        await sut.VerifyPasswordAsync("kate", "wrong");
+        await sut.VerifyPasswordAsync("kate", "wrong");
+
+        Assert.Equal(0, Assert.Single(store).AccessFailedCount);
+    }
+
+    [Fact]
+    public async Task VerifyPasswordAsync_relocks_on_first_failure_after_expiry_when_keeping_count()
+    {
+        options.LockoutPolicy = LockoutPolicy.KeepCount;
+        options.MaxFailedAccessAttempts = 2;
+        options.LockoutDuration = TimeSpan.FromMinutes(15);
+        await sut.CreateAsync("liam", "right");
+
+        await sut.VerifyPasswordAsync("liam", "wrong");
+        await sut.VerifyPasswordAsync("liam", "wrong");
+        Assert.Equal(2, Assert.Single(store).AccessFailedCount);
+
+        clock.Advance(TimeSpan.FromMinutes(16));
+        Assert.Equal(PasswordVerificationResult.Failed, await sut.VerifyPasswordAsync("liam", "wrong"));
+
+        Assert.Equal(clock.GetUtcNow().AddMinutes(15), Assert.Single(store).LockoutEnd);
+        Assert.Equal(PasswordVerificationResult.LockedOut, await sut.VerifyPasswordAsync("liam", "right"));
+    }
+
+    [Fact]
+    public async Task VerifyPasswordAsync_doubles_lock_duration_per_consecutive_lock_up_to_cap_when_progressive()
+    {
+        options.LockoutPolicy = LockoutPolicy.Progressive;
+        options.MaxFailedAccessAttempts = 1;
+        options.LockoutDuration = TimeSpan.FromMinutes(15);
+        options.MaxLockoutDuration = TimeSpan.FromMinutes(60);
+        await sut.CreateAsync("maya", "right");
+
+        TimeSpan[] expected = [TimeSpan.FromMinutes(15), TimeSpan.FromMinutes(30), TimeSpan.FromMinutes(60), TimeSpan.FromMinutes(60)];
+        foreach (var duration in expected)
+        {
+            await sut.VerifyPasswordAsync("maya", "wrong");
+            Assert.Equal(clock.GetUtcNow().Add(duration), Assert.Single(store).LockoutEnd);
+            clock.Advance(duration + TimeSpan.FromSeconds(1));
+        }
+    }
+
+    [Fact]
+    public async Task VerifyPasswordAsync_progressive_survives_many_consecutive_locks_without_overflow()
+    {
+        options.LockoutPolicy = LockoutPolicy.Progressive;
+        options.MaxFailedAccessAttempts = 1;
+        options.MaxLockoutDuration = TimeSpan.FromHours(24);
+        await sut.CreateAsync("noah", "right");
+        Assert.Single(store).AccessFailedCount = 5_000;
+
+        await sut.VerifyPasswordAsync("noah", "wrong");
+
+        Assert.Equal(clock.GetUtcNow().AddHours(24), Assert.Single(store).LockoutEnd);
+    }
+
+    [Fact]
+    public async Task VerifyPasswordAsync_progressive_restarts_from_base_duration_after_successful_login()
+    {
+        options.LockoutPolicy = LockoutPolicy.Progressive;
+        options.MaxFailedAccessAttempts = 1;
+        options.LockoutDuration = TimeSpan.FromMinutes(15);
+        await sut.CreateAsync("olga", "right");
+
+        await sut.VerifyPasswordAsync("olga", "wrong");
+        clock.Advance(TimeSpan.FromMinutes(16));
+        await sut.VerifyPasswordAsync("olga", "wrong");
+        clock.Advance(TimeSpan.FromMinutes(31));
+        Assert.Equal(PasswordVerificationResult.Success, await sut.VerifyPasswordAsync("olga", "right"));
+
+        await sut.VerifyPasswordAsync("olga", "wrong");
+
+        Assert.Equal(clock.GetUtcNow().AddMinutes(15), Assert.Single(store).LockoutEnd);
+    }
+
+    [Fact]
     public async Task VerifyPasswordAsync_reports_inactive_for_disabled_account()
     {
         var create = await sut.CreateAsync("gina", "pw");
@@ -188,6 +270,26 @@ public class UserServiceTests
         }
 
         Assert.Null(Assert.Single(store).LockoutEnd);
+    }
+
+    [Theory]
+    [InlineData(LockoutPolicy.ResetCountOnLock)]
+    [InlineData(LockoutPolicy.KeepCount)]
+    [InlineData(LockoutPolicy.Progressive)]
+    public async Task SetPasswordAsync_clears_failure_count_and_lock_so_the_owner_can_log_in(LockoutPolicy policy)
+    {
+        options.LockoutPolicy = policy;
+        options.MaxFailedAccessAttempts = 1;
+        var create = await sut.CreateAsync("pia", "oldpw");
+        await sut.VerifyPasswordAsync("pia", "wrong");
+        Assert.Equal(PasswordVerificationResult.LockedOut, await sut.VerifyPasswordAsync("pia", "oldpw"));
+
+        Assert.True((await sut.SetPasswordAsync(create.UserId!.Value, "newpw")).Succeeded);
+
+        var user = Assert.Single(store);
+        Assert.Equal(0, user.AccessFailedCount);
+        Assert.Null(user.LockoutEnd);
+        Assert.Equal(PasswordVerificationResult.Success, await sut.VerifyPasswordAsync("pia", "newpw"));
     }
 
     [Fact]
