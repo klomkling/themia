@@ -10,6 +10,18 @@ with the *why* and concrete upgrade steps.
 - Each entry states: **What changed**, **Why**, and **How to upgrade** (before → after).
 - Non-breaking changes are *not* listed here — see the CHANGELOG.
 
+## 0.35.3
+
+### `IUserService.SetPasswordAsync` clears the lockout (behaviour change)
+
+**What changed:** setting a password now also zeroes `AccessFailedCount` and clears `LockoutEnd`, so the owner can log in straight after a reset.
+
+**Why:** with the new `LockoutPolicy.KeepCount` / `Progressive` a lock can last up to `MaxLockoutDuration`, and someone else's wrong guesses could otherwise leave the owner locked out after recovering the account. The default policy gets the same behaviour so there is one rule.
+
+**Who is affected:** a host that calls `SetPasswordAsync` for an admin password set and relied on a locked account staying locked. Lock it another way (`IsActive = false` via `SetActiveAsync`, or an `IUserLifecycleHooks.OnBeforeSetPasswordAsync` refusal) if that matters.
+
+**How to upgrade:** nothing for the common case. `LockoutPolicy` and `MaxLockoutDuration` are opt-in (default `ResetCountOnLock`).
+
 ## 0.35.2
 
 ### `ThemiaMigrations.Run` retries a dropped lock connection (behaviour change, opt out with `LockConnectRetries = 0`)

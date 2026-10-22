@@ -27,6 +27,12 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.35.3] - 2026-10-23
+
+Identity lockout policy for `Themia.Modules.Identity` (coord #0168). No new packages, no migration, no API removed; the default lockout behaviour is unchanged.
+
+**Heads-up.** `IUserService.SetPasswordAsync` now also clears the failed-attempt count and any lockout, under every policy including the default.
+
 ### Added
 
 - `Themia.Modules.Identity`: `IdentityModuleOptions.LockoutPolicy` (`ResetCountOnLock` default, `KeepCount`, `Progressive`) and `MaxLockoutDuration` (24 h). Until now `AccessFailedCount` was zeroed at lock, so each expired lock gave `MaxFailedAccessAttempts` fresh guesses; `KeepCount` re-locks on the first wrong password after expiry, and `Progressive` also doubles the lock per consecutive lock up to the cap, with no new column or migration (the lock number is derived from the kept `AccessFailedCount`). The default behaves as before (coord #0168). `Progressive` lets someone who knows an account name keep it locked for up to the cap, so it is opt-in. Under `Progressive`, `MaxLockoutDuration` must be at most 365 days (checked at startup).
