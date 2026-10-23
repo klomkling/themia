@@ -44,6 +44,8 @@ public abstract class IdentityStoreConformanceTests
     {
         public IUserService Users => Inner.ServiceProvider.GetRequiredService<IUserService>();
         public IRoleService Roles => Inner.ServiceProvider.GetRequiredService<IRoleService>();
+        public IRoleLevelService RoleLevels => Inner.ServiceProvider.GetRequiredService<IRoleLevelService>();
+        public IUserLevelReader Levels => Inner.ServiceProvider.GetRequiredService<IUserLevelReader>();
         public IClaimService Claims => Inner.ServiceProvider.GetRequiredService<IClaimService>();
         public IUserTokenService Tokens => Inner.ServiceProvider.GetRequiredService<IUserTokenService>();
         public IRefreshTokenService RefreshTokens => Inner.ServiceProvider.GetRequiredService<IRefreshTokenService>();
@@ -220,6 +222,24 @@ public abstract class IdentityStoreConformanceTests
 
         var claims = await s.Claims.GetEffectiveClaimsAsync(userId);
         Assert.Contains(claims, c => c is { Type: "perm", Value: "write" });
+    }
+
+    [Fact]
+    public async Task User_level_is_the_highest_level_of_the_users_roles_and_follows_SetLevelAsync()
+    {
+        await ResetAsync();
+        await using var s = NewScope(new TenantId("acme"));
+        var userId = (await s.Users.CreateAsync("erin", "pw")).UserId!.Value;
+        Assert.Equal(RoleLevel.Level5, await s.Levels.GetLevelAsync(userId));
+
+        var staffId = (await s.RoleLevels.CreateAsync("Staff", RoleLevel.Level3))!.Value;
+        var managerId = (await s.RoleLevels.CreateAsync("Manager", RoleLevel.Level4))!.Value;
+        Assert.True(await s.Roles.AssignRoleAsync(userId, staffId));
+        Assert.True(await s.Roles.AssignRoleAsync(userId, managerId));
+        Assert.Equal(RoleLevel.Level3, await s.Levels.GetLevelAsync(userId));
+
+        Assert.True(await s.RoleLevels.SetLevelAsync(staffId, RoleLevel.Level2));
+        Assert.Equal(RoleLevel.Level2, await s.Levels.GetLevelAsync(userId));
     }
 
     [Fact]

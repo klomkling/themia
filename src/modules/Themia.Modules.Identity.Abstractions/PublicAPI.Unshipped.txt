@@ -510,3 +510,19 @@ Themia.Modules.Identity.Abstractions.IdentityModuleOptions.LockoutPolicy.get -> 
 Themia.Modules.Identity.Abstractions.IdentityModuleOptions.LockoutPolicy.set -> void
 Themia.Modules.Identity.Abstractions.IdentityModuleOptions.MaxLockoutDuration.get -> System.TimeSpan
 Themia.Modules.Identity.Abstractions.IdentityModuleOptions.MaxLockoutDuration.set -> void
+Themia.Modules.Identity.Abstractions.Entities.Role.Level.get -> Themia.Modules.Identity.Abstractions.RoleLevel
+Themia.Modules.Identity.Abstractions.Entities.Role.Level.set -> void
+Themia.Modules.Identity.Abstractions.IRoleLevelService
+Themia.Modules.Identity.Abstractions.IRoleLevelService.CreateAsync(string! name, Themia.Modules.Identity.Abstractions.RoleLevel level, string? description = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Guid?>!
+Themia.Modules.Identity.Abstractions.IRoleLevelService.SetLevelAsync(System.Guid roleId, Themia.Modules.Identity.Abstractions.RoleLevel level, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!
+Themia.Modules.Identity.Abstractions.IUserLevelReader
+Themia.Modules.Identity.Abstractions.IUserLevelReader.GetLevelAsync(System.Guid userId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Identity.Abstractions.RoleLevel>!
+Themia.Modules.Identity.Abstractions.RoleLevel
+Themia.Modules.Identity.Abstractions.RoleLevel.Level1 = 1 -> Themia.Modules.Identity.Abstractions.RoleLevel
+Themia.Modules.Identity.Abstractions.RoleLevel.Level2 = 2 -> Themia.Modules.Identity.Abstractions.RoleLevel
+Themia.Modules.Identity.Abstractions.RoleLevel.Level3 = 3 -> Themia.Modules.Identity.Abstractions.RoleLevel
+Themia.Modules.Identity.Abstractions.RoleLevel.Level4 = 4 -> Themia.Modules.Identity.Abstractions.RoleLevel
+Themia.Modules.Identity.Abstractions.RoleLevel.Level5 = 5 -> Themia.Modules.Identity.Abstractions.RoleLevel
+Themia.Modules.Identity.Abstractions.RoleLevelPolicy
+static Themia.Modules.Identity.Abstractions.RoleLevelPolicy.CanActOn(Themia.Modules.Identity.Abstractions.RoleLevel actor, Themia.Modules.Identity.Abstractions.RoleLevel target) -> bool
+static Themia.Modules.Identity.Abstractions.RoleLevelPolicy.CanGrant(Themia.Modules.Identity.Abstractions.RoleLevel actor, Themia.Modules.Identity.Abstractions.RoleLevel role) -> bool

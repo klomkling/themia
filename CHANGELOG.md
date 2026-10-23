@@ -27,6 +27,10 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+### Added
+
+- `Themia.Modules.Identity`: shared role levels. `RoleLevel` (`Level1` highest to `Level5`), `Role.Level` (default `Level5`), `IRoleLevelService` (`CreateAsync` with a level, `SetLevelAsync`), `IUserLevelReader.GetLevelAsync` (the highest level among a user's roles, read from the database on every call; `Level5` when none) and the static `RoleLevelPolicy.CanActOn` / `CanGrant`. They sit on new interfaces, so `IRoleService` and `IUserService` implementers are unaffected. New forward-only migration `AddRoleLevelMigration` adds `identity.roles.level smallint NOT NULL DEFAULT 5 CHECK (1..5)` on PostgreSQL and SQL Server; existing roles become `Level5` until the app sets them. Coord #0172.
+
 ## [0.35.3] - 2026-10-23
 
 Identity lockout policy for `Themia.Modules.Identity` (coord #0168). No new packages, no migration, no API removed; the default lockout behaviour is unchanged.

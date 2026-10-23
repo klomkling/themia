@@ -18,6 +18,9 @@ public sealed class Role : SoftDeletableEntity<Guid>, ITenantEntity
     /// <summary>An optional human-readable description.</summary>
     public string? Description { get; set; }
 
+    /// <summary>The role's rank; <see cref="RoleLevel.Level5"/> unless set.</summary>
+    public RoleLevel Level { get; set; } = RoleLevel.Level5;
+
     /// <summary>Assigns the identifier for a new (transient) role.</summary>
     /// <param name="id">A client-generated identifier.</param>
     public void SetId(Guid id) => Id = id;

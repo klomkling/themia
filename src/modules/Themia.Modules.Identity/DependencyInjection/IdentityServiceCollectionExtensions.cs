@@ -111,6 +111,8 @@ public static class IdentityServiceCollectionExtensions
 
         services.TryAddScoped<IUserService, UserService>();
         services.TryAddScoped<IRoleService, RoleService>();
+        services.TryAddScoped<IRoleLevelService, RoleLevelService>();
+        services.TryAddScoped<IUserLevelReader, UserLevelReader>();
         services.TryAddScoped<IClaimService, ClaimService>();
         services.TryAddScoped<IUserTokenService, UserTokenService>();
         services.TryAddScoped<IRefreshTokenService, RefreshTokenService>();
