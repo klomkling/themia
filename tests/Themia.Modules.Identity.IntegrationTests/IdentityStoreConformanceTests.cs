@@ -223,6 +223,32 @@ public abstract class IdentityStoreConformanceTests
     }
 
     [Fact]
+    public async Task Role_and_user_claim_changes_rotate_the_security_stamp_of_the_affected_users_only()
+    {
+        await ResetAsync();
+        await using var s = NewScope(new TenantId("acme"));
+        var holderId = (await s.Users.CreateAsync("fay", "pw")).UserId!.Value;
+        var bystanderId = (await s.Users.CreateAsync("gus", "pw")).UserId!.Value;
+        var roleId = (await s.Roles.CreateAsync("Editor"))!.Value;
+        Assert.True(await s.Roles.AssignRoleAsync(holderId, roleId));
+        var holderBefore = (await s.Users.FindByIdAsync(holderId))!.SecurityStamp;
+        var bystanderBefore = (await s.Users.FindByIdAsync(bystanderId))!.SecurityStamp;
+
+        await s.Claims.AddRoleClaimAsync(roleId, "perm", "write");
+        var afterRoleClaim = (await s.Users.FindByIdAsync(holderId))!.SecurityStamp;
+        Assert.NotEqual(holderBefore, afterRoleClaim);
+
+        await s.Claims.AddUserClaimAsync(holderId, "perm", "read");
+        var afterUserClaim = (await s.Users.FindByIdAsync(holderId))!.SecurityStamp;
+        Assert.NotEqual(afterRoleClaim, afterUserClaim);
+
+        Assert.True(await s.Claims.RemoveRoleClaimAsync(roleId, "perm", "write"));
+        Assert.NotEqual(afterUserClaim, (await s.Users.FindByIdAsync(holderId))!.SecurityStamp);
+
+        Assert.Equal(bystanderBefore, (await s.Users.FindByIdAsync(bystanderId))!.SecurityStamp);
+    }
+
+    [Fact]
     public async Task Soft_deleted_user_is_not_found()
     {
         await ResetAsync();

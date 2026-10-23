@@ -10,8 +10,6 @@ namespace Themia.Modules.Identity.Services;
 /// tenant resolution, and the id comes from a signature-verified token) and caches the answer in memory.</summary>
 public sealed class SecurityStampValidator : ISecurityStampValidator
 {
-    private const string CacheKeyPrefix = "themia:identity:stamp:";
-
     private readonly IReadRepository<User, Guid> users;
     private readonly IMemoryCache cache;
     private readonly IdentityModuleOptions options;
@@ -49,14 +47,14 @@ public sealed class SecurityStampValidator : ISecurityStampValidator
             return await LoadStampAsync(userId, cancellationToken).ConfigureAwait(false);
         }
 
-        var key = CacheKeyPrefix + userId.ToString("N");
+        var key = SecurityStampCache.Key(userId);
         if (cache.TryGetValue(key, out string? cached))
         {
             return cached;
         }
 
         var loaded = await LoadStampAsync(userId, cancellationToken).ConfigureAwait(false);
-        cache.Set(key, loaded, window);
+        cache.Set(key, loaded, SecurityStampCache.EntryOptions(window));
         return loaded;
     }
 

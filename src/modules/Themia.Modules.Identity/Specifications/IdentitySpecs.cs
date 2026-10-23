@@ -251,3 +251,20 @@ internal sealed class PlatformExternalLoginByProviderKeySpec : Specification<Ext
         WithoutTenantFilter();
     }
 }
+
+/// <summary>Memberships of a role. The join carries no tenant column; the caller has already resolved the role in scope.</summary>
+internal sealed class UserRolesByRoleSpec : Specification<UserRole>
+{
+    public UserRolesByRoleSpec(Guid roleId) => Where(ur => ur.RoleId == roleId);
+}
+
+/// <summary>Users by id in any tenant, for a set-based stamp rotation. The ids come from memberships of a role that
+/// resolved in scope, or from a user the caller already resolved in scope.</summary>
+internal sealed class UsersByIdsAnyTenantSpec : Specification<User>
+{
+    public UsersByIdsAnyTenantSpec(IReadOnlyCollection<Guid> ids)
+    {
+        Where(u => ids.Contains(u.Id));
+        WithoutTenantFilter();
+    }
+}

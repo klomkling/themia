@@ -33,7 +33,7 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ### Changed
 
-- `Themia.Modules.Identity`: `IUserService.SetActiveAsync` and `IRoleService.AssignRoleAsync` / `RemoveRoleAsync` now rotate the user's security stamp (a no-op assignment that changes nothing keeps it). `RoleService` gains a constructor taking `IDataFilterScope` (DI picks it; the old four-argument constructor stays). Coord #0170.
+- `Themia.Modules.Identity`: `IUserService.SetActiveAsync`, `IRoleService.AssignRoleAsync` / `RemoveRoleAsync` and `IClaimService` user-claim and role-claim add/remove now rotate the security stamp (of every holder of the role, for a role claim; in the same transaction as the claim write). A change that alters nothing keeps it. `RoleService` gains a constructor taking `IDataFilterScope`, and `RoleService`, `UserService` and `ClaimService` an optional `IMemoryCache` they evict the user's cached stamp from after the commit, so a rotation in this process is seen at once (other instances wait out `SecurityStampCacheDuration`). The old constructors stay. Cache entries carry `Size = 1`, so a cache with a `SizeLimit` works. Coord #0170.
 
 ## [0.35.3] - 2026-10-23
 

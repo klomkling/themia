@@ -122,3 +122,68 @@ public class SecurityStampValidatorTests
         Assert.False(await sut.IsCurrentAsync(user.Id, user.SecurityStamp));
     }
 }
+
+public class SecurityStampValidatorWindowTests
+{
+    private sealed class TestClock : Microsoft.Extensions.Internal.ISystemClock
+    {
+        public DateTimeOffset UtcNow { get; set; } = DateTimeOffset.Parse("2026-10-23T00:00:00Z");
+    }
+
+    private readonly List<User> store = [];
+    private readonly TestClock clock = new();
+    private readonly IdentityModuleOptions options = new() { SecurityStampCacheDuration = TimeSpan.FromSeconds(30) };
+    private readonly SecurityStampValidator sut;
+
+    public SecurityStampValidatorWindowTests()
+    {
+        var cache = new MemoryCache(new MemoryCacheOptions { Clock = clock, SizeLimit = 10 });
+        sut = new SecurityStampValidator(new FakeRepository<User>(store, u => u.Id), cache, options);
+    }
+
+    private User Seed(bool active = true)
+    {
+        var user = new User { UserName = "u", NormalizedUserName = "U", IsActive = active };
+        user.SetId(Guid.NewGuid());
+        store.Add(user);
+        return user;
+    }
+
+    [Fact]
+    public async Task The_old_stamp_is_refused_and_the_new_one_accepted_once_the_window_has_passed()
+    {
+        var user = Seed();
+        var issued = user.SecurityStamp;
+        Assert.True(await sut.IsCurrentAsync(user.Id, issued));
+        user.SecurityStamp = "rotated";
+
+        clock.UtcNow += TimeSpan.FromSeconds(29);
+        Assert.True(await sut.IsCurrentAsync(user.Id, issued));   // inside the window: still served from the cache
+
+        clock.UtcNow += TimeSpan.FromSeconds(2);
+        Assert.False(await sut.IsCurrentAsync(user.Id, issued));
+        Assert.True(await sut.IsCurrentAsync(user.Id, "rotated"));
+    }
+
+    [Fact]
+    public async Task A_cached_refusal_clears_once_the_window_has_passed()
+    {
+        var user = Seed(active: false);
+        Assert.False(await sut.IsCurrentAsync(user.Id, user.SecurityStamp));
+        user.IsActive = true;
+
+        clock.UtcNow += TimeSpan.FromSeconds(29);
+        Assert.False(await sut.IsCurrentAsync(user.Id, user.SecurityStamp));
+
+        clock.UtcNow += TimeSpan.FromSeconds(2);
+        Assert.True(await sut.IsCurrentAsync(user.Id, user.SecurityStamp));
+    }
+
+    [Fact]
+    public async Task Entries_carry_a_size_so_a_cache_with_a_SizeLimit_does_not_throw()
+    {
+        // The cache above has SizeLimit = 10; an entry without Size would throw InvalidOperationException.
+        var user = Seed();
+        Assert.True(await sut.IsCurrentAsync(user.Id, user.SecurityStamp));
+    }
+}

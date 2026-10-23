@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Caching.Memory;
 using Themia.Framework.Data.Abstractions.Filtering;
 using Themia.Framework.Data.Abstractions.Repositories;
 using Themia.Framework.Data.Abstractions.UnitOfWork;
@@ -15,6 +16,7 @@ public sealed class RoleService : IRoleService
     private readonly IRepository<UserRole, Guid> memberships;
     private readonly IUnitOfWork unitOfWork;
     private readonly IDataFilterScope filterScope;
+    private readonly IMemoryCache? stampCache;
 
     /// <summary>Creates the service with a default filter scope.</summary>
     public RoleService(
@@ -32,14 +34,16 @@ public sealed class RoleService : IRoleService
         IRepository<Role, Guid> roles,
         IRepository<UserRole, Guid> memberships,
         IUnitOfWork unitOfWork,
-        IDataFilterScope filterScope)
+        IDataFilterScope filterScope,
+        IMemoryCache? stampCache = null)
     {
-        ArgumentNullException.ThrowIfNull(filterScope);
-        this.filterScope = filterScope;
         ArgumentNullException.ThrowIfNull(users);
         ArgumentNullException.ThrowIfNull(roles);
         ArgumentNullException.ThrowIfNull(memberships);
         ArgumentNullException.ThrowIfNull(unitOfWork);
+        ArgumentNullException.ThrowIfNull(filterScope);
+        this.filterScope = filterScope;
+        this.stampCache = stampCache;
         this.users = users;
         this.roles = roles;
         this.memberships = memberships;
@@ -130,9 +134,10 @@ public sealed class RoleService : IRoleService
     // membership so a failure in between logs the user out needlessly rather than leaving a revoked role usable.
     private async Task RotateSecurityStampAsync(User user, CancellationToken cancellationToken)
     {
-        user.SecurityStamp = Guid.NewGuid().ToString("N");
+        user.SecurityStamp = SecurityStampCache.NewStamp();
         users.Update(user);
         await IdentityScope.SaveScopedAsync(unitOfWork, filterScope, user.TenantId is null, cancellationToken).ConfigureAwait(false);
+        SecurityStampCache.Evict(stampCache, [user.Id]);
     }
 
     /// <inheritdoc />
