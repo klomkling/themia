@@ -56,4 +56,25 @@ public class AuthTokenIssuerSessionTests
         Assert.Equal("jwt", tokens.AccessToken);
         Assert.Equal("raw", tokens.RefreshToken);
     }
+
+    private sealed class FactoryWithStoredSid(string storedSid) : IClaimsPrincipalFactory
+    {
+        public Task<ClaimsPrincipal> CreateAsync(User user, string authenticationType, CancellationToken cancellationToken = default) =>
+            Task.FromResult(new ClaimsPrincipal(new ClaimsIdentity(
+                [new Claim("sub", user.Id.ToString()), new Claim(SessionClaims.SessionId, storedSid)], authenticationType)));
+    }
+
+    [Fact]
+    public async Task IssueAsync_replaces_a_stored_sid_claim_so_it_cannot_shadow_the_real_session()
+    {
+        var family = Guid.NewGuid();
+        var access = new CapturingAccessTokens();
+        var user = new User { UserName = "u" };
+        user.SetId(Guid.NewGuid());
+
+        await AuthTokenIssuer.IssueAsync(
+            new FactoryWithStoredSid(Guid.NewGuid().ToString()), access, new StubRefreshTokens(family), TimeProvider.System, user, "test", CancellationToken.None);
+
+        Assert.Equal([family.ToString()], access.Principal!.FindAll(SessionClaims.SessionId).Select(c => c.Value));
+    }
 }
