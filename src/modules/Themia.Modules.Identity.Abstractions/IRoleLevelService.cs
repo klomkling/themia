@@ -12,10 +12,11 @@ public interface IRoleLevelService
     /// <returns>The new role id, or <see langword="null"/> when the name is already taken.</returns>
     Task<Guid?> CreateAsync(string name, RoleLevel level, string? description = null, CancellationToken cancellationToken = default);
 
-    /// <summary>Sets the level of a role in the ambient tenant or a platform role.</summary>
+    /// <summary>Sets the level of a role in the ambient tenant, or of a platform role when called from platform scope
+    /// (no ambient tenant). A platform role is shared by every tenant, so a tenant scope may not change its level.</summary>
     /// <param name="roleId">The role.</param>
     /// <param name="level">The new level.</param>
     /// <param name="cancellationToken">A token to cancel the write.</param>
-    /// <returns><see langword="false"/> when the role does not resolve in scope.</returns>
+    /// <returns><see langword="false"/> when the role does not resolve in scope, or is a platform role and the caller is in a tenant scope.</returns>
     Task<bool> SetLevelAsync(Guid roleId, RoleLevel level, CancellationToken cancellationToken = default);
 }

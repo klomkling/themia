@@ -12,11 +12,24 @@ public class RoleLevelServiceTests
 {
     private readonly List<Role> roles = [];
     private readonly RoleLevelService sut;
+    private readonly RoleLevelService platformSut;
 
     public RoleLevelServiceTests()
     {
-        var repo = new FakeRepository<Role>(roles, r => r.Id) { AmbientTenant = new TenantId("acme") };
-        sut = new RoleLevelService(repo, new FakeUnitOfWork(), new DataFilterScope());
+        var tenant = new TenantId("acme");
+        var repo = new FakeRepository<Role>(roles, r => r.Id) { AmbientTenant = tenant };
+        sut = new RoleLevelService(repo, new FakeUnitOfWork(), new DataFilterScope(), new TenantContext(tenant));
+        platformSut = new RoleLevelService(
+            new FakeRepository<Role>(roles, r => r.Id) { AmbientTenant = null },
+            new FakeUnitOfWork(), new DataFilterScope(), new TenantContext(null));
+    }
+
+    private Role SeedPlatformRole()
+    {
+        var role = new Role { Name = "Root", NormalizedName = "ROOT", TenantId = null };
+        role.SetId(Guid.NewGuid());
+        roles.Add(role);
+        return role;
     }
 
     [Fact]
@@ -69,5 +82,25 @@ public class RoleLevelServiceTests
     {
         var id = (await sut.CreateAsync("Staff", RoleLevel.Level5))!.Value;
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => sut.SetLevelAsync(id, (RoleLevel)0));
+    }
+
+    [Fact]
+    public async Task SetLevelAsync_refuses_a_platform_role_from_a_tenant_scope()
+    {
+        var platformRole = SeedPlatformRole();
+
+        Assert.False(await sut.SetLevelAsync(platformRole.Id, RoleLevel.Level1));
+
+        Assert.Equal(RoleLevel.Level5, platformRole.Level);
+    }
+
+    [Fact]
+    public async Task SetLevelAsync_changes_a_platform_role_from_platform_scope()
+    {
+        var platformRole = SeedPlatformRole();
+
+        Assert.True(await platformSut.SetLevelAsync(platformRole.Id, RoleLevel.Level1));
+
+        Assert.Equal(RoleLevel.Level1, platformRole.Level);
     }
 }

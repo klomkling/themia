@@ -1,3 +1,4 @@
+using Themia.Framework.Core.Abstractions.Tenancy;
 using Themia.Framework.Data.Abstractions.Filtering;
 using Themia.Framework.Data.Abstractions.Repositories;
 using Themia.Framework.Data.Abstractions.UnitOfWork;
@@ -13,10 +14,17 @@ public sealed class RoleLevelService : IRoleLevelService
     private readonly IRepository<Role, Guid> roles;
     private readonly IUnitOfWork unitOfWork;
     private readonly IDataFilterScope filterScope;
+    private readonly ITenantContext tenantContext;
 
     /// <summary>Creates the service.</summary>
-    public RoleLevelService(IRepository<Role, Guid> roles, IUnitOfWork unitOfWork, IDataFilterScope filterScope)
+    public RoleLevelService(
+        IRepository<Role, Guid> roles,
+        IUnitOfWork unitOfWork,
+        IDataFilterScope filterScope,
+        ITenantContext tenantContext)
     {
+        ArgumentNullException.ThrowIfNull(tenantContext);
+        this.tenantContext = tenantContext;
         ArgumentNullException.ThrowIfNull(roles);
         ArgumentNullException.ThrowIfNull(unitOfWork);
         ArgumentNullException.ThrowIfNull(filterScope);
@@ -49,6 +57,12 @@ public sealed class RoleLevelService : IRoleLevelService
         ValidateLevel(level);
         var role = await IdentityScope.ResolveRoleAsync(roles, roleId, cancellationToken).ConfigureAwait(false);
         if (role is null)
+        {
+            return false;
+        }
+
+        // A platform role is shared by every tenant, so its level is a platform-wide write: refuse it from a tenant scope.
+        if (role.TenantId is null && tenantContext.CurrentTenantId is not null)
         {
             return false;
         }
