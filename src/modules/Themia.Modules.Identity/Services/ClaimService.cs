@@ -44,6 +44,7 @@ public sealed class ClaimService : IClaimService
     public async Task AddUserClaimAsync(Guid userId, string claimType, string claimValue, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(claimType);
+        ThrowIfReserved(claimType);
         ArgumentNullException.ThrowIfNull(claimValue);
 
         // The parent must resolve in the ambient tenant or as a platform user; a cross-tenant
@@ -83,6 +84,7 @@ public sealed class ClaimService : IClaimService
     public async Task AddRoleClaimAsync(Guid roleId, string claimType, string claimValue, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(claimType);
+        ThrowIfReserved(claimType);
         ArgumentNullException.ThrowIfNull(claimValue);
 
         // The parent must resolve in the ambient tenant or as a platform role; cross-tenant is refused.
@@ -115,6 +117,16 @@ public sealed class ClaimService : IClaimService
         roleClaims.Remove(existing);
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         return true;
+    }
+
+    // Themia sets these itself; a stored claim of such a type could forge or shadow the issued one. Removing a stored
+    // row of a reserved type stays allowed, so rows written before this rule can be cleaned up.
+    private static void ThrowIfReserved(string claimType)
+    {
+        if (ReservedClaimTypes.IsReserved(claimType))
+        {
+            throw new ArgumentException($"Claim type '{claimType}' is reserved: Themia sets it itself.", nameof(claimType));
+        }
     }
 
     /// <inheritdoc />

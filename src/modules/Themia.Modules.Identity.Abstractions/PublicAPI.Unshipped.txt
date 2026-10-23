@@ -510,3 +510,5 @@ Themia.Modules.Identity.Abstractions.IdentityModuleOptions.LockoutPolicy.get -> 
 Themia.Modules.Identity.Abstractions.IdentityModuleOptions.LockoutPolicy.set -> void
 Themia.Modules.Identity.Abstractions.IdentityModuleOptions.MaxLockoutDuration.get -> System.TimeSpan
 Themia.Modules.Identity.Abstractions.IdentityModuleOptions.MaxLockoutDuration.set -> void
+Themia.Modules.Identity.Abstractions.ReservedClaimTypes
+static Themia.Modules.Identity.Abstractions.ReservedClaimTypes.IsReserved(string! claimType) -> bool

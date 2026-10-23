@@ -70,7 +70,12 @@ public sealed class ClaimsPrincipalFactory : IClaimsPrincipalFactory
 
         foreach (var claim in await claims.GetEffectiveClaimsAsync(user.Id, roleIds, cancellationToken).ConfigureAwait(false))
         {
-            identity.AddClaim(claim);
+            // Stored rows of a type Themia sets itself (written before the claim APIs refused them) are skipped, so
+            // they cannot forge or shadow the stamp, tenant, platform marker, session id or roles added above.
+            if (!ReservedClaimTypes.IsReserved(claim.Type))
+            {
+                identity.AddClaim(claim);
+            }
         }
 
         return new ClaimsPrincipal(identity);
