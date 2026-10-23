@@ -119,4 +119,17 @@ public class SessionRevocationTests
     {
         await Assert.ThrowsAnyAsync<ArgumentException>(() => sut.RevokeAllForUserExceptAsync(Guid.NewGuid(), null!));
     }
+
+    [Fact]
+    public async Task RevokeAllForUserExcept_with_a_well_formed_unknown_session_id_revokes_every_session()
+    {
+        var user = AddUser("alice");
+        await sut.IssueAsync(user.Id);
+        await sut.IssueAsync(user.Id);
+
+        var revoked = await sut.RevokeAllForUserExceptAsync(user.Id, Guid.NewGuid().ToString());
+
+        Assert.Equal(2, revoked);
+        Assert.All(tokens, t => Assert.NotNull(t.RevokedAt));
+    }
 }
