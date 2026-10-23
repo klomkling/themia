@@ -29,7 +29,7 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ### Changed
 
-- `Themia.Modules.Identity`: claim types Themia sets itself are reserved (`ReservedClaimTypes.IsReserved`: `sid`, every `themia:*` claim including the security stamp, tenant and platform markers, the role, name and subject claims in long and short form, and the registered JWT claims). `IClaimService.AddUserClaimAsync` and `AddRoleClaimAsync` now throw `ArgumentException` for one, and `ClaimsPrincipalFactory` drops any stored claim of a reserved type, so rows written earlier can no longer forge or shadow an issued claim (for example a stored `themia:is_platform` or `sid`). Removing a stored reserved claim still works, to clean such rows up.
+- `Themia.Modules.Identity`: claim types Themia sets itself are reserved (`ReservedClaimTypes.IsReserved`: `sid`, `tenant_id` (the claims tenant strategy's default claim type), every `themia:*` claim including the security stamp, tenant and platform markers, the role, name and subject claims in long and short form, and the registered JWT claims). `IClaimService.AddUserClaimAsync` and `AddRoleClaimAsync` now throw `ArgumentException` for one, and `ClaimsPrincipalFactory` drops any stored claim of a reserved type, so rows written earlier can no longer forge or shadow an issued claim (for example a stored `themia:is_platform` or `sid`). Removing a stored reserved claim still works, to clean such rows up.
 
 ## [0.35.3] - 2026-10-23
 

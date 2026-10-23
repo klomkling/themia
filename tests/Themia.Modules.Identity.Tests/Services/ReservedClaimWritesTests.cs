@@ -51,6 +51,9 @@ public class ReservedClaimWritesTests
 
     [Theory]
     [InlineData("sid")]
+    [InlineData("Sid")]
+    [InlineData("ROLE")]
+    [InlineData("HTTP://SCHEMAS.MICROSOFT.COM/WS/2008/06/IDENTITY/CLAIMS/ROLE")]
     [InlineData(IdentityClaimTypes.SecurityStamp)]
     [InlineData(IdentityClaimTypes.IsPlatform)]
     [InlineData(IdentityClaimTypes.TenantId)]
@@ -109,6 +112,8 @@ public class ReservedClaimWritesTests
         // Rows written before the rule existed: one direct, one through the role.
         userClaims.Add(new UserClaim { Id = Guid.NewGuid(), UserId = user.Id, ClaimType = IdentityClaimTypes.SecurityStamp, ClaimValue = "forged-stamp" });
         userClaims.Add(new UserClaim { Id = Guid.NewGuid(), UserId = user.Id, ClaimType = "sid", ClaimValue = "forged-sid" });
+        userClaims.Add(new UserClaim { Id = Guid.NewGuid(), UserId = user.Id, ClaimType = "ROLE", ClaimValue = "SuperAdmin" });
+        userClaims.Add(new UserClaim { Id = Guid.NewGuid(), UserId = user.Id, ClaimType = ClaimTypes.Role.ToUpperInvariant(), ClaimValue = "SuperAdmin" });
         userClaims.Add(new UserClaim { Id = Guid.NewGuid(), UserId = user.Id, ClaimType = "perm", ClaimValue = "read" });
         roleClaims.Add(new RoleClaim { Id = Guid.NewGuid(), RoleId = role.Id, ClaimType = IdentityClaimTypes.IsPlatform, ClaimValue = "true" });
         roleClaims.Add(new RoleClaim { Id = Guid.NewGuid(), RoleId = role.Id, ClaimType = ClaimTypes.Role, ClaimValue = "SuperAdmin" });

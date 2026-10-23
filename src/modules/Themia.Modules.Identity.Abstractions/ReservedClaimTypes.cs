@@ -9,10 +9,13 @@ public static class ReservedClaimTypes
 {
     private const string ThemiaPrefix = "themia:";
 
+    // Case-insensitive because ClaimsIdentity.FindFirst and IsInRole compare claim types that way, so 'ROLE' or an
+    // upper-cased ClaimTypes.Role would otherwise pass the check and still act as the real claim.
     // The long ClaimTypes URIs and their short wire names, plus the registered JWT claims the token descriptor sets.
-    private static readonly HashSet<string> Reserved = new(StringComparer.Ordinal)
+    private static readonly HashSet<string> Reserved = new(StringComparer.OrdinalIgnoreCase)
     {
         "sid",
+        "tenant_id",   // the claims tenant-resolution strategy reads this by default (MultiTenancyOptions.ClaimType)
         ClaimTypes.NameIdentifier,
         ClaimTypes.Name,
         ClaimTypes.Role,
@@ -33,6 +36,7 @@ public static class ReservedClaimTypes
     public static bool IsReserved(string claimType)
     {
         ArgumentNullException.ThrowIfNull(claimType);
-        return Reserved.Contains(claimType) || claimType.StartsWith(ThemiaPrefix, StringComparison.OrdinalIgnoreCase);
+        var type = claimType.Trim();
+        return Reserved.Contains(type) || type.StartsWith(ThemiaPrefix, StringComparison.OrdinalIgnoreCase);
     }
 }
