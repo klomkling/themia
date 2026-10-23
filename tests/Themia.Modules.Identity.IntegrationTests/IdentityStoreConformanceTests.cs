@@ -50,6 +50,8 @@ public abstract class IdentityStoreConformanceTests
         public IExternalLoginService ExternalLogins => Inner.ServiceProvider.GetRequiredService<IExternalLoginService>();
         public IExternalLoginLinkService Linking => Inner.ServiceProvider.GetRequiredService<IExternalLoginLinkService>();
         public IRepository<ExternalLoginLink, Guid> Links => Inner.ServiceProvider.GetRequiredService<IRepository<ExternalLoginLink, Guid>>();
+        public IRepository<User, Guid> UserRepo => Inner.ServiceProvider.GetRequiredService<IRepository<User, Guid>>();
+        public IRepository<UserRole, Guid> Memberships => Inner.ServiceProvider.GetRequiredService<IRepository<UserRole, Guid>>();
         public IUnitOfWork UnitOfWork => Inner.ServiceProvider.GetRequiredService<IUnitOfWork>();
 
         public async ValueTask DisposeAsync()
@@ -246,6 +248,44 @@ public abstract class IdentityStoreConformanceTests
         Assert.NotEqual(afterUserClaim, (await s.Users.FindByIdAsync(holderId))!.SecurityStamp);
 
         Assert.Equal(bystanderBefore, (await s.Users.FindByIdAsync(bystanderId))!.SecurityStamp);
+    }
+
+    [Fact]
+    public async Task Role_claim_change_rotates_every_holder_of_a_role_larger_than_one_sql_server_command()
+    {
+        // SQL Server caps a command at 2,100 parameters; the rotation must not send one per holder.
+        const int holderCount = 2300;
+        await ResetAsync();
+        await using var s = NewScope(new TenantId("acme"));
+        var roleId = (await s.Roles.CreateAsync("Big"))!.Value;
+        var holderIds = new List<Guid>(holderCount);
+        for (var i = 0; i < holderCount; i++)
+        {
+            var user = new User { UserName = $"holder{i}", NormalizedUserName = $"HOLDER{i}", PasswordHash = "x" };
+            user.SetId(Guid.CreateVersion7());
+            await s.UserRepo.AddAsync(user);
+            holderIds.Add(user.Id);
+        }
+
+        await s.UnitOfWork.SaveChangesAsync();   // users first: the membership FK has no model relationship to order the inserts
+        foreach (var holderId in holderIds)
+        {
+            var membership = new UserRole { UserId = holderId, RoleId = roleId };
+            membership.SetId(Guid.CreateVersion7());
+            await s.Memberships.AddAsync(membership);
+        }
+
+        await s.UnitOfWork.SaveChangesAsync();
+        var before = (await s.Users.FindByIdAsync(holderIds[0]))!.SecurityStamp;
+        var beforeLast = (await s.Users.FindByIdAsync(holderIds[^1]))!.SecurityStamp;
+
+        await s.Claims.AddRoleClaimAsync(roleId, "perm", "write");
+        Assert.NotEqual(before, (await s.Users.FindByIdAsync(holderIds[0]))!.SecurityStamp);
+        Assert.NotEqual(beforeLast, (await s.Users.FindByIdAsync(holderIds[^1]))!.SecurityStamp);
+
+        var afterAdd = (await s.Users.FindByIdAsync(holderIds[0]))!.SecurityStamp;
+        Assert.True(await s.Claims.RemoveRoleClaimAsync(roleId, "perm", "write"));
+        Assert.NotEqual(afterAdd, (await s.Users.FindByIdAsync(holderIds[0]))!.SecurityStamp);
     }
 
     [Fact]

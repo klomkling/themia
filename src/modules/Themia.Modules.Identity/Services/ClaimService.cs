@@ -11,6 +11,8 @@ namespace Themia.Modules.Identity.Services;
 /// <summary>Default <see cref="IClaimService"/> over the Themia data abstractions.</summary>
 public sealed class ClaimService : IClaimService
 {
+    private const int StampRotationBatchSize = 500;
+
     private readonly IRepository<UserClaim, Guid> userClaims;
     private readonly IRepository<RoleClaim, Guid> roleClaims;
     private readonly IRepository<UserRole, Guid> memberships;
@@ -84,7 +86,7 @@ public sealed class ClaimService : IClaimService
                 await userClaims.AddAsync(claim, ct).ConfigureAwait(false);
                 await unitOfWork.SaveChangesAsync(ct).ConfigureAwait(false);
             },
-            [userId],
+            _ => Task.FromResult<IReadOnlyCollection<Guid>>([userId]),
             cancellationToken).ConfigureAwait(false);
     }
 
@@ -109,7 +111,7 @@ public sealed class ClaimService : IClaimService
                 userClaims.Remove(existing);
                 await unitOfWork.SaveChangesAsync(ct).ConfigureAwait(false);
             },
-            [userId],
+            _ => Task.FromResult<IReadOnlyCollection<Guid>>([userId]),
             cancellationToken).ConfigureAwait(false);
         return true;
     }
@@ -128,14 +130,13 @@ public sealed class ClaimService : IClaimService
 
         var claim = new RoleClaim { RoleId = roleId, ClaimType = claimType, ClaimValue = claimValue };
         claim.SetId(Guid.CreateVersion7());
-        var holders = await HolderIdsAsync(roleId, cancellationToken).ConfigureAwait(false);
         await ChangeAsync(
             async ct =>
             {
                 await roleClaims.AddAsync(claim, ct).ConfigureAwait(false);
                 await unitOfWork.SaveChangesAsync(ct).ConfigureAwait(false);
             },
-            holders,
+            ct => HolderIdsAsync(roleId, ct),
             cancellationToken).ConfigureAwait(false);
     }
 
@@ -154,14 +155,13 @@ public sealed class ClaimService : IClaimService
             return false;
         }
 
-        var holders = await HolderIdsAsync(roleId, cancellationToken).ConfigureAwait(false);
         await ChangeAsync(
             async ct =>
             {
                 roleClaims.Remove(existing);
                 await unitOfWork.SaveChangesAsync(ct).ConfigureAwait(false);
             },
-            holders,
+            ct => HolderIdsAsync(roleId, ct),
             cancellationToken).ConfigureAwait(false);
         return true;
     }
@@ -173,26 +173,30 @@ public sealed class ClaimService : IClaimService
 
     // Apps read permissions from the access token's claims, so a claim change must cut the tokens issued before it:
     // the claim write and the stamp rotation of every affected user commit together, and the in-process cache is
-    // evicted only after the commit.
+    // evicted only after the commit. The holders are read inside the transaction, after the write, so a user assigned
+    // to the role in between is still rotated. The update runs in batches: Dapper sends one parameter per id and
+    // SQL Server caps a command at 2,100, which a large role would exceed.
     private async Task ChangeAsync(
         Func<CancellationToken, Task> write,
-        IReadOnlyCollection<Guid> affectedUserIds,
+        Func<CancellationToken, Task<IReadOnlyCollection<Guid>>> affectedUserIds,
         CancellationToken cancellationToken)
     {
+        IReadOnlyCollection<Guid> rotated = [];
         await unitOfWork.ExecuteInTransactionAsync(
             async ct =>
             {
                 await write(ct).ConfigureAwait(false);
-                if (affectedUserIds.Count > 0)
+                rotated = await affectedUserIds(ct).ConfigureAwait(false);
+                foreach (var batch in rotated.Chunk(StampRotationBatchSize))
                 {
                     await users.UpdateWhereAsync(
-                        new UsersByIdsAnyTenantSpec(affectedUserIds),
+                        new UsersByIdsAnyTenantSpec(batch),
                         set => set.Set(u => u.SecurityStamp, SecurityStampCache.NewStamp()),
                         ct).ConfigureAwait(false);
                 }
             },
             cancellationToken).ConfigureAwait(false);
-        SecurityStampCache.Evict(stampCache, affectedUserIds);
+        SecurityStampCache.Evict(stampCache, rotated);
     }
 
     /// <inheritdoc />

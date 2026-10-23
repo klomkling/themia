@@ -40,7 +40,6 @@ public sealed class UserService : IUserService
         ILogger<UserService>? logger = null,
         IMemoryCache? stampCache = null)
     {
-        this.stampCache = stampCache;
         ArgumentNullException.ThrowIfNull(users);
         ArgumentNullException.ThrowIfNull(unitOfWork);
         ArgumentNullException.ThrowIfNull(passwordHasher);
@@ -64,6 +63,7 @@ public sealed class UserService : IUserService
         // back-compat constructor below, and every OnUserMutatedAsync event would disappear with no error.
         // A default parameter keeps this constructor always resolvable, so it is always the one DI picks.
         this.logger = logger ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<UserService>.Instance;
+        this.stampCache = stampCache;
     }
 
     /// <summary>

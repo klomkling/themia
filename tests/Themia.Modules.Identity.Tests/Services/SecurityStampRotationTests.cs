@@ -165,4 +165,86 @@ public class SecurityStampRotationTests
 
         Assert.False(await validator.IsCurrentAsync(user.Id, issued));
     }
+
+    [Fact]
+    public async Task A_role_claim_change_rotates_every_holder_of_a_role_spanning_several_batches()
+    {
+        var role = SeedRole();
+        var holders = Enumerable.Range(0, 1201).Select(_ => SeedUser()).ToList();
+        foreach (var holder in holders)
+        {
+            memberships.Add(new UserRole { Id = Guid.NewGuid(), UserId = holder.Id, RoleId = role.Id });
+        }
+
+        var before = holders.ToDictionary(h => h.Id, h => h.SecurityStamp);
+
+        await claims.AddRoleClaimAsync(role.Id, "perm", "write");
+
+        Assert.All(holders, h => Assert.NotEqual(before[h.Id], h.SecurityStamp));
+    }
+
+    private sealed class TransactionRecordingUnitOfWork : Themia.Framework.Data.Abstractions.UnitOfWork.IUnitOfWork
+    {
+        private bool inTransaction;
+
+        public List<bool> SavesInsideTransaction { get; } = [];
+
+        public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+        {
+            SavesInsideTransaction.Add(inTransaction);
+            return Task.FromResult(0);
+        }
+
+        public Task<Themia.Framework.Data.Abstractions.UnitOfWork.ITransactionScope> BeginTransactionAsync(CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public async Task ExecuteInTransactionAsync(Func<CancellationToken, Task> work, CancellationToken cancellationToken = default)
+        {
+            inTransaction = true;
+            try
+            {
+                await work(cancellationToken);
+            }
+            finally
+            {
+                inTransaction = false;
+            }
+        }
+    }
+
+    [Fact]
+    public async Task Role_assignment_saves_the_stamp_and_the_membership_inside_one_transaction()
+    {
+        var uow = new TransactionRecordingUnitOfWork();
+        var service = new RoleService(
+            new FakeRepository<User>(users, u => u.Id) { AmbientTenant = Tenant },
+            new FakeRepository<Role>(roles, r => r.Id) { AmbientTenant = Tenant },
+            new FakeRepository<UserRole>(memberships, m => m.Id) { AmbientTenant = Tenant },
+            uow, new DataFilterScope(), cache);
+        var user = SeedUser();
+        var role = SeedRole();
+
+        await service.AssignRoleAsync(user.Id, role.Id);
+
+        Assert.Equal(2, uow.SavesInsideTransaction.Count);
+        Assert.All(uow.SavesInsideTransaction, inside => Assert.True(inside));
+    }
+
+    [Fact]
+    public async Task Role_removal_saves_the_stamp_and_the_membership_inside_one_transaction()
+    {
+        var uow = new TransactionRecordingUnitOfWork();
+        var service = new RoleService(
+            new FakeRepository<User>(users, u => u.Id) { AmbientTenant = Tenant },
+            new FakeRepository<Role>(roles, r => r.Id) { AmbientTenant = Tenant },
+            new FakeRepository<UserRole>(memberships, m => m.Id) { AmbientTenant = Tenant },
+            uow, new DataFilterScope(), cache);
+        var user = SeedUser();
+        var role = SeedRole(user);
+
+        Assert.True(await service.RemoveRoleAsync(user.Id, role.Id));
+
+        Assert.Equal(2, uow.SavesInsideTransaction.Count);
+        Assert.All(uow.SavesInsideTransaction, inside => Assert.True(inside));
+    }
 }

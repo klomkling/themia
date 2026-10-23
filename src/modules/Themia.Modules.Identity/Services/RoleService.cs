@@ -96,11 +96,16 @@ public sealed class RoleService : IRoleService
             return true;   // idempotent
         }
 
-        await RotateSecurityStampAsync(user, cancellationToken).ConfigureAwait(false);
         var membership = new UserRole { UserId = userId, RoleId = roleId };
         membership.SetId(Guid.CreateVersion7());
-        await memberships.AddAsync(membership, cancellationToken).ConfigureAwait(false);
-        await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        await ChangeMembershipAsync(
+            user,
+            async ct =>
+            {
+                await memberships.AddAsync(membership, ct).ConfigureAwait(false);
+                await unitOfWork.SaveChangesAsync(ct).ConfigureAwait(false);
+            },
+            cancellationToken).ConfigureAwait(false);
         return true;
     }
 
@@ -124,19 +129,32 @@ public sealed class RoleService : IRoleService
             return false;
         }
 
-        await RotateSecurityStampAsync(user, cancellationToken).ConfigureAwait(false);
-        memberships.Remove(existing);
-        await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        await ChangeMembershipAsync(
+            user,
+            async ct =>
+            {
+                memberships.Remove(existing);
+                await unitOfWork.SaveChangesAsync(ct).ConfigureAwait(false);
+            },
+            cancellationToken).ConfigureAwait(false);
         return true;
     }
 
-    // A role change must cut live access tokens (their role claims are now stale). The stamp is saved BEFORE the
-    // membership so a failure in between logs the user out needlessly rather than leaving a revoked role usable.
-    private async Task RotateSecurityStampAsync(User user, CancellationToken cancellationToken)
+    // A role change must cut live access tokens (their role claims are now stale). The stamp rotation and the
+    // membership change commit together: saved apart, a login in between would mint a token with the new stamp and the
+    // old roles, which then validates. The stamp is saved first inside the transaction, and the cached stamp is evicted
+    // only after the commit.
+    private async Task ChangeMembershipAsync(User user, Func<CancellationToken, Task> change, CancellationToken cancellationToken)
     {
-        user.SecurityStamp = SecurityStampCache.NewStamp();
-        users.Update(user);
-        await IdentityScope.SaveScopedAsync(unitOfWork, filterScope, user.TenantId is null, cancellationToken).ConfigureAwait(false);
+        await unitOfWork.ExecuteInTransactionAsync(
+            async ct =>
+            {
+                user.SecurityStamp = SecurityStampCache.NewStamp();
+                users.Update(user);
+                await IdentityScope.SaveScopedAsync(unitOfWork, filterScope, user.TenantId is null, ct).ConfigureAwait(false);
+                await change(ct).ConfigureAwait(false);
+            },
+            cancellationToken).ConfigureAwait(false);
         SecurityStampCache.Evict(stampCache, [user.Id]);
     }
 
