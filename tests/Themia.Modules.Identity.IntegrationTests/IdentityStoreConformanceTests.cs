@@ -46,6 +46,7 @@ public abstract class IdentityStoreConformanceTests
         public IRoleService Roles => Inner.ServiceProvider.GetRequiredService<IRoleService>();
         public IClaimService Claims => Inner.ServiceProvider.GetRequiredService<IClaimService>();
         public IUserTokenService Tokens => Inner.ServiceProvider.GetRequiredService<IUserTokenService>();
+        public ISessionRevoker Sessions => Inner.ServiceProvider.GetRequiredService<ISessionRevoker>();
         public IRefreshTokenService RefreshTokens => Inner.ServiceProvider.GetRequiredService<IRefreshTokenService>();
         public IExternalLoginService ExternalLogins => Inner.ServiceProvider.GetRequiredService<IExternalLoginService>();
         public IExternalLoginLinkService Linking => Inner.ServiceProvider.GetRequiredService<IExternalLoginLinkService>();
@@ -220,6 +221,24 @@ public abstract class IdentityStoreConformanceTests
 
         var claims = await s.Claims.GetEffectiveClaimsAsync(userId);
         Assert.Contains(claims, c => c is { Type: "perm", Value: "write" });
+    }
+
+    [Fact]
+    public async Task Revoking_all_but_one_session_keeps_that_session_signed_in_across_a_rotation()
+    {
+        await ResetAsync();
+        await using var s = NewScope(new TenantId("acme"));
+        var userId = (await s.Users.CreateAsync("ida", "pw")).UserId!.Value;
+        var kept = await s.RefreshTokens.IssueAsync(userId);
+        var other = await s.RefreshTokens.IssueAsync(userId);
+        Assert.True((await s.RefreshTokens.ValidateAndRotateAsync(kept.RawToken)).TryGetSuccess(out _, out var rotated));
+        Assert.Equal(kept.FamilyId, rotated.FamilyId);
+
+        var revoked = await s.Sessions.RevokeAllForUserExceptAsync(userId, rotated.FamilyId.ToString());
+
+        Assert.Equal(1, revoked);
+        Assert.False((await s.RefreshTokens.ValidateAndRotateAsync(other.RawToken)).TryGetSuccess(out _, out _));
+        Assert.True((await s.RefreshTokens.ValidateAndRotateAsync(rotated.RawToken)).TryGetSuccess(out _, out _));
     }
 
     [Fact]

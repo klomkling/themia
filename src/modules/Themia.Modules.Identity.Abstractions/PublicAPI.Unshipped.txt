@@ -510,3 +510,9 @@ Themia.Modules.Identity.Abstractions.IdentityModuleOptions.LockoutPolicy.get -> 
 Themia.Modules.Identity.Abstractions.IdentityModuleOptions.LockoutPolicy.set -> void
 Themia.Modules.Identity.Abstractions.IdentityModuleOptions.MaxLockoutDuration.get -> System.TimeSpan
 Themia.Modules.Identity.Abstractions.IdentityModuleOptions.MaxLockoutDuration.set -> void
+Themia.Modules.Identity.Abstractions.Authentication.ISessionRevoker
+Themia.Modules.Identity.Abstractions.Authentication.ISessionRevoker.RevokeAllForUserExceptAsync(System.Guid userId, string! keepSessionId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<int>!
+const Themia.Modules.Identity.Abstractions.SessionClaims.SessionId = "sid" -> string!
+Themia.Modules.Identity.Abstractions.SessionClaims
+static Themia.Modules.Identity.Abstractions.SessionClaims.GetSessionId(this System.Security.Claims.ClaimsPrincipal! principal) -> string?
+static Themia.Modules.Identity.Abstractions.SessionClaims.GetSessionId(this Themia.Modules.Identity.Abstractions.ICurrentUser! user) -> string?

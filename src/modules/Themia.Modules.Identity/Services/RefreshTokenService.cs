@@ -16,7 +16,7 @@ namespace Themia.Modules.Identity.Services;
 /// can never be rotated, revoked, or accepted (its row may be read by hash, but is rejected once the
 /// owner fails to resolve in scope). Rotation chains a family; replaying a consumed/revoked token
 /// revokes the family.</summary>
-public sealed class RefreshTokenService : IRefreshTokenService
+public sealed class RefreshTokenService : IRefreshTokenService, ISessionRevoker
 {
     private const int TokenByteLength = 32;
 
@@ -191,6 +191,33 @@ public sealed class RefreshTokenService : IRefreshTokenService
         }
 
         return await RevokeFamilyAsync(match.FamilyId, now, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task<int> RevokeAllForUserExceptAsync(Guid userId, string keepSessionId, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(keepSessionId);
+        if (!Guid.TryParse(keepSessionId, out var keepFamilyId))
+        {
+            throw new ArgumentException("The session id does not name a session.", nameof(keepSessionId));
+        }
+
+        // Resolve the owner in scope first, as RevokeAllForUserAsync does: a user outside it revokes nothing.
+        var user = await IdentityScope.ResolveUserAsync(users, userId, cancellationToken).ConfigureAwait(false);
+        if (user is null)
+        {
+            logger.LogWarning(
+                "RevokeAllForUserExcept revoked nothing: user {UserId} is not visible in the current tenant scope.", userId);
+            return 0;
+        }
+
+        var now = timeProvider.GetUtcNow();
+        var revoked = await tokens.UpdateWhereAsync(
+            new ActiveRefreshTokensByUserExceptFamilySpec(user.Id, keepFamilyId, now),
+            set => set.Set(t => t.RevokedAt, now),
+            cancellationToken).ConfigureAwait(false);
+        logger.LogInformation("Revoked {Count} refresh tokens for user {UserId}, keeping one session.", revoked, user.Id);
+        return revoked;
     }
 
     /// <inheritdoc />

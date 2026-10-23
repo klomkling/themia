@@ -201,6 +201,13 @@ internal sealed class ActiveRefreshTokensByUserSpec : Specification<RefreshToken
         Where(t => t.UserId == userId && t.RevokedAt == null && t.ExpiresAt > now);
 }
 
+/// <summary>A user's non-expired, non-revoked tokens in every family but one (for revoke-all-except-session).</summary>
+internal sealed class ActiveRefreshTokensByUserExceptFamilySpec : Specification<RefreshToken>
+{
+    public ActiveRefreshTokensByUserExceptFamilySpec(Guid userId, Guid keepFamilyId, DateTimeOffset now) =>
+        Where(t => t.UserId == userId && t.FamilyId != keepFamilyId && t.RevokedAt == null && t.ExpiresAt > now);
+}
+
 /// <summary>The external-login link matching a provider and provider subject within the ambient
 /// tenant. The framework tenant filter isolates it, so the same external account can map to a
 /// different user per tenant.</summary>
