@@ -9,7 +9,7 @@ using Themia.Modules.Identity.Specifications;
 namespace Themia.Modules.Identity.Services;
 
 /// <summary>Default <see cref="IUserTokenService"/>. Persists only token hashes; raw tokens are returned once.</summary>
-public sealed class UserTokenService : IUserTokenService
+public sealed class UserTokenService : IUserTokenService, IUserTokenValidator
 {
     private const int TokenByteLength = 32;
 
@@ -98,6 +98,38 @@ public sealed class UserTokenService : IUserTokenService
         tokens.Update(match);
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         return TokenConsumeResult.Success;
+    }
+
+    /// <inheritdoc />
+    public async Task<TokenValidationResult> ValidateAsync(TokenPurpose purpose, string rawToken, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(rawToken);
+
+        // The hash column is unique, so (purpose, hash) names at most one row; the token carries no user id.
+        var hash = TokenHasher.Hash(rawToken);
+        var match = await tokens.FirstOrDefaultAsync(new TokenByPurposeAndHashSpec(purpose, hash), cancellationToken).ConfigureAwait(false);
+        if (match is null)
+        {
+            return new TokenValidationResult(TokenValidationOutcome.NotFound, null);
+        }
+
+        // The owner must resolve in the ambient tenant or as a platform user, as in consume; cross-tenant is not found.
+        if (!await IdentityScope.UserExistsAsync(users, match.UserId, cancellationToken).ConfigureAwait(false))
+        {
+            return new TokenValidationResult(TokenValidationOutcome.NotFound, null);
+        }
+
+        if (match.ConsumedAt is not null)
+        {
+            return new TokenValidationResult(TokenValidationOutcome.AlreadyConsumed, null);
+        }
+
+        if (match.ExpiresAt <= timeProvider.GetUtcNow())
+        {
+            return new TokenValidationResult(TokenValidationOutcome.Expired, null);
+        }
+
+        return new TokenValidationResult(TokenValidationOutcome.Valid, match.UserId);
     }
 
     private static string Base64UrlEncode(byte[] bytes) =>

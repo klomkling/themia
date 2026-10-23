@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using Themia.Framework.Core.Abstractions.Tenancy;
 using Themia.Framework.Data.Abstractions.Filtering;
@@ -23,6 +24,7 @@ public sealed class UserService : IUserService
     private readonly IUserLifecycleHooks hooks;
     private readonly IIdentityEventObserver[] observers;
     private readonly ILogger<UserService> logger;
+    private readonly IMemoryCache? stampCache;
 
     /// <summary>Creates the service.</summary>
     public UserService(
@@ -35,7 +37,8 @@ public sealed class UserService : IUserService
         IPhoneNumberNormalizer phoneNormalizer,
         IUserLifecycleHooks hooks,
         IEnumerable<IIdentityEventObserver> observers,
-        ILogger<UserService>? logger = null)
+        ILogger<UserService>? logger = null,
+        IMemoryCache? stampCache = null)
     {
         ArgumentNullException.ThrowIfNull(users);
         ArgumentNullException.ThrowIfNull(unitOfWork);
@@ -60,6 +63,7 @@ public sealed class UserService : IUserService
         // back-compat constructor below, and every OnUserMutatedAsync event would disappear with no error.
         // A default parameter keeps this constructor always resolvable, so it is always the one DI picks.
         this.logger = logger ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<UserService>.Instance;
+        this.stampCache = stampCache;
     }
 
     /// <summary>
@@ -428,13 +432,14 @@ public sealed class UserService : IUserService
         }
 
         user.PasswordHash = passwordHasher.Hash(password);
-        user.SecurityStamp = Guid.NewGuid().ToString("N");
+        user.SecurityStamp = SecurityStampCache.NewStamp();
         // A reset proves ownership, so it also lifts a lock: otherwise a victim whose account was locked by someone
         // else's guesses would wait out the full (possibly progressive) lock after recovering.
         user.AccessFailedCount = 0;
         user.LockoutEnd = null;
         users.Update(user);
         await IdentityScope.SaveScopedAsync(unitOfWork, filterScope, user.TenantId is null, cancellationToken).ConfigureAwait(false);
+        SecurityStampCache.Evict(stampCache, [user.Id]);
         await NotifyMutatedAsync(user, UserMutation.Password, cancellationToken).ConfigureAwait(false);
         return UserMutationResult.Success();
     }
@@ -498,13 +503,14 @@ public sealed class UserService : IUserService
         if (passwordHasher.NeedsRehash(user.PasswordHash))
         {
             user.PasswordHash = passwordHasher.Hash(password);
-            user.SecurityStamp = Guid.NewGuid().ToString("N");
+            user.SecurityStamp = SecurityStampCache.NewStamp();
             changed = true;
         }
         if (changed)
         {
             users.Update(user);
             await IdentityScope.SaveScopedAsync(unitOfWork, filterScope, user.TenantId is null, cancellationToken).ConfigureAwait(false);
+            SecurityStampCache.Evict(stampCache, [user.Id]);
         }
 
         return PasswordVerificationResult.Success;
@@ -541,8 +547,10 @@ public sealed class UserService : IUserService
         }
 
         user.IsActive = isActive;
+        user.SecurityStamp = SecurityStampCache.NewStamp();
         users.Update(user);
         await IdentityScope.SaveScopedAsync(unitOfWork, filterScope, user.TenantId is null, cancellationToken).ConfigureAwait(false);
+        SecurityStampCache.Evict(stampCache, [user.Id]);
         await NotifyMutatedAsync(user, UserMutation.Active, cancellationToken).ConfigureAwait(false);
         return UserMutationResult.Success();
     }
@@ -565,6 +573,7 @@ public sealed class UserService : IUserService
 
         users.Remove(user);
         await IdentityScope.SaveScopedAsync(unitOfWork, filterScope, user.TenantId is null, cancellationToken).ConfigureAwait(false);
+        SecurityStampCache.Evict(stampCache, [user.Id]);
         await NotifyMutatedAsync(user, UserMutation.Deleted, cancellationToken).ConfigureAwait(false);
         return UserMutationResult.Success();
     }

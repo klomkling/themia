@@ -28,6 +28,20 @@ public sealed class IdentityModuleOptions
     /// <summary>Default lifetime for generated <see cref="Entities.TokenPurpose"/> tokens. Defaults to 1 hour.</summary>
     public TimeSpan DefaultTokenLifetime { get; set; } = TimeSpan.FromHours(1);
 
+    /// <summary>
+    /// When <see langword="true"/>, the Themia JwtBearer scheme refuses an access token whose security-stamp claim no
+    /// longer matches the user's stored stamp, or whose user is inactive or deleted, so a disable, delete, password
+    /// change or role change takes effect on the next request instead of at token expiry. Costs one cached user read
+    /// per <see cref="SecurityStampCacheDuration"/> per user. Tokens issued without the claim are refused once this is
+    /// on. Defaults to false so upgrading does not sign existing sessions out.
+    /// </summary>
+    public bool ValidateSecurityStampOnEachRequest { get; set; }
+
+    /// <summary>How long a stamp lookup is cached per user when <see cref="ValidateSecurityStampOnEachRequest"/> is on;
+    /// this bounds how long a revoked token keeps working. <see cref="TimeSpan.Zero"/> disables the cache. Defaults to
+    /// 30 seconds. The cache is per process, so each instance of a scaled-out API holds its own.</summary>
+    public TimeSpan SecurityStampCacheDuration { get; set; } = TimeSpan.FromSeconds(30);
+
     /// <summary>The lifetime of an issued refresh token. Default 14 days.</summary>
     public TimeSpan RefreshTokenLifetime { get; set; } = TimeSpan.FromDays(14);
 
@@ -64,6 +78,12 @@ public sealed class IdentityModuleOptions
         {
             throw new ArgumentOutOfRangeException(
                 nameof(MaxFailedAccessAttempts), MaxFailedAccessAttempts, "Must be at least 1.");
+        }
+
+        if (SecurityStampCacheDuration < TimeSpan.Zero)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(SecurityStampCacheDuration), SecurityStampCacheDuration, "Must not be negative.");
         }
 
         if (LockoutDuration <= TimeSpan.Zero)

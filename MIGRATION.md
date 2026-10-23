@@ -10,6 +10,18 @@ with the *why* and concrete upgrade steps.
 - Each entry states: **What changed**, **Why**, and **How to upgrade** (before → after).
 - Non-breaking changes are *not* listed here — see the CHANGELOG.
 
+## 0.36.0
+
+### Reserved claim types, and role/claim writes in their own transaction (behaviour change)
+
+**What changed:** `IClaimService.AddUserClaimAsync` and `AddRoleClaimAsync` throw `ArgumentException` for a claim type Themia sets itself (`ReservedClaimTypes.IsReserved`: `sid`, `tenant_id`, every `themia:*` claim, the role, name and subject claims in long and short form, the registered JWT claims), and `ClaimsPrincipalFactory` skips stored claims of those types. Separately, `AssignRoleAsync`, `RemoveRoleAsync` and the four claim add/remove methods now run in `IUnitOfWork.ExecuteInTransactionAsync`.
+
+**Why:** a stored claim of a type Themia issues could forge or shadow the stamp, tenant or platform marker, session id or roles on the principal. The transaction makes the stamp rotation and the write commit together, so a login in between cannot mint a token with the new stamp and the old roles.
+
+**Who is affected:** an app that stored such a claim (the write now throws and the stored row stops appearing on principals; removing it still works), and an app that calls those methods inside an outer transaction or a joined connection on the Dapper peer (it refuses nested transactions; they used to join). A custom `MultiTenancyOptions.ClaimType` is not reserved: do not store it as a user or role claim.
+
+**How to upgrade:** nothing for the common case. Remove stored claims of reserved types with `RemoveUserClaimAsync` / `RemoveRoleClaimAsync`, and call the role and claim methods outside an outer transaction.
+
 ## 0.35.3
 
 ### `IUserService.SetPasswordAsync` clears the lockout (behaviour change)

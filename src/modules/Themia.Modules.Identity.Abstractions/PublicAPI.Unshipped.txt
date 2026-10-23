@@ -510,3 +510,48 @@ Themia.Modules.Identity.Abstractions.IdentityModuleOptions.LockoutPolicy.get -> 
 Themia.Modules.Identity.Abstractions.IdentityModuleOptions.LockoutPolicy.set -> void
 Themia.Modules.Identity.Abstractions.IdentityModuleOptions.MaxLockoutDuration.get -> System.TimeSpan
 Themia.Modules.Identity.Abstractions.IdentityModuleOptions.MaxLockoutDuration.set -> void
+Themia.Modules.Identity.Abstractions.Authentication.ISecurityStampValidator
+Themia.Modules.Identity.Abstractions.Authentication.ISecurityStampValidator.IsCurrentAsync(System.Guid userId, string? stamp, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!
+Themia.Modules.Identity.Abstractions.IdentityModuleOptions.SecurityStampCacheDuration.get -> System.TimeSpan
+Themia.Modules.Identity.Abstractions.IdentityModuleOptions.SecurityStampCacheDuration.set -> void
+Themia.Modules.Identity.Abstractions.IdentityModuleOptions.ValidateSecurityStampOnEachRequest.get -> bool
+Themia.Modules.Identity.Abstractions.IdentityModuleOptions.ValidateSecurityStampOnEachRequest.set -> void
+Themia.Modules.Identity.Abstractions.Entities.Role.Level.get -> Themia.Modules.Identity.Abstractions.RoleLevel
+Themia.Modules.Identity.Abstractions.Entities.Role.Level.set -> void
+Themia.Modules.Identity.Abstractions.IRoleLevelService
+Themia.Modules.Identity.Abstractions.IRoleLevelService.CreateAsync(string! name, Themia.Modules.Identity.Abstractions.RoleLevel level, string? description = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Guid?>!
+Themia.Modules.Identity.Abstractions.IRoleLevelService.SetLevelAsync(System.Guid roleId, Themia.Modules.Identity.Abstractions.RoleLevel level, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!
+Themia.Modules.Identity.Abstractions.IUserLevelReader
+Themia.Modules.Identity.Abstractions.IUserLevelReader.GetLevelAsync(System.Guid userId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Identity.Abstractions.RoleLevel>!
+Themia.Modules.Identity.Abstractions.RoleLevel
+Themia.Modules.Identity.Abstractions.RoleLevel.Level1 = 1 -> Themia.Modules.Identity.Abstractions.RoleLevel
+Themia.Modules.Identity.Abstractions.RoleLevel.Level2 = 2 -> Themia.Modules.Identity.Abstractions.RoleLevel
+Themia.Modules.Identity.Abstractions.RoleLevel.Level3 = 3 -> Themia.Modules.Identity.Abstractions.RoleLevel
+Themia.Modules.Identity.Abstractions.RoleLevel.Level4 = 4 -> Themia.Modules.Identity.Abstractions.RoleLevel
+Themia.Modules.Identity.Abstractions.RoleLevel.Level5 = 5 -> Themia.Modules.Identity.Abstractions.RoleLevel
+Themia.Modules.Identity.Abstractions.RoleLevelPolicy
+static Themia.Modules.Identity.Abstractions.RoleLevelPolicy.CanActOn(Themia.Modules.Identity.Abstractions.RoleLevel actor, Themia.Modules.Identity.Abstractions.RoleLevel target) -> bool
+static Themia.Modules.Identity.Abstractions.RoleLevelPolicy.CanGrant(Themia.Modules.Identity.Abstractions.RoleLevel actor, Themia.Modules.Identity.Abstractions.RoleLevel role) -> bool
+Themia.Modules.Identity.Abstractions.IUserTokenValidator
+Themia.Modules.Identity.Abstractions.IUserTokenValidator.ValidateAsync(Themia.Modules.Identity.Abstractions.Entities.TokenPurpose purpose, string! rawToken, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Identity.Abstractions.TokenValidationResult>!
+Themia.Modules.Identity.Abstractions.TokenValidationOutcome
+Themia.Modules.Identity.Abstractions.TokenValidationOutcome.AlreadyConsumed = 3 -> Themia.Modules.Identity.Abstractions.TokenValidationOutcome
+Themia.Modules.Identity.Abstractions.TokenValidationOutcome.Expired = 2 -> Themia.Modules.Identity.Abstractions.TokenValidationOutcome
+Themia.Modules.Identity.Abstractions.TokenValidationOutcome.NotFound = 1 -> Themia.Modules.Identity.Abstractions.TokenValidationOutcome
+Themia.Modules.Identity.Abstractions.TokenValidationOutcome.Valid = 0 -> Themia.Modules.Identity.Abstractions.TokenValidationOutcome
+Themia.Modules.Identity.Abstractions.TokenValidationResult
+Themia.Modules.Identity.Abstractions.TokenValidationResult.IsValid.get -> bool
+Themia.Modules.Identity.Abstractions.TokenValidationResult.Outcome.get -> Themia.Modules.Identity.Abstractions.TokenValidationOutcome
+Themia.Modules.Identity.Abstractions.TokenValidationResult.TokenValidationResult() -> void
+Themia.Modules.Identity.Abstractions.TokenValidationResult.TokenValidationResult(Themia.Modules.Identity.Abstractions.TokenValidationOutcome Outcome, System.Guid? UserId) -> void
+Themia.Modules.Identity.Abstractions.TokenValidationResult.UserId.get -> System.Guid?
+Themia.Modules.Identity.Abstractions.TokenValidationResult.Outcome.init -> void
+Themia.Modules.Identity.Abstractions.TokenValidationResult.UserId.init -> void
+Themia.Modules.Identity.Abstractions.Authentication.ISessionRevoker
+Themia.Modules.Identity.Abstractions.Authentication.ISessionRevoker.RevokeAllForUserExceptAsync(System.Guid userId, string! keepSessionId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<int>!
+const Themia.Modules.Identity.Abstractions.SessionClaims.SessionId = "sid" -> string!
+Themia.Modules.Identity.Abstractions.SessionClaims
+static Themia.Modules.Identity.Abstractions.SessionClaims.GetSessionId(this System.Security.Claims.ClaimsPrincipal! principal) -> string?
+static Themia.Modules.Identity.Abstractions.SessionClaims.GetSessionId(this Themia.Modules.Identity.Abstractions.ICurrentUser! user) -> string?
+Themia.Modules.Identity.Abstractions.ReservedClaimTypes
+static Themia.Modules.Identity.Abstractions.ReservedClaimTypes.IsReserved(string! claimType) -> bool

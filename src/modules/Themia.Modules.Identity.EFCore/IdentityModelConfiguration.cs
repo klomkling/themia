@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Themia.Modules.Identity.Abstractions;
 using Themia.Modules.Identity.Abstractions.Entities;
 
 namespace Themia.Modules.Identity.EntityConfiguration;
@@ -61,6 +62,7 @@ public static class ModelBuilderExtensions
             b.Property(r => r.Name).HasColumnName("name").HasMaxLength(256).IsRequired();
             b.Property(r => r.NormalizedName).HasColumnName("normalized_name").HasMaxLength(256).IsRequired();
             b.Property(r => r.Description).HasColumnName("description").HasMaxLength(512);
+            b.Property(r => r.Level).HasColumnName("level").HasConversion<short>().HasDefaultValue(RoleLevel.Level5);
         }
     }
 

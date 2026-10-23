@@ -44,12 +44,18 @@ public abstract class IdentityStoreConformanceTests
     {
         public IUserService Users => Inner.ServiceProvider.GetRequiredService<IUserService>();
         public IRoleService Roles => Inner.ServiceProvider.GetRequiredService<IRoleService>();
+        public IRoleLevelService RoleLevels => Inner.ServiceProvider.GetRequiredService<IRoleLevelService>();
+        public IUserLevelReader Levels => Inner.ServiceProvider.GetRequiredService<IUserLevelReader>();
         public IClaimService Claims => Inner.ServiceProvider.GetRequiredService<IClaimService>();
+        public IUserTokenValidator TokenValidator => Inner.ServiceProvider.GetRequiredService<IUserTokenValidator>();
         public IUserTokenService Tokens => Inner.ServiceProvider.GetRequiredService<IUserTokenService>();
+        public ISessionRevoker Sessions => Inner.ServiceProvider.GetRequiredService<ISessionRevoker>();
         public IRefreshTokenService RefreshTokens => Inner.ServiceProvider.GetRequiredService<IRefreshTokenService>();
         public IExternalLoginService ExternalLogins => Inner.ServiceProvider.GetRequiredService<IExternalLoginService>();
         public IExternalLoginLinkService Linking => Inner.ServiceProvider.GetRequiredService<IExternalLoginLinkService>();
         public IRepository<ExternalLoginLink, Guid> Links => Inner.ServiceProvider.GetRequiredService<IRepository<ExternalLoginLink, Guid>>();
+        public IRepository<User, Guid> UserRepo => Inner.ServiceProvider.GetRequiredService<IRepository<User, Guid>>();
+        public IRepository<UserRole, Guid> Memberships => Inner.ServiceProvider.GetRequiredService<IRepository<UserRole, Guid>>();
         public IUnitOfWork UnitOfWork => Inner.ServiceProvider.GetRequiredService<IUnitOfWork>();
 
         public async ValueTask DisposeAsync()
@@ -220,6 +226,123 @@ public abstract class IdentityStoreConformanceTests
 
         var claims = await s.Claims.GetEffectiveClaimsAsync(userId);
         Assert.Contains(claims, c => c is { Type: "perm", Value: "write" });
+    }
+
+    [Fact]
+    public async Task Role_and_user_claim_changes_rotate_the_security_stamp_of_the_affected_users_only()
+    {
+        await ResetAsync();
+        await using var s = NewScope(new TenantId("acme"));
+        var holderId = (await s.Users.CreateAsync("fay", "pw")).UserId!.Value;
+        var bystanderId = (await s.Users.CreateAsync("gus", "pw")).UserId!.Value;
+        var roleId = (await s.Roles.CreateAsync("Editor"))!.Value;
+        Assert.True(await s.Roles.AssignRoleAsync(holderId, roleId));
+        var holderBefore = (await s.Users.FindByIdAsync(holderId))!.SecurityStamp;
+        var bystanderBefore = (await s.Users.FindByIdAsync(bystanderId))!.SecurityStamp;
+
+        await s.Claims.AddRoleClaimAsync(roleId, "perm", "write");
+        var afterRoleClaim = (await s.Users.FindByIdAsync(holderId))!.SecurityStamp;
+        Assert.NotEqual(holderBefore, afterRoleClaim);
+
+        await s.Claims.AddUserClaimAsync(holderId, "perm", "read");
+        var afterUserClaim = (await s.Users.FindByIdAsync(holderId))!.SecurityStamp;
+        Assert.NotEqual(afterRoleClaim, afterUserClaim);
+
+        Assert.True(await s.Claims.RemoveRoleClaimAsync(roleId, "perm", "write"));
+        Assert.NotEqual(afterUserClaim, (await s.Users.FindByIdAsync(holderId))!.SecurityStamp);
+
+        Assert.Equal(bystanderBefore, (await s.Users.FindByIdAsync(bystanderId))!.SecurityStamp);
+    }
+
+    [Fact]
+    public async Task Role_claim_change_rotates_every_holder_of_a_role_larger_than_one_sql_server_command()
+    {
+        // SQL Server caps a command at 2,100 parameters; the rotation must not send one per holder.
+        const int holderCount = 2300;
+        await ResetAsync();
+        await using var s = NewScope(new TenantId("acme"));
+        var roleId = (await s.Roles.CreateAsync("Big"))!.Value;
+        var holderIds = new List<Guid>(holderCount);
+        for (var i = 0; i < holderCount; i++)
+        {
+            var user = new User { UserName = $"holder{i}", NormalizedUserName = $"HOLDER{i}", PasswordHash = "x" };
+            user.SetId(Guid.CreateVersion7());
+            await s.UserRepo.AddAsync(user);
+            holderIds.Add(user.Id);
+        }
+
+        await s.UnitOfWork.SaveChangesAsync();   // users first: the membership FK has no model relationship to order the inserts
+        foreach (var holderId in holderIds)
+        {
+            var membership = new UserRole { UserId = holderId, RoleId = roleId };
+            membership.SetId(Guid.CreateVersion7());
+            await s.Memberships.AddAsync(membership);
+        }
+
+        await s.UnitOfWork.SaveChangesAsync();
+        var before = (await s.Users.FindByIdAsync(holderIds[0]))!.SecurityStamp;
+        var beforeLast = (await s.Users.FindByIdAsync(holderIds[^1]))!.SecurityStamp;
+
+        await s.Claims.AddRoleClaimAsync(roleId, "perm", "write");
+        Assert.NotEqual(before, (await s.Users.FindByIdAsync(holderIds[0]))!.SecurityStamp);
+        Assert.NotEqual(beforeLast, (await s.Users.FindByIdAsync(holderIds[^1]))!.SecurityStamp);
+
+        var afterAdd = (await s.Users.FindByIdAsync(holderIds[0]))!.SecurityStamp;
+        Assert.True(await s.Claims.RemoveRoleClaimAsync(roleId, "perm", "write"));
+        Assert.NotEqual(afterAdd, (await s.Users.FindByIdAsync(holderIds[0]))!.SecurityStamp);
+    }
+
+    [Fact]
+    public async Task User_level_is_the_highest_level_of_the_users_roles_and_follows_SetLevelAsync()
+    {
+        await ResetAsync();
+        await using var s = NewScope(new TenantId("acme"));
+        var userId = (await s.Users.CreateAsync("erin", "pw")).UserId!.Value;
+        Assert.Equal(RoleLevel.Level5, await s.Levels.GetLevelAsync(userId));
+
+        var staffId = (await s.RoleLevels.CreateAsync("Staff", RoleLevel.Level3))!.Value;
+        var managerId = (await s.RoleLevels.CreateAsync("Manager", RoleLevel.Level4))!.Value;
+        Assert.True(await s.Roles.AssignRoleAsync(userId, staffId));
+        Assert.True(await s.Roles.AssignRoleAsync(userId, managerId));
+        Assert.Equal(RoleLevel.Level3, await s.Levels.GetLevelAsync(userId));
+
+        Assert.True(await s.RoleLevels.SetLevelAsync(staffId, RoleLevel.Level2));
+        Assert.Equal(RoleLevel.Level2, await s.Levels.GetLevelAsync(userId));
+    }
+
+    [Fact]
+    public async Task Token_validation_names_the_owner_without_consuming_the_token()
+    {
+        await ResetAsync();
+        await using var s = NewScope(new TenantId("acme"));
+        var userId = (await s.Users.CreateAsync("hal", "pw")).UserId!.Value;
+        var raw = await s.Tokens.GenerateAsync(userId, TokenPurpose.PasswordReset);
+
+        var validated = await s.TokenValidator.ValidateAsync(TokenPurpose.PasswordReset, raw);
+        Assert.True(validated.IsValid);
+        Assert.Equal(userId, validated.UserId);
+        Assert.Equal(TokenValidationOutcome.NotFound, (await s.TokenValidator.ValidateAsync(TokenPurpose.EmailConfirm, raw)).Outcome);
+
+        Assert.Equal(TokenConsumeResult.Success, await s.Tokens.ConsumeAsync(userId, TokenPurpose.PasswordReset, raw));
+        Assert.Equal(TokenValidationOutcome.AlreadyConsumed, (await s.TokenValidator.ValidateAsync(TokenPurpose.PasswordReset, raw)).Outcome);
+    }
+
+    [Fact]
+    public async Task Revoking_all_but_one_session_keeps_that_session_signed_in_across_a_rotation()
+    {
+        await ResetAsync();
+        await using var s = NewScope(new TenantId("acme"));
+        var userId = (await s.Users.CreateAsync("ida", "pw")).UserId!.Value;
+        var kept = await s.RefreshTokens.IssueAsync(userId);
+        var other = await s.RefreshTokens.IssueAsync(userId);
+        Assert.True((await s.RefreshTokens.ValidateAndRotateAsync(kept.RawToken)).TryGetSuccess(out _, out var rotated));
+        Assert.Equal(kept.FamilyId, rotated.FamilyId);
+
+        var revoked = await s.Sessions.RevokeAllForUserExceptAsync(userId, rotated.FamilyId.ToString());
+
+        Assert.Equal(1, revoked);
+        Assert.False((await s.RefreshTokens.ValidateAndRotateAsync(other.RawToken)).TryGetSuccess(out _, out _));
+        Assert.True((await s.RefreshTokens.ValidateAndRotateAsync(rotated.RawToken)).TryGetSuccess(out _, out _));
     }
 
     [Fact]
