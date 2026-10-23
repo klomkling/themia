@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
 using Themia.Modules.Identity.Abstractions;
 using Themia.Modules.Identity.Abstractions.Authentication;
+using Themia.Modules.Identity.Principal;
 using Themia.Modules.Identity.Services;
 using Themia.Modules.Identity.AspNetCore.Authentication;
 using Themia.Modules.Identity.Tokens.AspNetCore.DependencyInjection;
@@ -150,6 +151,12 @@ public static class IdentityAspNetCoreServiceCollectionExtensions
                 bearer.Events.OnTokenValidated = async context =>
                 {
                     AddLongClaims(context);
+                    await RefuseStaleSecurityStampAsync(context).ConfigureAwait(false);
+                    if (context.Result?.Failure is not null)
+                    {
+                        return;
+                    }
+
                     if (inner is not null)
                     {
                         await inner(context).ConfigureAwait(false);
@@ -158,6 +165,27 @@ public static class IdentityAspNetCoreServiceCollectionExtensions
             });
 
         return builder;
+    }
+
+    /// <summary>When <see cref="IdentityModuleOptions.ValidateSecurityStampOnEachRequest"/> is on, fails the request if
+    /// the token's stamp claim no longer matches the user's current stamp (or the user is inactive or deleted). A token
+    /// with no usable subject or stamp claim is refused too: it predates the check and cannot be verified.</summary>
+    private static async Task RefuseStaleSecurityStampAsync(TokenValidatedContext context)
+    {
+        var services = context.HttpContext.RequestServices;
+        if (services.GetService<IdentityModuleOptions>() is not { ValidateSecurityStampOnEachRequest: true })
+        {
+            return;
+        }
+
+        var subject = context.Principal?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        var stamp = context.Principal?.FindFirst(IdentityClaimTypes.SecurityStamp)?.Value;
+        var validator = services.GetRequiredService<ISecurityStampValidator>();
+        if (!Guid.TryParse(subject, out var userId)
+            || !await validator.IsCurrentAsync(userId, stamp, context.HttpContext.RequestAborted).ConfigureAwait(false))
+        {
+            context.Fail("The access token is no longer valid.");
+        }
     }
 
     /// <summary>Re-adds the long <see cref="ClaimTypes"/> claims from their short JWT counterparts,

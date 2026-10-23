@@ -293,6 +293,17 @@ public class UserServiceTests
     }
 
     [Fact]
+    public async Task SetActiveAsync_rotates_the_security_stamp()
+    {
+        var create = await sut.CreateAsync("noor", "pw");
+        var stampBefore = Assert.Single(store).SecurityStamp;
+
+        Assert.True((await sut.SetActiveAsync(create.UserId!.Value, false)).Succeeded);
+
+        Assert.NotEqual(stampBefore, Assert.Single(store).SecurityStamp);
+    }
+
+    [Fact]
     public async Task SetPasswordAsync_rotates_security_stamp_and_new_password_verifies()
     {
         var create = await sut.CreateAsync("liam", "oldpw");

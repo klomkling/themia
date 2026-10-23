@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Themia.Modules.Identity.Abstractions;
 using Themia.Modules.Identity.Abstractions.Authentication;
 using Themia.Modules.Identity.Abstractions.Entities;
@@ -21,9 +22,27 @@ internal static class AuthTokenIssuer
         CancellationToken cancellationToken)
     {
         var principal = await principalFactory.CreateAsync(user, authenticationType, cancellationToken).ConfigureAwait(false);
-        var access = accessTokens.Issue(principal);
+        // The refresh family is the session, so it is issued first and its id goes into the access token.
         var refresh = await refreshTokens.IssueAsync(user.Id, cancellationToken).ConfigureAwait(false);
+        AddSession(principal, refresh.FamilyId);
+        var access = accessTokens.Issue(principal);
         return new AuthTokens(access.Token, ExpiresInSeconds(timeProvider, access.ExpiresAt), refresh.RawToken);
+    }
+
+    /// <summary>Sets the <c>sid</c> claim naming the refresh-token family (the session) the access token is for. Any
+    /// <c>sid</c> already on the principal (a stored user or role claim of that type) is dropped first, so it cannot
+    /// shadow the real session id when the claim is read back.</summary>
+    public static void AddSession(ClaimsPrincipal principal, Guid familyId)
+    {
+        foreach (var identity in principal.Identities)
+        {
+            foreach (var stale in identity.FindAll(SessionClaims.SessionId).ToList())
+            {
+                identity.RemoveClaim(stale);
+            }
+        }
+
+        principal.Identities.First().AddClaim(new Claim(SessionClaims.SessionId, familyId.ToString()));
     }
 
     /// <summary>The whole seconds remaining until <paramref name="expiresAt"/>, never negative.</summary>

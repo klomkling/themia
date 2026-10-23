@@ -312,6 +312,7 @@ public sealed class AuthenticationFlow : IAuthenticationFlow
         }
 
         var principal = await principalFactory.CreateAsync(user, AuthenticationType, cancellationToken).ConfigureAwait(false);
+        AuthTokenIssuer.AddSession(principal, replacement.FamilyId);   // rotation keeps the family, so the session id is stable
         var access = accessTokens.Issue(principal);
         var tokens = new AuthTokens(access.Token, AuthTokenIssuer.ExpiresInSeconds(timeProvider, access.ExpiresAt), replacement.RawToken);
 

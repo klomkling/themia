@@ -201,6 +201,20 @@ internal sealed class ActiveRefreshTokensByUserSpec : Specification<RefreshToken
         Where(t => t.UserId == userId && t.RevokedAt == null && t.ExpiresAt > now);
 }
 
+/// <summary>A user's non-expired, non-revoked tokens in one family: proof the family is a live session of that user.</summary>
+internal sealed class ActiveRefreshTokensByUserAndFamilySpec : Specification<RefreshToken>
+{
+    public ActiveRefreshTokensByUserAndFamilySpec(Guid userId, Guid familyId, DateTimeOffset now) =>
+        Where(t => t.UserId == userId && t.FamilyId == familyId && t.RevokedAt == null && t.ExpiresAt > now);
+}
+
+/// <summary>A user's non-expired, non-revoked tokens in every family but one (for revoke-all-except-session).</summary>
+internal sealed class ActiveRefreshTokensByUserExceptFamilySpec : Specification<RefreshToken>
+{
+    public ActiveRefreshTokensByUserExceptFamilySpec(Guid userId, Guid keepFamilyId, DateTimeOffset now) =>
+        Where(t => t.UserId == userId && t.FamilyId != keepFamilyId && t.RevokedAt == null && t.ExpiresAt > now);
+}
+
 /// <summary>The external-login link matching a provider and provider subject within the ambient
 /// tenant. The framework tenant filter isolates it, so the same external account can map to a
 /// different user per tenant.</summary>
@@ -250,4 +264,29 @@ internal sealed class PlatformExternalLoginByProviderKeySpec : Specification<Ext
         Where(l => l.Provider == provider && l.ExternalId == externalId && l.TenantId == null);
         WithoutTenantFilter();
     }
+}
+
+/// <summary>Memberships of a role. The join carries no tenant column; the caller has already resolved the role in scope.</summary>
+internal sealed class UserRolesByRoleSpec : Specification<UserRole>
+{
+    public UserRolesByRoleSpec(Guid roleId) => Where(ur => ur.RoleId == roleId);
+}
+
+/// <summary>Users by id in any tenant, for a set-based stamp rotation. The ids come from memberships of a role that
+/// resolved in scope, or from a user the caller already resolved in scope.</summary>
+internal sealed class UsersByIdsAnyTenantSpec : Specification<User>
+{
+    public UsersByIdsAnyTenantSpec(IReadOnlyCollection<Guid> ids)
+    {
+        Where(u => ids.Contains(u.Id));
+        WithoutTenantFilter();
+    }
+}
+
+/// <summary>The single token matching a purpose and exact (deterministic SHA-256) hash. The hash column is unique and
+/// the raw token is high-entropy, so the match names the owner without a user id from the caller.</summary>
+internal sealed class TokenByPurposeAndHashSpec : Specification<UserToken>
+{
+    public TokenByPurposeAndHashSpec(TokenPurpose purpose, string tokenHash) =>
+        Where(t => t.Purpose == purpose && t.TokenHash == tokenHash);
 }

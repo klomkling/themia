@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Caching.Memory;
 using System.Security.Claims;
 using Themia.Framework.Data.Abstractions.Repositories;
 using Themia.Framework.Data.Abstractions.UnitOfWork;
@@ -10,14 +11,17 @@ namespace Themia.Modules.Identity.Services;
 /// <summary>Default <see cref="IClaimService"/> over the Themia data abstractions.</summary>
 public sealed class ClaimService : IClaimService
 {
+    private const int StampRotationBatchSize = 500;
+
     private readonly IRepository<UserClaim, Guid> userClaims;
     private readonly IRepository<RoleClaim, Guid> roleClaims;
     private readonly IRepository<UserRole, Guid> memberships;
     private readonly IRepository<User, Guid> users;
     private readonly IRepository<Role, Guid> roles;
     private readonly IUnitOfWork unitOfWork;
+    private readonly IMemoryCache? stampCache;
 
-    /// <summary>Creates the service.</summary>
+    /// <summary>Creates the service without a stamp cache to evict.</summary>
     public ClaimService(
         IRepository<UserClaim, Guid> userClaims,
         IRepository<RoleClaim, Guid> roleClaims,
@@ -25,6 +29,26 @@ public sealed class ClaimService : IClaimService
         IRepository<User, Guid> users,
         IRepository<Role, Guid> roles,
         IUnitOfWork unitOfWork)
+        : this(userClaims, roleClaims, memberships, users, roles, unitOfWork, null)
+    {
+    }
+
+    /// <summary>Creates the service.</summary>
+    /// <param name="userClaims">The user-claim repository.</param>
+    /// <param name="roleClaims">The role-claim repository.</param>
+    /// <param name="memberships">The user-role repository.</param>
+    /// <param name="users">The user repository.</param>
+    /// <param name="roles">The role repository.</param>
+    /// <param name="unitOfWork">The unit of work.</param>
+    /// <param name="stampCache">The cache the security-stamp validator uses, evicted for each user whose stamp rotates; may be null.</param>
+    public ClaimService(
+        IRepository<UserClaim, Guid> userClaims,
+        IRepository<RoleClaim, Guid> roleClaims,
+        IRepository<UserRole, Guid> memberships,
+        IRepository<User, Guid> users,
+        IRepository<Role, Guid> roles,
+        IUnitOfWork unitOfWork,
+        IMemoryCache? stampCache)
     {
         ArgumentNullException.ThrowIfNull(userClaims);
         ArgumentNullException.ThrowIfNull(roleClaims);
@@ -38,12 +62,14 @@ public sealed class ClaimService : IClaimService
         this.users = users;
         this.roles = roles;
         this.unitOfWork = unitOfWork;
+        this.stampCache = stampCache;
     }
 
     /// <inheritdoc />
     public async Task AddUserClaimAsync(Guid userId, string claimType, string claimValue, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(claimType);
+        ThrowIfReserved(claimType);
         ArgumentNullException.ThrowIfNull(claimValue);
 
         // The parent must resolve in the ambient tenant or as a platform user; a cross-tenant
@@ -55,8 +81,14 @@ public sealed class ClaimService : IClaimService
 
         var claim = new UserClaim { UserId = userId, ClaimType = claimType, ClaimValue = claimValue };
         claim.SetId(Guid.CreateVersion7());
-        await userClaims.AddAsync(claim, cancellationToken).ConfigureAwait(false);
-        await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        await ChangeAsync(
+            async ct =>
+            {
+                await userClaims.AddAsync(claim, ct).ConfigureAwait(false);
+                await unitOfWork.SaveChangesAsync(ct).ConfigureAwait(false);
+            },
+            _ => Task.FromResult<IReadOnlyCollection<Guid>>([userId]),
+            cancellationToken).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -74,8 +106,14 @@ public sealed class ClaimService : IClaimService
             return false;
         }
 
-        userClaims.Remove(existing);
-        await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        await ChangeAsync(
+            async ct =>
+            {
+                userClaims.Remove(existing);
+                await unitOfWork.SaveChangesAsync(ct).ConfigureAwait(false);
+            },
+            _ => Task.FromResult<IReadOnlyCollection<Guid>>([userId]),
+            cancellationToken).ConfigureAwait(false);
         return true;
     }
 
@@ -83,6 +121,7 @@ public sealed class ClaimService : IClaimService
     public async Task AddRoleClaimAsync(Guid roleId, string claimType, string claimValue, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(claimType);
+        ThrowIfReserved(claimType);
         ArgumentNullException.ThrowIfNull(claimValue);
 
         // The parent must resolve in the ambient tenant or as a platform role; cross-tenant is refused.
@@ -93,8 +132,14 @@ public sealed class ClaimService : IClaimService
 
         var claim = new RoleClaim { RoleId = roleId, ClaimType = claimType, ClaimValue = claimValue };
         claim.SetId(Guid.CreateVersion7());
-        await roleClaims.AddAsync(claim, cancellationToken).ConfigureAwait(false);
-        await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        await ChangeAsync(
+            async ct =>
+            {
+                await roleClaims.AddAsync(claim, ct).ConfigureAwait(false);
+                await unitOfWork.SaveChangesAsync(ct).ConfigureAwait(false);
+            },
+            ct => HolderIdsAsync(roleId, ct),
+            cancellationToken).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -112,9 +157,58 @@ public sealed class ClaimService : IClaimService
             return false;
         }
 
-        roleClaims.Remove(existing);
-        await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        await ChangeAsync(
+            async ct =>
+            {
+                roleClaims.Remove(existing);
+                await unitOfWork.SaveChangesAsync(ct).ConfigureAwait(false);
+            },
+            ct => HolderIdsAsync(roleId, ct),
+            cancellationToken).ConfigureAwait(false);
         return true;
+    }
+
+    private async Task<IReadOnlyCollection<Guid>> HolderIdsAsync(Guid roleId, CancellationToken cancellationToken) =>
+        (await memberships.ListAsync(new UserRolesByRoleSpec(roleId), cancellationToken).ConfigureAwait(false))
+            .Select(m => m.UserId)
+            .ToList();
+
+    // Apps read permissions from the access token's claims, so a claim change must cut the tokens issued before it:
+    // the claim write and the stamp rotation of every affected user commit together, and the in-process cache is
+    // evicted only after the commit. The holders are read inside the transaction, after the write, so a user assigned
+    // to the role in between is still rotated. The update runs in batches: Dapper sends one parameter per id and
+    // SQL Server caps a command at 2,100, which a large role would exceed.
+    private async Task ChangeAsync(
+        Func<CancellationToken, Task> write,
+        Func<CancellationToken, Task<IReadOnlyCollection<Guid>>> affectedUserIds,
+        CancellationToken cancellationToken)
+    {
+        IReadOnlyCollection<Guid> rotated = [];
+        await unitOfWork.ExecuteInTransactionAsync(
+            async ct =>
+            {
+                await write(ct).ConfigureAwait(false);
+                rotated = await affectedUserIds(ct).ConfigureAwait(false);
+                foreach (var batch in rotated.Chunk(StampRotationBatchSize))
+                {
+                    await users.UpdateWhereAsync(
+                        new UsersByIdsAnyTenantSpec(batch),
+                        set => set.Set(u => u.SecurityStamp, SecurityStampCache.NewStamp()),
+                        ct).ConfigureAwait(false);
+                }
+            },
+            cancellationToken).ConfigureAwait(false);
+        SecurityStampCache.Evict(stampCache, rotated);
+    }
+
+    // Themia sets these itself; a stored claim of such a type could forge or shadow the issued one. Removing a stored
+    // row of a reserved type stays allowed, so rows written before this rule can be cleaned up.
+    private static void ThrowIfReserved(string claimType)
+    {
+        if (ReservedClaimTypes.IsReserved(claimType))
+        {
+            throw new ArgumentException($"Claim type '{claimType}' is reserved: Themia sets it itself.", nameof(claimType));
+        }
     }
 
     /// <inheritdoc />
