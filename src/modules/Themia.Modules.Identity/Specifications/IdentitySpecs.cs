@@ -201,6 +201,13 @@ internal sealed class ActiveRefreshTokensByUserSpec : Specification<RefreshToken
         Where(t => t.UserId == userId && t.RevokedAt == null && t.ExpiresAt > now);
 }
 
+/// <summary>A user's non-expired, non-revoked tokens in one family: proof the family is a live session of that user.</summary>
+internal sealed class ActiveRefreshTokensByUserAndFamilySpec : Specification<RefreshToken>
+{
+    public ActiveRefreshTokensByUserAndFamilySpec(Guid userId, Guid familyId, DateTimeOffset now) =>
+        Where(t => t.UserId == userId && t.FamilyId == familyId && t.RevokedAt == null && t.ExpiresAt > now);
+}
+
 /// <summary>A user's non-expired, non-revoked tokens in every family but one (for revoke-all-except-session).</summary>
 internal sealed class ActiveRefreshTokensByUserExceptFamilySpec : Specification<RefreshToken>
 {

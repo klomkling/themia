@@ -9,10 +9,12 @@ public interface ISessionRevoker
     /// scope like <see cref="IRefreshTokenService.RevokeAllForUserAsync"/>; a user outside it revokes nothing.</summary>
     /// <param name="userId">The user.</param>
     /// <param name="keepSessionId">The session to keep: the caller's <c>sid</c> claim (see
-    /// <see cref="SessionClaims.GetSessionId(ICurrentUser)"/>). A null, blank or malformed value throws. A well-formed
-    /// id that matches none of the user's sessions keeps nothing and revokes every session, the caller's included.</param>
+    /// <see cref="SessionClaims.GetSessionId(ICurrentUser)"/>). The call throws, and revokes nothing, unless this
+    /// names an active session of this user: a null, blank or malformed value, an unknown id, another user's session, or
+    /// one that is revoked or expired. A caller that catches it should fall back to revoking every session and issuing
+    /// a fresh pair.</param>
     /// <param name="cancellationToken">A cancellation token.</param>
     /// <returns>The number of refresh tokens revoked.</returns>
-    /// <exception cref="ArgumentException"><paramref name="keepSessionId"/> is null, blank or not a well-formed session id.</exception>
+    /// <exception cref="ArgumentException"><paramref name="keepSessionId"/> does not name an active session of the user.</exception>
     Task<int> RevokeAllForUserExceptAsync(Guid userId, string keepSessionId, CancellationToken cancellationToken = default);
 }

@@ -212,6 +212,14 @@ public sealed class RefreshTokenService : IRefreshTokenService, ISessionRevoker
         }
 
         var now = timeProvider.GetUtcNow();
+
+        // The kept id must be a live session of THIS user. Anything else (an unknown id, another user's family, a
+        // revoked or expired one) would keep nothing and sign the caller out, so refuse it and let the app fall back.
+        if (!await tokens.AnyAsync(new ActiveRefreshTokensByUserAndFamilySpec(user.Id, keepFamilyId, now), cancellationToken).ConfigureAwait(false))
+        {
+            throw new ArgumentException("The session id does not name an active session of the user.", nameof(keepSessionId));
+        }
+
         var revoked = await tokens.UpdateWhereAsync(
             new ActiveRefreshTokensByUserExceptFamilySpec(user.Id, keepFamilyId, now),
             set => set.Set(t => t.RevokedAt, now),

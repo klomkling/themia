@@ -104,7 +104,7 @@ public class SessionRevocationTests
     [InlineData("")]
     [InlineData("  ")]
     [InlineData("not-a-session-id")]
-    public async Task RevokeAllForUserExcept_rejects_a_session_id_that_names_no_family_instead_of_revoking_everything(string sessionId)
+    public async Task RevokeAllForUserExcept_rejects_a_blank_or_malformed_session_id_and_revokes_nothing(string sessionId)
     {
         var user = AddUser("alice");
         await sut.IssueAsync(user.Id);
@@ -121,15 +121,48 @@ public class SessionRevocationTests
     }
 
     [Fact]
-    public async Task RevokeAllForUserExcept_with_a_well_formed_unknown_session_id_revokes_every_session()
+    public async Task RevokeAllForUserExcept_throws_for_a_well_formed_unknown_session_id_and_revokes_nothing()
     {
         var user = AddUser("alice");
         await sut.IssueAsync(user.Id);
         await sut.IssueAsync(user.Id);
 
-        var revoked = await sut.RevokeAllForUserExceptAsync(user.Id, Guid.NewGuid().ToString());
+        await Assert.ThrowsAsync<ArgumentException>(() => sut.RevokeAllForUserExceptAsync(user.Id, Guid.NewGuid().ToString()));
 
-        Assert.Equal(2, revoked);
-        Assert.All(tokens, t => Assert.NotNull(t.RevokedAt));
+        Assert.All(tokens, t => Assert.Null(t.RevokedAt));
+    }
+
+    [Fact]
+    public async Task RevokeAllForUserExcept_throws_for_another_users_session_and_revokes_nothing()
+    {
+        var user = AddUser("alice");
+        var other = AddUser("bob");
+        await sut.IssueAsync(user.Id);
+        var othersSession = await sut.IssueAsync(other.Id);
+
+        await Assert.ThrowsAsync<ArgumentException>(() => sut.RevokeAllForUserExceptAsync(user.Id, othersSession.FamilyId.ToString()));
+
+        Assert.All(tokens, t => Assert.Null(t.RevokedAt));
+    }
+
+    [Fact]
+    public async Task RevokeAllForUserExcept_throws_when_the_kept_session_is_already_revoked()
+    {
+        var user = AddUser("alice");
+        var keep = await sut.IssueAsync(user.Id);
+        await sut.IssueAsync(user.Id);
+        await sut.RevokeAsync(keep.RawToken, allForUser: false);
+
+        await Assert.ThrowsAsync<ArgumentException>(() => sut.RevokeAllForUserExceptAsync(user.Id, keep.FamilyId.ToString()));
+    }
+
+    [Fact]
+    public async Task RevokeAllForUserExcept_throws_when_the_kept_session_has_expired()
+    {
+        var user = AddUser("alice");
+        var keep = await sut.IssueAsync(user.Id);
+        clock.Advance(TimeSpan.FromDays(400));
+
+        await Assert.ThrowsAsync<ArgumentException>(() => sut.RevokeAllForUserExceptAsync(user.Id, keep.FamilyId.ToString()));
     }
 }
