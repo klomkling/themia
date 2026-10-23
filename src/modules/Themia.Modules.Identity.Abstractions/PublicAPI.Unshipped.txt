@@ -510,3 +510,18 @@ Themia.Modules.Identity.Abstractions.IdentityModuleOptions.LockoutPolicy.get -> 
 Themia.Modules.Identity.Abstractions.IdentityModuleOptions.LockoutPolicy.set -> void
 Themia.Modules.Identity.Abstractions.IdentityModuleOptions.MaxLockoutDuration.get -> System.TimeSpan
 Themia.Modules.Identity.Abstractions.IdentityModuleOptions.MaxLockoutDuration.set -> void
+Themia.Modules.Identity.Abstractions.IUserTokenValidator
+Themia.Modules.Identity.Abstractions.IUserTokenValidator.ValidateAsync(Themia.Modules.Identity.Abstractions.Entities.TokenPurpose purpose, string! rawToken, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Identity.Abstractions.TokenValidationResult>!
+Themia.Modules.Identity.Abstractions.TokenValidationOutcome
+Themia.Modules.Identity.Abstractions.TokenValidationOutcome.AlreadyConsumed = 3 -> Themia.Modules.Identity.Abstractions.TokenValidationOutcome
+Themia.Modules.Identity.Abstractions.TokenValidationOutcome.Expired = 2 -> Themia.Modules.Identity.Abstractions.TokenValidationOutcome
+Themia.Modules.Identity.Abstractions.TokenValidationOutcome.NotFound = 1 -> Themia.Modules.Identity.Abstractions.TokenValidationOutcome
+Themia.Modules.Identity.Abstractions.TokenValidationOutcome.Valid = 0 -> Themia.Modules.Identity.Abstractions.TokenValidationOutcome
+Themia.Modules.Identity.Abstractions.TokenValidationResult
+Themia.Modules.Identity.Abstractions.TokenValidationResult.IsValid.get -> bool
+Themia.Modules.Identity.Abstractions.TokenValidationResult.Outcome.get -> Themia.Modules.Identity.Abstractions.TokenValidationOutcome
+Themia.Modules.Identity.Abstractions.TokenValidationResult.TokenValidationResult() -> void
+Themia.Modules.Identity.Abstractions.TokenValidationResult.TokenValidationResult(Themia.Modules.Identity.Abstractions.TokenValidationOutcome Outcome, System.Guid? UserId) -> void
+Themia.Modules.Identity.Abstractions.TokenValidationResult.UserId.get -> System.Guid?
+Themia.Modules.Identity.Abstractions.TokenValidationResult.Outcome.init -> void
+Themia.Modules.Identity.Abstractions.TokenValidationResult.UserId.init -> void

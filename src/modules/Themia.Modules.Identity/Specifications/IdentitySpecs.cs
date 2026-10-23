@@ -251,3 +251,11 @@ internal sealed class PlatformExternalLoginByProviderKeySpec : Specification<Ext
         WithoutTenantFilter();
     }
 }
+
+/// <summary>The single token matching a purpose and exact (deterministic SHA-256) hash. The hash column is unique and
+/// the raw token is high-entropy, so the match names the owner without a user id from the caller.</summary>
+internal sealed class TokenByPurposeAndHashSpec : Specification<UserToken>
+{
+    public TokenByPurposeAndHashSpec(TokenPurpose purpose, string tokenHash) =>
+        Where(t => t.Purpose == purpose && t.TokenHash == tokenHash);
+}

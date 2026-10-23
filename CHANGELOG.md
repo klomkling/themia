@@ -27,6 +27,10 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+### Added
+
+- `Themia.Modules.Identity`: `IUserTokenValidator.ValidateAsync(purpose, rawToken)` checks a reset/invite/confirm token and returns its owner (`TokenValidationResult`: `Valid`, `NotFound`, `Expired`, `AlreadyConsumed`) without consuming it or touching its expiry, so a password policy that needs the user (for example against their e-mail) can run before `IUserTokenService.ConsumeAsync` spends the link. The value is hashed and matched by exact equality as in consume; the owner is returned only for a valid token whose user resolves in the ambient tenant or as a platform user. On a new interface, so `IUserTokenService` implementers are unaffected. Neither call throttles; rate-limit both at the endpoint. Coord #0171.
+
 ## [0.35.3] - 2026-10-23
 
 Identity lockout policy for `Themia.Modules.Identity` (coord #0168). No new packages, no migration, no API removed; the default lockout behaviour is unchanged.

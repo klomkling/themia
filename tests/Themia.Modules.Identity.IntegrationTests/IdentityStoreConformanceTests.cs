@@ -45,6 +45,7 @@ public abstract class IdentityStoreConformanceTests
         public IUserService Users => Inner.ServiceProvider.GetRequiredService<IUserService>();
         public IRoleService Roles => Inner.ServiceProvider.GetRequiredService<IRoleService>();
         public IClaimService Claims => Inner.ServiceProvider.GetRequiredService<IClaimService>();
+        public IUserTokenValidator TokenValidator => Inner.ServiceProvider.GetRequiredService<IUserTokenValidator>();
         public IUserTokenService Tokens => Inner.ServiceProvider.GetRequiredService<IUserTokenService>();
         public IRefreshTokenService RefreshTokens => Inner.ServiceProvider.GetRequiredService<IRefreshTokenService>();
         public IExternalLoginService ExternalLogins => Inner.ServiceProvider.GetRequiredService<IExternalLoginService>();
@@ -220,6 +221,23 @@ public abstract class IdentityStoreConformanceTests
 
         var claims = await s.Claims.GetEffectiveClaimsAsync(userId);
         Assert.Contains(claims, c => c is { Type: "perm", Value: "write" });
+    }
+
+    [Fact]
+    public async Task Token_validation_names_the_owner_without_consuming_the_token()
+    {
+        await ResetAsync();
+        await using var s = NewScope(new TenantId("acme"));
+        var userId = (await s.Users.CreateAsync("hal", "pw")).UserId!.Value;
+        var raw = await s.Tokens.GenerateAsync(userId, TokenPurpose.PasswordReset);
+
+        var validated = await s.TokenValidator.ValidateAsync(TokenPurpose.PasswordReset, raw);
+        Assert.True(validated.IsValid);
+        Assert.Equal(userId, validated.UserId);
+        Assert.Equal(TokenValidationOutcome.NotFound, (await s.TokenValidator.ValidateAsync(TokenPurpose.EmailConfirm, raw)).Outcome);
+
+        Assert.Equal(TokenConsumeResult.Success, await s.Tokens.ConsumeAsync(userId, TokenPurpose.PasswordReset, raw));
+        Assert.Equal(TokenValidationOutcome.AlreadyConsumed, (await s.TokenValidator.ValidateAsync(TokenPurpose.PasswordReset, raw)).Outcome);
     }
 
     [Fact]
