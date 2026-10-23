@@ -18,12 +18,17 @@ concurrency:
 # the only thing worth cutting is the critical path (the slowest single job a PR waits on). So the
 # build gate and the test shards run in parallel (each rebuilds — fine), and the tests are sharded to
 # cut the tail. Integration (Testcontainers) tests run nightly in integration.yml, not here.
+# DRAFT PRs RUN NOTHING. Every job carries `github.event.pull_request.draft != true`; marking the PR ready
+# (`ready_for_review` is in the trigger types) starts the full run. A skipped job reports "skipped", which satisfies
+# a required check, so the required "Build & Test" does not hang as "Expected" on a draft (the aggregator below is
+# skipped the same way, rather than run and fail on its skipped needs), and a draft cannot merge anyway.
 jobs:
   # timeout-minutes on every job (coord #0136). None had one, so a hang held a runner for GitHub's
   # 360-minute default. Each is ~3-5x the longest successful run in the last 40 (2026-09-19): build 3.6,
   # test shard 3.5, analyzer smoke 2.3, migrations guard 1.7, aggregator and Copilot request 0.1 minutes.
   build:
     name: Build & inline review
+    if: ${{ github.event.pull_request.draft != true }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -80,6 +85,7 @@ jobs:
 
   test:
     name: Test (shard ${{ matrix.shard }}/3)
+    if: ${{ github.event.pull_request.draft != true }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     strategy:
@@ -156,7 +162,7 @@ jobs:
   build-test:
     name: Build & Test
     needs: [build, test]
-    if: always()
+    if: ${{ always() && github.event.pull_request.draft != true }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -170,6 +176,7 @@ jobs:
 
   analyzer-flow:
     name: Analyzer flow (adopter smoke test)
+    if: ${{ github.event.pull_request.draft != true }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -197,6 +204,7 @@ jobs:
 
   migrations-engine-guard:
     name: Migrations engine guard (adopter smoke test)
+    if: ${{ github.event.pull_request.draft != true }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
