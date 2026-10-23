@@ -29,7 +29,7 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ### Added
 
-- `Themia.Modules.Identity`: opt-in `IdentityModuleOptions.ValidateSecurityStampOnEachRequest` (default `false`) makes the Themia JwtBearer scheme refuse an access token whose security-stamp claim no longer matches the user's stored stamp, or whose user is inactive or deleted. A disable, delete, password change or role change then cuts live access tokens within `SecurityStampCacheDuration` (default 30 s, per-process `IMemoryCache`; `TimeSpan.Zero` disables the cache) instead of at expiry. New `ISecurityStampValidator` / `SecurityStampValidator`. With the option on, tokens minted without the stamp claim are refused. Coord #0170.
+- `Themia.Modules.Identity`: opt-in `IdentityModuleOptions.ValidateSecurityStampOnEachRequest` (default `false`) makes the Themia JwtBearer scheme refuse an access token whose security-stamp claim no longer matches the user's stored stamp, or whose user is inactive or deleted. A disable, delete, password change or role change then cuts live access tokens within `SecurityStampCacheDuration` (default 30 s, per-process `IMemoryCache`; `TimeSpan.Zero` disables the cache) instead of at expiry. New `ISecurityStampValidator` / `SecurityStampValidator`. With the option on, tokens minted without the stamp claim are refused, and a login that rehashes the password (cost parameters changed) rotates the stamp once, signing that user's other sessions out. Coord #0170.
 
 ### Changed
 
