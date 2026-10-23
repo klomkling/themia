@@ -430,6 +430,8 @@ Configure it in your `AppDbContext.OnModelCreating`. Themia never touches this t
 | `LockoutDuration` | 15 minutes | How long an account stays locked |
 | `LockoutPolicy` | `ResetCountOnLock` | `ResetCountOnLock` zeroes `AccessFailedCount` at lock, so each expired lock buys `MaxFailedAccessAttempts` fresh guesses. `KeepCount` keeps it, so the first wrong password after expiry re-locks. `Progressive` is `KeepCount` plus a lock that doubles per consecutive lock up to `MaxLockoutDuration`; a successful login restarts it. `Progressive` lets someone who knows an account name keep it locked for up to the cap. Under `KeepCount` and `Progressive` only a successful login or a password reset (`SetPasswordAsync`) clears the count and the lock; there is no unlock API yet |
 | `MaxLockoutDuration` | 24 hours | Longest single lock under `Progressive`; must be between `LockoutDuration` and 365 days. Ignored otherwise |
+| `ValidateSecurityStampOnEachRequest` | `false` | When on, the Themia JwtBearer scheme refuses a token whose stamp claim differs from the user's stored stamp, or whose user is inactive or deleted. Password change, disable and role change rotate the stamp; delete removes the user. Tokens without the claim are refused once on |
+| `SecurityStampCacheDuration` | 30 seconds | How long a per-user stamp lookup is cached in process; bounds how long a revoked token keeps working. `TimeSpan.Zero` disables the cache |
 | `DefaultTokenLifetime` | 1 hour | Expiry for generated tokens |
 | `AllowPlatformLogin` | `true` | Whether platform users (`tenant_id IS NULL`) can log in |
 | `ConnectionStringName` | `"Default"` | Connection string key used by Dapper |

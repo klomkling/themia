@@ -27,6 +27,14 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+### Added
+
+- `Themia.Modules.Identity`: opt-in `IdentityModuleOptions.ValidateSecurityStampOnEachRequest` (default `false`) makes the Themia JwtBearer scheme refuse an access token whose security-stamp claim no longer matches the user's stored stamp, or whose user is inactive or deleted. A disable, delete, password change or role change then cuts live access tokens within `SecurityStampCacheDuration` (default 30 s, per-process `IMemoryCache`; `TimeSpan.Zero` disables the cache) instead of at expiry. New `ISecurityStampValidator` / `SecurityStampValidator`. With the option on, tokens minted without the stamp claim are refused. Coord #0170.
+
+### Changed
+
+- `Themia.Modules.Identity`: `IUserService.SetActiveAsync` and `IRoleService.AssignRoleAsync` / `RemoveRoleAsync` now rotate the user's security stamp (a no-op assignment that changes nothing keeps it). `RoleService` gains a constructor taking `IDataFilterScope` (DI picks it; the old four-argument constructor stays). Coord #0170.
+
 ## [0.35.3] - 2026-10-23
 
 Identity lockout policy for `Themia.Modules.Identity` (coord #0168). No new packages, no migration, no API removed; the default lockout behaviour is unchanged.

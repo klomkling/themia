@@ -84,6 +84,44 @@ public class RoleServiceTests
     }
 
     [Fact]
+    public async Task AssignRoleAsync_rotates_the_user_security_stamp()
+    {
+        var userId = SeedUser();
+        var roleId = (await sut.CreateAsync("Editor"))!.Value;
+        var before = users.Single(u => u.Id == userId).SecurityStamp;
+
+        await sut.AssignRoleAsync(userId, roleId);
+
+        Assert.NotEqual(before, users.Single(u => u.Id == userId).SecurityStamp);
+    }
+
+    [Fact]
+    public async Task AssignRoleAsync_keeps_the_stamp_when_the_membership_already_exists()
+    {
+        var userId = SeedUser();
+        var roleId = (await sut.CreateAsync("Editor"))!.Value;
+        await sut.AssignRoleAsync(userId, roleId);
+        var before = users.Single(u => u.Id == userId).SecurityStamp;
+
+        await sut.AssignRoleAsync(userId, roleId);
+
+        Assert.Equal(before, users.Single(u => u.Id == userId).SecurityStamp);
+    }
+
+    [Fact]
+    public async Task RemoveRoleAsync_rotates_the_user_security_stamp()
+    {
+        var userId = SeedUser();
+        var roleId = (await sut.CreateAsync("Editor"))!.Value;
+        await sut.AssignRoleAsync(userId, roleId);
+        var before = users.Single(u => u.Id == userId).SecurityStamp;
+
+        await sut.RemoveRoleAsync(userId, roleId);
+
+        Assert.NotEqual(before, users.Single(u => u.Id == userId).SecurityStamp);
+    }
+
+    [Fact]
     public async Task RemoveRoleAsync_returns_false_when_user_in_another_tenant()
     {
         // User is in tenant "other"; ambient tenant is "acme", so the user is out of scope.

@@ -1,3 +1,4 @@
+using Themia.Framework.Data.Abstractions.Filtering;
 using Themia.Framework.Data.Abstractions.Repositories;
 using Themia.Framework.Data.Abstractions.UnitOfWork;
 using Themia.Modules.Identity.Abstractions;
@@ -13,14 +14,28 @@ public sealed class RoleService : IRoleService
     private readonly IRepository<Role, Guid> roles;
     private readonly IRepository<UserRole, Guid> memberships;
     private readonly IUnitOfWork unitOfWork;
+    private readonly IDataFilterScope filterScope;
+
+    /// <summary>Creates the service with a default filter scope.</summary>
+    public RoleService(
+        IRepository<User, Guid> users,
+        IRepository<Role, Guid> roles,
+        IRepository<UserRole, Guid> memberships,
+        IUnitOfWork unitOfWork)
+        : this(users, roles, memberships, unitOfWork, new DataFilterScope())
+    {
+    }
 
     /// <summary>Creates the service.</summary>
     public RoleService(
         IRepository<User, Guid> users,
         IRepository<Role, Guid> roles,
         IRepository<UserRole, Guid> memberships,
-        IUnitOfWork unitOfWork)
+        IUnitOfWork unitOfWork,
+        IDataFilterScope filterScope)
     {
+        ArgumentNullException.ThrowIfNull(filterScope);
+        this.filterScope = filterScope;
         ArgumentNullException.ThrowIfNull(users);
         ArgumentNullException.ThrowIfNull(roles);
         ArgumentNullException.ThrowIfNull(memberships);
@@ -61,7 +76,8 @@ public sealed class RoleService : IRoleService
     public async Task<bool> AssignRoleAsync(Guid userId, Guid roleId, CancellationToken cancellationToken = default)
     {
         // Both sides must resolve in the ambient tenant or as platform rows; cross-tenant is refused.
-        if (!await IdentityScope.UserExistsAsync(users, userId, cancellationToken).ConfigureAwait(false))
+        var user = await IdentityScope.ResolveUserAsync(users, userId, cancellationToken).ConfigureAwait(false);
+        if (user is null)
         {
             return false;
         }
@@ -76,6 +92,7 @@ public sealed class RoleService : IRoleService
             return true;   // idempotent
         }
 
+        await RotateSecurityStampAsync(user, cancellationToken).ConfigureAwait(false);
         var membership = new UserRole { UserId = userId, RoleId = roleId };
         membership.SetId(Guid.CreateVersion7());
         await memberships.AddAsync(membership, cancellationToken).ConfigureAwait(false);
@@ -87,7 +104,8 @@ public sealed class RoleService : IRoleService
     public async Task<bool> RemoveRoleAsync(Guid userId, Guid roleId, CancellationToken cancellationToken = default)
     {
         // Both sides must resolve in the ambient tenant or as platform rows; cross-tenant is refused.
-        if (!await IdentityScope.UserExistsAsync(users, userId, cancellationToken).ConfigureAwait(false))
+        var user = await IdentityScope.ResolveUserAsync(users, userId, cancellationToken).ConfigureAwait(false);
+        if (user is null)
         {
             return false;
         }
@@ -102,9 +120,19 @@ public sealed class RoleService : IRoleService
             return false;
         }
 
+        await RotateSecurityStampAsync(user, cancellationToken).ConfigureAwait(false);
         memberships.Remove(existing);
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         return true;
+    }
+
+    // A role change must cut live access tokens (their role claims are now stale). The stamp is saved BEFORE the
+    // membership so a failure in between logs the user out needlessly rather than leaving a revoked role usable.
+    private async Task RotateSecurityStampAsync(User user, CancellationToken cancellationToken)
+    {
+        user.SecurityStamp = Guid.NewGuid().ToString("N");
+        users.Update(user);
+        await IdentityScope.SaveScopedAsync(unitOfWork, filterScope, user.TenantId is null, cancellationToken).ConfigureAwait(false);
     }
 
     /// <inheritdoc />

@@ -510,3 +510,9 @@ Themia.Modules.Identity.Abstractions.IdentityModuleOptions.LockoutPolicy.get -> 
 Themia.Modules.Identity.Abstractions.IdentityModuleOptions.LockoutPolicy.set -> void
 Themia.Modules.Identity.Abstractions.IdentityModuleOptions.MaxLockoutDuration.get -> System.TimeSpan
 Themia.Modules.Identity.Abstractions.IdentityModuleOptions.MaxLockoutDuration.set -> void
+Themia.Modules.Identity.Abstractions.Authentication.ISecurityStampValidator
+Themia.Modules.Identity.Abstractions.Authentication.ISecurityStampValidator.IsCurrentAsync(System.Guid userId, string? stamp, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!
+Themia.Modules.Identity.Abstractions.IdentityModuleOptions.SecurityStampCacheDuration.get -> System.TimeSpan
+Themia.Modules.Identity.Abstractions.IdentityModuleOptions.SecurityStampCacheDuration.set -> void
+Themia.Modules.Identity.Abstractions.IdentityModuleOptions.ValidateSecurityStampOnEachRequest.get -> bool
+Themia.Modules.Identity.Abstractions.IdentityModuleOptions.ValidateSecurityStampOnEachRequest.set -> void

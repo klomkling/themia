@@ -541,6 +541,7 @@ public sealed class UserService : IUserService
         }
 
         user.IsActive = isActive;
+        user.SecurityStamp = Guid.NewGuid().ToString("N");
         users.Update(user);
         await IdentityScope.SaveScopedAsync(unitOfWork, filterScope, user.TenantId is null, cancellationToken).ConfigureAwait(false);
         await NotifyMutatedAsync(user, UserMutation.Active, cancellationToken).ConfigureAwait(false);
