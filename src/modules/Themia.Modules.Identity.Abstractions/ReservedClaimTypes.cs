@@ -5,6 +5,9 @@ namespace Themia.Modules.Identity.Abstractions;
 /// <summary>Claim types Themia sets itself when it builds a principal or mints an access token. The claim write APIs
 /// refuse them, and the principal factory drops any stored claim of such a type, so a stored row can never shadow or
 /// forge an issued claim (the security stamp, the tenant or platform marker, the session id, the roles, the subject).</summary>
+/// <remarks>The list is fixed. It covers <c>tenant_id</c>, the default claim type of the claims tenant-resolution
+/// strategy, but not a custom <c>MultiTenancyOptions.ClaimType</c>: an app that configures its own tenant claim type
+/// must not store that type as a user or role claim, or the stored value would reach the principal and be trusted.</remarks>
 public static class ReservedClaimTypes
 {
     private const string ThemiaPrefix = "themia:";
