@@ -27,6 +27,8 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.37.0] - 2026-10-24
+
 Host-wide switches for the sign-in methods of `Themia.Modules.Identity` (coord #0173). No new packages, no migration, no API removed; every method stays enabled by default, so nothing changes until a host turns one off.
 
 ### Added
