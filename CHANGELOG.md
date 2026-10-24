@@ -27,6 +27,13 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+Host-wide switches for the sign-in methods of `Themia.Modules.Identity` (coord #0173). No new packages, no migration, no API removed; every method stays enabled by default, so nothing changes until a host turns one off.
+
+### Added
+
+- `Themia.Modules.Identity`: `LoginMethods` (`[Flags]`: `Password`, `Otp`, `External`) and `IdentityModuleOptions.EnabledLoginMethods`, which defaults to all three and binds from configuration as a list of names, for example `"EnabledLoginMethods": "Password, Otp"`. A method left out refuses exactly like a failed login, with the same response and without touching any account: password login answers the usual 401 and does not run the hooks, the user lookup or the hash; a one-time-code start answers like a phone with no account and sends nothing; a verify fails like a wrong code, so a code issued before the switch cannot be redeemed; external login (every provider together, per-provider switching is not offered) answers the uniform 401, including for a provider name that is not registered. Refresh and logout are never gated, so sessions already issued keep working and can still be ended. The switch is host-wide; there is no per-tenant or per-user control.
+- `AuthenticationFlow` and `ExternalAuthenticationFlow` gain a constructor taking `IdentityModuleOptions`. The existing constructors remain and forward default options, so a hand-built instance keeps every method enabled; dependency injection picks the new one.
+
 ## [0.36.0] - 2026-10-23
 
 Identity access-token revocation, role levels, non-consuming token validation and session ids for `Themia.Modules.Identity` (coord #0169, #0170, #0171, #0172). No new packages and no API removed. One migration: `AddRoleLevelMigration` adds `identity.roles.level` (default 5, PostgreSQL and SQL Server), so existing roles become `Level5` until the app sets them.
