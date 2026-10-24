@@ -27,6 +27,10 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.38.0] - 2026-10-25
+
+A non-consuming check on `Themia.Challenges` (coord #0174). No new packages, no migration, no API removed; the one new member is on `IChallengeService`, see the note under it for adopters who implement that interface themselves.
+
 ### Added
 
 - **`Themia.Challenges`** — `IChallengeService.PeekAsync(scope, secret)`: checks a secret exactly as
