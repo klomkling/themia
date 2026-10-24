@@ -36,6 +36,30 @@ public interface IChallengeService
     Task<ChallengeVerifyResult> VerifyAsync(ChallengeScope scope, string code, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Checks a secret against the live challenge for <paramref name="scope"/> exactly as
+    /// <see cref="VerifyAsync"/> does, but never consumes it — for a caller that must look at the
+    /// principal behind a valid secret (a password policy that needs the user) before spending it.
+    /// </summary>
+    /// <remarks>
+    /// Same lookup, same constant-time comparison, same <see cref="ChallengeOptions.VerifyWindow"/> charge
+    /// and the same <see cref="PurposeOptions.MaxAttempts"/> accounting for wrong guesses, so peeking
+    /// gives an attacker nothing that verifying does not. A match changes nothing: the challenge is not
+    /// consumed and its expiry is not extended.
+    /// <para>
+    /// <b><see cref="ChallengeVerifyOutcome.Verified"/> here does not authorise anything.</b> It reports
+    /// that the secret was live a moment ago; it can be consumed by another caller before this one
+    /// acts. <see cref="VerifyAsync"/> remains the step that authorises, and its result is the one to
+    /// act on.
+    /// </para>
+    /// </remarks>
+    /// <param name="scope">The identity of the challenge being checked.</param>
+    /// <param name="secret">The plaintext secret the caller submitted.</param>
+    /// <param name="cancellationToken">Cancels the underlying store operations.</param>
+    /// <returns>How the check ended. See <see cref="ChallengeVerifyOutcome"/> for the full set of outcomes.</returns>
+    /// <exception cref="InvalidOperationException"><paramref name="scope"/>'s purpose was never configured via <see cref="ChallengeOptions.ConfigurePurpose"/>.</exception>
+    Task<ChallengeVerifyResult> PeekAsync(ChallengeScope scope, string secret, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Verifies an opaque token (a magic link) by the token's hash alone — the caller has only the
     /// token, not the original key and purpose.
     /// </summary>

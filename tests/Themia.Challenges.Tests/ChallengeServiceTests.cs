@@ -342,6 +342,99 @@ public sealed class ChallengeServiceTests : IDisposable
         Assert.True(result.Succeeded);
     }
 
+    // ---- Peek ---------------------------------------------------------------------------------
+
+    [Fact]
+    public async Task Peek_ShouldReturnVerifiedWithoutConsuming_SoVerifyStillSucceeds()
+    {
+        var service = CreateService(o => o.ConfigurePurpose("login", p => Configure(p)));
+        var scope = new ChallengeScope("+66411111111", "login", "tenantA");
+        var secret = (await service.IssueAsync(scope)).Secret!;
+
+        var firstPeek = await service.PeekAsync(scope, secret);
+        var secondPeek = await service.PeekAsync(scope, secret);
+        var verify = await service.VerifyAsync(scope, secret);
+        var afterConsume = await service.PeekAsync(scope, secret);
+
+        Assert.Equal(ChallengeVerifyOutcome.Verified, firstPeek.Outcome);
+        Assert.Equal(ChallengeVerifyOutcome.Verified, secondPeek.Outcome);
+        Assert.Equal(ChallengeVerifyOutcome.Verified, verify.Outcome);
+        Assert.Equal(ChallengeVerifyOutcome.Consumed, afterConsume.Outcome);
+    }
+
+    [Fact]
+    public async Task Peek_ShouldReturnIncorrect_ForAWrongSecret()
+    {
+        var service = CreateService(o => o.ConfigurePurpose("login", p => Configure(p)));
+        var scope = new ChallengeScope("+66422222222", "login", "tenantA");
+        var secret = (await service.IssueAsync(scope)).Secret!;
+        var wrong = secret == "000000" ? "111111" : "000000";
+
+        var result = await service.PeekAsync(scope, wrong);
+
+        Assert.Equal(ChallengeVerifyOutcome.Incorrect, result.Outcome);
+    }
+
+    [Fact]
+    public async Task Peek_ShouldCountWrongGuessesAgainstMaxAttempts()
+    {
+        var service = CreateService(o => o.ConfigurePurpose("login", p => Configure(p, maxAttempts: 2)));
+        var scope = new ChallengeScope("+66433333333", "login", "tenantA");
+        var secret = (await service.IssueAsync(scope)).Secret!;
+        var wrong = secret == "000000" ? "111111" : "000000";
+
+        var first = await service.PeekAsync(scope, wrong);
+        var second = await service.PeekAsync(scope, wrong);
+        var correctAfterCap = await service.VerifyAsync(scope, secret);
+
+        Assert.Equal(ChallengeVerifyOutcome.Incorrect, first.Outcome);
+        Assert.Equal(ChallengeVerifyOutcome.AttemptsExhausted, second.Outcome);
+        Assert.NotEqual(ChallengeVerifyOutcome.Verified, correctAfterCap.Outcome);
+    }
+
+    [Fact]
+    public async Task Peek_ShouldShareTheVerifyRateLimit()
+    {
+        var service = CreateService(o =>
+        {
+            o.VerifyWindow = (2, TimeSpan.FromMinutes(15));
+            o.ConfigurePurpose("login", p => Configure(p));
+        });
+        var scope = new ChallengeScope("+66444444400", "login", "tenantA");
+        var secret = (await service.IssueAsync(scope)).Secret!;
+
+        Assert.Equal(ChallengeVerifyOutcome.Verified, (await service.PeekAsync(scope, secret)).Outcome);
+        Assert.Equal(ChallengeVerifyOutcome.Verified, (await service.PeekAsync(scope, secret)).Outcome);
+
+        Assert.Equal(ChallengeVerifyOutcome.RateLimited, (await service.VerifyAsync(scope, secret)).Outcome);
+        Assert.Equal(ChallengeVerifyOutcome.RateLimited, (await service.PeekAsync(scope, secret)).Outcome);
+    }
+
+    [Fact]
+    public async Task Peek_ShouldNotExtendTheExpiry()
+    {
+        var service = CreateService(o => o.ConfigurePurpose("login", p => Configure(p, ttl: TimeSpan.FromMinutes(10))));
+        var scope = new ChallengeScope("+66455555555", "login", "tenantA");
+        var secret = (await service.IssueAsync(scope)).Secret!;
+
+        time.Advance(TimeSpan.FromMinutes(6));
+        Assert.Equal(ChallengeVerifyOutcome.Verified, (await service.PeekAsync(scope, secret)).Outcome);
+        time.Advance(TimeSpan.FromMinutes(6));
+
+        Assert.Equal(ChallengeVerifyOutcome.Expired, (await service.PeekAsync(scope, secret)).Outcome);
+    }
+
+    [Fact]
+    public async Task Peek_ShouldReturnNotFound_WhenNoChallengeWasEverIssued()
+    {
+        var service = CreateService(o => o.ConfigurePurpose("login", p => Configure(p)));
+        var scope = new ChallengeScope("+66466666666", "login", "tenantA");
+
+        var result = await service.PeekAsync(scope, "000000");
+
+        Assert.Equal(ChallengeVerifyOutcome.NotFound, result.Outcome);
+    }
+
     [Fact]
     public async Task Verify_ShouldReturnIncorrect_ForAWrongSecret()
     {

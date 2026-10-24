@@ -70,6 +70,7 @@ Themia.Challenges.IChallengeDialect.SelectLiveByTokenHashSql.get -> string!
 Themia.Challenges.IChallengeDialect.SelectMostRecentByScopeSql(Themia.Challenges.ChallengeTenancy tenancy) -> string!
 Themia.Challenges.IChallengeService
 Themia.Challenges.IChallengeService.IssueAsync(Themia.Challenges.ChallengeScope! scope, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Challenges.ChallengeIssueResult!>!
+Themia.Challenges.IChallengeService.PeekAsync(Themia.Challenges.ChallengeScope! scope, string! secret, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Challenges.ChallengeVerifyResult!>!
 Themia.Challenges.IChallengeService.RefundAsync(System.Guid challengeId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!
 Themia.Challenges.IChallengeService.VerifyAsync(Themia.Challenges.ChallengeScope! scope, string! code, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Challenges.ChallengeVerifyResult!>!
 Themia.Challenges.IChallengeService.VerifyByTokenAsync(string! token, string! purpose, string? tenantId = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Challenges.ChallengeVerifyResult!>!
