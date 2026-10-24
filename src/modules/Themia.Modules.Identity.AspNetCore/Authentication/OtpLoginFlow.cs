@@ -89,7 +89,11 @@ public sealed class OtpLoginFlow : IOtpLoginFlow
         // so under a claims-only strategy the ambient scope is null) and answers only for exactly one
         // active, confirmed, unlocked holder; no match, an unconfirmed or locked holder and an ambiguous
         // number all become the same decoy.
-        var recipient = await recipients.ResolveAsync(key, cancellationToken).ConfigureAwait(false);
+        // With one-time-code login switched off, no phone has a recipient: every start takes the decoy path
+        // below, so it answers like a phone with no account and no code is ever sent.
+        var recipient = identityOptions.EnabledLoginMethods.HasFlag(LoginMethods.Otp)
+            ? await recipients.ResolveAsync(key, cancellationToken).ConfigureAwait(false)
+            : null;
 
         OtpIssueResult issued;
         if (recipient is null)
@@ -123,8 +127,15 @@ public sealed class OtpLoginFlow : IOtpLoginFlow
     {
         ArgumentNullException.ThrowIfNull(code);
 
-        var check = await challenges.VerifyAsync(challengeId, code, cancellationToken).ConfigureAwait(false);
         var identifier = $"otp:{challengeId:N}";
+        if (!identityOptions.EnabledLoginMethods.HasFlag(LoginMethods.Otp))
+        {
+            // Refused like a wrong code, before the challenge is read, so a code issued before the method was
+            // switched off cannot be redeemed and no guess is counted against it.
+            return await FailAsync(identifier, LoginFailureReason.InvalidOtp, LoginResult.InvalidCredentials(), cancellationToken).ConfigureAwait(false);
+        }
+
+        var check = await challenges.VerifyAsync(challengeId, code, cancellationToken).ConfigureAwait(false);
         if (!check.Verified || check.UserId is not { } userId)
         {
             var locked = check.Outcome == OtpVerifyOutcome.LockedOut;
