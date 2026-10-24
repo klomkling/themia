@@ -341,7 +341,20 @@ internal sealed class ChallengeService : IChallengeService
             cancellationToken: cancellationToken));
 
     /// <inheritdoc />
-    public async Task<ChallengeVerifyResult> VerifyAsync(ChallengeScope scope, string code, CancellationToken cancellationToken = default)
+    public Task<ChallengeVerifyResult> VerifyAsync(ChallengeScope scope, string code, CancellationToken cancellationToken = default) =>
+        CheckSecretAsync(scope, code, consume: true, cancellationToken);
+
+    /// <inheritdoc />
+    public Task<ChallengeVerifyResult> PeekAsync(ChallengeScope scope, string secret, CancellationToken cancellationToken = default) =>
+        CheckSecretAsync(scope, secret, consume: false, cancellationToken);
+
+    /// <summary>
+    /// The one lookup behind <see cref="VerifyAsync"/> and <see cref="PeekAsync"/>. They differ only in
+    /// what a match does, so everything that bounds guessing — the verify-window charge, the attempt
+    /// accounting — is shared and cannot drift apart.
+    /// </summary>
+    private async Task<ChallengeVerifyResult> CheckSecretAsync(
+        ChallengeScope scope, string code, bool consume, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(scope);
         ArgumentException.ThrowIfNullOrEmpty(code);
@@ -411,6 +424,13 @@ internal sealed class ChallengeService : IChallengeService
             if (!SecretHasher.Verify(code, row.SecretHash, row.SecretSalt))
             {
                 continue;
+            }
+
+            // A peek stops at the match: the row is left live and untouched.
+            if (!consume)
+            {
+                logger.LogInformation("Challenge peek {Outcome} for purpose {Purpose}", ChallengeVerifyOutcome.Verified, scope.Purpose);
+                return ChallengeVerifyResult.Verified(scope);
             }
 
             var consumedRows = await connection.ExecuteAsync(new CommandDefinition(
