@@ -22,6 +22,7 @@ public sealed class AuthenticationFlow : IAuthenticationFlow
     private readonly IPasswordHasher passwordHasher;
     private readonly IAuthenticationHooks hooks;
     private readonly IIdentityEventObserver[] observers;
+    private readonly IdentityModuleOptions options;
     private readonly TimeProvider timeProvider;
     private readonly ILogger<AuthenticationFlow> logger;
 
@@ -34,6 +35,7 @@ public sealed class AuthenticationFlow : IAuthenticationFlow
         IPasswordHasher passwordHasher,
         IAuthenticationHooks hooks,
         IEnumerable<IIdentityEventObserver> observers,
+        IdentityModuleOptions options,
         TimeProvider timeProvider,
         ILogger<AuthenticationFlow> logger)
     {
@@ -44,6 +46,7 @@ public sealed class AuthenticationFlow : IAuthenticationFlow
         ArgumentNullException.ThrowIfNull(passwordHasher);
         ArgumentNullException.ThrowIfNull(hooks);
         ArgumentNullException.ThrowIfNull(observers);
+        ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(timeProvider);
         ArgumentNullException.ThrowIfNull(logger);
         this.users = users;
@@ -53,8 +56,29 @@ public sealed class AuthenticationFlow : IAuthenticationFlow
         this.passwordHasher = passwordHasher;
         this.hooks = hooks;
         this.observers = observers as IIdentityEventObserver[] ?? observers.ToArray();
+        this.options = options;
         this.timeProvider = timeProvider;
         this.logger = logger;
+    }
+
+    /// <summary>
+    /// Back-compatible overload matching the pre-<see cref="IdentityModuleOptions.EnabledLoginMethods"/> signature.
+    /// Forwards with default options, so every method stays enabled and a manually constructed instance behaves
+    /// exactly as before. DI resolves the greediest constructor it can satisfy, which is the one above.
+    /// </summary>
+    public AuthenticationFlow(
+        IUserService users,
+        IClaimsPrincipalFactory principalFactory,
+        IAccessTokenService accessTokens,
+        IRefreshTokenService refreshTokens,
+        IPasswordHasher passwordHasher,
+        IAuthenticationHooks hooks,
+        IEnumerable<IIdentityEventObserver> observers,
+        TimeProvider timeProvider,
+        ILogger<AuthenticationFlow> logger)
+        : this(users, principalFactory, accessTokens, refreshTokens, passwordHasher, hooks, observers,
+              new IdentityModuleOptions(), timeProvider, logger)
+    {
     }
 
     /// <summary>
@@ -133,6 +157,13 @@ public sealed class AuthenticationFlow : IAuthenticationFlow
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(identifier);
         ArgumentNullException.ThrowIfNull(password);
+
+        if (!options.EnabledLoginMethods.HasFlag(LoginMethods.Password))
+        {
+            // Switched off for the host: refused like any other bad credential, before OnBeforeLogin, the user
+            // lookup or the hash run, so nothing about any account is touched.
+            return await FailAsync(identifier, LoginFailureReason.NotFound, LoginResult.InvalidCredentials(), cancellationToken).ConfigureAwait(false);
+        }
 
         var before = new BeforeLoginContext(identifier);
         await hooks.OnBeforeLoginAsync(before, cancellationToken).ConfigureAwait(false);

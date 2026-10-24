@@ -555,3 +555,10 @@ static Themia.Modules.Identity.Abstractions.SessionClaims.GetSessionId(this Syst
 static Themia.Modules.Identity.Abstractions.SessionClaims.GetSessionId(this Themia.Modules.Identity.Abstractions.ICurrentUser! user) -> string?
 Themia.Modules.Identity.Abstractions.ReservedClaimTypes
 static Themia.Modules.Identity.Abstractions.ReservedClaimTypes.IsReserved(string! claimType) -> bool
+Themia.Modules.Identity.Abstractions.IdentityModuleOptions.EnabledLoginMethods.get -> Themia.Modules.Identity.Abstractions.LoginMethods
+Themia.Modules.Identity.Abstractions.IdentityModuleOptions.EnabledLoginMethods.set -> void
+Themia.Modules.Identity.Abstractions.LoginMethods
+Themia.Modules.Identity.Abstractions.LoginMethods.External = 4 -> Themia.Modules.Identity.Abstractions.LoginMethods
+Themia.Modules.Identity.Abstractions.LoginMethods.None = 0 -> Themia.Modules.Identity.Abstractions.LoginMethods
+Themia.Modules.Identity.Abstractions.LoginMethods.Otp = 2 -> Themia.Modules.Identity.Abstractions.LoginMethods
+Themia.Modules.Identity.Abstractions.LoginMethods.Password = 1 -> Themia.Modules.Identity.Abstractions.LoginMethods

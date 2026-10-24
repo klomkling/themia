@@ -23,6 +23,7 @@ internal sealed class ExternalAuthenticationFlow : IExternalAuthenticationFlow
     private readonly IRefreshTokenService refreshTokens;
     private readonly IExternalAuthenticationHooks hooks;
     private readonly IIdentityEventObserver[] observers;
+    private readonly IdentityModuleOptions options;
     private readonly TimeProvider timeProvider;
     private readonly ILogger<ExternalAuthenticationFlow> logger;
 
@@ -35,6 +36,7 @@ internal sealed class ExternalAuthenticationFlow : IExternalAuthenticationFlow
         IRefreshTokenService refreshTokens,
         IExternalAuthenticationHooks hooks,
         IEnumerable<IIdentityEventObserver> observers,
+        IdentityModuleOptions options,
         TimeProvider timeProvider,
         ILogger<ExternalAuthenticationFlow> logger)
     {
@@ -45,6 +47,7 @@ internal sealed class ExternalAuthenticationFlow : IExternalAuthenticationFlow
         ArgumentNullException.ThrowIfNull(refreshTokens);
         ArgumentNullException.ThrowIfNull(hooks);
         ArgumentNullException.ThrowIfNull(observers);
+        ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(timeProvider);
         ArgumentNullException.ThrowIfNull(logger);
         this.registry = registry;
@@ -54,8 +57,29 @@ internal sealed class ExternalAuthenticationFlow : IExternalAuthenticationFlow
         this.refreshTokens = refreshTokens;
         this.hooks = hooks;
         this.observers = observers as IIdentityEventObserver[] ?? observers.ToArray();
+        this.options = options;
         this.timeProvider = timeProvider;
         this.logger = logger;
+    }
+
+    /// <summary>
+    /// Back-compatible overload matching the pre-<see cref="IdentityModuleOptions.EnabledLoginMethods"/> signature.
+    /// Forwards with default options, so external login stays enabled and a manually constructed instance behaves
+    /// exactly as before. DI resolves the greediest constructor it can satisfy, which is the one above.
+    /// </summary>
+    public ExternalAuthenticationFlow(
+        IExternalAuthProviderRegistry registry,
+        IExternalLoginService externalLogins,
+        IClaimsPrincipalFactory principalFactory,
+        IAccessTokenService accessTokens,
+        IRefreshTokenService refreshTokens,
+        IExternalAuthenticationHooks hooks,
+        IEnumerable<IIdentityEventObserver> observers,
+        TimeProvider timeProvider,
+        ILogger<ExternalAuthenticationFlow> logger)
+        : this(registry, externalLogins, principalFactory, accessTokens, refreshTokens, hooks, observers,
+              new IdentityModuleOptions(), timeProvider, logger)
+    {
     }
 
     /// <summary>
@@ -104,6 +128,14 @@ internal sealed class ExternalAuthenticationFlow : IExternalAuthenticationFlow
     public async Task<ExternalLoginFlowResult> AuthenticateAsync(string provider, ExternalAuthRequest request, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(provider);
+
+        if (!options.EnabledLoginMethods.HasFlag(LoginMethods.External))
+        {
+            // Switched off for the host, every provider together: refused as a provider rejection, which the
+            // endpoint answers with the same uniform 401 as any failed login. This runs before the registry
+            // lookup, so an unknown provider name does not get a 404 that a known one would not.
+            return await FailAsync(provider, ExternalLoginOutcome.ProviderRejected, ExternalLoginFlowResult.ProviderRejected(), cancellationToken).ConfigureAwait(false);
+        }
 
         if (!registry.TryGet(provider, out var authProvider))
         {

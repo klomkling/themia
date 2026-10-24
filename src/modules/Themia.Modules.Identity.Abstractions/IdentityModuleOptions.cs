@@ -25,6 +25,15 @@ public sealed class IdentityModuleOptions
     /// <summary>Whether a platform (global) user may authenticate against a tenant entry point. Defaults to true.</summary>
     public bool AllowPlatformLogin { get; set; } = true;
 
+    /// <summary>
+    /// The sign-in methods this host accepts. Defaults to every method. A method left out refuses
+    /// exactly like a failed login: the password and external flows return their usual failure, a one-time-code start
+    /// answers like a phone with no account and sends nothing, and a verify fails like a wrong code. Refresh and
+    /// logout are never gated, so sessions already issued keep working and can still be ended. Host-wide only; binds
+    /// from configuration as a list of names, for example <c>"Password, Otp"</c>.
+    /// </summary>
+    public LoginMethods EnabledLoginMethods { get; set; } = LoginMethods.Password | LoginMethods.Otp | LoginMethods.External;
+
     /// <summary>Default lifetime for generated <see cref="Entities.TokenPurpose"/> tokens. Defaults to 1 hour.</summary>
     public TimeSpan DefaultTokenLifetime { get; set; } = TimeSpan.FromHours(1);
 
