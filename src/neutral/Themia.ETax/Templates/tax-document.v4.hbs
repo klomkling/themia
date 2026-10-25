@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<title>{{documentNumber}}</title>
+<style>
+{{{fontCss}}}
+/* A5 landscape, 210 x 148 mm. The page margins are inside .page (7 mm top and bottom, 9 mm left and right), so the PDF itself has none. */
+@page { size: 210mm 148mm; margin: 0; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { background: #fff; }
+body { font-family: 'Sarabun'; font-size: 9pt; line-height: 1.25; color: #000; }
+.page { width: 210mm; height: 148mm; padding: 7mm 9mm; position: relative; break-after: page; page-break-after: always; display: flex; flex-direction: column; }
+.page:last-child { break-after: auto; page-break-after: auto; }
+
+.en { font-size: 6.8pt; font-weight: 400; }
+b { font-weight: 700; }
+.row { display: flex; justify-content: space-between; align-items: flex-start; gap: 4mm; }
+.box { border: 0.5pt solid #000; }
+.r { text-align: right; } .c { text-align: center; }
+
+.logo { width: 18mm; height: 13mm; flex: none; display: flex; align-items: center; justify-content: center; }
+.logo img { max-width: 18mm; max-height: 13mm; }
+.seller { display: flex; gap: 3mm; flex: 1; }
+.seller .name { font-size: 9.5pt; font-weight: 700; }
+.seller .addr, .seller .tax { font-size: 8pt; }
+.title { font-size: 12pt; font-weight: 700; line-height: 1.15; }
+.title-en { font-size: 7.5pt; }
+.marker { border: 0.5pt solid #000; padding: 0.6mm 2mm; text-align: center; line-height: 1.1; font-size: 8pt; font-weight: 700; flex: none; }
+.marker .en { display: block; font-weight: 400; font-size: 6.5pt; }
+.meta { font-size: 8.2pt; margin-top: 1.5mm; }
+.meta b { margin-left: 1mm; }
+.buyer { margin-top: 2mm; padding: 1mm 2mm; font-size: 8pt; }
+.buyer .name { font-size: 8.5pt; font-weight: 700; }
+.compact-head { padding-bottom: 1.5mm; border-bottom: 0.5pt solid #000; }
+
+table { width: 100%; border-collapse: collapse; margin-top: 2mm; font-size: 8pt; table-layout: fixed; }
+th, td { border: 0.5pt solid #000; padding: 0 1.5mm; height: 5.6mm; white-space: nowrap; }
+td.desc { white-space: normal; overflow-wrap: anywhere; }
+th { background: #e6e6e6; height: 8mm; font-weight: 700; line-height: 1.1; white-space: normal; }
+th .en { display: block; font-weight: 400; }
+td.num, th.num { text-align: right; }
+tr.carry td { font-weight: 700; }
+table.last { margin-bottom: 0; }
+
+.sum { display: flex; border: 0.5pt solid #000; border-top: 0; font-size: 8pt; }
+.words { flex: 1; padding: 1.5mm 2mm; border-right: 0.5pt solid #000; display: flex; flex-direction: column; justify-content: center; }
+.words .v { font-size: 8.5pt; font-weight: 700; margin-top: 0.5mm; }
+.tot { width: 76mm; }
+.tot div { display: flex; justify-content: space-between; align-items: baseline; padding: 0.6mm 2mm; }
+.tot div + div { border-top: 0.5pt solid #000; }
+.tot .grand { font-weight: 700; font-size: 9pt; }
+.tot .grand .en { font-weight: 700; }
+
+.bottom { margin-top: 2mm; font-size: 7.8pt; }
+.pay { display: flex; align-items: center; gap: 1.5mm; white-space: nowrap; }
+.pay .date { display: inline-block; min-width: 22mm; border-bottom: 0.5pt dotted #000; text-align: center; }
+.cb { display: inline-block; width: 3mm; height: 3mm; border: 0.5pt solid #000; text-align: center; font-size: 7pt; line-height: 2.6mm; font-weight: 700; vertical-align: middle; }
+.sig { width: 50mm; flex: none; text-align: center; font-size: 7.5pt; }
+.sig .line { border-bottom: 0.5pt solid #000; height: 9mm; margin-bottom: 0.8mm; }
+.foot { margin-top: auto; padding-top: 1mm; display: flex; justify-content: space-between; font-size: 6.5pt; }
+.note { font-size: 7.5pt; margin-top: 1.5mm; }
+.reason { margin-top: 2mm; padding: 1.2mm 2mm; font-size: 7.8pt; }
+.reason .opts { display: flex; flex-wrap: wrap; gap: 1mm 4mm; margin-top: 0.8mm; }
+.reason .free { margin-top: 1mm; border-bottom: 0.5pt dotted #000; min-height: 4.5mm; }
+.replaces { font-size: 7.5pt; }
+.cancelled-watermark { position: fixed; top: 38%; left: 0; width: 100%; text-align: center; font-size: 60pt; font-weight: 700; color: rgba(200, 0, 0, 0.18); transform: rotate(-20deg); z-index: -1; }
+</style>
+</head>
+<body data-kind="{{#if receipt}}receipt{{else}}{{#if credit}}credit-note{{else}}debit-note{{/if}}{{/if}}">
+{{#if cancelled}}<div class="cancelled-watermark">ยกเลิก CANCELLED</div>{{/if}}
+{{#each pages}}
+<section class="page" data-page="{{number}}">
+{{#if full}}
+  <div class="row">
+    <div class="seller">
+      {{#if @root.logo}}<div class="logo"><img src="{{{@root.logo}}}" alt=""></div>{{/if}}
+      <div>
+        <div class="name">{{@root.seller.name}}</div>
+        {{#if @root.seller.address}}<div class="addr">{{@root.seller.address}}</div>{{/if}}
+        <div class="tax">เลขประจำตัวผู้เสียภาษี <span class="en">(Tax ID)</span> <b>{{@root.seller.taxId}}</b>{{#if @root.seller.branchTh}} &nbsp; {{@root.seller.branchTh}} <span class="en">({{@root.seller.branchEn}})</span>{{/if}}</div>
+      </div>
+    </div>
+    <div class="r">
+      <div class="row" style="justify-content:flex-end">
+        <div><div class="title">{{@root.titleTh}}</div><div class="title-en">{{@root.titleEn}}</div></div>
+        <div class="marker">{{@root.markerTh}}<span class="en">{{@root.markerEn}}</span></div>
+      </div>
+      <div class="meta">เลขที่ <span class="en">(No.)</span><b>{{@root.documentNumber}}</b><br>วันที่ <span class="en">(Date)</span><b>{{@root.issueDate}}</b>{{#if @root.replacement}}<br><span class="replaces">ใบแทนของเลขที่ <span class="en">(Replaces)</span> <b>{{@root.replacement.number}}</b> {{@root.replacement.date}}</span>{{/if}}</div>
+    </div>
+  </div>
+
+  <div class="box buyer">
+    <div class="row" style="gap:2mm">
+      <div>
+        <div><b>ผู้ซื้อ</b> <span class="en">(Buyer)</span> &nbsp;<span class="name">{{@root.buyer.name}}</span></div>
+        {{#if @root.buyer.address}}<div>{{@root.buyer.address}}</div>{{/if}}
+        {{#if @root.buyer.taxId}}<div>เลขประจำตัวผู้เสียภาษี <span class="en">(Tax ID)</span> {{@root.buyer.taxId}}{{#if @root.buyer.branchTh}} &nbsp; {{@root.buyer.branchTh}} <span class="en">({{@root.buyer.branchEn}})</span>{{/if}}</div>{{/if}}
+      </div>
+      {{#if @root.original}}
+      <div class="r" style="flex:none">
+        <div>อ้างอิงใบกำกับภาษีเดิม <span class="en">(Original tax invoice)</span></div>
+        <div>เลขที่ <span class="en">(No.)</span> <b>{{@root.original.number}}</b></div>
+        <div>วันที่ <span class="en">(Date)</span> <b>{{@root.original.date}}</b></div>
+      </div>
+      {{/if}}
+    </div>
+  </div>
+{{else}}
+  <div class="row compact-head">
+    <div class="seller">
+      {{#if @root.logo}}<div class="logo"><img src="{{{@root.logo}}}" alt=""></div>{{/if}}
+      <div><div class="name">{{@root.seller.name}}</div><div class="tax">เลขประจำตัวผู้เสียภาษี <span class="en">(Tax ID)</span> <b>{{@root.seller.taxId}}</b></div></div>
+    </div>
+    <div class="r">
+      <div class="row" style="justify-content:flex-end">
+        <div><div class="title">{{@root.titleTh}}</div><div class="title-en">{{@root.titleEn}} (ต่อ / continued)</div></div>
+        <div class="marker">{{@root.markerTh}}<span class="en">{{@root.markerEn}}</span></div>
+      </div>
+      <div class="meta">เลขที่ <span class="en">(No.)</span><b>{{@root.documentNumber}}</b> &nbsp; วันที่ <span class="en">(Date)</span><b>{{@root.issueDate}}</b></div>
+    </div>
+  </div>
+{{/if}}
+
+  <table{{#if closing}} class="last"{{/if}}>
+    {{#if @root.credit}}
+    <colgroup><col style="width:8%"><col style="width:38%"><col style="width:18%"><col style="width:18%"><col style="width:18%"></colgroup>
+    <thead><tr>
+      <th>ลำดับ<span class="en">No.</span></th>
+      <th style="text-align:left">รายการ<span class="en">Description</span></th>
+      <th class="num">มูลค่าตามใบกำกับภาษีเดิม<span class="en">Original value</span></th>
+      <th class="num">มูลค่าที่ถูกต้อง<span class="en">Correct value</span></th>
+      <th class="num">ผลต่าง<span class="en">Difference</span></th>
+    </tr></thead>
+    {{else}}
+    <colgroup><col style="width:9%"><col style="width:47%"><col style="width:10%"><col style="width:16%"><col style="width:18%"></colgroup>
+    <thead><tr>
+      <th>ลำดับ<span class="en">No.</span></th>
+      <th style="text-align:left">รายการ<span class="en">Description</span></th>
+      <th class="num">จำนวน<span class="en">Qty</span></th>
+      <th class="num">ราคาต่อหน่วย<span class="en">Unit price</span></th>
+      <th class="num">จำนวนเงิน<span class="en">Amount</span></th>
+    </tr></thead>
+    {{/if}}
+    <tbody>
+    {{#if broughtForward}}
+      {{#if @root.credit}}
+      <tr class="carry"><td colspan="2" class="r">ยอดยกมา <span class="en">(Brought forward)</span></td><td class="num">{{broughtForward.original}}</td><td class="num">{{broughtForward.correct}}</td><td class="num">{{broughtForward.amount}}</td></tr>
+      {{else}}
+      <tr class="carry"><td colspan="4" class="r">ยอดยกมา <span class="en">(Brought forward)</span></td><td class="num">{{broughtForward.amount}}</td></tr>
+      {{/if}}
+    {{/if}}
+    {{#each rows}}
+      {{#if blank}}
+      <tr><td></td><td></td><td></td><td></td><td></td></tr>
+      {{else}}
+        {{#if @root.credit}}
+      <tr><td class="c">{{number}}</td><td class="desc">{{description}}</td><td class="num">{{original}}</td><td class="num">{{correct}}</td><td class="num">{{difference}}</td></tr>
+        {{else}}
+      <tr><td class="c">{{number}}</td><td class="desc">{{description}}</td><td class="num">{{quantity}}</td><td class="num">{{unitPrice}}</td><td class="num">{{amount}}</td></tr>
+        {{/if}}
+      {{/if}}
+    {{/each}}
+    {{#if carriedForward}}
+      {{#if @root.credit}}
+      <tr class="carry"><td colspan="2" class="r">ยอดยกไป <span class="en">(Carried forward)</span></td><td class="num">{{carriedForward.original}}</td><td class="num">{{carriedForward.correct}}</td><td class="num">{{carriedForward.amount}}</td></tr>
+      {{else}}
+      <tr class="carry"><td colspan="4" class="r">ยอดยกไป <span class="en">(Carried forward)</span></td><td class="num">{{carriedForward.amount}}</td></tr>
+      {{/if}}
+    {{/if}}
+    </tbody>
+  </table>
+{{#if closing}}
+  <div class="sum">
+    <div class="words"><div>จำนวนเงินตัวอักษร <span class="en">(Amount in words)</span></div><div class="v">{{@root.amountInWords}}</div></div>
+    <div class="tot">
+      {{#if @root.credit}}
+      <div><span>ผลต่างรวม <span class="en">Total difference</span></span><span>{{@root.totals.subtotal}}</span></div>
+      <div><span>ภาษีมูลค่าเพิ่ม {{@root.totals.rate}} ของผลต่าง <span class="en">VAT on difference</span></span><span>{{@root.totals.vat}}</span></div>
+      <div class="grand"><span>จำนวนเงินที่ลดหนี้ <span class="en">Credit total</span></span><span>{{@root.totals.total}}</span></div>
+      {{else}}
+      <div><span>รวมเป็นเงิน <span class="en">Subtotal</span></span><span>{{@root.totals.subtotal}}</span></div>
+      <div><span>ภาษีมูลค่าเพิ่ม {{@root.totals.rate}} <span class="en">VAT {{@root.totals.rate}}</span></span><span>{{@root.totals.vat}}</span></div>
+      <div class="grand"><span>จำนวนเงินรวมทั้งสิ้น <span class="en">Total</span></span><span>{{@root.totals.total}}</span></div>
+      {{#if @root.totals.withheld}}
+      <div><span>หักภาษี ณ ที่จ่าย <span class="en">Withholding tax</span></span><span>{{@root.totals.withheld}}</span></div>
+      <div><span>ยอดรับสุทธิ <span class="en">Net received</span></span><span>{{@root.totals.netReceived}}</span></div>
+      {{/if}}
+      {{/if}}
+    </div>
+  </div>
+  {{#if @root.credit}}
+  <div class="box reason">
+    <b>เหตุผลในการลดหนี้</b> <span class="en">(Reason)</span>
+    <div class="opts">
+      {{#each @root.reasons}}<span><span class="cb">{{#if on}}✓{{/if}}</span> {{th}} <span class="en">({{en}})</span></span>{{/each}}
+    </div>
+    <div class="free">{{@root.reasonText}}</div>
+  </div>
+  <div class="bottom row" style="justify-content:flex-end">
+    <div class="sig"><div class="line"></div>ผู้มีอำนาจลงนาม <span class="en">(Authorized signature)</span><br>วันที่ <span class="en">(Date)</span> ....../....../......</div>
+  </div>
+  {{else}}
+  <div class="bottom row" style="align-items:flex-end">
+    <div class="pay">
+      <b>ได้รับเงินแล้วโดย</b> <span class="en">(Received by)</span>
+      <span class="cb">{{#if @root.payment.cash}}✓{{/if}}</span> เงินสด <span class="en">(Cash)</span>
+      <span class="cb">{{#if @root.payment.transfer}}✓{{/if}}</span> โอนเงิน <span class="en">(Transfer)</span>
+      &nbsp; วันที่รับเงิน <span class="en">(Payment date)</span> <span class="date">{{@root.payment.date}}</span>
+    </div>
+    <div class="sig"><div class="line"></div>ผู้รับเงิน <span class="en">(Receiver signature)</span><br>วันที่ <span class="en">(Date)</span> ....../....../......</div>
+  </div>
+  {{/if}}
+{{else}}
+  <div class="note r">ต่อหน้าถัดไป <span class="en">(Continued on next page)</span></div>
+{{/if}}
+  <div class="foot"><span>{{#if multi}}เลขที่ {{@root.documentNumber}}{{/if}}</span><span>หน้า {{number}}/{{count}} <span class="en">(Page {{number}}/{{count}})</span></span></div>
+</section>
+{{/each}}
+</body>
+</html>

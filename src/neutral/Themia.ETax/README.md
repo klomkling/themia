@@ -99,3 +99,20 @@ services.ConfigureThemiaETaxTemplates(o =>
 `ConfigureThemiaETaxTemplates` may be called before or after the other `AddThemiaETax*` methods and validates at registration.
 Changing `TemplateVersion` later only affects documents issued after the change: an issued document is always rendered under the version recorded on it,
 so its words never change.
+
+## Template version 4: A5 landscape receipt/tax invoice and credit note
+
+Template `"4"` prints the combined **ใบเสร็จรับเงิน/ใบกำกับภาษี** (a receipt/tax invoice with the payment line and a receiver-signature line) and the
+**ใบลดหนี้** (a credit note with the five section 82/10 reasons) on A5 landscape pages (210 × 148 mm), with the embedded Sarabun. It is opt-in
+(`o.TemplateVersion = "4"`; A4 stays available as `"1"` to `"3"`) and never the default. A debit note uses the credit note layout without the reason block.
+
+- **Data:** line `Quantity` / `Unit` / `UnitPriceSatang` fill the receipt table; on a note, line `OriginalAmountExVatSatang` / `CorrectAmountExVatSatang`
+  fill the original-value and correct-value columns (the difference is the line amount); `Payment` fills the payment line;
+  `TaxNoteReference.ReasonKind` ticks the reason. All optional: a missing value prints an empty cell.
+- **Overflow:** lines never shrink the type. A receipt holds 6 lines on one page (a credit note 4); more continue on a further page, and every page
+  but the last ends with a carried-forward subtotal (ยอดยกไป) that the next page opens with (ยอดยกมา). Middle and last pages use a compact header. The counts
+  are fixed (6 / 12 / 9 for a receipt, 4 / 12 / 5 for a credit note) and a Chromium test proves each fits; a description long enough to wrap uses more height, so
+  keep descriptions to about one line.
+- **Logo:** `TaxDocumentRenderer.RenderWithLogoAsync(snapshot, "4", marker, new TaxDocumentLogo(pngOrJpegBytes))` prints the logo top-left; without one no logo box
+  is printed. The logo is not part of the stored document, so `TaxDocumentService` re-renders without it until a host passes one.
+- **Numbers:** the document number is whatever the number source prints, for example `RTX-6910-000001` (`TaxDocumentNumberOptions.YearStyle`, `Themia.ETax.Data`).

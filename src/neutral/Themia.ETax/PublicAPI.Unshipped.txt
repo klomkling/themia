@@ -414,3 +414,8 @@ Themia.ETax.TaxNoteReference.ReasonKind.get -> Themia.ETax.TaxNoteReason?
 Themia.ETax.TaxNoteReference.ReasonKind.init -> void
 Themia.ETax.TaxDocumentSnapshot.Payment.get -> Themia.ETax.TaxPayment?
 Themia.ETax.TaxDocumentSnapshot.Payment.init -> void
+Themia.ETax.TaxDocumentLogo
+const Themia.ETax.TaxDocumentLogo.MaxBytes = 262144 -> int
+Themia.ETax.TaxDocumentLogo.MediaType.get -> string!
+Themia.ETax.TaxDocumentLogo.TaxDocumentLogo(byte[]! bytes) -> void
+Themia.ETax.TaxDocumentRenderer.RenderWithLogoAsync(Themia.ETax.TaxDocumentSnapshot! snapshot, string! templateVersion, Themia.ETax.TaxDocumentMarker marker, Themia.ETax.TaxDocumentLogo? logo, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.ETax.TaxDocumentRender!>!
