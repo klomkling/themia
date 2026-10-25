@@ -27,6 +27,10 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+### Added
+
+- **`Themia.Notifications`: email attachments (`NotificationMessage.Attachments`).** `EmailAttachment(fileName, contentType, content)` is checked on construction (file name non-blank, at most 255 characters, no path separator, quote, control, bidi-override or other format/separator/private-use character, no unpaired surrogate, so no header injection through `Content-Disposition` and no name that displays as something else; content type a plain `type/subtype`; content not empty). `NotificationMessage.Attachments` copies the list and takes at most `NotificationMessage.MaxAttachments` (10). `SmtpEmailSender` writes a `multipart/mixed` message (alongside the `multipart/alternative` part when `PlainTextBody` is set) with base64 parts and an RFC 2231/2047-encoded name for non-ASCII names, and enforces two options, as `ArgumentException` (never retried, nothing written): `SmtpEmailOptions.AllowedAttachmentContentTypes` (default `application/pdf` only) and `SmtpEmailOptions.MaxAttachmentBytes` (default 7 MiB in total, so the base64 message stays under the 10 MB many providers accept). A message without attachments is byte-identical to before. Decorators around `IEmailSender` pass the message through unchanged. Attachment bytes are never logged (`EmailAttachment.ToString()` prints name, type and length only). Direct sends only: the notifications module's outbox stores text columns and does not carry attachments, and `NotificationRequest` has no such property.
+
 ## [0.40.0] - 2026-10-25
 
 The seller logo on the paged e-tax templates (versions "4" and "5") becomes a host concern: a document records which logo it was issued with and is always re-rendered with it.

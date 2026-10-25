@@ -81,3 +81,15 @@ Themia.Notifications.ThemiaNotificationsOptions
 Themia.Notifications.ThemiaNotificationsOptions.ConfigureHandlebars.get -> System.Action<HandlebarsDotNet.IHandlebars!>?
 Themia.Notifications.ThemiaNotificationsOptions.ConfigureHandlebars.set -> void
 Themia.Notifications.ThemiaNotificationsOptions.ThemiaNotificationsOptions() -> void
+const Themia.Notifications.EmailAttachment.MaxFileNameLength = 255 -> int
+const Themia.Notifications.NotificationMessage.MaxAttachments = 10 -> int
+Themia.Notifications.EmailAttachment
+Themia.Notifications.EmailAttachment.Content.get -> System.ReadOnlyMemory<byte>
+Themia.Notifications.EmailAttachment.ContentType.get -> string!
+Themia.Notifications.EmailAttachment.EmailAttachment(string! fileName, string! contentType, System.ReadOnlyMemory<byte> content) -> void
+Themia.Notifications.EmailAttachment.FileName.get -> string!
+Themia.Notifications.NotificationMessage.Attachments.get -> System.Collections.Generic.IReadOnlyList<Themia.Notifications.EmailAttachment!>?
+Themia.Notifications.NotificationMessage.Attachments.init -> void
+Themia.Notifications.Providers.SmtpEmailOptions.AllowedAttachmentContentTypes.get -> System.Collections.Generic.ISet<string!>!
+Themia.Notifications.Providers.SmtpEmailOptions.MaxAttachmentBytes.get -> long
+Themia.Notifications.Providers.SmtpEmailOptions.MaxAttachmentBytes.set -> void
