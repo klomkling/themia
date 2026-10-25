@@ -134,10 +134,12 @@ public sealed class TaxDocumentService
                 return replaced;
         }
 
-        var number = await _numbers.NextNumberAsync(tx, request.SellerId, request.Key.Kind, draft.IssueDate, ct).ConfigureAwait(false);
+        // Before the number: a source that fails must not leave a taken number (a hole in a gapless sequence) behind.
         var logo = TaxDocumentTemplates.PageSizeOf(_templateVersion) is null
             ? null
             : await _logos.GetCurrentAsync(request.SellerId, ct).ConfigureAwait(false);
+
+        var number = await _numbers.NextNumberAsync(tx, request.SellerId, request.Key.Kind, draft.IssueDate, ct).ConfigureAwait(false);
         var snapshot = draft with { DocumentNumber = number, LogoSha256 = logo?.Sha256 };
         errors = Validate(snapshot, request.Key);
         if (errors.Count > 0)

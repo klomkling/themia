@@ -64,6 +64,16 @@ public sealed class LogoSourceTests
         Assert.Contains(result.Errors, e => e.Field == "logo_sha256");
     }
 
+    [Fact]
+    public async Task IssueAsync_ShouldTakeNoNumber_WhenTheLogoSourceFails()
+    {
+        var flow = new Flow(templates: Paged(null), logos: new ThrowingLogos());
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => flow.IssueAsync(Flow.Request()));
+
+        Assert.Equal(0, flow.Numbers.Calls);
+    }
+
     [Theory]
     [InlineData("abc")]
     [InlineData("ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789")]
@@ -169,6 +179,13 @@ public sealed class LogoSourceTests
         Assert.Throws<InvalidOperationException>(() => Paged(Brand, version).Validate());
 
     private static byte[] PngBytes(byte tag) => [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, tag];
+
+    private sealed class ThrowingLogos : ITaxDocumentLogoSource
+    {
+        public Task<TaxDocumentLogo?> GetCurrentAsync(string sellerId, CancellationToken ct = default) => throw new InvalidOperationException("logo store down");
+
+        public Task<TaxDocumentLogo?> FindAsync(string sellerId, string sha256, CancellationToken ct = default) => throw new InvalidOperationException("logo store down");
+    }
 
     private sealed class FixedLogos(TaxDocumentLogo logo) : ITaxDocumentLogoSource
     {

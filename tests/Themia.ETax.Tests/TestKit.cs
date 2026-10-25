@@ -82,8 +82,12 @@ internal sealed class FakeNumberSource : ITaxDocumentNumberSource
     /// <summary>Numbers allocated and not rolled back.</summary>
     public int Allocated { get; private set; }
 
+    /// <summary>Calls to <see cref="NextNumberAsync"/>, whether or not rolled back.</summary>
+    public int Calls { get; private set; }
+
     public Task<string> NextNumberAsync(System.Data.Common.DbTransaction tx, string sellerId, TaxDocumentKind kind, DateOnly issueDate, CancellationToken ct = default)
     {
+        Calls++;
         Allocated++;
         ((InMemoryTaxDocumentStore.FakeTransaction)tx).OnRollback(() => Allocated--);
         return Task.FromResult($"TAX-{Allocated:0000}");
