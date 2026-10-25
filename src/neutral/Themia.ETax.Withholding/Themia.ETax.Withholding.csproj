@@ -12,6 +12,7 @@
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="Templates/withholding-certificate.v1.hbs" LogicalName="Templates.withholding-certificate.v1.hbs" />
+    <EmbeddedResource Include="Templates/withholding-certificate.v2.hbs" LogicalName="Templates.withholding-certificate.v2.hbs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../Themia.ETax/Themia.ETax.csproj" />

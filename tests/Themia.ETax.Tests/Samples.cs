@@ -37,6 +37,7 @@ internal static class Samples
             OriginalIssueDate = new DateOnly(2026, 10, 14),
             Mode = TaxNoteMode.FullCancellation,
             Reason = "Refund",
+            ReasonKind = TaxNoteReason.ServiceCancelled,
             RefundedNetSatang = 104_000,
         },
     };
@@ -66,6 +67,7 @@ internal static class Samples
                 OriginalIssueDate = new DateOnly(2026, 10, 14),
                 Mode = TaxNoteMode.Adjustment,
                 Reason = "Price correction",
+                ReasonKind = kind == TaxDocumentKind.CreditNote ? TaxNoteReason.PriceReduction : null,
                 OriginalValueSatang = original,
                 CorrectedValueSatang = corrected,
             },

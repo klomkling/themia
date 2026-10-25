@@ -202,7 +202,7 @@ Themia.ETax.Withholding.IWithholdingCertificateStore.FindByKeyForIssueAsync(Syst
 Themia.ETax.Withholding.IWithholdingCertificateStore.GetAsync(System.Data.Common.DbTransaction? tx, System.Guid id, string! payerId, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.ETax.Withholding.WithholdingCertificateRecord?>!
 Themia.ETax.Withholding.IWithholdingCertificateStore.InsertAsync(System.Data.Common.DbTransaction! tx, Themia.ETax.Withholding.NewWithholdingCertificate! document, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
 Themia.ETax.Withholding.WithholdingTemplates
-const Themia.ETax.Withholding.WithholdingTemplates.CurrentVersion = "1" -> string!
+const Themia.ETax.Withholding.WithholdingTemplates.CurrentVersion = "2" -> string!
 Themia.ETax.Withholding.IssueWithholdingCertificateRequest
 Themia.ETax.Withholding.IssueWithholdingCertificateRequest.Key.get -> Themia.ETax.Withholding.WithholdingCertificateKey
 Themia.ETax.Withholding.IssueWithholdingCertificateRequest.Key.init -> void

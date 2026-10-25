@@ -44,3 +44,8 @@ Themia.ETax.Data.SequenceTaxDocumentNumberSource.SequenceTaxDocumentNumberSource
 Themia.ETax.Data.SequenceTaxDocumentNumberSource.NextNumberAsync(System.Data.Common.DbTransaction! tx, string! sellerId, Themia.ETax.TaxDocumentKind kind, System.DateOnly issueDate, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<string!>!
 Microsoft.Extensions.DependencyInjection.ETaxDataServiceCollectionExtensions
 static Microsoft.Extensions.DependencyInjection.ETaxDataServiceCollectionExtensions.AddThemiaETaxSequenceNumbers(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Themia.ETax.Data.TaxDocumentNumberOptions!>? configure = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+Themia.ETax.Data.TaxDocumentNumberYearStyle
+Themia.ETax.Data.TaxDocumentNumberYearStyle.BuddhistEraTwoDigit = 1 -> Themia.ETax.Data.TaxDocumentNumberYearStyle
+Themia.ETax.Data.TaxDocumentNumberYearStyle.Gregorian = 0 -> Themia.ETax.Data.TaxDocumentNumberYearStyle
+Themia.ETax.Data.TaxDocumentNumberOptions.YearStyle.get -> Themia.ETax.Data.TaxDocumentNumberYearStyle
+Themia.ETax.Data.TaxDocumentNumberOptions.YearStyle.set -> void

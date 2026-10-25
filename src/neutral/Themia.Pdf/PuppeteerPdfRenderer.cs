@@ -307,8 +307,10 @@ internal sealed class PuppeteerPdfRenderer : IVersionedPdfRenderer, IAsyncDispos
             PdfPaperFormat.Letter => PaperFormat.Letter,
             PdfPaperFormat.Legal => PaperFormat.Legal,
             PdfPaperFormat.Tabloid => PaperFormat.Tabloid,
+            PdfPaperFormat.A5 => PaperFormat.A5,
             _ => PaperFormat.A4,
         },
+        Landscape = o.Landscape,
         PrintBackground = o.PrintBackground,
         MarginOptions = new MarginOptions
         {

@@ -48,5 +48,7 @@ TaxDocumentGuards.ApplySameSellerReplacementKey(this, map);
 
 `services.AddThemiaETaxSequenceNumbers()` (after `AddThemiaSequences`) registers an `ITaxDocumentNumberSource` over
 `ITransactionalSequenceAllocator`: the number is drawn inside the issue transaction, so commit keeps it and rollback returns it. One run per seller,
-kind and (by default) year, formatted `TAX-2026-000001`. Prefixes, period, padding and tenant-or-host counters are options; anything else is your own
+kind and (by default) year, formatted `TAX-2026-000001`. Prefixes, period, padding, year style and tenant-or-host counters are options; set
+`Period = Monthly` and `YearStyle = BuddhistEraTwoDigit` with your own prefix (`Prefixes[TaxDocumentKind.TaxInvoiceReceipt] = "RTX"`) for
+`RTX-6910-000001`, a run per month and a Buddhist-era two-digit year (the run key stays Gregorian, so changing the style never restarts a run). Anything else is your own
 `ITaxDocumentNumberSource`. Seller ids must be short enough for the allocator's 100-character key. The caller's transaction must be READ COMMITTED.

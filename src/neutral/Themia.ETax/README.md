@@ -99,3 +99,22 @@ services.ConfigureThemiaETaxTemplates(o =>
 `ConfigureThemiaETaxTemplates` may be called before or after the other `AddThemiaETax*` methods and validates at registration.
 Changing `TemplateVersion` later only affects documents issued after the change: an issued document is always rendered under the version recorded on it,
 so its words never change.
+
+## Template versions 4 and 5: receipt/tax invoice and credit note on A4 portrait or A5 landscape
+
+Templates `"4"` and `"5"` print the combined **ใบเสร็จรับเงิน/ใบกำกับภาษี** (a receipt/tax invoice with the payment line and a receiver-signature line) and the
+**ใบลดหนี้** (a credit note with the five section 82/10 reasons) in one layout, with the embedded Sarabun. `"4"` is **A4 portrait** (210 × 297 mm), the page for
+documents sent as PDFs: the content flows from the top, with no blank rows, and grows downwards. `"5"` is **A5 landscape** (210 × 148 mm), a small form whose
+table keeps its full height. The page size is part of the version, because a document records only its version. Both are opt-in (`o.TemplateVersion = "4"`);
+`"1"` to `"3"` stay as they were and the default stays `"1"`. A debit note (ใบเพิ่มหนี้) uses the credit note layout, with its reason printed as text (the five section 82/10 reasons are for credit notes only).
+
+- **Data:** line `Quantity` / `Unit` / `UnitPriceSatang` fill the receipt table; on a note, line `OriginalAmountExVatSatang` / `CorrectAmountExVatSatang`
+  fill the original-value and correct-value columns (the difference is the line amount); `Payment` fills the payment line;
+  `TaxNoteReference.ReasonKind` ticks the reason. All optional: a missing value prints an empty cell.
+- **Overflow:** lines never shrink the type. A page takes new lines until it is full; the next lines continue on a further page, every page but the last ends with a
+  carried-forward subtotal (ยอดยกไป) that the next page opens with (ยอดยกมา), and middle and last pages use a compact header. The counts are fixed constants:
+  on A4 a receipt holds 32 lines on one page (a credit note 30) and then 38 per middle page and 34 on the last (32); on A5 6 / 12 / 9 (credit note 4 / 12 / 5).
+  A Chromium test proves each count fits. A description that wraps uses more height and can add a page; it is never clipped, so keep descriptions to about one line.
+- **Logo:** `TaxDocumentRenderer.RenderWithLogoAsync(snapshot, "4", marker, new TaxDocumentLogo(pngOrJpegBytes))` prints the logo top-left; without one no logo box
+  is printed. The logo is not part of the stored document, so `TaxDocumentService` re-renders without it until a host passes one.
+- **Numbers:** the document number is whatever the number source prints, for example `RTX-6910-000001` (`TaxDocumentNumberOptions.YearStyle`, `Themia.ETax.Data`).

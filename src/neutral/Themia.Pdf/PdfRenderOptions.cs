@@ -15,6 +15,9 @@ public sealed class PdfRenderOptions
     /// <summary>Whether CSS backgrounds are printed. Default <see langword="true"/>.</summary>
     public bool PrintBackground { get; init; } = true;
 
+    /// <summary>Prints the page turned on its side (a wide page). Default <see langword="false"/>, portrait.</summary>
+    public bool Landscape { get; init; }
+
     /// <summary>Top margin (CSS length, e.g. "20mm"). Default "20mm".</summary>
     public string MarginTop { get; init; } = "20mm";
 

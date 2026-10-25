@@ -47,6 +47,57 @@ public sealed class SequenceTaxDocumentNumberSourceTests
         return new SequenceTaxDocumentNumberSource(_allocator, options);
     }
 
+    [Theory]
+    [InlineData(TaxDocumentNumberPeriod.Never, "RTX-000001", "DocNo:ETax:TaxInvoiceReceipt:s")]
+    [InlineData(TaxDocumentNumberPeriod.Yearly, "RTX-69-000001", "DocNo:ETax:TaxInvoiceReceipt:s:2026")]
+    [InlineData(TaxDocumentNumberPeriod.Monthly, "RTX-6910-000001", "DocNo:ETax:TaxInvoiceReceipt:s:202610")]
+    public async Task NextNumberAsync_ShouldPrintTheBuddhistEraTwoDigitYear_AndKeepTheRunKeyGregorian(TaxDocumentNumberPeriod period, string expected, string key)
+    {
+        var sut = Sut(o =>
+        {
+            o.Period = period;
+            o.YearStyle = TaxDocumentNumberYearStyle.BuddhistEraTwoDigit;
+            o.Prefixes[TaxDocumentKind.TaxInvoiceReceipt] = "RTX";
+        });
+
+        var number = await sut.NextNumberAsync(new NoTx(), "s", TaxDocumentKind.TaxInvoiceReceipt, Date);
+
+        Assert.Equal(expected, number);
+        Assert.Equal(key, _allocator.Calls[0].Key);
+    }
+
+    [Theory]
+    [InlineData(2026, 1, "RTX-6901-000001")]
+    [InlineData(2026, 12, "RTX-6912-000001")]
+    [InlineData(2057, 3, "RTX-0003-000001")]
+    public async Task NextNumberAsync_ShouldZeroPadTheMonth_AndWrapTheBuddhistYearAtTwoDigits(int year, int month, string expected)
+    {
+        var sut = Sut(o =>
+        {
+            o.Period = TaxDocumentNumberPeriod.Monthly;
+            o.YearStyle = TaxDocumentNumberYearStyle.BuddhistEraTwoDigit;
+            o.Prefixes[TaxDocumentKind.TaxInvoiceReceipt] = "RTX";
+        });
+
+        Assert.Equal(expected, await sut.NextNumberAsync(new NoTx(), "s", TaxDocumentKind.TaxInvoiceReceipt, new DateOnly(year, month, 5)));
+    }
+
+    [Fact]
+    public async Task NextNumberAsync_ShouldRestartEachMonthWithItsOwnRun_WhenMonthly()
+    {
+        var sut = Sut(o => { o.Period = TaxDocumentNumberPeriod.Monthly; o.YearStyle = TaxDocumentNumberYearStyle.BuddhistEraTwoDigit; });
+        _allocator.Next = 1;
+
+        await sut.NextNumberAsync(new NoTx(), "s", TaxDocumentKind.CreditNote, new DateOnly(2026, 10, 31));
+        await sut.NextNumberAsync(new NoTx(), "s", TaxDocumentKind.CreditNote, new DateOnly(2026, 11, 1));
+
+        Assert.Equal(["DocNo:ETax:CreditNote:s:202610", "DocNo:ETax:CreditNote:s:202611"], _allocator.Calls.Select(c => c.Key));
+    }
+
+    [Fact]
+    public void Options_ShouldRejectAnUnknownYearStyle() =>
+        Assert.Throws<InvalidOperationException>(() => Sut(o => o.YearStyle = (TaxDocumentNumberYearStyle)9));
+
     [Fact]
     public async Task NextNumberAsync_ShouldFormatPrefixYearAndPaddedCounter()
     {

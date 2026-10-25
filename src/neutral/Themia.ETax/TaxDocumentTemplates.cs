@@ -22,14 +22,30 @@ public static class TaxDocumentTemplates
     private static readonly Lazy<string> Version2 = new(() =>
         System.Text.Encoding.UTF8.GetString(TaxDocumentFonts.ReadBytes("Templates.tax-document.v2.hbs")));
 
-    /// <summary>True when <paramref name="templateVersion"/> can still be rendered.</summary>
+    private static readonly Lazy<string> Version4 = new(() =>
+        System.Text.Encoding.UTF8.GetString(TaxDocumentFonts.ReadBytes("Templates.tax-document.v4.hbs")));
+
+    /// <summary>The paper of a paged version ("4" A4 portrait, "5" A5 landscape); <see langword="null"/> for the single-sheet versions "1" to "3".</summary>
+    internal static TaxDocumentPageSize? PageSizeOf(string templateVersion) => templateVersion switch
+    {
+        "4" => TaxDocumentPageSize.A4Portrait,
+        "5" => TaxDocumentPageSize.A5Landscape,
+        _ => null,
+    };
+
+    /// <summary>
+    /// True when <paramref name="templateVersion"/> can still be rendered. Versions <c>"1"</c> to <c>"3"</c> print A4 sheets; <c>"4"</c> and <c>"5"</c> print the
+    /// combined receipt/tax invoice and the credit note in the designer's layout, <c>"4"</c> on A4 portrait (the page for PDFs: content flows from the top, no padding)
+    /// and <c>"5"</c> on A5 landscape (<see cref="ThaiBahtTextEtMode.TensOnly"/> words, a carried-forward subtotal when the lines continue on a further page).
+    /// Adopters opt into either for new documents; neither is the default.
+    /// </summary>
     /// <param name="templateVersion">The version recorded on a document.</param>
-    public static bool IsSupported(string? templateVersion) => templateVersion is "1" or "2" or "3";
+    public static bool IsSupported(string? templateVersion) => templateVersion is "1" or "2" or "3" or "4" or "5";
 
     // Versions 2 and 3 share one layout; the version alone fixes how the amount in words reads a units digit of 1.
     internal static ThaiBahtTextEtMode EtModeOf(string templateVersion) => templateVersion switch
     {
-        "3" => ThaiBahtTextEtMode.TensOnly,
+        "3" or "4" or "5" => ThaiBahtTextEtMode.TensOnly,
         _ => ThaiBahtTextEtMode.Always,
     };
 
@@ -37,6 +53,7 @@ public static class TaxDocumentTemplates
     {
         "1" => Version1.Value,
         "2" or "3" => Version2.Value,
+        "4" or "5" => Version4.Value,
         _ => throw new ArgumentException($"Unknown tax document template version '{templateVersion}'.", nameof(templateVersion)),
     };
 }

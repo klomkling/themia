@@ -15,6 +15,8 @@ namespace Themia.ETax.Data;
 /// </remarks>
 public sealed class SequenceTaxDocumentNumberSource : ITaxDocumentNumberSource
 {
+    private const int BuddhistEraOffset = 543;
+
     private readonly ITransactionalSequenceAllocator _allocator;
     private readonly TaxDocumentNumberOptions _options;
 
@@ -37,8 +39,8 @@ public sealed class SequenceTaxDocumentNumberSource : ITaxDocumentNumberSource
         if (!Enum.IsDefined(kind))
             throw new ArgumentOutOfRangeException(nameof(kind));
 
-        var period = PeriodText(issueDate);
-        var key = $"DocNo:ETax:{kind}:{sellerId}" + (period.Length == 0 ? string.Empty : ":" + period);
+        var runPeriod = RunPeriodText(issueDate);
+        var key = $"DocNo:ETax:{kind}:{sellerId}" + (runPeriod.Length == 0 ? string.Empty : ":" + runPeriod);
         if (key.Length > TaxDocumentNumberOptions.MaxKeyLength)
         {
             throw new ArgumentException(
@@ -52,13 +54,30 @@ public sealed class SequenceTaxDocumentNumberSource : ITaxDocumentNumberSource
 
         var counter = next.ToString("D" + _options.Padding.ToString(CultureInfo.InvariantCulture), CultureInfo.InvariantCulture);
         var prefix = _options.Prefixes[kind];
+        var period = PrintedPeriodText(issueDate);
         return period.Length == 0 ? $"{prefix}-{counter}" : $"{prefix}-{period}-{counter}";
     }
 
-    private string PeriodText(DateOnly issueDate) => _options.Period switch
+    // The run key always uses the Gregorian period, whatever year style the printed number shows: changing the style never starts a new run.
+    private string RunPeriodText(DateOnly issueDate) => _options.Period switch
     {
         TaxDocumentNumberPeriod.Yearly => issueDate.ToString("yyyy", CultureInfo.InvariantCulture),
         TaxDocumentNumberPeriod.Monthly => issueDate.ToString("yyyyMM", CultureInfo.InvariantCulture),
         _ => string.Empty,
     };
+
+    private string PrintedPeriodText(DateOnly issueDate)
+    {
+        if (_options.YearStyle == TaxDocumentNumberYearStyle.Gregorian)
+            return RunPeriodText(issueDate);
+
+        // Buddhist-era year is year + 543 computed here, never from a Thai culture or calendar (their data can differ between hosts).
+        var year = ((issueDate.Year + BuddhistEraOffset) % 100).ToString("D2", CultureInfo.InvariantCulture);
+        return _options.Period switch
+        {
+            TaxDocumentNumberPeriod.Yearly => year,
+            TaxDocumentNumberPeriod.Monthly => year + issueDate.Month.ToString("D2", CultureInfo.InvariantCulture),
+            _ => string.Empty,
+        };
+    }
 }
