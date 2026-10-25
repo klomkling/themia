@@ -12,7 +12,7 @@ namespace Themia.ETax.Withholding.Tests;
 /// </summary>
 public sealed class TemplateVersion1GoldenTests
 {
-    private sealed class NoPdf : IVersionedPdfRenderer
+    internal sealed class NoPdf : IVersionedPdfRenderer
     {
         public Task<byte[]> RenderHtmlAsync(string html, PdfRenderOptions? options = null, CancellationToken ct = default) =>
             throw new NotSupportedException();
@@ -62,7 +62,7 @@ public sealed class TemplateVersion1GoldenTests
         { "everything-signed-jpeg", "29c59a3a504d804f21c3bbd249f5c69a2516250724893645cd944fd14074c93f" },
     };
 
-    private static (WithholdingCertificateSnapshot Snapshot, WithholdingCopy Copy, WithholdingRenderMode Mode, WithholdingSignatureImage? Signature) Fixture(string name) => name switch
+    internal static (WithholdingCertificateSnapshot Snapshot, WithholdingCopy Copy, WithholdingRenderMode Mode, WithholdingSignatureImage? Signature) Fixture(string name) => name switch
     {
         "single-copy1" => (Samples.Valid(), WithholdingCopy.Copy1, WithholdingRenderMode.Issued, null),
         "single-copy2" => (Samples.Valid(), WithholdingCopy.Copy2, WithholdingRenderMode.Issued, null),
@@ -79,7 +79,7 @@ public sealed class TemplateVersion1GoldenTests
     public void Html_ShouldMatchTheGolden_BecauseVersion1MustNeverChange(string name, string expectedSha256)
     {
         var (snapshot, copy, mode, signature) = Fixture(name);
-        var html = new WithholdingCertificateRenderer(new NoPdf()).RenderHtml(snapshot, WithholdingTemplates.CurrentVersion, copy, mode, signature);
+        var html = new WithholdingCertificateRenderer(new NoPdf()).RenderHtml(snapshot, "1", copy, mode, signature);
 
         Assert.Equal(expectedSha256, Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(html))).ToLowerInvariant());
     }

@@ -33,9 +33,10 @@ public sealed partial class CertificateRendererTests
     private WithholdingCertificateRenderer Sut() => new(_pdf);
 
     private async Task<string> HtmlOf(
-        WithholdingCertificateSnapshot? snapshot = null, WithholdingCopy copy = WithholdingCopy.Copy1, WithholdingRenderMode mode = WithholdingRenderMode.Issued)
+        WithholdingCertificateSnapshot? snapshot = null, WithholdingCopy copy = WithholdingCopy.Copy1, WithholdingRenderMode mode = WithholdingRenderMode.Issued,
+        string? version = null)
     {
-        await Sut().RenderAsync(snapshot ?? Samples.Valid(), WithholdingTemplates.CurrentVersion, copy, mode);
+        await Sut().RenderAsync(snapshot ?? Samples.Valid(), version ?? WithholdingTemplates.CurrentVersion, copy, mode);
         return Decoded(_pdf.Html!);
     }
 
@@ -51,7 +52,7 @@ public sealed partial class CertificateRendererTests
     [Fact]
     public async Task RenderAsync_ShouldPrintTheOfficialTitleAndBothCopyLinesExactly()
     {
-        var html = await HtmlOf();
+        var html = await HtmlOf(version: "1");
 
         Assert.Contains("หนังสือรับรองการหักภาษี ณ ที่จ่าย", html);
         Assert.Contains("ตามมาตรา 50 ทวิ แห่งประมวลรัษฎากร", html);
@@ -65,7 +66,31 @@ public sealed partial class CertificateRendererTests
     [InlineData(WithholdingCopy.Copy2, "copy-2", "<div>ฉบับที่ 1", "<div class=\"on\">ฉบับที่ 2")]
     public async Task RenderAsync_ShouldMarkTheCopyItIs_AndStillPrintBothLines(WithholdingCopy copy, string key, string first, string second)
     {
-        var html = await HtmlOf(copy: copy);
+        var html = await HtmlOf(copy: copy, version: "1");
+
+        Assert.Contains($"data-copy=\"{key}\"", html);
+        Assert.Contains(first, html);
+        Assert.Contains(second, html);
+    }
+
+    [Fact]
+    public async Task RenderAsync_ShouldPrintTheOfficialTitleAndBothCopyLinesExactly_InVersion2()
+    {
+        var html = await HtmlOf(version: "2");
+
+        Assert.Contains("หนังสือรับรองการหักภาษี ณ ที่จ่าย", html);
+        Assert.Contains("ตามมาตรา 50 ทวิ แห่งประมวลรัษฎากร", html);
+        Assert.Contains("<b>ฉบับที่ 1</b> <i>(สำหรับผู้ถูกหักภาษี ณ ที่จ่าย ใช้แนบพร้อมกับแบบแสดงรายการภาษี)</i>", html);
+        Assert.Contains("<b>ฉบับที่ 2</b> <i>(สำหรับผู้ถูกหักภาษี ณ ที่จ่าย เก็บไว้เป็นหลักฐาน)</i>", html);
+        Assert.Contains("<title>WHT-2569-000123</title>", html);
+    }
+
+    [Theory]
+    [InlineData(WithholdingCopy.Copy1, "copy-1", "<div class=\"on\"><b>ฉบับที่ 1</b>", "<div><b>ฉบับที่ 2</b>")]
+    [InlineData(WithholdingCopy.Copy2, "copy-2", "<div><b>ฉบับที่ 1</b>", "<div class=\"on\"><b>ฉบับที่ 2</b>")]
+    public async Task RenderAsync_ShouldMarkTheCopyItIs_AndStillPrintBothLines_InVersion2(WithholdingCopy copy, string key, string first, string second)
+    {
+        var html = await HtmlOf(copy: copy, version: "2");
 
         Assert.Contains($"data-copy=\"{key}\"", html);
         Assert.Contains(first, html);
@@ -373,12 +398,13 @@ public sealed partial class CertificateRendererTests
     }
 
     [Fact]
-    public void Templates_ShouldSupportOnlyVersion1()
+    public void Templates_ShouldSupportVersions1And2_AndIssueNewCertificatesWithVersion2()
     {
         Assert.True(WithholdingTemplates.IsSupported("1"));
-        Assert.False(WithholdingTemplates.IsSupported("2"));
+        Assert.True(WithholdingTemplates.IsSupported("2"));
+        Assert.False(WithholdingTemplates.IsSupported("3"));
         Assert.False(WithholdingTemplates.IsSupported(null));
-        Assert.Equal("1", WithholdingTemplates.CurrentVersion);
+        Assert.Equal("2", WithholdingTemplates.CurrentVersion);
     }
 
     // ---- stored certificates ---------------------------------------------------------------------------------------
