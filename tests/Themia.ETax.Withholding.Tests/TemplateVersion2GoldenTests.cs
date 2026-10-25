@@ -12,13 +12,13 @@ public sealed class TemplateVersion2GoldenTests
 {
     public static TheoryData<string, string> Documents => new()
     {
-        { "single-copy1", "0412bb1c14d5b5f26e2857d30e8809fc63354ac190a15f935cf846b448aed766" },
-        { "single-copy2", "d44cacf317aa2d71d7e394004d5740960df5327b6ba5c5784164402a1b830bab" },
-        { "everything-copy1", "86401a2f3b2e63addadb05a0bb9f88b51d23426d44377ed7ce8be4164ab4b5e1" },
-        { "single-replacement-copy", "ed6dc1250d0c251189a374a5df512186d60cd21d839b3b20dcb7fd2f888ee899" },
-        { "single-cancelled", "59ed437d4e03347c079f665e8620cb5892a17fffb19ace2414d04ad515c982c7" },
-        { "single-signed-png", "671419539b4ea2102a749fe6ca168694ec67c1b0bed305fd414cbabc47650fae" },
-        { "everything-signed-jpeg", "3c3bb8ead9fa8cfec0f5a961ca40fe86c9def50d457fe12ea5531c2a7ae1e760" },
+        { "single-copy1", "85bec428cb542864724805b97b026b262445105a9842f52ddf14bc98d234ca80" },
+        { "single-copy2", "85835cd5a6ca7fa0e6df56d085013e53836c5d46a7414b310627a5c1c246324b" },
+        { "everything-copy1", "185770cc68b44b10320d0b0c32a7d4d87fb136f21afb0013548bc80da0a3d5ce" },
+        { "single-replacement-copy", "b28f99a1015fef55b2e5d399cf70d8ec5264ceee300653d9c2c3c78ca4a62f4f" },
+        { "single-cancelled", "93d5bd589616a085296423ba857c3f3278fc58324eea67d9d0e5b38d1489d2f7" },
+        { "single-signed-png", "66b1a6d2b0a96b655ff510fc77c9ceddd747320d72a708138f3450800a00d02e" },
+        { "everything-signed-jpeg", "d103e87ee50f43664e9498932756e6059b1ae39a3e948e03cc83c1ee74fec0e4" },
     };
 
     [Theory]
