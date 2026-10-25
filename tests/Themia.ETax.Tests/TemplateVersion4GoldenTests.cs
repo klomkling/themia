@@ -13,18 +13,18 @@ public sealed class TemplateVersion4GoldenTests
 {
     public static TheoryData<string, string, string> Documents => new()
     {
-        { "4", "receipt-1-line", "3fe601ec167b8331ec4ec61a50c41b2725874da1035e1eab61170f4eb73157a1" },
-        { "4", "receipt-full-page", "97a00407f7863b15f6d753f1e33ac851d51baed124a37c4f00d6699b48d6645f" },
-        { "4", "receipt-2-pages", "ee3d649685970c7330ecd8cde8f542a74538e01799eca22d0367386d211f754b" },
-        { "4", "receipt-copy", "667915e8f5ad0a715718fce07e713c5fd1aa0c0c5ae371585b973c2eecb3bbc4" },
-        { "4", "credit-note", "50ddc7ef4d354f09b08075ef276064e0a7137948b22a97cf146432af870aeb62" },
-        { "4", "debit-note", "b4b5c4ba67c1102665eb449d0d1d22b8de9319a671afa2f7c9297f5c9f4ae9cd" },
-        { "5", "receipt-1-line", "b023060d3049b0568711733dffa0dc9d97992ef0c7c0c13248ca69c44a4272c1" },
-        { "5", "receipt-full-page", "6ed9a4e53bff4d4cc836e21f258a34886c5452a95edf06c86b9426a1da67076b" },
-        { "5", "receipt-2-pages", "770c627158b7f5344166971273568825fc48f02ec242c4e05dc2226041742c55" },
-        { "5", "receipt-copy", "bc8fa63382de2e15ff65e43c3db9fd083be77680656b5564f3cd650cd4037acb" },
-        { "5", "credit-note", "c56979c3140b7645ffd4b1e99d7142178c71b76f49c897fb0b555a796b268d12" },
-        { "5", "debit-note", "cba96a1b11ae8b08fba57c5e7e9a7c9f200975882cb0913e8951a2b784c14d01" },
+        { "4", "receipt-1-line", "2d8b90a3d99cb8e0f56e02fea04bb3a0302f0f2d5395d79e141fe788018bc7fe" },
+        { "4", "receipt-full-page", "f657dcf12ae452319d7e2a9a7a9df668e58af8b23c5d38c3697aad4739c1c6f0" },
+        { "4", "receipt-2-pages", "56399de670c1ae9f1f33bec7d4e3db3d674e177d5491bcf5e2df5661192520f0" },
+        { "4", "receipt-copy", "b4fc7d928a2874a86ab922e62cd372f531d39723422cc8420c1766258de1c4a0" },
+        { "4", "credit-note", "344fbe98438b3ae0b1f83555c0ac0c2ee3e51c1d0176dc8648f4f150f6bebce8" },
+        { "4", "debit-note", "35a431a80a9c329c8f6bf16c293cb31738bde6e4915963b35633420237192a65" },
+        { "5", "receipt-1-line", "bc83b5df2e8269493158c0358ff94b18083aeb33dcf97bc46ab890ba62552838" },
+        { "5", "receipt-full-page", "71dc38184c913a30beb17a417b732d676d8b478f018e04aadd4480a6182953dd" },
+        { "5", "receipt-2-pages", "f67beed27311e422388f5477c75e3157068c6d08e07cead89353668b083dead8" },
+        { "5", "receipt-copy", "685e66db3c13b0fa736a2a0249dddc816408604a23cb040b47b7f6b8597568fd" },
+        { "5", "credit-note", "6b245cf7bdf72bd90ba35454470751d479b44587f026ec790d513874bb1c15e3" },
+        { "5", "debit-note", "5527944fb1243db86e2d942d5d293c974d0301ac147acfe729b99fabd531796a" },
     };
 
     private static TaxDocumentPageSize SizeOf(string version) => TaxDocumentTemplates.PageSizeOf(version)!.Value;

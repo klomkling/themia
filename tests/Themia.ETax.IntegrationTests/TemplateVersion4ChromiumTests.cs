@@ -1,5 +1,6 @@
 using System.Text.RegularExpressions;
 using Microsoft.Extensions.DependencyInjection;
+using PuppeteerSharp;
 using Themia.ETax;
 using Xunit;
 
@@ -151,6 +152,37 @@ public sealed partial class TemplateVersion4ChromiumTests
             Assert.InRange(height, 841, 843);
         else
             Assert.InRange(height, 419, 421);
+    }
+
+    // The watermark sits behind the content (z-index -1), so anything opaque painted on html or body would cover it and a cancelled copy would print
+    // without it while its HTML still contains the words. Only what the browser paints can show that: a cancelled copy and a plain copy have the same
+    // marker text, so their screenshots differ exactly when the watermark is visible.
+    private static async Task<byte[]> ScreenshotAsync(string html)
+    {
+        var path = Environment.GetEnvironmentVariable(ChromiumPath.EnvironmentVariable);
+        if (string.IsNullOrWhiteSpace(path))
+            path = (await new BrowserFetcher().DownloadAsync().ConfigureAwait(false)).GetExecutablePath();
+
+        await using var browser = await Puppeteer.LaunchAsync(new LaunchOptions { Headless = true, ExecutablePath = path, Args = ["--no-sandbox"] });
+        await using var page = await browser.NewPageAsync();
+        await page.SetViewportAsync(new ViewPortOptions { Width = 794, Height = 1123 });
+        await page.SetContentAsync(html);
+        return await page.ScreenshotDataAsync();
+    }
+
+    [Theory]
+    [InlineData("4")]
+    [InlineData("5")]
+    public async Task Render_ShouldPaintTheCancelledWatermark_OnACancelledCopy(string version)
+    {
+        await using var host = NewHost();
+        var renderer = host.GetRequiredService<TaxDocumentRenderer>();
+        var receipt = Receipt(2);
+
+        var copy = await ScreenshotAsync(renderer.RenderHtml(receipt, version, TaxDocumentMarker.Copy));
+        var cancelled = await ScreenshotAsync(renderer.RenderHtml(receipt, version, TaxDocumentMarker.CancelledCopy));
+
+        Assert.NotEqual(copy, cancelled);
     }
 
     [Theory]
