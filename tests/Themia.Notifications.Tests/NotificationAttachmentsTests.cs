@@ -48,8 +48,22 @@ public sealed class NotificationAttachmentsTests
     [InlineData("..")]
     [InlineData("a\r\nBcc: x@y.test.pdf")]
     [InlineData("a\"b.pdf")]
+    [InlineData("invoice\u202Efdp.exe")]     // right-to-left override: shows as invoiceexe.pdf
+    [InlineData("a\u2066b.pdf")]             // bidi isolate
+    [InlineData("a\u200Bb.pdf")]             // zero-width space
+    [InlineData("a\u2028b.pdf")]             // line separator
+    [InlineData("a\u2029b.pdf")]             // paragraph separator
+    [InlineData("a\uE000b.pdf")]             // private use
     public void EmailAttachment_ShouldRejectAnUnsafeFileName(string name) =>
         Assert.Throws<ArgumentException>(() => Receipt(name));
+
+    [Fact]
+    public void EmailAttachment_ShouldRejectAnUnpairedSurrogateInTheFileName()
+    {
+        // Built here: xUnit replaces a lone surrogate in inline data with U+FFFD, which would test something else.
+        Assert.Throws<ArgumentException>(() => Receipt("a" + (char)0xD800 + "b.pdf"));
+        Assert.Throws<ArgumentException>(() => Receipt("a" + (char)0xDC00 + "b.pdf"));
+    }
 
     [Fact]
     public void EmailAttachment_ShouldRejectAFileNameLongerThanTheLimit() =>
@@ -74,6 +88,7 @@ public sealed class NotificationAttachmentsTests
     public void EmailAttachment_ShouldLowerCaseTheContentType_AndAcceptAThaiName()
     {
         var attachment = Receipt("ใบเสร็จ.pdf", "Application/PDF");
+        Assert.Equal("ใบกำกับภาษี 😀.pdf", Receipt("ใบกำกับภาษี 😀.pdf").FileName);
 
         Assert.Equal("application/pdf", attachment.ContentType);
         Assert.Equal("ใบเสร็จ.pdf", attachment.FileName);

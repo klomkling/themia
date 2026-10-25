@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net.Mime;
 using System.Text;
 
@@ -26,7 +27,7 @@ public sealed record EmailAttachment
     {
         if (string.IsNullOrWhiteSpace(fileName)
             || fileName.Length > MaxFileNameLength
-            || fileName.Any(c => char.IsControl(c) || c is '/' or '\\' or '"')
+            || !IsSafeFileName(fileName)
             || fileName is "." or "..")
         {
             throw new ArgumentException(
@@ -64,6 +65,49 @@ public sealed record EmailAttachment
         builder.Append("FileName = ").Append(FileName).Append(", ContentType = ").Append(ContentType)
             .Append(", Length = ").Append(Content.Length);
         return true;
+    }
+
+    // Beyond the header-injection characters: the name is what the recipient reads, so characters that make it display as something it
+    // is not are refused too. Format covers the bidi overrides and isolates (U+202A-202E, U+2066-2069) and zero-width characters;
+    // an unpaired surrogate is not text at all. Scripts' own marks (Thai vowels, tone marks) are letters/marks, not Format.
+    private static bool IsSafeFileName(string name)
+    {
+        foreach (var rune in EnumerateRunes(name))
+        {
+            if (rune is null)
+                return false;
+
+            var r = rune.Value;
+            if (Rune.IsControl(r) || r.Value is '/' or '\\' or '"')
+                return false;
+
+            if (Rune.GetUnicodeCategory(r) is UnicodeCategory.Format or UnicodeCategory.LineSeparator
+                or UnicodeCategory.ParagraphSeparator or UnicodeCategory.PrivateUse or UnicodeCategory.OtherNotAssigned)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    // Null marks an invalid (unpaired surrogate) position.
+    private static IEnumerable<Rune?> EnumerateRunes(string name)
+    {
+        var i = 0;
+        while (i < name.Length)
+        {
+            if (Rune.TryGetRuneAt(name, i, out var rune))
+            {
+                i += rune.Utf16SequenceLength;
+                yield return rune;
+            }
+            else
+            {
+                i++;
+                yield return null;
+            }
+        }
     }
 
     private static bool TryNormaliseContentType(string? value, out string normalised)
