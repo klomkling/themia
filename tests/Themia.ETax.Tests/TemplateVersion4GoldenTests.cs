@@ -6,7 +6,7 @@ namespace Themia.ETax.Tests;
 
 /// <summary>
 /// Template versions "4" (A4 portrait) and "5" (A5 landscape) are what every stored document issued under them is re-rendered with, for years. This pins the
-/// complete HTML of a one-line receipt, a full page, a receipt that continues on a second page, a copy and a credit note, for each. A failure means: ship
+/// complete HTML of a one-line receipt, a full page, a receipt that continues on a second page, a copy, a credit note and a debit note, for each. A failure means: ship
 /// template version "6" and leave "4" and "5" untouched. It never means: update the hash.
 /// </summary>
 public sealed class TemplateVersion4GoldenTests
@@ -18,11 +18,13 @@ public sealed class TemplateVersion4GoldenTests
         { "4", "receipt-2-pages", "ee3d649685970c7330ecd8cde8f542a74538e01799eca22d0367386d211f754b" },
         { "4", "receipt-copy", "667915e8f5ad0a715718fce07e713c5fd1aa0c0c5ae371585b973c2eecb3bbc4" },
         { "4", "credit-note", "50ddc7ef4d354f09b08075ef276064e0a7137948b22a97cf146432af870aeb62" },
+        { "4", "debit-note", "b4b5c4ba67c1102665eb449d0d1d22b8de9319a671afa2f7c9297f5c9f4ae9cd" },
         { "5", "receipt-1-line", "b023060d3049b0568711733dffa0dc9d97992ef0c7c0c13248ca69c44a4272c1" },
         { "5", "receipt-full-page", "6ed9a4e53bff4d4cc836e21f258a34886c5452a95edf06c86b9426a1da67076b" },
         { "5", "receipt-2-pages", "770c627158b7f5344166971273568825fc48f02ec242c4e05dc2226041742c55" },
         { "5", "receipt-copy", "bc8fa63382de2e15ff65e43c3db9fd083be77680656b5564f3cd650cd4037acb" },
         { "5", "credit-note", "c56979c3140b7645ffd4b1e99d7142178c71b76f49c897fb0b555a796b268d12" },
+        { "5", "debit-note", "cba96a1b11ae8b08fba57c5e7e9a7c9f200975882cb0913e8951a2b784c14d01" },
     };
 
     private static TaxDocumentPageSize SizeOf(string version) => TaxDocumentTemplates.PageSizeOf(version)!.Value;
@@ -37,6 +39,7 @@ public sealed class TemplateVersion4GoldenTests
             "receipt-2-pages" => (TemplateVersion4Tests.Receipt(single + 2), TaxDocumentMarker.Original),
             "receipt-copy" => (TemplateVersion4Tests.Receipt(2), TaxDocumentMarker.Copy),
             "credit-note" => (CreditNote(), TaxDocumentMarker.Original),
+            "debit-note" => (TemplateVersion4Tests.DebitNote(), TaxDocumentMarker.Original),
             _ => throw new ArgumentOutOfRangeException(nameof(name)),
         };
     }

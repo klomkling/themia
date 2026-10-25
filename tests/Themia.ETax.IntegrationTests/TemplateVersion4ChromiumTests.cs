@@ -156,6 +156,25 @@ public sealed partial class TemplateVersion4ChromiumTests
     [Theory]
     [InlineData("4")]
     [InlineData("5")]
+    public async Task Render_ShouldKeepAFullDebitNoteOnOnePage_AtTheCreditNoteCapacity(string version)
+    {
+        await using var host = NewHost();
+        var lines = TaxDocumentPageLayout.SinglePageRows(SizeOf(version), TaxDocumentKind.DebitNote);
+        var debit = CreditNote(lines) with
+        {
+            Kind = TaxDocumentKind.DebitNote,
+            DocumentNumber = "DN-6910-000001",
+            Note = CreditNote(lines).Note! with { ReasonKind = null, Reason = "ปรับราคาตามจำนวนที่ส่งจริง" },
+        };
+
+        var render = await host.GetRequiredService<TaxDocumentRenderer>().RenderAsync(debit, version, TaxDocumentMarker.Original);
+
+        Assert.Equal(1, Pages(render.Pdf));
+    }
+
+    [Theory]
+    [InlineData("4")]
+    [InlineData("5")]
     public async Task Render_ShouldKeepAFullReceiptWithWithholdingRowsOnOnePage(string version)
     {
         await using var host = NewHost();
