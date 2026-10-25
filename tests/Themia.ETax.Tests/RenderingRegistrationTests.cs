@@ -20,6 +20,22 @@ public sealed class RenderingRegistrationTests
     }
 
     [Fact]
+    public async Task AddThemiaETaxRendering_ShouldServeTheConfiguredLogo_WhateverTheOrderOfRegistration()
+    {
+        var logo = new TaxDocumentLogo([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 7]);
+        var services = new ServiceCollection();
+        services.ConfigureThemiaETaxTemplates(o => { o.TemplateVersion = "4"; o.Logo = logo; });
+        services.AddThemiaETaxRendering();
+        using var sp = services.BuildServiceProvider();
+
+        var source = sp.GetRequiredService<ITaxDocumentLogoSource>();
+
+        Assert.Same(logo, await source.GetCurrentAsync("s"));
+        Assert.Same(logo, await source.FindAsync("s", logo.Sha256));
+        Assert.Null(await source.FindAsync("s", new string('0', 64)));
+    }
+
+    [Fact]
     public void AddThemiaETaxRendering_ShouldBeIdempotent()
     {
         var services = new ServiceCollection();

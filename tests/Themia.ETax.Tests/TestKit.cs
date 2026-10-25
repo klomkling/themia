@@ -82,8 +82,12 @@ internal sealed class FakeNumberSource : ITaxDocumentNumberSource
     /// <summary>Numbers allocated and not rolled back.</summary>
     public int Allocated { get; private set; }
 
+    /// <summary>Calls to <see cref="NextNumberAsync"/>, whether or not rolled back.</summary>
+    public int Calls { get; private set; }
+
     public Task<string> NextNumberAsync(System.Data.Common.DbTransaction tx, string sellerId, TaxDocumentKind kind, DateOnly issueDate, CancellationToken ct = default)
     {
+        Calls++;
         Allocated++;
         ((InMemoryTaxDocumentStore.FakeTransaction)tx).OnRollback(() => Allocated--);
         return Task.FromResult($"TAX-{Allocated:0000}");
@@ -196,15 +200,16 @@ internal sealed class Flow
     public static readonly DateTimeOffset Start = new(2026, 10, 14, 5, 0, 0, TimeSpan.Zero);
     public const string Seller = "seller-1";
 
-    public Flow(TaxDocumentSendOptions? options = null, TaxDocumentTemplateOptions? templates = null)
+    public Flow(TaxDocumentSendOptions? options = null, TaxDocumentTemplateOptions? templates = null, ITaxDocumentLogoSource? logos = null)
     {
         Options = options ?? new TaxDocumentSendOptions { RevenueDepartmentAddress = "rd@example.test" };
         Clock = new ManualTimeProvider(Start);
         InMemory = new InMemoryTaxDocumentStore();
         Store = new HookedStore(InMemory);
         templates ??= new TaxDocumentTemplateOptions();
-        Renderer = new TaxDocumentRenderer(Pdf);
-        Service = new TaxDocumentService(Store, Numbers, Renderer, new TaxDocumentValidationOptions(), templates, Clock, new CapturingLogger<TaxDocumentService>(Logs));
+        logos ??= new OptionsTaxDocumentLogoSource(templates);
+        Renderer = new TaxDocumentRenderer(Pdf, logos);
+        Service = new TaxDocumentService(Store, Numbers, Renderer, new TaxDocumentValidationOptions(), templates, logos, Clock, new CapturingLogger<TaxDocumentService>(Logs));
         Sender = new TaxDocumentSender(Store, Mailer, Failures, Renderer, Options, Clock, new CapturingLogger<TaxDocumentSender>(Logs));
     }
 

@@ -15,6 +15,7 @@ public sealed class TaxDocumentService
     private readonly ITaxDocumentNumberSource _numbers;
     private readonly TaxDocumentRenderer _renderer;
     private readonly TaxDocumentValidationOptions _validation;
+    private readonly ITaxDocumentLogoSource _logos;
     private readonly string _templateVersion;
     private readonly TimeProvider _clock;
     private readonly ILogger<TaxDocumentService> _logger;
@@ -42,7 +43,7 @@ public sealed class TaxDocumentService
     /// <param name="numbers">The gapless number source.</param>
     /// <param name="renderer">Renders copies.</param>
     /// <param name="validation">Validation options for new input.</param>
-    /// <param name="templates">The adopter's template options; the service reads <see cref="TaxDocumentTemplateOptions.TemplateVersion"/> for new documents.</param>
+    /// <param name="templates">The adopter's template options; the service reads <see cref="TaxDocumentTemplateOptions.TemplateVersion"/> for new documents, and <see cref="TaxDocumentTemplateOptions.Logo"/> as the one logo of every seller.</param>
     /// <param name="clock">The clock.</param>
     /// <param name="logger">The logger.</param>
     public TaxDocumentService(
@@ -53,10 +54,33 @@ public sealed class TaxDocumentService
         TaxDocumentTemplateOptions templates,
         TimeProvider clock,
         ILogger<TaxDocumentService> logger)
+        : this(store, numbers, renderer, validation, templates, new OptionsTaxDocumentLogoSource(templates ?? throw new ArgumentNullException(nameof(templates))), clock, logger)
+    {
+    }
+
+    /// <summary>Creates the service.</summary>
+    /// <param name="store">The app's store.</param>
+    /// <param name="numbers">The gapless number source.</param>
+    /// <param name="renderer">Renders copies.</param>
+    /// <param name="validation">Validation options for new input.</param>
+    /// <param name="templates">The adopter's template options; the service reads <see cref="TaxDocumentTemplateOptions.TemplateVersion"/> for new documents.</param>
+    /// <param name="logos">Where a new document of a paged template gets its seller's logo.</param>
+    /// <param name="clock">The clock.</param>
+    /// <param name="logger">The logger.</param>
+    public TaxDocumentService(
+        ITaxDocumentStore store,
+        ITaxDocumentNumberSource numbers,
+        TaxDocumentRenderer renderer,
+        TaxDocumentValidationOptions validation,
+        TaxDocumentTemplateOptions templates,
+        ITaxDocumentLogoSource logos,
+        TimeProvider clock,
+        ILogger<TaxDocumentService> logger)
     {
         ArgumentNullException.ThrowIfNull(templates);
         templates.Validate();
         _templateVersion = templates.TemplateVersion;
+        _logos = logos ?? throw new ArgumentNullException(nameof(logos));
         _store = store ?? throw new ArgumentNullException(nameof(store));
         _numbers = numbers ?? throw new ArgumentNullException(nameof(numbers));
         _renderer = renderer ?? throw new ArgumentNullException(nameof(renderer));
@@ -91,8 +115,11 @@ public sealed class TaxDocumentService
                 : Failed(TaxDocumentIssueOutcome.SourceConflict);
         }
 
-        var draft = request.Snapshot with { DocumentNumber = PendingNumber };
+        // The logo hash is the service's to stamp: a value from the caller is refused, not silently replaced.
+        var draft = request.Snapshot with { DocumentNumber = PendingNumber, LogoSha256 = null };
         var errors = Validate(draft, request.Key);
+        if (request.Snapshot.LogoSha256 is not null)
+            errors.Add(new TaxDocumentValidationError(TaxDocumentValidationCode.NotAllowed, "logo_sha256"));
         if (errors.Count > 0)
             return Failed(TaxDocumentIssueOutcome.ValidationFailed, errors);
 
@@ -107,8 +134,13 @@ public sealed class TaxDocumentService
                 return replaced;
         }
 
+        // Before the number: a source that fails must not leave a taken number (a hole in a gapless sequence) behind.
+        var logo = TaxDocumentTemplates.PageSizeOf(_templateVersion) is null
+            ? null
+            : await _logos.GetCurrentAsync(request.SellerId, ct).ConfigureAwait(false);
+
         var number = await _numbers.NextNumberAsync(tx, request.SellerId, request.Key.Kind, draft.IssueDate, ct).ConfigureAwait(false);
-        var snapshot = draft with { DocumentNumber = number };
+        var snapshot = draft with { DocumentNumber = number, LogoSha256 = logo?.Sha256 };
         errors = Validate(snapshot, request.Key);
         if (errors.Count > 0)
             return Failed(TaxDocumentIssueOutcome.ValidationFailed, errors);
@@ -152,7 +184,7 @@ public sealed class TaxDocumentService
 
         var snapshot = TaxDocumentSnapshotSerializer.Deserialize(document.SnapshotJson, document.SnapshotSha256);
         var marker = document.State == TaxDocumentState.Cancelled ? TaxDocumentMarker.CancelledCopy : TaxDocumentMarker.Copy;
-        return await _renderer.RenderAsync(snapshot, document.TemplateVersion, marker, ct).ConfigureAwait(false);
+        return await _renderer.RenderForSellerAsync(sellerId, snapshot, document.TemplateVersion, marker, ct).ConfigureAwait(false);
     }
 
     /// <summary>Returns a Failed document to automation (see <see cref="ITaxDocumentStore.RequeueAsync"/>). Logs who and when.</summary>

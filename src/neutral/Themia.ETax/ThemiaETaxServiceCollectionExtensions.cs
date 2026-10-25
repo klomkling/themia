@@ -20,7 +20,8 @@ public static class ThemiaETaxServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(services);
 
         services.AddThemiaPdf(configurePdf);
-        _ = TemplateOptionsOf(services);
+        var templates = TemplateOptionsOf(services);
+        services.TryAddSingleton<ITaxDocumentLogoSource>(new OptionsTaxDocumentLogoSource(templates));
         services.TryAddSingleton<TaxDocumentRenderer>();
         return services;
     }

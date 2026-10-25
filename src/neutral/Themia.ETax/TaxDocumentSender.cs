@@ -99,7 +99,18 @@ public sealed class TaxDocumentSender
             return;
         }
 
-        var render = await RenderOriginalAsync(document, snapshot, ct).ConfigureAwait(false);
+        TaxDocumentRender? render;
+        try
+        {
+            render = await RenderOriginalAsync(document, snapshot, ct).ConfigureAwait(false);
+        }
+        catch (TaxDocumentLogoException)
+        {
+            // Permanent until the host restores the image: no retry, the sender cannot guess a logo.
+            await FailAsync(document, token, "logo_unavailable", ct).ConfigureAwait(false);
+            return;
+        }
+
         if (render is null)
         {
             await RetryOrFailAsync(document, token, "render_error", null, ct).ConfigureAwait(false);
@@ -136,9 +147,9 @@ public sealed class TaxDocumentSender
     {
         try
         {
-            return await _renderer.RenderAsync(snapshot, document.TemplateVersion, TaxDocumentMarker.Original, ct).ConfigureAwait(false);
+            return await _renderer.RenderForSellerAsync(document.SellerId, snapshot, document.TemplateVersion, TaxDocumentMarker.Original, ct).ConfigureAwait(false);
         }
-        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+        catch (Exception ex) when (ex is not TaxDocumentLogoException && (ex is not OperationCanceledException || !ct.IsCancellationRequested))
         {
             _logger.LogWarning("Tax document {DocumentId} render failed: {ExceptionType}.", document.Id, ex.GetType().Name);
             return null;

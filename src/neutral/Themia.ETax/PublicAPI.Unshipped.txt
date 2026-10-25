@@ -419,3 +419,17 @@ const Themia.ETax.TaxDocumentLogo.MaxBytes = 262144 -> int
 Themia.ETax.TaxDocumentLogo.MediaType.get -> string!
 Themia.ETax.TaxDocumentLogo.TaxDocumentLogo(byte[]! bytes) -> void
 Themia.ETax.TaxDocumentRenderer.RenderWithLogoAsync(Themia.ETax.TaxDocumentSnapshot! snapshot, string! templateVersion, Themia.ETax.TaxDocumentMarker marker, Themia.ETax.TaxDocumentLogo? logo, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.ETax.TaxDocumentRender!>!
+Themia.ETax.ITaxDocumentLogoSource
+Themia.ETax.ITaxDocumentLogoSource.FindAsync(string! sellerId, string! sha256, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.ETax.TaxDocumentLogo?>!
+Themia.ETax.ITaxDocumentLogoSource.GetCurrentAsync(string! sellerId, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.ETax.TaxDocumentLogo?>!
+Themia.ETax.TaxDocumentLogo.Sha256.get -> string!
+Themia.ETax.TaxDocumentLogoException
+Themia.ETax.TaxDocumentLogoException.LogoSha256.get -> string!
+Themia.ETax.TaxDocumentLogoException.TaxDocumentLogoException(string! logoSha256) -> void
+Themia.ETax.TaxDocumentRenderer.RenderForSellerAsync(string! sellerId, Themia.ETax.TaxDocumentSnapshot! snapshot, string! templateVersion, Themia.ETax.TaxDocumentMarker marker, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.ETax.TaxDocumentRender!>!
+Themia.ETax.TaxDocumentRenderer.TaxDocumentRenderer(Themia.Pdf.IVersionedPdfRenderer! pdf, Themia.ETax.ITaxDocumentLogoSource! logos) -> void
+Themia.ETax.TaxDocumentService.TaxDocumentService(Themia.ETax.ITaxDocumentStore! store, Themia.ETax.ITaxDocumentNumberSource! numbers, Themia.ETax.TaxDocumentRenderer! renderer, Themia.ETax.TaxDocumentValidationOptions! validation, Themia.ETax.TaxDocumentTemplateOptions! templates, Themia.ETax.ITaxDocumentLogoSource! logos, System.TimeProvider! clock, Microsoft.Extensions.Logging.ILogger<Themia.ETax.TaxDocumentService!>! logger) -> void
+Themia.ETax.TaxDocumentSnapshot.LogoSha256.get -> string?
+Themia.ETax.TaxDocumentSnapshot.LogoSha256.init -> void
+Themia.ETax.TaxDocumentTemplateOptions.Logo.get -> Themia.ETax.TaxDocumentLogo?
+Themia.ETax.TaxDocumentTemplateOptions.Logo.set -> void

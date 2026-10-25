@@ -12,8 +12,17 @@ public sealed class TaxDocumentTemplateOptions
     /// </summary>
     public string TemplateVersion { get; set; } = TaxDocumentTemplates.CurrentVersion;
 
+    /// <summary>
+    /// The seller's logo for the paged templates ("4" and "5"), the same for every seller. Documents issued with it record its hash and print it again when
+    /// re-rendered; after you swap it, those documents are reported unavailable unless you register an <see cref="ITaxDocumentLogoSource"/> that keeps the old image.
+    /// Null prints no logo box. Setting it with another template version throws.
+    /// </summary>
+    public TaxDocumentLogo? Logo { get; set; }
+
     internal void Validate()
     {
+        if (Logo is not null && TaxDocumentTemplates.PageSizeOf(TemplateVersion) is null)
+            throw new InvalidOperationException($"{nameof(TaxDocumentTemplateOptions)}.{nameof(Logo)} needs {nameof(TemplateVersion)} \"4\" or \"5\"; '{TemplateVersion}' has no logo slot.");
         if (!TaxDocumentTemplates.IsSupported(TemplateVersion))
             throw new InvalidOperationException($"{nameof(TaxDocumentTemplateOptions)}.{nameof(TemplateVersion)} '{TemplateVersion}' is not a supported template version.");
     }
