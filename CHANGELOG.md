@@ -43,6 +43,9 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
   rendering byte-identically under version 1 (`IsSupported` accepts `"1"` and `"2"`). Existing tests that pin version 1's markup now name
   version `"1"` explicitly; version 2 has its own golden-hash tests. A custom `IWithholdingCertificateStore` needs no change.
 
+
+- **`Themia.Pdf`** — `PdfPaperFormat.A5` and `PdfRenderOptions.Landscape` (default `false`): an A5 page, or A5 turned on its side (210 × 148 mm).
+  Existing renders are unchanged.
 - **`Themia.ETax`** — data for the A5 receipt/tax invoice and credit note, all optional and additive (schema version stays 1): `TaxDocumentLine`
   `Quantity`, `Unit`, `UnitPriceSatang` and, on notes, `OriginalAmountExVatSatang` / `CorrectAmountExVatSatang`; `TaxDocumentSnapshot.Payment`
   (`TaxPayment`: `TaxPaymentMethod` Cash/Transfer and a date, receipts only); `TaxNoteReference.ReasonKind` (`TaxNoteReason`: the five section 82/10

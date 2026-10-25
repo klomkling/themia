@@ -133,15 +133,23 @@ public sealed class PuppeteerPdfRendererTests
     public void ToPdfOptions_MapsEveryPaperFormat()
     {
         // Literal expectations (not a switch mirroring production) so an identical mis-edit in both
-        // places can't hide. Covers all 5 PdfPaperFormat values incl. the A4 default arm.
+        // places can't hide. Covers all 6 PdfPaperFormat values incl. the A4 default arm.
         Assert.Equal(PaperFormat.A4, Map(PdfPaperFormat.A4));
         Assert.Equal(PaperFormat.A3, Map(PdfPaperFormat.A3));
         Assert.Equal(PaperFormat.Letter, Map(PdfPaperFormat.Letter));
         Assert.Equal(PaperFormat.Legal, Map(PdfPaperFormat.Legal));
         Assert.Equal(PaperFormat.Tabloid, Map(PdfPaperFormat.Tabloid));
+        Assert.Equal(PaperFormat.A5, Map(PdfPaperFormat.A5));
 
         static PaperFormat Map(PdfPaperFormat f) =>
             PuppeteerPdfRenderer.ToPdfOptions(new PdfRenderOptions { PaperFormat = f }).Format;
+    }
+
+    [Fact]
+    public void ToPdfOptions_PrintsPortrait_UnlessLandscapeIsSet()
+    {
+        Assert.False(PuppeteerPdfRenderer.ToPdfOptions(new PdfRenderOptions()).Landscape);
+        Assert.True(PuppeteerPdfRenderer.ToPdfOptions(new PdfRenderOptions { PaperFormat = PdfPaperFormat.A5, Landscape = true }).Landscape);
     }
 
     [Fact]

@@ -53,3 +53,6 @@ Themia.Pdf.PdfRenderResult.RendererVersion.get -> string!
 Themia.Pdf.PdfRenderResult.RendererVersion.init -> void
 Themia.Pdf.PdfRenderOptions.Tagged.get -> bool?
 Themia.Pdf.PdfRenderOptions.Tagged.init -> void
+Themia.Pdf.PdfPaperFormat.A5 = 5 -> Themia.Pdf.PdfPaperFormat
+Themia.Pdf.PdfRenderOptions.Landscape.get -> bool
+Themia.Pdf.PdfRenderOptions.Landscape.init -> void

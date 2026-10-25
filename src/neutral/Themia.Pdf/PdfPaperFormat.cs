@@ -17,4 +17,7 @@ public enum PdfPaperFormat
 
     /// <summary>Tabloid (11 × 17 in).</summary>
     Tabloid,
+
+    /// <summary>A5 (148 × 210 mm portrait; 210 × 148 mm with <see cref="PdfRenderOptions.Landscape"/>).</summary>
+    A5,
 }
