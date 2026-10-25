@@ -10,6 +10,32 @@ with the *why* and concrete upgrade steps.
 - Each entry states: **What changed**, **Why**, and **How to upgrade** (before → after).
 - Non-breaking changes are *not* listed here — see the CHANGELOG.
 
+## 0.39.0
+
+### A new credit note must carry `ReasonKind` (breaking)
+
+**What changed:** `TaxDocumentSnapshotValidator` now requires `TaxNoteReference.ReasonKind` (`TaxNoteReason`: `PriceReduction`, `GoodsReturned`, `Compensation`, `DepositRefund`, `ServiceCancelled`) on every new credit note, refuses it on a debit note, and rejects a `ReasonCode` that differs from `TaxNoteReasons.CodeOf(ReasonKind)` when both are set. A new credit note without a `ReasonKind` fails validation with `Required` on `note.reason_kind`.
+
+**Why:** section 82/10 allows a credit note only for a short list of reasons, and the A5/A4 credit note prints them as ticks. Making the kind a typed field (not a free string) lets the template and the validator agree on it.
+
+**Who is affected:** an app that issues credit notes through `TaxDocumentService` or validates them itself. Documents already issued are untouched: the stored JSON and hash of an old snapshot are byte-identical, and the validator never re-checks stored snapshots.
+
+**How to upgrade:** set the kind where the credit note is built.
+
+```csharp
+Note = new TaxNoteReference { /* ... */ Reason = "Price correction", ReasonKind = TaxNoteReason.PriceReduction }
+```
+
+### New withholding certificates are issued under template version 2 (behaviour change)
+
+**What changed:** `WithholdingTemplates.CurrentVersion` is `"2"`, so a certificate issued from 0.39.0 records template version 2, a layout closer to the Revenue Department's 50 bis form. Certificates already issued keep rendering under version 1, byte for byte; `IsSupported` accepts `"1"` and `"2"`.
+
+**Why:** version 1 differs from the official form in a few places (indentation of the dividend rows, the footnote's position, the shape of the tax-id cells). A layout change always ships as a new version, never an edit.
+
+**Who is affected:** an app that issues withholding certificates and compares the printed layout, or pins `WithholdingTemplates.CurrentVersion` in a test. The printed words and amounts are the same.
+
+**How to upgrade:** nothing for the common case. A test that asserted `CurrentVersion == "1"` now sees `"2"`.
+
 ## 0.36.0
 
 ### Reserved claim types, and role/claim writes in their own transaction (behaviour change)

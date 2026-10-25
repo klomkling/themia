@@ -27,6 +27,10 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.39.0] - 2026-10-25
+
+The receipt / tax invoice and credit / debit note templates (A4 portrait and A5 landscape), the `RTX-6910-000001` number shape for `Themia.ETax` documents, and the second template version of the 50 bis withholding certificate. No new packages and no migration. Two behaviour changes for adopters, both in [MIGRATION.md](MIGRATION.md): a new credit note must carry `TaxNoteReference.ReasonKind` **(breaking)**, and new withholding certificates are issued under template version 2.
+
 ### Added
 
 - **`Themia.ETax.Data`** — `TaxDocumentNumberOptions.YearStyle` (`Gregorian`, the default, or `BuddhistEraTwoDigit`): with `Period = Monthly` the
@@ -48,14 +52,14 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 - **`Themia.ETax`** — data for the A5 receipt/tax invoice and credit note, all optional and additive (schema version stays 1): `TaxDocumentLine`
   `Quantity`, `Unit`, `UnitPriceSatang` and, on notes, `OriginalAmountExVatSatang` / `CorrectAmountExVatSatang`; `TaxDocumentSnapshot.Payment`
   (`TaxPayment`: `TaxPaymentMethod` Cash/Transfer and a date, receipts only); `TaxNoteReference.ReasonKind` (`TaxNoteReason`: the five section 82/10
-  cases, with stable codes from `TaxNoteReasons.CodeOf`). The validator checks them on new input: a credit note now **requires** `ReasonKind`, a
+  cases, with stable codes from `TaxNoteReasons.CodeOf`). The validator checks them on new input: **(breaking)** a credit note now **requires** `ReasonKind`, a
   debit note may not carry one, and a `ReasonCode` set beside it must equal its code. New fields are omitted from the stored JSON when null, so an
   already issued snapshot re-serialises to the same bytes and hash (pinned by `SnapshotSchemaStabilityTests`). Callers that issue credit notes must
   now set `ReasonKind`.
 
 ### Changed
 
-- **`Themia.ETax.Withholding`** — withholding certificate **template version 2**, closer to the Revenue Department's 50 bis form
+- **`Themia.ETax.Withholding`** — **(behaviour change)** withholding certificate **template version 2**, closer to the Revenue Department's 50 bis form
   (coord #0164): indented and hanging-indented dividend sub-rows, a dotted write-in line on payer condition (4), tax-id cells drawn as joined
   groups, the income table in its own rounded box, a hanging-indent warning box, italic copy-line captions and the footnote below the frame.
   `WithholdingTemplates.CurrentVersion` is now `"2"`, so **new certificates are issued under version 2**; certificates already issued keep
