@@ -27,6 +27,13 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+### Added
+
+- **`Themia.ETax.Data`** — `TaxDocumentNumberOptions.YearStyle` (`Gregorian`, the default, or `BuddhistEraTwoDigit`): with `Period = Monthly` the
+  sequence number source prints `RTX-6910-000001` (the adopter's prefix, Buddhist-era two-digit year, month, counter), one gapless run per
+  seller, kind and month, drawn in the issue transaction. The run key stays Gregorian, so switching the style never restarts a run. Default
+  output is unchanged. Same shape `Themia.ETax.Withholding.Data` got in #309.
+
 ## [0.38.0] - 2026-10-25
 
 A non-consuming check on `Themia.Challenges` (coord #0174). No new packages, no migration, no API removed; the one new member is on `IChallengeService`, see the note under it for adopters who implement that interface themselves.
