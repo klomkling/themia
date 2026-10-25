@@ -1,7 +1,7 @@
 namespace Themia.ETax;
 
 /// <summary>
-/// The seller's logo, printed in the logo slot of the A5 templates. A PNG or JPEG of at most <see cref="MaxBytes"/>: it is embedded in the page, so
+/// The seller's logo, printed in the logo slot of the paged templates (versions "4" and "5"). A PNG or JPEG of at most <see cref="MaxBytes"/>: it is embedded in the page, so
 /// anything bigger bloats every PDF. Passed when rendering; it is not part of the stored document, so a document re-rendered without it prints no logo box.
 /// </summary>
 public sealed class TaxDocumentLogo

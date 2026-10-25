@@ -2,24 +2,25 @@ using System.Globalization;
 
 namespace Themia.ETax;
 
-/// <summary>The data the A5 landscape template (version "4") prints: one entry per page, split by <see cref="A5Layout"/>.</summary>
-internal static class TaxDocumentA5Model
+/// <summary>The data the paged template (versions "4" A4 portrait and "5" A5 landscape) prints: one entry per page, split by <see cref="TaxDocumentPageLayout"/>.</summary>
+internal static class TaxDocumentPagedModel
 {
     private const string HeadOfficeBranch = "00000";
     private static readonly int[] TaxIdGroups = [1, 4, 5, 2, 1];
 
     public static object Build(
-        TaxDocumentSnapshot s, TaxDocumentMarker marker, string fontCss, ThaiBahtTextEtMode etMode, TaxDocumentLogo? logo)
+        TaxDocumentSnapshot s, TaxDocumentMarker marker, string fontCss, ThaiBahtTextEtMode etMode, TaxDocumentLogo? logo, TaxDocumentPageSize size)
     {
         var isReceipt = s.Kind == TaxDocumentKind.TaxInvoiceReceipt;
         var isCredit = s.Kind == TaxDocumentKind.CreditNote;
-        var plan = A5Layout.Plan(s.Kind, s.Lines.Count);
+        var plan = TaxDocumentPageLayout.Plan(size, s.Kind, s.Lines.Count);
         var (titleTh, titleEn) = Title(s.Kind);
         var (markerTh, markerEn) = marker == TaxDocumentMarker.Original ? ("ต้นฉบับ", "Original") : ("สำเนา", "Copy");
 
         return new
         {
             fontCss,
+            landscape = size == TaxDocumentPageSize.A5Landscape,
             documentNumber = s.DocumentNumber,
             issueDate = TaxDocumentRenderModel.Date(s.IssueDate),
             logo = logo?.ToDataUri(),
@@ -41,11 +42,11 @@ internal static class TaxDocumentA5Model
             reasonText = s.Note?.Reason,
             totals = Totals(s),
             amountInWords = ThaiBahtText.Format(s.Totals.InclVatSatang, etMode),
-            pages = Pages(s, plan),
+            pages = Pages(s, plan, size),
         };
     }
 
-    private static object[] Pages(TaxDocumentSnapshot s, IReadOnlyList<A5Page> plan)
+    private static object[] Pages(TaxDocumentSnapshot s, IReadOnlyList<TaxDocumentPagePlan> plan, TaxDocumentPageSize size)
     {
         var pages = new object[plan.Count];
         var carried = new Sums();
@@ -60,10 +61,10 @@ internal static class TaxDocumentA5Model
                 carried.Add(s.Lines[l]);
             }
 
-            // A single page keeps its table at the form's full height; a document with its own fixed row count is not padded.
-            if (page.Role == A5PageRole.Single)
+            // A small form keeps its table at the form's full height; A4 flows from the top and is not padded.
+            if (page.Role == TaxDocumentPageRole.Single)
             {
-                for (var pad = page.Count; pad < A5Layout.SinglePageRows(s.Kind); pad++)
+                for (var pad = page.Count; pad < TaxDocumentPageLayout.PaddedRows(size, s.Kind); pad++)
                     rows.Add(new { blank = true });
             }
 
@@ -71,12 +72,12 @@ internal static class TaxDocumentA5Model
             {
                 number = i + 1,
                 count = plan.Count,
-                full = page.Role is A5PageRole.Single or A5PageRole.First,
-                continued = page.Role is A5PageRole.Middle or A5PageRole.Last,
+                full = page.Role is TaxDocumentPageRole.Single or TaxDocumentPageRole.First,
+                continued = page.Role is TaxDocumentPageRole.Middle or TaxDocumentPageRole.Last,
                 multi = plan.Count > 1,
-                closing = page.Role is A5PageRole.Single or A5PageRole.Last,
+                closing = page.Role is TaxDocumentPageRole.Single or TaxDocumentPageRole.Last,
                 broughtForward,
-                carriedForward = page.Role is A5PageRole.First or A5PageRole.Middle ? carried.Show(s.Kind) : null,
+                carriedForward = page.Role is TaxDocumentPageRole.First or TaxDocumentPageRole.Middle ? carried.Show(s.Kind) : null,
                 rows,
             };
         }

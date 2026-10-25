@@ -53,6 +53,17 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
   receiver signature line, and for a credit note the original invoice number and date, original / correct / difference values, VAT on the difference and the
   five section 82/10 reasons. New `TaxDocumentRenderer.RenderWithLogoAsync` and `TaxDocumentLogo` (PNG/JPEG up to 256 KB) fill an optional logo slot; with no
   logo no box is printed. `TaxDocumentTemplates.IsSupported` now accepts `"4"`.
+
+- **`Themia.ETax`** — template versions **4** and **5**: the combined receipt/tax invoice (ใบเสร็จรับเงิน/ใบกำกับภาษี) and the credit note (ใบลดหนี้) in the designer's
+  layout, **`"4"` on A4 portrait** (the page for PDFs: content flows from the top with no blank rows) and **`"5"` on A5 landscape** (a small form; the page size is part
+  of the version because a document records only its version). Opt-in through `TaxDocumentTemplateOptions.TemplateVersion` (versions 1 to 3 are unchanged and the
+  default stays `"1"`). Sarabun embedded, 9 pt base. A page takes lines until it is full (A4: 32 per page for a receipt, 30 for a credit note; A5: 6 and 4), then the document
+  continues on a further page with a carried-forward / brought-forward subtotal and a compact header; the type never shrinks, and the pages are `min-height` so
+  an overflowing page runs onto another instead of hiding content. Prints seller and buyer name, address, grouped 13-digit tax id and branch, number, date,
+  quantity / unit price / amount, VAT shown separately, the total in figures and Thai words, original/copy marking, payment method and date, the receiver
+  signature line, and for a credit note the original invoice number and date, original / correct / difference values, VAT on the difference and the five section 82/10
+  reasons. New `TaxDocumentRenderer.RenderWithLogoAsync` and `TaxDocumentLogo` (PNG/JPEG up to 256 KB) fill an optional logo slot; with no logo no box is printed.
+  `TaxDocumentTemplates.IsSupported` now accepts `"4"` and `"5"`.
 - **`Themia.Pdf`** — `PdfPaperFormat.A5` and `PdfRenderOptions.Landscape` (default `false`): an A5 page, or A5 turned on its side (210 × 148 mm).
   Existing renders are unchanged.
 - **`Themia.ETax`** — data for the A5 receipt/tax invoice and credit note, all optional and additive (schema version stays 1): `TaxDocumentLine`
