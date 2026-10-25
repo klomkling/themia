@@ -151,7 +151,9 @@ public class SnapshotValidatorTests
     [Fact]
     public void Validate_ShouldRejectDebitNoteFullCancellation()
     {
-        AssertSingle(Validate(Samples.FullCancellationCreditNote() with { Kind = TaxDocumentKind.DebitNote }), TaxDocumentValidationCode.NotAllowed, "note.mode");
+        // A debit note carries no credit note reason kind.
+        var debit = Samples.FullCancellationCreditNote();
+        AssertSingle(Validate(debit with { Kind = TaxDocumentKind.DebitNote, Note = debit.Note! with { ReasonKind = null } }), TaxDocumentValidationCode.NotAllowed, "note.mode");
     }
 
     [Fact]

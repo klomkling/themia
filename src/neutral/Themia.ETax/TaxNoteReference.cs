@@ -29,4 +29,10 @@ public sealed record TaxNoteReference
 
     /// <summary><see cref="TaxNoteMode.Adjustment"/>: the VAT-inclusive value after the correction.</summary>
     public long? CorrectedValueSatang { get; init; }
+
+    /// <summary>
+    /// Why a credit note was issued (section 82/10). Required on a new credit note, not allowed on a debit note, and when
+    /// <see cref="ReasonCode"/> is also set it must equal <see cref="TaxNoteReasons.CodeOf"/> of this value.
+    /// </summary>
+    public TaxNoteReason? ReasonKind { get; init; }
 }

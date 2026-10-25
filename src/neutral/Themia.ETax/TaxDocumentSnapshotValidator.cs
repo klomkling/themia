@@ -23,6 +23,7 @@ public static class TaxDocumentSnapshotValidator
         ValidateTotals(snapshot, errors);
         ValidateNote(snapshot, errors);
         ValidateReplacement(snapshot.Replacement, errors);
+        ValidatePayment(snapshot, errors);
         ValidateCharacters(snapshot, errors);
         return errors;
     }
@@ -93,7 +94,59 @@ public static class TaxDocumentSnapshotValidator
                 Add(errors, TaxDocumentValidationCode.Required, $"lines[{i}].description");
             if (s.Lines[i].AmountExVatSatang < 0)
                 Add(errors, TaxDocumentValidationCode.Malformed, $"lines[{i}].amount_ex_vat_satang");
+            ValidateQuantityAndPrice(s.Lines[i], i, errors);
+            ValidateNoteValues(s, s.Lines[i], i, errors);
         }
+    }
+
+    private static void ValidateQuantityAndPrice(TaxDocumentLine line, int index, List<TaxDocumentValidationError> errors)
+    {
+        if (line.Quantity is null != line.UnitPriceSatang is null)
+        {
+            Add(errors, TaxDocumentValidationCode.Required, line.Quantity is null ? $"lines[{index}].quantity" : $"lines[{index}].unit_price_satang");
+            return;
+        }
+
+        if (line.Quantity is <= 0)
+            Add(errors, TaxDocumentValidationCode.Malformed, $"lines[{index}].quantity");
+        if (line.UnitPriceSatang is < 0)
+            Add(errors, TaxDocumentValidationCode.Malformed, $"lines[{index}].unit_price_satang");
+    }
+
+    // The original and correct value of a line mean something only against a referenced document, so a receipt may not carry them.
+    private static void ValidateNoteValues(TaxDocumentSnapshot s, TaxDocumentLine line, int index, List<TaxDocumentValidationError> errors)
+    {
+        if (line.OriginalAmountExVatSatang is null && line.CorrectAmountExVatSatang is null)
+            return;
+
+        if (s.Kind is not (TaxDocumentKind.CreditNote or TaxDocumentKind.DebitNote))
+        {
+            Add(errors, TaxDocumentValidationCode.NotAllowed, $"lines[{index}].original_amount_ex_vat_satang");
+            return;
+        }
+
+        if (line.OriginalAmountExVatSatang is null || line.CorrectAmountExVatSatang is null)
+        {
+            Add(errors, TaxDocumentValidationCode.Required,
+                line.OriginalAmountExVatSatang is null ? $"lines[{index}].original_amount_ex_vat_satang" : $"lines[{index}].correct_amount_ex_vat_satang");
+            return;
+        }
+
+        if (line.OriginalAmountExVatSatang < 0)
+            Add(errors, TaxDocumentValidationCode.Malformed, $"lines[{index}].original_amount_ex_vat_satang");
+        if (line.CorrectAmountExVatSatang < 0)
+            Add(errors, TaxDocumentValidationCode.Malformed, $"lines[{index}].correct_amount_ex_vat_satang");
+    }
+
+    private static void ValidatePayment(TaxDocumentSnapshot s, List<TaxDocumentValidationError> errors)
+    {
+        if (s.Payment is null)
+            return;
+
+        if (s.Kind != TaxDocumentKind.TaxInvoiceReceipt)
+            Add(errors, TaxDocumentValidationCode.NotAllowed, "payment");
+        else if (!Enum.IsDefined(s.Payment.Method))
+            Add(errors, TaxDocumentValidationCode.Malformed, "payment.method");
     }
 
     private static void ValidateTotals(TaxDocumentSnapshot s, List<TaxDocumentValidationError> errors)
@@ -169,7 +222,7 @@ public static class TaxDocumentSnapshotValidator
             return;
         }
 
-        ValidateNoteReference(s.Note, errors);
+        ValidateNoteReference(s, s.Note, errors);
         if (!Enum.IsDefined(s.Note.Mode))
             Add(errors, TaxDocumentValidationCode.Malformed, "note.mode");
         else if (s.Note.Mode == TaxNoteMode.FullCancellation)
@@ -178,7 +231,7 @@ public static class TaxDocumentSnapshotValidator
             ValidateAdjustment(s, errors);
     }
 
-    private static void ValidateNoteReference(TaxNoteReference n, List<TaxDocumentValidationError> errors)
+    private static void ValidateNoteReference(TaxDocumentSnapshot s, TaxNoteReference n, List<TaxDocumentValidationError> errors)
     {
         if (n.OriginalDocumentId == Guid.Empty)
             Add(errors, TaxDocumentValidationCode.Required, "note.original_document_id");
@@ -188,6 +241,26 @@ public static class TaxDocumentSnapshotValidator
             Add(errors, TaxDocumentValidationCode.Required, "note.original_issue_date");
         if (string.IsNullOrWhiteSpace(n.Reason))
             Add(errors, TaxDocumentValidationCode.Required, "note.reason");
+        ValidateReasonKind(s, n, errors);
+    }
+
+    private static void ValidateReasonKind(TaxDocumentSnapshot s, TaxNoteReference n, List<TaxDocumentValidationError> errors)
+    {
+        if (n.ReasonKind is not { } kind)
+        {
+            if (s.Kind == TaxDocumentKind.CreditNote)
+                Add(errors, TaxDocumentValidationCode.Required, "note.reason_kind");
+            return;
+        }
+
+        if (s.Kind != TaxDocumentKind.CreditNote)
+            Add(errors, TaxDocumentValidationCode.NotAllowed, "note.reason_kind");
+        else if (!Enum.IsDefined(kind))
+            Add(errors, TaxDocumentValidationCode.Malformed, "note.reason_kind");
+        // A code with an uncovered character is already reported on this field as UnsupportedCharacter; it is not reported twice.
+        else if (n.ReasonCode is not null && TaxDocumentFontCoverage.Covers(n.ReasonCode)
+            && !string.Equals(n.ReasonCode, TaxNoteReasons.CodeOf(kind), StringComparison.Ordinal))
+            Add(errors, TaxDocumentValidationCode.Malformed, "note.reason_code");
     }
 
     private static void ValidateFullCancellation(TaxDocumentSnapshot s, List<TaxDocumentValidationError> errors)
@@ -248,7 +321,10 @@ public static class TaxDocumentSnapshotValidator
         CheckParty(s.Seller, "seller", errors);
         CheckParty(s.Buyer, "buyer", errors);
         for (var i = 0; s.Lines is not null && i < s.Lines.Count; i++)
+        {
             CheckText(s.Lines[i]?.Description, $"lines[{i}].description", errors);
+            CheckText(s.Lines[i]?.Unit, $"lines[{i}].unit", errors);
+        }
 
         if (s.Note is { } n)
         {

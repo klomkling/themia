@@ -43,6 +43,14 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
   rendering byte-identically under version 1 (`IsSupported` accepts `"1"` and `"2"`). Existing tests that pin version 1's markup now name
   version `"1"` explicitly; version 2 has its own golden-hash tests. A custom `IWithholdingCertificateStore` needs no change.
 
+- **`Themia.ETax`** — data for the A5 receipt/tax invoice and credit note, all optional and additive (schema version stays 1): `TaxDocumentLine`
+  `Quantity`, `Unit`, `UnitPriceSatang` and, on notes, `OriginalAmountExVatSatang` / `CorrectAmountExVatSatang`; `TaxDocumentSnapshot.Payment`
+  (`TaxPayment`: `TaxPaymentMethod` Cash/Transfer and a date, receipts only); `TaxNoteReference.ReasonKind` (`TaxNoteReason`: the five section 82/10
+  cases, with stable codes from `TaxNoteReasons.CodeOf`). The validator checks them on new input: a credit note now **requires** `ReasonKind`, a
+  debit note may not carry one, and a `ReasonCode` set beside it must equal its code. New fields are omitted from the stored JSON when null, so an
+  already issued snapshot re-serialises to the same bytes and hash (pinned by `SnapshotSchemaStabilityTests`). Callers that issue credit notes must
+  now set `ReasonKind`.
+
 ## [0.38.0] - 2026-10-25
 
 A non-consuming check on `Themia.Challenges` (coord #0174). No new packages, no migration, no API removed; the one new member is on `IChallengeService`, see the note under it for adopters who implement that interface themselves.

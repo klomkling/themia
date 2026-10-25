@@ -384,3 +384,33 @@ Themia.ETax.TaxDocumentTemplateOptions.TaxDocumentTemplateOptions() -> void
 Themia.ETax.TaxDocumentTemplateOptions.TemplateVersion.get -> string!
 Themia.ETax.TaxDocumentTemplateOptions.TemplateVersion.set -> void
 static Microsoft.Extensions.DependencyInjection.ThemiaETaxServiceCollectionExtensions.ConfigureThemiaETaxTemplates(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Themia.ETax.TaxDocumentTemplateOptions!>! configure) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+Themia.ETax.TaxPaymentMethod
+Themia.ETax.TaxPaymentMethod.Cash = 1 -> Themia.ETax.TaxPaymentMethod
+Themia.ETax.TaxPaymentMethod.Transfer = 2 -> Themia.ETax.TaxPaymentMethod
+Themia.ETax.TaxPayment
+Themia.ETax.TaxPayment.Method.get -> Themia.ETax.TaxPaymentMethod
+Themia.ETax.TaxPayment.Method.init -> void
+Themia.ETax.TaxPayment.Date.get -> System.DateOnly?
+Themia.ETax.TaxPayment.Date.init -> void
+Themia.ETax.TaxNoteReason
+Themia.ETax.TaxNoteReason.PriceReduction = 1 -> Themia.ETax.TaxNoteReason
+Themia.ETax.TaxNoteReason.GoodsReturned = 2 -> Themia.ETax.TaxNoteReason
+Themia.ETax.TaxNoteReason.Compensation = 3 -> Themia.ETax.TaxNoteReason
+Themia.ETax.TaxNoteReason.DepositRefund = 4 -> Themia.ETax.TaxNoteReason
+Themia.ETax.TaxNoteReason.ServiceCancelled = 5 -> Themia.ETax.TaxNoteReason
+Themia.ETax.TaxNoteReasons
+static Themia.ETax.TaxNoteReasons.CodeOf(Themia.ETax.TaxNoteReason reason) -> string!
+Themia.ETax.TaxDocumentLine.Quantity.get -> decimal?
+Themia.ETax.TaxDocumentLine.Quantity.init -> void
+Themia.ETax.TaxDocumentLine.Unit.get -> string?
+Themia.ETax.TaxDocumentLine.Unit.init -> void
+Themia.ETax.TaxDocumentLine.UnitPriceSatang.get -> long?
+Themia.ETax.TaxDocumentLine.UnitPriceSatang.init -> void
+Themia.ETax.TaxDocumentLine.OriginalAmountExVatSatang.get -> long?
+Themia.ETax.TaxDocumentLine.OriginalAmountExVatSatang.init -> void
+Themia.ETax.TaxDocumentLine.CorrectAmountExVatSatang.get -> long?
+Themia.ETax.TaxDocumentLine.CorrectAmountExVatSatang.init -> void
+Themia.ETax.TaxNoteReference.ReasonKind.get -> Themia.ETax.TaxNoteReason?
+Themia.ETax.TaxNoteReference.ReasonKind.init -> void
+Themia.ETax.TaxDocumentSnapshot.Payment.get -> Themia.ETax.TaxPayment?
+Themia.ETax.TaxDocumentSnapshot.Payment.init -> void
