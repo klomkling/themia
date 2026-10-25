@@ -27,6 +27,10 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.40.0] - 2026-10-25
+
+The seller logo on the paged e-tax templates (versions "4" and "5") becomes a host concern: a document records which logo it was issued with and is always re-rendered with it.
+
 ### Added
 
 - **`Themia.ETax`: the seller's logo as a host option for the paged templates ("4" and "5").** `TaxDocumentTemplateOptions.Logo` (setting it with a template version that has no logo slot throws at registration) is the one logo of every seller; an adopter with several sellers or a rebrand registers an `ITaxDocumentLogoSource` instead (`GetCurrentAsync(sellerId)` for new documents, `FindAsync(sellerId, sha256)` for documents already issued). `TaxDocumentLogo.Sha256` is the lowercase hex SHA-256 of the image. `TaxDocumentService` stamps the hash of the logo a document is issued with into `TaxDocumentSnapshot.LogoSha256`, and `TaxDocumentRenderer.RenderForSellerAsync` (used for copies and the ORIGINAL send) prints exactly that image. A document issued without a logo prints no logo box, whatever the host holds later. A missing or different logo throws `TaxDocumentLogoException`, `RenderWithLogoAsync` checks the hash too, and the sender fails such a document at once with `logo_unavailable` instead of retrying. A caller-supplied `LogoSha256` is rejected. The snapshot schema stays 1 and the field is omitted when null, so documents without a logo are byte-identical to before; a document WITH a logo cannot be read by a 0.39 reader (`UnmappedMemberHandling.Disallow`), so an app rollback to 0.39 breaks only those.
