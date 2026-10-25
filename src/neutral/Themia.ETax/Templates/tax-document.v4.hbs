@@ -5,12 +5,13 @@
 <title>{{documentNumber}}</title>
 <style>
 {{{fontCss}}}
-/* A5 landscape, 210 x 148 mm. The page margins are inside .page (7 mm top and bottom, 9 mm left and right), so the PDF itself has none. */
-@page { size: 210mm 148mm; margin: 0; }
+/* A4 portrait (210 x 297 mm) or A5 landscape (210 x 148 mm). The page margins are inside .page (7 mm top and bottom, 9 mm left and right), so the PDF itself has none. */
+@page { size: 210mm {{#if landscape}}148mm{{else}}297mm{{/if}}; margin: 0; }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { background: #fff; }
 body { font-family: 'Sarabun'; font-size: 9pt; line-height: 1.25; color: #000; }
-.page { width: 210mm; height: 148mm; padding: 7mm 9mm; position: relative; break-after: page; page-break-after: always; display: flex; flex-direction: column; }
+/* min-height, not height: a page whose content outgrows the sheet then runs onto a further page (the page count shows it) instead of being painted over the next one. */
+.page { width: 210mm; min-height: {{#if landscape}}148mm{{else}}297mm{{/if}}; padding: 7mm 9mm; position: relative; break-after: page; page-break-after: always; display: flex; flex-direction: column; }
 .page:last-child { break-after: auto; page-break-after: auto; }
 
 .en { font-size: 6.8pt; font-weight: 400; }

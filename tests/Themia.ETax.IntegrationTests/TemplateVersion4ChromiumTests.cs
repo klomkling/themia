@@ -6,8 +6,9 @@ using Xunit;
 namespace Themia.ETax.IntegrationTests;
 
 /// <summary>
-/// Template version "4" on the Chromium this CI downloads: the page counts the layout constants promise are the page counts the browser prints (a count
-/// that no longer fits would spill a line onto an extra page), each page is A5 landscape, and a render is byte-reproducible.
+/// Template versions "4" (A4 portrait) and "5" (A5 landscape) on the Chromium this CI downloads: the page counts the layout constants promise are the page
+/// counts the browser prints (a count that no longer fits would spill a line onto an extra page), each page has its version's paper size, and a render is
+/// byte-reproducible.
 /// </summary>
 [Trait("Category", "Integration")]
 public sealed partial class TemplateVersion4ChromiumTests
@@ -19,6 +20,10 @@ public sealed partial class TemplateVersion4ChromiumTests
         services.AddThemiaETaxRendering(o => ChromiumPath.Apply(o));
         return services.BuildServiceProvider();
     }
+
+    internal static TaxDocumentSnapshot ReceiptFor(int lines, long withheld) => Receipt(lines, withheld);
+
+    internal static TaxDocumentSnapshot CreditNoteFor(int lines) => CreditNote(lines);
 
     private static TaxDocumentSnapshot Receipt(int lines, long withheld = 0)
     {
@@ -101,21 +106,27 @@ public sealed partial class TemplateVersion4ChromiumTests
 
     private static int Pages(byte[] pdf) => PageObject().Matches(System.Text.Encoding.Latin1.GetString(pdf)).Count;
 
-    private static int[] LineCounts(TaxDocumentKind kind)
+    private static TaxDocumentPageSize SizeOf(string version) => TaxDocumentTemplates.PageSizeOf(version)!.Value;
+
+    private static int[] LineCounts(string version, TaxDocumentKind kind)
     {
-        var single = A5Layout.SinglePageRows(kind);
-        var middle = A5Layout.MiddlePageRows(kind);
-        var last = A5Layout.LastPageRows(kind);
+        var size = SizeOf(version);
+        var single = TaxDocumentPageLayout.SinglePageRows(size, kind);
+        var middle = TaxDocumentPageLayout.MiddlePageRows(size, kind);
+        var last = TaxDocumentPageLayout.LastPageRows(size, kind);
         return [1, single, single + 1, single + last, single + last + 1, single + middle + last, single + middle + last + 1];
     }
 
-    public static TheoryData<TaxDocumentKind, int> Cases()
+    public static TheoryData<string, TaxDocumentKind, int> Cases()
     {
-        var data = new TheoryData<TaxDocumentKind, int>();
-        foreach (var kind in new[] { TaxDocumentKind.TaxInvoiceReceipt, TaxDocumentKind.CreditNote })
+        var data = new TheoryData<string, TaxDocumentKind, int>();
+        foreach (var version in new[] { "4", "5" })
         {
-            foreach (var n in LineCounts(kind))
-                data.Add(kind, n);
+            foreach (var kind in new[] { TaxDocumentKind.TaxInvoiceReceipt, TaxDocumentKind.CreditNote })
+            {
+                foreach (var n in LineCounts(version, kind))
+                    data.Add(version, kind, n);
+            }
         }
 
         return data;
@@ -123,39 +134,49 @@ public sealed partial class TemplateVersion4ChromiumTests
 
     [Theory]
     [MemberData(nameof(Cases))]
-    public async Task Render_ShouldPrintExactlyThePlannedNumberOfA5LandscapePages(TaxDocumentKind kind, int lines)
+    public async Task Render_ShouldPrintExactlyThePlannedNumberOfPages_OnTheVersionsPaper(string version, TaxDocumentKind kind, int lines)
     {
         await using var host = NewHost();
         var snapshot = kind == TaxDocumentKind.CreditNote ? CreditNote(lines) : Receipt(lines);
 
-        var render = await host.GetRequiredService<TaxDocumentRenderer>().RenderAsync(snapshot, "4", TaxDocumentMarker.Original);
+        var render = await host.GetRequiredService<TaxDocumentRenderer>().RenderAsync(snapshot, version, TaxDocumentMarker.Original);
 
-        Assert.Equal(A5Layout.Plan(kind, lines).Count, Pages(render.Pdf));
+        Assert.Equal(TaxDocumentPageLayout.Plan(SizeOf(version), kind, lines).Count, Pages(render.Pdf));
         var box = MediaBox().Match(System.Text.Encoding.Latin1.GetString(render.Pdf));
         Assert.True(box.Success);
-        Assert.InRange(double.Parse(box.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture), 595, 596.5);
-        Assert.InRange(double.Parse(box.Groups[2].Value, System.Globalization.CultureInfo.InvariantCulture), 419, 421);
+        var width = double.Parse(box.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture);
+        var height = double.Parse(box.Groups[2].Value, System.Globalization.CultureInfo.InvariantCulture);
+        Assert.InRange(width, 595, 596.5);
+        if (version == "4")
+            Assert.InRange(height, 841, 843);
+        else
+            Assert.InRange(height, 419, 421);
     }
 
-    [Fact]
-    public async Task Render_ShouldKeepAFullReceiptWithWithholdingRowsOnOnePage()
+    [Theory]
+    [InlineData("4")]
+    [InlineData("5")]
+    public async Task Render_ShouldKeepAFullReceiptWithWithholdingRowsOnOnePage(string version)
     {
         await using var host = NewHost();
+        var single = TaxDocumentPageLayout.SinglePageRows(SizeOf(version), TaxDocumentKind.TaxInvoiceReceipt);
 
         var render = await host.GetRequiredService<TaxDocumentRenderer>()
-            .RenderAsync(Receipt(A5Layout.SinglePageRows(TaxDocumentKind.TaxInvoiceReceipt), withheld: 3_000), "4", TaxDocumentMarker.Original);
+            .RenderAsync(Receipt(single, withheld: 3_000), version, TaxDocumentMarker.Original);
 
         Assert.Equal(1, Pages(render.Pdf));
     }
 
-    [Fact]
-    public async Task Render_ShouldBeByteIdentical_ForTheSameDocument()
+    [Theory]
+    [InlineData("4")]
+    [InlineData("5")]
+    public async Task Render_ShouldBeByteIdentical_ForTheSameDocument(string version)
     {
         await using var host = NewHost();
         var renderer = host.GetRequiredService<TaxDocumentRenderer>();
 
-        var first = await renderer.RenderAsync(Receipt(8), "4", TaxDocumentMarker.Copy);
-        var second = await renderer.RenderAsync(Receipt(8), "4", TaxDocumentMarker.Copy);
+        var first = await renderer.RenderAsync(Receipt(8), version, TaxDocumentMarker.Copy);
+        var second = await renderer.RenderAsync(Receipt(8), version, TaxDocumentMarker.Copy);
 
         Assert.Equal(first.PdfSha256, second.PdfSha256);
     }

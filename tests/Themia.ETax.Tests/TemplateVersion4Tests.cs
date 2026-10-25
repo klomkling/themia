@@ -4,13 +4,13 @@ using Xunit;
 namespace Themia.ETax.Tests;
 
 /// <summary>
-/// Template version "4": the combined receipt/tax invoice and the credit note on A5 landscape pages. These read the printed words and numbers from the
-/// rendered HTML; <see cref="TemplateVersion4GoldenTests"/> pins the whole HTML.
+/// Template versions "4" (A4 portrait) and "5" (A5 landscape): the combined receipt/tax invoice and the credit note. They share one layout, so the printed
+/// words and numbers are read from the rendered HTML of either; <see cref="TemplateVersion4GoldenTests"/> pins the whole HTML of both.
 /// </summary>
 public sealed class TemplateVersion4Tests
 {
-    private static string Html(TaxDocumentSnapshot s, TaxDocumentMarker marker = TaxDocumentMarker.Original, TaxDocumentLogo? logo = null) =>
-        WebUtility.HtmlDecode(new TaxDocumentRenderer(new TemplateVersion1GoldenTests.NoPdf()).RenderHtml(s, "4", marker, logo));
+    private static string Html(TaxDocumentSnapshot s, TaxDocumentMarker marker = TaxDocumentMarker.Original, TaxDocumentLogo? logo = null, string version = "4") =>
+        WebUtility.HtmlDecode(new TaxDocumentRenderer(new TemplateVersion1GoldenTests.NoPdf()).RenderHtml(s, version, marker, logo));
 
     internal static TaxDocumentSnapshot Receipt(int lines)
     {
@@ -102,9 +102,9 @@ public sealed class TemplateVersion4Tests
     }
 
     [Fact]
-    public void Receipt_ShouldContinueOnASecondPage_WithCarriedAndBroughtForwardSubtotals()
+    public void Receipt_ShouldContinueOnASecondPage_WithCarriedAndBroughtForwardSubtotals_OnA5()
     {
-        var html = Html(Receipt(7));
+        var html = Html(Receipt(7), version: "5");
 
         Assert.Equal(2, html.Split("<section class=\"page\"").Length - 1);
         Assert.Contains("ยอดยกไป", html);
@@ -115,6 +115,41 @@ public sealed class TemplateVersion4Tests
         Assert.Contains("หน้า 2/2", html);
         Assert.Contains("(ต่อ / continued)", html);
         Assert.Equal(1, html.Split("ผู้รับเงิน").Length - 1);
+    }
+
+    [Fact]
+    public void Receipt_ShouldFlowFromTheTopOfAnA4Page_WithoutBlankRowsOrAPageBreak()
+    {
+        var html = Html(Receipt(7));
+
+        Assert.Equal(1, html.Split("<section class=\"page\"").Length - 1);
+        Assert.DoesNotContain("ยอดยกไป", html);
+        Assert.Equal(0, html.Split("<tr><td></td><td></td><td></td><td></td><td></td></tr>").Length - 1);
+        Assert.Contains("@page { size: 210mm 297mm;", html);
+        Assert.Contains("min-height: 297mm;", html);
+    }
+
+    [Fact]
+    public void Receipt_ShouldPadASmallA5FormToItsFullHeight_AndPrintItsPageSize()
+    {
+        var html = Html(Receipt(3), version: "5");
+
+        Assert.Equal(3, html.Split("<tr><td></td><td></td><td></td><td></td><td></td></tr>").Length - 1);
+        Assert.Contains("@page { size: 210mm 148mm;", html);
+    }
+
+    [Fact]
+    public void Receipt_ShouldContinueOnASecondA4Page_OnlyWhenTheFirstIsFull()
+    {
+        var single = TaxDocumentPageLayout.SinglePageRows(TaxDocumentPageSize.A4Portrait, TaxDocumentKind.TaxInvoiceReceipt);
+
+        Assert.Equal(1, Html(Receipt(single)).Split("<section class=\"page\"").Length - 1);
+
+        var two = Html(Receipt(single + 1));
+        Assert.Equal(2, two.Split("<section class=\"page\"").Length - 1);
+        Assert.Contains("ยอดยกไป", two);
+        Assert.Contains("ยอดยกมา", two);
+        Assert.Contains("หน้า 2/2", two);
     }
 
     [Fact]
