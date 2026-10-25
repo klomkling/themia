@@ -24,6 +24,7 @@ public static class TaxDocumentSnapshotValidator
         ValidateNote(snapshot, errors);
         ValidateReplacement(snapshot.Replacement, errors);
         ValidatePayment(snapshot, errors);
+        ValidateLogo(snapshot, errors);
         ValidateCharacters(snapshot, errors);
         return errors;
     }
@@ -136,6 +137,12 @@ public static class TaxDocumentSnapshotValidator
             Add(errors, TaxDocumentValidationCode.Malformed, $"lines[{index}].original_amount_ex_vat_satang");
         if (line.CorrectAmountExVatSatang < 0)
             Add(errors, TaxDocumentValidationCode.Malformed, $"lines[{index}].correct_amount_ex_vat_satang");
+    }
+
+    private static void ValidateLogo(TaxDocumentSnapshot s, List<TaxDocumentValidationError> errors)
+    {
+        if (s.LogoSha256 is { } sha && !(sha.Length == 64 && sha.All(c => c is >= '0' and <= '9' or >= 'a' and <= 'f')))
+            Add(errors, TaxDocumentValidationCode.Malformed, "logo_sha256");
     }
 
     private static void ValidatePayment(TaxDocumentSnapshot s, List<TaxDocumentValidationError> errors)

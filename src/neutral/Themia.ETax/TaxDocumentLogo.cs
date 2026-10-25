@@ -2,7 +2,7 @@ namespace Themia.ETax;
 
 /// <summary>
 /// The seller's logo, printed in the logo slot of the paged templates (versions "4" and "5"). A PNG or JPEG of at most <see cref="MaxBytes"/>: it is embedded in the page, so
-/// anything bigger bloats every PDF. Passed when rendering; it is not part of the stored document, so a document re-rendered without it prints no logo box.
+/// anything bigger bloats every PDF. The document stores only <see cref="Sha256"/>; the image comes from an <see cref="ITaxDocumentLogoSource"/> at render time.
 /// </summary>
 public sealed class TaxDocumentLogo
 {
@@ -29,10 +29,14 @@ public sealed class TaxDocumentLogo
             : bytes.AsSpan().StartsWith(JpegSignature) ? "image/jpeg"
             : throw new ArgumentException("The logo image must be a PNG or a JPEG.", nameof(bytes));
         _bytes = (byte[])bytes.Clone();
+        Sha256 = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(_bytes)).ToLowerInvariant();
     }
 
     /// <summary><c>image/png</c> or <c>image/jpeg</c>.</summary>
     public string MediaType { get; }
+
+    /// <summary>Lowercase hex SHA-256 of the image bytes: what a document records to find this logo again.</summary>
+    public string Sha256 { get; }
 
     internal string ToDataUri() => $"data:{MediaType};base64,{Convert.ToBase64String(_bytes)}";
 }

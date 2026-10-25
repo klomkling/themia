@@ -56,34 +56,69 @@ public sealed class TaxDocumentRenderer
 
     private readonly IVersionedPdfRenderer _pdf;
 
-    /// <summary>Creates the renderer.</summary>
+    private readonly ITaxDocumentLogoSource _logos;
+
+    /// <summary>Creates a renderer that prints no logo from storage (documents carrying a logo hash cannot be rendered through it).</summary>
     /// <param name="pdf">Prints the HTML and reports the browser version.</param>
     public TaxDocumentRenderer(IVersionedPdfRenderer pdf)
+        : this(pdf, new OptionsTaxDocumentLogoSource(new TaxDocumentTemplateOptions()))
     {
-        _pdf = pdf ?? throw new ArgumentNullException(nameof(pdf));
     }
 
-    /// <summary>Renders <paramref name="snapshot"/> with the template it was issued under.</summary>
+    /// <summary>Creates the renderer.</summary>
+    /// <param name="pdf">Prints the HTML and reports the browser version.</param>
+    /// <param name="logos">Finds the logo a stored document was issued with.</param>
+    public TaxDocumentRenderer(IVersionedPdfRenderer pdf, ITaxDocumentLogoSource logos)
+    {
+        _pdf = pdf ?? throw new ArgumentNullException(nameof(pdf));
+        _logos = logos ?? throw new ArgumentNullException(nameof(logos));
+    }
+
+    /// <summary>Renders <paramref name="snapshot"/> with the template it was issued under, and the logo it was issued with, found for <paramref name="sellerId"/>.</summary>
+    /// <param name="sellerId">The seller the document belongs to.</param>
     /// <param name="snapshot">The hash-verified snapshot read back from storage.</param>
     /// <param name="templateVersion">The template version recorded on the document.</param>
     /// <param name="marker">ORIGINAL on the send path only; COPY otherwise; CancelledCopy for a cancelled document.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <exception cref="ArgumentException"><paramref name="templateVersion"/> is not a known version.</exception>
+    /// <exception cref="TaxDocumentLogoException">The snapshot records a logo the source does not hold.</exception>
+    public async Task<TaxDocumentRender> RenderForSellerAsync(
+        string sellerId, TaxDocumentSnapshot snapshot, string templateVersion, TaxDocumentMarker marker, CancellationToken ct = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(sellerId);
+        ArgumentNullException.ThrowIfNull(snapshot);
+
+        var logo = snapshot.LogoSha256 is { } sha
+            ? await _logos.FindAsync(sellerId, sha, ct).ConfigureAwait(false) ?? throw new TaxDocumentLogoException(sha)
+            : null;
+        return await RenderWithLogoAsync(snapshot, templateVersion, marker, logo, ct).ConfigureAwait(false);
+    }
+
+    /// <summary>Renders <paramref name="snapshot"/> with the template it was issued under. For a snapshot that records a logo use the overload taking the seller.</summary>
+    /// <param name="snapshot">The hash-verified snapshot read back from storage.</param>
+    /// <param name="templateVersion">The template version recorded on the document.</param>
+    /// <param name="marker">ORIGINAL on the send path only; COPY otherwise; CancelledCopy for a cancelled document.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <exception cref="ArgumentException"><paramref name="templateVersion"/> is not a known version.</exception>
+    /// <exception cref="TaxDocumentLogoException">The snapshot records a logo (there is no seller to find it for).</exception>
     public async Task<TaxDocumentRender> RenderAsync(
         TaxDocumentSnapshot snapshot, string templateVersion, TaxDocumentMarker marker, CancellationToken ct = default) =>
         await RenderWithLogoAsync(snapshot, templateVersion, marker, logo: null, ct).ConfigureAwait(false);
 
-    /// <summary>Renders a snapshot like <see cref="RenderAsync"/>, printing <paramref name="logo"/> in the logo slot of the paged templates (versions <c>"4"</c> and <c>"5"</c>).</summary>
+    /// <summary>Renders a snapshot like <see cref="RenderForSellerAsync"/>, printing <paramref name="logo"/> in the logo slot of the paged templates (versions <c>"4"</c> and <c>"5"</c>).</summary>
     /// <param name="snapshot">The document content.</param>
     /// <param name="templateVersion">The version recorded on the document.</param>
     /// <param name="marker">Original, copy or cancelled copy.</param>
-    /// <param name="logo">The seller's logo, or <see langword="null"/> for none: no logo box is printed. Versions 1 to 3 have no logo slot and ignore it.</param>
+    /// <param name="logo">The seller's logo, or <see langword="null"/> for none: no logo box is printed. Versions 1 to 3 have no logo slot and ignore it. When the snapshot records a logo hash this must be that logo.</param>
     /// <param name="ct">Cancellation token.</param>
+    /// <exception cref="TaxDocumentLogoException">The snapshot records a logo hash and <paramref name="logo"/> is missing or has another hash.</exception>
     public async Task<TaxDocumentRender> RenderWithLogoAsync(
         TaxDocumentSnapshot snapshot, string templateVersion, TaxDocumentMarker marker, TaxDocumentLogo? logo, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(snapshot);
         ArgumentNullException.ThrowIfNull(templateVersion);
+        if (snapshot.LogoSha256 is { } recorded && !string.Equals(logo?.Sha256, recorded, StringComparison.Ordinal))
+            throw new TaxDocumentLogoException(recorded);
 
         var html = RenderHtml(snapshot, templateVersion, marker, logo);
         var options = TaxDocumentTemplates.PageSizeOf(templateVersion) switch

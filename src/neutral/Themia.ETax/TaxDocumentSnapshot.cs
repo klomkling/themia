@@ -44,4 +44,10 @@ public sealed record TaxDocumentSnapshot
 
     /// <summary>How and when a receipt was paid. Receipts only; omitted from the stored JSON when <see langword="null"/>.</summary>
     public TaxPayment? Payment { get; init; }
+
+    /// <summary>
+    /// Lowercase hex SHA-256 of the logo the document was issued with (paged templates only). Stamped by <see cref="TaxDocumentService"/>; a caller-supplied value
+    /// is rejected. Omitted from the stored JSON when <see langword="null"/>, so a document without a logo is byte-identical to one issued before logos existed.
+    /// </summary>
+    public string? LogoSha256 { get; init; }
 }
