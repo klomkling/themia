@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<title>{{documentNumber}}</title>
+<style>
+{{{fontCss}}}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body { font-family: 'Sarabun'; font-size: 8.8pt; line-height: 1.2; color: #000; }
+.copies { margin: 0 0 1mm 2mm; font-size: 8pt; }
+.copies b { font-weight: 700; }
+.copies i { font-weight: 400; }
+.copies div.on i { font-weight: 700; }
+.sheet { position: relative; border: 0.6pt solid #000; padding: 1.2mm; }
+.top { display: flex; justify-content: space-between; align-items: flex-start; }
+.replacement span { display: inline-block; border: 1pt solid #000; padding: 0 6mm; font-size: 14pt; font-weight: 700; margin-right: 2mm; }
+.title { text-align: center; padding: 1mm 0 0.6mm; }
+.title h1 { margin: 0; font-size: 13pt; font-weight: 700; }
+.title .sub { font-size: 9.5pt; }
+.docno { position: absolute; right: 2.5mm; top: 2mm; width: 40mm; font-size: 8.6pt; }
+.docno div { border-bottom: 0.4pt dotted #000; height: 4.6mm; margin-bottom: 0.6mm; white-space: nowrap; }
+.docno b { font-weight: 400; }
+.party { border: 0.6pt solid #000; border-radius: 2.4mm; padding: 1mm 2mm 0.8mm; margin-top: 1.2mm; }
+.party .row { display: flex; align-items: flex-end; margin-bottom: 0.4mm; }
+.party h2 { margin: 0; font-size: 9.6pt; font-weight: 700; white-space: nowrap; }
+.party .grow { flex: 1; }
+.party .lbl { white-space: nowrap; margin-right: 1mm; }
+.ids { display: flex; align-items: center; white-space: nowrap; }
+.ids .group { display: flex; position: relative; border: 0.4pt solid #000; margin-left: 2.2mm; }
+.ids .group:first-child { margin-left: 1mm; }
+.ids .group + .group::before { content: ""; position: absolute; left: -2.2mm; top: 50%; width: 2.2mm; border-top: 0.4pt solid #000; }
+.cell { display: inline-block; width: 3.9mm; height: 4.5mm; border-left: 0.3pt dotted #000; text-align: center; font-size: 8.6pt; line-height: 4.4mm; }
+.group .cell:first-child { border-left: 0; }
+.name { flex: 1; border-bottom: 0.4pt dotted #000; min-height: 4.6mm; padding-left: 1mm; margin-right: 2mm; font-weight: 700; }
+.addr { flex: 1; border-bottom: 0.4pt dotted #000; min-height: 4.6mm; padding-left: 1mm; }
+.cap { font-size: 6.6pt; font-style: italic; margin: 0 0 0.6mm 6mm; }
+.cap b { font-style: normal; font-weight: 700; font-size: 7.8pt; }
+.cb { display: inline-block; position: relative; width: 3.6mm; height: 3.6mm; border: 0.5pt solid #000; vertical-align: -0.7mm; margin-right: 1mm; }
+.cb.on::after { content: ""; position: absolute; left: 1mm; top: 0.1mm; width: 1.1mm; height: 2.3mm; border: solid #000; border-width: 0 0.7pt 0.7pt 0; transform: rotate(45deg); }
+.seq { display: flex; align-items: flex-start; margin-top: 0.6mm; }
+.seq .box { display: inline-block; min-width: 24mm; height: 5mm; border: 0.5pt solid #000; padding-left: 1mm; vertical-align: middle; margin: 0 2mm 0 1mm; }
+.seq .hint { font-size: 6.4pt; font-style: italic; max-width: 50mm; line-height: 1.05; }
+.seq .forms { display: grid; grid-template-columns: 33mm 38mm 25mm 25mm; row-gap: 1.6mm; margin-left: 3mm; align-items: center; }
+.tbox { border: 0.6pt solid #000; border-radius: 2.4mm; overflow: hidden; margin-top: 1.2mm; }
+table.income { width: calc(100% + 1.2pt); border-collapse: collapse; margin: -0.6pt; table-layout: fixed; }
+table.income th, table.income td { border: 0.6pt solid #000; padding: 0 1mm; vertical-align: top; }
+table.income th { font-weight: 700; text-align: center; font-size: 9pt; padding: 0.6mm 1mm; line-height: 1.1; }
+table.income td.label { border-top: 0; border-bottom: 0; }
+table.income tr.line td { border-top: 0.3pt dotted #000; border-bottom: 0; padding-top: 0.4mm; padding-bottom: 0.5mm; }
+table.income tr.line td.label { border-top: 0.3pt dotted #fff; }
+td.date { text-align: center; white-space: nowrap; }
+td.baht { text-align: right; border-right: 0.3pt solid #000 !important; white-space: nowrap; }
+td.satang { text-align: center; white-space: nowrap; }
+.fill { display: inline-block; text-indent: 0; min-width: 24mm; border-bottom: 0.4pt dotted #000; padding: 0 1mm; }
+table.income .fill { display: inline; min-width: 0; }
+.fill.block { display: block; margin-top: 0.4mm; min-height: 3.6mm; }
+table.income td.ind0 { padding-left: 5mm; text-indent: -4mm; }
+table.income td.ind1 { padding-left: 9mm; text-indent: -4mm; }
+table.income td.ind2 { padding-left: 16.4mm; text-indent: -6.4mm; }
+table.income td.ind3 { padding-left: 26.7mm; text-indent: -10mm; }
+tr.total td { border-top: 0.6pt solid #000; border-bottom: 0.6pt solid #000; font-weight: 700; }
+tr.total td.label { text-align: right; padding-right: 3mm; }
+.words { display: flex; padding: 0.6mm 2mm; align-items: center; }
+.words .lbl { font-weight: 700; white-space: nowrap; margin-left: 8mm; }
+.words .val { flex: 1; background: #d9d9d9; margin-left: 2mm; padding: 0.4mm 2mm; min-height: 5mm; font-weight: 700; }
+.funds { border: 0.6pt solid #000; border-radius: 2.4mm; padding: 0.8mm 2mm; margin-top: 1.2mm; display: flex; justify-content: space-between; white-space: nowrap; font-size: 7.8pt; }
+.funds .item { margin-right: 1mm; }
+.funds .item .v { display: inline-block; min-width: 15mm; text-align: right; border-bottom: 0.4pt dotted #000; padding: 0 1mm; }
+.cond { border: 0.6pt solid #000; border-radius: 2.4mm; padding: 0.8mm 2mm; margin-top: 1.2mm; display: flex; align-items: center; white-space: nowrap; }
+.cond b { margin-right: 4mm; font-size: 9.6pt; }
+.cond .opt { margin-right: 5mm; }
+.cond .fill { min-width: 50mm; }
+.cond .opt:last-child:not(.sel)::after { content: ""; display: inline-block; width: 50mm; border-bottom: 0.4pt dotted #000; }
+.bottom { display: flex; margin-top: 1.2mm; }
+.warn { display: flex; width: 39%; border: 0.6pt solid #000; border-radius: 2.4mm; padding: 1mm 2mm; margin-right: 1.5mm; }
+.warn b { font-weight: 700; flex: none; width: 11mm; }
+.sign { flex: 1; border: 0.6pt solid #000; border-radius: 2.4mm; padding: 1mm 2mm; position: relative; text-align: center; }
+.sign .line { display: flex; align-items: flex-end; justify-content: center; margin-top: 5mm; padding-right: 22mm; }
+.sign .line .dots { position: relative; width: 62mm; border-bottom: 0.4pt dotted #000; height: 4mm; }
+.sign .line .dots img.signature { position: absolute; left: 50%; bottom: 0.4mm; transform: translateX(-50%); max-height: 11mm; max-width: 56mm; }
+.sign .date { margin-top: 1mm; padding-right: 22mm; }
+.sign .date span.d { display: inline-block; min-width: 12mm; border-bottom: 0.4pt dotted #000; }
+.sign .date span.d.m { min-width: 22mm; }
+.sign .cap2 { font-style: italic; padding-right: 22mm; }
+.stamp { position: absolute; right: 4mm; top: 8mm; width: 17mm; height: 17mm; border: 0.5pt solid #000; border-radius: 50%; text-align: center; font-size: 6.4pt; line-height: 1.1; padding-top: 4.6mm; }
+.note { margin: 1mm 0 0 2mm; font-size: 7.8pt; display: flex; }
+.note .head { white-space: nowrap; margin-right: 4mm; }
+.cancelled-watermark { position: fixed; top: 40%; left: 0; width: 100%; text-align: center; font-size: 80pt; font-weight: 700; color: rgba(200, 0, 0, 0.18); transform: rotate(-30deg); z-index: -1; }
+</style>
+</head>
+<body data-copy="{{copy}}">
+{{#if cancelled}}<div class="cancelled-watermark">ยกเลิก CANCELLED</div>{{/if}}
+<div class="top">
+  <div class="copies">
+    <div{{#if copy1}} class="on"{{/if}}><b>ฉบับที่ 1</b> <i>(สำหรับผู้ถูกหักภาษี ณ ที่จ่าย ใช้แนบพร้อมกับแบบแสดงรายการภาษี)</i></div>
+    <div{{#if copy2}} class="on"{{/if}}><b>ฉบับที่ 2</b> <i>(สำหรับผู้ถูกหักภาษี ณ ที่จ่าย เก็บไว้เป็นหลักฐาน)</i></div>
+  </div>
+  {{#if replacementCopy}}<div class="replacement"><span>ใบแทน</span></div>{{/if}}
+</div>
+<div class="sheet">
+  <div class="docno">
+    <div>เล่มที่ <b>{{bookNumber}}</b></div>
+    <div>เลขที่ <b>{{documentNumber}}</b></div>
+  </div>
+  <div class="title"><h1>หนังสือรับรองการหักภาษี ณ ที่จ่าย</h1><div class="sub">ตามมาตรา 50 ทวิ แห่งประมวลรัษฎากร</div></div>
+
+  {{#with payer}}
+  <div class="party" data-party="payer">
+    <div class="row"><h2>ผู้มีหน้าที่หักภาษี ณ ที่จ่าย :-</h2><span class="grow"></span><span class="lbl"><b>เลขประจำตัวผู้เสียภาษีอากร (13 หลัก)*</b></span>
+      <span class="ids">{{#each taxId}}<span class="group">{{#each cells}}<span class="cell">{{this}}</span>{{/each}}</span>{{/each}}</span></div>
+    <div class="row"><span class="lbl"><b>ชื่อ</b></span><span class="name">{{name}}</span><span class="lbl"><b>เลขประจำตัวผู้เสียภาษีอากร</b></span>
+      <span class="ids">{{#each legacyTaxId}}<span class="group">{{#each cells}}<span class="cell">{{this}}</span>{{/each}}</span>{{/each}}</span></div>
+    <div class="cap">(ให้ระบุว่าเป็น บุคคล นิติบุคคล บริษัท สมาคม หรือคณะบุคคล) <b>{{kind}}</b></div>
+    <div class="row"><span class="lbl"><b>ที่อยู่</b></span><span class="addr">{{address}}</span></div>
+    <div class="cap">(ให้ระบุ ชื่ออาคาร/หมู่บ้าน ห้องเลขที่ ชั้นที่ เลขที่ ตรอก/ซอย หมู่ที่ ถนน ตำบล/แขวง อำเภอ/เขต จังหวัด)</div>
+  </div>
+  {{/with}}
+
+  {{#with payee}}
+  <div class="party" data-party="payee">
+    <div class="row"><h2>ผู้ถูกหักภาษี ณ ที่จ่าย :-</h2><span class="grow"></span><span class="lbl"><b>เลขประจำตัวผู้เสียภาษีอากร (13 หลัก)*</b></span>
+      <span class="ids">{{#each taxId}}<span class="group">{{#each cells}}<span class="cell">{{this}}</span>{{/each}}</span>{{/each}}</span></div>
+    <div class="row"><span class="lbl"><b>ชื่อ</b></span><span class="name">{{name}}</span><span class="lbl"><b>เลขประจำตัวผู้เสียภาษีอากร</b></span>
+      <span class="ids">{{#each legacyTaxId}}<span class="group">{{#each cells}}<span class="cell">{{this}}</span>{{/each}}</span>{{/each}}</span></div>
+    <div class="cap">(ให้ระบุว่าเป็น บุคคล นิติบุคคล บริษัท สมาคม หรือคณะบุคคล) <b>{{kind}}</b></div>
+    <div class="row"><span class="lbl"><b>ที่อยู่</b></span><span class="addr">{{address}}</span></div>
+    <div class="cap">(ให้ระบุ ชื่ออาคาร/หมู่บ้าน ห้องเลขที่ ชั้นที่ เลขที่ ตรอก/ซอย หมู่ที่ ถนน ตำบล/แขวง อำเภอ/เขต จังหวัด)</div>
+    <div class="seq">
+      <div><b>ลำดับที่</b><span class="box">{{../filingSequence}}</span><b>ในแบบ</b><div class="hint">(ให้สามารถอ้างอิงหรือสอบยันกันได้ระหว่างลำดับที่ตามหนังสือรับรองฯ กับแบบยื่นรายการภาษีหักที่จ่าย)</div></div>
+      <div class="forms">{{#each ../filingForms}}<span><span class="cb{{#if on}} on{{/if}}"></span>({{number}}) <b>{{label}}</b></span>{{/each}}</div>
+    </div>
+  </div>
+  {{/with}}
+
+  <div class="tbox">
+  <table class="income">
+    <colgroup><col style="width: 101mm"><col style="width: 27mm"><col style="width: 28mm"><col style="width: 7mm"><col style="width: 21mm"><col style="width: 7mm"></colgroup>
+    <thead><tr><th>ประเภทเงินได้พึงประเมินที่จ่าย</th><th>วัน เดือน<br>หรือปีภาษี ที่จ่าย</th><th colspan="2">จำนวนเงินที่จ่าย</th><th colspan="2">ภาษีที่หัก<br>และนำส่งไว้</th></tr></thead>
+    <tbody>
+    {{#each lines}}
+      <tr class="line"><td class="label ind{{indent}}">{{label}}{{#if specify}}<span class="fill{{#unless fill}} empty{{/unless}}">{{fill}}</span>{{/if}}</td>
+        <td class="date">{{date}}</td><td class="baht">{{paid.baht}}</td><td class="satang">{{paid.satang}}</td><td class="baht">{{withheld.baht}}</td><td class="satang">{{withheld.satang}}</td></tr>
+    {{/each}}
+      <tr class="total"><td class="label">รวมเงินที่จ่ายและภาษีที่หักนำส่ง</td><td></td>
+        <td class="baht">{{totals.paid.baht}}</td><td class="satang">{{totals.paid.satang}}</td><td class="baht">{{totals.withheld.baht}}</td><td class="satang">{{totals.withheld.satang}}</td></tr>
+    </tbody>
+  </table>
+  <div class="words"><span class="lbl">รวมเงินภาษีที่หักนำส่ง <i>(ตัวอักษร)</i></span><span class="val">({{totals.withheldInWords}})</span></div>
+  </div>
+
+  <div class="funds">
+    <span class="item">เงินที่จ่ายเข้า กบข./กสจ./กองทุนสงเคราะห์ครูโรงเรียนเอกชน <span class="v">{{funds.governmentPension}}</span> บาท</span>
+    <span class="item">กองทุนประกันสังคม <span class="v">{{funds.socialSecurity}}</span> บาท</span>
+    <span class="item">กองทุนสำรองเลี้ยงชีพ <span class="v">{{funds.providentFund}}</span> บาท</span>
+  </div>
+
+  <div class="cond"><b>ผู้จ่ายเงิน</b>
+    {{#each conditions}}<span class="opt{{#if on}} sel{{/if}}"><span class="cb{{#if on}} on{{/if}}"></span>({{number}}) {{label}}{{#if on}}{{#if text}} <span class="fill">{{text}}</span>{{/if}}{{/if}}</span>{{/each}}
+  </div>
+
+  <div class="bottom">
+    <div class="warn"><b>คำเตือน</b><span>ผู้มีหน้าที่ออกหนังสือรับรองการหักภาษี ณ ที่จ่าย ฝ่าฝืนไม่ปฏิบัติตามมาตรา 50 ทวิ แห่งประมวลรัษฎากร ต้องรับโทษทางอาญาตามมาตรา 35 แห่งประมวลรัษฎากร</span></div>
+    <div class="sign">
+      <div>ขอรับรองว่าข้อความและตัวเลขดังกล่าวข้างต้นถูกต้องตรงกับความจริงทุกประการ</div>
+      <div class="line"><span>ลงชื่อ</span><span class="dots">{{#if signature}}<img class="signature" src="{{{signature}}}">{{/if}}</span><span>ผู้จ่ายเงิน</span></div>
+      <div class="date"><span class="d">{{issued.day}}</span> / <span class="d m">{{issued.month}}</span> / <span class="d">{{issued.year}}</span></div>
+      <div class="cap2">(วัน เดือน ปี ที่ออกหนังสือรับรองฯ)</div>
+      <div class="stamp">ประทับตรา<br>นิติบุคคล<br>(ถ้ามี)</div>
+    </div>
+  </div>
+</div>
+<div class="note"><span class="head">หมายเหตุ เลขประจำตัวผู้เสียภาษีอากร (13 หลัก)* หมายถึง</span><span>1. กรณีบุคคลธรรมดาไทย ให้ใช้เลขประจำตัวประชาชนของกรมการปกครอง<br>2. กรณีนิติบุคคล ให้ใช้เลขทะเบียนนิติบุคคลของกรมพัฒนาธุรกิจการค้า<br>3. กรณีอื่น ๆ นอกเหนือจาก 1. และ 2. ให้ใช้เลขประจำตัวผู้เสียภาษีอากร (13 หลัก) ของกรมสรรพากร</span></div>
+</body>
+</html>

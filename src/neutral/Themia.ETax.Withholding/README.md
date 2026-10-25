@@ -56,8 +56,8 @@ cancel pending until you roll back).
 ## Rendering (`WithholdingCertificateRenderer`)
 
 `services.AddThemiaETaxWithholdingRendering()` registers the renderer and the Puppeteer PDF renderer it prints through. It prints the
-official layout (หนังสือรับรองการหักภาษี ณ ที่จ่าย, form 50 ทวิ) on one A4 page with the embedded Sarabun, in template version `"1"` (frozen by
-golden-hash tests: a layout change ships as template `"2"`, never an edit). The same stored certificate and the same markings give the same
+official layout (หนังสือรับรองการหักภาษี ณ ที่จ่าย, form 50 ทวิ) on one A4 page with the embedded Sarabun, in template version `"2"` for new certificates (versions `"1"` and `"2"` are
+frozen by golden-hash tests: a layout change ships as the next version, never an edit; a stored certificate is always re-rendered with the version it was issued under). The same stored certificate and the same markings give the same
 bytes: no clock, no culture, PDF dates pinned to the issue date, dates printed in the Buddhist era (`15/10/2569`).
 
 - **Markings are chosen when rendering and never stored:** `WithholdingCopy.Copy1` / `Copy2` (both copy lines are printed as on the form and the

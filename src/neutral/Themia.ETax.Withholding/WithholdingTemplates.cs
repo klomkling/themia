@@ -4,17 +4,19 @@ namespace Themia.ETax.Withholding;
 public static class WithholdingTemplates
 {
     /// <summary>The version new certificates are issued under.</summary>
-    public const string CurrentVersion = "1";
+    public const string CurrentVersion = "2";
 
     private static readonly Lazy<string> Version1 = new(() => ReadResource("Templates.withholding-certificate.v1.hbs"));
+    private static readonly Lazy<string> Version2 = new(() => ReadResource("Templates.withholding-certificate.v2.hbs"));
 
     /// <summary>Whether <paramref name="templateVersion"/> is a version this release can still render.</summary>
     /// <param name="templateVersion">The version stored with a certificate.</param>
-    public static bool IsSupported(string? templateVersion) => templateVersion == "1";
+    public static bool IsSupported(string? templateVersion) => templateVersion is "1" or "2";
 
     internal static string Get(string templateVersion) => templateVersion switch
     {
         "1" => Version1.Value,
+        "2" => Version2.Value,
         _ => throw new ArgumentException($"Unknown withholding certificate template version '{templateVersion}'.", nameof(templateVersion)),
     };
 

@@ -27,6 +27,15 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+### Changed
+
+- **`Themia.ETax.Withholding`** — withholding certificate **template version 2**, closer to the Revenue Department's 50 bis form
+  (coord #0164): indented and hanging-indented dividend sub-rows, a dotted write-in line on payer condition (4), tax-id cells drawn as joined
+  groups, the income table in its own rounded box, a hanging-indent warning box, italic copy-line captions and the footnote below the frame.
+  `WithholdingTemplates.CurrentVersion` is now `"2"`, so **new certificates are issued under version 2**; certificates already issued keep
+  rendering byte-identically under version 1 (`IsSupported` accepts `"1"` and `"2"`). Existing tests that pin version 1's markup now name
+  version `"1"` explicitly; version 2 has its own golden-hash tests. A custom `IWithholdingCertificateStore` needs no change.
+
 ## [0.38.0] - 2026-10-25
 
 A non-consuming check on `Themia.Challenges` (coord #0174). No new packages, no migration, no API removed; the one new member is on `IChallengeService`, see the note under it for adopters who implement that interface themselves.
