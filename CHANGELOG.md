@@ -33,27 +33,6 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
   sequence number source prints `RTX-6910-000001` (the adopter's prefix, Buddhist-era two-digit year, month, counter), one gapless run per
   seller, kind and month, drawn in the issue transaction. The run key stays Gregorian, so switching the style never restarts a run. Default
   output is unchanged. Same shape `Themia.ETax.Withholding.Data` got in #309.
-
-### Changed
-
-- **`Themia.ETax.Withholding`** — withholding certificate **template version 2**, closer to the Revenue Department's 50 bis form
-  (coord #0164): indented and hanging-indented dividend sub-rows, a dotted write-in line on payer condition (4), tax-id cells drawn as joined
-  groups, the income table in its own rounded box, a hanging-indent warning box, italic copy-line captions and the footnote below the frame.
-  `WithholdingTemplates.CurrentVersion` is now `"2"`, so **new certificates are issued under version 2**; certificates already issued keep
-  rendering byte-identically under version 1 (`IsSupported` accepts `"1"` and `"2"`). Existing tests that pin version 1's markup now name
-  version `"1"` explicitly; version 2 has its own golden-hash tests. A custom `IWithholdingCertificateStore` needs no change.
-
-
-
-- **`Themia.ETax`** — template version **4**: the combined receipt/tax invoice (ใบเสร็จรับเงิน/ใบกำกับภาษี) and the credit note (ใบลดหนี้) on **A5 landscape**
-  pages, opt-in through `TaxDocumentTemplateOptions.TemplateVersion = "4"` (A4 versions 1 to 3 are unchanged and the default stays `"1"`). Layout from the
-  designer's accepted A5 sheet: Sarabun embedded, 9 pt base, a receipt holds 6 lines per page and a credit note 4; more lines continue on further pages with a
-  carried-forward / brought-forward subtotal and a compact header (the type never shrinks). Prints seller and buyer name, address, grouped 13-digit tax id and branch,
-  number, date, quantity / unit price / amount, VAT shown separately, the total in figures and Thai words, original/copy marking, payment method and date, the
-  receiver signature line, and for a credit note the original invoice number and date, original / correct / difference values, VAT on the difference and the
-  five section 82/10 reasons. New `TaxDocumentRenderer.RenderWithLogoAsync` and `TaxDocumentLogo` (PNG/JPEG up to 256 KB) fill an optional logo slot; with no
-  logo no box is printed. `TaxDocumentTemplates.IsSupported` now accepts `"4"`.
-
 - **`Themia.ETax`** — template versions **4** and **5**: the combined receipt/tax invoice (ใบเสร็จรับเงิน/ใบกำกับภาษี) and the credit note (ใบลดหนี้) in the designer's
   layout, **`"4"` on A4 portrait** (the page for PDFs: content flows from the top with no blank rows) and **`"5"` on A5 landscape** (a small form; the page size is part
   of the version because a document records only its version). Opt-in through `TaxDocumentTemplateOptions.TemplateVersion` (versions 1 to 3 are unchanged and the
@@ -73,6 +52,15 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
   debit note may not carry one, and a `ReasonCode` set beside it must equal its code. New fields are omitted from the stored JSON when null, so an
   already issued snapshot re-serialises to the same bytes and hash (pinned by `SnapshotSchemaStabilityTests`). Callers that issue credit notes must
   now set `ReasonKind`.
+
+### Changed
+
+- **`Themia.ETax.Withholding`** — withholding certificate **template version 2**, closer to the Revenue Department's 50 bis form
+  (coord #0164): indented and hanging-indented dividend sub-rows, a dotted write-in line on payer condition (4), tax-id cells drawn as joined
+  groups, the income table in its own rounded box, a hanging-indent warning box, italic copy-line captions and the footnote below the frame.
+  `WithholdingTemplates.CurrentVersion` is now `"2"`, so **new certificates are issued under version 2**; certificates already issued keep
+  rendering byte-identically under version 1 (`IsSupported` accepts `"1"` and `"2"`). Existing tests that pin version 1's markup now name
+  version `"1"` explicitly; version 2 has its own golden-hash tests. A custom `IWithholdingCertificateStore` needs no change.
 
 ## [0.38.0] - 2026-10-25
 
