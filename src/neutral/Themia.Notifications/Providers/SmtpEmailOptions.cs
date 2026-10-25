@@ -29,4 +29,13 @@ public sealed class SmtpEmailOptions
     /// <summary>When set, emails are written as <c>.eml</c> files to this directory instead of sent
     /// (System.Net.Mail pickup-directory delivery). For tests / local dev.</summary>
     public string? PickupDirectory { get; set; }
+
+    /// <summary>The media types an attachment may have (compared without parameters, case-insensitively). Default: <c>application/pdf</c> only.</summary>
+    public ISet<string> AllowedAttachmentContentTypes { get; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "application/pdf" };
+
+    /// <summary>
+    /// The most all attachments of one message may weigh together, in bytes. Default 7 MiB: base64 grows a file by a third, and the whole
+    /// message must stay under the 10 MB many providers (Amazon SES among them) accept.
+    /// </summary>
+    public long MaxAttachmentBytes { get; set; } = 7 * 1024 * 1024;
 }

@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Mail;
 using System.Net.Mime;
+using System.Runtime.InteropServices;
 using System.Text;
 
 namespace Themia.Notifications.Providers;
@@ -74,9 +75,40 @@ internal sealed class SmtpEmailSender(SmtpEmailOptions options, INotificationTem
                 mail.Headers.Add(name, value);
         }
 
+        AddAttachments(mail, message.Attachments);
+
         using var client = CreateClient();
         await client.SendMailAsync(mail, cancellationToken).ConfigureAwait(false);
         return NotificationResult.Success();
+    }
+
+    // Policy lives here, not on the message: the allow-list and the cap are per deployment. A violation is the caller's mistake and can
+    // never succeed on retry, so it throws ArgumentException (which the outbox dispatcher already treats as permanent) rather than
+    // returning a failed result, which reads as transient.
+    private void AddAttachments(MailMessage mail, IReadOnlyList<EmailAttachment>? attachments)
+    {
+        if (attachments is not { Count: > 0 })
+            return;
+
+        long total = 0;
+        foreach (var attachment in attachments)
+        {
+            if (!options.AllowedAttachmentContentTypes.Contains(attachment.ContentType))
+                throw new ArgumentException($"Attachment content type '{attachment.ContentType}' is not allowed by {nameof(SmtpEmailOptions)}.{nameof(SmtpEmailOptions.AllowedAttachmentContentTypes)}.", nameof(attachments));
+
+            total += attachment.Content.Length;
+            if (total > options.MaxAttachmentBytes)
+                throw new ArgumentException($"The attachments weigh more than {options.MaxAttachmentBytes} bytes ({nameof(SmtpEmailOptions)}.{nameof(SmtpEmailOptions.MaxAttachmentBytes)}).", nameof(attachments));
+        }
+
+        foreach (var attachment in attachments)
+        {
+            // Over the caller's own array when there is one (no copy of up to several MB); the stream is read-only.
+            var stream = MemoryMarshal.TryGetArray(attachment.Content, out var segment)
+                ? new MemoryStream(segment.Array!, segment.Offset, segment.Count, writable: false)
+                : new MemoryStream(attachment.Content.ToArray(), writable: false);
+            mail.Attachments.Add(new Attachment(stream, attachment.FileName, attachment.ContentType) { NameEncoding = Encoding.UTF8 });
+        }
     }
 
     // Renders only when the text actually carries a token, so a plain string is not paid for. Shared by

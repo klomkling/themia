@@ -27,6 +27,7 @@ public sealed class NotificationMessage
     private readonly IReadOnlyList<string>? _cc;
     private readonly IReadOnlyList<string>? _bcc;
     private readonly string? _plainTextBody;
+    private readonly IReadOnlyList<EmailAttachment>? _attachments;
 
     /// <summary>The delivery channel.</summary>
     public NotificationChannel Channel { get; init; }
@@ -154,6 +155,37 @@ public sealed class NotificationMessage
     {
         get => _headers;
         init => _headers = value is null ? null : ValidateAndCopy(value);
+    }
+
+    /// <summary>The most attachments one message may carry.</summary>
+    public const int MaxAttachments = 10;
+
+    /// <summary>
+    /// Files to attach (email). Null by default; ignored by channels without attachments and by the logger stub, which sends nothing.
+    /// </summary>
+    /// <remarks>
+    /// Direct sends only: the notifications module's outbox stores a message as text columns and does not carry attachments
+    /// (<c>NotificationRequest</c> has no such property), so a host that sends a file goes through <see cref="IEmailSender"/> itself.
+    /// The list is copied on assignment, like <see cref="Cc"/>. <c>SmtpEmailSender</c> additionally enforces the content-type
+    /// allow-list and the total size cap in <c>SmtpEmailOptions</c>. The bytes are never logged.
+    /// </remarks>
+    /// <exception cref="ArgumentException">An entry is null, or there are more than <see cref="MaxAttachments"/>.</exception>
+    public IReadOnlyList<EmailAttachment>? Attachments
+    {
+        get => _attachments;
+        init => _attachments = value is null ? null : ValidateAndCopyAttachments(value);
+    }
+
+    private static IReadOnlyList<EmailAttachment> ValidateAndCopyAttachments(IReadOnlyList<EmailAttachment> attachments)
+    {
+        if (attachments.Count > MaxAttachments)
+            throw new ArgumentException($"A message carries at most {MaxAttachments} attachments; got {attachments.Count}.", nameof(Attachments));
+
+        var copy = new EmailAttachment[attachments.Count];
+        for (var i = 0; i < copy.Length; i++)
+            copy[i] = attachments[i] ?? throw new ArgumentException($"{nameof(Attachments)}[{i}] is null.", nameof(Attachments));
+
+        return copy;
     }
 
     // Copies rather than storing the caller's instance: an IReadOnlyDictionary is only read-only through
