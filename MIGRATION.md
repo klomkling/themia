@@ -10,6 +10,25 @@ with the *why* and concrete upgrade steps.
 - Each entry states: **What changed**, **Why**, and **How to upgrade** (before → after).
 - Non-breaking changes are *not* listed here — see the CHANGELOG.
 
+## 0.40.0
+
+### The logo of the paged e-tax templates comes from a host source (rollback limit)
+
+**What changed:** `TaxDocumentTemplateOptions.Logo` (one logo for every seller) or your own `ITaxDocumentLogoSource` (`GetCurrentAsync(sellerId)` for new documents, `FindAsync(sellerId, sha256)` for issued ones) now supplies the logo of template versions `"4"` and `"5"`. `TaxDocumentService` records the SHA-256 of the logo in `TaxDocumentSnapshot.LogoSha256` when it issues a document, and copies and the ORIGINAL send print exactly that image (`TaxDocumentRenderer.RenderForSellerAsync`). Nothing changes until you set a logo: no logo means no logo box and no new field in the stored JSON, and `RenderWithLogoAsync(snapshot, ..., logo)` still works for a document without a recorded logo.
+
+**Why:** a document must re-render to the same bytes for as long as it may be sent or copied. A logo that lives only in the host's current configuration would change every older document the day the brand changes, or be printed on the wrong seller's documents.
+
+**Who is affected:** apps that opt into a logo. Others only see new public members.
+
+**How to upgrade:**
+- One seller, never rebranded: `ConfigureThemiaETaxTemplates(o => { o.TemplateVersion = "4"; o.Logo = new TaxDocumentLogo(bytes); });`.
+- Several sellers, or a rebrand: register your own `ITaxDocumentLogoSource` and keep every logo that an issued document may still reference, looked up by seller and `TaxDocumentLogo.Sha256`. Both calls run on the issue path and on every render, so serve them from memory or a cache.
+- If the logo recorded on a document is gone, `RenderCopyAsync` throws `TaxDocumentLogoException` and the sender fails the document at once with `logo_unavailable` (no retry); restore the image and requeue it.
+- `TaxDocumentRenderer.RenderAsync(snapshot, ...)` has no seller and throws for a snapshot that records a logo; use `RenderForSellerAsync(sellerId, snapshot, ...)`. A `TaxDocumentRenderer` built by hand with `new TaxDocumentRenderer(pdf)` has no logo source and fails such documents closed; pass one, or resolve the renderer from DI.
+- `Logo` set together with template version `"1"` to `"3"` throws at registration.
+
+**Rollback limit:** documents issued WITHOUT a logo are byte-identical to 0.39 documents and stay readable by 0.39. A document issued WITH a logo carries `logo_sha256`, which a 0.39 reader rejects (the snapshot reader refuses unknown members), so rolling an app back to 0.39 makes only those documents unreadable (the sender records `snapshot_integrity`). Do not turn the logo on in an app that may still roll back.
+
 ## 0.39.0
 
 ### A new credit note must carry `ReasonKind` (breaking)

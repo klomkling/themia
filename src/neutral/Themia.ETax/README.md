@@ -115,6 +115,8 @@ table keeps its full height. The page size is part of the version, because a doc
   carried-forward subtotal (ยอดยกไป) that the next page opens with (ยอดยกมา), and middle and last pages use a compact header. The counts are fixed constants:
   on A4 a receipt holds 32 lines on one page (a credit note 30) and then 38 per middle page and 34 on the last (32); on A5 6 / 12 / 9 (credit note 4 / 12 / 5).
   A Chromium test proves each count fits. A description that wraps uses more height and can add a page; it is never clipped, so keep descriptions to about one line.
-- **Logo:** `TaxDocumentRenderer.RenderWithLogoAsync(snapshot, "4", marker, new TaxDocumentLogo(pngOrJpegBytes))` prints the logo top-left; without one no logo box
-  is printed. The logo is not part of the stored document, so `TaxDocumentService` re-renders without it until a host passes one.
+- **Logo:** set `TaxDocumentTemplateOptions.Logo` (a `TaxDocumentLogo` of PNG or JPEG bytes, one logo for every seller) or register an `ITaxDocumentLogoSource` (per seller;
+  keep old logos while documents issued with them may still be rendered). The logo prints top-left; without one no logo box is printed. `TaxDocumentService` records the
+  logo's SHA-256 on the document, and copies and the ORIGINAL send print exactly that image; if it is gone the render throws `TaxDocumentLogoException` and the sender
+  fails the document with `logo_unavailable`. A document issued without a logo never prints one.
 - **Numbers:** the document number is whatever the number source prints, for example `RTX-6910-000001` (`TaxDocumentNumberOptions.YearStyle`, `Themia.ETax.Data`).
