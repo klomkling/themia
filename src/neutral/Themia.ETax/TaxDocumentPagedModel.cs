@@ -27,6 +27,8 @@ internal static class TaxDocumentPagedModel
             cancelled = marker == TaxDocumentMarker.CancelledCopy,
             receipt = isReceipt,
             credit = isCredit,
+            debit = s.Kind == TaxDocumentKind.DebitNote,
+            note = s.Kind != TaxDocumentKind.TaxInvoiceReceipt,
             titleTh,
             titleEn,
             markerTh,

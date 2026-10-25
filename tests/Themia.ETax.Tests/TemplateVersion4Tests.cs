@@ -180,6 +180,54 @@ public sealed class TemplateVersion4Tests
         Assert.Contains("ผู้มีอำนาจลงนาม", html);
     }
 
+    internal static TaxDocumentSnapshot DebitNote()
+    {
+        var note = Samples.AdjustmentNote(TaxDocumentKind.DebitNote, 107_000, 160_500);
+        return note with
+        {
+            Lines = [note.Lines[0] with { OriginalAmountExVatSatang = 100_000, CorrectAmountExVatSatang = 150_000 }],
+            Note = note.Note! with { Reason = "ปรับราคาตามจำนวนที่ส่งจริง" },
+        };
+    }
+
+    [Theory]
+    [InlineData("4")]
+    [InlineData("5")]
+    public void DebitNote_ShouldPrintTheNoteLayoutWithItsReason_NotTheReceiptLayout(string version)
+    {
+        var html = Html(DebitNote(), version: version);
+
+        Assert.Contains("ใบเพิ่มหนี้", html);
+        Assert.Contains("Debit Note", html);
+        Assert.Contains("อ้างอิงใบกำกับภาษีเดิม", html);
+        Assert.Contains("TAX-2026-000001", html);
+        Assert.Contains("มูลค่าตามใบกำกับภาษีเดิม", html);
+        Assert.Contains("มูลค่าที่ถูกต้อง", html);
+        Assert.Contains("ผลต่างรวม", html);
+        Assert.Contains("ภาษีมูลค่าเพิ่ม 7% ของผลต่าง", html);
+        Assert.Contains("จำนวนเงินที่เพิ่มหนี้", html);
+        Assert.Contains("เหตุผลในการเพิ่มหนี้", html);
+        Assert.Contains("ปรับราคาตามจำนวนที่ส่งจริง", html);
+        Assert.Contains("ผู้มีอำนาจลงนาม", html);
+        Assert.DoesNotContain("ราคาต่อหน่วย", html);
+        Assert.DoesNotContain("ได้รับเงินแล้วโดย", html);
+        Assert.DoesNotContain("จำนวนเงินที่ลดหนี้", html);
+        Assert.DoesNotContain("ลดราคาสินค้า/บริการ", html);
+    }
+
+    [Fact]
+    public void CreditNote_ShouldNotPrintTheDebitWording()
+    {
+        var note = Samples.AdjustmentNote(TaxDocumentKind.CreditNote, 107_000, 53_500);
+
+        var html = Html(note);
+
+        Assert.Contains("เหตุผลในการลดหนี้", html);
+        Assert.Contains("ลดราคาสินค้า/บริการ", html);
+        Assert.DoesNotContain("เหตุผลในการเพิ่มหนี้", html);
+        Assert.DoesNotContain("จำนวนเงินที่เพิ่มหนี้", html);
+    }
+
     [Fact]
     public void Document_ShouldPrintTheCancelledWatermark_OnACancelledCopy()
     {

@@ -106,7 +106,7 @@ Templates `"4"` and `"5"` print the combined **ใบเสร็จรับเ
 **ใบลดหนี้** (a credit note with the five section 82/10 reasons) in one layout, with the embedded Sarabun. `"4"` is **A4 portrait** (210 × 297 mm), the page for
 documents sent as PDFs: the content flows from the top, with no blank rows, and grows downwards. `"5"` is **A5 landscape** (210 × 148 mm), a small form whose
 table keeps its full height. The page size is part of the version, because a document records only its version. Both are opt-in (`o.TemplateVersion = "4"`);
-`"1"` to `"3"` stay as they were and the default stays `"1"`. A debit note uses the credit note layout without the reason block.
+`"1"` to `"3"` stay as they were and the default stays `"1"`. A debit note (ใบเพิ่มหนี้) uses the credit note layout, with its reason printed as text (the five section 82/10 reasons are for credit notes only).
 
 - **Data:** line `Quantity` / `Unit` / `UnitPriceSatang` fill the receipt table; on a note, line `OriginalAmountExVatSatang` / `CorrectAmountExVatSatang`
   fill the original-value and correct-value columns (the difference is the line amount); `Payment` fills the payment line;

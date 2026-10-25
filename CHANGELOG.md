@@ -63,7 +63,7 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
   quantity / unit price / amount, VAT shown separately, the total in figures and Thai words, original/copy marking, payment method and date, the receiver
   signature line, and for a credit note the original invoice number and date, original / correct / difference values, VAT on the difference and the five section 82/10
   reasons. New `TaxDocumentRenderer.RenderWithLogoAsync` and `TaxDocumentLogo` (PNG/JPEG up to 256 KB) fill an optional logo slot; with no logo no box is printed.
-  `TaxDocumentTemplates.IsSupported` now accepts `"4"` and `"5"`.
+  A debit note prints in the credit note layout (ใบเพิ่มหนี้, "Debit total") with its reason text. `TaxDocumentTemplates.IsSupported` now accepts `"4"` and `"5"`.
 - **`Themia.Pdf`** — `PdfPaperFormat.A5` and `PdfRenderOptions.Landscape` (default `false`): an A5 page, or A5 turned on its side (210 × 148 mm).
   Existing renders are unchanged.
 - **`Themia.ETax`** — data for the A5 receipt/tax invoice and credit note, all optional and additive (schema version stays 1): `TaxDocumentLine`

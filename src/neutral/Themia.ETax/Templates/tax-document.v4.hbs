@@ -124,7 +124,7 @@ table.last { margin-bottom: 0; }
 {{/if}}
 
   <table{{#if closing}} class="last"{{/if}}>
-    {{#if @root.credit}}
+    {{#if @root.note}}
     <colgroup><col style="width:8%"><col style="width:38%"><col style="width:18%"><col style="width:18%"><col style="width:18%"></colgroup>
     <thead><tr>
       <th>ลำดับ<span class="en">No.</span></th>
@@ -145,7 +145,7 @@ table.last { margin-bottom: 0; }
     {{/if}}
     <tbody>
     {{#if broughtForward}}
-      {{#if @root.credit}}
+      {{#if @root.note}}
       <tr class="carry"><td colspan="2" class="r">ยอดยกมา <span class="en">(Brought forward)</span></td><td class="num">{{broughtForward.original}}</td><td class="num">{{broughtForward.correct}}</td><td class="num">{{broughtForward.amount}}</td></tr>
       {{else}}
       <tr class="carry"><td colspan="4" class="r">ยอดยกมา <span class="en">(Brought forward)</span></td><td class="num">{{broughtForward.amount}}</td></tr>
@@ -155,7 +155,7 @@ table.last { margin-bottom: 0; }
       {{#if blank}}
       <tr><td></td><td></td><td></td><td></td><td></td></tr>
       {{else}}
-        {{#if @root.credit}}
+        {{#if @root.note}}
       <tr><td class="c">{{number}}</td><td class="desc">{{description}}</td><td class="num">{{original}}</td><td class="num">{{correct}}</td><td class="num">{{difference}}</td></tr>
         {{else}}
       <tr><td class="c">{{number}}</td><td class="desc">{{description}}</td><td class="num">{{quantity}}</td><td class="num">{{unitPrice}}</td><td class="num">{{amount}}</td></tr>
@@ -163,7 +163,7 @@ table.last { margin-bottom: 0; }
       {{/if}}
     {{/each}}
     {{#if carriedForward}}
-      {{#if @root.credit}}
+      {{#if @root.note}}
       <tr class="carry"><td colspan="2" class="r">ยอดยกไป <span class="en">(Carried forward)</span></td><td class="num">{{carriedForward.original}}</td><td class="num">{{carriedForward.correct}}</td><td class="num">{{carriedForward.amount}}</td></tr>
       {{else}}
       <tr class="carry"><td colspan="4" class="r">ยอดยกไป <span class="en">(Carried forward)</span></td><td class="num">{{carriedForward.amount}}</td></tr>
@@ -175,10 +175,10 @@ table.last { margin-bottom: 0; }
   <div class="sum">
     <div class="words"><div>จำนวนเงินตัวอักษร <span class="en">(Amount in words)</span></div><div class="v">{{@root.amountInWords}}</div></div>
     <div class="tot">
-      {{#if @root.credit}}
+      {{#if @root.note}}
       <div><span>ผลต่างรวม <span class="en">Total difference</span></span><span>{{@root.totals.subtotal}}</span></div>
       <div><span>ภาษีมูลค่าเพิ่ม {{@root.totals.rate}} ของผลต่าง <span class="en">VAT on difference</span></span><span>{{@root.totals.vat}}</span></div>
-      <div class="grand"><span>จำนวนเงินที่ลดหนี้ <span class="en">Credit total</span></span><span>{{@root.totals.total}}</span></div>
+      <div class="grand"><span>{{#if @root.debit}}จำนวนเงินที่เพิ่มหนี้ <span class="en">Debit total</span>{{else}}จำนวนเงินที่ลดหนี้ <span class="en">Credit total</span>{{/if}}</span><span>{{@root.totals.total}}</span></div>
       {{else}}
       <div><span>รวมเป็นเงิน <span class="en">Subtotal</span></span><span>{{@root.totals.subtotal}}</span></div>
       <div><span>ภาษีมูลค่าเพิ่ม {{@root.totals.rate}} <span class="en">VAT {{@root.totals.rate}}</span></span><span>{{@root.totals.vat}}</span></div>
@@ -190,12 +190,14 @@ table.last { margin-bottom: 0; }
       {{/if}}
     </div>
   </div>
-  {{#if @root.credit}}
+  {{#if @root.note}}
   <div class="box reason">
-    <b>เหตุผลในการลดหนี้</b> <span class="en">(Reason)</span>
+    {{#if @root.debit}}<b>เหตุผลในการเพิ่มหนี้</b>{{else}}<b>เหตุผลในการลดหนี้</b>{{/if}} <span class="en">(Reason)</span>
+    {{#if @root.credit}}
     <div class="opts">
       {{#each @root.reasons}}<span><span class="cb">{{#if on}}✓{{/if}}</span> {{th}} <span class="en">({{en}})</span></span>{{/each}}
     </div>
+    {{/if}}
     <div class="free">{{@root.reasonText}}</div>
   </div>
   <div class="bottom row" style="justify-content:flex-end">
