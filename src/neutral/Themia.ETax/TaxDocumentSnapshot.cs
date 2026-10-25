@@ -41,4 +41,7 @@ public sealed record TaxDocumentSnapshot
 
     /// <summary>Present when this document replaces a cancelled one.</summary>
     public TaxDocumentReplacement? Replacement { get; init; }
+
+    /// <summary>How and when a receipt was paid. Receipts only; omitted from the stored JSON when <see langword="null"/>.</summary>
+    public TaxPayment? Payment { get; init; }
 }
