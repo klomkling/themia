@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 
 using Themia.Payments.DependencyInjection;
+using Themia.Payments.TwoCTwoP.Internal;
 
 namespace Themia.Payments.TwoCTwoP.DependencyInjection;
 
@@ -33,6 +34,12 @@ public static class TwoCTwoPServiceCollectionExtensions
             .Validate(
                 o => o.TransactionTimeOffset >= TimeSpan.FromHours(-14) && o.TransactionTimeOffset <= TimeSpan.FromHours(14),
                 "TwoCTwoPOptions.TransactionTimeOffset must be within +/-14 hours.")
+            .Validate(
+                o => !TwoCTwoPRefundKeys.IsConfigured(o) || TwoCTwoPRefundKeys.TryCreate(o, TimeProvider.System, out var keys, out _) && Dispose(keys),
+                "TwoCTwoPOptions.MerchantPrivateKeyPem / ProviderPublicCertificatePem must be a valid RSA private key (at least 2048 bits) and an unexpired x509 certificate.")
+            .Validate(
+                o => TwoCTwoPRefundKeys.IsConfigured(o) || (string.IsNullOrWhiteSpace(o.MerchantPrivateKeyPem) && string.IsNullOrWhiteSpace(o.ProviderPublicCertificatePem)),
+                "TwoCTwoPOptions: set BOTH MerchantPrivateKeyPem and ProviderPublicCertificatePem to enable refunds, or neither.")
             .ValidateOnStart();
 
         services.AddHttpClient(TwoCTwoPPaymentGateway.HttpClientName, (sp, client) =>
@@ -51,5 +58,11 @@ public static class TwoCTwoPServiceCollectionExtensions
         // TryAdd and TryAddEnumerable throughout.
         services.AddThemiaPayments();
         return services;
+    }
+
+    private static bool Dispose(IDisposable? keys)
+    {
+        keys?.Dispose();
+        return true;
     }
 }

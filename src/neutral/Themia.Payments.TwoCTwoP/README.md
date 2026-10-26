@@ -70,17 +70,44 @@ invoice number and charge id are the same value.
 shopper paid: reporting either as a failed payment could get a paid order cancelled. Retry the inquiry
 instead. The raw code is always carried.
 
-## Refunds are not supported in this version
+## Refunds
+
+> **Not yet verified against the 2C2P sandbox.** The request and response shapes follow 2C2P's published
+> Payment Maintenance documentation and are tested against key pairs generated in the tests only. Run a
+> sandbox refund with your own merchant key pair before relying on it in production.
+
+Refunds go through 2C2P's Payment Maintenance API (`processType` `R`), which does not use the shared secret
+every other call here uses. The XML request is encrypted to 2C2P's public certificate as a JWE
+(`RSA-OAEP` + `A256GCM`) and the JWE is signed with the merchant's private key as a JWS (`PS256`). Responses
+are verified with 2C2P's public key first and only then decrypted; the algorithms are pinned, and a header
+that names another algorithm or selects a key (`kid`, `jwk`, `jku`, `x5u`, `zip`, `crit`) is refused.
 
 ```csharp
-Task<RefundCreation> RefundAsync(RefundRequest request, CancellationToken cancellationToken = default) =>
-    throw new PaymentApiException(FailureKind.Validation, "refund_not_supported", httpStatus: 0, /* … */);
+services.AddThemiaPaymentsTwoCTwoP(o =>
+{
+    // ... MerchantId, SecretKey, Environment as above ...
+    o.MerchantPrivateKeyPem       = configuration["Payments:TwoCTwoP:MerchantPrivateKeyPem"];       // RSA >= 2048, PKCS#8 or PKCS#1
+    o.ProviderPublicCertificatePem = configuration["Payments:TwoCTwoP:ProviderPublicCertificatePem"]; // x509 from the 2C2P portal
+});
 ```
 
-`RefundAsync` **always** throws — nothing is sent to 2C2P. 2C2P's own refund path is the Payment
-Maintenance API, which needs the merchant's RSA key pair plus 2C2P's certificate (a JWE wrapped inside a
-JWS, `PS256`) rather than the shared HS256 secret every other call here uses, and only for a settled
-transaction. Until that key pair exists for a real merchant, **refund from the 2C2P merchant portal.**
+Both are read from configuration, never logged, and checked on start (RSA of at least 2048 bits, an unexpired
+certificate). Set both or neither: with neither, `RefundAsync` refuses with `refund_not_supported` and
+sends nothing, as in earlier versions.
+
+- **Full or partial.** `RefundRequest.Amount` of `null` refunds the charge's whole amount; otherwise the amount
+  must be greater than zero, in the charge's currency, and not above the charge's amount. 2C2P refunds a
+  settled transaction only.
+- **Sent once, never retried.** Nothing establishes that 2C2P replays an `idempotencyID`, so a timeout, a transport
+  failure, a `5xx`/`429`, an unverifiable response or an unknown `respCode` throws `PaymentApiException`
+  `refund_outcome_unknown` (`FailureKind.Unknown`). **Check the 2C2P merchant portal before refunding again.**
+  The `IdempotencyKey` you pass (or a generated one) is sent as `idempotencyID`.
+- **Status.** `respCode` `00` with refund status `RF` is `Succeeded`; `RFF`, `RR`, `RR1` to `RR3` are `Failed`;
+  `RP` and any status this package does not know are `Pending`, never `Succeeded`. `RefundCreation.RefundId` is
+  always `null`: key your records on the charge.
+- **2C2P is the only guard against over-refunding.** The inquiry does not show what was already refunded, so
+  two concurrent or repeated partial refunds can exceed the charge locally unnoticed. Serialize refunds per charge.
+- A response is accepted only when its `invoiceNo` (and `merchantID`, when present) match the request.
 
 ## Payment channels: group codes, not individual banks/wallets
 

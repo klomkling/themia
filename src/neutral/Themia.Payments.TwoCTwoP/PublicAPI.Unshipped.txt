@@ -30,3 +30,9 @@ static Themia.Payments.TwoCTwoP.DependencyInjection.TwoCTwoPServiceCollectionExt
 Themia.Payments.TwoCTwoP.TwoCTwoPWebhookVerifier
 Themia.Payments.TwoCTwoP.TwoCTwoPWebhookVerifier.TwoCTwoPWebhookVerifier(Microsoft.Extensions.Options.IOptions<Themia.Payments.TwoCTwoP.TwoCTwoPOptions!>! options) -> void
 Themia.Payments.TwoCTwoP.TwoCTwoPWebhookVerifier.Verify(System.ReadOnlySpan<byte> rawBody, System.Collections.Generic.IReadOnlyDictionary<string!, string!>! headers) -> Themia.Payments.WebhookVerification!
+Themia.Payments.TwoCTwoP.TwoCTwoPOptions.MerchantPrivateKeyPem.get -> string?
+Themia.Payments.TwoCTwoP.TwoCTwoPOptions.MerchantPrivateKeyPem.set -> void
+Themia.Payments.TwoCTwoP.TwoCTwoPOptions.ProviderPublicCertificatePem.get -> string?
+Themia.Payments.TwoCTwoP.TwoCTwoPOptions.ProviderPublicCertificatePem.set -> void
+static Themia.Payments.TwoCTwoP.TwoCTwoPOptions.ActionUriFor(Themia.Payments.TwoCTwoP.TwoCTwoPEnvironment environment) -> System.Uri!
+Themia.Payments.TwoCTwoP.TwoCTwoPPaymentGateway.Dispose() -> void

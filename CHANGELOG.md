@@ -27,6 +27,10 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+### Added
+
+- **2C2P refunds** (`Themia.Payments.TwoCTwoP`): `RefundAsync` now refunds through the Payment Maintenance API (full or partial; XML in a JWE inside a JWS, `RSA-OAEP` + `A256GCM` + `PS256`) when `TwoCTwoPOptions.MerchantPrivateKeyPem` and `ProviderPublicCertificatePem` are set; with neither it still refuses with `refund_not_supported`. A refund is sent once and never retried; an unknown outcome throws `refund_outcome_unknown`. Not yet verified against the 2C2P sandbox. See the package README.
+
 ### Changed
 
 - **(breaking)** `SmtpEmailOptions.AllowedAttachmentContentTypes`: a list given in configuration (or added in code) now REPLACES the default instead of adding to it. Empty (the default) still allows `application/pdf` only; once any type is listed, only the listed types are allowed, so `application/pdf` must be listed again if it is still wanted. Before, `application/pdf` could not be removed. See [MIGRATION.md](MIGRATION.md).
