@@ -214,7 +214,7 @@ public sealed class TwoCTwoPPaymentGateway : IPaymentGateway, IPaymentGatewayCap
     /// Needs <see cref="TwoCTwoPOptions.MerchantPrivateKeyPem"/> and <see cref="TwoCTwoPOptions.ProviderPublicCertificatePem"/>; without them it refuses
     /// with <c>refund_not_supported</c> and sends nothing. The refund goes through 2C2P's Payment Maintenance API (XML in a JWE inside a JWS, see the
     /// README). It is sent ONCE, never retried: whether 2C2P replays an <c>idempotencyID</c> is not established, so a timeout or 5xx throws
-    /// <c>refund_outcome_unknown</c> and the caller must check the 2C2P merchant portal before refunding again. 2C2P is the only guard against
+    /// <c>refund_outcome_unknown</c> (so does cancelling the token once the request is on the wire) and the caller must check the 2C2P merchant portal before refunding again. 2C2P is the only guard against
     /// refunding more than was paid; serialize refunds per charge.
     /// </remarks>
     /// <exception cref="ArgumentNullException"><paramref name="request"/> is null (on the returned task).</exception>
@@ -257,13 +257,14 @@ public sealed class TwoCTwoPPaymentGateway : IPaymentGateway, IPaymentGatewayCap
 
         var decimalAmount = TwoCTwoPMapping.ToDecimalAmount(amount);
         var invoiceNo = charge.ReferenceId;
+        var idempotencyId = request.IdempotencyKey ?? Guid.NewGuid().ToString("N");
         var xml = TwoCTwoPRefundXml.BuildRequest(
-            twoCTwoPOptions.MerchantId, invoiceNo, decimalAmount, request.IdempotencyKey ?? Guid.NewGuid().ToString("N"),
+            twoCTwoPOptions.MerchantId, invoiceNo, decimalAmount, idempotencyId,
             DateTimeOffset.UtcNow.ToOffset(twoCTwoPOptions.TransactionTimeOffset));
         var jws = JweJws.Seal(xml, keys.ProviderPublic, keys.MerchantPrivate);
 
         var verified = await SendRefundAsync(jws, twoCTwoPOptions, keys, cancellationToken).ConfigureAwait(false);
-        return MapRefund(verified, invoiceNo, twoCTwoPOptions.MerchantId);
+        return MapRefund(verified, invoiceNo, twoCTwoPOptions.MerchantId, idempotencyId);
     }
 
     private TwoCTwoPRefundKeys RefundKeys(TwoCTwoPOptions twoCTwoPOptions)
@@ -302,8 +303,10 @@ public sealed class TwoCTwoPPaymentGateway : IPaymentGateway, IPaymentGatewayCap
             status = (int)response.StatusCode;
             body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
         }
-        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException && !cancellationToken.IsCancellationRequested)
+        catch (Exception ex) when (ex is HttpRequestException or OperationCanceledException)
         {
+            // Includes the caller's own cancellation: once the request is on the wire the refund may have been made,
+            // so a bare OperationCanceledException would read as "nothing happened" and invite a second refund.
             throw OutcomeUnknown("The refund request may or may not have reached 2C2P.", 0, ex);
         }
 
@@ -325,11 +328,12 @@ public sealed class TwoCTwoPPaymentGateway : IPaymentGateway, IPaymentGatewayCap
         return parsed;
     }
 
-    private static RefundCreation MapRefund(TwoCTwoPRefundXml.Response response, string invoiceNo, string merchantId)
+    private static RefundCreation MapRefund(TwoCTwoPRefundXml.Response response, string invoiceNo, string merchantId, string idempotencyId)
     {
         // A genuinely signed response for another refund must not read as this one.
         if (!string.Equals(response.InvoiceNo, invoiceNo, StringComparison.Ordinal)
-            || (response.MerchantId is not null && !string.Equals(response.MerchantId, merchantId, StringComparison.Ordinal)))
+            || (response.MerchantId is not null && !string.Equals(response.MerchantId, merchantId, StringComparison.Ordinal))
+            || (response.IdempotencyId is not null && !string.Equals(response.IdempotencyId, idempotencyId, StringComparison.Ordinal)))
         {
             throw OutcomeUnknown("The refund response is for a different transaction.", 200);
         }

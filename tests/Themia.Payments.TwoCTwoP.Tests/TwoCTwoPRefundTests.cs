@@ -229,6 +229,34 @@ public sealed class TwoCTwoPRefundTests : IDisposable
     }
 
     [Fact]
+    public async Task Refund_ShouldReportAnUnknownOutcome_WhenTheCallerCancelsAfterTheRequestIsSent()
+    {
+        using var cts = new CancellationTokenSource();
+        var handler = new StubHandler().Enqueue(HttpStatusCode.OK, PaidInquiry()).EnqueueThrow(() =>
+        {
+            cts.Cancel();
+            return new TaskCanceledException("cancelled", null, cts.Token);
+        });
+
+        var ex = await Assert.ThrowsAsync<PaymentApiException>(() => Gateway(handler).RefundAsync(Refund(null), cts.Token));
+
+        Assert.Equal("refund_outcome_unknown", ex.ProviderCode);
+    }
+
+    [Fact]
+    public async Task Refund_ShouldRefuseAResponseThatEchoesAnotherIdempotencyId()
+    {
+        var other = JweJws.Seal(
+            "<PaymentProcessResponse><respCode>00</respCode><invoiceNo>order-1</invoiceNo><status>RF</status><idempotencyID>someone-else</idempotencyID></PaymentProcessResponse>",
+            merchantKey, providerKey);
+        var handler = new StubHandler().Enqueue(HttpStatusCode.OK, PaidInquiry()).Enqueue(HttpStatusCode.OK, other);
+
+        var ex = await Assert.ThrowsAsync<PaymentApiException>(() => Gateway(handler).RefundAsync(Refund(null, key: "r-1")));
+
+        Assert.Equal("refund_outcome_unknown", ex.ProviderCode);
+    }
+
+    [Fact]
     public async Task Refund_ShouldNotTrustAResponseSignedByAnotherKey()
     {
         using var stranger = RSA.Create(2048);

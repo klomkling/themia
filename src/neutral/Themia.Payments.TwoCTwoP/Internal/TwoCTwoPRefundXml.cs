@@ -10,7 +10,7 @@ internal static class TwoCTwoPRefundXml
     private const string RequestVersion = "4.3";
 
     /// <summary>What a verified response says. Strings are as 2C2P sent them.</summary>
-    public sealed record Response(string RespCode, string? RespDesc, string? Status, string? InvoiceNo, string? MerchantId);
+    public sealed record Response(string RespCode, string? RespDesc, string? Status, string? InvoiceNo, string? MerchantId, string? IdempotencyId);
 
     /// <summary>Builds the request with <see cref="XElement"/>, so every value is escaped. Amount is a two-place decimal, invariant culture.</summary>
     public static string BuildRequest(string merchantId, string invoiceNo, decimal amount, string idempotencyId, DateTimeOffset now)
@@ -40,7 +40,7 @@ internal static class TwoCTwoPRefundXml
             }
 
             var respCode = Text(root, "respCode");
-            return respCode is null ? null : new Response(respCode, Text(root, "respDesc"), Text(root, "status"), Text(root, "invoiceNo"), Text(root, "merchantID"));
+            return respCode is null ? null : new Response(respCode, Text(root, "respDesc"), Text(root, "status"), Text(root, "invoiceNo"), Text(root, "merchantID"), Text(root, "idempotencyID"));
         }
         catch (XmlException)
         {
