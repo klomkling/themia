@@ -99,14 +99,14 @@ sends nothing, as in earlier versions.
   must be greater than zero, in the charge's currency, and not above the charge's amount. 2C2P refunds a
   settled transaction only.
 - **Sent once, never retried.** Nothing establishes that 2C2P replays an `idempotencyID`, so a timeout, a transport
-  failure, a `5xx`/`429`, an unverifiable response or an unknown `respCode` throws `PaymentApiException`
+  failure, a `5xx`/`429`/`408`, an unverifiable response or an unknown `respCode` throws `PaymentApiException`
   `refund_outcome_unknown` (`FailureKind.Unknown`). **Check the 2C2P merchant portal before refunding again.**
   Cancelling the `CancellationToken` after the request is sent is reported the same way, not as a cancellation.
   The `IdempotencyKey` you pass is sent as `idempotencyID`; without one a fresh id is generated, which identifies
   nothing on a later attempt, so **pass a stable key per refund** (for example your refund record's id). A response
   that echoes another `idempotencyID` is refused. The named `HttpClient` has no resilience or retry handler; do not
   add one to it, it would re-send a refund.
-- **Status.** `respCode` `00` with refund status `RF` is `Succeeded`; `RFF`, `RR`, `RR1` to `RR3` are `Failed`;
+- **Status.** `respCode` `00` with refund status `RF` is `Succeeded`; `RFF` (Refund Failed), `RR` (Refund Rejected) and `RR1` to `RR3` (rejected: insufficient balance, invalid bank information, bank account mismatch) are `Failed`, per 2C2P's [Payment Maintenance status codes](https://developer.2c2p.com/docs/response-code-payment-maintenance-status-code);
   `RP` and any status this package does not know are `Pending`, never `Succeeded`. `RefundCreation.RefundId` is
   always `null`: key your records on the charge.
 - **2C2P is the only guard against over-refunding.** The inquiry does not show what was already refunded, so

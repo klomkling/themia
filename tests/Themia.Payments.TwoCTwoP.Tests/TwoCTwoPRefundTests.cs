@@ -206,6 +206,7 @@ public sealed class TwoCTwoPRefundTests : IDisposable
     [InlineData(HttpStatusCode.InternalServerError)]
     [InlineData(HttpStatusCode.ServiceUnavailable)]
     [InlineData(HttpStatusCode.TooManyRequests)]
+    [InlineData(HttpStatusCode.RequestTimeout)]
     public async Task Refund_ShouldSendOnce_AndReportAnUnknownOutcome_OnAServerError(HttpStatusCode status)
     {
         var handler = new StubHandler().Enqueue(HttpStatusCode.OK, PaidInquiry()).Enqueue(status, "oops");
@@ -287,7 +288,8 @@ public sealed class TwoCTwoPRefundTests : IDisposable
 
         var ex = await Assert.ThrowsAsync<PaymentApiException>(() => Gateway(handler).RefundAsync(Refund(null)));
 
-        Assert.Equal("9999", ex.ProviderCode);
+        Assert.Equal("refund_outcome_unknown", ex.ProviderCode);
+        Assert.Contains("9999", ex.Message, StringComparison.Ordinal);
         Assert.Equal(FailureKind.Unknown, ex.Kind);
     }
 

@@ -310,7 +310,7 @@ public sealed class TwoCTwoPPaymentGateway : IPaymentGateway, IPaymentGatewayCap
             throw OutcomeUnknown("The refund request may or may not have reached 2C2P.", 0, ex);
         }
 
-        if (status is >= 500 or 429)
+        if (status is >= 500 or 429 or 408)
         {
             throw OutcomeUnknown("2C2P answered with a server error; the refund may or may not have been made.", status);
         }
@@ -340,11 +340,14 @@ public sealed class TwoCTwoPPaymentGateway : IPaymentGateway, IPaymentGatewayCap
 
         if (response.RespCode != RefundAcceptedRespCode)
         {
-            throw OutcomeUnknown($"2C2P answered respCode {response.RespCode} ({response.RespDesc}); the refund may not have been made.", 200, providerCode: response.RespCode);
+            throw OutcomeUnknown($"2C2P answered respCode {response.RespCode} ({response.RespDesc}); the refund may not have been made.", 200);
         }
 
-        // respCode 00 means the request was accepted; the refund's own status says how far it got. A status this
-        // package does not know stays Pending, never Succeeded.
+        // respCode 00 means the request was accepted; the refund's own status says how far it got. The statuses are
+        // 2C2P's "Payment Maintenance Status Codes" (https://developer.2c2p.com/docs/response-code-payment-maintenance-status-code):
+        // RF "Refund confirmed"; RP "Refund Pending"; RFF "Refund Failed"; RR "Refund Rejected"; RR1 "Refund Rejected -
+        // insufficient balance"; RR2 "invalid bank information"; RR3 "bank account mismatch". A status this package does
+        // not know stays Pending, never Succeeded.
         return new RefundCreation(null, response.Status switch
         {
             "RF" => PaymentStatus.Succeeded,
@@ -353,8 +356,8 @@ public sealed class TwoCTwoPPaymentGateway : IPaymentGateway, IPaymentGatewayCap
         });
     }
 
-    private static PaymentApiException OutcomeUnknown(string message, int httpStatus, Exception? inner = null, string? providerCode = null) =>
-        new(FailureKind.Unknown, providerCode ?? "refund_outcome_unknown", httpStatus,
+    private static PaymentApiException OutcomeUnknown(string message, int httpStatus, Exception? inner = null) =>
+        new(FailureKind.Unknown, "refund_outcome_unknown", httpStatus,
             message + " Check the 2C2P merchant portal before refunding again.", inner);
 
     /// <summary>
