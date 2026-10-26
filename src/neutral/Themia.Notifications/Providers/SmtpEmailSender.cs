@@ -11,6 +11,9 @@ namespace Themia.Notifications.Providers;
 /// pre-rendered <see cref="NotificationMessage.Body"/> is supplied.</summary>
 internal sealed class SmtpEmailSender(SmtpEmailOptions options, INotificationTemplateRenderer renderer) : IEmailSender
 {
+    // What an empty SmtpEmailOptions.AllowedAttachmentContentTypes allows.
+    private const string DefaultAttachmentContentType = "application/pdf";
+
     public async Task<NotificationResult> SendAsync(NotificationMessage message, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(message);
@@ -85,6 +88,10 @@ internal sealed class SmtpEmailSender(SmtpEmailOptions options, INotificationTem
     // Policy lives here, not on the message: the allow-list and the cap are per deployment. A violation is the caller's mistake and can
     // never succeed on retry, so it throws ArgumentException (which the outbox dispatcher already treats as permanent) rather than
     // returning a failed result, which reads as transient.
+    private bool IsAllowed(string contentType) => options.AllowedAttachmentContentTypes.Count == 0
+        ? string.Equals(contentType, DefaultAttachmentContentType, StringComparison.OrdinalIgnoreCase)
+        : options.AllowedAttachmentContentTypes.Contains(contentType);
+
     private void AddAttachments(MailMessage mail, IReadOnlyList<EmailAttachment>? attachments)
     {
         if (attachments is not { Count: > 0 })
@@ -93,7 +100,7 @@ internal sealed class SmtpEmailSender(SmtpEmailOptions options, INotificationTem
         long total = 0;
         foreach (var attachment in attachments)
         {
-            if (!options.AllowedAttachmentContentTypes.Contains(attachment.ContentType))
+            if (!IsAllowed(attachment.ContentType))
                 throw new ArgumentException($"Attachment content type '{attachment.ContentType}' is not allowed by {nameof(SmtpEmailOptions)}.{nameof(SmtpEmailOptions.AllowedAttachmentContentTypes)}.", nameof(attachments));
 
             total += attachment.Content.Length;

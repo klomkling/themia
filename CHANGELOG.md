@@ -27,6 +27,10 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+### Changed
+
+- **(breaking)** `SmtpEmailOptions.AllowedAttachmentContentTypes`: a list given in configuration (or added in code) now REPLACES the default instead of adding to it. Empty (the default) still allows `application/pdf` only; once any type is listed, only the listed types are allowed, so `application/pdf` must be listed again if it is still wanted. Before, `application/pdf` could not be removed. See [MIGRATION.md](MIGRATION.md).
+
 ## [0.41.0] - 2026-10-25
 
 Email attachments for `Themia.Notifications`.

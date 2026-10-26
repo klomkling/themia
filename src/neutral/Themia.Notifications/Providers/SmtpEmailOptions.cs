@@ -30,8 +30,12 @@ public sealed class SmtpEmailOptions
     /// (System.Net.Mail pickup-directory delivery). For tests / local dev.</summary>
     public string? PickupDirectory { get; set; }
 
-    /// <summary>The media types an attachment may have (compared without parameters, case-insensitively). Default: <c>application/pdf</c> only.</summary>
-    public ISet<string> AllowedAttachmentContentTypes { get; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "application/pdf" };
+    /// <summary>
+    /// The media types an attachment may have (compared without parameters, case-insensitively). Empty (the default) allows <c>application/pdf</c> only;
+    /// once any type is listed, ONLY the listed types are allowed, so a list in configuration replaces the default and <c>application/pdf</c> must be
+    /// listed again if it is still wanted.
+    /// </summary>
+    public ISet<string> AllowedAttachmentContentTypes { get; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
     /// The most all attachments of one message may weigh together, in bytes. Default 7 MiB: base64 grows a file by a third, and the whole
