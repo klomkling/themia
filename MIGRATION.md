@@ -10,6 +10,18 @@ with the *why* and concrete upgrade steps.
 - Each entry states: **What changed**, **Why**, and **How to upgrade** (before → after).
 - Non-breaking changes are *not* listed here — see the CHANGELOG.
 
+## Unreleased
+
+### `AllowedAttachmentContentTypes` replaces the default list (behaviour change)
+
+**What changed:** `SmtpEmailOptions.AllowedAttachmentContentTypes` started as `{ "application/pdf" }`, and configuration binding adds to an existing set, so `application/pdf` could never be removed. The set now starts EMPTY; an empty set allows `application/pdf` only, and once any type is listed ONLY the listed types are allowed.
+
+**Why:** a host that wants to refuse PDFs, or to allow images only, had no way to say so in appsettings.
+
+**Who is affected:** apps (0.41.0) that added a type, in code (`options.AllowedAttachmentContentTypes.Add("image/png")`) or in configuration, and still send PDFs. They now get an `ArgumentException` for the PDF. Apps that never touched the set see no change.
+
+**How to upgrade:** list every type you want, `application/pdf` included: `"AllowedAttachmentContentTypes": ["application/pdf", "image/png"]`.
+
 ## 0.40.0
 
 ### The logo of the paged e-tax templates comes from a host source (rollback limit)

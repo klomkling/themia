@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 
 using Themia.Notifications.Providers;
@@ -184,6 +185,46 @@ public sealed class NotificationAttachmentsTests
     }
 
     [Fact]
+    public async Task Send_ShouldAllowOnlyTheListedTypes_WhenTheHostListsAny()
+    {
+        var pdf = Email(Receipt());
+        var dir = Directory.CreateTempSubdirectory("themia-smtp-").FullName;
+        try
+        {
+            await Assert.ThrowsAsync<ArgumentException>(() => SenderTo(dir, o => o.AllowedAttachmentContentTypes.Add("image/png")).SendAsync(pdf));
+            Assert.Empty(Directory.EnumerateFiles(dir));
+        }
+        finally { Directory.Delete(dir, recursive: true); }
+    }
+
+    [Fact]
+    public async Task Send_ShouldAllowPdf_WhenTheHostListsNothing()
+    {
+        Assert.Contains("RTX-2610-000123.pdf", await SendAndReadEmlAsync(Email(Receipt())), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Send_ShouldAllowOnlyTheTypesInAppsettings_AndPdfWhenThereAreNone()
+    {
+        static void Bind(SmtpEmailOptions options, params string[] types) =>
+            new ConfigurationBuilder()
+                .AddInMemoryCollection(types.Select((t, i) => KeyValuePair.Create<string, string?>($"AllowedAttachmentContentTypes:{i}", t)))
+                .Build()
+                .Bind(options);
+
+        var dir = Directory.CreateTempSubdirectory("themia-smtp-").FullName;
+        try
+        {
+            await Assert.ThrowsAsync<ArgumentException>(() => SenderTo(dir, o => Bind(o, "IMAGE/PNG")).SendAsync(Email(Receipt())));
+            Assert.Empty(Directory.EnumerateFiles(dir));
+        }
+        finally { Directory.Delete(dir, recursive: true); }
+
+        Assert.Contains("image/png", await SendAndReadEmlAsync(Email(Receipt("logo.png", "image/png")), o => Bind(o, "IMAGE/PNG")), StringComparison.Ordinal);
+        Assert.Contains("RTX-2610-000123.pdf", await SendAndReadEmlAsync(Email(Receipt()), o => Bind(o)), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Send_ShouldRefuseAttachmentsAboveTheCapInTotal_AndAllowThemAtIt()
     {
         var two = Email(Receipt("a.pdf", bytes: new byte[600]), Receipt("b.pdf", bytes: new byte[600]));
@@ -203,7 +244,7 @@ public sealed class NotificationAttachmentsTests
     {
         var options = new SmtpEmailOptions();
 
-        Assert.Equal(["application/pdf"], options.AllowedAttachmentContentTypes);
+        Assert.Empty(options.AllowedAttachmentContentTypes);
         Assert.Equal(7L * 1024 * 1024, options.MaxAttachmentBytes);
     }
 
