@@ -113,6 +113,16 @@ sends nothing, as in earlier versions.
   two concurrent or repeated partial refunds can exceed the charge locally unnoticed. Serialize refunds per charge.
 - A response is accepted only when its `invoiceNo` (and `merchantID`, when present) match the request.
 
+## In-page PromptPay QR
+
+A charge whose `AllowedMethods` is exactly `[PaymentMethod.QrPromptPay]` returns `NextAction.ShowQr` rather than the hosted-page `Redirect`, so the QR can be drawn inside your own page (for example in LINE LIFF). After the `paymentToken` call the gateway calls **Do Payment** (`POST /payment/4.3/payment`) once with `channelCode: THQR`, `agentCode: PPQR`, and expects flow code `1005` ("Pending for user scan QR") with `type: URL` and `data` = the QR PNG address, plus `expiryTimer` in milliseconds. `ShowQr.ImagePng` is that PNG, `RawPayload` is `null`, and `Expiry` is now + `expiryTimer` (or the request's `ExpiresAt` when 2C2P sends none).
+
+- **Always a safe fallback.** If Do Payment fails or answers anything else (another flow code, `type: QR` raw data, an error), or the image cannot be fetched, the charge still succeeds and returns the hosted-page `Redirect`. Check `Action` by type; do not assume `ShowQr`.
+- **Image fetch is restricted:** `https` on a `2c2p.com` host only, no other host after redirects, at most 256 KB, and it must be a PNG.
+- Do Payment is sent once and never retried. The shopper's payment still arrives through the normal notification / inquiry path; nothing about status mapping changes.
+- Charges that allow cards, mobile banking or wallets keep the `Redirect`, since those need 2C2P's hosted page (3-D Secure, app switching).
+- **Not yet verified against the 2C2P sandbox.** The request and response shapes come from 2C2P's "Do Payment" and "Payment Flow Codes" documentation; 2C2P's current docs show Do Payment at `/payment/4.5/payment`, while this package pins 4.3 like the rest of its calls. Run a sandbox charge before relying on it.
+
 ## Payment channels: group codes, not individual banks/wallets
 
 `PaymentMethod` is sent to 2C2P as one of its `paymentChannel[]` group codes:

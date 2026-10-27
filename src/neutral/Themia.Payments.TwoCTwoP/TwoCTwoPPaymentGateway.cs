@@ -25,6 +25,12 @@ public sealed class TwoCTwoPPaymentGateway : IPaymentGateway, IPaymentGatewayCap
     /// <summary>The name this adapter's <see cref="HttpClient"/> is registered under.</summary>
     public const string HttpClientName = "themia-payments-2c2p";
 
+    private const string DoPaymentPath = "/payment/4.3/payment";
+
+    // PromptPay in 2C2P's Payment Channel Matrix: channel THQR (Thai QR), agent PPQR.
+    private const string PromptPayChannelCode = "THQR";
+    private const string PromptPayAgentCode = "PPQR";
+
     // 2C2P's "success" respCode on the Payment Maintenance API (the PGW 4.3 API uses 0000).
     private const string RefundAcceptedRespCode = "00";
 
@@ -156,7 +162,107 @@ public sealed class TwoCTwoPPaymentGateway : IPaymentGateway, IPaymentGatewayCap
             throw new PaymentApiException(FailureKind.Unknown, "malformed_response", (int)response.StatusCode);
         }
 
-        return new ChargeCreation(request.ReferenceId, PaymentStatus.Pending, new NextAction.Redirect(webPaymentUrl));
+        NextAction action = new NextAction.Redirect(webPaymentUrl);
+        if (allowed.Count == 1 && allowed[0] == PaymentMethod.QrPromptPay &&
+            TwoCTwoPMapping.TryGetNonEmptyString(verified, "paymentToken", out var paymentToken) &&
+            await TryCreateQrAsync(httpClient, paymentToken, twoCTwoPOptions.SecretKey, request, cancellationToken).ConfigureAwait(false)
+                is { } showQr)
+        {
+            action = showQr;
+        }
+
+        return new ChargeCreation(request.ReferenceId, PaymentStatus.Pending, action);
+    }
+
+    /// <summary>
+    /// For a PromptPay-only charge, asks 2C2P's Do Payment API for the QR so it can be shown in the page instead
+    /// of redirecting to the hosted page. Sent once, never retried. Any doubt — a failed call, another flow code,
+    /// an untrusted or unreadable image — returns <see langword="null"/> and the caller redirects to the hosted
+    /// page, which can still take the payment.
+    /// </summary>
+    private static async Task<NextAction.ShowQr?> TryCreateQrAsync(
+        HttpClient httpClient, string paymentToken, string secretKey, CreateChargeRequest request, CancellationToken cancellationToken)
+    {
+        var body = JsonSerializer.Serialize(new
+        {
+            paymentToken,
+            payment = new
+            {
+                code = new { channelCode = PromptPayChannelCode, agentCode = PromptPayAgentCode },
+                data = new { },
+            },
+        });
+
+        string responseText;
+        try
+        {
+            using var response = await httpClient.PostAsync(
+                DoPaymentPath, new StringContent(body, Encoding.UTF8, "application/json"), cancellationToken).ConfigureAwait(false);
+            if (!response.IsSuccessStatusCode)
+            {
+                return null;
+            }
+
+            responseText = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (HttpRequestException)
+        {
+            return null;
+        }
+        catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            return null;
+        }
+
+        if (!TryParseDoPaymentAnswer(responseText, secretKey, out var answer) ||
+            !TwoCTwoPQrCode.TryReadQrAnswer(answer, out var imageUrl, out var expiresIn))
+        {
+            return null;
+        }
+
+        var png = await TwoCTwoPQrCode.TryDownloadPngAsync(httpClient, imageUrl, cancellationToken).ConfigureAwait(false);
+        if (png is null)
+        {
+            return null;
+        }
+
+        // The earlier of 2C2P's countdown and the caller's own deadline.
+        var expiry = request.ExpiresAt;
+        if (expiresIn is { } timer)
+        {
+            var countdownEnd = DateTimeOffset.UtcNow + timer;
+            expiry = expiry is { } own && own < countdownEnd ? own : countdownEnd;
+        }
+
+        return new NextAction.ShowQr(png, RawPayload: null, expiry);
+    }
+
+    // The documentation shows Do Payment answering plain JSON while stating that responses are JWT: take either,
+    // but a body that carries a signed payload must verify before any of it is read.
+    private static bool TryParseDoPaymentAnswer(string responseText, string secretKey, out JsonElement answer)
+    {
+        answer = default;
+        try
+        {
+            using var document = JsonDocument.Parse(responseText);
+            var root = document.RootElement;
+            if (root.ValueKind != JsonValueKind.Object)
+            {
+                return false;
+            }
+
+            if (root.TryGetProperty("payload", out _))
+            {
+                return TwoCTwoPMapping.TryReadVerifiedPayload(root, secretKey, out answer);
+            }
+
+            answer = root.Clone();
+            return true;
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
     }
 
     /// <inheritdoc />
