@@ -17,8 +17,8 @@ namespace Themia.Payments.TwoCTwoP;
 /// <c>{ "respCode", "respDesc" }</c> request-rejection shape, and only to raise a <see cref="PaymentApiException"/>
 /// carrying that code. 2C2P mints no charge id before payment, so
 /// <see cref="ChargeCreation.ChargeId"/> and <see cref="Charge.ChargeId"/> are always the caller's own
-/// <see cref="CreateChargeRequest.ReferenceId"/> — 2C2P's <c>invoiceNo</c>. Refunds are not supported in this
-/// version (see <see cref="RefundAsync"/>).
+/// <see cref="CreateChargeRequest.ReferenceId"/> — 2C2P's <c>invoiceNo</c>. Refunds are sent once and never
+/// retried (see <see cref="RefundAsync"/>).
 /// </remarks>
 public sealed class TwoCTwoPPaymentGateway : IPaymentGateway, IPaymentGatewayCapabilities, IDisposable
 {
@@ -163,7 +163,8 @@ public sealed class TwoCTwoPPaymentGateway : IPaymentGateway, IPaymentGatewayCap
         }
 
         NextAction action = new NextAction.Redirect(webPaymentUrl);
-        if (allowed.Count == 1 && allowed[0] == PaymentMethod.QrPromptPay &&
+        if (request.PresentationMode != PresentationMode.HostedPage &&
+            allowed.Count == 1 && allowed[0] == PaymentMethod.QrPromptPay &&
             TwoCTwoPMapping.TryGetNonEmptyString(verified, "paymentToken", out var paymentToken) &&
             await TryCreateQrAsync(httpClient, paymentToken, twoCTwoPOptions.SecretKey, request, cancellationToken).ConfigureAwait(false)
                 is { } showQr)

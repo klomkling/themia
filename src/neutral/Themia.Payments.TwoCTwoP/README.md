@@ -108,15 +108,18 @@ sends nothing, as in earlier versions.
   add one to it, it would re-send a refund.
 - **Status.** `respCode` `00` with refund status `RF` is `Succeeded`; `RFF` (Refund Failed), `RR` (Refund Rejected) and `RR1` to `RR3` (rejected: insufficient balance, invalid bank information, bank account mismatch) are `Failed`, per 2C2P's [Payment Maintenance status codes](https://developer.2c2p.com/docs/response-code-payment-maintenance-status-code);
   `RP` and any status this package does not know are `Pending`, never `Succeeded`. `RefundCreation.RefundId` is
-  always `null`: key your records on the charge.
+  always `null`: key your records on the charge. There is no refund webhook: 2C2P sends no notification when a
+  refund settles, so a `Pending` refund is resolved by checking the 2C2P merchant portal. A caller must never retry
+  `refund_outcome_unknown` automatically.
 - **2C2P is the only guard against over-refunding.** The inquiry does not show what was already refunded, so
   two concurrent or repeated partial refunds can exceed the charge locally unnoticed. Serialize refunds per charge.
 - A response is accepted only when its `invoiceNo` (and `merchantID`, when present) match the request.
 
 ## In-page PromptPay QR
 
-A charge whose `AllowedMethods` is exactly `[PaymentMethod.QrPromptPay]` returns `NextAction.ShowQr` rather than the hosted-page `Redirect`, so the QR can be drawn inside your own page (for example in LINE LIFF). After the `paymentToken` call the gateway calls **Do Payment** (`POST /payment/4.3/payment`) once with `channelCode: THQR`, `agentCode: PPQR`, and expects flow code `1005` ("Pending for user scan QR") with `type: URL` and `data` = the QR PNG address, plus `expiryTimer` in milliseconds. `ShowQr.ImagePng` is that PNG, `RawPayload` is `null`, and `Expiry` is now + `expiryTimer` (or the request's `ExpiresAt` when 2C2P sends none).
+A charge whose `AllowedMethods` is exactly `[PaymentMethod.QrPromptPay]` and whose `PresentationMode` is not `HostedPage` returns `NextAction.ShowQr` rather than the hosted-page `Redirect`, so the QR can be drawn inside your own page (for example in LINE LIFF). After the `paymentToken` call the gateway calls **Do Payment** (`POST /payment/4.3/payment`) once with `channelCode: THQR`, `agentCode: PPQR`, and expects flow code `1005` ("Pending for user scan QR") with `type: URL` and `data` = the QR PNG address, plus `expiryTimer` in milliseconds. `ShowQr.ImagePng` is that PNG, `RawPayload` is `null`, and `Expiry` is now + `expiryTimer` (or the request's `ExpiresAt` when 2C2P sends none).
 
+- **`PresentationMode.HostedPage` opts out.** Set it to get the hosted-page `Redirect` for a PromptPay-only charge; Do Payment is then not called at all.
 - **Always a safe fallback.** If Do Payment fails or answers anything else (another flow code, `type: QR` raw data, an error), or the image cannot be fetched, the charge still succeeds and returns the hosted-page `Redirect`. Check `Action` by type; do not assume `ShowQr`.
 - **Image fetch is restricted:** `https` on a `2c2p.com` host only, no other host after redirects, at most 256 KB, and it must be a PNG.
 - Do Payment is sent once and never retried. The shopper's payment still arrives through the normal notification / inquiry path; nothing about status mapping changes.

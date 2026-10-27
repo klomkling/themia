@@ -53,6 +53,17 @@ public class TwoCTwoPQrTests
     }
 
     [Fact]
+    public async Task A_promptpay_only_charge_in_hosted_page_mode_redirects_and_never_calls_do_payment()
+    {
+        var handler = new RoutingHandler().Token();
+
+        var creation = await BuildGateway(handler).CreateChargeAsync(PromptPayOnly() with { PresentationMode = PresentationMode.HostedPage });
+
+        Assert.Equal(new Uri(HostedUrl), Assert.IsType<NextAction.Redirect>(creation.Action).Url);
+        Assert.Single(handler.Calls);
+    }
+
+    [Fact]
     public async Task A_charge_that_allows_cards_keeps_the_hosted_redirect_and_never_calls_do_payment()
     {
         var handler = new RoutingHandler().Token();
