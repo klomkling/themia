@@ -4,7 +4,6 @@ using System.Text.Json;
 
 using Microsoft.Extensions.Options;
 
-using Themia.Payments;
 using Themia.Payments.TwoCTwoP.Internal;
 
 using Xunit;
@@ -110,6 +109,7 @@ public class TwoCTwoPQrTests
     [InlineData("""{"channelCode":"THQR","type":"URL","data":"https://api.2c2p.com/pgw/qr/a.png","respCode":"1000","respDesc":"Redirect"}""")]
     [InlineData("""{"channelCode":"THQR","type":"URL","data":"https://evil.example/a.png","respCode":"1005","respDesc":"x"}""")]
     [InlineData("""{"channelCode":"THQR","type":"URL","data":"https://api.2c2p.com.evil.example/a.png","respCode":"1005","respDesc":"x"}""")]
+    [InlineData("""{"channelCode":"THQR","type":"URL","data":"https://evil2c2p.com/a.png","respCode":"1005","respDesc":"x"}""")]
     [InlineData("""{"channelCode":"THQR","type":"URL","data":"http://api.2c2p.com/pgw/qr/a.png","respCode":"1005","respDesc":"x"}""")]
     [InlineData("""{"channelCode":"THQR","type":"URL","data":"not a url","respCode":"1005","respDesc":"x"}""")]
     [InlineData("""{"channelCode":"THQR","type":"URL","respCode":"1005","respDesc":"x"}""")]
