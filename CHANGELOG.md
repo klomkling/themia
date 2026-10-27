@@ -27,6 +27,10 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.42.1] - 2026-10-27
+
+A fix for `Themia.Payments.TwoCTwoP`: `PresentationMode.HostedPage` is honoured for a PromptPay-only charge.
+
 ### Fixed
 
 - **`Themia.Payments.TwoCTwoP`:** a PromptPay-only charge with `PresentationMode.HostedPage` returned `NextAction.ShowQr` (and called Do Payment) instead of the hosted-page `Redirect`; it now honours `HostedPage` and calls Do Payment only for the in-page QR. The README also states that a refund is sent once, `RefundId` is `null`, there is no refund webhook, and `refund_outcome_unknown` must not be retried automatically.
