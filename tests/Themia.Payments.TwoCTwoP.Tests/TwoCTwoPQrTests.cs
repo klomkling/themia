@@ -191,6 +191,39 @@ public class TwoCTwoPQrTests
     }
 
     [Fact]
+    public async Task A_qr_image_cut_off_mid_body_falls_back_to_the_redirect()
+    {
+        var handler = new RoutingHandler().Token().DoPayment(QrResponse())
+            .PngBody(PngUrl, new FaultyStream(Png, hang: false));
+
+        var creation = await BuildGateway(handler).CreateChargeAsync(PromptPayOnly());
+
+        Assert.IsType<NextAction.Redirect>(creation.Action);
+    }
+
+    [Fact]
+    public async Task A_qr_image_body_that_never_finishes_falls_back_to_the_redirect_at_the_client_timeout()
+    {
+        var handler = new RoutingHandler().Token().DoPayment(QrResponse())
+            .PngBody(PngUrl, new FaultyStream(Png, hang: true));
+
+        var creation = await BuildGateway(handler, TimeSpan.FromMilliseconds(200)).CreateChargeAsync(PromptPayOnly());
+
+        Assert.IsType<NextAction.Redirect>(creation.Action);
+    }
+
+    [Fact]
+    public async Task The_reported_expiry_is_the_earlier_of_the_countdown_and_the_requests_own_expiry()
+    {
+        var handler = new RoutingHandler().Token().DoPayment(QrResponse()).Png(PngUrl, Png);   // countdown: 5 minutes
+        var ownDeadline = DateTimeOffset.UtcNow.AddMinutes(1);
+
+        var creation = await BuildGateway(handler).CreateChargeAsync(PromptPayOnly(ownDeadline));
+
+        Assert.Equal(ownDeadline, Assert.IsType<NextAction.ShowQr>(creation.Action).Expiry);
+    }
+
+    [Fact]
     public async Task The_callers_own_cancellation_is_not_swallowed_into_the_fallback()
     {
         using var cts = new CancellationTokenSource();
@@ -224,9 +257,14 @@ public class TwoCTwoPQrTests
         ["expiryTimer"] = 300000,
     };
 
-    private static TwoCTwoPPaymentGateway BuildGateway(RoutingHandler handler)
+    private static TwoCTwoPPaymentGateway BuildGateway(RoutingHandler handler, TimeSpan? timeout = null)
     {
         var client = new HttpClient(handler) { BaseAddress = TwoCTwoPOptions.BaseAddressFor(TwoCTwoPEnvironment.Sandbox) };
+        if (timeout is { } limit)
+        {
+            client.Timeout = limit;
+        }
+
         var options = new TwoCTwoPOptions { MerchantId = "JT01", SecretKey = Secret };
         var gate = new PaymentMethodGate(Options.Create(new ThemiaPaymentsOptions()));
         return new TwoCTwoPPaymentGateway(new SingleClientFactory(client), Options.Create(options), gate);
@@ -266,6 +304,9 @@ public class TwoCTwoPQrTests
                 RequestMessage = finalUri is null ? null : new HttpRequestMessage(HttpMethod.Get, finalUri),
             });
 
+        public RoutingHandler PngBody(string url, Stream body) =>
+            Route(KeyOf(new Uri(url)), () => new HttpResponseMessage(HttpStatusCode.OK) { Content = new StreamContent(body) });
+
         public RoutingHandler PngStatus(string url, HttpStatusCode status) =>
             Route(KeyOf(new Uri(url)), () => new HttpResponseMessage(status));
 
@@ -289,6 +330,41 @@ public class TwoCTwoPQrTests
 
         private static HttpResponseMessage Text(string body, HttpStatusCode status) =>
             new(status) { Content = new StringContent(body) };
+    }
+
+    /// <summary>Delivers the PNG signature, then either fails like a dropped connection or never returns.</summary>
+    private sealed class FaultyStream(byte[] head, bool hang) : Stream
+    {
+        private bool sentHead;
+
+        public override bool CanRead => true;
+        public override bool CanSeek => false;
+        public override bool CanWrite => false;
+        public override long Length => throw new NotSupportedException();
+        public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
+
+        public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+        {
+            if (!sentHead)
+            {
+                sentHead = true;
+                head.AsMemory(0, 8).CopyTo(buffer);
+                return 8;
+            }
+
+            if (hang)
+            {
+                await Task.Delay(Timeout.Infinite, cancellationToken);
+            }
+
+            throw new IOException("The response ended prematurely.");
+        }
+
+        public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+        public override void Flush() { }
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
     }
 
     private sealed class SingleClientFactory(HttpClient client) : IHttpClientFactory

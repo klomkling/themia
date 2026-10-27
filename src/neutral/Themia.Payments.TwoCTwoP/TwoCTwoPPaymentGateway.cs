@@ -226,7 +226,14 @@ public sealed class TwoCTwoPPaymentGateway : IPaymentGateway, IPaymentGatewayCap
             return null;
         }
 
-        var expiry = expiresIn is { } timer ? DateTimeOffset.UtcNow + timer : request.ExpiresAt;
+        // The earlier of 2C2P's countdown and the caller's own deadline.
+        var expiry = request.ExpiresAt;
+        if (expiresIn is { } timer)
+        {
+            var countdownEnd = DateTimeOffset.UtcNow + timer;
+            expiry = expiry is { } own && own < countdownEnd ? own : countdownEnd;
+        }
+
         return new NextAction.ShowQr(png, RawPayload: null, expiry);
     }
 

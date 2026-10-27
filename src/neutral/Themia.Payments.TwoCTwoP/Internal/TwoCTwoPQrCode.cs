@@ -48,9 +48,17 @@ internal static class TwoCTwoPQrCode
     /// <exception cref="OperationCanceledException"><paramref name="cancellationToken"/> was cancelled.</exception>
     public static async Task<byte[]?> TryDownloadPngAsync(HttpClient httpClient, Uri imageUrl, CancellationToken cancellationToken)
     {
+        // HttpCompletionOption.ResponseHeadersRead hands back before the body arrives, so the client's Timeout no
+        // longer covers the streamed read: apply it to the whole download here, or a slow drip would hang the charge.
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        if (httpClient.Timeout != Timeout.InfiniteTimeSpan)
+        {
+            timeout.CancelAfter(httpClient.Timeout);
+        }
+
         try
         {
-            using var response = await httpClient.GetAsync(imageUrl, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
+            using var response = await httpClient.GetAsync(imageUrl, HttpCompletionOption.ResponseHeadersRead, timeout.Token)
                 .ConfigureAwait(false);
 
             // A redirect is followed by the handler; refuse to trust an image that came from somewhere else.
@@ -60,15 +68,14 @@ internal static class TwoCTwoPQrCode
                 return null;
             }
 
-            var bytes = await ReadCappedAsync(response.Content, cancellationToken).ConfigureAwait(false);
+            var bytes = await ReadCappedAsync(response.Content, timeout.Token).ConfigureAwait(false);
             return bytes is not null && IsPng(bytes) ? bytes : null;
         }
-        catch (HttpRequestException)
+        catch (Exception ex) when (ex is HttpRequestException or IOException ||
+            (ex is OperationCanceledException && !cancellationToken.IsCancellationRequested))
         {
-            return null;
-        }
-        catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
-        {
+            // A refused connection, a body cut off mid-stream (HttpIOException is an IOException) or the timeout:
+            // the caller falls back to the hosted page rather than failing a charge that was already created.
             return null;
         }
     }
