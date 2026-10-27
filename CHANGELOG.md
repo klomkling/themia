@@ -30,6 +30,7 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 ### Added
 
 - **2C2P refunds** (`Themia.Payments.TwoCTwoP`): `RefundAsync` now refunds through the Payment Maintenance API (full or partial; XML in a JWE inside a JWS, `RSA-OAEP` + `A256GCM` + `PS256`) when `TwoCTwoPOptions.MerchantPrivateKeyPem` and `ProviderPublicCertificatePem` are set; with neither it still refuses with `refund_not_supported`. A refund is sent once and never retried; an unknown outcome throws `refund_outcome_unknown`. Not yet verified against the 2C2P sandbox. See the package README.
+- **2C2P in-page PromptPay QR** (`Themia.Payments.TwoCTwoP`): a charge that allows only `PaymentMethod.QrPromptPay` now calls 2C2P's Do Payment API after the payment token and returns `NextAction.ShowQr` (QR PNG and expiry) instead of `NextAction.Redirect`, so a shopper inside an app (e.g. LINE LIFF) never leaves the page. Charges that allow cards or other methods are unchanged. If Do Payment or the QR image is unavailable or not trusted, the charge still succeeds with the hosted-page `Redirect`. Not yet verified against the 2C2P sandbox. See the package README.
 
 ### Changed
 
