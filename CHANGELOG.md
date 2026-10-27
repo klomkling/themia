@@ -27,6 +27,10 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.42.0] - 2026-10-27
+
+2C2P refunds and an in-page PromptPay QR for `Themia.Payments.TwoCTwoP` (neither verified against the 2C2P sandbox yet), and a behaviour change to the SMTP attachment allow-list.
+
 ### Added
 
 - **2C2P refunds** (`Themia.Payments.TwoCTwoP`): `RefundAsync` now refunds through the Payment Maintenance API (full or partial; XML in a JWE inside a JWS, `RSA-OAEP` + `A256GCM` + `PS256`) when `TwoCTwoPOptions.MerchantPrivateKeyPem` and `ProviderPublicCertificatePem` are set; with neither it still refuses with `refund_not_supported`. A refund is sent once and never retried; an unknown outcome throws `refund_outcome_unknown`. Not yet verified against the 2C2P sandbox. See the package README.
