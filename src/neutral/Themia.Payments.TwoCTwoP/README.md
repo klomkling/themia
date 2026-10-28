@@ -109,11 +109,19 @@ sends nothing, as in earlier versions.
 - **Status.** `respCode` `00` with refund status `RF` is `Succeeded`; `RFF` (Refund Failed), `RR` (Refund Rejected) and `RR1` to `RR3` (rejected: insufficient balance, invalid bank information, bank account mismatch) are `Failed`, per 2C2P's [Payment Maintenance status codes](https://developer.2c2p.com/docs/response-code-payment-maintenance-status-code);
   `RP` and any status this package does not know are `Pending`, never `Succeeded`. `RefundCreation.RefundId` is
   always `null`: key your records on the charge. There is no refund webhook: 2C2P sends no notification when a
-  refund settles, so a `Pending` refund is resolved by checking the 2C2P merchant portal. A caller must never retry
+  refund settles, so follow a `Pending` refund with `GetRefundsAsync` (below) or the 2C2P merchant portal. A caller must never retry
   `refund_outcome_unknown` automatically.
 - **2C2P is the only guard against over-refunding.** The inquiry does not show what was already refunded, so
   two concurrent or repeated partial refunds can exceed the charge locally unnoticed. Serialize refunds per charge.
 - A response is accepted only when its `invoiceNo` (and `merchantID`, when present) match the request.
+
+### Following a refund: `GetRefundsAsync`
+
+`TwoCTwoPPaymentGateway` also implements `IRefundStatusGateway`. `GetRefundsAsync(ChargeRef)` asks the Payment Maintenance API for the refund status of the charge's invoice (`processType` `RS`) and returns a `RefundRecord` per refund: 2C2P's `referenceNo` as `RefundId`, the amount in the charge's currency, the status (mapped as above), the time, and `IdempotencyKey`.
+
+- **Matching a record to the refund you sent.** The `IdempotencyKey` you pass to `RefundAsync` is also sent as the refund's `userDefined1`, and 2C2P returns it on the refund in the status list, so match on `RefundRecord.IdempotencyKey`. A refund made in the 2C2P portal (or one that 2C2P does not echo) has `null`. The key is sent as `userDefined1` only when it is at most 50 characters (2C2P publishes 150 for `userDefined1` on a payment token request but no length for the Payment Process request, and a rejected value would fail the refund); a longer key is still sent as `idempotencyID` but its record comes back with `IdempotencyKey` `null`, so match it on amount and time. Keep keys short.
+- Needs the same keys as `RefundAsync` (`refund_not_supported` without them). It changes nothing and is safe to repeat: a failure to reach 2C2P is `FailureKind.Transient` (`refund_status_unavailable`), not `refund_outcome_unknown`. An unverifiable response, another invoice's, or a refund row with an unreadable amount is `malformed_response`; any other `respCode` is thrown as that code.
+- Not verified against the 2C2P sandbox: the request omits `actionAmount` (the sample in the docs includes one for `RS`; the older documentation does not), and the `userDefined1` echo is as documented.
 
 ## In-page PromptPay QR
 

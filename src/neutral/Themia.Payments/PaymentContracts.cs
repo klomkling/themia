@@ -112,3 +112,13 @@ public sealed record RefundRequest(ChargeRef Charge, Money? Amount, string? Reas
 /// Payment Process does. Key your own records on the charge, not on this.</param>
 /// <param name="Status">Usually <see cref="PaymentStatus.Pending"/>; the outcome arrives by webhook.</param>
 public sealed record RefundCreation(string? RefundId, PaymentStatus Status);
+
+/// <summary>One refund of a charge, as the provider reports it.</summary>
+/// <param name="RefundId">The provider's refund reference, or null where it gives none.</param>
+/// <param name="Amount">How much was refunded, in the charge's currency.</param>
+/// <param name="Status">Where the refund stands.</param>
+/// <param name="At">When the provider recorded it, or null when it gives no usable time.</param>
+/// <param name="IdempotencyKey">The <see cref="RefundRequest.IdempotencyKey"/> the refund was requested with, so a
+/// caller can match this record to the refund it sent; null for a refund that was not requested through this
+/// package (for example one made in the provider's portal), or where the provider does not echo it back.</param>
+public sealed record RefundRecord(string? RefundId, Money Amount, PaymentStatus Status, DateTimeOffset? At, string? IdempotencyKey);

@@ -129,6 +129,20 @@ Themia.Payments.RefundCreation.RefundId.get -> string?
 Themia.Payments.RefundCreation.RefundId.init -> void
 Themia.Payments.RefundCreation.Status.get -> Themia.Payments.PaymentStatus
 Themia.Payments.RefundCreation.Status.init -> void
+Themia.Payments.RefundRecord
+Themia.Payments.RefundRecord.RefundRecord(string? RefundId, Themia.Payments.Money Amount, Themia.Payments.PaymentStatus Status, System.DateTimeOffset? At, string? IdempotencyKey) -> void
+Themia.Payments.RefundRecord.RefundId.get -> string?
+Themia.Payments.RefundRecord.RefundId.init -> void
+Themia.Payments.RefundRecord.Amount.get -> Themia.Payments.Money
+Themia.Payments.RefundRecord.Amount.init -> void
+Themia.Payments.RefundRecord.Status.get -> Themia.Payments.PaymentStatus
+Themia.Payments.RefundRecord.Status.init -> void
+Themia.Payments.RefundRecord.At.get -> System.DateTimeOffset?
+Themia.Payments.RefundRecord.At.init -> void
+Themia.Payments.RefundRecord.IdempotencyKey.get -> string?
+Themia.Payments.RefundRecord.IdempotencyKey.init -> void
+Themia.Payments.IRefundStatusGateway
+Themia.Payments.IRefundStatusGateway.GetRefundsAsync(Themia.Payments.ChargeRef charge, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Themia.Payments.RefundRecord!>!>!
 Themia.Payments.IPaymentGateway
 Themia.Payments.IPaymentGateway.CreateChargeAsync(Themia.Payments.CreateChargeRequest! request, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Payments.ChargeCreation!>!
 Themia.Payments.IPaymentGateway.GetChargeAsync(Themia.Payments.ChargeRef charge, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Payments.Charge!>!
