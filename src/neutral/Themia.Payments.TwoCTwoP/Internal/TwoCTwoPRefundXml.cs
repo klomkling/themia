@@ -9,6 +9,13 @@ internal static class TwoCTwoPRefundXml
 {
     private const string RequestVersion = "4.3";
 
+    /// <summary>
+    /// The longest key sent as <c>userDefined1</c>. 2C2P documents 150 for <c>userDefined1</c> on a payment token request but publishes no
+    /// length for the Payment Process request, and a rejected value would fail the whole refund, so the cap is deliberately low. A longer key is
+    /// still sent as <c>idempotencyID</c>; it just cannot be matched back through the refund status.
+    /// </summary>
+    public const int MaxUserDefinedLength = 50;
+
     /// <summary>What a verified response says. Strings are as 2C2P sent them.</summary>
     public sealed record Response(string RespCode, string? RespDesc, string? Status, string? InvoiceNo, string? MerchantId, string? IdempotencyId);
 
@@ -19,7 +26,7 @@ internal static class TwoCTwoPRefundXml
     public sealed record StatusResponse(string RespCode, string? RespDesc, string? InvoiceNo, string? MerchantId, IReadOnlyList<RefundRow> Refunds);
 
     /// <summary>Builds the request with <see cref="XElement"/>, so every value is escaped. Amount is a two-place decimal, invariant culture.
-    /// The idempotency id is also sent as <c>userDefined1</c>, which 2C2P echoes on the refund in a status inquiry, so the refund can be matched later.</summary>
+    /// The idempotency id is also sent as <c>userDefined1</c> when it is at most <see cref="MaxUserDefinedLength"/> characters; 2C2P echoes it on the refund in a status inquiry, so the refund can be matched later.</summary>
     public static string BuildRequest(string merchantId, string invoiceNo, decimal amount, string idempotencyId, DateTimeOffset now)
     {
         var root = new XElement("PaymentProcessRequest",
@@ -29,8 +36,12 @@ internal static class TwoCTwoPRefundXml
             new XElement("processType", "R"),
             new XElement("invoiceNo", invoiceNo),
             new XElement("actionAmount", amount.ToString("0.00", CultureInfo.InvariantCulture)),
-            new XElement("idempotencyID", idempotencyId),
-            new XElement("userDefined1", idempotencyId));
+            new XElement("idempotencyID", idempotencyId));
+        if (idempotencyId.Length <= MaxUserDefinedLength)
+        {
+            root.Add(new XElement("userDefined1", idempotencyId));
+        }
+
         return root.ToString(SaveOptions.DisableFormatting);
     }
 

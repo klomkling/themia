@@ -336,6 +336,21 @@ public sealed class TwoCTwoPRefundTests : IDisposable
         Assert.Equal("refund-42", SentXml(handler).Element("userDefined1")!.Value);
     }
 
+    [Theory]
+    [InlineData(50, true)]
+    [InlineData(51, false)]
+    public async Task Refund_ShouldSendTheKeyAsUserDefined1_OnlyWhenItFits(int length, bool sent)
+    {
+        var key = new string('k', length);
+        var handler = new StubHandler().Enqueue(HttpStatusCode.OK, PaidInquiry()).Enqueue(HttpStatusCode.OK, RefundResponse());
+
+        await Gateway(handler).RefundAsync(Refund(null, key: key));
+
+        var xml = SentXml(handler);
+        Assert.Equal(key, xml.Element("idempotencyID")!.Value);
+        Assert.Equal(sent ? key : null, xml.Element("userDefined1")?.Value);
+    }
+
     [Fact]
     public async Task GetRefunds_ShouldAskForTheRefundStatusOfTheInvoice()
     {
