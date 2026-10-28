@@ -56,17 +56,44 @@ public sealed class S3StorageProvider : IStorageProvider, IDisposable
         Themia.Storage.StorageKey.EnsureMatchesVisibility(key, options.Visibility);
         var (resolvedBucket, resolvedKey) = Resolve(key);
         var contentType = string.IsNullOrEmpty(options.ContentType) ? "application/octet-stream" : options.ContentType;
-        var response = await client.PutObjectAsync(new PutObjectRequest
+        var request = new PutObjectRequest
         {
             BucketName = resolvedBucket,
             Key = resolvedKey,
             InputStream = content,
             ContentType = contentType,
             AutoCloseStream = false,
-        }, cancellationToken).ConfigureAwait(false);
+        };
 
-        var length = content.CanSeek ? content.Length : 0;
-        return new StorageObjectInfo(key, length, contentType, response.ETag);
+        FileStream? buffered = null;
+        try
+        {
+            if (client.Config.ServiceURL is { Length: > 0 } serviceUrl)
+            {
+                // S3-compatible servers such as Cloudflare R2 reject aws-chunked streaming signatures
+                // ("STREAMING-AWS4-HMAC-SHA256-PAYLOAD not implemented"), so send one plain body. That needs a known
+                // Content-Length, hence a stream that cannot seek is spooled to a temporary file first.
+                request.UseChunkEncoding = false;
+                request.DisablePayloadSigning = serviceUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase);
+                if (!content.CanSeek)
+                {
+                    buffered = new FileStream(
+                        Path.GetTempFileName(), FileMode.Create, FileAccess.ReadWrite, FileShare.None, 81920,
+                        FileOptions.DeleteOnClose | FileOptions.Asynchronous);
+                    await content.CopyToAsync(buffered, cancellationToken).ConfigureAwait(false);
+                    buffered.Position = 0;
+                    request.InputStream = buffered;
+                }
+            }
+
+            var response = await client.PutObjectAsync(request, cancellationToken).ConfigureAwait(false);
+            var length = request.InputStream.CanSeek ? request.InputStream.Length : 0;
+            return new StorageObjectInfo(key, length, contentType, response.ETag);
+        }
+        finally
+        {
+            buffered?.Dispose();
+        }
     }
 
     /// <inheritdoc />
@@ -205,9 +232,14 @@ public sealed class S3StorageProvider : IStorageProvider, IDisposable
         }
     }
 
-    internal static IAmazonS3 BuildClient(S3StorageOptions options)
+    internal static IAmazonS3 BuildClient(S3StorageOptions options, HttpClientFactory? httpClientFactory = null)
     {
         var config = new AmazonS3Config { ForcePathStyle = options.ForcePathStyle };
+        if (httpClientFactory is not null)
+        {
+            config.HttpClientFactory = httpClientFactory;
+        }
+
         if (options.ServiceUrl is not null)
         {
             config.ServiceURL = options.ServiceUrl.AbsoluteUri;
