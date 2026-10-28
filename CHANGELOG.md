@@ -27,6 +27,10 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+### Added
+
+- **`Themia.Payments` / `Themia.Payments.TwoCTwoP`:** `IRefundStatusGateway.GetRefundsAsync` lists a charge's refunds as `RefundRecord`s; the 2C2P gateway implements it through the Payment Maintenance refund status inquiry (`processType` `RS`), since 2C2P sends no refund webhook (coord #0177). `RefundAsync` now also sends its idempotency key as `userDefined1`, which comes back as `RefundRecord.IdempotencyKey` so a caller can match a record to the refund it sent. Not verified against the 2C2P sandbox.
+
 ## [0.42.1] - 2026-10-27
 
 A fix for `Themia.Payments.TwoCTwoP`: `PresentationMode.HostedPage` is honoured for a PromptPay-only charge.
