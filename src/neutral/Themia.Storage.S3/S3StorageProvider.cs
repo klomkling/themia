@@ -15,6 +15,7 @@ public sealed class S3StorageProvider : IStorageProvider, IDisposable
     private readonly string publicBucket;
     private readonly string publicBaseUrl;
     private readonly bool ownsClient;
+    private readonly long maxSpooledUploadBytes;
 
     /// <summary>Creates the provider, building the S3 client from <paramref name="options"/>.</summary>
     /// <param name="options">The S3 options.</param>
@@ -33,12 +34,18 @@ public sealed class S3StorageProvider : IStorageProvider, IDisposable
         publicBaseUrl = options.PublicBaseUrl;
         client = BuildClient(options);
         ownsClient = true;
+        maxSpooledUploadBytes = options.MaxSpooledUploadBytes;
     }
 
     /// <summary>Creates the provider over an existing client (used by tests against MinIO).</summary>
     /// <param name="client">The S3 client.</param>
     /// <param name="bucketName">The bucket name.</param>
     public S3StorageProvider(IAmazonS3 client, string bucketName)
+        : this(client, bucketName, null)
+    {
+    }
+
+    internal S3StorageProvider(IAmazonS3 client, string bucketName, long? maxSpooledUploadBytes)
     {
         ArgumentNullException.ThrowIfNull(client);
         ArgumentException.ThrowIfNullOrWhiteSpace(bucketName);
@@ -47,6 +54,7 @@ public sealed class S3StorageProvider : IStorageProvider, IDisposable
         publicBucket = string.Empty;
         publicBaseUrl = string.Empty;
         ownsClient = false;
+        this.maxSpooledUploadBytes = maxSpooledUploadBytes ?? new S3StorageOptions().MaxSpooledUploadBytes;
     }
 
     /// <inheritdoc />
@@ -77,11 +85,7 @@ public sealed class S3StorageProvider : IStorageProvider, IDisposable
                 request.DisablePayloadSigning = serviceUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase);
                 if (!content.CanSeek)
                 {
-                    buffered = new FileStream(
-                        Path.GetTempFileName(), FileMode.Create, FileAccess.ReadWrite, FileShare.None, 81920,
-                        FileOptions.DeleteOnClose | FileOptions.Asynchronous);
-                    await content.CopyToAsync(buffered, cancellationToken).ConfigureAwait(false);
-                    buffered.Position = 0;
+                    buffered = await SpoolAsync(content, cancellationToken).ConfigureAwait(false);
                     request.InputStream = buffered;
                 }
             }
@@ -93,6 +97,40 @@ public sealed class S3StorageProvider : IStorageProvider, IDisposable
         finally
         {
             buffered?.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// Copies <paramref name="content"/> to a temporary file the OS names and creates owner-only (no part of the path
+    /// comes from the caller), deleted when the returned stream is disposed, and never longer than the configured limit.
+    /// </summary>
+    private async Task<FileStream> SpoolAsync(Stream content, CancellationToken cancellationToken)
+    {
+        var spool = new FileStream(
+            Path.GetTempFileName(), FileMode.Create, FileAccess.ReadWrite, FileShare.None, 81920,
+            FileOptions.DeleteOnClose | FileOptions.Asynchronous);
+        try
+        {
+            var chunk = new byte[81920];
+            int read;
+            while ((read = await content.ReadAsync(chunk, cancellationToken).ConfigureAwait(false)) > 0)
+            {
+                if (spool.Length + read > maxSpooledUploadBytes)
+                {
+                    throw new InvalidOperationException(
+                        $"The upload is longer than the {maxSpooledUploadBytes}-byte limit for a stream that cannot seek (S3StorageOptions.MaxSpooledUploadBytes).");
+                }
+
+                await spool.WriteAsync(chunk.AsMemory(0, read), cancellationToken).ConfigureAwait(false);
+            }
+
+            spool.Position = 0;
+            return spool;
+        }
+        catch
+        {
+            await spool.DisposeAsync().ConfigureAwait(false);
+            throw;
         }
     }
 

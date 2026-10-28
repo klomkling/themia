@@ -46,7 +46,7 @@ public sealed class S3CustomEndpointUploadTests
         public override bool DisposeHttpClientsAfterUse(IClientConfig clientConfig) => false;
     }
 
-    private static async Task<Sent> PutAsync(string? serviceUrl, Stream content)
+    private static async Task<Sent> PutAsync(string? serviceUrl, Stream content, long? maxSpooledUploadBytes = null)
     {
         var handler = new CapturingHandler();
         using var provider = new S3StorageProvider(
@@ -60,7 +60,8 @@ public sealed class S3CustomEndpointUploadTests
                     SecretKey = "test-secret-key",
                 },
                 new StubFactory(handler)),
-            "private-bucket");
+            "private-bucket",
+            maxSpooledUploadBytes);
 
         await provider.PutAsync("a.txt", content, new StoragePutOptions { ContentType = "text/plain" });
 
@@ -101,6 +102,31 @@ public sealed class S3CustomEndpointUploadTests
 
         Assert.Equal(payload, sent.Body);
         Assert.Equal("5", sent.Headers["content-length"]);
+    }
+
+    [Fact]
+    public async Task A_stream_that_cannot_seek_is_spooled_up_to_the_limit()
+    {
+        var sent = await PutAsync("https://account.r2.cloudflarestorage.com", new NonSeekableStream("hello"u8.ToArray()), maxSpooledUploadBytes: 5);
+
+        Assert.Equal("5", sent.Headers["content-length"]);
+    }
+
+    [Fact]
+    public async Task A_stream_that_cannot_seek_and_exceeds_the_limit_is_refused_before_anything_is_sent()
+    {
+        var handler = new CapturingHandler();
+        using var provider = new S3StorageProvider(
+            S3StorageProvider.BuildClient(
+                new S3StorageOptions { BucketName = "private-bucket", ServiceUrl = new Uri("https://account.r2.cloudflarestorage.com"), Region = "us-east-1" },
+                new StubFactory(handler)),
+            "private-bucket",
+            maxSpooledUploadBytes: 4);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => provider.PutAsync("a.txt", new NonSeekableStream("hello"u8.ToArray()), new StoragePutOptions()));
+
+        Assert.Empty(handler.Requests);
     }
 
     [Fact]
