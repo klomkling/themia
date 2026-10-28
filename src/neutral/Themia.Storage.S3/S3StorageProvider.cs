@@ -15,6 +15,7 @@ public sealed class S3StorageProvider : IStorageProvider, IDisposable
     private readonly string publicBucket;
     private readonly string publicBaseUrl;
     private readonly bool ownsClient;
+    private readonly long maxSpooledUploadBytes;
 
     /// <summary>Creates the provider, building the S3 client from <paramref name="options"/>.</summary>
     /// <param name="options">The S3 options.</param>
@@ -33,12 +34,18 @@ public sealed class S3StorageProvider : IStorageProvider, IDisposable
         publicBaseUrl = options.PublicBaseUrl;
         client = BuildClient(options);
         ownsClient = true;
+        maxSpooledUploadBytes = options.MaxSpooledUploadBytes;
     }
 
     /// <summary>Creates the provider over an existing client (used by tests against MinIO).</summary>
     /// <param name="client">The S3 client.</param>
     /// <param name="bucketName">The bucket name.</param>
     public S3StorageProvider(IAmazonS3 client, string bucketName)
+        : this(client, bucketName, null)
+    {
+    }
+
+    internal S3StorageProvider(IAmazonS3 client, string bucketName, long? maxSpooledUploadBytes)
     {
         ArgumentNullException.ThrowIfNull(client);
         ArgumentException.ThrowIfNullOrWhiteSpace(bucketName);
@@ -47,6 +54,7 @@ public sealed class S3StorageProvider : IStorageProvider, IDisposable
         publicBucket = string.Empty;
         publicBaseUrl = string.Empty;
         ownsClient = false;
+        this.maxSpooledUploadBytes = maxSpooledUploadBytes ?? new S3StorageOptions().MaxSpooledUploadBytes;
     }
 
     /// <inheritdoc />
@@ -56,17 +64,74 @@ public sealed class S3StorageProvider : IStorageProvider, IDisposable
         Themia.Storage.StorageKey.EnsureMatchesVisibility(key, options.Visibility);
         var (resolvedBucket, resolvedKey) = Resolve(key);
         var contentType = string.IsNullOrEmpty(options.ContentType) ? "application/octet-stream" : options.ContentType;
-        var response = await client.PutObjectAsync(new PutObjectRequest
+        var request = new PutObjectRequest
         {
             BucketName = resolvedBucket,
             Key = resolvedKey,
             InputStream = content,
             ContentType = contentType,
             AutoCloseStream = false,
-        }, cancellationToken).ConfigureAwait(false);
+        };
 
-        var length = content.CanSeek ? content.Length : 0;
-        return new StorageObjectInfo(key, length, contentType, response.ETag);
+        FileStream? buffered = null;
+        try
+        {
+            if (client.Config.ServiceURL is { Length: > 0 } serviceUrl)
+            {
+                // S3-compatible servers such as Cloudflare R2 reject aws-chunked streaming signatures
+                // ("STREAMING-AWS4-HMAC-SHA256-PAYLOAD not implemented"), so send one plain body. That needs a known
+                // Content-Length, hence a stream that cannot seek is spooled to a temporary file first.
+                request.UseChunkEncoding = false;
+                request.DisablePayloadSigning = serviceUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase);
+                if (!content.CanSeek)
+                {
+                    buffered = await SpoolAsync(content, cancellationToken).ConfigureAwait(false);
+                    request.InputStream = buffered;
+                }
+            }
+
+            var response = await client.PutObjectAsync(request, cancellationToken).ConfigureAwait(false);
+            var length = request.InputStream.CanSeek ? request.InputStream.Length : 0;
+            return new StorageObjectInfo(key, length, contentType, response.ETag);
+        }
+        finally
+        {
+            buffered?.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// Copies <paramref name="content"/> to a temporary file the OS names and creates owner-only (no part of the path
+    /// comes from the caller), deleted when the returned stream is disposed, and never longer than the configured limit.
+    /// </summary>
+    private async Task<FileStream> SpoolAsync(Stream content, CancellationToken cancellationToken)
+    {
+        var spool = new FileStream(
+            Path.GetTempFileName(), FileMode.Create, FileAccess.ReadWrite, FileShare.None, 81920,
+            FileOptions.DeleteOnClose | FileOptions.Asynchronous);
+        try
+        {
+            var chunk = new byte[81920];
+            int read;
+            while ((read = await content.ReadAsync(chunk, cancellationToken).ConfigureAwait(false)) > 0)
+            {
+                if (spool.Length + read > maxSpooledUploadBytes)
+                {
+                    throw new InvalidOperationException(
+                        $"The upload is longer than the {maxSpooledUploadBytes}-byte limit for a stream that cannot seek (S3StorageOptions.MaxSpooledUploadBytes).");
+                }
+
+                await spool.WriteAsync(chunk.AsMemory(0, read), cancellationToken).ConfigureAwait(false);
+            }
+
+            spool.Position = 0;
+            return spool;
+        }
+        catch
+        {
+            await spool.DisposeAsync().ConfigureAwait(false);
+            throw;
+        }
     }
 
     /// <inheritdoc />
@@ -205,9 +270,14 @@ public sealed class S3StorageProvider : IStorageProvider, IDisposable
         }
     }
 
-    private static IAmazonS3 BuildClient(S3StorageOptions options)
+    internal static IAmazonS3 BuildClient(S3StorageOptions options, HttpClientFactory? httpClientFactory = null)
     {
         var config = new AmazonS3Config { ForcePathStyle = options.ForcePathStyle };
+        if (httpClientFactory is not null)
+        {
+            config.HttpClientFactory = httpClientFactory;
+        }
+
         if (options.ServiceUrl is not null)
         {
             config.ServiceURL = options.ServiceUrl.AbsoluteUri;
@@ -219,13 +289,11 @@ public sealed class S3StorageProvider : IStorageProvider, IDisposable
                 config.AuthenticationRegion = options.Region;
             }
 
-            // Over plain http the SDK's default checksum is a SIGNED CRC32 trailer, which S3-compatible servers such
-            // as Garage reject on upload ("Invalid payload signature"). https uses an unsigned trailer and is
-            // unaffected, so a checksum is added only where the service requires one, and only for http endpoints.
-            if (string.Equals(options.ServiceUrl.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase))
-            {
-                config.RequestChecksumCalculation = RequestChecksumCalculation.WHEN_REQUIRED;
-            }
+            // The SDK's default checksum is a CRC32 trailer. S3-compatible servers reject it on upload: Garage over
+            // http ("Invalid payload signature", a signed trailer) and Cloudflare R2 over https (unsigned trailer
+            // not accepted). So a checksum is added only where the service requires one, for every custom endpoint.
+            // Real AWS (no ServiceUrl) keeps the SDK default.
+            config.RequestChecksumCalculation = RequestChecksumCalculation.WHEN_REQUIRED;
         }
         else if (!string.IsNullOrWhiteSpace(options.Region))
         {

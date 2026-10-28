@@ -20,6 +20,13 @@ public sealed class S3StorageOptions
     /// <summary>A custom service endpoint (set for Cloudflare R2 / MinIO / any S3-compatible server).</summary>
     public Uri? ServiceUrl { get; set; }
 
+    /// <summary>The most bytes of one upload that may be spooled to a temporary file, 100 MiB by default. A
+    /// stream that cannot seek has no known length, and an upload to a <see cref="ServiceUrl"/> endpoint needs one
+    /// (such servers reject streaming signatures), so it is copied to a temporary file first; a stream longer than
+    /// this is refused with <see cref="InvalidOperationException"/> before anything is sent. A stream that can seek
+    /// is never spooled and is not limited by this.</summary>
+    public long MaxSpooledUploadBytes { get; set; } = 100L * 1024 * 1024;
+
     /// <summary>Whether to force path-style addressing (required for R2 and MinIO).</summary>
     public bool ForcePathStyle { get; set; }
 
