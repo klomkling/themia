@@ -27,6 +27,8 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.43.0] - 2026-10-28
+
 ### Fixed
 
 - **`Themia.Storage.S3`:** uploads to Cloudflare R2 failed because the SDK's default checksum trailer was dropped only for `http` endpoints. The checksum is now requested only when the service requires it for every `ServiceUrl`, and an upload to a `ServiceUrl` is sent as one plain body (no aws-chunked streaming signature, payload unsigned over `https`) because R2 rejects `STREAMING-AWS4-HMAC-SHA256-PAYLOAD`; a stream that cannot seek is spooled to an OS-named, delete-on-close temporary file first so Content-Length is known, refused with `InvalidOperationException` above the new `S3StorageOptions.MaxSpooledUploadBytes` (100 MiB default) (coord #0178). Real AWS keeps the SDK defaults.
