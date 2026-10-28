@@ -315,6 +315,153 @@ public sealed class TwoCTwoPRefundTests : IDisposable
         Assert.Contains("validity", error, StringComparison.Ordinal);
     }
 
+    // ---- Refund status (processType RS) ----
+
+    private string RefundStatusResponse(string refunds, string respCode = "00", string invoiceNo = "order-1", string merchant = Merchant) =>
+        JweJws.Seal(
+            $"<PaymentProcessResponse><version>4.3</version><respCode>{respCode}</respCode><respDesc>Success</respDesc><processType>RS</processType>"
+            + $"<invoiceNo>{invoiceNo}</invoiceNo><merchantID>{merchant}</merchantID><status>S</status><refundList>{refunds}</refundList></PaymentProcessResponse>",
+            merchantKey, providerKey);
+
+    private static string RefundRow(string status = "RF", string amount = "25.00", string reference = "3598743", string userDefined1 = "r-1") =>
+        $"<refund amount=\"{amount}\" status=\"{status}\" referenceNo=\"{reference}\" dateTime=\"20260225155130\" userDefined1=\"{userDefined1}\" userDefined2=\"\" acquirerResponseCode=\"00\"/>";
+
+    [Fact]
+    public async Task Refund_ShouldSendTheIdempotencyKeyAsUserDefined1_SoTheRefundCanBeMatchedLater()
+    {
+        var handler = new StubHandler().Enqueue(HttpStatusCode.OK, PaidInquiry()).Enqueue(HttpStatusCode.OK, RefundResponse());
+
+        await Gateway(handler).RefundAsync(Refund(null, key: "refund-42"));
+
+        Assert.Equal("refund-42", SentXml(handler).Element("userDefined1")!.Value);
+    }
+
+    [Theory]
+    [InlineData(50, true)]
+    [InlineData(51, false)]
+    public async Task Refund_ShouldSendTheKeyAsUserDefined1_OnlyWhenItFits(int length, bool sent)
+    {
+        var key = new string('k', length);
+        var handler = new StubHandler().Enqueue(HttpStatusCode.OK, PaidInquiry()).Enqueue(HttpStatusCode.OK, RefundResponse());
+
+        await Gateway(handler).RefundAsync(Refund(null, key: key));
+
+        var xml = SentXml(handler);
+        Assert.Equal(key, xml.Element("idempotencyID")!.Value);
+        Assert.Equal(sent ? key : null, xml.Element("userDefined1")?.Value);
+    }
+
+    [Fact]
+    public async Task GetRefunds_ShouldAskForTheRefundStatusOfTheInvoice()
+    {
+        var handler = new StubHandler().Enqueue(HttpStatusCode.OK, PaidInquiry()).Enqueue(HttpStatusCode.OK, RefundStatusResponse(RefundRow()));
+
+        await Gateway(handler).GetRefundsAsync(new ChargeRef(null, "order-1"));
+
+        var xml = SentXml(handler);
+        Assert.Equal("RS", xml.Element("processType")!.Value);
+        Assert.Equal("order-1", xml.Element("invoiceNo")!.Value);
+        Assert.Equal(Merchant, xml.Element("merchantID")!.Value);
+        Assert.Equal("https://demo2.2c2p.com/PaymentAction/2.0/action", handler.Requests[1].RequestUri!.ToString());
+    }
+
+    [Fact]
+    public async Task GetRefunds_ShouldReturnEachRefund_WithTheKeyTheCallerSent()
+    {
+        var rows = RefundRow("RF", "25.00", "3598743", "r-1") + RefundRow("RP", "10.50", "3598744", "r-2");
+        var handler = new StubHandler().Enqueue(HttpStatusCode.OK, PaidInquiry()).Enqueue(HttpStatusCode.OK, RefundStatusResponse(rows));
+
+        var refunds = await Gateway(handler).GetRefundsAsync(new ChargeRef(null, "order-1"));
+
+        Assert.Equal(2, refunds.Count);
+        Assert.Equal(new RefundRecord("3598743", Money.Thb(2500), PaymentStatus.Succeeded, new DateTimeOffset(2026, 2, 25, 15, 51, 30, TimeSpan.FromHours(7)), "r-1"), refunds[0]);
+        Assert.Equal("r-2", refunds[1].IdempotencyKey);
+        Assert.Equal(Money.Thb(1050), refunds[1].Amount);
+        Assert.Equal(PaymentStatus.Pending, refunds[1].Status);
+    }
+
+    [Theory]
+    [InlineData("RF", PaymentStatus.Succeeded)]
+    [InlineData("RP", PaymentStatus.Pending)]
+    [InlineData("RFF", PaymentStatus.Failed)]
+    [InlineData("RR2", PaymentStatus.Failed)]
+    [InlineData("SOMETHING_NEW", PaymentStatus.Pending)]
+    public async Task GetRefunds_ShouldMapTheStatusLikeARefund_AndNeverReadAnUnknownOneAsSucceeded(string status, PaymentStatus expected)
+    {
+        var handler = new StubHandler().Enqueue(HttpStatusCode.OK, PaidInquiry()).Enqueue(HttpStatusCode.OK, RefundStatusResponse(RefundRow(status)));
+
+        Assert.Equal(expected, Assert.Single(await Gateway(handler).GetRefundsAsync(new ChargeRef(null, "order-1"))).Status);
+    }
+
+    [Fact]
+    public async Task GetRefunds_ShouldReturnNothing_ForAChargeWithNoRefunds()
+    {
+        var handler = new StubHandler().Enqueue(HttpStatusCode.OK, PaidInquiry()).Enqueue(HttpStatusCode.OK, RefundStatusResponse(string.Empty));
+
+        Assert.Empty(await Gateway(handler).GetRefundsAsync(new ChargeRef(null, "order-1")));
+    }
+
+    [Fact]
+    public async Task GetRefunds_ShouldLeaveTheKeyNull_WhenTheRefundCameFromElsewhere()
+    {
+        var handler = new StubHandler().Enqueue(HttpStatusCode.OK, PaidInquiry()).Enqueue(HttpStatusCode.OK, RefundStatusResponse(RefundRow(userDefined1: string.Empty)));
+
+        Assert.Null(Assert.Single(await Gateway(handler).GetRefundsAsync(new ChargeRef(null, "order-1"))).IdempotencyKey);
+    }
+
+    [Fact]
+    public async Task GetRefunds_ShouldRefuseAResponseForAnotherInvoice()
+    {
+        var handler = new StubHandler().Enqueue(HttpStatusCode.OK, PaidInquiry()).Enqueue(HttpStatusCode.OK, RefundStatusResponse(RefundRow(), invoiceNo: "order-2"));
+
+        var ex = await Assert.ThrowsAsync<PaymentApiException>(() => Gateway(handler).GetRefundsAsync(new ChargeRef(null, "order-1")));
+
+        Assert.Equal("malformed_response", ex.ProviderCode);
+    }
+
+    [Fact]
+    public async Task GetRefunds_ShouldRefuseAMalformedRefundRow_RatherThanSkipIt()
+    {
+        var handler = new StubHandler().Enqueue(HttpStatusCode.OK, PaidInquiry()).Enqueue(HttpStatusCode.OK, RefundStatusResponse(RefundRow(amount: "not-a-number")));
+
+        var ex = await Assert.ThrowsAsync<PaymentApiException>(() => Gateway(handler).GetRefundsAsync(new ChargeRef(null, "order-1")));
+
+        Assert.Equal("malformed_response", ex.ProviderCode);
+    }
+
+    [Fact]
+    public async Task GetRefunds_ShouldReportA2C2PErrorWithItsCode()
+    {
+        var handler = new StubHandler().Enqueue(HttpStatusCode.OK, PaidInquiry()).Enqueue(HttpStatusCode.OK, RefundStatusResponse(string.Empty, respCode: "42"));
+
+        var ex = await Assert.ThrowsAsync<PaymentApiException>(() => Gateway(handler).GetRefundsAsync(new ChargeRef(null, "order-1")));
+
+        Assert.Equal("42", ex.ProviderCode);
+    }
+
+    [Fact]
+    public async Task GetRefunds_ShouldTreatATransportFailureAsTransient_NotAsAnUnknownRefundOutcome()
+    {
+        var handler = new StubHandler().Enqueue(HttpStatusCode.OK, PaidInquiry()).Enqueue(HttpStatusCode.ServiceUnavailable, "down");
+
+        var ex = await Assert.ThrowsAsync<PaymentApiException>(() => Gateway(handler).GetRefundsAsync(new ChargeRef(null, "order-1")));
+
+        Assert.Equal(FailureKind.Transient, ex.Kind);
+        Assert.NotEqual("refund_outcome_unknown", ex.ProviderCode);
+    }
+
+    [Fact]
+    public async Task GetRefunds_ShouldRefuseWithoutKeys_AndSendNothing()
+    {
+        var handler = new StubHandler();
+
+        var ex = await Assert.ThrowsAsync<PaymentApiException>(
+            () => Gateway(handler, o => o.MerchantPrivateKeyPem = null).GetRefundsAsync(new ChargeRef(null, "order-1")));
+
+        Assert.Equal("refund_not_supported", ex.ProviderCode);
+        Assert.Empty(handler.Requests);
+    }
+
     private sealed class StubFactory(HttpClient client) : IHttpClientFactory
     {
         public HttpClient CreateClient(string name) => client;

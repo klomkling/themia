@@ -20,7 +20,7 @@ namespace Themia.Payments.TwoCTwoP;
 /// <see cref="CreateChargeRequest.ReferenceId"/> — 2C2P's <c>invoiceNo</c>. Refunds are sent once and never
 /// retried (see <see cref="RefundAsync"/>).
 /// </remarks>
-public sealed class TwoCTwoPPaymentGateway : IPaymentGateway, IPaymentGatewayCapabilities, IDisposable
+public sealed class TwoCTwoPPaymentGateway : IPaymentGateway, IRefundStatusGateway, IPaymentGatewayCapabilities, IDisposable
 {
     /// <summary>The name this adapter's <see cref="HttpClient"/> is registered under.</summary>
     public const string HttpClientName = "themia-payments-2c2p";
@@ -370,8 +370,64 @@ public sealed class TwoCTwoPPaymentGateway : IPaymentGateway, IPaymentGatewayCap
             DateTimeOffset.UtcNow.ToOffset(twoCTwoPOptions.TransactionTimeOffset));
         var jws = JweJws.Seal(xml, keys.ProviderPublic, keys.MerchantPrivate);
 
-        var verified = await SendRefundAsync(jws, twoCTwoPOptions, keys, cancellationToken).ConfigureAwait(false);
+        var verified = await SendActionAsync(
+            jws, twoCTwoPOptions, keys, TwoCTwoPRefundXml.ParseResponse, OutcomeUnknown, OutcomeUnknown, cancellationToken).ConfigureAwait(false);
         return MapRefund(verified, invoiceNo, twoCTwoPOptions.MerchantId, idempotencyId);
+    }
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// Asks 2C2P's Payment Maintenance API for the refunds of the charge's invoice (<c>processType</c> <c>RS</c>); 2C2P sends no
+    /// refund webhook, so this is how a <see cref="PaymentStatus.Pending"/> refund is followed to its end. Needs the same keys as
+    /// <see cref="RefundAsync"/> and refuses with <c>refund_not_supported</c> without them. Match a record to the refund you sent
+    /// by <see cref="RefundRecord.IdempotencyKey"/>: the key given to <see cref="RefundAsync"/> is sent as <c>userDefined1</c> and
+    /// echoed back (a refund made in the 2C2P portal has none). Read-only and repeatable; a failure to reach 2C2P is
+    /// <see cref="FailureKind.Transient"/>. Not verified against the 2C2P sandbox.
+    /// </remarks>
+    public async Task<IReadOnlyList<RefundRecord>> GetRefundsAsync(ChargeRef charge, CancellationToken cancellationToken = default)
+    {
+        var twoCTwoPOptions = options.Value;
+        if (!TwoCTwoPRefundKeys.IsConfigured(twoCTwoPOptions))
+        {
+            throw Refuse("refund_not_supported",
+                "Refund status is not configured: set MerchantPrivateKeyPem and ProviderPublicCertificatePem.");
+        }
+
+        var keys = RefundKeys(twoCTwoPOptions);
+        var paid = await GetChargeAsync(charge, cancellationToken).ConfigureAwait(false);
+        var jws = JweJws.Seal(
+            TwoCTwoPRefundXml.BuildStatusRequest(twoCTwoPOptions.MerchantId, paid.ReferenceId, DateTimeOffset.UtcNow.ToOffset(twoCTwoPOptions.TransactionTimeOffset)),
+            keys.ProviderPublic, keys.MerchantPrivate);
+
+        var answer = await SendActionAsync(
+            jws, twoCTwoPOptions, keys, TwoCTwoPRefundXml.ParseStatusResponse, StatusUnavailable, StatusUnreadable, cancellationToken).ConfigureAwait(false);
+
+        if (!string.Equals(answer.InvoiceNo, paid.ReferenceId, StringComparison.Ordinal)
+            || (answer.MerchantId is not null && !string.Equals(answer.MerchantId, twoCTwoPOptions.MerchantId, StringComparison.Ordinal)))
+        {
+            throw StatusUnreadable("The refund status response is for a different transaction.", 200, null);
+        }
+
+        if (answer.RespCode != RefundAcceptedRespCode)
+        {
+            throw new PaymentApiException(FailureKind.Unknown, answer.RespCode, 200, answer.RespDesc);
+        }
+
+        return answer.Refunds.Select(row => MapRefundRow(row, paid.Amount.Currency, twoCTwoPOptions.TransactionTimeOffset)).ToList();
+    }
+
+    private static RefundRecord MapRefundRow(TwoCTwoPRefundXml.RefundRow row, string currency, TimeSpan offset)
+    {
+        if (!TwoCTwoPMapping.TryFromDecimalAmount(row.Amount, currency, out var amount))
+        {
+            throw StatusUnreadable("A refund amount in the refund status response is not a valid amount.", 200, null);
+        }
+
+        // yyyyMMddHHmmss, in the same zone as the transaction's own timestamps.
+        DateTimeOffset? at = DateTime.TryParseExact(row.DateTime, "yyyyMMddHHmmss", CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsed)
+            ? new DateTimeOffset(parsed, offset)
+            : null;
+        return new RefundRecord(row.ReferenceNo, amount, MapRefundStatus(row.Status), at, row.UserDefined1);
     }
 
     private TwoCTwoPRefundKeys RefundKeys(TwoCTwoPOptions twoCTwoPOptions)
@@ -392,9 +448,16 @@ public sealed class TwoCTwoPPaymentGateway : IPaymentGateway, IPaymentGatewayCap
         }
     }
 
-    /// <summary>One attempt, no retry. Anything that leaves the outcome in doubt is <c>refund_outcome_unknown</c>.</summary>
-    private async Task<TwoCTwoPRefundXml.Response> SendRefundAsync(
-        string jws, TwoCTwoPOptions twoCTwoPOptions, TwoCTwoPRefundKeys keys, CancellationToken cancellationToken)
+    /// <summary>
+    /// One attempt, no retry, on the Payment Action endpoint. <paramref name="uncertain"/> builds the error for a transport failure
+    /// or a 5xx/429/408, <paramref name="unreadable"/> for a response that cannot be opened or parsed: a refund answers both with
+    /// <c>refund_outcome_unknown</c>, a read-only inquiry with something it is safe to retry.
+    /// </summary>
+    private async Task<T> SendActionAsync<T>(
+        string jws, TwoCTwoPOptions twoCTwoPOptions, TwoCTwoPRefundKeys keys, Func<string, T?> parse,
+        Func<string, int, Exception?, PaymentApiException> uncertain, Func<string, int, Exception?, PaymentApiException> unreadable,
+        CancellationToken cancellationToken)
+        where T : class
     {
         var httpClient = httpClientFactory.CreateClient(HttpClientName);
         using var content = new StringContent(jws, Encoding.UTF8);
@@ -414,12 +477,12 @@ public sealed class TwoCTwoPPaymentGateway : IPaymentGateway, IPaymentGatewayCap
         {
             // Includes the caller's own cancellation: once the request is on the wire the refund may have been made,
             // so a bare OperationCanceledException would read as "nothing happened" and invite a second refund.
-            throw OutcomeUnknown("The refund request may or may not have reached 2C2P.", 0, ex);
+            throw uncertain("The request may or may not have reached 2C2P.", 0, ex);
         }
 
         if (status is >= 500 or 429 or 408)
         {
-            throw OutcomeUnknown("2C2P answered with a server error; the refund may or may not have been made.", status);
+            throw uncertain("2C2P answered with a server error.", status, null);
         }
 
         if (status is >= 400)
@@ -427,9 +490,9 @@ public sealed class TwoCTwoPPaymentGateway : IPaymentGateway, IPaymentGatewayCap
             throw new PaymentApiException(TwoCTwoPMapping.ToFailureKindForStatus(status), $"HTTP_{status}", status);
         }
 
-        if (!JweJws.TryOpen(body, keys.ProviderPublic, keys.MerchantPrivate, out var xml) || TwoCTwoPRefundXml.ParseResponse(xml) is not { } parsed)
+        if (!JweJws.TryOpen(body, keys.ProviderPublic, keys.MerchantPrivate, out var xml) || parse(xml) is not { } parsed)
         {
-            throw OutcomeUnknown("The refund response could not be verified; the refund may or may not have been made.", status);
+            throw unreadable("The response could not be verified.", status, null);
         }
 
         return parsed;
@@ -455,17 +518,26 @@ public sealed class TwoCTwoPPaymentGateway : IPaymentGateway, IPaymentGatewayCap
         // RF "Refund confirmed"; RP "Refund Pending"; RFF "Refund Failed"; RR "Refund Rejected"; RR1 "Refund Rejected -
         // insufficient balance"; RR2 "invalid bank information"; RR3 "bank account mismatch". A status this package does
         // not know stays Pending, never Succeeded.
-        return new RefundCreation(null, response.Status switch
-        {
-            "RF" => PaymentStatus.Succeeded,
-            "RFF" or "RR" or "RR1" or "RR2" or "RR3" => PaymentStatus.Failed,
-            _ => PaymentStatus.Pending,
-        });
+        return new RefundCreation(null, MapRefundStatus(response.Status));
     }
+
+    private static PaymentStatus MapRefundStatus(string? status) => status switch
+    {
+        "RF" => PaymentStatus.Succeeded,
+        "RFF" or "RR" or "RR1" or "RR2" or "RR3" => PaymentStatus.Failed,
+        _ => PaymentStatus.Pending,
+    };
 
     private static PaymentApiException OutcomeUnknown(string message, int httpStatus, Exception? inner = null) =>
         new(FailureKind.Unknown, "refund_outcome_unknown", httpStatus,
-            message + " Check the 2C2P merchant portal before refunding again.", inner);
+            message + " The refund may or may not have been made. Check the 2C2P merchant portal before refunding again.", inner);
+
+    /// <summary>Reading is repeatable, so a transport failure or 5xx is plain <see cref="FailureKind.Transient"/>.</summary>
+    private static PaymentApiException StatusUnavailable(string message, int httpStatus, Exception? inner) =>
+        new(FailureKind.Transient, "refund_status_unavailable", httpStatus, message, inner);
+
+    private static PaymentApiException StatusUnreadable(string message, int httpStatus, Exception? inner) =>
+        new(FailureKind.Unknown, "malformed_response", httpStatus, message, inner);
 
     /// <summary>
     /// Parses the response body and returns its verified <c>payload</c> contents. Throws for anything else: a
