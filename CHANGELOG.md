@@ -31,6 +31,10 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 - **`Themia.Payments` / `Themia.Payments.TwoCTwoP`:** `IRefundStatusGateway.GetRefundsAsync` lists a charge's refunds as `RefundRecord`s; the 2C2P gateway implements it through the Payment Maintenance refund status inquiry (`processType` `RS`), since 2C2P sends no refund webhook (coord #0177). `RefundAsync` now also sends its idempotency key as `userDefined1`, which comes back as `RefundRecord.IdempotencyKey` so a caller can match a record to the refund it sent. Not verified against the 2C2P sandbox.
 
+### Security
+
+- **`MySqlConnector`** bumped 2.6.0 to 2.6.2 to clear GHSA-473q-m89c-ghf8 (affects 2.6.0 and below 2.6.1). It reaches adopters through `Themia.Framework.Data.Sequences`, `Themia.ETax.Data`, `Themia.ETax.Withholding.Data` and every `*.MySql` engine package, and failed their Security Scans (coord #0179). No API change.
+
 ## [0.43.0] - 2026-10-28
 
 ### Fixed
