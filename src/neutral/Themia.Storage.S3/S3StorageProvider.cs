@@ -205,7 +205,7 @@ public sealed class S3StorageProvider : IStorageProvider, IDisposable
         }
     }
 
-    private static IAmazonS3 BuildClient(S3StorageOptions options)
+    internal static IAmazonS3 BuildClient(S3StorageOptions options)
     {
         var config = new AmazonS3Config { ForcePathStyle = options.ForcePathStyle };
         if (options.ServiceUrl is not null)
@@ -219,13 +219,11 @@ public sealed class S3StorageProvider : IStorageProvider, IDisposable
                 config.AuthenticationRegion = options.Region;
             }
 
-            // Over plain http the SDK's default checksum is a SIGNED CRC32 trailer, which S3-compatible servers such
-            // as Garage reject on upload ("Invalid payload signature"). https uses an unsigned trailer and is
-            // unaffected, so a checksum is added only where the service requires one, and only for http endpoints.
-            if (string.Equals(options.ServiceUrl.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase))
-            {
-                config.RequestChecksumCalculation = RequestChecksumCalculation.WHEN_REQUIRED;
-            }
+            // The SDK's default checksum is a CRC32 trailer. S3-compatible servers reject it on upload: Garage over
+            // http ("Invalid payload signature", a signed trailer) and Cloudflare R2 over https (unsigned trailer
+            // not accepted). So a checksum is added only where the service requires one, for every custom endpoint.
+            // Real AWS (no ServiceUrl) keeps the SDK default.
+            config.RequestChecksumCalculation = RequestChecksumCalculation.WHEN_REQUIRED;
         }
         else if (!string.IsNullOrWhiteSpace(options.Region))
         {

@@ -27,6 +27,10 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+### Fixed
+
+- **`Themia.Storage.S3`:** uploads to Cloudflare R2 failed because the SDK's default checksum trailer was dropped only for `http` endpoints. The checksum is now requested only when the service requires it for every `ServiceUrl` (coord #0178); real AWS keeps the SDK default.
+
 ## [0.42.1] - 2026-10-27
 
 A fix for `Themia.Payments.TwoCTwoP`: `PresentationMode.HostedPage` is honoured for a PromptPay-only charge.
