@@ -138,7 +138,7 @@
     <!-- Integration tests: real PostgreSQL via Testcontainers -->
     <PackageVersion Include="Testcontainers.PostgreSql" Version="4.13.0" />
     <!-- Exceptional dialects (0.3.0): MySQL + SqlServer drivers + FluentMigrator runners -->
-    <PackageVersion Include="MySqlConnector" Version="2.6.0" />
+    <PackageVersion Include="MySqlConnector" Version="2.6.2" />
     <PackageVersion Include="Microsoft.Data.SqlClient" Version="6.1.5" />
     <PackageVersion Include="Testcontainers.MySql" Version="4.13.0" />
     <!-- MariaDB needs its own container type: MySqlBuilder's readiness probe shells out to mysqladmin, which
