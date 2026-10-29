@@ -11,20 +11,20 @@ Follows the repo pattern: neutral core `Themia.Conversations` (`net8.0;net10.0`,
 realtime transport (v1 is polling on open plus the batched notification of §5; SignalR comes later) and the business object itself. The object is an
 opaque `(SubjectType, SubjectId)` pair, so no app domain enters Themia.
 
-## 2. Entities (all rows carry `TenantId`; every call takes the tenant explicitly, as `Themia.Audit` does (the `.AspNetCore` adapter supplies it from the request), and every query carries the predicate; child tables reference their parent with composite `(Id, TenantId)` foreign keys from the first migration, so a row cannot point across tenants)
+## 2. Entities (all rows carry `TenantId`; every call takes the tenant explicitly, as `Themia.Audit` does (the `.AspNetCore` adapter supplies it from the request), and every query carries the predicate; child tables reference their parent with composite foreign keys from the first migration that bind the tenant **and** the conversation: messages to participants on `(TenantId, ConversationId, ParticipantId)`, attachments to messages and to participants on `(TenantId, ConversationId, ...)`, each parent exposing the matching unique key, so a row can point neither across tenants nor across conversations; the compared string columns (`TenantId`, `SubjectType`, `SubjectId`, `UserRef`, `ClientMessageId`, `StorageKey`, `PepperKeyId`) use a binary collation on MySQL and SQL Server, without which `Acme` and `acme` would compare equal and the keys above would not isolate anything there)
 
 - **Conversation:** `Id`, `SubjectType`, `SubjectId`, `State` (`Open | Closed`), `RetentionState` (`Active | LegalHold | Expired`), `LastSeq` (the counter of the `Seq` rule below),
   `CreatedAt`, `ClosedAt`, `RetentionUntil`. Unique on `(TenantId, SubjectType, SubjectId)`.
 - **Participant:** `Id`, `ConversationId`, `Kind` (`Member | Guest | System`), `UserRef` (opaque id, members only; an agent of another app joining through the partner API is a `Member` whose `UserRef` is an opaque id from that app's namespace), `DisplayName`,
-  `ContactHash` with `PepperKeyId` (guests; HMAC of the normalised contact with a versioned server-side pepper, because phone numbers are enumerable; lookup tries every active key id and a hit re-hashes under the current one, so rotation breaks neither the re-invite limit nor DSR lookup), `RoleLabel`, `JoinedAt`, `LeftAt`, `LastReadSeq`. Indexes `(TenantId, ContactHash)` and `(TenantId, UserRef)`: a guest is one participant per conversation, and these find the same person across conversations for a data-subject request.
+  `ContactHash` with `PepperKeyId` (guests; HMAC of the normalised contact with a versioned server-side pepper, because phone numbers are enumerable; lookup tries every active key id and a hit re-hashes under the current one, so rotation breaks neither the re-invite limit nor DSR lookup), `RoleLabel`, `JoinedAt`, `LeftAt`, `LastReadSeq`. A person is one participant per conversation: `UNIQUE (TenantId, ConversationId, UserRef)` and `UNIQUE (TenantId, ConversationId, ContactHash)`, filtered to non-null values on PostgreSQL and SQL Server. The lookup indexes `(TenantId, ContactHash)` and `(TenantId, UserRef)` find the same person across conversations for a data-subject request.
 - **Message:** `Id`, `ConversationId`, `Seq` (dense per conversation, the only ordering), `ParticipantId`, `Kind` (`Text | System`),
   `Body` (plain text, length-capped, never HTML), `ClientMessageId` (idempotency), `CreatedAt`, `RedactedAt`. **v1 has no user edit and no user delete:** a message changes only through the retention component (erasure redacts, purge deletes, §6) or a staff
   redaction, which is audited and leaves the tombstone (`RedactedAt`); an edit history would be a second store of the same personal data (§6). `Seq` is allocated by `UPDATE conversation SET last_seq = last_seq + 1` inside the post
   transaction (a row lock; syntax per engine), and `(TenantId, ConversationId, ParticipantId, ClientMessageId)` is unique.
 - **GuestSession:** `Id`, `ParticipantId`, `KeyHash` (the cookie key, hashed at rest), `CreatedAt`, `ExpiresAt`, `RevokedAt` (§3).
-- **ConversationEvent:** `Id`, `Kind`, `Payload`, `CreatedAt`, `DeliveredAt` (§5; the event id is what a subscriber dedupes on).
+- **ConversationEvent:** `Id`, `ConversationId` (not null, no foreign key; indexed with the tenant, so the debounce of §5 and the purge of §6 find a conversation's events without parsing the payload), `Kind`, `Payload`, `CreatedAt`, `DeliveredAt` (§5; the event id is what a subscriber dedupes on).
 - **Tombstone:** `ConversationId`, `SubjectType`, `SubjectId`, `MessageCount`, `AttachmentCount`, `PurgedAt` (§6), kept after the conversation is gone.
-- **Attachment:** `MessageId`, `OwnerParticipantId`, `StorageKey` (the bytes live in `Themia.Storage` through `IStorageProvider`, the package's one attachment dependency; `Themia.Imaging` re-encodes images), `ContentType`, `Size`, `Sha256`. The key is scoped
+- **Attachment:** `ConversationId`, `MessageId`, `OwnerParticipantId`, `StorageKey` (the bytes live in `Themia.Storage` through `IStorageProvider`, the package's one attachment dependency; `Themia.Imaging` re-encodes images), `ContentType`, `Size`, `Sha256`. The key is scoped
   `{tenant}/{conversation}/{attachmentId}`; the hash is a column for integrity, not the key, so there is no cross-message or
   cross-tenant sharing and a purge or erasure never deletes bytes another row uses. Only images are re-encoded (through
   `IImageProcessor`, dropping EXIF and GPS), and their `ContentType` and `Size` come from the processor output, never from the client.
@@ -70,7 +70,7 @@ that transaction (a rolled-back post leaves none), and a drain job hands rows to
 `RetentionUntil` is set when a conversation closes: default **180 days** after the subject closes, a setting per `SubjectType`
 (**pending counsel review** of the PDPA basis; do not treat the number as decided). A purge job deletes expired
 messages and attachments (storage objects first) and leaves a tombstone (id, counts, purge time) for the audit trail;
-`LegalHold` blocks it. **Purge deletes the conversation row too** (after writing the `Tombstone`), so the unique
+`LegalHold` blocks it. The purge locks (or flips) the conversation row first and only then deletes the children, so it cannot deadlock with a concurrent post. **Purge deletes the conversation row too** (after writing the `Tombstone`), so the unique
 subject key of §2 is free again and `OpenAsync` on that subject starts a new conversation with a new id. Purge and erasure also delete the person's or conversation's `GuestSession` and `ConversationEvent` rows (the event payloads hold participant ids and counts), so neither outlives retention. `RetentionState.Expired` is only the
 marker between the retention date and the purge run: `OpenAsync` on an `Expired` conversation refuses with `PendingPurge`, and on a
 `Closed` one reopens it (clearing `RetentionUntil`). **Export for a data subject:** everything they authored or appear in, as JSON plus an attachment
@@ -96,12 +96,12 @@ presigned URL, with `Content-Disposition: attachment`, `X-Content-Type-Options: 
 ```csharp
 public interface IConversationService
 {
-    Task<OpenResult> OpenAsync(ConversationSubject subject, CancellationToken ct = default);   // Opened | Reopened | PendingPurge
-    Task<PostResult> PostAsync(PostMessage message, CancellationToken ct = default);   // Posted | Duplicate | Closed | Refused
+    Task<OpenResult> OpenAsync(Actor actor, ConversationSubject subject, CancellationToken ct = default);   // Opened | Reopened | PendingPurge
+    Task<PostResult> PostAsync(Actor actor, PostMessage message, CancellationToken ct = default);   // Posted | Duplicate | Closed | Refused
     Task<MessagePage> ListAsync(ConversationId id, Actor viewer, long afterSeq, int limit, CancellationToken ct = default);
-    Task MarkReadAsync(ConversationId id, ParticipantId who, long seq, CancellationToken ct = default);
-    Task<GuestInvite> InviteGuestAsync(ConversationId id, GuestContact contact, CancellationToken ct = default);
-    Task CloseAsync(ConversationId id, CancellationToken ct = default);
+    Task MarkReadAsync(Actor actor, ConversationId id, long seq, CancellationToken ct = default);
+    Task<GuestInvite> InviteGuestAsync(Actor actor, ConversationId id, GuestContact contact, CancellationToken ct = default);
+    Task CloseAsync(Actor actor, ConversationId id, CancellationToken ct = default);
 }
 public interface IGuestAccess { Task<GuestSessionResult> ExchangeAsync(string token, CancellationToken ct = default); }
 public interface IConversationRetention { Task<DataSubjectExport> ExportAsync(ParticipantRef who, ...); Task<EraseOutcome> EraseAsync(ParticipantRef who, ...); }   // Erased | DeferredByHold
@@ -109,7 +109,7 @@ public interface IConversationExporter { Task<ExportedDocument> ExportAsync(Conv
 ```
 
 Outcomes are enums with computed booleans, not bool flags. `CloseAsync` is idempotent; reopening is allowed until purge and clears `RetentionUntil`;
-`MarkReadAsync` is monotonic. The ids, `Actor`, `PostMessage` and the other placeholders get concrete types in the implementation plan, with the
+`MarkReadAsync` is monotonic and clamped to the conversation's `LastSeq`. Every method takes the `Actor`; the participant is **resolved from the actor inside the transaction** (same tenant and conversation, `LeftAt` null, kind matching) and is never passed in, and the order is access policy, then participant, then the idempotency read, then the `Seq` counter, then the inserts. The ids, `Actor`, `PostMessage` and the other placeholders get concrete types in the implementation plan, with the
 `PublicAPI` files and the three engine projects.
 
 ## 10. Decisions, deviations and what is still open
