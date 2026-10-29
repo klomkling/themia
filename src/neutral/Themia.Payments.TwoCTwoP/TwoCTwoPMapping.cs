@@ -258,6 +258,45 @@ internal static class TwoCTwoPMapping
             completedAt = parsedTransactionTime;
         }
 
-        return new Charge(invoiceNo, invoiceNo, amount, status, failure, completedAt);
+        TryGetNonEmptyString(verified, "channelCode", out var channelCode);
+        TryGetNonEmptyString(verified, "agentCode", out var agentCode);
+        return new Charge(invoiceNo, invoiceNo, amount, status, failure, completedAt)
+        {
+            PaidMethod = ToPaidMethod(channelCode, agentCode),
+        };
+    }
+
+    /// <summary>
+    /// The method behind a <c>channelCode</c> / <c>agentCode</c> pair of the payment inquiry, from the codes 2C2P names in its payment-channel
+    /// reference and its inquiry sample: card (<c>CC</c>, <c>CSTOKEN</c> and the sample's scheme code <c>VI</c>), Thai QR PromptPay
+    /// (<c>THQR</c> + <c>PPQR</c>) and the Thai wallet QRs (<c>THQR</c> + <c>TRUEMONEYQR</c> / <c>SHPQR</c> / <c>GPTHQR</c>). Anything else is
+    /// <see langword="null"/>: a receipt that says nothing beats one that says the wrong thing. Internet banking is not mapped, as the reference
+    /// gives it no code the inquiry is known to return.
+    /// </summary>
+    internal static PaymentMethod? ToPaidMethod(string? channelCode, string? agentCode)
+    {
+        if (channelCode is null)
+        {
+            return null;
+        }
+
+        if (channelCode.Equals("CC", StringComparison.OrdinalIgnoreCase) ||
+            channelCode.Equals("CSTOKEN", StringComparison.OrdinalIgnoreCase) ||
+            channelCode.Equals("VI", StringComparison.OrdinalIgnoreCase))
+        {
+            return PaymentMethod.Card;
+        }
+
+        if (!channelCode.Equals("THQR", StringComparison.OrdinalIgnoreCase) || agentCode is null)
+        {
+            return null;
+        }
+
+        return agentCode.ToUpperInvariant() switch
+        {
+            "PPQR" => PaymentMethod.QrPromptPay,
+            "TRUEMONEYQR" or "SHPQR" or "GPTHQR" => PaymentMethod.Wallet,
+            _ => null,
+        };
     }
 }

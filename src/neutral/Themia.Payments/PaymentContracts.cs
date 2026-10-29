@@ -30,7 +30,14 @@ public sealed record Charge(
     Money Amount,
     PaymentStatus Status,
     PaymentFailure? Failure,
-    DateTimeOffset? CompletedAt);
+    DateTimeOffset? CompletedAt)
+{
+    /// <summary>
+    /// The method the shopper actually paid with, when the provider says and the adapter can name it; <see langword="null"/> otherwise
+    /// (not paid yet, or a channel this adapter does not map). Use it to label a receipt; never to decide whether the charge succeeded.
+    /// </summary>
+    public PaymentMethod? PaidMethod { get; init; }
+}
 
 /// <summary>What the shopper must do next, if anything.</summary>
 public abstract record NextAction

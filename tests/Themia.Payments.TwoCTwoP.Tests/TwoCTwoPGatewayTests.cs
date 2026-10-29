@@ -154,6 +154,38 @@ public class TwoCTwoPGatewayTests
         Assert.Equal(new DateTimeOffset(2026, 9, 22, 10, 0, 0, TimeSpan.Zero), charge.CompletedAt);
     }
 
+    // The channel codes are the ones 2C2P names in its payment-channel reference and its inquiry sample (channelCode VI, agentCode OCBC);
+    // none of it is verified against the sandbox. Anything not named there stays null rather than guessed.
+    [Theory]
+    [InlineData("VI", "OCBC", PaymentMethod.Card)]
+    [InlineData("CC", "KBANK", PaymentMethod.Card)]
+    [InlineData("cstoken", null, PaymentMethod.Card)]
+    [InlineData("THQR", "PPQR", PaymentMethod.QrPromptPay)]
+    [InlineData("thqr", "ppqr", PaymentMethod.QrPromptPay)]
+    [InlineData("THQR", "TRUEMONEYQR", PaymentMethod.Wallet)]
+    [InlineData("THQR", "SHPQR", PaymentMethod.Wallet)]
+    [InlineData("THQR", "GPTHQR", PaymentMethod.Wallet)]
+    [InlineData("THQR", null, null)]
+    [InlineData("THQR", "SOMETHINGNEW", null)]
+    [InlineData("123", "THBBL", null)]
+    [InlineData("ZZ", "THBBL", null)]
+    [InlineData(null, null, null)]
+    public async Task Reading_a_charge_reports_the_method_the_shopper_paid_with(string? channelCode, string? agentCode, PaymentMethod? expected)
+    {
+        var claims = new Dictionary<string, object?>
+        {
+            ["invoiceNo"] = "order-1", ["amount"] = 1000.00m, ["currencyCode"] = "THB",
+            ["respCode"] = "0000", ["respDesc"] = "Success", ["transactionDateTime"] = "20260922100000",
+        };
+        if (channelCode is not null) claims["channelCode"] = channelCode;
+        if (agentCode is not null) claims["agentCode"] = agentCode;
+        var gateway = BuildGateway(new StubHandler().Enqueue(HttpStatusCode.OK, ResponseEnvelope(claims)));
+
+        var charge = await gateway.GetChargeAsync(new ChargeRef(ProviderChargeId: null, ReferenceId: "order-1"));
+
+        Assert.Equal(expected, charge.PaidMethod);
+    }
+
     [Fact]
     public async Task An_absent_transactionDateTime_leaves_completedAt_null()
     {
