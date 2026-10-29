@@ -69,7 +69,7 @@ permission from the app's policy and always writes an audit record, as does ever
 
 Authorization is the app's, through `IConversationAccessPolicy.Can(actor, conversation, action)`, **default deny**. Posts are
 rate-limited per participant and idempotent on `ClientMessageId`; guest invites are rate-limited per tenant and per contact (SMS
-pumping). Bodies are escaped on output. Named caps (all options): body 4,000 characters, 10 attachments and 10 MiB per message,
+pumping). Bodies are escaped on output. Named caps (all options): body 4,000 characters, guest `DisplayName` 80 characters without control or markup characters, 10 attachments and 10 MiB per message,
 200 MiB per conversation. Attachments are never public: each download goes through the access policy and a short-lived
 presigned URL, with `Content-Disposition: attachment`, `X-Content-Type-Options: nosniff` and a sandboxing CSP.
 
