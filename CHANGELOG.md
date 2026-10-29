@@ -27,6 +27,8 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.45.1] - 2026-10-30
+
 ### Fixed
 
 - **`Themia.Payments.TwoCTwoP`:** `Charge.PaidMethod` (0.45.0) read the wrong code list. The payment inquiry documents `paymentScheme` and `channelCode` as values of 2C2P's "Payment Scheme / Process by" list, not of the payment-channel group codes, so a MasterCard (`MA`), JCB, UnionPay, TrueMoney or LINE Pay payment came back `null` and only `VI` worked. The mapping now follows that list's own `Type` column (every Card code is `Card`, every Wallet code `Wallet`), reading `paymentScheme` first, and keeps the group codes as a fallback; mobile banking stays `null` because the documentation does not say what the inquiry returns for it. Not verified against the 2C2P sandbox (coord audit of the adapter against developer.2c2p.com, 2026-10-30).
