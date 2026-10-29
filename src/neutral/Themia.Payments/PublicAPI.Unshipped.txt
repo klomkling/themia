@@ -213,3 +213,5 @@ Themia.Payments.RefundRequestValidator
 static Themia.Payments.RefundRequestValidator.Validate(Themia.Payments.RefundRequest! request) -> void
 Themia.Payments.Charge.PaidMethod.get -> Themia.Payments.PaymentMethod?
 Themia.Payments.Charge.PaidMethod.init -> void
+Themia.Payments.Charge.PaidChannel.get -> string?
+Themia.Payments.Charge.PaidChannel.init -> void

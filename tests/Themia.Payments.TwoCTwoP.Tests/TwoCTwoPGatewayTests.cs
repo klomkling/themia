@@ -223,6 +223,35 @@ public class TwoCTwoPGatewayTests
         Assert.Equal(expected, charge.PaidMethod);
     }
 
+    // PaidChannel is the provider's own codes for logging and reconciliation. 2C2P's values are AN 30 codes; anything else (spaces, line breaks, markup,
+    // too long) is dropped so a provider-controlled string cannot forge a log line.
+    [Theory]
+    [InlineData("MA", "BBL", "MA", "paymentScheme=MA channelCode=MA agentCode=BBL")]
+    [InlineData("VI", "OCBC", null, "channelCode=VI agentCode=OCBC")]
+    [InlineData(null, null, "TM", "paymentScheme=TM")]
+    [InlineData("ZZ", null, null, "channelCode=ZZ")]
+    [InlineData(null, null, null, null)]
+    [InlineData("VI\nrespCode=0000", "OCBC", null, "agentCode=OCBC")]
+    [InlineData("VI ", "a b", null, null)]
+    [InlineData("<b>", "OCBC", "MA", "paymentScheme=MA agentCode=OCBC")]
+    [InlineData("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456", null, null, null)]
+    public async Task Reading_a_charge_exposes_the_provider_codes_as_paid_channel(string? channelCode, string? agentCode, string? paymentScheme, string? expected)
+    {
+        var claims = new Dictionary<string, object?>
+        {
+            ["invoiceNo"] = "order-1", ["amount"] = 1000.00m, ["currencyCode"] = "THB",
+            ["respCode"] = "0000", ["respDesc"] = "Success", ["transactionDateTime"] = "20260922100000",
+        };
+        if (channelCode is not null) claims["channelCode"] = channelCode;
+        if (agentCode is not null) claims["agentCode"] = agentCode;
+        if (paymentScheme is not null) claims["paymentScheme"] = paymentScheme;
+        var gateway = BuildGateway(new StubHandler().Enqueue(HttpStatusCode.OK, ResponseEnvelope(claims)));
+
+        var charge = await gateway.GetChargeAsync(new ChargeRef(ProviderChargeId: null, ReferenceId: "order-1"));
+
+        Assert.Equal(expected, charge.PaidChannel);
+    }
+
     [Fact]
     public async Task An_absent_transactionDateTime_leaves_completedAt_null()
     {

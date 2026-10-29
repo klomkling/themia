@@ -264,7 +264,30 @@ internal static class TwoCTwoPMapping
         return new Charge(invoiceNo, invoiceNo, amount, status, failure, completedAt)
         {
             PaidMethod = ToPaidMethod(channelCode, agentCode, paymentScheme),
+            PaidChannel = ToPaidChannel(channelCode, agentCode, paymentScheme),
         };
+    }
+
+    /// <summary>
+    /// The inquiry's codes as <c>paymentScheme=MA channelCode=VI agentCode=OCBC</c> (absent parts left out) for logging and reconciliation. 2C2P types all three as
+    /// short alphanumeric codes (AN 30), so a value with any other character or over 30 characters is dropped: a provider-controlled string must not be able to
+    /// add a line or a field to an app's log.
+    /// </summary>
+    internal static string? ToPaidChannel(string? channelCode, string? agentCode, string? paymentScheme)
+    {
+        var parts = new List<string>(3);
+        AddCode(parts, "paymentScheme", paymentScheme);
+        AddCode(parts, "channelCode", channelCode);
+        AddCode(parts, "agentCode", agentCode);
+        return parts.Count == 0 ? null : string.Join(' ', parts);
+    }
+
+    private static void AddCode(List<string> parts, string name, string? value)
+    {
+        if (value is { Length: > 0 and <= 30 } && value.All(char.IsAsciiLetterOrDigit))
+        {
+            parts.Add(name + "=" + value);
+        }
     }
 
     /// <summary>

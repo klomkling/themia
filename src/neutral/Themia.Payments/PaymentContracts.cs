@@ -37,6 +37,14 @@ public sealed record Charge(
     /// (not paid yet, or a channel this adapter does not map). Use it to label a receipt; never to decide whether the charge succeeded.
     /// </summary>
     public PaymentMethod? PaidMethod { get; init; }
+
+    /// <summary>
+    /// The provider's own codes for how this charge was paid, as short <c>name=value</c> pairs separated by spaces (for 2C2P:
+    /// <c>paymentScheme=MA channelCode=VI agentCode=OCBC</c>, absent parts left out), or <see langword="null"/> when the provider gave none.
+    /// For logging and reconciliation, for example to learn which codes left <see cref="PaidMethod"/> null: never branch on it, its parts and
+    /// spelling are the provider's. Codes only, no personal data; a value that is not a short code is dropped.
+    /// </summary>
+    public string? PaidChannel { get; init; }
 }
 
 /// <summary>What the shopper must do next, if anything.</summary>
