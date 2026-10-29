@@ -13,14 +13,17 @@ opaque `(SubjectType, SubjectId)` pair, so no app domain enters Themia.
 
 ## 2. Entities (all rows carry `TenantId`; every call takes the tenant explicitly, as `Themia.Audit` does (the `.AspNetCore` adapter supplies it from the request), and every query carries the predicate; child tables reference their parent with composite `(Id, TenantId)` foreign keys from the first migration, so a row cannot point across tenants)
 
-- **Conversation:** `Id`, `SubjectType`, `SubjectId`, `State` (`Open | Closed`), `RetentionState` (`Active | LegalHold | Expired`),
+- **Conversation:** `Id`, `SubjectType`, `SubjectId`, `State` (`Open | Closed`), `RetentionState` (`Active | LegalHold | Expired`), `LastSeq` (the counter of the `Seq` rule below),
   `CreatedAt`, `ClosedAt`, `RetentionUntil`. Unique on `(TenantId, SubjectType, SubjectId)`.
 - **Participant:** `Id`, `ConversationId`, `Kind` (`Member | Guest | System`), `UserRef` (opaque id, members only; an agent of another app joining through the partner API is a `Member` whose `UserRef` is an opaque id from that app's namespace), `DisplayName`,
-  `ContactHash` (guests; HMAC with a server-side pepper, because phone numbers are enumerable), `RoleLabel`, `JoinedAt`, `LeftAt`, `LastReadSeq`.
+  `ContactHash` with `PepperKeyId` (guests; HMAC of the normalised contact with a versioned server-side pepper, because phone numbers are enumerable; lookup tries every active key id and a hit re-hashes under the current one, so rotation breaks neither the re-invite limit nor DSR lookup), `RoleLabel`, `JoinedAt`, `LeftAt`, `LastReadSeq`. Indexes `(TenantId, ContactHash)` and `(TenantId, UserRef)`: a guest is one participant per conversation, and these find the same person across conversations for a data-subject request.
 - **Message:** `Id`, `ConversationId`, `Seq` (dense per conversation, the only ordering), `ParticipantId`, `Kind` (`Text | System`),
   `Body` (plain text, length-capped, never HTML), `ClientMessageId` (idempotency), `CreatedAt`, `RedactedAt`. **v1 has no user edit and no user delete:** a message changes only through the retention component (erasure redacts, purge deletes, §6) or a staff
   redaction, which is audited and leaves the tombstone (`RedactedAt`); an edit history would be a second store of the same personal data (§6). `Seq` is allocated by `UPDATE conversation SET last_seq = last_seq + 1` inside the post
   transaction (a row lock; syntax per engine), and `(TenantId, ConversationId, ParticipantId, ClientMessageId)` is unique.
+- **GuestSession:** `Id`, `ParticipantId`, `KeyHash` (the cookie key, hashed at rest), `CreatedAt`, `ExpiresAt`, `RevokedAt` (§3).
+- **ConversationEvent:** `Id`, `Kind`, `Payload`, `CreatedAt`, `DeliveredAt` (§5; the event id is what a subscriber dedupes on).
+- **Tombstone:** `ConversationId`, `SubjectType`, `SubjectId`, `MessageCount`, `AttachmentCount`, `PurgedAt` (§6), kept after the conversation is gone.
 - **Attachment:** `MessageId`, `OwnerParticipantId`, `StorageKey` (the bytes live in `Themia.Storage` through `IStorageProvider`, the package's one attachment dependency; `Themia.Imaging` re-encodes images), `ContentType`, `Size`, `Sha256`. The key is scoped
   `{tenant}/{conversation}/{attachmentId}`; the hash is a column for integrity, not the key, so there is no cross-message or
   cross-tenant sharing and a purge or erasure never deletes bytes another row uses. Only images are re-encoded (through
@@ -37,9 +40,13 @@ posts it to the exchange endpoint, the token is moved out of the URL (fragment, 
 `Cache-Control: no-store` with `Referrer-Policy: no-referrer`. The exchange yields a **guest session**: an opaque lookup key
 (default 12 h) bound to one `(ConversationId, ParticipantId)`, carried in an `HttpOnly`, `Secure`, `SameSite` cookie scoped to the
 conversation path. It can read and post in that conversation and nothing else. It is **not self-contained**: every request
-re-reads the participant's `LeftAt` and the conversation state, so setting `LeftAt` or closing revokes at once. Redeeming consumes the token, so a guest returning after the 12 h session has no
-way back except a **re-invite**: a member, or the guest asking from the expired page, triggers it (limited to 3 per hour per contact and
-conversation); a fresh invite revokes the participant's earlier sessions. Tokens and sessions are never logged; an unknown, expired or revoked token gives one
+re-reads the participant's `LeftAt` and the conversation state, so setting `LeftAt` or closing revokes at once. Redeeming consumes the token, so a guest returning after the 12 h session has no way back except a **re-invite**. The expired page
+asks the guest to type their contact; the server matches its keyed hash against the tenant's participants and answers **identically
+whether or not it matched** (same text, same timing, "if this contact is in the conversation a new link was sent"), so the page is no
+oracle for who is in a conversation. On a match it issues a new token and has the app's sender deliver it to the contact just typed,
+which the hash proved equal to the stored one; limited to 3 per hour per contact and conversation, and per address and tenant. The
+earlier sessions are revoked **only when the new token is redeemed**, not when it is issued, so a stranger who knows a contact and a
+conversation URL cannot log the real guest out. A member can also re-invite. Tokens and sessions are never logged; an unknown, expired or revoked token gives one
 indistinguishable refusal. Guests never become identity users.
 
 ## 4. Masking
@@ -54,7 +61,7 @@ Notifications and the masked export use the same projection, and guests see the 
 The core sends nothing itself and cannot enlist in the `Themia.Messaging` outbox, whose only store is the net10 framework module. It owns a
 transaction-aware port instead: `IConversationEventSink.RaiseAsync(DbConnection, DbTransaction, ConversationEvent, ct)`, called inside the
 post transaction with `MessagePosted(ConversationId, MessageId, Seq, RecipientParticipantIds)`. The default sink writes an event row in
-that transaction (a rolled-back post leaves none), and a drain job hands rows to app subscribers at least once. A later
+that transaction (a rolled-back post leaves none), and a drain job hands rows to app subscribers at least once, **debounced**: within `NotifyDebounce` (default 2 minutes) the posts a recipient has not read in one conversation become one batched event (count and last `Seq`), so a busy thread sends one notification, not twenty. A later
 `Themia.Modules.Conversations` (net10) may bridge the port to the Messaging outbox. The app subscribes and sends through
 `Themia.Notifications`; unread digests are its job on `Themia.Scheduling`, driven by `LastReadSeq` (`UnreadSince(participant)`).
 
@@ -63,9 +70,12 @@ that transaction (a rolled-back post leaves none), and a drain job hands rows to
 `RetentionUntil` is set when a conversation closes: default **180 days** after the subject closes, a setting per `SubjectType`
 (**pending counsel review** of the PDPA basis; do not treat the number as decided). A purge job deletes expired
 messages and attachments (storage objects first) and leaves a tombstone (id, counts, purge time) for the audit trail;
-`LegalHold` blocks it. **Export for a data subject:** everything they authored or appear in, as JSON plus an attachment
+`LegalHold` blocks it. **Purge deletes the conversation row too** (after writing the `Tombstone`), so the unique
+subject key of §2 is free again and `OpenAsync` on that subject starts a new conversation with a new id. `RetentionState.Expired` is only the
+marker between the retention date and the purge run: `OpenAsync` on an `Expired` conversation refuses with `PendingPurge`, and on a
+`Closed` one reopens it (clearing `RetentionUntil`). **Export for a data subject:** everything they authored or appear in, as JSON plus an attachment
 manifest. **Erasure:** their message bodies are redacted (`Body` null, `RedactedAt` set), the participant is anonymised
-(contact hash cleared, name replaced), and the thread keeps its shape. Erasure also deletes the person's attachments (storage objects and rows). An export holds the subject's own messages in full and other people's messages masked or omitted (counsel decides which). Both write an `Themia.Audit` record.
+(contact hash cleared, name replaced), and the thread keeps its shape. An erasure request against a conversation under `LegalHold` returns `DeferredByHold` and is queued until the hold is lifted; otherwise it returns `Erased`. Which should win is a legal question (§10). Erasure also deletes the person's attachments (storage objects and rows). An export holds the subject's own messages in full and other people's messages masked or omitted (counsel decides which). Both write an `Themia.Audit` record.
 
 ## 7. Dossier export
 
@@ -86,7 +96,7 @@ presigned URL, with `Content-Disposition: attachment`, `X-Content-Type-Options: 
 ```csharp
 public interface IConversationService
 {
-    Task<Conversation> OpenAsync(ConversationSubject subject, CancellationToken ct = default);
+    Task<OpenResult> OpenAsync(ConversationSubject subject, CancellationToken ct = default);   // Opened | Reopened | PendingPurge
     Task<PostResult> PostAsync(PostMessage message, CancellationToken ct = default);   // Posted | Duplicate | Closed | Refused
     Task<MessagePage> ListAsync(ConversationId id, Actor viewer, long afterSeq, int limit, CancellationToken ct = default);
     Task MarkReadAsync(ConversationId id, ParticipantId who, long seq, CancellationToken ct = default);
@@ -94,7 +104,7 @@ public interface IConversationService
     Task CloseAsync(ConversationId id, CancellationToken ct = default);
 }
 public interface IGuestAccess { Task<GuestSessionResult> ExchangeAsync(string token, CancellationToken ct = default); }
-public interface IConversationRetention { Task<DataSubjectExport> ExportAsync(ParticipantRef who, ...); Task EraseAsync(ParticipantRef who, ...); }
+public interface IConversationRetention { Task<DataSubjectExport> ExportAsync(ParticipantRef who, ...); Task<EraseOutcome> EraseAsync(ParticipantRef who, ...); }   // Erased | DeferredByHold
 public interface IConversationExporter { Task<ExportedDocument> ExportAsync(ConversationSubject s, ExportMode mode, ...); }
 ```
 
@@ -114,5 +124,5 @@ of §7, and a masked-at-write copy can be added later without a migration of mea
 Decided: no realtime in v1 (polling plus batched notify, SignalR later); attachments are allow-listed, images re-encoded, stored under a tenant- and conversation-scoped key with the hash kept as a
 column, with the virus scan a later row; the event port of §5 is the transaction-aware design, not the outbox; default retention 180 days after the subject closes, marked pending counsel
 review; one conversation per subject in v1 (the unique key of §2 stands); guest links go over the guest's own signup channel,
-sent by an app-supplied sender. **Still open:** the legal basis for each retention period (counsel, not engineering), and whether
+sent by an app-supplied sender. **Still open for counsel:** the legal basis for each retention period, whether erasure or a legal hold wins when both apply, what a data-subject export may contain of other people's messages, and whether
 a later "several conversations per subject" needs a `Kind` column in the unique key (a migration, not a redesign).
