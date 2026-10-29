@@ -15,13 +15,13 @@ opaque `(SubjectType, SubjectId)` pair, so no app domain enters Themia.
 
 - **Conversation:** `Id`, `SubjectType`, `SubjectId`, `State` (`Open | Closed`), `RetentionState` (`Active | LegalHold | Expired`),
   `CreatedAt`, `ClosedAt`, `RetentionUntil`. Unique on `(TenantId, SubjectType, SubjectId)`.
-- **Participant:** `Id`, `ConversationId`, `Kind` (`Member | Guest | System`), `UserRef` (opaque id, members only), `DisplayName`,
+- **Participant:** `Id`, `ConversationId`, `Kind` (`Member | Guest | System`), `UserRef` (opaque id, members only; an agent of another app joining through the partner API is a `Member` whose `UserRef` is an opaque id from that app's namespace), `DisplayName`,
   `ContactHash` (guests; HMAC with a server-side pepper, because phone numbers are enumerable), `RoleLabel`, `JoinedAt`, `LeftAt`, `LastReadSeq`.
 - **Message:** `Id`, `ConversationId`, `Seq` (dense per conversation, the only ordering), `ParticipantId`, `Kind` (`Text | System`),
-  `Body` (plain text, length-capped, never HTML), `ClientMessageId` (idempotency), `CreatedAt`, `RedactedAt`. Messages change only through
-  the retention component: erasure redacts, purge deletes (§6). `Seq` is allocated by `UPDATE conversation SET last_seq = last_seq + 1` inside the post
+  `Body` (plain text, length-capped, never HTML), `ClientMessageId` (idempotency), `CreatedAt`, `RedactedAt`. **v1 has no user edit and no user delete:** a message changes only through the retention component (erasure redacts, purge deletes, §6) or a staff
+  redaction, which is audited and leaves the tombstone (`RedactedAt`); an edit history would be a second store of the same personal data (§6). `Seq` is allocated by `UPDATE conversation SET last_seq = last_seq + 1` inside the post
   transaction (a row lock; syntax per engine), and `(TenantId, ConversationId, ParticipantId, ClientMessageId)` is unique.
-- **Attachment:** `MessageId`, `OwnerParticipantId`, `StorageKey`, `ContentType`, `Size`, `Sha256`. The key is scoped
+- **Attachment:** `MessageId`, `OwnerParticipantId`, `StorageKey` (the bytes live in `Themia.Storage` through `IStorageProvider`, the package's one attachment dependency; `Themia.Imaging` re-encodes images), `ContentType`, `Size`, `Sha256`. The key is scoped
   `{tenant}/{conversation}/{attachmentId}`; the hash is a column for integrity, not the key, so there is no cross-message or
   cross-tenant sharing and a purge or erasure never deletes bytes another row uses. Only images are re-encoded (through
   `IImageProcessor`, dropping EXIF and GPS), and their `ContentType` and `Size` come from the processor output, never from the client.
@@ -47,7 +47,7 @@ indistinguishable refusal. Guests never become identity users.
 A read-time projection, never a write-time edit, and best effort rather than a control (regexes miss things), so the stored text stays whole for export and DSR. `IConversationMasker`
 receives the viewer (`Member | Guest`) and the message and returns what that viewer may see: guests see role labels instead of
 member names, and phone numbers, e-mail addresses and chat handles in text are replaced (a default regex masker, replaceable).
-Notifications and the masked export use the same projection, and notifications carry **no message body by default** ("new message" and a link); an app opts in.
+Notifications and the masked export use the same projection, and guests see the other participants' **display names** (names only; contact details are masked, and role labels replace names for members who are staff-only) and notifications carry **no message body by default** ("new message" and a link); an app opts in.
 
 ## 5. Notification hook
 
@@ -71,11 +71,11 @@ manifest. **Erasure:** their message bodies are redacted (`Body` null, `Redacted
 
 `IConversationExporter` renders the whole transcript of a subject, ordered by `Seq`, through `Themia.Pdf` or `Themia.Export`,
 with an attachment list and each file's SHA-256, capped (500 messages and 50 listed attachments per part; a larger transcript is split into parts). `ExportMode` is `Masked` (default) or `Full`; `Full` needs an explicit
-permission from the app's policy and always writes an audit record, as does every read by staff.
+permission from the app's policy and always writes an audit record, as does a staff read of a conversation they are not a participant in. That read is audited **once on open and on each export**, never per poll (one row per actor, conversation and session window of 15 minutes), so the audit table is not a poll log.
 
 ## 8. Security defaults
 
-Authorization is the app's, through `IConversationAccessPolicy.Can(actor, conversation, action)`, **default deny**. Posts are
+Authorization is the app's, through `IConversationAccessPolicy.Can(actor, conversation, action)`, **default deny**. `Actor` carries its scope, so the policy accepts partner-scoped actors (an agent of one app in a conversation of another, arriving through the partner API) as well as members and guests; the scope is part of every `Can` decision and of the audit row. Posts are
 rate-limited per participant and idempotent on `ClientMessageId`; guest invites are rate-limited per tenant and per contact (SMS
 pumping). Bodies are escaped on output. Named caps (all options): body 4,000 characters, guest `DisplayName` 80 characters without control or markup characters, 10 attachments and 10 MiB per message,
 200 MiB per conversation. Attachments are never public: each download goes through the access policy and a short-lived
@@ -102,7 +102,14 @@ Outcomes are enums with computed booleans, not bool flags. `CloseAsync` is idemp
 `MarkReadAsync` is monotonic. The ids, `Actor`, `PostMessage` and the other placeholders get concrete types in the implementation plan, with the
 `PublicAPI` files and the three engine projects.
 
-## 10. Decisions and what is still open
+## 10. Decisions, deviations and what is still open
+
+**Deviation from the request: masking is applied when a message is read, not when it is written.** The request asked for masked
+storage. Read-time masking keeps the original text for the data-subject export, the `Full` dossier and an erasure that must find
+what a person wrote, lets a policy change apply to old messages, and lets each viewer type get its own projection from one stored
+copy. The cost is that the unmasked text exists at rest; it is protected by the tenant predicate, the access policy and the audit
+of §7, and a masked-at-write copy can be added later without a migration of meaning.
+
 
 Decided: no realtime in v1 (polling plus batched notify, SignalR later); attachments are allow-listed, images re-encoded, stored under a tenant- and conversation-scoped key with the hash kept as a
 column, with the virus scan a later row; the event port of §5 is the transaction-aware design, not the outbox; default retention 180 days after the subject closes, marked pending counsel
