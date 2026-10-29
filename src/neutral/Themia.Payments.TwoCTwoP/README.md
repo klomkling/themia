@@ -123,6 +123,10 @@ sends nothing, as in earlier versions.
 - Needs the same keys as `RefundAsync` (`refund_not_supported` without them). It changes nothing and is safe to repeat: a failure to reach 2C2P is `FailureKind.Transient` (`refund_status_unavailable`), not `refund_outcome_unknown`. An unverifiable response, another invoice's, or a refund row with an unreadable amount is `malformed_response`; any other `respCode` is thrown as that code.
 - Not verified against the 2C2P sandbox: the request omits `actionAmount` (the sample in the docs includes one for `RS`; the older documentation does not), and the `userDefined1` echo is as documented.
 
+## What the shopper paid with: `Charge.PaidMethod`
+
+`GetChargeAsync` fills `Charge.PaidMethod` from the inquiry's `channelCode` / `agentCode`, so a receipt can say Card rather than Transfer: `CC`, `CSTOKEN` and `VI` are `Card`; `THQR` with `PPQR` is `QrPromptPay`; `THQR` with `TRUEMONEYQR`, `SHPQR` or `GPTHQR` is `Wallet`. Anything else, including internet banking, is `null` (not paid yet, or a channel this adapter does not map), so keep a fallback. It labels a receipt; it never decides success. The codes come from 2C2P's payment-channel reference and inquiry sample and are **not verified against the sandbox** (the reference lists card as `CC` while the sample shows the scheme code `VI`; both are mapped).
+
 ## In-page PromptPay QR
 
 A charge whose `AllowedMethods` is exactly `[PaymentMethod.QrPromptPay]` and whose `PresentationMode` is not `HostedPage` returns `NextAction.ShowQr` rather than the hosted-page `Redirect`, so the QR can be drawn inside your own page (for example in LINE LIFF). After the `paymentToken` call the gateway calls **Do Payment** (`POST /payment/4.3/payment`) once with `channelCode: THQR`, `agentCode: PPQR`, and expects flow code `1005` ("Pending for user scan QR") with `type: URL` and `data` = the QR PNG address, plus `expiryTimer` in milliseconds. `ShowQr.ImagePng` is that PNG, `RawPayload` is `null`, and `Expiry` is now + `expiryTimer` (or the request's `ExpiresAt` when 2C2P sends none).

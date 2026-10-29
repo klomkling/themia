@@ -122,6 +122,9 @@ internal static class TaxDocumentPagedModel
         {
             cash = p.Method == TaxPaymentMethod.Cash,
             transfer = p.Method == TaxPaymentMethod.Transfer,
+            card = p.Method == TaxPaymentMethod.Card,
+            mobileBanking = p.Method == TaxPaymentMethod.MobileBanking,
+            wallet = p.Method == TaxPaymentMethod.Wallet,
             date = p.Date is { } d ? TaxDocumentRenderModel.Date(d) : null,
         };
 

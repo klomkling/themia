@@ -99,19 +99,21 @@ public sealed class TemplateVersion2Tests
     }
 
     [Fact]
-    public void Templates_ShouldSupportVersions1To5Only()
+    public void Templates_ShouldSupportVersions1To7Only()
     {
         Assert.True(TaxDocumentTemplates.IsSupported("1"));
         Assert.True(TaxDocumentTemplates.IsSupported("2"));
         Assert.True(TaxDocumentTemplates.IsSupported("3"));
         Assert.True(TaxDocumentTemplates.IsSupported("4"));
         Assert.True(TaxDocumentTemplates.IsSupported("5"));
-        Assert.False(TaxDocumentTemplates.IsSupported("6"));
+        Assert.True(TaxDocumentTemplates.IsSupported("6"));
+        Assert.True(TaxDocumentTemplates.IsSupported("7"));
+        Assert.False(TaxDocumentTemplates.IsSupported("8"));
         Assert.False(TaxDocumentTemplates.IsSupported(null));
         Assert.Equal("1", TaxDocumentTemplates.CurrentVersion);
         Assert.Equal("3", TaxDocumentTemplates.LatestVersion);
         Assert.Equal(TaxDocumentTemplates.Get("2"), TaxDocumentTemplates.Get("3"));
-        Assert.Throws<ArgumentException>(() => TaxDocumentTemplates.Get("6"));
+        Assert.Throws<ArgumentException>(() => TaxDocumentTemplates.Get("8"));
     }
 
     [Fact]

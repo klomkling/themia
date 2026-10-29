@@ -209,6 +209,8 @@ public sealed class TaxDocumentService
         var errors = TaxDocumentSnapshotValidator.Validate(snapshot, _validation).ToList();
         if (snapshot.Kind != key.Kind)
             errors.Add(new TaxDocumentValidationError(TaxDocumentValidationCode.Malformed, "kind"));
+        if (snapshot.Payment is { } payment && Enum.IsDefined(payment.Method) && !TaxDocumentTemplates.PrintsPaymentMethod(_templateVersion, payment.Method))
+            errors.Add(new TaxDocumentValidationError(TaxDocumentValidationCode.NotAllowed, "payment.method"));
         return errors;
     }
 

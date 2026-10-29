@@ -387,6 +387,9 @@ static Microsoft.Extensions.DependencyInjection.ThemiaETaxServiceCollectionExten
 Themia.ETax.TaxPaymentMethod
 Themia.ETax.TaxPaymentMethod.Cash = 1 -> Themia.ETax.TaxPaymentMethod
 Themia.ETax.TaxPaymentMethod.Transfer = 2 -> Themia.ETax.TaxPaymentMethod
+Themia.ETax.TaxPaymentMethod.Card = 3 -> Themia.ETax.TaxPaymentMethod
+Themia.ETax.TaxPaymentMethod.MobileBanking = 4 -> Themia.ETax.TaxPaymentMethod
+Themia.ETax.TaxPaymentMethod.Wallet = 5 -> Themia.ETax.TaxPaymentMethod
 Themia.ETax.TaxPayment
 Themia.ETax.TaxPayment.Method.get -> Themia.ETax.TaxPaymentMethod
 Themia.ETax.TaxPayment.Method.init -> void

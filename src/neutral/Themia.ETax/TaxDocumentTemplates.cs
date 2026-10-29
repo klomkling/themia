@@ -22,14 +22,17 @@ public static class TaxDocumentTemplates
     private static readonly Lazy<string> Version2 = new(() =>
         System.Text.Encoding.UTF8.GetString(TaxDocumentFonts.ReadBytes("Templates.tax-document.v2.hbs")));
 
+    private static readonly Lazy<string> Version6 = new(() =>
+        System.Text.Encoding.UTF8.GetString(TaxDocumentFonts.ReadBytes("Templates.tax-document.v6.hbs")));
+
     private static readonly Lazy<string> Version4 = new(() =>
         System.Text.Encoding.UTF8.GetString(TaxDocumentFonts.ReadBytes("Templates.tax-document.v4.hbs")));
 
     /// <summary>The paper of a paged version ("4" A4 portrait, "5" A5 landscape); <see langword="null"/> for the single-sheet versions "1" to "3".</summary>
     internal static TaxDocumentPageSize? PageSizeOf(string templateVersion) => templateVersion switch
     {
-        "4" => TaxDocumentPageSize.A4Portrait,
-        "5" => TaxDocumentPageSize.A5Landscape,
+        "4" or "6" => TaxDocumentPageSize.A4Portrait,
+        "5" or "7" => TaxDocumentPageSize.A5Landscape,
         _ => null,
     };
 
@@ -40,12 +43,19 @@ public static class TaxDocumentTemplates
     /// Adopters opt into either for new documents; neither is the default.
     /// </summary>
     /// <param name="templateVersion">The version recorded on a document.</param>
-    public static bool IsSupported(string? templateVersion) => templateVersion is "1" or "2" or "3" or "4" or "5";
+    public static bool IsSupported(string? templateVersion) => templateVersion is "1" or "2" or "3" or "4" or "5" or "6" or "7";
+
+    /// <summary>
+    /// Whether the payment line of <paramref name="templateVersion"/> has a box for <paramref name="method"/>. Cash and Transfer are on every version; Card, Mobile banking
+    /// and Wallet only on <c>"6"</c> and <c>"7"</c>, so an older version is refused at issue rather than printed with nothing ticked.
+    /// </summary>
+    internal static bool PrintsPaymentMethod(string templateVersion, TaxPaymentMethod method) =>
+        method is TaxPaymentMethod.Cash or TaxPaymentMethod.Transfer || templateVersion is "6" or "7";
 
     // Versions 2 and 3 share one layout; the version alone fixes how the amount in words reads a units digit of 1.
     internal static ThaiBahtTextEtMode EtModeOf(string templateVersion) => templateVersion switch
     {
-        "3" or "4" or "5" => ThaiBahtTextEtMode.TensOnly,
+        "3" or "4" or "5" or "6" or "7" => ThaiBahtTextEtMode.TensOnly,
         _ => ThaiBahtTextEtMode.Always,
     };
 
@@ -54,6 +64,7 @@ public static class TaxDocumentTemplates
         "1" => Version1.Value,
         "2" or "3" => Version2.Value,
         "4" or "5" => Version4.Value,
+        "6" or "7" => Version6.Value,
         _ => throw new ArgumentException($"Unknown tax document template version '{templateVersion}'.", nameof(templateVersion)),
     };
 }

@@ -108,6 +108,8 @@ documents sent as PDFs: the content flows from the top, with no blank rows, and 
 table keeps its full height. The page size is part of the version, because a document records only its version. Both are opt-in (`o.TemplateVersion = "4"`);
 `"1"` to `"3"` stay as they were and the default stays `"1"`. A debit note (ใบเพิ่มหนี้) uses the credit note layout, with its reason printed as text (the five section 82/10 reasons are for credit notes only).
 
+**Templates `"6"` (A4 portrait) and `"7"` (A5 landscape)** are `"4"` and `"5"` with a longer payment line: Cash and Transfer plus **Card** (บัตร), **Mobile banking** (แอปธนาคาร) and **Wallet** (อีวอลเล็ต). `TaxPaymentMethod` gains `Card = 3`, `MobileBanking = 4`, `Wallet = 5` (serialised by name). Versions `"1"` to `"5"` never change, because issued receipts re-render from their snapshot, so issuing a receipt whose `Payment.Method` is Card, MobileBanking or Wallet under a version before `"6"` is refused (`ValidationFailed`, `payment.method` / `NotAllowed`) rather than printed with nothing ticked: move to `"6"` or `"7"` first. Mapping a charge to a receipt is yours; `Themia.ETax` does not depend on `Themia.Payments`, so map `Charge.PaidMethod` (QrPromptPay to Transfer, Card to Card, MobileBanking to MobileBanking, Wallet to Wallet) and fall back to your own rule when it is `null`.
+
 - **Data:** line `Quantity` / `Unit` / `UnitPriceSatang` fill the receipt table; on a note, line `OriginalAmountExVatSatang` / `CorrectAmountExVatSatang`
   fill the original-value and correct-value columns (the difference is the line amount); `Payment` fills the payment line;
   `TaxNoteReference.ReasonKind` ticks the reason. All optional: a missing value prints an empty cell.
