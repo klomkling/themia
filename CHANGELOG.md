@@ -27,6 +27,8 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.46.0] - 2026-10-30
+
 ### Added
 
 - **`Themia.Payments` / `Themia.Payments.TwoCTwoP`:** `Charge.PaidChannel` (nullable string) carries the provider's own codes behind `PaidMethod`, for logging and reconciliation; the 2C2P gateway fills it from the inquiry as `paymentScheme=MA channelCode=VI agentCode=OCBC` (absent parts left out; a value that is not a short alphanumeric code is dropped so it cannot forge a log line). An app can now see which codes left `PaidMethod` null. Never branch on it. Not verified against the 2C2P sandbox.
