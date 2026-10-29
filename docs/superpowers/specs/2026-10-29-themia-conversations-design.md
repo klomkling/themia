@@ -6,34 +6,40 @@
 ## 1. Scope
 
 A shared chat attached to one business object (a booking, a ticket, an asset) for members and for guests without an account.
-Follows the repo pattern: neutral core `Themia.Conversations` (Dapper + FluentMigrator, no ASP.NET dependency), engines
+Follows the repo pattern: neutral core `Themia.Conversations` (`net8.0;net10.0`, Dapper + FluentMigrator, no ASP.NET and no `Themia.Messaging` dependency), engines
 `.PostgreSql` / `.MySql` / `.SqlServer`, and `.AspNetCore` for the guest-link endpoints and DI. **Not in scope:** UI, a
 realtime transport (v1 is polling on open plus the batched notification of §5; SignalR comes later) and the business object itself. The object is an
 opaque `(SubjectType, SubjectId)` pair, so no app domain enters Themia.
 
-## 2. Entities (all rows carry `TenantId`; every query carries the tenant predicate; child tables reference their parent with composite `(Id, TenantId)` foreign keys from the first migration, so a row cannot point across tenants)
+## 2. Entities (all rows carry `TenantId`; every call takes the tenant explicitly, as `Themia.Audit` does (the `.AspNetCore` adapter supplies it from the request), and every query carries the predicate; child tables reference their parent with composite `(Id, TenantId)` foreign keys from the first migration, so a row cannot point across tenants)
 
 - **Conversation:** `Id`, `SubjectType`, `SubjectId`, `State` (`Open | Closed`), `RetentionState` (`Active | LegalHold | Expired`),
   `CreatedAt`, `ClosedAt`, `RetentionUntil`. Unique on `(TenantId, SubjectType, SubjectId)`.
 - **Participant:** `Id`, `ConversationId`, `Kind` (`Member | Guest | System`), `UserRef` (opaque id, members only), `DisplayName`,
   `ContactHash` (guests; HMAC with a server-side pepper, because phone numbers are enumerable), `RoleLabel`, `JoinedAt`, `LeftAt`, `LastReadSeq`.
 - **Message:** `Id`, `ConversationId`, `Seq` (dense per conversation, the only ordering), `ParticipantId`, `Kind` (`Text | System`),
-  `Body` (plain text, length-capped, never HTML), `ClientMessageId` (idempotency), `CreatedAt`, `RedactedAt`. Messages are never
-  updated or deleted by the app: erasure redacts (§6).
-- **Attachment:** `MessageId`, `OwnerParticipantId`, `StorageKey` (through `IStorageProvider`), `ContentType` and `Size` (both allow-listed), `Sha256`
-  of the stored bytes. Images are re-encoded through `Themia.Imaging` before storing, which drops EXIF and GPS data, and the object
-  is stored under its hash. A virus scan is a later row; the model leaves room for a `ScanState` enum without a migration of meaning.
+  `Body` (plain text, length-capped, never HTML), `ClientMessageId` (idempotency), `CreatedAt`, `RedactedAt`. Messages change only through
+  the retention component: erasure redacts, purge deletes (§6). `Seq` is allocated by `UPDATE conversation SET last_seq = last_seq + 1` inside the post
+  transaction (a row lock; syntax per engine), and `(TenantId, ConversationId, ParticipantId, ClientMessageId)` is unique.
+- **Attachment:** `MessageId`, `OwnerParticipantId`, `StorageKey`, `ContentType`, `Size`, `Sha256`. The key is scoped
+  `{tenant}/{conversation}/{attachmentId}`; the hash is a column for integrity, not the key, so there is no cross-message or
+  cross-tenant sharing and a purge or erasure never deletes bytes another row uses. Only images are re-encoded (through
+  `IImageProcessor`, dropping EXIF and GPS), and their `ContentType` and `Size` come from the processor output, never from the client.
+  Allow-listed non-images (PDF) are stored as-is and served download-only under the sandbox headers of §8 until the virus-scan row.
 
 ## 3. Guests and magic links
 
 A guest is a `Participant` of `Kind.Guest`, invited over the channel they signed up with (e-mail, SMS or LINE); the app supplies the sender, the core only issues the link. The link carries one opaque token issued by
-`IChallengeService` (purpose `conversation-guest`, scope = tenant + participant), so TTL, single use, attempt cap and both
-rate limits come from `Themia.Challenges`. The token is **never redeemed by a GET**, because mail and LINE link previewers would burn it: the page the link opens
+`IChallengeService` (purpose `conversation-guest`, scope = tenant + participant), so TTL, single use and the issue-side rate limits come from `Themia.Challenges`. Its token path has no attempt cap (the
+bound is token entropy, so the token is at least 128 bits), so the `.AspNetCore` exchange endpoint rate-limits by address and tenant itself;
+the tenant comes from the request and is passed to `VerifyByTokenAsync` explicitly. The token is **never redeemed by a GET**, because mail and LINE link previewers would burn it: the page the link opens
 posts it to the exchange endpoint, the token is moved out of the URL (fragment, then stripped), and the responses are
 `Cache-Control: no-store` with `Referrer-Policy: no-referrer`. The exchange yields a **guest session**: an opaque lookup key
 (default 12 h) bound to one `(ConversationId, ParticipantId)`, carried in an `HttpOnly`, `Secure`, `SameSite` cookie scoped to the
 conversation path. It can read and post in that conversation and nothing else. It is **not self-contained**: every request
-re-reads the participant's `LeftAt` and the conversation state, so setting `LeftAt` or closing revokes at once. Tokens and sessions are never logged; an unknown, expired or revoked token gives one
+re-reads the participant's `LeftAt` and the conversation state, so setting `LeftAt` or closing revokes at once. Redeeming consumes the token, so a guest returning after the 12 h session has no
+way back except a **re-invite**: a member, or the guest asking from the expired page, triggers it (limited to 3 per hour per contact and
+conversation); a fresh invite revokes the participant's earlier sessions. Tokens and sessions are never logged; an unknown, expired or revoked token gives one
 indistinguishable refusal. Guests never become identity users.
 
 ## 4. Masking
@@ -45,10 +51,12 @@ Notifications and the masked export use the same projection, and notifications c
 
 ## 5. Notification hook
 
-The core sends nothing itself. After commit it raises `MessagePosted(ConversationId, MessageId, Seq, RecipientParticipantIds)`
-through the `Themia.Messaging` outbox, so a lost process never loses the event and a rolled-back post raises none. The app
-subscribes and sends through `Themia.Notifications`, using the masked body. Unread digests are the app's job on
-`Themia.Scheduling`, driven by `Participant.LastReadSeq`; the core exposes `UnreadSince(participant)`.
+The core sends nothing itself and cannot enlist in the `Themia.Messaging` outbox, whose only store is the net10 framework module. It owns a
+transaction-aware port instead: `IConversationEventSink.RaiseAsync(DbConnection, DbTransaction, ConversationEvent, ct)`, called inside the
+post transaction with `MessagePosted(ConversationId, MessageId, Seq, RecipientParticipantIds)`. The default sink writes an event row in
+that transaction (a rolled-back post leaves none), and a drain job hands rows to app subscribers at least once. A later
+`Themia.Modules.Conversations` (net10) may bridge the port to the Messaging outbox. The app subscribes and sends through
+`Themia.Notifications`; unread digests are its job on `Themia.Scheduling`, driven by `LastReadSeq` (`UnreadSince(participant)`).
 
 ## 6. Retention and data-subject requests
 
@@ -62,7 +70,7 @@ manifest. **Erasure:** their message bodies are redacted (`Body` null, `Redacted
 ## 7. Dossier export
 
 `IConversationExporter` renders the whole transcript of a subject, ordered by `Seq`, through `Themia.Pdf` or `Themia.Export`,
-with an attachment list and each file's SHA-256. `ExportMode` is `Masked` (default) or `Full`; `Full` needs an explicit
+with an attachment list and each file's SHA-256, capped (500 messages and 50 listed attachments per part; a larger transcript is split into parts). `ExportMode` is `Masked` (default) or `Full`; `Full` needs an explicit
 permission from the app's policy and always writes an audit record, as does every read by staff.
 
 ## 8. Security defaults
@@ -90,12 +98,14 @@ public interface IConversationRetention { Task<DataSubjectExport> ExportAsync(Pa
 public interface IConversationExporter { Task<ExportedDocument> ExportAsync(ConversationSubject s, ExportMode mode, ...); }
 ```
 
-Outcomes are enums with computed booleans, not bool flags.
+Outcomes are enums with computed booleans, not bool flags. `CloseAsync` is idempotent; reopening is allowed until purge and clears `RetentionUntil`;
+`MarkReadAsync` is monotonic. The ids, `Actor`, `PostMessage` and the other placeholders get concrete types in the implementation plan, with the
+`PublicAPI` files and the three engine projects.
 
 ## 10. Decisions and what is still open
 
-Decided: no realtime in v1 (polling plus batched notify, SignalR later); attachments are allow-listed, image-re-encoded and
-hash-stored, with the virus scan a later row; default retention 180 days after the subject closes, marked pending counsel
+Decided: no realtime in v1 (polling plus batched notify, SignalR later); attachments are allow-listed, images re-encoded, stored under a tenant- and conversation-scoped key with the hash kept as a
+column, with the virus scan a later row; the event port of §5 is the transaction-aware design, not the outbox; default retention 180 days after the subject closes, marked pending counsel
 review; one conversation per subject in v1 (the unique key of §2 stands); guest links go over the guest's own signup channel,
 sent by an app-supplied sender. **Still open:** the legal basis for each retention period (counsel, not engineering), and whether
 a later "several conversations per subject" needs a `Kind` column in the unique key (a migration, not a redesign).
