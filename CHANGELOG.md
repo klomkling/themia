@@ -27,6 +27,8 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.45.0] - 2026-10-29
+
 ### Added
 
 - **`Themia.ETax`:** `TaxPaymentMethod` gains `Card`, `MobileBanking` and `Wallet`, printed by new template versions `"6"` (A4 portrait) and `"7"` (A5 landscape), which are `"4"` and `"5"` with a longer payment line; versions `"1"` to `"5"` are unchanged, and issuing a receipt with one of the new methods under them is refused with a `payment.method` validation error instead of printing a receipt that ticks nothing (coord #0181).
