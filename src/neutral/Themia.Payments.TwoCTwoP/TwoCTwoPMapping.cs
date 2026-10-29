@@ -260,29 +260,52 @@ internal static class TwoCTwoPMapping
 
         TryGetNonEmptyString(verified, "channelCode", out var channelCode);
         TryGetNonEmptyString(verified, "agentCode", out var agentCode);
+        TryGetNonEmptyString(verified, "paymentScheme", out var paymentScheme);
         return new Charge(invoiceNo, invoiceNo, amount, status, failure, completedAt)
         {
-            PaidMethod = ToPaidMethod(channelCode, agentCode),
+            PaidMethod = ToPaidMethod(channelCode, agentCode, paymentScheme),
         };
     }
 
     /// <summary>
-    /// The method behind a <c>channelCode</c> / <c>agentCode</c> pair of the payment inquiry, from the codes 2C2P names in its payment-channel
-    /// reference and its inquiry sample: card (<c>CC</c>, <c>CSTOKEN</c> and the sample's scheme code <c>VI</c>), Thai QR PromptPay
-    /// (<c>THQR</c> + <c>PPQR</c>) and the Thai wallet QRs (<c>THQR</c> + <c>TRUEMONEYQR</c> / <c>SHPQR</c> / <c>GPTHQR</c>). Anything else is
-    /// <see langword="null"/>: a receipt that says nothing beats one that says the wrong thing. Internet banking is not mapped, as the reference
-    /// gives it no code the inquiry is known to return.
+    /// The method behind the <c>paymentScheme</c> / <c>channelCode</c> / <c>agentCode</c> of a payment inquiry. The inquiry documents <c>paymentScheme</c> and
+    /// <c>channelCode</c> as values of the "Payment Scheme / Process by" list, whose <c>Type</c> column files each code under Card or Wallet
+    /// (<see cref="TwoCTwoPProcessByCodes"/>); <c>paymentScheme</c> is read first, then <c>channelCode</c>. Two fallbacks from the payment-channel reference: the group
+    /// codes <c>CC</c> and <c>CSTOKEN</c> (Card) and <c>THQR</c> with agent <c>PPQR</c> (PromptPay QR) or a Thai wallet QR agent. <c>ETQ</c> ("QR Gateway - Thai QR")
+    /// is read as PromptPay. Anything else, including bank transfer, loyalty, the other QR types and the Thai bank deep links (whose inquiry values the documentation does
+    /// not give), is <see langword="null"/>: a receipt that says nothing beats one that says the wrong thing.
     /// </summary>
-    internal static PaymentMethod? ToPaidMethod(string? channelCode, string? agentCode)
+    internal static PaymentMethod? ToPaidMethod(string? channelCode, string? agentCode, string? paymentScheme = null) =>
+        FromProcessBy(paymentScheme) ?? FromProcessBy(channelCode) ?? FromChannelReference(channelCode, agentCode);
+
+    private static PaymentMethod? FromProcessBy(string? code)
+    {
+        if (code is null)
+        {
+            return null;
+        }
+
+        if (TwoCTwoPProcessByCodes.Cards.Contains(code))
+        {
+            return PaymentMethod.Card;
+        }
+
+        if (TwoCTwoPProcessByCodes.Wallets.Contains(code))
+        {
+            return PaymentMethod.Wallet;
+        }
+
+        return code.Equals("ETQ", StringComparison.OrdinalIgnoreCase) ? PaymentMethod.QrPromptPay : null;
+    }
+
+    private static PaymentMethod? FromChannelReference(string? channelCode, string? agentCode)
     {
         if (channelCode is null)
         {
             return null;
         }
 
-        if (channelCode.Equals("CC", StringComparison.OrdinalIgnoreCase) ||
-            channelCode.Equals("CSTOKEN", StringComparison.OrdinalIgnoreCase) ||
-            channelCode.Equals("VI", StringComparison.OrdinalIgnoreCase))
+        if (channelCode.Equals("CC", StringComparison.OrdinalIgnoreCase) || channelCode.Equals("CSTOKEN", StringComparison.OrdinalIgnoreCase))
         {
             return PaymentMethod.Card;
         }
