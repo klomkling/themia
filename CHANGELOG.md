@@ -27,6 +27,13 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.45.1] - 2026-10-30
+
+### Fixed
+
+- **`Themia.Payments.TwoCTwoP`:** `Charge.PaidMethod` (0.45.0) read the wrong code list. The payment inquiry documents `paymentScheme` and `channelCode` as values of 2C2P's "Payment Scheme / Process by" list, not of the payment-channel group codes, so a MasterCard (`MA`), JCB, UnionPay, TrueMoney or LINE Pay payment came back `null` and only `VI` worked. The mapping now follows that list's own `Type` column (every Card code is `Card`, every Wallet code `Wallet`), reading `paymentScheme` first, and keeps the group codes as a fallback; mobile banking stays `null` because the documentation does not say what the inquiry returns for it. Not verified against the 2C2P sandbox (coord audit of the adapter against developer.2c2p.com, 2026-10-30).
+- **`Themia.Payments.TwoCTwoP` README:** 2C2P does send a refund notification for asynchronous refunds (some 123 payments and wallets; this package does not receive it), refunds are for settled transactions only, and `invoiceNo` is documented as 50 characters with 20 for QR (this package keeps its 20 limit).
+
 ## [0.45.0] - 2026-10-29
 
 ### Added

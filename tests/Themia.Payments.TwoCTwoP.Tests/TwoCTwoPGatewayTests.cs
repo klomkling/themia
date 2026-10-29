@@ -186,6 +186,43 @@ public class TwoCTwoPGatewayTests
         Assert.Equal(expected, charge.PaidMethod);
     }
 
+    // The inquiry's channelCode and paymentScheme are values of 2C2P's "Payment Scheme / Process by" list (code, Type Card / Wallet / QR ...), not of the
+    // payment-channel group codes; agentCode is the separate agent list. Cases below are rows of that list. Not verified against the sandbox.
+    [Theory]
+    [InlineData("MA", null, null, PaymentMethod.Card)]
+    [InlineData("JC", "KBANK", null, PaymentMethod.Card)]
+    [InlineData("UP", null, null, PaymentMethod.Card)]
+    [InlineData("AM", null, null, PaymentMethod.Card)]
+    [InlineData("TM", null, null, PaymentMethod.Wallet)]
+    [InlineData("SH", null, null, PaymentMethod.Wallet)]
+    [InlineData("LP", null, null, PaymentMethod.Wallet)]
+    [InlineData("PP", null, null, PaymentMethod.Wallet)]
+    [InlineData("ETQ", null, null, PaymentMethod.QrPromptPay)]
+    [InlineData("ZZ", "THBBL", "MA", PaymentMethod.Card)]       // paymentScheme wins over channelCode
+    [InlineData("VI", "OCBC", "TM", PaymentMethod.Wallet)]      // ... even when the two disagree
+    [InlineData("tm", null, null, PaymentMethod.Wallet)]        // codes are not case sensitive
+    [InlineData(null, null, "VI", PaymentMethod.Card)]           // scheme alone is enough
+    [InlineData("TQ", null, null, null)]                        // a QR-type scheme the adapter does not map
+    [InlineData("BT", null, null, null)]                        // Bank Transfer
+    [InlineData("LO", null, null, null)]                        // Loyalty
+    [InlineData("QQ", null, "QQ", null)]                        // not in the list
+    public async Task Reading_a_charge_maps_the_documented_process_by_code_to_the_method(string? channelCode, string? agentCode, string? paymentScheme, PaymentMethod? expected)
+    {
+        var claims = new Dictionary<string, object?>
+        {
+            ["invoiceNo"] = "order-1", ["amount"] = 1000.00m, ["currencyCode"] = "THB",
+            ["respCode"] = "0000", ["respDesc"] = "Success", ["transactionDateTime"] = "20260922100000",
+        };
+        if (channelCode is not null) claims["channelCode"] = channelCode;
+        if (agentCode is not null) claims["agentCode"] = agentCode;
+        if (paymentScheme is not null) claims["paymentScheme"] = paymentScheme;
+        var gateway = BuildGateway(new StubHandler().Enqueue(HttpStatusCode.OK, ResponseEnvelope(claims)));
+
+        var charge = await gateway.GetChargeAsync(new ChargeRef(ProviderChargeId: null, ReferenceId: "order-1"));
+
+        Assert.Equal(expected, charge.PaidMethod);
+    }
+
     [Fact]
     public async Task An_absent_transactionDateTime_leaves_completedAt_null()
     {

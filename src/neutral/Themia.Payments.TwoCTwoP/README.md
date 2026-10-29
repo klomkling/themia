@@ -39,13 +39,13 @@ every direction of every call. A response is verified before anything in it is t
 `{ "respCode", "respDesc" }` error shape 2C2P uses for request-level rejections (bad merchant, bad
 signature).
 
-## `ReferenceId` is 2C2P's `invoiceNo` — 20 characters, no more
+## `ReferenceId` is 2C2P's `invoiceNo` — 20 characters here, no more
 
 ```csharp
 public required string ReferenceId { get; init; } // -> invoiceNo
 ```
 
-2C2P caps `invoiceNo` at 20 characters. `CreateChargeAsync` checks this **before** calling 2C2P and
+2C2P documents `invoiceNo` as up to 50 characters, with 20 alphanumeric characters for QR payments (and 12 numerals for Myanmar APM). This package holds every charge to 20, so a reference id that works for a card never fails later on the QR path. `CreateChargeAsync` checks this **before** calling 2C2P and
 refuses locally (`PaymentApiException(FailureKind.Validation, "reference_id_too_long", …)`) rather than
 letting a 21-character reference id fail at the provider.
 
@@ -108,8 +108,7 @@ sends nothing, as in earlier versions.
   add one to it, it would re-send a refund.
 - **Status.** `respCode` `00` with refund status `RF` is `Succeeded`; `RFF` (Refund Failed), `RR` (Refund Rejected) and `RR1` to `RR3` (rejected: insufficient balance, invalid bank information, bank account mismatch) are `Failed`, per 2C2P's [Payment Maintenance status codes](https://developer.2c2p.com/docs/response-code-payment-maintenance-status-code);
   `RP` and any status this package does not know are `Pending`, never `Succeeded`. `RefundCreation.RefundId` is
-  always `null`: key your records on the charge. There is no refund webhook: 2C2P sends no notification when a
-  refund settles, so follow a `Pending` refund with `GetRefundsAsync` (below) or the 2C2P merchant portal. A caller must never retry
+  always `null`: key your records on the charge. 2C2P's refund guide says a refund of some 123 payments and wallets is asynchronous and that 2C2P then POSTs the final status, encrypted with JWE + JWS (`notifyResponse=...`). **This package does not receive that notification**, so follow a `Pending` refund with `GetRefundsAsync` (below) or the 2C2P merchant portal. 2C2P also states that a refund can only be requested for a settled transaction. A caller must never retry
   `refund_outcome_unknown` automatically.
 - **2C2P is the only guard against over-refunding.** The inquiry does not show what was already refunded, so
   two concurrent or repeated partial refunds can exceed the charge locally unnoticed. Serialize refunds per charge.
@@ -125,7 +124,7 @@ sends nothing, as in earlier versions.
 
 ## What the shopper paid with: `Charge.PaidMethod`
 
-`GetChargeAsync` fills `Charge.PaidMethod` from the inquiry's `channelCode` / `agentCode`, so a receipt can say Card rather than Transfer: `CC`, `CSTOKEN` and `VI` are `Card`; `THQR` with `PPQR` is `QrPromptPay`; `THQR` with `TRUEMONEYQR`, `SHPQR` or `GPTHQR` is `Wallet`. Anything else, including internet banking, is `null` (not paid yet, or a channel this adapter does not map), so keep a fallback. It labels a receipt; it never decides success. The codes come from 2C2P's payment-channel reference and inquiry sample and are **not verified against the sandbox** (the reference lists card as `CC` while the sample shows the scheme code `VI`; both are mapped).
+`GetChargeAsync` fills `Charge.PaidMethod`, so a receipt can say Card rather than Transfer. The payment inquiry documents `paymentScheme` and `channelCode` as values of 2C2P's [Payment Scheme / Process by](https://developer.2c2p.com/docs/reference-codes-payment-scheme) list, whose `Type` column files each code: every code of Type **Card** (`VI`, `MA`, `JC`, `UP`, `AM`, ...) is `Card`, and every code of Type **Wallet** (`TM` TrueMoney, `SH` ShopeePay, `LP` LINE Pay, `PP` PaoTang, ...) is `Wallet`, which also covers the pay-later wallets 2C2P files there. `paymentScheme` is read first, then `channelCode`. From the payment-channel reference there are three more rules: the group codes `CC` and `CSTOKEN` are `Card`, `THQR` with agent `PPQR` is `QrPromptPay`, and `ETQ` ("QR Gateway - Thai QR") is read as `QrPromptPay`. Anything else is `null`: bank transfer, loyalty, the other QR types, and **mobile banking**, because 2C2P documents the Thai bank deep links as a way to request a payment but does not say what the inquiry returns for one. So `null` happens (not paid yet, or an unmapped channel) and each app needs its own fallback. It labels a receipt; it never decides success. Not verified against the sandbox; the list was copied from the documentation on 2026-10-30.
 
 ## In-page PromptPay QR
 
