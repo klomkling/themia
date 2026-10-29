@@ -53,7 +53,8 @@ table.last { margin-bottom: 0; }
 .tot .grand .en { font-weight: 700; }
 
 .bottom { margin-top: 2mm; font-size: 7.8pt; }
-.pay { display: flex; align-items: center; gap: 1.5mm; white-space: nowrap; }
+.pay { display: flex; flex-wrap: wrap; flex: 1; min-width: 0; align-items: center; gap: 1.2mm 3mm; }
+.pay .opt { white-space: nowrap; }
 .pay .date { display: inline-block; min-width: 22mm; border-bottom: 0.5pt dotted #000; text-align: center; }
 .cb { display: inline-block; width: 3mm; height: 3mm; border: 0.5pt solid #000; text-align: center; font-size: 7pt; line-height: 2.6mm; font-weight: 700; vertical-align: middle; }
 .sig { width: 50mm; flex: none; text-align: center; font-size: 7.5pt; }
@@ -205,13 +206,13 @@ table.last { margin-bottom: 0; }
   {{else}}
   <div class="bottom row" style="align-items:flex-end">
     <div class="pay">
-      <b>ได้รับเงินแล้วโดย</b> <span class="en">(Received by)</span>
-      <span class="cb">{{#if @root.payment.cash}}✓{{/if}}</span> เงินสด <span class="en">(Cash)</span>
-      <span class="cb">{{#if @root.payment.transfer}}✓{{/if}}</span> โอนเงิน <span class="en">(Transfer)</span>
-      <span class="cb">{{#if @root.payment.card}}✓{{/if}}</span> บัตร <span class="en">(Card)</span>
-      <span class="cb">{{#if @root.payment.mobileBanking}}✓{{/if}}</span> แอปธนาคาร <span class="en">(Mobile banking)</span>
-      <span class="cb">{{#if @root.payment.wallet}}✓{{/if}}</span> อีวอลเล็ต <span class="en">(Wallet)</span>
-      &nbsp; วันที่รับเงิน <span class="en">(Payment date)</span> <span class="date">{{@root.payment.date}}</span>
+      <span class="opt"><b>ได้รับเงินแล้วโดย</b> <span class="en">(Received by)</span></span>
+      <span class="opt"><span class="cb">{{#if @root.payment.cash}}✓{{/if}}</span> เงินสด <span class="en">(Cash)</span></span>
+      <span class="opt"><span class="cb">{{#if @root.payment.transfer}}✓{{/if}}</span> โอนเงิน <span class="en">(Transfer)</span></span>
+      <span class="opt"><span class="cb">{{#if @root.payment.card}}✓{{/if}}</span> บัตร <span class="en">(Card)</span></span>
+      <span class="opt"><span class="cb">{{#if @root.payment.mobileBanking}}✓{{/if}}</span> แอปธนาคาร <span class="en">(Mobile banking)</span></span>
+      <span class="opt"><span class="cb">{{#if @root.payment.wallet}}✓{{/if}}</span> อีวอลเล็ต <span class="en">(Wallet)</span></span>
+      <span class="opt">วันที่รับเงิน <span class="en">(Payment date)</span> <span class="date">{{@root.payment.date}}</span></span>
     </div>
     <div class="sig"><div class="line"></div>ผู้รับเงิน <span class="en">(Receiver signature)</span><br>วันที่ <span class="en">(Date)</span> ....../....../......</div>
   </div>
