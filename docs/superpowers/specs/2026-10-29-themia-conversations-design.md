@@ -71,7 +71,7 @@ that transaction (a rolled-back post leaves none), and a drain job hands rows to
 (**pending counsel review** of the PDPA basis; do not treat the number as decided). A purge job deletes expired
 messages and attachments (storage objects first) and leaves a tombstone (id, counts, purge time) for the audit trail;
 `LegalHold` blocks it. **Purge deletes the conversation row too** (after writing the `Tombstone`), so the unique
-subject key of §2 is free again and `OpenAsync` on that subject starts a new conversation with a new id. `RetentionState.Expired` is only the
+subject key of §2 is free again and `OpenAsync` on that subject starts a new conversation with a new id. Purge and erasure also delete the person's or conversation's `GuestSession` and `ConversationEvent` rows (the event payloads hold participant ids and counts), so neither outlives retention. `RetentionState.Expired` is only the
 marker between the retention date and the purge run: `OpenAsync` on an `Expired` conversation refuses with `PendingPurge`, and on a
 `Closed` one reopens it (clearing `RetentionUntil`). **Export for a data subject:** everything they authored or appear in, as JSON plus an attachment
 manifest. **Erasure:** their message bodies are redacted (`Body` null, `RedactedAt` set), the participant is anonymised
