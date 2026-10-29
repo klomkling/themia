@@ -1,14 +1,14 @@
 # Themia.Conversations: per-object conversations
 
 **Status:** draft for review (design only, no code). **Tracks:** coord #0182. **Target:** post-launch, no version promised.
-**Basis:** written from the maintainer brief, not from the coord thread text; every open point is in §9.
+**Basis:** written from the maintainer brief, not from the coord thread text. The decisions on the former open questions (2026-10-29) are folded into the sections and listed in §10.
 
 ## 1. Scope
 
 A shared chat attached to one business object (a booking, a ticket, an asset) for members and for guests without an account.
 Follows the repo pattern: neutral core `Themia.Conversations` (Dapper + FluentMigrator, no ASP.NET dependency), engines
-`.PostgreSql` / `.MySql` / `.SqlServer`, and `.AspNetCore` for the guest-link endpoints and DI. **Not in scope:** UI, the
-realtime transport (the core raises events; an app wires SignalR or polling), and the business object itself. The object is an
+`.PostgreSql` / `.MySql` / `.SqlServer`, and `.AspNetCore` for the guest-link endpoints and DI. **Not in scope:** UI, a
+realtime transport (v1 is polling on open plus the batched notification of §5; SignalR comes later) and the business object itself. The object is an
 opaque `(SubjectType, SubjectId)` pair, so no app domain enters Themia.
 
 ## 2. Entities (all rows carry `TenantId`; every query carries the tenant predicate)
@@ -20,12 +20,13 @@ opaque `(SubjectType, SubjectId)` pair, so no app domain enters Themia.
 - **Message:** `Id`, `ConversationId`, `Seq` (dense per conversation, the only ordering), `ParticipantId`, `Kind` (`Text | System`),
   `Body` (plain text, length-capped, never HTML), `ClientMessageId` (idempotency), `CreatedAt`, `RedactedAt`. Messages are never
   updated or deleted by the app: erasure redacts (§6).
-- **Attachment:** `MessageId`, `StorageKey` (through `IStorageProvider`), `ContentType` (allow-list), `Size`, `Sha256`,
-  `ScanState` (`Pending | Clean | Rejected`; only `Clean` is served).
+- **Attachment:** `MessageId`, `StorageKey` (through `IStorageProvider`), `ContentType` and `Size` (both allow-listed), `Sha256`
+  of the stored bytes. Images are re-encoded through `Themia.Imaging` before storing, which drops EXIF and GPS data, and the object
+  is stored under its hash. A virus scan is a later row; the model leaves room for a `ScanState` enum without a migration of meaning.
 
 ## 3. Guests and magic links
 
-A guest is a `Participant` of `Kind.Guest`, invited by contact (email or phone). The link carries one opaque token issued by
+A guest is a `Participant` of `Kind.Guest`, invited over the channel they signed up with (e-mail, SMS or LINE); the app supplies the sender, the core only issues the link. The link carries one opaque token issued by
 `IChallengeService` (purpose `conversation-guest`, scope = tenant + participant), so TTL, single use, attempt cap and both
 rate limits come from `Themia.Challenges`. Exchanging the token yields a **guest session**: a signed, short-lived (default 12 h)
 credential bound to one `(ConversationId, ParticipantId)` that can read and post in that conversation and nothing else. It is
@@ -48,7 +49,8 @@ subscribes and sends through `Themia.Notifications`, using the masked body. Unre
 
 ## 6. Retention and data-subject requests
 
-`RetentionUntil` is set when a conversation closes (per-`SubjectType` option, in days). A purge job deletes expired
+`RetentionUntil` is set when a conversation closes: default **180 days** after the subject closes, a setting per `SubjectType`
+(**pending counsel review** of the PDPA basis; do not treat the number as decided). A purge job deletes expired
 messages and attachments (storage objects first) and leaves a tombstone (id, counts, purge time) for the audit trail;
 `LegalHold` blocks it. **Export for a data subject:** everything they authored or appear in, as JSON plus an attachment
 manifest. **Erasure:** their message bodies are redacted (`Body` null, `RedactedAt` set), the participant is anonymised
@@ -63,8 +65,8 @@ permission from the app's policy and always writes an audit record.
 ## 8. Security defaults
 
 Authorization is the app's, through `IConversationAccessPolicy.Can(actor, conversation, action)`, **default deny**. Posts are
-rate-limited per participant and idempotent on `ClientMessageId`. Bodies are escaped on output. Attachments are served only
-when `Clean`, with `Content-Disposition: attachment`.
+rate-limited per participant and idempotent on `ClientMessageId`. Bodies are escaped on output. Attachments are served with
+`Content-Disposition: attachment` and the allow-listed type only.
 
 ## 9. Public API sketch
 
@@ -85,9 +87,10 @@ public interface IConversationExporter { Task<ExportedDocument> ExportAsync(Conv
 
 Outcomes are enums with computed booleans, not bool flags.
 
-## 10. Open questions
+## 10. Decisions and what is still open
 
-1. Realtime: ship a SignalR adapter in `.AspNetCore`, or leave it to apps? 2. Attachment scanning: who runs it, and may a
-`Pending` file be shown to its uploader only? 3. Default retention per subject type, and the legal basis for each (needs the
-owner, not engineering). 4. Is one conversation per subject enough, or do apps need several (buyer and seller)? That changes the
-unique key. 5. Do guests ever need to receive e-mail from the thread, or is the magic link the only channel?
+Decided: no realtime in v1 (polling plus batched notify, SignalR later); attachments are allow-listed, image-re-encoded and
+hash-stored, with the virus scan a later row; default retention 180 days after the subject closes, marked pending counsel
+review; one conversation per subject in v1 (the unique key of §2 stands); guest links go over the guest's own signup channel,
+sent by an app-supplied sender. **Still open:** the legal basis for each retention period (counsel, not engineering), and whether
+a later "several conversations per subject" needs a `Kind` column in the unique key (a migration, not a redesign).
