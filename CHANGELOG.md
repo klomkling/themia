@@ -27,6 +27,10 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+### Added
+
+- **`Themia.Conversations` (+ `.PostgreSql`, `.MySql`, `.SqlServer`):** the schema and types of the per-object conversations package, first part (coord #0182; design in `docs/superpowers/specs/`). One migration creates the whole schema (conversations, participants, messages, attachments, guest sessions, events, tombstones) with the tenant bound into every key (children reference their parent on `(tenant_id, conversation_id, ...)`), a byte-exact collation on the compared string columns on MySQL and SQL Server, one participant per person per conversation, and a SQL Server clustering on `(conversation_id, seq)`. Also `ConversationOptions` (caps and retention, 180 days default pending counsel review), `IConversationAccessPolicy` with a default that denies everything, and `AddThemiaConversations` / `AddThemiaConversations<Engine>`. **No store yet:** nothing posts or reads a message in this release; the store, guests, retention and the ASP.NET Core endpoints follow.
+
 ## [0.45.1] - 2026-10-30
 
 ### Fixed
