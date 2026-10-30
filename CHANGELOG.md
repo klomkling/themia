@@ -27,6 +27,20 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.48.0] - 2026-10-31
+
+### Added
+
+- **`Themia.Storage.Configuration`:** `AddThemiaStorageFromConfiguration` now wraps the public S3/R2 slot with `PurgingStorageProvider` when an `ICdnPurger` is registered (`AddThemiaStorageCloudflarePurge`, in any registration order), so deleting a `public/` key purges its public URL; private keys are never purged and a Local public slot is not wrapped. Do not wrap the public slot yourself when you use the binding. It also registers the `LocalUrlSigner` that `MapThemiaLocalStorage` verifies with, built from `Storage:Local:SigningKey` (`TryAdd`: a signer you register yourself is kept; one built from a different key makes every presigned link 403).
+
+### Changed
+
+- **`Themia.Storage.Configuration`:** `Storage:Local:SigningKey` must be at least 32 characters; a shorter value stops the host at start (the message names the key, never the value).
+
+### Needs a human look
+
+- `LocalUrlSigner` registration: it verifies presigned download/upload tokens for private files. Confirm that every app mapping `MapThemiaLocalStorage` uses the same `Storage:Local:SigningKey` as its provider, and drop an app-side signer registration built from another key.
+
 ## [0.47.0] - 2026-10-30
 
 ### Added
