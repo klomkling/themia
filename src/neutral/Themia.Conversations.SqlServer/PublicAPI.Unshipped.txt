@@ -1,0 +1,7 @@
+#nullable enable
+static Themia.Conversations.SqlServer.ServiceCollectionExtensions.AddThemiaConversationsSqlServer(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, string! connectionString) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+Themia.Conversations.SqlServer.ServiceCollectionExtensions
+Themia.Conversations.SqlServer.SqlServerConversationDialect
+Themia.Conversations.SqlServer.SqlServerConversationDialect.CreateConnection() -> System.Data.Common.DbConnection!
+Themia.Conversations.SqlServer.SqlServerConversationDialect.IsDuplicateKey(System.Data.Common.DbException! exception) -> bool
+Themia.Conversations.SqlServer.SqlServerConversationDialect.SqlServerConversationDialect(string! connectionString) -> void
