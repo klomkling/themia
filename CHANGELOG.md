@@ -30,6 +30,23 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 ### Added
 
 - **`Themia.Payments` / `Themia.Payments.TwoCTwoP`:** `Charge.PaidChannel` (nullable string) carries the provider's own codes behind `PaidMethod`, for logging and reconciliation; the 2C2P gateway fills it from the inquiry as `paymentScheme=MA channelCode=VI agentCode=OCBC` (absent parts left out; a value that is not a short alphanumeric code is dropped so it cannot forge a log line). An app can now see which codes left `PaidMethod` null. Never branch on it. Not verified against the 2C2P sandbox.
+- `Themia.Storage.Configuration`: `AddThemiaStorageFromConfiguration(configuration)` reads one documented `Storage`
+  key set and registers `IStorageProvider` and `IStorageUrlService`. Private files are always Local: a value that
+  would move them (`Storage:Private:Provider=S3`, `Storage:Provider=S3`, a typo) stops the host at start, with no
+  escape hatch. The public slot is Local (default) or S3/R2 (`Storage:Public:Provider`), and the S3 side is
+  public-only. Unknown keys under `Storage:S3`, `Storage:Local`, `Storage:Public` and `Storage:Private` and keys
+  that would be dead configuration are refused. Env names and the key table are in the package README.
+
+### Deprecated
+- Storage keys accepted by `AddThemiaStorageFromConfiguration` with a startup warning, removed in 0.48.0:
+  `Storage:Provider` (use `Storage:Public:Provider`; `Split` becomes `S3`), `Storage:Local:UploadsDirectory` (use
+  `Storage:Local:RootPath`), `Storage:DownloadBaseUrl` (use `Storage:Local:PresignedBaseUrl`).
+  `Storage:S3:BucketName` is not accepted at all: it is `Storage:S3:PublicBucketName` now.
+
+### Fixed
+- `LocalStorageOptions` (and so `LocalStorageProvider`) refuses a `PublicRootPath` inside `RootPath`'s `blobs` or
+  `content-types` directory, and a `RootPath` inside the public root's: either made one file reachable as a private
+  and a public key, so the anonymous public route could serve a private object.
 
 ## [0.45.1] - 2026-10-30
 
