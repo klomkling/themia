@@ -1,3 +1,4 @@
+using Dapper;
 using System.Data.Common;
 using MySqlConnector;
 
@@ -30,4 +31,26 @@ public sealed class MySqlConversationDialect : IConversationDialect
     /// <inheritdoc />
     public bool IsDuplicateKey(DbException exception) =>
         exception is MySqlException { ErrorCode: MySqlErrorCode.DuplicateKeyEntry };
+
+    /// <inheritdoc />
+    public bool IsDeadlock(DbException exception) =>
+        exception is MySqlException { ErrorCode: MySqlErrorCode.LockDeadlock or MySqlErrorCode.LockWaitTimeout };
+
+    /// <inheritdoc />
+    public string LimitClause => "LIMIT @Limit";
+
+    /// <inheritdoc />
+    public async Task<long?> IncrementLastSeqAsync(DbConnection connection, DbTransaction transaction, string tenantId, Guid conversationId, CancellationToken cancellationToken = default)
+    {
+        // MySQL has no RETURNING: LAST_INSERT_ID(expr) stores the new value for this connection. It is read only when the UPDATE matched a row, in a
+        // statement of its own, because after a zero-row UPDATE it would still hold an older value from a previous statement on the connection.
+        var matched = await connection.ExecuteAsync(new CommandDefinition(
+            "UPDATE conversations SET last_seq = LAST_INSERT_ID(last_seq + 1) WHERE tenant_id = @TenantId AND id = @ConversationId AND state = 0;",
+            new { TenantId = tenantId, ConversationId = conversationId },
+            transaction,
+            cancellationToken: cancellationToken));
+        return matched == 0
+            ? null
+            : await connection.ExecuteScalarAsync<long>(new CommandDefinition("SELECT LAST_INSERT_ID();", transaction: transaction, cancellationToken: cancellationToken));
+    }
 }

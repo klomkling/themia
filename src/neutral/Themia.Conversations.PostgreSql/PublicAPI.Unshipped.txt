@@ -1,7 +1,10 @@
 #nullable enable
-static Themia.Conversations.PostgreSql.ServiceCollectionExtensions.AddThemiaConversationsPostgres(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, string! connectionString) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
 Themia.Conversations.PostgreSql.PostgresConversationDialect
 Themia.Conversations.PostgreSql.PostgresConversationDialect.CreateConnection() -> System.Data.Common.DbConnection!
+Themia.Conversations.PostgreSql.PostgresConversationDialect.IncrementLastSeqAsync(System.Data.Common.DbConnection! connection, System.Data.Common.DbTransaction! transaction, string! tenantId, System.Guid conversationId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<long?>!
+Themia.Conversations.PostgreSql.PostgresConversationDialect.IsDeadlock(System.Data.Common.DbException! exception) -> bool
 Themia.Conversations.PostgreSql.PostgresConversationDialect.IsDuplicateKey(System.Data.Common.DbException! exception) -> bool
+Themia.Conversations.PostgreSql.PostgresConversationDialect.LimitClause.get -> string!
 Themia.Conversations.PostgreSql.PostgresConversationDialect.PostgresConversationDialect(string! connectionString) -> void
 Themia.Conversations.PostgreSql.ServiceCollectionExtensions
+static Themia.Conversations.PostgreSql.ServiceCollectionExtensions.AddThemiaConversationsPostgres(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, string! connectionString) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
