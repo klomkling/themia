@@ -1,7 +1,10 @@
 #nullable enable
-static Themia.Conversations.SqlServer.ServiceCollectionExtensions.AddThemiaConversationsSqlServer(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, string! connectionString) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
 Themia.Conversations.SqlServer.ServiceCollectionExtensions
 Themia.Conversations.SqlServer.SqlServerConversationDialect
 Themia.Conversations.SqlServer.SqlServerConversationDialect.CreateConnection() -> System.Data.Common.DbConnection!
+Themia.Conversations.SqlServer.SqlServerConversationDialect.IncrementLastSeqAsync(System.Data.Common.DbConnection! connection, System.Data.Common.DbTransaction! transaction, string! tenantId, System.Guid conversationId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<long?>!
+Themia.Conversations.SqlServer.SqlServerConversationDialect.IsDeadlock(System.Data.Common.DbException! exception) -> bool
 Themia.Conversations.SqlServer.SqlServerConversationDialect.IsDuplicateKey(System.Data.Common.DbException! exception) -> bool
+Themia.Conversations.SqlServer.SqlServerConversationDialect.LimitClause.get -> string!
 Themia.Conversations.SqlServer.SqlServerConversationDialect.SqlServerConversationDialect(string! connectionString) -> void
+static Themia.Conversations.SqlServer.ServiceCollectionExtensions.AddThemiaConversationsSqlServer(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, string! connectionString) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!

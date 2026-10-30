@@ -1,3 +1,4 @@
+using Dapper;
 using System.Data.Common;
 using Npgsql;
 
@@ -22,4 +23,19 @@ public sealed class PostgresConversationDialect : IConversationDialect
     /// <inheritdoc />
     public bool IsDuplicateKey(DbException exception) =>
         exception is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation };
+
+    /// <inheritdoc />
+    public bool IsDeadlock(DbException exception) =>
+        exception is PostgresException { SqlState: PostgresErrorCodes.DeadlockDetected or PostgresErrorCodes.SerializationFailure };
+
+    /// <inheritdoc />
+    public string LimitClause => "LIMIT @Limit";
+
+    /// <inheritdoc />
+    public async Task<long?> IncrementLastSeqAsync(DbConnection connection, DbTransaction transaction, string tenantId, Guid conversationId, CancellationToken cancellationToken = default) =>
+        await connection.ExecuteScalarAsync<long?>(new CommandDefinition(
+            "UPDATE conversations SET last_seq = last_seq + 1 WHERE tenant_id = @TenantId AND id = @ConversationId AND state = 0 RETURNING last_seq;",
+            new { TenantId = tenantId, ConversationId = conversationId },
+            transaction,
+            cancellationToken: cancellationToken));
 }
