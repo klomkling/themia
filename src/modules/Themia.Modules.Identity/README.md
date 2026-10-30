@@ -432,6 +432,11 @@ var renewed = await issuer.RenewSessionAsync(userId, sessionId, request, ct);   
 - The refresh token is issued first (its family is the session) and revoked again, even if the request was cancelled, when the access
   token cannot be issued. `IIdentityEventObserver.OnSessionIssuedAsync` is raised for a new session (not a renewal); an observer that
   throws does not fail it.
+- **A renewal does not look at the security stamp**, like a refresh: rotating the stamp (a password or phone change) does not end a session by
+  itself. End the user's sessions explicitly when that matters (`RevokeAllForUserAsync`, or `RevokeAllForUserExceptAsync` to keep the
+  caller's), and renewals of those families are then refused (`SessionNotLive`).
+- **`AppClaims` are the app's to compute on the server** from its own data, never copied from a request: Themia only refuses the reserved
+  types, it cannot tell a legitimate app claim from a forged one.
 - Not covered: principals that are not `User` rows (a service or bot token) stay in the app.
 - A custom `IRefreshTokenService` must implement `IsSessionLiveAsync` for `RenewSessionAsync` to work; the default answers false (fail closed).
 
