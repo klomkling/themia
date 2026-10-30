@@ -13,10 +13,12 @@ internal sealed partial class ConversationService(
     ConversationOptions options,
     IConversationAccessPolicy policy,
     IConversationEventSink sink,
+    IConversationMasker masker,
     TimeProvider time,
     ILogger<ConversationService> logger) : IConversationService
 {
     private const int MaxOpenAttempts = 3;
+    private const string MaskFailedBody = "[message hidden]";
 
     /// <inheritdoc />
     public async Task<OpenResult> OpenAsync(ConversationActor actor, string tenantId, ConversationSubject subject, CancellationToken cancellationToken = default)
@@ -143,11 +145,28 @@ internal sealed partial class ConversationService(
         }
 
         var rows = await connection.QueryAsync<MessageRow>(new CommandDefinition(
-            "SELECT id AS Id, seq AS Seq, participant_id AS ParticipantId, kind AS Kind, body AS Body, created_at AS CreatedAt, redacted_at AS RedactedAt " +
-            "FROM conversation_messages WHERE tenant_id = @TenantId AND conversation_id = @ConversationId AND seq > @AfterSeq ORDER BY seq " + dialect.LimitClause + ";",
+            "SELECT m.id AS Id, m.seq AS Seq, m.participant_id AS ParticipantId, m.kind AS Kind, m.body AS Body, m.created_at AS CreatedAt, m.redacted_at AS RedactedAt, " +
+            "p.kind AS SenderKind, p.display_name AS SenderName, p.role_label AS SenderRole " +
+            "FROM conversation_messages m LEFT JOIN conversation_participants p ON p.tenant_id = m.tenant_id AND p.conversation_id = m.conversation_id AND p.id = m.participant_id " +
+            "WHERE m.tenant_id = @TenantId AND m.conversation_id = @ConversationId AND m.seq > @AfterSeq ORDER BY m.seq " + dialect.LimitClause + ";",
             new { TenantId = tenantId, ConversationId = conversationId, AfterSeq = afterSeq, Limit = Math.Min(limit, options.MaxListLimit) },
             cancellationToken: cancellationToken));
-        return new MessagePage(ListOutcome.Listed, rows.Select(r => r.ToMessage()).ToList());
+        return new MessagePage(ListOutcome.Listed, rows.Select(r => ViewOf(actor.Kind, r.ToMessage(actor.Kind), conversationId)).ToList());
+    }
+
+    /// <summary>The message as the viewer may see it. A masker that throws (or times out) hides the body: fail closed, never the raw text.</summary>
+    private ConversationMessage ViewOf(ConversationActorKind viewer, ConversationMessage message, Guid conversationId)
+    {
+        try
+        {
+            return masker.Mask(viewer, message);
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            // The exception type only: a masker's message or stack may quote the text it choked on.
+            logger.LogWarning("Conversation {ConversationId} message {MessageId} could not be masked for a {Viewer} viewer ({ExceptionType}); its body is hidden", conversationId, message.Id, viewer, ex.GetType().Name);
+            return message with { Body = message.IsRedacted ? null : MaskFailedBody };
+        }
     }
 
     /// <inheritdoc />
@@ -216,12 +235,12 @@ internal sealed partial class ConversationService(
         return new CloseResult(closed == 1 ? CloseOutcome.Closed : CloseOutcome.AlreadyClosed);
     }
 
-    private DateTime Now() => time.GetUtcNow().UtcDateTime;
+    internal DateTime Now() => time.GetUtcNow().UtcDateTime;
 
-    private async ValueTask<bool> AllowedAsync(ConversationActor actor, string tenantId, Guid? conversationId, ConversationAction action, CancellationToken cancellationToken, ConversationSubject? subject = null) =>
+    internal async ValueTask<bool> AllowedAsync(ConversationActor actor, string tenantId, Guid? conversationId, ConversationAction action, CancellationToken cancellationToken, ConversationSubject? subject = null) =>
         await policy.CanAsync(actor, new ConversationTarget(tenantId, conversationId, subject), action, cancellationToken);
 
-    private async Task<DbConnection> OpenConnectionAsync(CancellationToken cancellationToken)
+    internal async Task<DbConnection> OpenConnectionAsync(CancellationToken cancellationToken)
     {
         var connection = dialect.CreateConnection();
         try
@@ -237,18 +256,19 @@ internal sealed partial class ConversationService(
     }
 
     /// <summary>
-    /// The participant this actor is, in this tenant and conversation, if still active and of the matching kind. The id a guest actor carries is only a
-    /// lookup key here, never an assertion: a member's participant id offered as a guest matches nothing.
+    /// The participant this actor is, in this tenant and conversation, if still active and of the matching kind. A guest is proved by the hash of the session key it
+    /// holds (this tenant and conversation, unexpired, not revoked, participant not left) in the same statement; no id the caller supplies is trusted.
     /// </summary>
-    private static async Task<Guid?> ResolveParticipantAsync(DbConnection connection, DbTransaction? transaction, ConversationActor actor, string tenantId, Guid conversationId, CancellationToken cancellationToken)
+    internal async Task<Guid?> ResolveParticipantAsync(DbConnection connection, DbTransaction? transaction, ConversationActor actor, string tenantId, Guid conversationId, CancellationToken cancellationToken)
     {
         const string Active = "tenant_id = @TenantId AND conversation_id = @ConversationId AND left_at IS NULL";
         var sql = actor switch
         {
             { Kind: ConversationActorKind.Member or ConversationActorKind.Partner, UserRef: not null } =>
                 $"SELECT id FROM conversation_participants WHERE {Active} AND kind = 0 AND user_ref = @UserRef;",
-            { Kind: ConversationActorKind.Guest, ParticipantId: not null } =>
-                $"SELECT id FROM conversation_participants WHERE {Active} AND kind = 1 AND id = @ParticipantId;",
+            { Kind: ConversationActorKind.Guest, GuestSession: not null } =>
+                "SELECT p.id FROM conversation_guest_sessions s JOIN conversation_participants p ON p.tenant_id = s.tenant_id AND p.conversation_id = s.conversation_id AND p.id = s.participant_id " +
+                "WHERE s.key_hash = @KeyHash AND s.tenant_id = @TenantId AND s.conversation_id = @ConversationId AND s.revoked_at IS NULL AND s.expires_at > @Now AND p.left_at IS NULL AND p.kind = 1;",
             _ => null,
         };
 
@@ -257,7 +277,7 @@ internal sealed partial class ConversationService(
             ? null
             : await connection.QuerySingleOrDefaultAsync<Guid?>(new CommandDefinition(
                 sql,
-                new { TenantId = tenantId, ConversationId = conversationId, UserRef = ConversationInput.StoredUserRef(actor), actor.ParticipantId },
+                new { TenantId = tenantId, ConversationId = conversationId, UserRef = ConversationInput.StoredUserRef(actor), KeyHash = actor.GuestSession?.Hash(), Now = Now() },
                 transaction,
                 cancellationToken: cancellationToken));
     }
@@ -292,7 +312,21 @@ internal sealed partial class ConversationService(
 
         public object? RedactedAt { get; set; }
 
-        public ConversationMessage ToMessage() => new(
+        public int? SenderKind { get; set; }
+
+        public string? SenderName { get; set; }
+
+        public string? SenderRole { get; set; }
+
+        /// <summary>A guest sees staff by role label, never by name; everyone else sees the display name.</summary>
+        private string? LabelFor(ConversationActorKind viewer) => SenderKind switch
+        {
+            (int)ParticipantKind.System or null => "System",
+            (int)ParticipantKind.Member when viewer == ConversationActorKind.Guest => string.IsNullOrWhiteSpace(SenderRole) ? "Staff" : SenderRole,
+            _ => SenderName,
+        };
+
+        public ConversationMessage ToMessage(ConversationActorKind viewer) => new(
             Id,
             Seq,
             ParticipantId,
@@ -304,6 +338,7 @@ internal sealed partial class ConversationService(
             },
             Body,
             ConversationTime.ToUtc(CreatedAt),
-            RedactedAt is not null);
+            RedactedAt is not null,
+            LabelFor(viewer));
     }
 }

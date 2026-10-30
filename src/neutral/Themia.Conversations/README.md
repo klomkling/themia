@@ -3,8 +3,8 @@
 A per-object chat for members and guests: tenant-scoped conversations, participants, messages and attachments. Design:
 `docs/superpowers/specs/2026-10-29-themia-conversations-design.md`.
 
-**Status: the store.** Schema, engine packages, options and the default-deny policy shipped first; this part adds `IConversationService` (open, join, post, list,
-mark read, close) and the transaction-aware `IConversationEventSink`. Guests, notification delivery, retention and erasure, export and the ASP.NET Core
+**Status: the store and guests.** Schema, engine packages, options and the default-deny policy shipped first; this part adds `IConversationService` (open, join, post, list,
+mark read, close) and the transaction-aware `IConversationEventSink`. Guest invites, the token exchange and read-time masking are in; self-service re-invite, notification delivery, retention and erasure, export and the ASP.NET Core
 endpoints follow in later releases.
 
 ```csharp
@@ -17,7 +17,7 @@ var posted = await conversations.PostAsync(actor, tenantId, opened.ConversationI
 ```
 
 - **Every call takes the `Actor` and the tenant.** Order inside a call: access policy, then the acting participant is resolved inside the transaction (this tenant
-  and conversation, not left, kind matching the actor; a guest's `ParticipantId` is only a lookup key: build a guest actor only from a verified guest session), then the idempotency read, the sequence counter, the inserts.
+  and conversation, not left, kind matching the actor; a guest is proved by the hash of the `GuestSessionKey` it holds: unexpired, not revoked, participant not left, this tenant and conversation, checked inside the same transaction), then the idempotency read, the sequence counter, the inserts.
   A denied call, a stranger and another tenant's conversation all answer `Refused`.
 - **Post is ordered and idempotent.** `Seq` is dense per conversation: the counter row lock serialises posters (PostgreSQL `RETURNING`, SQL Server `OUTPUT`, MySQL
   `LAST_INSERT_ID(expr)`). The same `ClientMessageId` returns `Duplicate` with the original message and overwrites nothing. A deadlock or lock timeout retries the whole
@@ -36,3 +36,38 @@ var posted = await conversations.PostAsync(actor, tenantId, opened.ConversationI
   (`Acme` and `acme` are different tenants).
 - **Retention is a setting, pending counsel review:** 180 days after the subject closes by default, per `SubjectType` if you list it. Do not treat the number as decided.
 - **MariaDB is not supported**, like the rest of Themia.
+
+## Guests
+
+A guest is a participant invited by contact (e-mail, E.164 phone or LINE id). The app sends the link; the core only issues the token.
+
+```csharp
+services.AddThemiaChallenges(o => o.ConfigureConversationGuestPurpose(TimeSpan.FromHours(72)));   // + one Challenges engine registration
+services.AddThemiaConversationGuests(o =>
+{
+    o.Peppers["2026-10"] = pepperBytes;      // >= 32 random bytes from your secret store
+    o.CurrentPepperId = "2026-10";
+});
+
+var invite = await guests.InviteAsync(memberActor, tenantId, conversationId, new GuestContact(GuestContactKind.Email, "guest@example.com"), "Guest");
+// hand invite.Token!.Reveal() to your sender; never store or log it (Token and the contact have no property that returns their text, so logging an invite or a contact does not write them out)
+var session = await guestAccess.ExchangeAsync(tenantId, tokenFromThePostedForm);          // POST only
+var actor = ConversationActor.ForGuest(new GuestSessionKey(cookieValue));
+```
+
+- **The session is the only way to act as a guest.** `ExchangeAsync` redeems the token (one use) and returns a 256-bit key once; the store keeps only its SHA-256. Every call
+  with a guest actor re-proves the session in the same statement, so leaving the conversation, closing it, expiry or revocation end access at once. `GuestSessionKey` has
+  no member that returns the text, so logging or serialising an actor does not leak it. Session length is `SessionLifetime` (default 7 days, an interim value).
+- **Redeem from a POST, never a GET:** mail and chat link previewers fetch URLs and would spend the token. Move the token out of the URL, send `Cache-Control: no-store`
+  and `Referrer-Policy: no-referrer`, and rate-limit the endpoint by address and tenant (the `.AspNetCore` part will).
+- **Revocation is read-then-write.** A post already in flight can commit after a concurrent redeem revoked its key; the next call is refused.
+- **One live link per guest.** A re-invite supersedes the earlier link ("the old link stopped working" is expected). The guest's earlier sessions end when the new link is
+  redeemed, not when it is issued, so someone who only knows a contact cannot log the guest out. Every failed exchange is one `Refused`.
+- **Limits are layered.** `Themia.Challenges` throttles per participant. The core adds `MaxGuestsPerConversation` (default 50). Per-contact and per-inviter delivery
+  throttling (SMS pumping) belongs to the sender you write.
+- **Contacts are hashed, never stored.** HMAC-SHA256 under a versioned pepper over `kind:value`; an e-mail is lower-cased, a phone must be E.164 (a national form would make
+  one person two guests), a LINE id keeps its case. **Never remove a pepper id while any row carries it:** the guest would not be found, a re-invite would add a second
+  participant and a data-subject lookup would miss the person. Rotate by adding an id and making it current; a guest is re-hashed when next invited.
+- **Masking is a read-time projection** (`IConversationMasker`, default regex): for a guest viewer e-mail, phone numbers and handles in the text are replaced and staff show
+  their role label (or "Staff"). Best effort, not a control. If the masker throws, the body is hidden (`[message hidden]`), never shown raw. The stored text stays whole.
+- A guest who left is not re-added by an invite; a call to add them back arrives with the retention part.
