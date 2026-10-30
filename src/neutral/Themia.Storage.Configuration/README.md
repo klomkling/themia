@@ -39,7 +39,9 @@ Refused at start: an unknown key under `Storage:S3`, `Storage:Local`, `Storage:P
 with a Local public slot; `Storage:Local:PublicRootPath`/`PublicBaseUrl` with an S3/R2 public slot; a public root inside the
 private root's `blobs`/`content-types` directory (or the reverse). Messages name the key and never a value. The root checks compare paths, not symlinks or junctions: a link from one root into the other is not caught.
 
-## Deprecated keys (read with a startup warning, removed in 0.48.0)
+## Deprecated keys (read with a startup warning)
+
+Removed in the first release after every adopting app has switched; the CHANGELOG announces it.
 
 | Old | New |
 |---|---|
@@ -51,6 +53,37 @@ Setting an old key together with its new one is refused (`DownloadBaseUrl` may r
 **`Storage:S3:BucketName` is not accepted**: it is now `Storage:S3:PublicBucketName`, and there is no private bucket.
 `RootPath` has no default; an app that relied on the `uploads` default sets `Storage:Local:RootPath=uploads`.
 `SigningKey` is required even with a Local-only public slot.
+
+## Per app: old key -> new key
+
+Copy the app's block into its adoption runbook. Names are environment variables.
+
+**Propertiezy** (today `Split`)
+
+| Old | New |
+|---|---|
+| `Storage__Provider=Split` | `Storage__Public__Provider=R2` |
+| `Storage__S3__*` (`ServiceUrl`, `ForcePathStyle`, `Region`, `PublicBucketName`, `PublicBaseUrl`, `AccessKey`, `SecretKey`) | unchanged |
+| `Storage__Local__RootPath`, `SigningKey`, `PresignedBaseUrl` | unchanged |
+
+**EzyAssets**
+
+| Old | New |
+|---|---|
+| `Storage__Public__Provider`, `Storage__Private__Provider=Local` | unchanged |
+| `Storage__S3__BucketName` (the public bucket) | `Storage__S3__PublicBucketName` (the old name is refused) |
+| `Storage__S3__PublicBaseUrl`, `ServiceUrl`, `Region`, `AccessKey`, `SecretKey`, `ForcePathStyle` | unchanged (`AccessKey` and `SecretKey` both required) |
+| `Storage__Local__UploadsDirectory` (default `uploads`) | `Storage__Local__RootPath=uploads` (no default; set it explicitly) |
+| `Storage__Local__PublicBaseUrl` | unchanged (Local public slot only) |
+| (none) | `Storage__Local__SigningKey`: new and required. Generate a random value of 32+ characters in the secret store (Coolify); never a file |
+
+**EzyServices** (Local only)
+
+| Old | New |
+|---|---|
+| `Storage__Provider=Local` | remove (Local is the default) |
+| `Storage__Local__RootPath`, `SigningKey` | unchanged |
+| `Storage__DownloadBaseUrl` | `Storage__Local__PresignedBaseUrl` |
 
 ## Not covered
 

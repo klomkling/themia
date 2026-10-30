@@ -217,7 +217,7 @@ public sealed class StorageConfigurationTests : IDisposable
         Assert.IsType<SplitStorageProvider>(host.Services.GetRequiredService<IStorageProvider>());
         var warning = Assert.Single(logs.Warnings);
         Assert.Contains("Storage:Provider", warning);
-        Assert.Contains(StorageSettingsReader.LegacyKeysRemovedIn, warning);
+        Assert.Contains("later release", warning);
         Assert.All(new[] { SecretKey, AccessKey, SigningKey }, secret => Assert.DoesNotContain(secret, warning));
     }
 

@@ -11,9 +11,6 @@ namespace Themia.Storage.Configuration;
 /// </summary>
 internal static class StorageSettingsReader
 {
-    /// <summary>The release after which the deprecated keys stop being read.</summary>
-    internal const string LegacyKeysRemovedIn = "0.48.0";
-
     private const string Local = "Local";
     private const string PrivateProvider = "Storage:Private:Provider";
     private const string PublicProvider = "Storage:Public:Provider";

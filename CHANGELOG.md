@@ -38,7 +38,8 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
   that would be dead configuration are refused. Env names and the key table are in the package README.
 
 ### Deprecated
-- Storage keys accepted by `AddThemiaStorageFromConfiguration` with a startup warning, removed in 0.48.0:
+- Storage keys accepted by `AddThemiaStorageFromConfiguration` with a startup warning, removed in the first release after
+  every adopting app has switched (announced here):
   `Storage:Provider` (use `Storage:Public:Provider`; `Split` becomes `S3`), `Storage:Local:UploadsDirectory` (use
   `Storage:Local:RootPath`), `Storage:DownloadBaseUrl` (use `Storage:Local:PresignedBaseUrl`).
   `Storage:S3:BucketName` is not accepted at all: it is `Storage:S3:PublicBucketName` now.

@@ -50,7 +50,7 @@ public static class StorageConfigurationServiceCollectionExtensions
             var logger = sp.GetRequiredService<ILoggerFactory>().CreateLogger("Themia.Storage.Configuration");
             foreach (var warning in settings.Warnings)
             {
-                logger.LogWarning("{Warning} The deprecated keys are read until {RemovedIn}.", warning, StorageSettingsReader.LegacyKeysRemovedIn);
+                logger.LogWarning("{Warning} Deprecated keys will stop being read in a later release; switch to the new names.", warning);
             }
 
             return settings;
