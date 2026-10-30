@@ -1,0 +1,7 @@
+#nullable enable
+static Themia.Conversations.MySql.ServiceCollectionExtensions.AddThemiaConversationsMySql(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, string! connectionString) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+Themia.Conversations.MySql.MySqlConversationDialect
+Themia.Conversations.MySql.MySqlConversationDialect.CreateConnection() -> System.Data.Common.DbConnection!
+Themia.Conversations.MySql.MySqlConversationDialect.IsDuplicateKey(System.Data.Common.DbException! exception) -> bool
+Themia.Conversations.MySql.MySqlConversationDialect.MySqlConversationDialect(string! connectionString) -> void
+Themia.Conversations.MySql.ServiceCollectionExtensions

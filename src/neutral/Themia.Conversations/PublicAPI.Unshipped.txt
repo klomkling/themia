@@ -1,0 +1,75 @@
+#nullable enable
+const Themia.Conversations.ConversationOptions.BodyColumnWidth = 4000 -> int
+const Themia.Conversations.ConversationOptions.DisplayNameColumnWidth = 80 -> int
+override Themia.Conversations.Migrations.ConversationSchemaMigration.Down() -> void
+override Themia.Conversations.Migrations.ConversationSchemaMigration.Up() -> void
+static Themia.Conversations.DependencyInjection.ConversationServiceCollectionExtensions.AddThemiaConversations(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Themia.Conversations.ConversationOptions!>? configure = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+Themia.Conversations.ConversationAction
+Themia.Conversations.ConversationAction.Close = 4 -> Themia.Conversations.ConversationAction
+Themia.Conversations.ConversationAction.Export = 6 -> Themia.Conversations.ConversationAction
+Themia.Conversations.ConversationAction.Invite = 5 -> Themia.Conversations.ConversationAction
+Themia.Conversations.ConversationAction.MarkRead = 3 -> Themia.Conversations.ConversationAction
+Themia.Conversations.ConversationAction.Open = 0 -> Themia.Conversations.ConversationAction
+Themia.Conversations.ConversationAction.Post = 2 -> Themia.Conversations.ConversationAction
+Themia.Conversations.ConversationAction.Read = 1 -> Themia.Conversations.ConversationAction
+Themia.Conversations.ConversationActor
+Themia.Conversations.ConversationActor.ConversationActor(Themia.Conversations.ConversationActorKind Kind, string? UserRef = null, string? Scope = null, System.Guid? ParticipantId = null) -> void
+Themia.Conversations.ConversationActor.Kind.get -> Themia.Conversations.ConversationActorKind
+Themia.Conversations.ConversationActor.Kind.init -> void
+Themia.Conversations.ConversationActor.ParticipantId.get -> System.Guid?
+Themia.Conversations.ConversationActor.ParticipantId.init -> void
+Themia.Conversations.ConversationActor.Scope.get -> string?
+Themia.Conversations.ConversationActor.Scope.init -> void
+Themia.Conversations.ConversationActor.UserRef.get -> string?
+Themia.Conversations.ConversationActor.UserRef.init -> void
+Themia.Conversations.ConversationActorKind
+Themia.Conversations.ConversationActorKind.Guest = 1 -> Themia.Conversations.ConversationActorKind
+Themia.Conversations.ConversationActorKind.Member = 0 -> Themia.Conversations.ConversationActorKind
+Themia.Conversations.ConversationActorKind.Partner = 2 -> Themia.Conversations.ConversationActorKind
+Themia.Conversations.ConversationActorKind.System = 3 -> Themia.Conversations.ConversationActorKind
+Themia.Conversations.ConversationOptions
+Themia.Conversations.ConversationOptions.ConversationOptions() -> void
+Themia.Conversations.ConversationOptions.DefaultRetention.get -> System.TimeSpan
+Themia.Conversations.ConversationOptions.DefaultRetention.set -> void
+Themia.Conversations.ConversationOptions.MaxAttachmentBytesPerConversation.get -> long
+Themia.Conversations.ConversationOptions.MaxAttachmentBytesPerConversation.set -> void
+Themia.Conversations.ConversationOptions.MaxAttachmentBytesPerMessage.get -> long
+Themia.Conversations.ConversationOptions.MaxAttachmentBytesPerMessage.set -> void
+Themia.Conversations.ConversationOptions.MaxAttachmentsPerMessage.get -> int
+Themia.Conversations.ConversationOptions.MaxAttachmentsPerMessage.set -> void
+Themia.Conversations.ConversationOptions.MaxBodyLength.get -> int
+Themia.Conversations.ConversationOptions.MaxBodyLength.set -> void
+Themia.Conversations.ConversationOptions.MaxDisplayNameLength.get -> int
+Themia.Conversations.ConversationOptions.MaxDisplayNameLength.set -> void
+Themia.Conversations.ConversationOptions.MaxListLimit.get -> int
+Themia.Conversations.ConversationOptions.MaxListLimit.set -> void
+Themia.Conversations.ConversationOptions.RetentionBySubjectType.get -> System.Collections.Generic.IDictionary<string!, System.TimeSpan>!
+Themia.Conversations.ConversationOptions.RetentionFor(string! subjectType) -> System.TimeSpan
+Themia.Conversations.ConversationRetentionState
+Themia.Conversations.ConversationRetentionState.Active = 0 -> Themia.Conversations.ConversationRetentionState
+Themia.Conversations.ConversationRetentionState.Expired = 2 -> Themia.Conversations.ConversationRetentionState
+Themia.Conversations.ConversationRetentionState.LegalHold = 1 -> Themia.Conversations.ConversationRetentionState
+Themia.Conversations.ConversationState
+Themia.Conversations.ConversationState.Closed = 1 -> Themia.Conversations.ConversationState
+Themia.Conversations.ConversationState.Open = 0 -> Themia.Conversations.ConversationState
+Themia.Conversations.ConversationTarget
+Themia.Conversations.ConversationTarget.ConversationId.get -> System.Guid?
+Themia.Conversations.ConversationTarget.ConversationId.init -> void
+Themia.Conversations.ConversationTarget.ConversationTarget(string! TenantId, System.Guid? ConversationId) -> void
+Themia.Conversations.ConversationTarget.TenantId.get -> string!
+Themia.Conversations.ConversationTarget.TenantId.init -> void
+Themia.Conversations.DependencyInjection.ConversationServiceCollectionExtensions
+Themia.Conversations.IConversationAccessPolicy
+Themia.Conversations.IConversationAccessPolicy.CanAsync(Themia.Conversations.ConversationActor! actor, Themia.Conversations.ConversationTarget! target, Themia.Conversations.ConversationAction action, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<bool>
+Themia.Conversations.IConversationDialect
+Themia.Conversations.IConversationDialect.CreateConnection() -> System.Data.Common.DbConnection!
+Themia.Conversations.IConversationDialect.IsDuplicateKey(System.Data.Common.DbException! exception) -> bool
+Themia.Conversations.MessageKind
+Themia.Conversations.MessageKind.System = 1 -> Themia.Conversations.MessageKind
+Themia.Conversations.MessageKind.Text = 0 -> Themia.Conversations.MessageKind
+Themia.Conversations.Migrations.ConversationSchemaMigration
+Themia.Conversations.Migrations.ConversationSchemaMigration.ConversationSchemaMigration() -> void
+Themia.Conversations.ParticipantKind
+Themia.Conversations.ParticipantKind.Guest = 1 -> Themia.Conversations.ParticipantKind
+Themia.Conversations.ParticipantKind.Member = 0 -> Themia.Conversations.ParticipantKind
+Themia.Conversations.ParticipantKind.System = 2 -> Themia.Conversations.ParticipantKind
