@@ -57,6 +57,14 @@ public static class IdentityAspNetCoreServiceCollectionExtensions
         // bare ServiceCollection. AddLogging is idempotent/TryAdd-based.
         services.AddLogging();
 
+        // Second factor: the default policy asks nobody (every flow behaves as before). An app replaces the policy
+        // to require one; the ticket service (data protection + a single-use user token) and the completion are
+        // what it needs to finish such a login. Data protection keys must be persisted in production.
+        services.AddDataProtection();
+        services.TryAddSingleton<ISecondFactorPolicy>(NotRequiredSecondFactorPolicy.Instance);
+        services.TryAddScoped<ISecondFactorTicketService, SecondFactorTicketService>();
+        services.TryAddScoped<ISecondFactorCompletion, SecondFactorCompletion>();
+
         services.TryAddScoped<IAuthenticationFlow, AuthenticationFlow>();
         services.TryAddScoped<IAuthenticationHooks, AuthenticationHooksBase>();
 

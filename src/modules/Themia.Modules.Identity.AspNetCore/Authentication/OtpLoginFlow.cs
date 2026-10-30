@@ -30,8 +30,10 @@ public sealed class OtpLoginFlow : IOtpLoginFlow
     private readonly IdentityModuleOptions identityOptions;
     private readonly TimeProvider timeProvider;
     private readonly ILogger<OtpLoginFlow> logger;
+    private readonly ISecondFactorPolicy secondFactorPolicy;
+    private readonly ISecondFactorTicketService? secondFactorTickets;
 
-    /// <summary>Creates the flow.</summary>
+    /// <summary>Creates the flow with the default second-factor policy (nobody owes a second factor).</summary>
     public OtpLoginFlow(
         IUserService users,
         IOtpRecipientResolver recipients,
@@ -46,7 +48,47 @@ public sealed class OtpLoginFlow : IOtpLoginFlow
         IdentityModuleOptions identityOptions,
         TimeProvider timeProvider,
         ILogger<OtpLoginFlow> logger)
+        : this(users, recipients, challenges, sender, phoneNormalizer, principalFactory, accessTokens, refreshTokens, hooks, observers,
+              identityOptions, timeProvider, logger, NotRequiredSecondFactorPolicy.Instance, null)
     {
+    }
+
+    /// <summary>Creates the flow.</summary>
+    /// <param name="users">The user service.</param>
+    /// <param name="recipients">Resolves who a code may be sent to.</param>
+    /// <param name="challenges">Issues and checks one-time codes.</param>
+    /// <param name="sender">Delivers the code.</param>
+    /// <param name="phoneNormalizer">Normalises phone numbers.</param>
+    /// <param name="principalFactory">Builds the principal for the access token.</param>
+    /// <param name="accessTokens">Issues access tokens.</param>
+    /// <param name="refreshTokens">Issues refresh tokens.</param>
+    /// <param name="hooks">The authentication hooks.</param>
+    /// <param name="observers">The identity event observers.</param>
+    /// <param name="identityOptions">The module options.</param>
+    /// <param name="timeProvider">The clock.</param>
+    /// <param name="logger">The logger.</param>
+    /// <param name="secondFactorPolicy">Decides whether a user who passed the code check owes a second factor.</param>
+    /// <param name="secondFactorTickets">Issues the ticket of a login waiting for its second factor; required only when the policy asks for one.</param>
+    public OtpLoginFlow(
+        IUserService users,
+        IOtpRecipientResolver recipients,
+        IOtpChallengeService challenges,
+        IOtpCodeSender sender,
+        IPhoneNumberNormalizer phoneNormalizer,
+        IClaimsPrincipalFactory principalFactory,
+        IAccessTokenService accessTokens,
+        IRefreshTokenService refreshTokens,
+        IAuthenticationHooks hooks,
+        IEnumerable<IIdentityEventObserver> observers,
+        IdentityModuleOptions identityOptions,
+        TimeProvider timeProvider,
+        ILogger<OtpLoginFlow> logger,
+        ISecondFactorPolicy secondFactorPolicy,
+        ISecondFactorTicketService? secondFactorTickets = null)
+    {
+        ArgumentNullException.ThrowIfNull(secondFactorPolicy);
+        this.secondFactorPolicy = secondFactorPolicy;
+        this.secondFactorTickets = secondFactorTickets;
         ArgumentNullException.ThrowIfNull(users);
         ArgumentNullException.ThrowIfNull(recipients);
         ArgumentNullException.ThrowIfNull(challenges);
@@ -202,6 +244,16 @@ public sealed class OtpLoginFlow : IOtpLoginFlow
         if (!user.PhoneNumberConfirmed || !string.Equals(user.NormalizedPhoneNumber, check.NormalizedPhoneNumber, StringComparison.Ordinal))
         {
             return await FailAsync(phone, LoginFailureReason.InvalidOtp, LoginResult.InvalidCredentials(), cancellationToken).ConfigureAwait(false);
+        }
+
+        // The code was right, so this is not a failed login. A user who owes a second factor gets a ticket
+        // instead of tokens; OnLoginSucceeded fires when the login completes.
+        var pending = await SecondFactorGate.RequireAsync(
+            secondFactorPolicy, secondFactorTickets, user, SecondFactorMethod.Otp, null, false, false, cancellationToken).ConfigureAwait(false);
+        if (pending is { } owed)
+        {
+            logger.LogInformation("User {UserId} passed the one-time code check and owes a second factor ({Stage}).", user.Id, owed.Stage);
+            return LoginResult.RequiresSecondFactor(owed);
         }
 
         var succeeded = new LoginSucceededContext(user);

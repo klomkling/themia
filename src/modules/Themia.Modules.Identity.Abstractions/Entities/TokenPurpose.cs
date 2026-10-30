@@ -14,4 +14,7 @@ public enum TokenPurpose
 
     /// <summary>A two-factor authentication challenge token.</summary>
     TwoFactor,
+
+    /// <summary>The single-use ticket of a login waiting for its second factor.</summary>
+    SecondFactorTicket,
 }

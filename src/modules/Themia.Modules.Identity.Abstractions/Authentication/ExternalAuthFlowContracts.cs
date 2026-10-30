@@ -19,14 +19,18 @@ public enum ExternalLoginOutcome
     /// <summary>The resolved (pre-existing) linked account is inactive or locked out. Collapses to the
     /// same uniform 401 as the other failures; the distinct value exists only so audit sees the reason.</summary>
     AccountInactive,
+
+    /// <summary>The provider accepted the identity but the app's <see cref="ISecondFactorPolicy"/> requires a second factor first: nothing was
+    /// issued, and this is not a failed login. See <see cref="ExternalLoginFlowResult.SecondFactor"/>.</summary>
+    SecondFactorRequired,
 }
 
 /// <summary>The result of <see cref="IExternalAuthenticationFlow.AuthenticateAsync"/>.</summary>
 public readonly record struct ExternalLoginFlowResult
 {
-    private ExternalLoginFlowResult(ExternalLoginOutcome outcome, AuthTokens? tokens, bool wasCreated, bool wasLinked)
+    private ExternalLoginFlowResult(ExternalLoginOutcome outcome, AuthTokens? tokens, bool wasCreated, bool wasLinked, PendingSecondFactor? secondFactor = null)
     {
-        Outcome = outcome; Tokens = tokens; WasCreated = wasCreated; WasLinked = wasLinked;
+        Outcome = outcome; Tokens = tokens; WasCreated = wasCreated; WasLinked = wasLinked; SecondFactor = secondFactor;
     }
 
     /// <summary>The outcome.</summary>
@@ -40,6 +44,9 @@ public readonly record struct ExternalLoginFlowResult
 
     /// <summary>Whether a new link was created.</summary>
     public bool WasLinked { get; }
+
+    /// <summary>The pending second factor when <see cref="Outcome"/> is <see cref="ExternalLoginOutcome.SecondFactorRequired"/>; otherwise null.</summary>
+    public PendingSecondFactor? SecondFactor { get; }
 
     /// <summary>Whether the attempt succeeded.</summary>
     public bool Succeeded => Outcome == ExternalLoginOutcome.Success;
@@ -59,6 +66,13 @@ public readonly record struct ExternalLoginFlowResult
 
     /// <summary>Creates a denied result.</summary>
     public static ExternalLoginFlowResult Denied() => new(ExternalLoginOutcome.Denied, null, false, false);
+
+    /// <summary>Creates a result for a login that must pass a second factor before anything is issued.</summary>
+    /// <param name="pending">The pending login and its ticket.</param>
+    /// <param name="created">Whether a new user was provisioned.</param>
+    /// <param name="linked">Whether a new link was created.</param>
+    public static ExternalLoginFlowResult RequiresSecondFactor(PendingSecondFactor pending, bool created, bool linked) =>
+        new(ExternalLoginOutcome.SecondFactorRequired, null, created, linked, pending);
 
     /// <summary>Creates an account-inactive result (resolved account is disabled or locked out).</summary>
     public static ExternalLoginFlowResult AccountInactive() => new(ExternalLoginOutcome.AccountInactive, null, false, false);

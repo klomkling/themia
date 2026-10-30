@@ -38,11 +38,25 @@ public sealed class ServiceRegistrationTests
         Assert.Contains(services, d => d.ServiceType == typeof(IAccessTokenService));
         Assert.Contains(services, d => d.ServiceType == typeof(IAuthenticationFlow));
         Assert.Contains(services, d => d.ServiceType == typeof(IAuthenticationHooks));
+        Assert.Contains(services, d => d.ServiceType == typeof(ISecondFactorPolicy));
+        Assert.Contains(services, d => d.ServiceType == typeof(ISecondFactorTicketService));
+        Assert.Contains(services, d => d.ServiceType == typeof(ISecondFactorCompletion));
 
         // The external-login flow/hooks are now owned by AddThemiaExternalAuth (ExternalAuth package),
         // not AddThemiaIdentityAspNetCore — so they are intentionally absent here.
         Assert.DoesNotContain(services, d => d.ServiceType == typeof(IExternalAuthenticationFlow));
         Assert.DoesNotContain(services, d => d.ServiceType == typeof(IExternalAuthenticationHooks));
+    }
+
+    [Fact]
+    public void AddThemiaIdentityAspNetCore_keeps_an_app_second_factor_policy()
+    {
+        var services = WithCoreIdentity();
+        var own = new ScriptedSecondFactorPolicy();
+        services.AddSingleton<ISecondFactorPolicy>(own);
+        services.AddThemiaIdentityAspNetCore(Configure);
+
+        Assert.Single(services, d => d.ServiceType == typeof(ISecondFactorPolicy));
     }
 
     [Fact]

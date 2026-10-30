@@ -342,6 +342,49 @@ Known limits, so you can decide what to add:
 - **Expired rows** are purged in small batches on later starts; there is no background job.
 - **Which login methods are enabled** per tenant or user is not modelled here. Enforce it in `OnBeforeLoginAsync` for now.
 
+## Requiring a second factor (staff MFA)
+
+Themia does not verify a second factor; it gives the app one place to say "this user owes one" and one way to finish the
+login afterwards. Register an `ISecondFactorPolicy`; the default asks nobody, so nothing changes until you do.
+
+```csharp
+public sealed class StaffMfaPolicy(IMfaStore mfa) : ISecondFactorPolicy
+{
+    public async ValueTask<SecondFactorRequirement> EvaluateAsync(SecondFactorContext context, CancellationToken ct = default) =>
+        !await mfa.IsStaffAsync(context.UserId, ct) ? SecondFactorRequirement.NotRequired
+        : await mfa.HasFactorAsync(context.UserId, ct) ? SecondFactorRequirement.Verify
+        : SecondFactorRequirement.Enrol;
+}
+services.AddSingleton<ISecondFactorPolicy, StaffMfaPolicy>();   // after AddThemiaIdentityAspNetCore (TryAdd)
+```
+
+- The policy runs **after the primary check succeeded and before anything is issued**, in all three Themia flows: password
+  (`LoginAsync`), one-time code (`VerifyAsync`) and external login (`AuthenticateAsync`). `SecondFactorContext` carries the
+  method and, for external login, the provider key.
+- A login that owes a second factor returns `LoginOutcome.SecondFactorRequired` (external: `ExternalLoginOutcome.SecondFactorRequired`)
+  with `result.SecondFactor`: the `UserId`, the `Stage` (`Verify` or `Enrol`), an opaque single-use `Ticket` and its `ExpiresAt`
+  (Verify tickets live 5 minutes, Enrol tickets 15). Nothing is issued: no refresh row, no tokens. It is **not** a failed login:
+  no failure hook, no lockout count, and `OnLoginSucceeded` fires only when the login completes. The built-in endpoints answer
+  it with their uniform 401 because they cannot complete the factor; use your own controller.
+- The app verifies (or enrols and confirms) the factor itself, for example with `Themia.Totp`, then calls
+  `ISecondFactorCompletion.CompleteAsync(ticket)`. It consumes the ticket, **repeats the original flow's gates** in the ticket's
+  tenant scope (the user still exists in that tenant, is active and not locked out, has the same security stamp, the login method
+  is still switched on, a one-time-code user still has a confirmed phone), runs the method's own success hook and observer
+  (external logins get the external ones, with `WasCreated`/`WasLinked`), and issues the session exactly as a normal login would
+  (same claims, same `sid`). A hook that denies at completion returns `Denied`. After too many wrong codes call
+  `RejectAsync(ticket)` to burn the ticket; the attempt limits are the app's.
+- A policy that throws stops the login with that exception and nothing is issued (it is not turned into a "bad password").
+  A policy that asks for a second factor while no `ISecondFactorTicketService` is registered also throws.
+- Tickets are protected with ASP.NET Core data protection plus a single-use user token (`TokenPurpose.SecondFactorTicket`); persist
+  the data-protection keys in production. Losing them only invalidates tickets in flight. The ticket and the password are never logged.
+- **The seam covers only the three Themia flows.** Code that mints sessions with the public building blocks
+  (`IRefreshTokenService.IssueAsync`, `IAccessTokenService.Issue`) bypasses it and must call `ISecondFactorPolicy` itself. A
+  federation or bot sign-in in your app is such a path.
+- **Enabling a policy does not end existing sessions.** Refresh families minted before the policy was on stay valid and keep
+  rotating; revoke the affected users' families (`IRefreshTokenService.RevokeAllForUserAsync`) when you turn it on.
+- Breaking for source: `LoginOutcome` and `ExternalLoginOutcome` gain a member, so an exhaustive `switch` without a discard stops
+  compiling until it handles `SecondFactorRequired`. `result.Succeeded` is unchanged, so `if (!result.Succeeded)` callers fail closed.
+
 ## Refresh, logout and one-time-code login with no tenant scope
 
 With a claims-only tenant strategy the tenant comes from the JWT, but `refresh`, `logout`, `otp/start` and `otp/verify` carry no JWT, so

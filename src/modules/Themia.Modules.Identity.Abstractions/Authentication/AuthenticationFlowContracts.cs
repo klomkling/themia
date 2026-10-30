@@ -36,15 +36,20 @@ public enum LoginOutcome
 
     /// <summary>A hook denied the attempt.</summary>
     Denied,
+
+    /// <summary>The primary check passed but the app's <see cref="ISecondFactorPolicy"/> requires a second factor first: nothing was issued, and
+    /// this is not a failed login (no failure hook, no lockout count). See <see cref="LoginResult.SecondFactor"/>.</summary>
+    SecondFactorRequired,
 }
 
 /// <summary>The result of <see cref="IAuthenticationFlow.LoginAsync"/>.</summary>
 public readonly record struct LoginResult
 {
-    private LoginResult(LoginOutcome outcome, AuthTokens? tokens)
+    private LoginResult(LoginOutcome outcome, AuthTokens? tokens, PendingSecondFactor? secondFactor = null)
     {
         Outcome = outcome;
         Tokens = tokens;
+        SecondFactor = secondFactor;
     }
 
     /// <summary>The outcome.</summary>
@@ -52,6 +57,9 @@ public readonly record struct LoginResult
 
     /// <summary>The issued tokens on success; otherwise null.</summary>
     public AuthTokens? Tokens { get; }
+
+    /// <summary>The pending second factor when <see cref="Outcome"/> is <see cref="LoginOutcome.SecondFactorRequired"/>; otherwise null.</summary>
+    public PendingSecondFactor? SecondFactor { get; }
 
     /// <summary>Whether the login succeeded.</summary>
     public bool Succeeded => Outcome == LoginOutcome.Success;
@@ -76,6 +84,10 @@ public readonly record struct LoginResult
 
     /// <summary>Creates a denied result.</summary>
     public static LoginResult Denied() => new(LoginOutcome.Denied, null);
+
+    /// <summary>Creates a result for a login that must pass a second factor before anything is issued.</summary>
+    /// <param name="pending">The pending login and its ticket.</param>
+    public static LoginResult RequiresSecondFactor(PendingSecondFactor pending) => new(LoginOutcome.SecondFactorRequired, null, pending);
 }
 
 /// <summary>The outcome of a refresh attempt. Every non-success collapses to a uniform 401.</summary>
