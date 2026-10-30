@@ -375,8 +375,12 @@ services.AddSingleton<ISecondFactorPolicy, StaffMfaPolicy>();   // after AddThem
   `RejectAsync(ticket)` to burn the ticket; the attempt limits are the app's.
 - A policy that throws stops the login with that exception and nothing is issued (it is not turned into a "bad password").
   A policy that asks for a second factor while no `ISecondFactorTicketService` is registered also throws.
-- Tickets are protected with ASP.NET Core data protection plus a single-use user token (`TokenPurpose.SecondFactorTicket`); persist
-  the data-protection keys in production. Losing them only invalidates tickets in flight. The ticket and the password are never logged.
+- **Call `CompleteAsync` only after your own factor check has passed**: completion trusts that the app verified (or enrolled and confirmed)
+  the factor; Themia cannot tell. The ticket proves the primary check passed, not that the second factor did.
+- **Enrol is only as strong as the primary check.** Return `Enrol` only for accounts that have no factor yet, and notify the user
+  (and any existing devices) when a factor is enrolled, otherwise whoever holds a stolen password can enrol their own.
+- Tickets are protected with ASP.NET Core data protection plus a single-use user token (`TokenPurpose.SecondFactorTicket`); persist and protect
+  the data-protection keys in production (a key store that is not encrypted at rest is a risk for every ticket and cookie). Losing them only invalidates tickets in flight. The ticket and the password are never logged.
 - **The seam covers only the three Themia flows.** Code that mints sessions with the public building blocks
   (`IRefreshTokenService.IssueAsync`, `IAccessTokenService.Issue`) bypasses it and must call `ISecondFactorPolicy` itself. A
   federation or bot sign-in in your app is such a path.
