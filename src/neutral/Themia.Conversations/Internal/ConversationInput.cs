@@ -12,6 +12,10 @@ internal static class ConversationInput
 
     public static void Tenant(string value, string name) => Key(value, name, ConversationSchemaMigration.TenantIdWidth);
 
+    /// <summary>Whether <paramref name="value"/> would pass <see cref="Tenant"/>; for input that arrives from an anonymous caller, where a refusal beats an exception.</summary>
+    public static bool IsTenant(string? value) =>
+        !string.IsNullOrWhiteSpace(value) && value.Length <= ConversationSchemaMigration.TenantIdWidth && !char.IsWhiteSpace(value[0]) && !char.IsWhiteSpace(value[^1]);
+
     public static void Subject(ConversationSubject subject)
     {
         ArgumentNullException.ThrowIfNull(subject);

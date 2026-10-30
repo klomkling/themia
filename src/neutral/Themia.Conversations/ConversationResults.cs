@@ -46,7 +46,8 @@ public sealed record PostResult(PostOutcome Outcome, Guid? MessageId, long? Seq)
 /// <param name="Body">The text; <see langword="null"/> once redacted.</param>
 /// <param name="CreatedAt">When it was stored (UTC).</param>
 /// <param name="IsRedacted">Whether the body was removed by erasure or staff redaction.</param>
-public sealed record ConversationMessage(Guid Id, long Seq, Guid ParticipantId, MessageKind Kind, string? Body, DateTimeOffset CreatedAt, bool IsRedacted);
+/// <param name="SenderLabel">How the viewer sees the sender: the display name, except that a guest sees staff by role label (or "Staff") and the system as "System".</param>
+public sealed record ConversationMessage(Guid Id, long Seq, Guid ParticipantId, MessageKind Kind, string? Body, DateTimeOffset CreatedAt, bool IsRedacted, string? SenderLabel = null);
 
 /// <summary>The result of <see cref="IConversationService.ListAsync"/>.</summary>
 /// <param name="Outcome">How the call ended.</param>

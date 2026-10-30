@@ -42,7 +42,7 @@ public abstract class ConversationServiceTests(ConversationEngineFixture fixture
     private static ConversationActor Member(string userRef) => new(ConversationActorKind.Member, userRef);
 
     private ConversationService Service(IConversationAccessPolicy? policy = null, ConversationOptions? options = null, IConversationEventSink? sink = null) =>
-        new(fixture.Dialect, options ?? new ConversationOptions(), policy ?? new AllowAll(), sink ?? new DefaultConversationEventSink(TimeProvider.System), TimeProvider.System, NullLogger<ConversationService>.Instance);
+        new(fixture.Dialect, options ?? new ConversationOptions(), policy ?? new AllowAll(), sink ?? new DefaultConversationEventSink(TimeProvider.System), new RegexConversationMasker(), TimeProvider.System, NullLogger<ConversationService>.Instance);
 
     private async Task<(string Tenant, Guid Conversation)> OpenAsync(ConversationService service, string? subjectId = null)
     {
@@ -347,13 +347,13 @@ public abstract class ConversationServiceTests(ConversationEngineFixture fixture
     }
 
     [Fact]
-    public async Task Post_ShouldBeRefused_WhenAGuestActorNamesAMembersParticipantId()
+    public async Task Post_ShouldBeRefused_WhenAGuestActorHoldsAKeyNoSessionWasIssuedFor()
     {
         var service = Service();
         var (tenant, conversation) = await OpenAsync(service);
-        var member = await service.JoinAsync(Member("a"), tenant, conversation, "Somchai");
+        await service.JoinAsync(Member("a"), tenant, conversation, "Somchai");
 
-        var asGuest = new ConversationActor(ConversationActorKind.Guest, ParticipantId: member.ParticipantId);
+        var asGuest = ConversationActor.ForGuest(GuestSessionKey.Generate());
         var result = await service.PostAsync(asGuest, tenant, conversation, new PostMessage("m-1", "hi"));
 
         Assert.Equal(PostOutcome.Refused, result.Outcome);

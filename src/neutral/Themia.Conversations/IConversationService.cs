@@ -3,7 +3,7 @@ namespace Themia.Conversations;
 /// <summary>
 /// The conversation store. The tenant is an explicit argument of every call, never ambient. Every method asks <see cref="IConversationAccessPolicy"/> first,
 /// then resolves the acting participant inside its own transaction (this tenant and conversation, <c>LeftAt</c> empty, kind matching the actor); the
-/// <see cref="ConversationActor.ParticipantId"/> of a guest is a lookup key only: the caller must have verified the guest session before building the actor. A failure to authorise comes back as <c>Refused</c>, the same answer
+/// guest is proved by the hash of its <see cref="ConversationActor.GuestSession"/> key (unexpired, not revoked, participant not left), re-checked on every call. A failure to authorise comes back as <c>Refused</c>, the same answer
 /// for a conversation that does not exist, so a caller cannot probe another tenant's ids.
 /// </summary>
 /// <exception cref="ArgumentException">A tenant, subject, user reference or client message id is empty, longer than its column, or has leading or trailing

@@ -29,7 +29,7 @@ public sealed class ConversationInputTests
     }
 
     private static ConversationService Service() =>
-        new(new NoDatabase(), new ConversationOptions(), new AllowAll(), new DefaultConversationEventSink(TimeProvider.System), TimeProvider.System, NullLogger<ConversationService>.Instance);
+        new(new NoDatabase(), new ConversationOptions(), new AllowAll(), new DefaultConversationEventSink(TimeProvider.System), new RegexConversationMasker(), TimeProvider.System, NullLogger<ConversationService>.Instance);
 
     private static readonly ConversationActor Member = new(ConversationActorKind.Member, "user-1");
 

@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Themia.Conversations.Internal;
 
@@ -27,13 +28,40 @@ public static class ConversationServiceCollectionExtensions
         services.TryAddSingleton<IConversationAccessPolicy, DenyAllConversationAccessPolicy>();
         services.TryAddSingleton(TimeProvider.System);
         services.TryAddSingleton<IConversationEventSink>(sp => new DefaultConversationEventSink(sp.GetRequiredService<TimeProvider>()));
-        services.TryAddSingleton<IConversationService>(sp => new ConversationService(
+        services.TryAddSingleton<IConversationMasker, RegexConversationMasker>();
+        services.TryAddSingleton(sp => new ConversationService(
             sp.GetRequiredService<IConversationDialect>(),
             sp.GetRequiredService<ConversationOptions>(),
             sp.GetRequiredService<IConversationAccessPolicy>(),
             sp.GetRequiredService<IConversationEventSink>(),
+            sp.GetRequiredService<IConversationMasker>(),
             sp.GetRequiredService<TimeProvider>(),
             sp.GetRequiredService<ILogger<ConversationService>>()));
+        services.TryAddSingleton<IConversationService>(sp => sp.GetRequiredService<ConversationService>());
+        return services;
+    }
+
+    /// <summary>
+    /// Adds guest access on top of <see cref="AddThemiaConversations"/>: <see cref="IConversationGuests"/> (invite by contact) and <see cref="IGuestAccess"/> (exchange a link token for
+    /// a session). It needs <c>Themia.Challenges</c> with <see cref="ConversationGuestChallengeExtensions.ConfigureConversationGuestPurpose"/> applied; the host fails at start if either is missing.
+    /// </summary>
+    /// <param name="services">The service collection.</param>
+    /// <param name="configure">Sets the peppers and the session limits.</param>
+    /// <exception cref="InvalidOperationException">An option is out of range; raised here, at registration.</exception>
+    public static IServiceCollection AddThemiaConversationGuests(this IServiceCollection services, Action<ConversationGuestOptions> configure)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(configure);
+
+        var options = new ConversationGuestOptions();
+        configure(options);
+        options.Validate();
+
+        services.TryAddSingleton(options);
+        services.TryAddScoped<ConversationGuests>();
+        services.TryAddScoped<IConversationGuests>(sp => sp.GetRequiredService<ConversationGuests>());
+        services.TryAddScoped<IGuestAccess>(sp => sp.GetRequiredService<ConversationGuests>());
+        services.AddHostedService<GuestConfigurationValidator>();
         return services;
     }
 }
