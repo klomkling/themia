@@ -89,7 +89,8 @@ internal sealed partial class GuardedAuthTokenIssuer : IAuthTokenIssuer
         }
     }
 
-    public async Task<IssueResult> CompleteSessionAsync(Guid userId, string ticket, SessionRequest request, CancellationToken cancellationToken = default)
+    public async Task<IssueResult> CompleteSessionAsync(
+        Guid userId, string ticket, SecondFactorStage expectedStage, SessionRequest request, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(ticket);
         Validate(request);
@@ -100,10 +101,11 @@ internal sealed partial class GuardedAuthTokenIssuer : IAuthTokenIssuer
         if (data is null
             || data.Method != SecondFactorMethod.Custom
             || data.UserId != userId
+            || data.Stage != expectedStage
             || !string.Equals(data.Provider, request.Channel, StringComparison.Ordinal)
             || !Equals(data.TenantId, request.ExpectedTenant))
         {
-            logger.LogWarning("Session completion refused on channel {Channel}: the ticket is unknown, used, expired, or not for this user, channel and tenant.", request.Channel);
+            logger.LogWarning("Session completion refused on channel {Channel}: the ticket is unknown, used, expired, or not for this user, stage, channel and tenant.", request.Channel);
             return IssueResult.Refused(IssueOutcome.TicketInvalid);
         }
 

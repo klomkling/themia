@@ -171,7 +171,7 @@ public sealed class GuardedAuthTokenIssuerTests : IDisposable
         var claims = new[] { new Claim("app:session_start", "123") };
         var pending = (await Issuer().StartSessionAsync(user.Id, Request(claims: claims))).SecondFactor!.Value;
 
-        var result = await Issuer().CompleteSessionAsync(user.Id, pending.Ticket, Request(claims: claims));
+        var result = await Issuer().CompleteSessionAsync(user.Id, pending.Ticket, pending.Stage, Request(claims: claims));
 
         Assert.True(result.Succeeded);
         Assert.Equal("123", access.LastPrincipal!.FindFirst("app:session_start")!.Value);
@@ -189,19 +189,33 @@ public sealed class GuardedAuthTokenIssuerTests : IDisposable
         var issuer = Issuer();
 
         var forOther = (await issuer.StartSessionAsync(user.Id, Request())).SecondFactor!.Value;
-        Assert.Equal(IssueOutcome.TicketInvalid, (await issuer.CompleteSessionAsync(Guid.NewGuid(), forOther.Ticket, Request())).Outcome);
+        Assert.Equal(IssueOutcome.TicketInvalid, (await issuer.CompleteSessionAsync(Guid.NewGuid(), forOther.Ticket, forOther.Stage, Request())).Outcome);
 
         var wrongChannel = (await issuer.StartSessionAsync(user.Id, Request())).SecondFactor!.Value;
-        Assert.Equal(IssueOutcome.TicketInvalid, (await issuer.CompleteSessionAsync(user.Id, wrongChannel.Ticket, Request(channel: "chat"))).Outcome);
+        Assert.Equal(IssueOutcome.TicketInvalid, (await issuer.CompleteSessionAsync(user.Id, wrongChannel.Ticket, wrongChannel.Stage, Request(channel: "chat"))).Outcome);
 
         var once = (await issuer.StartSessionAsync(user.Id, Request())).SecondFactor!.Value;
-        Assert.True((await issuer.CompleteSessionAsync(user.Id, once.Ticket, Request())).Succeeded);
-        Assert.Equal(IssueOutcome.TicketInvalid, (await issuer.CompleteSessionAsync(user.Id, once.Ticket, Request())).Outcome);
+        Assert.True((await issuer.CompleteSessionAsync(user.Id, once.Ticket, once.Stage, Request())).Succeeded);
+        Assert.Equal(IssueOutcome.TicketInvalid, (await issuer.CompleteSessionAsync(user.Id, once.Ticket, once.Stage, Request())).Outcome);
 
         var stale = (await issuer.StartSessionAsync(user.Id, Request())).SecondFactor!.Value;
         user.SecurityStamp = Guid.NewGuid().ToString("N");
-        Assert.Equal(IssueOutcome.TicketInvalid, (await issuer.CompleteSessionAsync(user.Id, stale.Ticket, Request())).Outcome);
+        Assert.Equal(IssueOutcome.TicketInvalid, (await issuer.CompleteSessionAsync(user.Id, stale.Ticket, stale.Stage, Request())).Outcome);
         Assert.Equal(1, access.IssueCalls);
+    }
+
+    [Fact]
+    public async Task Complete_refuses_a_verify_ticket_presented_at_the_enrol_stage_and_burns_it()
+    {
+        var user = Member();
+        users.UserToReturn = user;
+        policy.Requirement = SecondFactorRequirement.Verify;
+        var issuer = Issuer();
+        var pending = (await issuer.StartSessionAsync(user.Id, Request())).SecondFactor!.Value;
+
+        Assert.Equal(IssueOutcome.TicketInvalid, (await issuer.CompleteSessionAsync(user.Id, pending.Ticket, SecondFactorStage.Enrol, Request())).Outcome);
+        Assert.Equal(IssueOutcome.TicketInvalid, (await issuer.CompleteSessionAsync(user.Id, pending.Ticket, pending.Stage, Request())).Outcome);
+        AssertNothingIssued();
     }
 
     [Fact]
@@ -212,7 +226,7 @@ public sealed class GuardedAuthTokenIssuerTests : IDisposable
         var password = await ticketService.IssueAsync(new SecondFactorTicketData(
             user.Id, user.TenantId, SecondFactorMethod.Password, null, false, false, user.SecurityStamp, SecondFactorStage.Verify));
 
-        Assert.Equal(IssueOutcome.TicketInvalid, (await Issuer().CompleteSessionAsync(user.Id, password.Ticket, Request())).Outcome);
+        Assert.Equal(IssueOutcome.TicketInvalid, (await Issuer().CompleteSessionAsync(user.Id, password.Ticket, password.Stage, Request())).Outcome);
         AssertNothingIssued();
     }
 

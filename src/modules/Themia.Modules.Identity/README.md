@@ -411,7 +411,7 @@ switch (r.Outcome)
     default: return Unauthorized();                                                 // Inactive, LockedOut, TenantMismatch
 }
 // after YOUR factor check passed for exactly this user:
-var done = await issuer.CompleteSessionAsync(userId, ticket, request, ct);
+var done = await issuer.CompleteSessionAsync(userId, ticket, SecondFactorStage.Verify, request, ct);   // the stage you handled
 // a new access token for a session you already hold (a cookie renewal, say):
 var renewed = await issuer.RenewSessionAsync(userId, sessionId, request, ct);       // access token only; r.Tokens.RefreshToken is empty
 ```

@@ -92,9 +92,12 @@ public interface IAuthTokenIssuer
     /// This is the only completion path for an app-channel ticket (<see cref="ISecondFactorCompletion"/> refuses them).</summary>
     /// <param name="userId">The user whose factor the app just verified.</param>
     /// <param name="ticket">The ticket from <see cref="PendingSecondFactor.Ticket"/>.</param>
+    /// <param name="expectedStage">The stage the app just handled (verify or enrol). A ticket issued for the other stage is refused and
+    /// burnt, so a verify ticket cannot be spent at an enrol endpoint.</param>
     /// <param name="request">The same tenant, channel and app claims as the start.</param>
     /// <param name="cancellationToken">A cancellation token.</param>
-    Task<IssueResult> CompleteSessionAsync(Guid userId, string ticket, SessionRequest request, CancellationToken cancellationToken = default);
+    Task<IssueResult> CompleteSessionAsync(
+        Guid userId, string ticket, SecondFactorStage expectedStage, SessionRequest request, CancellationToken cancellationToken = default);
 
     /// <summary>Issues a new access token for a session that already exists, without a new refresh family and without asking the
     /// second-factor policy (the session passed it when it was created). Refused unless <paramref name="sessionId"/> is a live
