@@ -25,7 +25,7 @@ internal sealed partial class ConversationService(
         ConversationInput.Tenant(tenantId, nameof(tenantId));
         ConversationInput.Subject(subject);
 
-        if (!await AllowedAsync(actor, tenantId, null, ConversationAction.Open, cancellationToken))
+        if (!await AllowedAsync(actor, tenantId, null, ConversationAction.Open, cancellationToken, subject))
         {
             return new OpenResult(OpenOutcome.Refused, null);
         }
@@ -54,6 +54,12 @@ internal sealed partial class ConversationService(
             if (existing is null)
             {
                 continue; // purged between the insert and the read: try again
+            }
+
+            // The first check could not name a conversation. Ask again with the real id before revealing it or reopening it.
+            if (!await AllowedAsync(actor, tenantId, existing.Id, ConversationAction.Open, cancellationToken, subject))
+            {
+                return new OpenResult(OpenOutcome.Refused, null);
             }
 
             if (existing.IsPastRetention(time.GetUtcNow()))
@@ -212,8 +218,8 @@ internal sealed partial class ConversationService(
 
     private DateTime Now() => time.GetUtcNow().UtcDateTime;
 
-    private async ValueTask<bool> AllowedAsync(ConversationActor actor, string tenantId, Guid? conversationId, ConversationAction action, CancellationToken cancellationToken) =>
-        await policy.CanAsync(actor, new ConversationTarget(tenantId, conversationId), action, cancellationToken);
+    private async ValueTask<bool> AllowedAsync(ConversationActor actor, string tenantId, Guid? conversationId, ConversationAction action, CancellationToken cancellationToken, ConversationSubject? subject = null) =>
+        await policy.CanAsync(actor, new ConversationTarget(tenantId, conversationId, subject), action, cancellationToken);
 
     private async Task<DbConnection> OpenConnectionAsync(CancellationToken cancellationToken)
     {
