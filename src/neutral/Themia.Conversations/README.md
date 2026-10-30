@@ -50,7 +50,7 @@ services.AddThemiaConversationGuests(o =>
 });
 
 var invite = await guests.InviteAsync(memberActor, tenantId, conversationId, new GuestContact(GuestContactKind.Email, "guest@example.com"), "Guest");
-// hand invite.Token to your sender; never store or log it
+// hand invite.Token!.Reveal() to your sender; never store or log it (Token and the contact have no property that returns their text, so logging an invite or a contact does not write them out)
 var session = await guestAccess.ExchangeAsync(tenantId, tokenFromThePostedForm);          // POST only
 var actor = ConversationActor.ForGuest(new GuestSessionKey(cookieValue));
 ```
@@ -60,6 +60,7 @@ var actor = ConversationActor.ForGuest(new GuestSessionKey(cookieValue));
   no member that returns the text, so logging or serialising an actor does not leak it. Session length is `SessionLifetime` (default 7 days, an interim value).
 - **Redeem from a POST, never a GET:** mail and chat link previewers fetch URLs and would spend the token. Move the token out of the URL, send `Cache-Control: no-store`
   and `Referrer-Policy: no-referrer`, and rate-limit the endpoint by address and tenant (the `.AspNetCore` part will).
+- **Revocation is read-then-write.** A post already in flight can commit after a concurrent redeem revoked its key; the next call is refused.
 - **One live link per guest.** A re-invite supersedes the earlier link ("the old link stopped working" is expected). The guest's earlier sessions end when the new link is
   redeemed, not when it is issued, so someone who only knows a contact cannot log the guest out. Every failed exchange is one `Refused`.
 - **Limits are layered.** `Themia.Challenges` throttles per participant. The core adds `MaxGuestsPerConversation` (default 50). Per-contact and per-inviter delivery

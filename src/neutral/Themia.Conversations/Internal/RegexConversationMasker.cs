@@ -11,11 +11,14 @@ internal sealed class RegexConversationMasker : IConversationMasker
     private static readonly TimeSpan Timeout = TimeSpan.FromMilliseconds(100);
     private const RegexOptions Flags = RegexOptions.CultureInvariant | RegexOptions.IgnoreCase;
 
+    // No lookbehind in the first three, so they can run without backtracking (linear time); the handle pattern needs a lookbehind and keeps the timeout.
+    private const RegexOptions Linear = Flags | RegexOptions.NonBacktracking;
+
     private static readonly (Regex Pattern, string Replacement)[] Rules =
     [
-        (new Regex(@"[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+", Flags, Timeout), "[email hidden]"),
-        (new Regex(@"\+?\d(?:[\s().\-]?\d){6,}", Flags, Timeout), "[phone hidden]"),
-        (new Regex(@"\bline(?:\s+id)?\s*[:=]\s*\S+", Flags, Timeout), "[handle hidden]"),
+        (new Regex(@"[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+", Linear, Timeout), "[email hidden]"),
+        (new Regex(@"\+?\d(?:[\s().\-]?\d){6,}", Linear, Timeout), "[phone hidden]"),
+        (new Regex(@"\bline(?:\s+id)?\s*[:=]\s*\S+", Linear, Timeout), "[handle hidden]"),
         (new Regex(@"(?<![\w@])@\w{2,}", Flags, Timeout), "[handle hidden]"),
     ];
 

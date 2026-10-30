@@ -119,11 +119,8 @@ Themia.Conversations.ConversationTarget.TenantId.get -> string!
 Themia.Conversations.ConversationTarget.TenantId.init -> void
 Themia.Conversations.DependencyInjection.ConversationServiceCollectionExtensions
 Themia.Conversations.GuestContact
-Themia.Conversations.GuestContact.GuestContact(Themia.Conversations.GuestContactKind Kind, string! Value) -> void
+Themia.Conversations.GuestContact.GuestContact(Themia.Conversations.GuestContactKind kind, string! value) -> void
 Themia.Conversations.GuestContact.Kind.get -> Themia.Conversations.GuestContactKind
-Themia.Conversations.GuestContact.Kind.init -> void
-Themia.Conversations.GuestContact.Value.get -> string!
-Themia.Conversations.GuestContact.Value.init -> void
 Themia.Conversations.GuestContactKind
 Themia.Conversations.GuestContactKind.Email = 0 -> Themia.Conversations.GuestContactKind
 Themia.Conversations.GuestContactKind.Line = 2 -> Themia.Conversations.GuestContactKind
@@ -134,13 +131,13 @@ Themia.Conversations.GuestExchangeOutcome.Refused = 1 -> Themia.Conversations.Gu
 Themia.Conversations.GuestInvite
 Themia.Conversations.GuestInvite.ExpiresAt.get -> System.DateTimeOffset?
 Themia.Conversations.GuestInvite.ExpiresAt.init -> void
-Themia.Conversations.GuestInvite.GuestInvite(Themia.Conversations.GuestInviteOutcome Outcome, System.Guid? ParticipantId, string? Token, System.DateTimeOffset? ExpiresAt) -> void
+Themia.Conversations.GuestInvite.GuestInvite(Themia.Conversations.GuestInviteOutcome Outcome, System.Guid? ParticipantId, Themia.Conversations.GuestLinkToken? Token, System.DateTimeOffset? ExpiresAt) -> void
 Themia.Conversations.GuestInvite.Outcome.get -> Themia.Conversations.GuestInviteOutcome
 Themia.Conversations.GuestInvite.Outcome.init -> void
 Themia.Conversations.GuestInvite.ParticipantId.get -> System.Guid?
 Themia.Conversations.GuestInvite.ParticipantId.init -> void
 Themia.Conversations.GuestInvite.Succeeded.get -> bool
-Themia.Conversations.GuestInvite.Token.get -> string?
+Themia.Conversations.GuestInvite.Token.get -> Themia.Conversations.GuestLinkToken?
 Themia.Conversations.GuestInvite.Token.init -> void
 Themia.Conversations.GuestInviteOutcome
 Themia.Conversations.GuestInviteOutcome.Invalid = 2 -> Themia.Conversations.GuestInviteOutcome
@@ -149,6 +146,8 @@ Themia.Conversations.GuestInviteOutcome.LimitReached = 4 -> Themia.Conversations
 Themia.Conversations.GuestInviteOutcome.RateLimited = 5 -> Themia.Conversations.GuestInviteOutcome
 Themia.Conversations.GuestInviteOutcome.Refused = 3 -> Themia.Conversations.GuestInviteOutcome
 Themia.Conversations.GuestInviteOutcome.Reinvited = 1 -> Themia.Conversations.GuestInviteOutcome
+Themia.Conversations.GuestLinkToken
+Themia.Conversations.GuestLinkToken.Reveal() -> string!
 Themia.Conversations.GuestSessionKey
 Themia.Conversations.GuestSessionKey.Equals(Themia.Conversations.GuestSessionKey? other) -> bool
 Themia.Conversations.GuestSessionKey.GuestSessionKey(string! value) -> void
@@ -263,6 +262,8 @@ const Themia.Conversations.ConversationGuestOptions.MinPepperBytes = 32 -> int
 const Themia.Conversations.ConversationGuestOptions.PepperIdWidth = 40 -> int
 const Themia.Conversations.ConversationOptions.BodyColumnWidth = 4000 -> int
 const Themia.Conversations.ConversationOptions.DisplayNameColumnWidth = 80 -> int
+override Themia.Conversations.GuestContact.ToString() -> string!
+override Themia.Conversations.GuestLinkToken.ToString() -> string!
 override Themia.Conversations.GuestSessionKey.Equals(object? obj) -> bool
 override Themia.Conversations.GuestSessionKey.GetHashCode() -> int
 override Themia.Conversations.GuestSessionKey.ToString() -> string!

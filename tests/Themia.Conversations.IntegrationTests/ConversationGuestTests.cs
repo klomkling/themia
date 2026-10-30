@@ -109,7 +109,7 @@ public abstract class ConversationGuestTests(ConversationEngineFixture fixture)
     {
         var invite = await rig.Guests.InviteAsync(Member("staff"), tenant, conversation, contact ?? Email(), "Guest One");
         Assert.True(invite.Succeeded, invite.Outcome.ToString());
-        return (invite, await rig.Guests.ExchangeAsync(tenant, invite.Token!));
+        return (invite, await rig.Guests.ExchangeAsync(tenant, invite.Token!.Reveal()));
     }
 
     [Fact]
@@ -135,11 +135,11 @@ public abstract class ConversationGuestTests(ConversationEngineFixture fixture)
         var (tenant, conversation) = await OpenWithMemberAsync(rig);
         var invite = await rig.Guests.InviteAsync(Member("staff"), tenant, conversation, Email(), "Guest One");
 
-        var wrongTenant = await rig.Guests.ExchangeAsync(NewTenant(), invite.Token!);
-        var first = await rig.Guests.ExchangeAsync(tenant, invite.Token!);
-        var replay = await rig.Guests.ExchangeAsync(tenant, invite.Token!);
+        var wrongTenant = await rig.Guests.ExchangeAsync(NewTenant(), invite.Token!.Reveal());
+        var first = await rig.Guests.ExchangeAsync(tenant, invite.Token!.Reveal());
+        var replay = await rig.Guests.ExchangeAsync(tenant, invite.Token!.Reveal());
         var garbage = await rig.Guests.ExchangeAsync(tenant, "not-a-token");
-        var blankTenant = await rig.Guests.ExchangeAsync(" ", invite.Token!);
+        var blankTenant = await rig.Guests.ExchangeAsync(" ", invite.Token!.Reveal());
 
         Assert.Equal(GuestExchangeOutcome.Refused, wrongTenant.Outcome);
         Assert.True(first.Succeeded);
@@ -157,8 +157,8 @@ public abstract class ConversationGuestTests(ConversationEngineFixture fixture)
         await fixture.ExecuteAsync("UPDATE conversation_participants SET left_at = @Now WHERE id = @Id;", new { Id = left.ParticipantId, Now = DateTime.UtcNow });
         await rig.Store.CloseAsync(Member("staff"), tenant, conversation);
 
-        Assert.Equal(GuestExchangeOutcome.Refused, (await rig.Guests.ExchangeAsync(tenant, left.Token!)).Outcome);
-        Assert.Equal(GuestExchangeOutcome.Refused, (await rig.Guests.ExchangeAsync(tenant, closed.Token!)).Outcome);
+        Assert.Equal(GuestExchangeOutcome.Refused, (await rig.Guests.ExchangeAsync(tenant, left.Token!.Reveal())).Outcome);
+        Assert.Equal(GuestExchangeOutcome.Refused, (await rig.Guests.ExchangeAsync(tenant, closed.Token!.Reveal())).Outcome);
     }
 
     [Fact]
@@ -209,9 +209,9 @@ public abstract class ConversationGuestTests(ConversationEngineFixture fixture)
         Assert.Equal(GuestInviteOutcome.Reinvited, again.Outcome);
         Assert.Equal(first.ParticipantId, again.ParticipantId);
         Assert.Equal(PostOutcome.Posted, (await rig.Store.PostAsync(oldActor, tenant, conversation, new PostMessage("g-1", "still in"))).Outcome);
-        Assert.Equal(GuestExchangeOutcome.Refused, (await rig.Guests.ExchangeAsync(tenant, first.Token!)).Outcome);
+        Assert.Equal(GuestExchangeOutcome.Refused, (await rig.Guests.ExchangeAsync(tenant, first.Token!.Reveal())).Outcome);
 
-        var fresh = await rig.Guests.ExchangeAsync(tenant, again.Token!);
+        var fresh = await rig.Guests.ExchangeAsync(tenant, again.Token!.Reveal());
 
         Assert.True(fresh.Succeeded);
         Assert.Equal(PostOutcome.Refused, (await rig.Store.PostAsync(oldActor, tenant, conversation, new PostMessage("g-2", "revoked"))).Outcome);
@@ -245,7 +245,7 @@ public abstract class ConversationGuestTests(ConversationEngineFixture fixture)
         var (tenant, conversation) = await OpenWithMemberAsync(rig);
         var first = await rig.Guests.InviteAsync(Member("staff"), tenant, conversation, Email(), "Guest One");
         await fixture.ExecuteAsync("UPDATE conversation_participants SET left_at = @Now WHERE id = @Id;", new { Id = first.ParticipantId, Now = DateTime.UtcNow });
-        var session = await rig.Guests.ExchangeAsync(tenant, (await rig.Guests.InviteAsync(Member("staff"), tenant, conversation, Email("other@example.com"), "Guest Two")).Token!);
+        var session = await rig.Guests.ExchangeAsync(tenant, (await rig.Guests.InviteAsync(Member("staff"), tenant, conversation, Email("other@example.com"), "Guest Two")).Token!.Reveal());
 
         var left = await rig.Guests.InviteAsync(Member("staff"), tenant, conversation, Email(), "Guest One");
         var stranger = await rig.Guests.InviteAsync(Member("stranger"), tenant, conversation, Email("x@example.com"), "X");
@@ -268,6 +268,30 @@ public abstract class ConversationGuestTests(ConversationEngineFixture fixture)
         Assert.All(results, r => Assert.True(r.Succeeded, r.Outcome.ToString()));
         Assert.Single(results.Select(r => r.ParticipantId).Distinct());
         Assert.Equal(1, await fixture.ScalarAsync<int>("SELECT COUNT(*) FROM conversation_participants WHERE conversation_id = @Id AND kind = 1;", new { Id = conversation }));
+    }
+
+    [Fact]
+    public async Task Exchange_ShouldSucceedForEveryGuest_WhileMembersPostAndInviteInTheSameConversation()
+    {
+        // The exchange takes its locks in the order Post and Invite do (conversation row, then participant). The other order is a cycle on SQL Server,
+        // and a lost retry would burn the spent token.
+        var rig = NewRig();
+        var (tenant, conversation) = await OpenWithMemberAsync(rig);
+        var invites = new List<GuestInvite>();
+        for (var i = 0; i < 12; i++)
+        {
+            invites.Add(await rig.Guests.InviteAsync(Member("staff"), tenant, conversation, Email($"x{i}@example.com"), "Guest"));
+        }
+
+        var exchanges = invites.Select(i => Task.Run(() => rig.Guests.ExchangeAsync(tenant, i.Token!.Reveal())));
+        var posts = Enumerable.Range(0, 30).Select(i => Task.Run(() => rig.Store.PostAsync(Member("staff"), tenant, conversation, new PostMessage($"m-{i}", "hi"))));
+        var moreInvites = Enumerable.Range(0, 5).Select(i => Task.Run(() => rig.Guests.InviteAsync(Member("staff"), tenant, conversation, Email($"y{i}@example.com"), "Guest")));
+        var results = await Task.WhenAll(exchanges);
+        var postResults = await Task.WhenAll(posts);
+        await Task.WhenAll(moreInvites);
+
+        Assert.All(results, r => Assert.True(r.Succeeded));
+        Assert.All(postResults, r => Assert.Equal(PostOutcome.Posted, r.Outcome));
     }
 
     [Fact]

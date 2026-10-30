@@ -22,6 +22,19 @@ public sealed class GuestTests
         Assert.DoesNotContain(key.Value, JsonSerializer.Serialize(key));
     }
 
+    [Fact]
+    public void InviteAndContact_ShouldNotShowTheTokenOrTheAddress_InToStringOrJson()
+    {
+        var invite = new GuestInvite(GuestInviteOutcome.Invited, Guid.NewGuid(), new GuestLinkToken("secret-link-token"), DateTimeOffset.UtcNow);
+        var contact = new GuestContact(GuestContactKind.Email, "someone@example.com");
+
+        Assert.DoesNotContain("secret-link-token", invite.ToString());
+        Assert.DoesNotContain("secret-link-token", JsonSerializer.Serialize(invite));
+        Assert.DoesNotContain("someone@example.com", contact.ToString());
+        Assert.DoesNotContain("someone@example.com", JsonSerializer.Serialize(contact));
+        Assert.Equal("secret-link-token", invite.Token!.Reveal());
+    }
+
     [Theory]
     [InlineData("")]
     [InlineData("short")]

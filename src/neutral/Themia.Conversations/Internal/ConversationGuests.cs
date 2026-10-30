@@ -68,16 +68,18 @@ internal sealed class ConversationGuests(
         {
             var participantId = Guid.NewGuid();
             var current = guestOptions.Peppers[guestOptions.CurrentPepperId!];
+            var stored = false;
             await using var transaction = await connection.BeginTransactionAsync(IsolationLevel.ReadCommitted, cancellationToken);
             try
             {
-                // Lock the conversation row first, so invites to one conversation serialise and the cap below cannot be overshot by a race.
-                var locked = await connection.ExecuteAsync(new CommandDefinition(
-                    "UPDATE conversations SET last_seq = last_seq WHERE tenant_id = @TenantId AND id = @ConversationId AND state = 0 AND retention_state <> 2;",
+                // Lock the conversation row first (the order Post uses), so invites to one conversation serialise and the cap below cannot be overshot by a race.
+                // The affected-row count is not read: a MySQL host may report changed rows rather than matched ones.
+                await connection.ExecuteAsync(new CommandDefinition(
+                    "UPDATE conversations SET last_seq = last_seq WHERE tenant_id = @TenantId AND id = @ConversationId;",
                     new { TenantId = tenantId, ConversationId = conversationId },
                     transaction,
                     cancellationToken: cancellationToken));
-                if (locked == 0)
+                if (!await ConversationOpenAsync(connection, transaction, tenantId, conversationId, cancellationToken))
                 {
                     return Failed(GuestInviteOutcome.Refused);
                 }
@@ -106,33 +108,41 @@ internal sealed class ConversationGuests(
                 }
 
                 await transaction.CommitAsync(cancellationToken);
-                return await IssueAsync(GuestInviteOutcome.Invited, participantId, tenantId, conversationId, cancellationToken);
+                stored = true;
             }
             catch (DbException ex) when (dialect.IsDuplicateKey(ex))
             {
                 await transaction.RollbackAsync(CancellationToken.None); // a PostgreSQL transaction is aborted by the violation
+
                 // A concurrent invite of the same contact won the unique index: this one is a re-invite of that guest.
                 found = await FindGuestAsync(connection, tenantId, conversationId, input, cancellationToken)
                     ?? throw new InvalidOperationException("A duplicate guest contact was reported but no stored guest was found.");
             }
+
+            if (stored)
+            {
+                return await IssueAsync(GuestInviteOutcome.Invited, participantId, tenantId, conversationId, cancellationToken);
+            }
         }
 
-        if (found.LeftAt is not null)
+        // Reached with a guest: found, or re-read after losing the insert race (the new-guest branch above returns otherwise).
+        var guest = found!;
+        if (guest.LeftAt is not null)
         {
             return Failed(GuestInviteOutcome.Refused); // a guest who left is not re-added by an invite
         }
 
-        if (found.PepperKeyId != guestOptions.CurrentPepperId)
+        if (guest.PepperKeyId != guestOptions.CurrentPepperId)
         {
-            await RehashAsync(connection, tenantId, found, input, cancellationToken);
+            await RehashAsync(connection, tenantId, guest, input, cancellationToken);
         }
 
-        if (!await ConversationOpenAsync(connection, tenantId, conversationId, cancellationToken))
+        if (!await ConversationOpenAsync(connection, null, tenantId, conversationId, cancellationToken))
         {
             return Failed(GuestInviteOutcome.Refused);
         }
 
-        return await IssueAsync(GuestInviteOutcome.Reinvited, found.Id, tenantId, conversationId, cancellationToken);
+        return await IssueAsync(GuestInviteOutcome.Reinvited, guest.Id, tenantId, conversationId, cancellationToken);
     }
 
     /// <inheritdoc />
@@ -171,19 +181,37 @@ internal sealed class ConversationGuests(
         await using var connection = await store.OpenConnectionAsync(cancellationToken);
         await using var transaction = await connection.BeginTransactionAsync(IsolationLevel.ReadCommitted, cancellationToken);
 
-        // Lock the participant row first, so two redeems for one guest serialise here and "one live session" holds.
+        // The conversation of the guest, read without a lock, so the locks below can be taken in the order Post and Invite take them: conversation row, then participant.
+        // (The other order is a lock cycle on SQL Server, where a lost retry would burn the spent token.)
+        var conversation = await connection.QuerySingleOrDefaultAsync<Guid?>(new CommandDefinition(
+            "SELECT conversation_id FROM conversation_participants WHERE tenant_id = @TenantId AND id = @ParticipantId AND kind = 1;",
+            new { TenantId = tenantId, ParticipantId = participantId },
+            transaction,
+            cancellationToken: cancellationToken));
+        if (conversation is not { } conversationId)
+        {
+            return null;
+        }
+
+        await connection.ExecuteAsync(new CommandDefinition(
+            "UPDATE conversations SET last_seq = last_seq WHERE tenant_id = @TenantId AND id = @ConversationId;",
+            new { TenantId = tenantId, ConversationId = conversationId },
+            transaction,
+            cancellationToken: cancellationToken));
+
+        // The participant row next, so two redeems for one guest serialise and "one live session" holds. Then the state is read under both locks.
         await connection.ExecuteAsync(new CommandDefinition(
             "UPDATE conversation_participants SET last_read_seq = last_read_seq WHERE tenant_id = @TenantId AND id = @ParticipantId AND kind = 1 AND left_at IS NULL;",
             new { TenantId = tenantId, ParticipantId = participantId },
             transaction,
             cancellationToken: cancellationToken));
-        var conversationId = await connection.QuerySingleOrDefaultAsync<Guid?>(new CommandDefinition(
-            "SELECT p.conversation_id FROM conversation_participants p JOIN conversations c ON c.tenant_id = p.tenant_id AND c.id = p.conversation_id " +
-            "WHERE p.tenant_id = @TenantId AND p.id = @ParticipantId AND p.kind = 1 AND p.left_at IS NULL AND c.state = 0 AND c.retention_state <> 2;",
-            new { TenantId = tenantId, ParticipantId = participantId },
+        var active = await connection.ExecuteScalarAsync<int>(new CommandDefinition(
+            "SELECT COUNT(*) FROM conversation_participants p JOIN conversations c ON c.tenant_id = p.tenant_id AND c.id = p.conversation_id " +
+            "WHERE p.tenant_id = @TenantId AND p.id = @ParticipantId AND p.conversation_id = @ConversationId AND p.kind = 1 AND p.left_at IS NULL AND c.state = 0 AND c.retention_state <> 2;",
+            new { TenantId = tenantId, ParticipantId = participantId, ConversationId = conversationId },
             transaction,
             cancellationToken: cancellationToken));
-        if (conversationId is not { } conversation)
+        if (active == 0)
         {
             return null;
         }
@@ -199,13 +227,13 @@ internal sealed class ConversationGuests(
         var expiresAt = now + guestOptions.SessionLifetime;
         await connection.ExecuteAsync(new CommandDefinition(
             "INSERT INTO conversation_guest_sessions (id, tenant_id, conversation_id, participant_id, key_hash, created_at, expires_at) VALUES (@Id, @TenantId, @ConversationId, @ParticipantId, @KeyHash, @Now, @ExpiresAt);",
-            new { Id = Guid.NewGuid(), TenantId = tenantId, ConversationId = conversation, ParticipantId = participantId, KeyHash = key.Hash(), Now = now.UtcDateTime, ExpiresAt = expiresAt.UtcDateTime },
+            new { Id = Guid.NewGuid(), TenantId = tenantId, ConversationId = conversationId, ParticipantId = participantId, KeyHash = key.Hash(), Now = now.UtcDateTime, ExpiresAt = expiresAt.UtcDateTime },
             transaction,
             cancellationToken: cancellationToken));
         await transaction.CommitAsync(cancellationToken);
 
-        logger.LogInformation("Guest {ParticipantId} opened a session in conversation {ConversationId}", participantId, conversation);
-        return new GuestSessionResult(GuestExchangeOutcome.Established, conversation, key, expiresAt);
+        logger.LogInformation("Guest {ParticipantId} opened a session in conversation {ConversationId}", participantId, conversationId);
+        return new GuestSessionResult(GuestExchangeOutcome.Established, conversationId, key, expiresAt);
     }
 
     private async Task<GuestInvite> IssueAsync(GuestInviteOutcome success, Guid participantId, string tenantId, Guid conversationId, CancellationToken cancellationToken)
@@ -218,7 +246,7 @@ internal sealed class ConversationGuests(
         }
 
         logger.LogInformation("Conversation {ConversationId} guest {ParticipantId} link issued ({Outcome})", conversationId, participantId, success);
-        return new GuestInvite(success, participantId, issued.Secret, issued.ExpiresAt);
+        return new GuestInvite(success, participantId, new GuestLinkToken(issued.Secret!), issued.ExpiresAt);
     }
 
     /// <summary>The guest of this conversation holding the contact, found under any configured pepper (the current one first).</summary>
@@ -256,10 +284,11 @@ internal sealed class ConversationGuests(
         }
     }
 
-    private static async Task<bool> ConversationOpenAsync(DbConnection connection, string tenantId, Guid conversationId, CancellationToken cancellationToken) =>
+    private static async Task<bool> ConversationOpenAsync(DbConnection connection, DbTransaction? transaction, string tenantId, Guid conversationId, CancellationToken cancellationToken) =>
         await connection.ExecuteScalarAsync<int>(new CommandDefinition(
             "SELECT COUNT(*) FROM conversations WHERE tenant_id = @TenantId AND id = @ConversationId AND state = 0 AND retention_state <> 2;",
             new { TenantId = tenantId, ConversationId = conversationId },
+            transaction,
             cancellationToken: cancellationToken)) == 1;
 
     private static GuestInvite Failed(GuestInviteOutcome outcome) => new(outcome, null, null, null);

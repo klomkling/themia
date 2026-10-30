@@ -15,12 +15,12 @@ internal static partial class GuestContactHasher
     public static bool TryNormalise(GuestContact? contact, out string input)
     {
         input = string.Empty;
-        if (contact?.Value is not { } raw || !Enum.IsDefined(contact.Kind))
+        if (contact is null || !Enum.IsDefined(contact.Kind))
         {
             return false;
         }
 
-        var value = raw.Trim();
+        var value = contact.Value.Trim();
         var normalised = contact.Kind switch
         {
             GuestContactKind.Email => IsEmail(value) ? "email:" + value.ToLowerInvariant() : null,

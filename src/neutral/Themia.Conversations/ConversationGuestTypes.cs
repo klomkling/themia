@@ -13,10 +13,44 @@ public enum GuestContactKind
     Line = 2,
 }
 
-/// <summary>The contact a guest is invited over. It is hashed with a server-side pepper before it is stored, and never logged.</summary>
-/// <param name="Kind">The channel.</param>
-/// <param name="Value">The address, number or id.</param>
-public sealed record GuestContact(GuestContactKind Kind, string Value);
+/// <summary>
+/// The contact a guest is invited over. It is hashed with a server-side pepper before it is stored, and never logged. The address has no public member and
+/// <see cref="ToString"/> shows the kind only, so logging or destructuring a contact does not write it out.
+/// </summary>
+public sealed class GuestContact
+{
+    /// <summary>Wraps a contact.</summary>
+    /// <param name="kind">The channel.</param>
+    /// <param name="value">The address, number or id.</param>
+    public GuestContact(GuestContactKind kind, string value)
+    {
+        ArgumentNullException.ThrowIfNull(value);
+        Kind = kind;
+        Value = value;
+    }
+
+    /// <summary>The channel.</summary>
+    public GuestContactKind Kind { get; }
+
+    internal string Value { get; }
+
+    /// <inheritdoc />
+    public override string ToString() => $"GuestContact {{ Kind = {Kind}, Value = [redacted] }}";
+}
+
+/// <summary>The one-time secret of a guest link. Hand <see cref="Reveal"/> to the app's sender; it is a method so a logger or serialiser that reads properties cannot write it out.</summary>
+public sealed class GuestLinkToken
+{
+    private readonly string value;
+
+    internal GuestLinkToken(string value) => this.value = value;
+
+    /// <summary>The token to put in the link. Never store or log it.</summary>
+    public string Reveal() => value;
+
+    /// <inheritdoc />
+    public override string ToString() => "[redacted]";
+}
 
 /// <summary>How <see cref="IConversationGuests.InviteAsync"/> ended.</summary>
 public enum GuestInviteOutcome
@@ -45,7 +79,7 @@ public enum GuestInviteOutcome
 /// <param name="ParticipantId">The guest participant, when invited.</param>
 /// <param name="Token">The link secret, when invited.</param>
 /// <param name="ExpiresAt">When the link stops working.</param>
-public sealed record GuestInvite(GuestInviteOutcome Outcome, Guid? ParticipantId, string? Token, DateTimeOffset? ExpiresAt)
+public sealed record GuestInvite(GuestInviteOutcome Outcome, Guid? ParticipantId, GuestLinkToken? Token, DateTimeOffset? ExpiresAt)
 {
     /// <summary>Whether a link was issued.</summary>
     public bool Succeeded => Outcome is GuestInviteOutcome.Invited or GuestInviteOutcome.Reinvited;
