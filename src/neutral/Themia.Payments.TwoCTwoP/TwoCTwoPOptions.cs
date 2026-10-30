@@ -31,6 +31,13 @@ public sealed class TwoCTwoPOptions
     /// <summary>The payment methods this merchant is enabled for with 2C2P, sent as <c>paymentChannel[]</c>.</summary>
     public IReadOnlyList<PaymentMethod> PaymentChannels { get; set; } = [];
 
+    /// <summary>
+    /// The https URL 2C2P calls with the final status of an asynchronous refund (some 123 payments and wallets), sent as <c>notifyURL</c> in the refund request; point it at an
+    /// endpoint that hands the body to <see cref="TwoCTwoPRefundNotificationVerifier"/>. Needs the refund keys. Default <see langword="null"/>: nothing is sent and refunds are followed by polling.
+    /// <b>Do not set it in production until a sandbox refund confirms 2C2P accepts the element:</b> the guide only names <c>notifyURL</c>, and a request 2C2P refuses would turn every refund into <c>refund_outcome_unknown</c>.
+    /// </summary>
+    public string? RefundNotifyUrl { get; set; }
+
     /// <summary>Per-request timeout. Default 30 seconds.</summary>
     public TimeSpan Timeout { get; set; } = TimeSpan.FromSeconds(30);
 
@@ -57,4 +64,7 @@ public sealed class TwoCTwoPOptions
         TwoCTwoPEnvironment.Production => new Uri("https://pgw.2c2p.com"),
         _ => throw new ArgumentOutOfRangeException(nameof(environment)),
     };
+
+    internal static bool IsValidNotifyUrl(string? value) =>
+        value is null || (Uri.TryCreate(value, UriKind.Absolute, out var uri) && uri.Scheme == Uri.UriSchemeHttps && uri.UserInfo.Length == 0 && uri.Fragment.Length == 0);
 }

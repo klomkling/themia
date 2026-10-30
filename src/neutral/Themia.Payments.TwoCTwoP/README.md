@@ -108,7 +108,7 @@ sends nothing, as in earlier versions.
   add one to it, it would re-send a refund.
 - **Status.** `respCode` `00` with refund status `RF` is `Succeeded`; `RFF` (Refund Failed), `RR` (Refund Rejected) and `RR1` to `RR3` (rejected: insufficient balance, invalid bank information, bank account mismatch) are `Failed`, per 2C2P's [Payment Maintenance status codes](https://developer.2c2p.com/docs/response-code-payment-maintenance-status-code);
   `RP` and any status this package does not know are `Pending`, never `Succeeded`. `RefundCreation.RefundId` is
-  always `null`: key your records on the charge. 2C2P's refund guide says a refund of some 123 payments and wallets is asynchronous and that 2C2P then POSTs the final status, encrypted with JWE + JWS (`notifyResponse=...`). **This package does not receive that notification**, so follow a `Pending` refund with `GetRefundsAsync` (below) or the 2C2P merchant portal. 2C2P also states that a refund can only be requested for a settled transaction. A caller must never retry
+  always `null`: key your records on the charge. 2C2P's refund guide says a refund of some 123 payments and wallets is asynchronous and that 2C2P then POSTs the final status, encrypted with JWE + JWS (`notifyResponse=...`). `TwoCTwoPRefundNotificationVerifier` opens that notification (see "Refund notification" below); the poll, `GetRefundsAsync` (below), stays the way to read the result. 2C2P also states that a refund can only be requested for a settled transaction. A caller must never retry
   `refund_outcome_unknown` automatically.
 - **2C2P is the only guard against over-refunding.** The inquiry does not show what was already refunded, so
   two concurrent or repeated partial refunds can exceed the charge locally unnoticed. Serialize refunds per charge.
@@ -170,3 +170,13 @@ Confirm each against a real sandbox transaction before trusting it in production
 3. **The group codes themselves** (`CC` / `THQR` / `DEEPLINK` / `EWALLET`) — taken from 2C2P's published
    payment-channel reference, not from the older ezy-assets integration this package replaces, which used
    a different, non-matching set (`CC`/`THQR`/`EWALLETS`/`123`) and never actually sent the field.
+
+## Refund notification
+
+For an asynchronous refund 2C2P can call you when it finishes. Set `TwoCTwoPOptions.RefundNotifyUrl` (https, needs the refund keys; sent as `notifyURL` in the refund request) and map that URL to an endpoint that hands the raw body to `TwoCTwoPRefundNotificationVerifier.Verify(body, headers)` (resolve it as itself: `IPaymentWebhookVerifier` stays the payment webhook's). Set the endpoint's request body limit to 64 KiB.
+
+- It checks the JWS signature with the 2C2P certificate before decrypting anything with the merchant key, and accepts only the pinned algorithms. A bad or unreadable token is `SignatureMismatch` (also what a merchant key that changed looks like: check the keys before assuming an attack); a body that is not one `notifyResponse` form field, a notification for another merchant or another process type, or one without a time is `Malformed`.
+- **Use a `Verified` refund event as a nudge: call `GetRefundsAsync` for the charge and reconcile by `RefundRecord.IdempotencyKey`. Do not write the event's status onto a refund row.** The notification does not say which of several refunds of one invoice it is about, and `RefundAsync` never learns 2C2P's reference. The status is mapped like the poll (`RF` succeeded, `RFF`/`RR*` failed, anything else or a `respCode` other than `00` is `Other` and pending). `RawJson` carries `idempotencyID`/`userDefined1`/`refundReferenceNo` when 2C2P sends them (not confirmed), and nothing about the card.
+- A body is authentic, not fresh: a captured one replays for ever. As a nudge a replay costs one read; coalesce nudges per charge if you want to bound that.
+- Missing or invalid refund keys make `Verify` throw `InvalidOperationException` (a 500 for 2C2P to retry), not a verdict on the sender.
+- **Not verified against the 2C2P sandbox, so do not set `RefundNotifyUrl` in production yet:** the `notifyURL` element name and place in the request (a request 2C2P refuses would turn every refund into `refund_outcome_unknown`), the form encoding and content type, which reference the notification carries, whether `timeStamp` (`yyMMddHHmmss`, used as the event time) is the refund time, and whether 2C2P retries on a non-2xx answer or publishes sender addresses.

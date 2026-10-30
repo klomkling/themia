@@ -25,9 +25,14 @@ internal static class TwoCTwoPRefundXml
     /// <summary>What a verified refund status answer says. <see cref="Refunds"/> is empty when 2C2P lists none.</summary>
     public sealed record StatusResponse(string RespCode, string? RespDesc, string? InvoiceNo, string? MerchantId, IReadOnlyList<RefundRow> Refunds);
 
+    /// <summary>What an asynchronous refund notification says. Strings are as 2C2P sent them; nothing here is the card or the payer.</summary>
+    public sealed record Notification(
+        string RespCode, string? ProcessType, string InvoiceNo, string? MerchantId, string? Status, string? TimeStamp, string? ReferenceNo,
+        string? RefundReferenceNo, string? Amount, string? ApprovalCode, string? IdempotencyId, string? UserDefined1);
+
     /// <summary>Builds the request with <see cref="XElement"/>, so every value is escaped. Amount is a two-place decimal, invariant culture.
     /// The idempotency id is also sent as <c>userDefined1</c> when it is at most <see cref="MaxUserDefinedLength"/> characters; 2C2P echoes it on the refund in a status inquiry, so the refund can be matched later.</summary>
-    public static string BuildRequest(string merchantId, string invoiceNo, decimal amount, string idempotencyId, DateTimeOffset now)
+    public static string BuildRequest(string merchantId, string invoiceNo, decimal amount, string idempotencyId, DateTimeOffset now, string? notifyUrl = null)
     {
         var root = new XElement("PaymentProcessRequest",
             new XElement("version", RequestVersion),
@@ -40,6 +45,11 @@ internal static class TwoCTwoPRefundXml
         if (idempotencyId.Length <= MaxUserDefinedLength)
         {
             root.Add(new XElement("userDefined1", idempotencyId));
+        }
+
+        if (notifyUrl is not null)
+        {
+            root.Add(new XElement("notifyURL", notifyUrl)); // the element name is the guide's; not yet confirmed against the sandbox
         }
 
         return root.ToString(SaveOptions.DisableFormatting);
@@ -119,5 +129,28 @@ internal static class TwoCTwoPRefundXml
     {
         var value = root.Element(name)?.Value.Trim();
         return string.IsNullOrEmpty(value) ? null : value;
+    }
+
+    /// <summary>Parses a refund notification, DTDs prohibited. <see langword="null"/> when it is not a <c>PaymentProcessResponse</c> with a <c>respCode</c> and an <c>invoiceNo</c>.</summary>
+    public static Notification? ParseNotification(string xml)
+    {
+        var settings = new XmlReaderSettings { DtdProcessing = DtdProcessing.Prohibit, XmlResolver = null, MaxCharactersFromEntities = 0 };
+        try
+        {
+            using var reader = XmlReader.Create(new StringReader(xml), settings);
+            var root = XDocument.Load(reader).Root;
+            if (root is not { Name.LocalName: "PaymentProcessResponse" } || Text(root, "respCode") is not { } respCode || Text(root, "invoiceNo") is not { } invoiceNo)
+            {
+                return null;
+            }
+
+            return new Notification(
+                respCode, Text(root, "processType"), invoiceNo, Text(root, "merchantID"), Text(root, "status"), Text(root, "timeStamp"), Text(root, "referenceNo"),
+                Text(root, "refundReferenceNo"), Text(root, "amount"), Text(root, "approvalCode"), Text(root, "idempotencyID"), Text(root, "userDefined1"));
+        }
+        catch (XmlException)
+        {
+            return null;
+        }
     }
 }

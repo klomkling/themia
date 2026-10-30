@@ -30,6 +30,7 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 ### Added
 
 - **`Themia.Payments` / `Themia.Payments.TwoCTwoP`:** `Charge.PaidChannel` (nullable string) carries the provider's own codes behind `PaidMethod`, for logging and reconciliation; the 2C2P gateway fills it from the inquiry as `paymentScheme=MA channelCode=VI agentCode=OCBC` (absent parts left out; a value that is not a short alphanumeric code is dropped so it cannot forge a log line). An app can now see which codes left `PaidMethod` null. Never branch on it. Not verified against the 2C2P sandbox.
+- **`Themia.Payments.TwoCTwoP`: `TwoCTwoPRefundNotificationVerifier`** opens 2C2P's asynchronous refund notification (`notifyResponse=` JWS around a JWE): signature checked with the 2C2P certificate before decrypting with the merchant key, pinned algorithms, strict form parsing, a 64 KiB cap, keys loaded once. A `Verified` event (`RefundSucceeded` / `RefundFailed` / `Other`, status mapped like the poll, never succeeded for an unknown status or a `respCode` other than `00`) is a nudge to call `GetRefundsAsync`, not a state to write. New option `RefundNotifyUrl` (https, needs the refund keys, default `null`) sends `notifyURL` in the refund request. Not verified against the 2C2P sandbox: leave `RefundNotifyUrl` unset in production until it is. Registered as itself, so `IPaymentWebhookVerifier` stays the payment webhook's.
 
 ## [0.45.1] - 2026-10-30
 
