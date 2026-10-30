@@ -1,13 +1,18 @@
 #nullable enable
-const Themia.Conversations.ConversationOptions.BodyColumnWidth = 4000 -> int
-const Themia.Conversations.ConversationOptions.DisplayNameColumnWidth = 80 -> int
-override Themia.Conversations.Migrations.ConversationSchemaMigration.Down() -> void
-override Themia.Conversations.Migrations.ConversationSchemaMigration.Up() -> void
-static Themia.Conversations.DependencyInjection.ConversationServiceCollectionExtensions.AddThemiaConversations(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Themia.Conversations.ConversationOptions!>? configure = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+Themia.Conversations.CloseOutcome
+Themia.Conversations.CloseOutcome.AlreadyClosed = 1 -> Themia.Conversations.CloseOutcome
+Themia.Conversations.CloseOutcome.Closed = 0 -> Themia.Conversations.CloseOutcome
+Themia.Conversations.CloseOutcome.Refused = 2 -> Themia.Conversations.CloseOutcome
+Themia.Conversations.CloseResult
+Themia.Conversations.CloseResult.CloseResult(Themia.Conversations.CloseOutcome Outcome) -> void
+Themia.Conversations.CloseResult.Outcome.get -> Themia.Conversations.CloseOutcome
+Themia.Conversations.CloseResult.Outcome.init -> void
+Themia.Conversations.CloseResult.Succeeded.get -> bool
 Themia.Conversations.ConversationAction
 Themia.Conversations.ConversationAction.Close = 4 -> Themia.Conversations.ConversationAction
 Themia.Conversations.ConversationAction.Export = 6 -> Themia.Conversations.ConversationAction
 Themia.Conversations.ConversationAction.Invite = 5 -> Themia.Conversations.ConversationAction
+Themia.Conversations.ConversationAction.Join = 7 -> Themia.Conversations.ConversationAction
 Themia.Conversations.ConversationAction.MarkRead = 3 -> Themia.Conversations.ConversationAction
 Themia.Conversations.ConversationAction.Open = 0 -> Themia.Conversations.ConversationAction
 Themia.Conversations.ConversationAction.Post = 2 -> Themia.Conversations.ConversationAction
@@ -27,6 +32,40 @@ Themia.Conversations.ConversationActorKind.Guest = 1 -> Themia.Conversations.Con
 Themia.Conversations.ConversationActorKind.Member = 0 -> Themia.Conversations.ConversationActorKind
 Themia.Conversations.ConversationActorKind.Partner = 2 -> Themia.Conversations.ConversationActorKind
 Themia.Conversations.ConversationActorKind.System = 3 -> Themia.Conversations.ConversationActorKind
+Themia.Conversations.ConversationEvent
+Themia.Conversations.ConversationEvent.ConversationEvent(System.Guid Id, string! TenantId, System.Guid ConversationId, Themia.Conversations.ConversationEventKind Kind, System.Guid MessageId, long Seq, System.Collections.Generic.IReadOnlyList<System.Guid>! RecipientParticipantIds) -> void
+Themia.Conversations.ConversationEvent.ConversationId.get -> System.Guid
+Themia.Conversations.ConversationEvent.ConversationId.init -> void
+Themia.Conversations.ConversationEvent.Id.get -> System.Guid
+Themia.Conversations.ConversationEvent.Id.init -> void
+Themia.Conversations.ConversationEvent.Kind.get -> Themia.Conversations.ConversationEventKind
+Themia.Conversations.ConversationEvent.Kind.init -> void
+Themia.Conversations.ConversationEvent.MessageId.get -> System.Guid
+Themia.Conversations.ConversationEvent.MessageId.init -> void
+Themia.Conversations.ConversationEvent.RecipientParticipantIds.get -> System.Collections.Generic.IReadOnlyList<System.Guid>!
+Themia.Conversations.ConversationEvent.RecipientParticipantIds.init -> void
+Themia.Conversations.ConversationEvent.Seq.get -> long
+Themia.Conversations.ConversationEvent.Seq.init -> void
+Themia.Conversations.ConversationEvent.TenantId.get -> string!
+Themia.Conversations.ConversationEvent.TenantId.init -> void
+Themia.Conversations.ConversationEventKind
+Themia.Conversations.ConversationEventKind.MessagePosted = 0 -> Themia.Conversations.ConversationEventKind
+Themia.Conversations.ConversationMessage
+Themia.Conversations.ConversationMessage.Body.get -> string?
+Themia.Conversations.ConversationMessage.Body.init -> void
+Themia.Conversations.ConversationMessage.ConversationMessage(System.Guid Id, long Seq, System.Guid ParticipantId, Themia.Conversations.MessageKind Kind, string? Body, System.DateTimeOffset CreatedAt, bool IsRedacted) -> void
+Themia.Conversations.ConversationMessage.CreatedAt.get -> System.DateTimeOffset
+Themia.Conversations.ConversationMessage.CreatedAt.init -> void
+Themia.Conversations.ConversationMessage.Id.get -> System.Guid
+Themia.Conversations.ConversationMessage.Id.init -> void
+Themia.Conversations.ConversationMessage.IsRedacted.get -> bool
+Themia.Conversations.ConversationMessage.IsRedacted.init -> void
+Themia.Conversations.ConversationMessage.Kind.get -> Themia.Conversations.MessageKind
+Themia.Conversations.ConversationMessage.Kind.init -> void
+Themia.Conversations.ConversationMessage.ParticipantId.get -> System.Guid
+Themia.Conversations.ConversationMessage.ParticipantId.init -> void
+Themia.Conversations.ConversationMessage.Seq.get -> long
+Themia.Conversations.ConversationMessage.Seq.init -> void
 Themia.Conversations.ConversationOptions
 Themia.Conversations.ConversationOptions.ConversationOptions() -> void
 Themia.Conversations.ConversationOptions.DefaultRetention.get -> System.TimeSpan
@@ -52,6 +91,12 @@ Themia.Conversations.ConversationRetentionState.LegalHold = 1 -> Themia.Conversa
 Themia.Conversations.ConversationState
 Themia.Conversations.ConversationState.Closed = 1 -> Themia.Conversations.ConversationState
 Themia.Conversations.ConversationState.Open = 0 -> Themia.Conversations.ConversationState
+Themia.Conversations.ConversationSubject
+Themia.Conversations.ConversationSubject.ConversationSubject(string! SubjectType, string! SubjectId) -> void
+Themia.Conversations.ConversationSubject.SubjectId.get -> string!
+Themia.Conversations.ConversationSubject.SubjectId.init -> void
+Themia.Conversations.ConversationSubject.SubjectType.get -> string!
+Themia.Conversations.ConversationSubject.SubjectType.init -> void
 Themia.Conversations.ConversationTarget
 Themia.Conversations.ConversationTarget.ConversationId.get -> System.Guid?
 Themia.Conversations.ConversationTarget.ConversationId.init -> void
@@ -63,13 +108,93 @@ Themia.Conversations.IConversationAccessPolicy
 Themia.Conversations.IConversationAccessPolicy.CanAsync(Themia.Conversations.ConversationActor! actor, Themia.Conversations.ConversationTarget! target, Themia.Conversations.ConversationAction action, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<bool>
 Themia.Conversations.IConversationDialect
 Themia.Conversations.IConversationDialect.CreateConnection() -> System.Data.Common.DbConnection!
+Themia.Conversations.IConversationDialect.IncrementLastSeqAsync(System.Data.Common.DbConnection! connection, System.Data.Common.DbTransaction! transaction, string! tenantId, System.Guid conversationId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<long?>!
+Themia.Conversations.IConversationDialect.IsDeadlock(System.Data.Common.DbException! exception) -> bool
 Themia.Conversations.IConversationDialect.IsDuplicateKey(System.Data.Common.DbException! exception) -> bool
+Themia.Conversations.IConversationDialect.LimitClause.get -> string!
+Themia.Conversations.IConversationEventSink
+Themia.Conversations.IConversationEventSink.RaiseAsync(System.Data.Common.DbConnection! connection, System.Data.Common.DbTransaction! transaction, Themia.Conversations.ConversationEvent! conversationEvent, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Conversations.IConversationService
+Themia.Conversations.IConversationService.CloseAsync(Themia.Conversations.ConversationActor! actor, string! tenantId, System.Guid conversationId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Conversations.CloseResult!>!
+Themia.Conversations.IConversationService.JoinAsync(Themia.Conversations.ConversationActor! actor, string! tenantId, System.Guid conversationId, string! displayName, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Conversations.JoinResult!>!
+Themia.Conversations.IConversationService.ListAsync(Themia.Conversations.ConversationActor! actor, string! tenantId, System.Guid conversationId, long afterSeq, int limit, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Conversations.MessagePage!>!
+Themia.Conversations.IConversationService.MarkReadAsync(Themia.Conversations.ConversationActor! actor, string! tenantId, System.Guid conversationId, long seq, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Conversations.MarkReadResult!>!
+Themia.Conversations.IConversationService.OpenAsync(Themia.Conversations.ConversationActor! actor, string! tenantId, Themia.Conversations.ConversationSubject! subject, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Conversations.OpenResult!>!
+Themia.Conversations.IConversationService.PostAsync(Themia.Conversations.ConversationActor! actor, string! tenantId, System.Guid conversationId, Themia.Conversations.PostMessage! message, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Conversations.PostResult!>!
+Themia.Conversations.JoinOutcome
+Themia.Conversations.JoinOutcome.AlreadyJoined = 1 -> Themia.Conversations.JoinOutcome
+Themia.Conversations.JoinOutcome.Invalid = 2 -> Themia.Conversations.JoinOutcome
+Themia.Conversations.JoinOutcome.Joined = 0 -> Themia.Conversations.JoinOutcome
+Themia.Conversations.JoinOutcome.Refused = 3 -> Themia.Conversations.JoinOutcome
+Themia.Conversations.JoinResult
+Themia.Conversations.JoinResult.JoinResult(Themia.Conversations.JoinOutcome Outcome, System.Guid? ParticipantId) -> void
+Themia.Conversations.JoinResult.Outcome.get -> Themia.Conversations.JoinOutcome
+Themia.Conversations.JoinResult.Outcome.init -> void
+Themia.Conversations.JoinResult.ParticipantId.get -> System.Guid?
+Themia.Conversations.JoinResult.ParticipantId.init -> void
+Themia.Conversations.JoinResult.Succeeded.get -> bool
+Themia.Conversations.ListOutcome
+Themia.Conversations.ListOutcome.Listed = 0 -> Themia.Conversations.ListOutcome
+Themia.Conversations.ListOutcome.Refused = 1 -> Themia.Conversations.ListOutcome
+Themia.Conversations.MarkReadOutcome
+Themia.Conversations.MarkReadOutcome.Marked = 0 -> Themia.Conversations.MarkReadOutcome
+Themia.Conversations.MarkReadOutcome.Refused = 1 -> Themia.Conversations.MarkReadOutcome
+Themia.Conversations.MarkReadResult
+Themia.Conversations.MarkReadResult.LastReadSeq.get -> long
+Themia.Conversations.MarkReadResult.LastReadSeq.init -> void
+Themia.Conversations.MarkReadResult.MarkReadResult(Themia.Conversations.MarkReadOutcome Outcome, long LastReadSeq) -> void
+Themia.Conversations.MarkReadResult.Outcome.get -> Themia.Conversations.MarkReadOutcome
+Themia.Conversations.MarkReadResult.Outcome.init -> void
 Themia.Conversations.MessageKind
 Themia.Conversations.MessageKind.System = 1 -> Themia.Conversations.MessageKind
 Themia.Conversations.MessageKind.Text = 0 -> Themia.Conversations.MessageKind
+Themia.Conversations.MessagePage
+Themia.Conversations.MessagePage.MessagePage(Themia.Conversations.ListOutcome Outcome, System.Collections.Generic.IReadOnlyList<Themia.Conversations.ConversationMessage!>! Messages) -> void
+Themia.Conversations.MessagePage.Messages.get -> System.Collections.Generic.IReadOnlyList<Themia.Conversations.ConversationMessage!>!
+Themia.Conversations.MessagePage.Messages.init -> void
+Themia.Conversations.MessagePage.Outcome.get -> Themia.Conversations.ListOutcome
+Themia.Conversations.MessagePage.Outcome.init -> void
 Themia.Conversations.Migrations.ConversationSchemaMigration
 Themia.Conversations.Migrations.ConversationSchemaMigration.ConversationSchemaMigration() -> void
+Themia.Conversations.OpenOutcome
+Themia.Conversations.OpenOutcome.Opened = 0 -> Themia.Conversations.OpenOutcome
+Themia.Conversations.OpenOutcome.PendingPurge = 2 -> Themia.Conversations.OpenOutcome
+Themia.Conversations.OpenOutcome.Refused = 3 -> Themia.Conversations.OpenOutcome
+Themia.Conversations.OpenOutcome.Reopened = 1 -> Themia.Conversations.OpenOutcome
+Themia.Conversations.OpenResult
+Themia.Conversations.OpenResult.ConversationId.get -> System.Guid?
+Themia.Conversations.OpenResult.ConversationId.init -> void
+Themia.Conversations.OpenResult.OpenResult(Themia.Conversations.OpenOutcome Outcome, System.Guid? ConversationId) -> void
+Themia.Conversations.OpenResult.Outcome.get -> Themia.Conversations.OpenOutcome
+Themia.Conversations.OpenResult.Outcome.init -> void
+Themia.Conversations.OpenResult.Succeeded.get -> bool
 Themia.Conversations.ParticipantKind
 Themia.Conversations.ParticipantKind.Guest = 1 -> Themia.Conversations.ParticipantKind
 Themia.Conversations.ParticipantKind.Member = 0 -> Themia.Conversations.ParticipantKind
 Themia.Conversations.ParticipantKind.System = 2 -> Themia.Conversations.ParticipantKind
+Themia.Conversations.PostMessage
+Themia.Conversations.PostMessage.Body.get -> string!
+Themia.Conversations.PostMessage.Body.init -> void
+Themia.Conversations.PostMessage.ClientMessageId.get -> string!
+Themia.Conversations.PostMessage.ClientMessageId.init -> void
+Themia.Conversations.PostMessage.PostMessage(string! ClientMessageId, string! Body) -> void
+Themia.Conversations.PostOutcome
+Themia.Conversations.PostOutcome.Closed = 2 -> Themia.Conversations.PostOutcome
+Themia.Conversations.PostOutcome.Duplicate = 1 -> Themia.Conversations.PostOutcome
+Themia.Conversations.PostOutcome.InvalidMessage = 3 -> Themia.Conversations.PostOutcome
+Themia.Conversations.PostOutcome.Posted = 0 -> Themia.Conversations.PostOutcome
+Themia.Conversations.PostOutcome.Refused = 4 -> Themia.Conversations.PostOutcome
+Themia.Conversations.PostResult
+Themia.Conversations.PostResult.MessageId.get -> System.Guid?
+Themia.Conversations.PostResult.MessageId.init -> void
+Themia.Conversations.PostResult.Outcome.get -> Themia.Conversations.PostOutcome
+Themia.Conversations.PostResult.Outcome.init -> void
+Themia.Conversations.PostResult.PostResult(Themia.Conversations.PostOutcome Outcome, System.Guid? MessageId, long? Seq) -> void
+Themia.Conversations.PostResult.Seq.get -> long?
+Themia.Conversations.PostResult.Seq.init -> void
+Themia.Conversations.PostResult.Succeeded.get -> bool
+const Themia.Conversations.ConversationOptions.BodyColumnWidth = 4000 -> int
+const Themia.Conversations.ConversationOptions.DisplayNameColumnWidth = 80 -> int
+override Themia.Conversations.Migrations.ConversationSchemaMigration.Down() -> void
+override Themia.Conversations.Migrations.ConversationSchemaMigration.Up() -> void
+static Themia.Conversations.DependencyInjection.ConversationServiceCollectionExtensions.AddThemiaConversations(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Themia.Conversations.ConversationOptions!>? configure = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!

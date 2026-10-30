@@ -85,4 +85,98 @@ public enum ConversationAction
 
     /// <summary>Export the transcript.</summary>
     Export = 6,
+
+    /// <summary>Become a participant (a member or partner agent joining by its user reference).</summary>
+    Join = 7,
+}
+
+/// <summary>How <see cref="IConversationService.OpenAsync"/> ended.</summary>
+public enum OpenOutcome
+{
+    /// <summary>The subject's conversation was created, or already open.</summary>
+    Opened = 0,
+
+    /// <summary>A closed conversation was reopened and its retention date cleared.</summary>
+    Reopened = 1,
+
+    /// <summary>The conversation is past its retention date and waits for the purge; it cannot be opened until then.</summary>
+    PendingPurge = 2,
+
+    /// <summary>The access policy denied the call.</summary>
+    Refused = 3,
+}
+
+/// <summary>How <see cref="IConversationService.JoinAsync"/> ended.</summary>
+public enum JoinOutcome
+{
+    /// <summary>The actor became a participant.</summary>
+    Joined = 0,
+
+    /// <summary>The actor already was one.</summary>
+    AlreadyJoined = 1,
+
+    /// <summary>The display name is empty, too long, or holds control or markup characters.</summary>
+    Invalid = 2,
+
+    /// <summary>The policy denied the call, the conversation does not exist in this tenant, or the actor has no user reference.</summary>
+    Refused = 3,
+}
+
+/// <summary>How <see cref="IConversationService.PostAsync"/> ended.</summary>
+public enum PostOutcome
+{
+    /// <summary>The message was stored with a new sequence number.</summary>
+    Posted = 0,
+
+    /// <summary>The same client message id was posted before; the original message is returned and nothing is overwritten.</summary>
+    Duplicate = 1,
+
+    /// <summary>The conversation is closed.</summary>
+    Closed = 2,
+
+    /// <summary>The body is empty or longer than <see cref="ConversationOptions.MaxBodyLength"/>.</summary>
+    InvalidMessage = 3,
+
+    /// <summary>The policy denied the call, or the actor is not an active participant of this conversation in this tenant.</summary>
+    Refused = 4,
+}
+
+/// <summary>How <see cref="IConversationService.ListAsync"/> ended.</summary>
+public enum ListOutcome
+{
+    /// <summary>The page was read (it may be empty).</summary>
+    Listed = 0,
+
+    /// <summary>The policy denied the call, or the actor is not an active participant.</summary>
+    Refused = 1,
+}
+
+/// <summary>How <see cref="IConversationService.MarkReadAsync"/> ended.</summary>
+public enum MarkReadOutcome
+{
+    /// <summary>The marker is at <see cref="MarkReadResult.LastReadSeq"/> (unchanged when the request was not ahead of it).</summary>
+    Marked = 0,
+
+    /// <summary>The policy denied the call, or the actor is not an active participant.</summary>
+    Refused = 1,
+}
+
+/// <summary>How <see cref="IConversationService.CloseAsync"/> ended.</summary>
+public enum CloseOutcome
+{
+    /// <summary>The conversation was open and is now closed.</summary>
+    Closed = 0,
+
+    /// <summary>The conversation was closed already; nothing changed.</summary>
+    AlreadyClosed = 1,
+
+    /// <summary>The policy denied the call, or the actor is not an active participant.</summary>
+    Refused = 2,
+}
+
+/// <summary>What a <see cref="ConversationEvent"/> reports.</summary>
+public enum ConversationEventKind
+{
+    /// <summary>A message was posted.</summary>
+    MessagePosted = 0,
 }

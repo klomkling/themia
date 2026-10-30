@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
 using Themia.Conversations.Internal;
 
 namespace Themia.Conversations.DependencyInjection;
@@ -8,7 +9,7 @@ namespace Themia.Conversations.DependencyInjection;
 public static class ConversationServiceCollectionExtensions
 {
     /// <summary>
-    /// Registers the options and the default-deny <see cref="IConversationAccessPolicy"/> (register your own before or after: the last registration wins).
+    /// Registers the options, <see cref="IConversationService"/>, the default event sink (a row in <c>conversation_events</c>) and the default-deny <see cref="IConversationAccessPolicy"/> (register your own before or after: the last registration wins).
     /// Call the engine package's registration as well (for example <c>AddThemiaConversationsPostgres</c>), which registers the dialect and runs the migration.
     /// </summary>
     /// <param name="services">The service collection.</param>
@@ -24,6 +25,15 @@ public static class ConversationServiceCollectionExtensions
 
         services.TryAddSingleton(options);
         services.TryAddSingleton<IConversationAccessPolicy, DenyAllConversationAccessPolicy>();
+        services.TryAddSingleton(TimeProvider.System);
+        services.TryAddSingleton<IConversationEventSink>(sp => new DefaultConversationEventSink(sp.GetRequiredService<TimeProvider>()));
+        services.TryAddSingleton<IConversationService>(sp => new ConversationService(
+            sp.GetRequiredService<IConversationDialect>(),
+            sp.GetRequiredService<ConversationOptions>(),
+            sp.GetRequiredService<IConversationAccessPolicy>(),
+            sp.GetRequiredService<IConversationEventSink>(),
+            sp.GetRequiredService<TimeProvider>(),
+            sp.GetRequiredService<ILogger<ConversationService>>()));
         return services;
     }
 }
