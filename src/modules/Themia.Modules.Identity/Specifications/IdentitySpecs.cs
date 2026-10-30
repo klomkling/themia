@@ -167,6 +167,13 @@ internal sealed class TokenByUserPurposeAndHashSpec : Specification<UserToken>
         Where(t => t.UserId == userId && t.Purpose == purpose && t.TokenHash == tokenHash);
 }
 
+/// <summary>One token row while it is still unconsumed and unexpired: the predicate of the atomic consume.</summary>
+internal sealed class ClaimableUserTokenSpec : Specification<UserToken>
+{
+    public ClaimableUserTokenSpec(Guid tokenId, DateTimeOffset now) =>
+        Where(t => t.Id == tokenId && t.ConsumedAt == null && t.ExpiresAt > now);
+}
+
 /// <summary>All roles whose id is in the given set, resolved without the tenant filter but still
 /// guarded to platform (null-tenant) roles or roles of the ambient tenant.</summary>
 internal sealed class RolesByIdsSpec : Specification<Role>

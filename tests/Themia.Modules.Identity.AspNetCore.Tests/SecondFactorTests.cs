@@ -187,7 +187,7 @@ public sealed class SecondFactorTests : IDisposable
     {
         var pending = await PendingPasswordLoginAsync();
 
-        var result = await Completion().CompleteAsync(pending.Ticket);
+        var result = await Completion().CompleteAsync(pending.Ticket, pending.UserId, pending.Stage);
 
         Assert.True(result.Succeeded);
         Assert.Equal(SecondFactorMethod.Password, result.Method);
@@ -198,13 +198,38 @@ public sealed class SecondFactorTests : IDisposable
     }
 
     [Fact]
+    public async Task A_ticket_for_another_user_is_refused_and_burnt()
+    {
+        var pending = await PendingPasswordLoginAsync();
+        var completion = Completion();
+
+        var wrongUser = await completion.CompleteAsync(pending.Ticket, Guid.NewGuid(), pending.Stage);
+
+        Assert.Equal(SecondFactorCompletionOutcome.Refused, wrongUser.Outcome);
+        Assert.Equal(0, refresh.IssueCalls);
+        // Burnt: the right caller can no longer use it either.
+        Assert.Equal(SecondFactorCompletionOutcome.Refused, (await completion.CompleteAsync(pending.Ticket, pending.UserId, pending.Stage)).Outcome);
+    }
+
+    [Fact]
+    public async Task A_verify_ticket_cannot_be_completed_at_the_enrol_stage()
+    {
+        var pending = await PendingPasswordLoginAsync();
+
+        var result = await Completion().CompleteAsync(pending.Ticket, pending.UserId, SecondFactorStage.Enrol);
+
+        Assert.Equal(SecondFactorCompletionOutcome.Refused, result.Outcome);
+        Assert.Equal(0, refresh.IssueCalls);
+    }
+
+    [Fact]
     public async Task A_ticket_is_single_use()
     {
         var pending = await PendingPasswordLoginAsync();
         var completion = Completion();
 
-        Assert.True((await completion.CompleteAsync(pending.Ticket)).Succeeded);
-        var second = await completion.CompleteAsync(pending.Ticket);
+        Assert.True((await completion.CompleteAsync(pending.Ticket, pending.UserId, pending.Stage)).Succeeded);
+        var second = await completion.CompleteAsync(pending.Ticket, pending.UserId, pending.Stage);
 
         Assert.Equal(SecondFactorCompletionOutcome.Refused, second.Outcome);
         Assert.Equal(1, refresh.IssueCalls);
@@ -216,8 +241,8 @@ public sealed class SecondFactorTests : IDisposable
         var pending = await PendingPasswordLoginAsync();
         var tampered = pending.Ticket[..^3] + (pending.Ticket.EndsWith("AAA", StringComparison.Ordinal) ? "BBB" : "AAA");
 
-        Assert.Equal(SecondFactorCompletionOutcome.Refused, (await Completion().CompleteAsync(tampered)).Outcome);
-        Assert.Equal(SecondFactorCompletionOutcome.Refused, (await Completion().CompleteAsync("not-a-ticket")).Outcome);
+        Assert.Equal(SecondFactorCompletionOutcome.Refused, (await Completion().CompleteAsync(tampered, pending.UserId, pending.Stage)).Outcome);
+        Assert.Equal(SecondFactorCompletionOutcome.Refused, (await Completion().CompleteAsync("not-a-ticket", pending.UserId, pending.Stage)).Outcome);
         Assert.Equal(0, refresh.IssueCalls);
     }
 
@@ -228,7 +253,7 @@ public sealed class SecondFactorTests : IDisposable
 
         clock.Advance(TimeSpan.FromMinutes(6));
 
-        Assert.Equal(SecondFactorCompletionOutcome.Refused, (await Completion().CompleteAsync(pending.Ticket)).Outcome);
+        Assert.Equal(SecondFactorCompletionOutcome.Refused, (await Completion().CompleteAsync(pending.Ticket, pending.UserId, pending.Stage)).Outcome);
     }
 
     [Fact]
@@ -240,7 +265,7 @@ public sealed class SecondFactorTests : IDisposable
 
         clock.Advance(TimeSpan.FromMinutes(10));
 
-        Assert.True((await Completion().CompleteAsync(pending.Ticket)).Succeeded);
+        Assert.True((await Completion().CompleteAsync(pending.Ticket, pending.UserId, pending.Stage)).Succeeded);
     }
 
     [Fact]
@@ -251,7 +276,7 @@ public sealed class SecondFactorTests : IDisposable
 
         user.SecurityStamp = Guid.NewGuid().ToString("N");
 
-        Assert.Equal(SecondFactorCompletionOutcome.Refused, (await Completion().CompleteAsync(pending.Ticket)).Outcome);
+        Assert.Equal(SecondFactorCompletionOutcome.Refused, (await Completion().CompleteAsync(pending.Ticket, pending.UserId, pending.Stage)).Outcome);
         Assert.Equal(0, refresh.IssueCalls);
     }
 
@@ -261,12 +286,12 @@ public sealed class SecondFactorTests : IDisposable
         var user = Staff();
         var pending = await PendingPasswordLoginAsync(user);
         user.IsActive = false;
-        Assert.Equal(SecondFactorCompletionOutcome.Refused, (await Completion().CompleteAsync(pending.Ticket)).Outcome);
+        Assert.Equal(SecondFactorCompletionOutcome.Refused, (await Completion().CompleteAsync(pending.Ticket, pending.UserId, pending.Stage)).Outcome);
 
         user.IsActive = true;
         var second = await PendingPasswordLoginAsync(user);
         user.LockoutEnd = clock.GetUtcNow().AddHours(1);
-        Assert.Equal(SecondFactorCompletionOutcome.Refused, (await Completion().CompleteAsync(second.Ticket)).Outcome);
+        Assert.Equal(SecondFactorCompletionOutcome.Refused, (await Completion().CompleteAsync(second.Ticket, second.UserId, second.Stage)).Outcome);
         Assert.Equal(0, refresh.IssueCalls);
     }
 
@@ -277,7 +302,7 @@ public sealed class SecondFactorTests : IDisposable
 
         options.EnabledLoginMethods = LoginMethods.Otp | LoginMethods.External;
 
-        Assert.Equal(SecondFactorCompletionOutcome.Refused, (await Completion().CompleteAsync(pending.Ticket)).Outcome);
+        Assert.Equal(SecondFactorCompletionOutcome.Refused, (await Completion().CompleteAsync(pending.Ticket, pending.UserId, pending.Stage)).Outcome);
     }
 
     [Fact]
@@ -286,14 +311,14 @@ public sealed class SecondFactorTests : IDisposable
         var pending = await PendingPasswordLoginAsync();
         hooks.DenyOnSucceeded = true;
 
-        var result = await Completion().CompleteAsync(pending.Ticket);
+        var result = await Completion().CompleteAsync(pending.Ticket, pending.UserId, pending.Stage);
 
         Assert.Equal(SecondFactorCompletionOutcome.Denied, result.Outcome);
         Assert.Equal(0, refresh.IssueCalls);
         Assert.Contains(nameof(IIdentityEventObserver.OnLoginDeniedAsync), observer.Calls);
         // The ticket is burnt either way.
         hooks.DenyOnSucceeded = false;
-        Assert.Equal(SecondFactorCompletionOutcome.Refused, (await Completion().CompleteAsync(pending.Ticket)).Outcome);
+        Assert.Equal(SecondFactorCompletionOutcome.Refused, (await Completion().CompleteAsync(pending.Ticket, pending.UserId, pending.Stage)).Outcome);
     }
 
     [Fact]
@@ -304,7 +329,7 @@ public sealed class SecondFactorTests : IDisposable
         var pending = await PendingPasswordLoginAsync(user);
         TenantContextAccessor.CurrentTenantId = null;
 
-        var result = await Completion().CompleteAsync(pending.Ticket);
+        var result = await Completion().CompleteAsync(pending.Ticket, pending.UserId, pending.Stage);
 
         Assert.True(result.Succeeded);
         Assert.Equal(TenantId.From("t1"), principals.TenantSeen);
@@ -320,7 +345,7 @@ public sealed class SecondFactorTests : IDisposable
 
         user.TenantId = TenantId.From("t2");
 
-        Assert.Equal(SecondFactorCompletionOutcome.Refused, (await Completion().CompleteAsync(pending.Ticket)).Outcome);
+        Assert.Equal(SecondFactorCompletionOutcome.Refused, (await Completion().CompleteAsync(pending.Ticket, pending.UserId, pending.Stage)).Outcome);
     }
 
     [Fact]
@@ -331,7 +356,7 @@ public sealed class SecondFactorTests : IDisposable
 
         await completion.RejectAsync(pending.Ticket);
 
-        Assert.Equal(SecondFactorCompletionOutcome.Refused, (await completion.CompleteAsync(pending.Ticket)).Outcome);
+        Assert.Equal(SecondFactorCompletionOutcome.Refused, (await completion.CompleteAsync(pending.Ticket, pending.UserId, pending.Stage)).Outcome);
         Assert.Equal(0, refresh.IssueCalls);
     }
 
@@ -343,7 +368,7 @@ public sealed class SecondFactorTests : IDisposable
         var pending = await ticketService.IssueAsync(new SecondFactorTicketData(
             user.Id, user.TenantId, SecondFactorMethod.External, "line", WasCreated: true, WasLinked: true, user.SecurityStamp, SecondFactorStage.Verify));
 
-        var result = await Completion().CompleteAsync(pending.Ticket);
+        var result = await Completion().CompleteAsync(pending.Ticket, pending.UserId, pending.Stage);
 
         Assert.True(result.Succeeded);
         Assert.Equal(SecondFactorMethod.External, result.Method);
@@ -366,7 +391,7 @@ public sealed class SecondFactorTests : IDisposable
         var completion = new SecondFactorCompletion(ticketService, users, principals, access, refresh, hooks, [observer], options, clock,
             NullLogger<SecondFactorCompletion>.Instance);
 
-        Assert.Equal(SecondFactorCompletionOutcome.Refused, (await completion.CompleteAsync(pending.Ticket)).Outcome);
+        Assert.Equal(SecondFactorCompletionOutcome.Refused, (await completion.CompleteAsync(pending.Ticket, pending.UserId, pending.Stage)).Outcome);
         Assert.Equal(0, refresh.IssueCalls);
     }
 
@@ -380,7 +405,7 @@ public sealed class SecondFactorTests : IDisposable
 
         user.PhoneNumberConfirmed = false;
 
-        Assert.Equal(SecondFactorCompletionOutcome.Refused, (await Completion().CompleteAsync(pending.Ticket)).Outcome);
+        Assert.Equal(SecondFactorCompletionOutcome.Refused, (await Completion().CompleteAsync(pending.Ticket, pending.UserId, pending.Stage)).Outcome);
     }
 
     [Fact]
@@ -390,8 +415,8 @@ public sealed class SecondFactorTests : IDisposable
         var pending = await PendingPasswordLoginAsync();
         var completion = new SecondFactorCompletion(ticketService, users, principals, access, refresh, hooks, [observer], options, clock, logger, externalHooks);
 
-        await completion.CompleteAsync(pending.Ticket);
-        await completion.CompleteAsync(pending.Ticket);
+        await completion.CompleteAsync(pending.Ticket, pending.UserId, pending.Stage);
+        await completion.CompleteAsync(pending.Ticket, pending.UserId, pending.Stage);
 
         Assert.DoesNotContain(pending.Ticket, logger.Text);
     }

@@ -469,6 +469,31 @@ public abstract class IdentityStoreConformanceTests
     }
 
     [Fact]
+    public async Task Two_concurrent_consumes_of_one_token_let_exactly_one_win()
+    {
+        await ResetAsync();
+        await using var setup = NewScope(new TenantId("acme"));
+        var userId = (await setup.Users.CreateAsync("ivan", "pw")).UserId!.Value;
+
+        // The read-check-write race is narrow, so repeat it: any iteration where both consumers see an unconsumed
+        // row and both report Success is a double spend of a single-use token (a second-factor ticket, a reset link).
+        for (var i = 0; i < 25; i++)
+        {
+            var raw = await setup.Tokens.GenerateAsync(userId, TokenPurpose.SecondFactorTicket);
+            await using var first = NewScope(new TenantId("acme"));
+            await using var second = NewScope(new TenantId("acme"));
+            using var gate = new ManualResetEventSlim(false);
+
+            var results = await Task.WhenAll(
+                Task.Run(async () => { gate.Wait(); return await first.Tokens.ConsumeAsync(userId, TokenPurpose.SecondFactorTicket, raw); }),
+                Task.Run(async () => { gate.Wait(); return await second.Tokens.ConsumeAsync(userId, TokenPurpose.SecondFactorTicket, raw); }),
+                Task.Run(() => { gate.Set(); return TokenConsumeResult.NotFound; }));
+
+            Assert.Equal(1, results.Take(2).Count(r => r == TokenConsumeResult.Success));
+        }
+    }
+
+    [Fact]
     public async Task Token_generate_consume_is_single_use_and_purpose_scoped()
     {
         await ResetAsync();
