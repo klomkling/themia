@@ -46,7 +46,8 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 ### Fixed
 - `LocalStorageOptions` (and so `LocalStorageProvider`) refuses a `PublicRootPath` inside `RootPath`'s `blobs` or
   `content-types` directory, and a `RootPath` inside the public root's: either made one file reachable as a private
-  and a public key, so the anonymous public route could serve a private object.
+  and a public key, so the anonymous public route could serve a private object. A deployment that runs such a layout now stops at
+  start; move one root.
 
 ## [0.45.1] - 2026-10-30
 

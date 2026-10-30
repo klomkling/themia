@@ -37,7 +37,7 @@ A relative path is under the content root. In an environment variable `:` is `__
 
 Refused at start: an unknown key under `Storage:S3`, `Storage:Local`, `Storage:Public` or `Storage:Private`; `Storage:S3:*`
 with a Local public slot; `Storage:Local:PublicRootPath`/`PublicBaseUrl` with an S3/R2 public slot; a public root inside the
-private root's `blobs`/`content-types` directory (or the reverse). Messages name the key and never a secret.
+private root's `blobs`/`content-types` directory (or the reverse). Messages name the key and never a value. The root checks compare paths, not symlinks or junctions: a link from one root into the other is not caught.
 
 ## Deprecated keys (read with a startup warning, removed in 0.48.0)
 

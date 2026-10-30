@@ -48,7 +48,7 @@ internal static class StorageSettingsReader
         var privateProvider = Value(configuration, PrivateProvider);
         if (privateProvider is not null && !privateProvider.Equals(Local, StringComparison.OrdinalIgnoreCase))
         {
-            throw Fail($"{PrivateProvider}='{privateProvider}' is not supported: private files stay on Local (RoPA), there is no other value.");
+            throw Fail($"{PrivateProvider} is not supported: private files stay on Local (RoPA), there is no other value.");
         }
 
         var publicSlot = ReadPublicSlot(configuration, warnings);
@@ -85,7 +85,7 @@ internal static class StorageSettingsReader
 
             return legacy.Equals(Local, StringComparison.OrdinalIgnoreCase)
                 ? PublicSlot.Local
-                : throw Fail($"{LegacyProvider}='{legacy}' is not supported: it would put private files off Local. Use Local or Split.");
+                : throw Fail($"{LegacyProvider} is not supported: it would put private files off Local. Use Local or Split.");
         }
 
         if (configured is null || configured.Equals(Local, StringComparison.OrdinalIgnoreCase))
@@ -95,7 +95,7 @@ internal static class StorageSettingsReader
 
         return configured.Equals("S3", StringComparison.OrdinalIgnoreCase) || configured.Equals("R2", StringComparison.OrdinalIgnoreCase)
             ? PublicSlot.S3
-            : throw Fail($"{PublicProvider}='{configured}' is not supported. Expected Local, S3 or R2.");
+            : throw Fail($"{PublicProvider} is not supported. Expected Local, S3 or R2.");
     }
 
     private static string ReadPresignedBaseUrl(IConfiguration configuration, List<string> warnings)

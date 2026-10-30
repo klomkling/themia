@@ -57,7 +57,7 @@ public static class StorageConfigurationServiceCollectionExtensions
         });
         services.AddSingleton(sp => CreateProvider(sp.GetRequiredService<StorageSettings>()));
 
-        // The router (or the Local provider) is what apps inject; it owns and disposes the slots it was built from.
+        // The router (or the Local provider) is what apps inject; the container disposes it, and it disposes its slots.
         services.AddSingleton<IStorageProvider>(sp => sp.GetRequiredService<ConfiguredStorage>().Provider);
 
         services.AddThemiaStorageUrls();
@@ -95,12 +95,11 @@ public static class StorageConfigurationServiceCollectionExtensions
         }
     }
 
-    /// <summary>The built provider, held in a type of its own so the container disposes it once.</summary>
-    internal sealed class ConfiguredStorage(IStorageProvider provider) : IDisposable
+    /// <summary>The built provider, held so the start-up check can tell it from a later registration. It is not
+    /// disposable: the container disposes the provider once, as the singleton <see cref="IStorageProvider"/>.</summary>
+    internal sealed class ConfiguredStorage(IStorageProvider provider)
     {
         public IStorageProvider Provider { get; } = provider;
-
-        public void Dispose() => (Provider as IDisposable)?.Dispose();
     }
 
     /// <summary>The empty options type whose validation builds the provider at host start.</summary>

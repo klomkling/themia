@@ -76,6 +76,7 @@ public sealed class StorageConfigurationTests : IDisposable
         Assert.DoesNotContain(SecretKey, error.Message);
         Assert.DoesNotContain(AccessKey, error.Message);
         Assert.DoesNotContain(SigningKey, error.Message);
+        Assert.All(new[] { SecretKey, AccessKey, SigningKey }, secret => Assert.DoesNotContain(secret, logs.All));
         return error.Message;
     }
 
@@ -138,7 +139,9 @@ public sealed class StorageConfigurationTests : IDisposable
             settings.Remove("Storage:Public:Provider");
         }
 
-        Assert.Contains(key, await FailureOf(settings));
+        var message = await FailureOf(settings);
+        Assert.Contains(key, message);
+        Assert.DoesNotContain(value, message.Replace(key, string.Empty), StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
