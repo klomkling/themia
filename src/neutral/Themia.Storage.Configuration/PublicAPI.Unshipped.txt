@@ -1,0 +1,3 @@
+#nullable enable
+Themia.Storage.Configuration.StorageConfigurationServiceCollectionExtensions
+static Themia.Storage.Configuration.StorageConfigurationServiceCollectionExtensions.AddThemiaStorageFromConfiguration(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, Microsoft.Extensions.Configuration.IConfiguration! configuration) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!

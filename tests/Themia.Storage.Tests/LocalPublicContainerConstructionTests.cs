@@ -26,6 +26,59 @@ public sealed class LocalPublicContainerConstructionTests
     }
 
     [Theory]
+    [InlineData("blobs", "pub")]
+    [InlineData("content-types", "pub")]
+    [InlineData("blobs", "")]
+    public void A_public_root_inside_the_private_stores_subtree_is_refused(string store, string tail)
+    {
+        // {Root}/blobs/pub/blobs/x is also private key "pub/blobs/x" and public key "public/x": one file, two keys.
+        var nested = Path.Combine(Root, store, tail);
+
+        var error = Assert.Throws<ArgumentException>(() => new LocalStorageProvider(new LocalStorageOptions
+        {
+            RootPath = Root,
+            PublicRootPath = nested,
+            PublicBaseUrl = "https://cdn.example.com/media",
+        }));
+
+        Assert.Contains("PublicRootPath", error.Message);
+    }
+
+    [Theory]
+    [InlineData("blobs", "private")]
+    [InlineData("content-types", "private")]
+    public void A_private_root_inside_the_public_stores_subtree_is_refused(string store, string tail)
+    {
+        // Every private blob would sit inside the public tree and be served as public/<tail>/blobs/<key>.
+        var publicRoot = Root + "-public";
+
+        var error = Assert.Throws<ArgumentException>(() => new LocalStorageProvider(new LocalStorageOptions
+        {
+            RootPath = Path.Combine(publicRoot, store, tail),
+            PublicRootPath = publicRoot,
+            PublicBaseUrl = "https://cdn.example.com/media",
+        }));
+
+        Assert.Contains("RootPath", error.Message);
+    }
+
+    [Theory]
+    [InlineData("public")]
+    [InlineData("blobs-public")]
+    [InlineData("other/public")]
+    public void A_public_root_beside_the_private_stores_is_accepted(string tail)
+    {
+        var provider = new LocalStorageProvider(new LocalStorageOptions
+        {
+            RootPath = Root,
+            PublicRootPath = Path.Combine(Root, tail),
+            PublicBaseUrl = "https://cdn.example.com/media",
+        });
+
+        Assert.NotNull(provider);
+    }
+
+    [Theory]
     [InlineData("/media")]
     [InlineData("media")]
     [InlineData("ftp://cdn.example.com/media")]

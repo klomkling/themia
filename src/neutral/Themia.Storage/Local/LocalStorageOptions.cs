@@ -67,10 +67,41 @@ public sealed class LocalStorageOptions
         // SAME directory, so an ordinal-only compare would wave through a shared container and let a public
         // and private key with the same tail collide — the exact failure this two-container split prevents.
         var cmp = OperatingSystem.IsWindows() || OperatingSystem.IsMacOS() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
-        if (string.Equals(Path.GetFullPath(RootPath), Path.GetFullPath(PublicRootPath), cmp))
+        var root = Path.GetFullPath(RootPath);
+        var publicRoot = Path.GetFullPath(PublicRootPath);
+        if (string.Equals(root, publicRoot, cmp))
         {
             throw new ArgumentException("PublicRootPath must differ from RootPath; public and private objects cannot share a container.", nameof(PublicRootPath));
         }
+
+        // Equal roots are not the only way to share files: a root inside the other's blobs/ or content-types/
+        // subtree makes one file reachable as a private key and as a public key (or puts the whole private store
+        // inside the public tree), which the anonymous public route would then serve.
+        if (IsInsideStore(publicRoot, root, cmp))
+        {
+            throw new ArgumentException("PublicRootPath must not lie inside RootPath's blobs or content-types directory; a private object would be served as a public one.", nameof(PublicRootPath));
+        }
+
+        if (IsInsideStore(root, publicRoot, cmp))
+        {
+            throw new ArgumentException("RootPath must not lie inside PublicRootPath's blobs or content-types directory; every private object would be served as a public one.", nameof(RootPath));
+        }
+    }
+
+    // True when candidate is, or is below, {container}/blobs or {container}/content-types.
+    private static bool IsInsideStore(string candidate, string container, StringComparison cmp)
+    {
+        foreach (var store in new[] { "blobs", "content-types" })
+        {
+            var prefix = Path.Combine(container, store);
+            if (string.Equals(candidate, prefix, cmp) ||
+                candidate.StartsWith(prefix + Path.DirectorySeparatorChar, cmp))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /// <summary>Validates that required options are set, failing fast at composition time.</summary>
