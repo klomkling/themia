@@ -19,12 +19,22 @@ internal static class ConversationInput
         Key(subject.SubjectId, nameof(ConversationSubject.SubjectId), ConversationSchemaMigration.SubjectIdWidth);
     }
 
+    /// <summary>Longest user reference an actor may carry: the stored value gains a two-character kind prefix.</summary>
+    public const int MaxUserRefLength = ConversationSchemaMigration.UserRefWidth - 2;
+
+    /// <summary>
+    /// The value stored in <c>user_ref</c>. A member and a partner agent live in different id spaces, so <c>member 42</c> and <c>partner 42</c> must be two people:
+    /// the kind is part of the stored key (<c>m:</c> or <c>p:</c>), which also keeps the unique key per conversation exact. A data-subject lookup must use the same form.
+    /// </summary>
+    public static string? StoredUserRef(ConversationActor actor) =>
+        actor.UserRef is null ? null : (actor.Kind == ConversationActorKind.Partner ? "p:" : "m:") + actor.UserRef;
+
     public static void Actor(ConversationActor actor)
     {
         ArgumentNullException.ThrowIfNull(actor);
         if (actor.UserRef is not null)
         {
-            Key(actor.UserRef, nameof(ConversationActor.UserRef), ConversationSchemaMigration.UserRefWidth);
+            Key(actor.UserRef, nameof(ConversationActor.UserRef), MaxUserRefLength);
         }
     }
 

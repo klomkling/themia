@@ -57,6 +57,7 @@ public sealed class ConversationInputTests
         await Assert.ThrowsAsync<ArgumentException>(() => Service().PostAsync(Member, "t", Guid.NewGuid(), new PostMessage("m-1 ", "hi")));
         await Assert.ThrowsAsync<ArgumentException>(() => Service().PostAsync(new ConversationActor(ConversationActorKind.Member, "user-1 "), "t", Guid.NewGuid(), new PostMessage("m-1", "hi")));
         await Assert.ThrowsAsync<ArgumentException>(() => Service().PostAsync(Member, "t", Guid.NewGuid(), new PostMessage(new string('x', 65), "hi")));
+        await Assert.ThrowsAsync<ArgumentException>(() => Service().PostAsync(new ConversationActor(ConversationActorKind.Member, new string('x', 199)), "t", Guid.NewGuid(), new PostMessage("m-1", "hi")));
     }
 
     [Fact]

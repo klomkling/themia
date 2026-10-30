@@ -26,6 +26,7 @@ var posted = await conversations.PostAsync(actor, tenantId, opened.ConversationI
   register your own sink to enlist elsewhere. Draining and debouncing the rows is a later part.
 - **Padded keys are refused.** Tenant, subject, user reference and client message id with leading or trailing whitespace throw `ArgumentException`: MySQL and SQL Server
   compare strings without trailing spaces, PostgreSQL does not.
+- **Member and partner references never collide.** `user_ref` is stored with a kind prefix (`m:` member, `p:` partner), so member 42 and partner 42 are two participants; a data-subject lookup by reference must use the same form. A reference may be at most 198 characters.
 - **Limits.** The body cap counts `string.Length` (UTF-16 units). The per-participant post rate limit belongs to the ASP.NET Core part, with the other limits.
 - **System actors** are not resolved to a participant yet (system lines arrive with the retention part).
 

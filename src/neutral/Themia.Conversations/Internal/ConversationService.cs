@@ -111,7 +111,7 @@ internal sealed partial class ConversationService(
             var inserted = await connection.ExecuteAsync(new CommandDefinition(
                 "INSERT INTO conversation_participants (id, tenant_id, conversation_id, kind, user_ref, display_name, joined_at, last_read_seq) " +
                 "SELECT @Id, @TenantId, c.id, 0, @UserRef, @DisplayName, @Now, 0 FROM conversations c WHERE c.tenant_id = @TenantId AND c.id = @ConversationId;",
-                new { Id = participantId, TenantId = tenantId, ConversationId = conversationId, actor.UserRef, DisplayName = displayName, Now = Now() },
+                new { Id = participantId, TenantId = tenantId, ConversationId = conversationId, UserRef = ConversationInput.StoredUserRef(actor), DisplayName = displayName, Now = Now() },
                 cancellationToken: cancellationToken));
             return inserted == 1 ? new JoinResult(JoinOutcome.Joined, participantId) : new JoinResult(JoinOutcome.Refused, null);
         }
@@ -257,7 +257,7 @@ internal sealed partial class ConversationService(
             ? null
             : await connection.QuerySingleOrDefaultAsync<Guid?>(new CommandDefinition(
                 sql,
-                new { TenantId = tenantId, ConversationId = conversationId, actor.UserRef, actor.ParticipantId },
+                new { TenantId = tenantId, ConversationId = conversationId, UserRef = ConversationInput.StoredUserRef(actor), actor.ParticipantId },
                 transaction,
                 cancellationToken: cancellationToken));
     }
