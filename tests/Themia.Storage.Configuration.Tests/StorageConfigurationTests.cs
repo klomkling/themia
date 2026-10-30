@@ -180,6 +180,18 @@ public sealed class StorageConfigurationTests : IDisposable
     }
 
     [Fact]
+    public async Task A_signing_key_shorter_than_32_characters_stops_the_host_without_echoing_it()
+    {
+        var settings = Local();
+        settings["Storage:Local:SigningKey"] = "short-key-0123456789";
+
+        var message = await FailureOf(settings);
+
+        Assert.Contains("Storage:Local:SigningKey", message);
+        Assert.DoesNotContain("short-key-0123456789", message);
+    }
+
+    [Fact]
     public async Task S3_keys_with_a_local_public_slot_are_dead_configuration_and_stop_the_host()
     {
         var settings = S3();
