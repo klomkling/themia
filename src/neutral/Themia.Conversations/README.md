@@ -17,7 +17,7 @@ var posted = await conversations.PostAsync(actor, tenantId, opened.ConversationI
 ```
 
 - **Every call takes the `Actor` and the tenant.** Order inside a call: access policy, then the acting participant is resolved inside the transaction (this tenant
-  and conversation, not left, kind matching the actor; a guest's `ParticipantId` is only a lookup key), then the idempotency read, the sequence counter, the inserts.
+  and conversation, not left, kind matching the actor; a guest's `ParticipantId` is only a lookup key: build a guest actor only from a verified guest session), then the idempotency read, the sequence counter, the inserts.
   A denied call, a stranger and another tenant's conversation all answer `Refused`.
 - **Post is ordered and idempotent.** `Seq` is dense per conversation: the counter row lock serialises posters (PostgreSQL `RETURNING`, SQL Server `OUTPUT`, MySQL
   `LAST_INSERT_ID(expr)`). The same `ClientMessageId` returns `Duplicate` with the original message and overwrites nothing. A deadlock or lock timeout retries the whole
