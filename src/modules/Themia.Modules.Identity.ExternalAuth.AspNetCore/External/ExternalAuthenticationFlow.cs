@@ -26,6 +26,25 @@ internal sealed class ExternalAuthenticationFlow : IExternalAuthenticationFlow
     private readonly IdentityModuleOptions options;
     private readonly TimeProvider timeProvider;
     private readonly ILogger<ExternalAuthenticationFlow> logger;
+    private readonly ISecondFactorPolicy secondFactorPolicy;
+    private readonly ISecondFactorTicketService? secondFactorTickets;
+
+    /// <summary>Creates the flow with the default second-factor policy (nobody owes a second factor).</summary>
+    public ExternalAuthenticationFlow(
+        IExternalAuthProviderRegistry registry,
+        IExternalLoginService externalLogins,
+        IClaimsPrincipalFactory principalFactory,
+        IAccessTokenService accessTokens,
+        IRefreshTokenService refreshTokens,
+        IExternalAuthenticationHooks hooks,
+        IEnumerable<IIdentityEventObserver> observers,
+        IdentityModuleOptions options,
+        TimeProvider timeProvider,
+        ILogger<ExternalAuthenticationFlow> logger)
+        : this(registry, externalLogins, principalFactory, accessTokens, refreshTokens, hooks, observers, options, timeProvider, logger,
+              NotRequiredSecondFactorPolicy.Instance, null)
+    {
+    }
 
     /// <summary>Creates the flow.</summary>
     public ExternalAuthenticationFlow(
@@ -38,8 +57,13 @@ internal sealed class ExternalAuthenticationFlow : IExternalAuthenticationFlow
         IEnumerable<IIdentityEventObserver> observers,
         IdentityModuleOptions options,
         TimeProvider timeProvider,
-        ILogger<ExternalAuthenticationFlow> logger)
+        ILogger<ExternalAuthenticationFlow> logger,
+        ISecondFactorPolicy secondFactorPolicy,
+        ISecondFactorTicketService? secondFactorTickets = null)
     {
+        ArgumentNullException.ThrowIfNull(secondFactorPolicy);
+        this.secondFactorPolicy = secondFactorPolicy;
+        this.secondFactorTickets = secondFactorTickets;
         ArgumentNullException.ThrowIfNull(registry);
         ArgumentNullException.ThrowIfNull(externalLogins);
         ArgumentNullException.ThrowIfNull(principalFactory);
@@ -164,6 +188,31 @@ internal sealed class ExternalAuthenticationFlow : IExternalAuthenticationFlow
         if (!IsActiveAndUnlocked(resolution.User))
         {
             return await FailAsync(provider, ExternalLoginOutcome.AccountInactive, ExternalLoginFlowResult.AccountInactive(), cancellationToken).ConfigureAwait(false);
+        }
+
+        // The provider vouched for the identity, so this is not a failed login. A user who owes a second factor
+        // gets a ticket instead of tokens; the success hook and observer fire when the login completes.
+        var requirement = await secondFactorPolicy.EvaluateAsync(
+            new SecondFactorContext(resolution.User.Id, resolution.User.TenantId, SecondFactorMethod.External, provider), cancellationToken).ConfigureAwait(false);
+        if (requirement != SecondFactorRequirement.NotRequired)
+        {
+            var stage = requirement switch
+            {
+                SecondFactorRequirement.Verify => SecondFactorStage.Verify,
+                SecondFactorRequirement.Enrol => SecondFactorStage.Enrol,
+                _ => throw new InvalidOperationException($"The second-factor policy returned an undefined requirement ({(int)requirement})."),
+            };
+
+            // Fail closed: a policy that asks for a second factor with nowhere to issue the ticket must not let the login through.
+            var tickets = secondFactorTickets
+                ?? throw new InvalidOperationException("The second-factor policy requires a second factor but no ISecondFactorTicketService is registered.");
+            var pending = await tickets.IssueAsync(
+                new SecondFactorTicketData(
+                    resolution.User.Id, resolution.User.TenantId, SecondFactorMethod.External, provider,
+                    resolution.WasCreated, resolution.WasLinked, resolution.User.SecurityStamp, stage),
+                cancellationToken).ConfigureAwait(false);
+            logger.LogInformation("User {UserId} passed external login via {Provider} and owes a second factor ({Stage}).", resolution.User.Id, provider, stage);
+            return ExternalLoginFlowResult.RequiresSecondFactor(pending, resolution.WasCreated, resolution.WasLinked);
         }
 
         var succeeded = new ExternalLoginSucceededContext(resolution.User, resolution.WasCreated, resolution.WasLinked);

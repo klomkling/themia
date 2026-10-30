@@ -30,6 +30,7 @@ public static class ExternalAuthServiceCollectionExtensions
         // so a bring-your-own-user-store consumer gets them without the local/password wiring. The flow
         // resolves IExternalLoginService and the token seams at runtime; call ValidateThemiaExternalAuth
         // once wiring is complete to fail fast if any are missing.
+        services.TryAddSingleton<ISecondFactorPolicy>(NotRequiredSecondFactorPolicy.Instance);
         services.TryAddScoped<IExternalAuthenticationFlow, External.ExternalAuthenticationFlow>();
         services.TryAddScoped<IExternalAuthenticationHooks, External.ExternalAuthenticationHooksBase>();
         return new ExternalAuthBuilder(services);
