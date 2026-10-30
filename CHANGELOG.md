@@ -36,6 +36,7 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
   escape hatch. The public slot is Local (default) or S3/R2 (`Storage:Public:Provider`), and the S3 side is
   public-only. Unknown keys under `Storage:S3`, `Storage:Local`, `Storage:Public` and `Storage:Private` and keys
   that would be dead configuration are refused. Env names and the key table are in the package README.
+- **`Themia.Payments.TwoCTwoP`: `TwoCTwoPRefundNotificationVerifier`** opens 2C2P's asynchronous refund notification (`notifyResponse=` JWS around a JWE): signature checked with the 2C2P certificate before decrypting with the merchant key, pinned algorithms, strict form parsing, a 64 KiB cap, keys loaded once. A `Verified` event (`RefundSucceeded` / `RefundFailed` / `Other`, status mapped like the poll, never succeeded for an unknown status or a `respCode` other than `00`) is a nudge to call `GetRefundsAsync`, not a state to write. New option `RefundNotifyUrl` (https, needs the refund keys, default `null`) sends `notifyURL` in the refund request. Not verified against the 2C2P sandbox: leave `RefundNotifyUrl` unset in production until it is. Registered as itself, so `IPaymentWebhookVerifier` stays the payment webhook's.
 
 ### Deprecated
 - Storage keys accepted by `AddThemiaStorageFromConfiguration` with a startup warning, removed in the first release after
@@ -49,7 +50,6 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
   `content-types` directory, and a `RootPath` inside the public root's: either made one file reachable as a private
   and a public key, so the anonymous public route could serve a private object. A deployment that runs such a layout now stops at
   start; move one root.
-
 ## [0.45.1] - 2026-10-30
 
 ### Fixed

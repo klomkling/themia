@@ -367,7 +367,7 @@ public sealed class TwoCTwoPPaymentGateway : IPaymentGateway, IRefundStatusGatew
         var idempotencyId = request.IdempotencyKey ?? Guid.NewGuid().ToString("N");
         var xml = TwoCTwoPRefundXml.BuildRequest(
             twoCTwoPOptions.MerchantId, invoiceNo, decimalAmount, idempotencyId,
-            DateTimeOffset.UtcNow.ToOffset(twoCTwoPOptions.TransactionTimeOffset));
+            DateTimeOffset.UtcNow.ToOffset(twoCTwoPOptions.TransactionTimeOffset), twoCTwoPOptions.RefundNotifyUrl);
         var jws = JweJws.Seal(xml, keys.ProviderPublic, keys.MerchantPrivate);
 
         var verified = await SendActionAsync(
@@ -377,8 +377,9 @@ public sealed class TwoCTwoPPaymentGateway : IPaymentGateway, IRefundStatusGatew
 
     /// <inheritdoc />
     /// <remarks>
-    /// Asks 2C2P's Payment Maintenance API for the refunds of the charge's invoice (<c>processType</c> <c>RS</c>); 2C2P sends no
-    /// refund webhook, so this is how a <see cref="PaymentStatus.Pending"/> refund is followed to its end. Needs the same keys as
+    /// Asks 2C2P's Payment Maintenance API for the refunds of the charge's invoice (<c>processType</c> <c>RS</c>); this is how a
+    /// <see cref="PaymentStatus.Pending"/> refund is followed to its end. 2C2P can also notify an asynchronous refund (see
+    /// <see cref="TwoCTwoPRefundNotificationVerifier"/>), but that event only says when to call this method again. Needs the same keys as
     /// <see cref="RefundAsync"/> and refuses with <c>refund_not_supported</c> without them. Match a record to the refund you sent
     /// by <see cref="RefundRecord.IdempotencyKey"/>: the key given to <see cref="RefundAsync"/> is sent as <c>userDefined1</c> and
     /// echoed back (a refund made in the 2C2P portal has none). Read-only and repeatable; a failure to reach 2C2P is
@@ -521,7 +522,7 @@ public sealed class TwoCTwoPPaymentGateway : IPaymentGateway, IRefundStatusGatew
         return new RefundCreation(null, MapRefundStatus(response.Status));
     }
 
-    private static PaymentStatus MapRefundStatus(string? status) => status switch
+    internal static PaymentStatus MapRefundStatus(string? status) => status switch
     {
         "RF" => PaymentStatus.Succeeded,
         "RFF" or "RR" or "RR1" or "RR2" or "RR3" => PaymentStatus.Failed,

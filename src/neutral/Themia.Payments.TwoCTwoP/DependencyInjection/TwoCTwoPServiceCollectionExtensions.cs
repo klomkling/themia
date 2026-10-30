@@ -40,6 +40,12 @@ public static class TwoCTwoPServiceCollectionExtensions
             .Validate(
                 o => TwoCTwoPRefundKeys.IsConfigured(o) || (string.IsNullOrWhiteSpace(o.MerchantPrivateKeyPem) && string.IsNullOrWhiteSpace(o.ProviderPublicCertificatePem)),
                 "TwoCTwoPOptions: set BOTH MerchantPrivateKeyPem and ProviderPublicCertificatePem to enable refunds, or neither.")
+            .Validate(
+                o => TwoCTwoPOptions.IsValidNotifyUrl(o.RefundNotifyUrl),
+                "TwoCTwoPOptions.RefundNotifyUrl must be an absolute https URL without credentials or a fragment.")
+            .Validate(
+                o => o.RefundNotifyUrl is null || TwoCTwoPRefundKeys.IsConfigured(o),
+                "TwoCTwoPOptions.RefundNotifyUrl needs MerchantPrivateKeyPem and ProviderPublicCertificatePem: a refund notification cannot be opened without them.")
             .ValidateOnStart();
 
         services.AddHttpClient(TwoCTwoPPaymentGateway.HttpClientName, (sp, client) =>
@@ -53,6 +59,7 @@ public static class TwoCTwoPServiceCollectionExtensions
         services.TryAddSingleton<IPaymentGateway>(sp => sp.GetRequiredService<TwoCTwoPPaymentGateway>());
         services.TryAddSingleton<IPaymentGatewayCapabilities>(sp => sp.GetRequiredService<TwoCTwoPPaymentGateway>());
         services.TryAddSingleton<IPaymentWebhookVerifier, TwoCTwoPWebhookVerifier>();
+        services.TryAddSingleton<TwoCTwoPRefundNotificationVerifier>();
 
         // So the gate exists even when the host forgot the core call. AddThemiaPayments is idempotent: it uses
         // TryAdd and TryAddEnumerable throughout.
