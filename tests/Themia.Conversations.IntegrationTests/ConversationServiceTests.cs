@@ -180,6 +180,28 @@ public abstract class ConversationServiceTests(ConversationEngineFixture fixture
     }
 
     [Fact]
+    public async Task Join_ShouldKeepAMemberAndAPartnerWithTheSameUserRefApart()
+    {
+        var service = Service();
+        var (tenant, conversation) = await OpenAsync(service);
+        var member = new ConversationActor(ConversationActorKind.Member, "42");
+        var partner = new ConversationActor(ConversationActorKind.Partner, "42");
+
+        var memberJoin = await service.JoinAsync(member, tenant, conversation, "Member");
+        var partnerJoin = await service.JoinAsync(partner, tenant, conversation, "Partner");
+        var partnerPost = await service.PostAsync(partner, tenant, conversation, new PostMessage("m-1", "from partner"));
+        var page = await service.ListAsync(member, tenant, conversation, 0, 10);
+
+        Assert.Equal(JoinOutcome.Joined, memberJoin.Outcome);
+        Assert.Equal(JoinOutcome.Joined, partnerJoin.Outcome);
+        Assert.NotEqual(memberJoin.ParticipantId, partnerJoin.ParticipantId);
+        Assert.Equal(partnerJoin.ParticipantId, page.Messages.Single().ParticipantId);
+        Assert.Equal(PostOutcome.Posted, partnerPost.Outcome);
+        Assert.Equal(2, await fixture.ScalarAsync<int>("SELECT COUNT(*) FROM conversation_participants WHERE conversation_id = @Id;", new { Id = conversation }));
+        Assert.Equal(1, (await service.MarkReadAsync(member, tenant, conversation, 1)).LastReadSeq);
+    }
+
+    [Fact]
     public async Task Join_ShouldBeRefused_ForAnotherTenantsConversation()
     {
         var service = Service();
