@@ -562,3 +562,88 @@ Themia.Modules.Identity.Abstractions.LoginMethods.External = 4 -> Themia.Modules
 Themia.Modules.Identity.Abstractions.LoginMethods.None = 0 -> Themia.Modules.Identity.Abstractions.LoginMethods
 Themia.Modules.Identity.Abstractions.LoginMethods.Otp = 2 -> Themia.Modules.Identity.Abstractions.LoginMethods
 Themia.Modules.Identity.Abstractions.LoginMethods.Password = 1 -> Themia.Modules.Identity.Abstractions.LoginMethods
+Themia.Modules.Identity.Abstractions.Authentication.SecondFactorMethod
+Themia.Modules.Identity.Abstractions.Authentication.SecondFactorMethod.Password = 0 -> Themia.Modules.Identity.Abstractions.Authentication.SecondFactorMethod
+Themia.Modules.Identity.Abstractions.Authentication.SecondFactorMethod.Otp = 1 -> Themia.Modules.Identity.Abstractions.Authentication.SecondFactorMethod
+Themia.Modules.Identity.Abstractions.Authentication.SecondFactorMethod.External = 2 -> Themia.Modules.Identity.Abstractions.Authentication.SecondFactorMethod
+Themia.Modules.Identity.Abstractions.Authentication.SecondFactorRequirement
+Themia.Modules.Identity.Abstractions.Authentication.SecondFactorRequirement.NotRequired = 0 -> Themia.Modules.Identity.Abstractions.Authentication.SecondFactorRequirement
+Themia.Modules.Identity.Abstractions.Authentication.SecondFactorRequirement.Verify = 1 -> Themia.Modules.Identity.Abstractions.Authentication.SecondFactorRequirement
+Themia.Modules.Identity.Abstractions.Authentication.SecondFactorRequirement.Enrol = 2 -> Themia.Modules.Identity.Abstractions.Authentication.SecondFactorRequirement
+Themia.Modules.Identity.Abstractions.Authentication.SecondFactorStage
+Themia.Modules.Identity.Abstractions.Authentication.SecondFactorStage.Verify = 0 -> Themia.Modules.Identity.Abstractions.Authentication.SecondFactorStage
+Themia.Modules.Identity.Abstractions.Authentication.SecondFactorStage.Enrol = 1 -> Themia.Modules.Identity.Abstractions.Authentication.SecondFactorStage
+Themia.Modules.Identity.Abstractions.Authentication.SecondFactorCompletionOutcome
+Themia.Modules.Identity.Abstractions.Authentication.SecondFactorCompletionOutcome.Completed = 0 -> Themia.Modules.Identity.Abstractions.Authentication.SecondFactorCompletionOutcome
+Themia.Modules.Identity.Abstractions.Authentication.SecondFactorCompletionOutcome.Refused = 1 -> Themia.Modules.Identity.Abstractions.Authentication.SecondFactorCompletionOutcome
+Themia.Modules.Identity.Abstractions.Authentication.SecondFactorCompletionOutcome.Denied = 2 -> Themia.Modules.Identity.Abstractions.Authentication.SecondFactorCompletionOutcome
+Themia.Modules.Identity.Abstractions.Authentication.LoginOutcome.SecondFactorRequired = 4 -> Themia.Modules.Identity.Abstractions.Authentication.LoginOutcome
+Themia.Modules.Identity.Abstractions.Authentication.ExternalLoginOutcome.SecondFactorRequired = 5 -> Themia.Modules.Identity.Abstractions.Authentication.ExternalLoginOutcome
+Themia.Modules.Identity.Abstractions.Authentication.LoginResult.SecondFactor.get -> Themia.Modules.Identity.Abstractions.Authentication.PendingSecondFactor?
+static Themia.Modules.Identity.Abstractions.Authentication.LoginResult.RequiresSecondFactor(Themia.Modules.Identity.Abstractions.Authentication.PendingSecondFactor pending) -> Themia.Modules.Identity.Abstractions.Authentication.LoginResult
+Themia.Modules.Identity.Abstractions.Authentication.ExternalLoginFlowResult.SecondFactor.get -> Themia.Modules.Identity.Abstractions.Authentication.PendingSecondFactor?
+static Themia.Modules.Identity.Abstractions.Authentication.ExternalLoginFlowResult.RequiresSecondFactor(Themia.Modules.Identity.Abstractions.Authentication.PendingSecondFactor pending, bool created, bool linked) -> Themia.Modules.Identity.Abstractions.Authentication.ExternalLoginFlowResult
+Themia.Modules.Identity.Abstractions.Authentication.SecondFactorContext
+Themia.Modules.Identity.Abstractions.Authentication.SecondFactorContext.SecondFactorContext() -> void
+Themia.Modules.Identity.Abstractions.Authentication.SecondFactorContext.SecondFactorContext(System.Guid UserId, Themia.Framework.Core.Abstractions.Tenancy.TenantId? TenantId, Themia.Modules.Identity.Abstractions.Authentication.SecondFactorMethod Method, string? Provider = null) -> void
+Themia.Modules.Identity.Abstractions.Authentication.SecondFactorContext.UserId.get -> System.Guid
+Themia.Modules.Identity.Abstractions.Authentication.SecondFactorContext.UserId.init -> void
+Themia.Modules.Identity.Abstractions.Authentication.SecondFactorContext.TenantId.get -> Themia.Framework.Core.Abstractions.Tenancy.TenantId?
+Themia.Modules.Identity.Abstractions.Authentication.SecondFactorContext.TenantId.init -> void
+Themia.Modules.Identity.Abstractions.Authentication.SecondFactorContext.Method.get -> Themia.Modules.Identity.Abstractions.Authentication.SecondFactorMethod
+Themia.Modules.Identity.Abstractions.Authentication.SecondFactorContext.Method.init -> void
+Themia.Modules.Identity.Abstractions.Authentication.SecondFactorContext.Provider.get -> string?
+Themia.Modules.Identity.Abstractions.Authentication.SecondFactorContext.Provider.init -> void
+Themia.Modules.Identity.Abstractions.Authentication.ISecondFactorPolicy
+Themia.Modules.Identity.Abstractions.Authentication.ISecondFactorPolicy.EvaluateAsync(Themia.Modules.Identity.Abstractions.Authentication.SecondFactorContext context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<Themia.Modules.Identity.Abstractions.Authentication.SecondFactorRequirement>
+Themia.Modules.Identity.Abstractions.Authentication.PendingSecondFactor
+Themia.Modules.Identity.Abstractions.Authentication.PendingSecondFactor.PendingSecondFactor() -> void
+Themia.Modules.Identity.Abstractions.Authentication.PendingSecondFactor.PendingSecondFactor(System.Guid UserId, Themia.Modules.Identity.Abstractions.Authentication.SecondFactorStage Stage, string! Ticket, System.DateTimeOffset ExpiresAt) -> void
+Themia.Modules.Identity.Abstractions.Authentication.PendingSecondFactor.UserId.get -> System.Guid
+Themia.Modules.Identity.Abstractions.Authentication.PendingSecondFactor.UserId.init -> void
+Themia.Modules.Identity.Abstractions.Authentication.PendingSecondFactor.Stage.get -> Themia.Modules.Identity.Abstractions.Authentication.SecondFactorStage
+Themia.Modules.Identity.Abstractions.Authentication.PendingSecondFactor.Stage.init -> void
+Themia.Modules.Identity.Abstractions.Authentication.PendingSecondFactor.Ticket.get -> string!
+Themia.Modules.Identity.Abstractions.Authentication.PendingSecondFactor.Ticket.init -> void
+Themia.Modules.Identity.Abstractions.Authentication.PendingSecondFactor.ExpiresAt.get -> System.DateTimeOffset
+Themia.Modules.Identity.Abstractions.Authentication.PendingSecondFactor.ExpiresAt.init -> void
+Themia.Modules.Identity.Abstractions.Authentication.SecondFactorTicketData
+Themia.Modules.Identity.Abstractions.Authentication.SecondFactorTicketData.SecondFactorTicketData(System.Guid UserId, Themia.Framework.Core.Abstractions.Tenancy.TenantId? TenantId, Themia.Modules.Identity.Abstractions.Authentication.SecondFactorMethod Method, string? Provider, bool WasCreated, bool WasLinked, string! SecurityStamp, Themia.Modules.Identity.Abstractions.Authentication.SecondFactorStage Stage) -> void
+Themia.Modules.Identity.Abstractions.Authentication.SecondFactorTicketData.UserId.get -> System.Guid
+Themia.Modules.Identity.Abstractions.Authentication.SecondFactorTicketData.UserId.init -> void
+Themia.Modules.Identity.Abstractions.Authentication.SecondFactorTicketData.TenantId.get -> Themia.Framework.Core.Abstractions.Tenancy.TenantId?
+Themia.Modules.Identity.Abstractions.Authentication.SecondFactorTicketData.TenantId.init -> void
+Themia.Modules.Identity.Abstractions.Authentication.SecondFactorTicketData.Method.get -> Themia.Modules.Identity.Abstractions.Authentication.SecondFactorMethod
+Themia.Modules.Identity.Abstractions.Authentication.SecondFactorTicketData.Method.init -> void
+Themia.Modules.Identity.Abstractions.Authentication.SecondFactorTicketData.Provider.get -> string?
+Themia.Modules.Identity.Abstractions.Authentication.SecondFactorTicketData.Provider.init -> void
+Themia.Modules.Identity.Abstractions.Authentication.SecondFactorTicketData.WasCreated.get -> bool
+Themia.Modules.Identity.Abstractions.Authentication.SecondFactorTicketData.WasCreated.init -> void
+Themia.Modules.Identity.Abstractions.Authentication.SecondFactorTicketData.WasLinked.get -> bool
+Themia.Modules.Identity.Abstractions.Authentication.SecondFactorTicketData.WasLinked.init -> void
+Themia.Modules.Identity.Abstractions.Authentication.SecondFactorTicketData.SecurityStamp.get -> string!
+Themia.Modules.Identity.Abstractions.Authentication.SecondFactorTicketData.SecurityStamp.init -> void
+Themia.Modules.Identity.Abstractions.Authentication.SecondFactorTicketData.Stage.get -> Themia.Modules.Identity.Abstractions.Authentication.SecondFactorStage
+Themia.Modules.Identity.Abstractions.Authentication.SecondFactorTicketData.Stage.init -> void
+Themia.Modules.Identity.Abstractions.Authentication.ISecondFactorTicketService
+Themia.Modules.Identity.Abstractions.Authentication.ISecondFactorTicketService.IssueAsync(Themia.Modules.Identity.Abstractions.Authentication.SecondFactorTicketData! data, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Identity.Abstractions.Authentication.PendingSecondFactor>!
+Themia.Modules.Identity.Abstractions.Authentication.ISecondFactorTicketService.ConsumeAsync(string! ticket, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Identity.Abstractions.Authentication.SecondFactorTicketData?>!
+Themia.Modules.Identity.Abstractions.Authentication.SecondFactorCompletionResult
+Themia.Modules.Identity.Abstractions.Authentication.SecondFactorCompletionResult.SecondFactorCompletionResult() -> void
+Themia.Modules.Identity.Abstractions.Authentication.SecondFactorCompletionResult.Outcome.get -> Themia.Modules.Identity.Abstractions.Authentication.SecondFactorCompletionOutcome
+Themia.Modules.Identity.Abstractions.Authentication.SecondFactorCompletionResult.Tokens.get -> Themia.Modules.Identity.Abstractions.Authentication.AuthTokens?
+Themia.Modules.Identity.Abstractions.Authentication.SecondFactorCompletionResult.Method.get -> Themia.Modules.Identity.Abstractions.Authentication.SecondFactorMethod?
+Themia.Modules.Identity.Abstractions.Authentication.SecondFactorCompletionResult.Provider.get -> string?
+Themia.Modules.Identity.Abstractions.Authentication.SecondFactorCompletionResult.WasCreated.get -> bool
+Themia.Modules.Identity.Abstractions.Authentication.SecondFactorCompletionResult.WasLinked.get -> bool
+Themia.Modules.Identity.Abstractions.Authentication.SecondFactorCompletionResult.Succeeded.get -> bool
+static Themia.Modules.Identity.Abstractions.Authentication.SecondFactorCompletionResult.Completed(Themia.Modules.Identity.Abstractions.Authentication.AuthTokens tokens, Themia.Modules.Identity.Abstractions.Authentication.SecondFactorMethod method, string? provider, bool wasCreated, bool wasLinked) -> Themia.Modules.Identity.Abstractions.Authentication.SecondFactorCompletionResult
+static Themia.Modules.Identity.Abstractions.Authentication.SecondFactorCompletionResult.Refused() -> Themia.Modules.Identity.Abstractions.Authentication.SecondFactorCompletionResult
+static Themia.Modules.Identity.Abstractions.Authentication.SecondFactorCompletionResult.Denied() -> Themia.Modules.Identity.Abstractions.Authentication.SecondFactorCompletionResult
+Themia.Modules.Identity.Abstractions.Authentication.ISecondFactorCompletion
+Themia.Modules.Identity.Abstractions.Authentication.ISecondFactorCompletion.CompleteAsync(string! ticket, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Identity.Abstractions.Authentication.SecondFactorCompletionResult>!
+Themia.Modules.Identity.Abstractions.Authentication.ISecondFactorCompletion.RejectAsync(string! ticket, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Modules.Identity.Abstractions.Entities.TokenPurpose.SecondFactorTicket = 4 -> Themia.Modules.Identity.Abstractions.Entities.TokenPurpose
+Themia.Modules.Identity.Abstractions.Authentication.NotRequiredSecondFactorPolicy
+Themia.Modules.Identity.Abstractions.Authentication.NotRequiredSecondFactorPolicy.EvaluateAsync(Themia.Modules.Identity.Abstractions.Authentication.SecondFactorContext context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<Themia.Modules.Identity.Abstractions.Authentication.SecondFactorRequirement>
+static readonly Themia.Modules.Identity.Abstractions.Authentication.NotRequiredSecondFactorPolicy.Instance -> Themia.Modules.Identity.Abstractions.Authentication.NotRequiredSecondFactorPolicy!

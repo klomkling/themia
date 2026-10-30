@@ -25,8 +25,10 @@ public sealed class AuthenticationFlow : IAuthenticationFlow
     private readonly IdentityModuleOptions options;
     private readonly TimeProvider timeProvider;
     private readonly ILogger<AuthenticationFlow> logger;
+    private readonly ISecondFactorPolicy secondFactorPolicy;
+    private readonly ISecondFactorTicketService? secondFactorTickets;
 
-    /// <summary>Creates the flow.</summary>
+    /// <summary>Creates the flow with the default second-factor policy (nobody owes a second factor).</summary>
     public AuthenticationFlow(
         IUserService users,
         IClaimsPrincipalFactory principalFactory,
@@ -38,7 +40,41 @@ public sealed class AuthenticationFlow : IAuthenticationFlow
         IdentityModuleOptions options,
         TimeProvider timeProvider,
         ILogger<AuthenticationFlow> logger)
+        : this(users, principalFactory, accessTokens, refreshTokens, passwordHasher, hooks, observers, options, timeProvider, logger,
+              NotRequiredSecondFactorPolicy.Instance, null)
     {
+    }
+
+    /// <summary>Creates the flow.</summary>
+    /// <param name="users">The user service.</param>
+    /// <param name="principalFactory">Builds the principal for the access token.</param>
+    /// <param name="accessTokens">Issues access tokens.</param>
+    /// <param name="refreshTokens">Issues and rotates refresh tokens.</param>
+    /// <param name="passwordHasher">The password hasher (used for timing equalisation).</param>
+    /// <param name="hooks">The authentication hooks.</param>
+    /// <param name="observers">The identity event observers.</param>
+    /// <param name="options">The module options.</param>
+    /// <param name="timeProvider">The clock.</param>
+    /// <param name="logger">The logger.</param>
+    /// <param name="secondFactorPolicy">Decides whether a user who passed the password check owes a second factor.</param>
+    /// <param name="secondFactorTickets">Issues the ticket of a login waiting for its second factor; required only when the policy asks for one.</param>
+    public AuthenticationFlow(
+        IUserService users,
+        IClaimsPrincipalFactory principalFactory,
+        IAccessTokenService accessTokens,
+        IRefreshTokenService refreshTokens,
+        IPasswordHasher passwordHasher,
+        IAuthenticationHooks hooks,
+        IEnumerable<IIdentityEventObserver> observers,
+        IdentityModuleOptions options,
+        TimeProvider timeProvider,
+        ILogger<AuthenticationFlow> logger,
+        ISecondFactorPolicy secondFactorPolicy,
+        ISecondFactorTicketService? secondFactorTickets = null)
+    {
+        ArgumentNullException.ThrowIfNull(secondFactorPolicy);
+        this.secondFactorPolicy = secondFactorPolicy;
+        this.secondFactorTickets = secondFactorTickets;
         ArgumentNullException.ThrowIfNull(users);
         ArgumentNullException.ThrowIfNull(principalFactory);
         ArgumentNullException.ThrowIfNull(accessTokens);
@@ -203,6 +239,16 @@ public sealed class AuthenticationFlow : IAuthenticationFlow
 
             var failure = verification == PasswordVerificationResult.LockedOut ? LoginResult.LockedOut() : LoginResult.InvalidCredentials();
             return await FailAsync(identifier, Map(verification), failure, cancellationToken).ConfigureAwait(false);
+        }
+
+        // The password was right, so this is not a failed login: no failure hook, no lockout count. A user who
+        // owes a second factor gets a ticket instead of tokens, and OnLoginSucceeded fires when the login completes.
+        var pending = await SecondFactorGate.RequireAsync(
+            secondFactorPolicy, secondFactorTickets, resolved, SecondFactorMethod.Password, null, false, false, cancellationToken).ConfigureAwait(false);
+        if (pending is { } owed)
+        {
+            logger.LogInformation("User {UserId} passed the password check and owes a second factor ({Stage}).", resolved.Id, owed.Stage);
+            return LoginResult.RequiresSecondFactor(owed);
         }
 
         var succeeded = new LoginSucceededContext(resolved);

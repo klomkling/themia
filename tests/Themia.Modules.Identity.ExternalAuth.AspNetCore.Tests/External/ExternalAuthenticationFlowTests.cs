@@ -1,6 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
+using Themia.Modules.Identity.Abstractions;
 using Themia.Modules.Identity.Abstractions.Authentication;
 using Themia.Modules.Identity.Abstractions.Entities;
 using Themia.Modules.Identity.ExternalAuth.AspNetCore.External;
@@ -33,6 +34,82 @@ public sealed class ExternalAuthenticationFlowTests
     }
 
     private static ExternalAuthRequest Request() => new("auth-code", "https://app.test/callback");
+
+    private sealed class FixedSecondFactorPolicy(SecondFactorRequirement requirement) : ISecondFactorPolicy
+    {
+        public List<SecondFactorContext> Contexts { get; } = [];
+
+        public ValueTask<SecondFactorRequirement> EvaluateAsync(SecondFactorContext context, CancellationToken cancellationToken = default)
+        {
+            Contexts.Add(context);
+            return ValueTask.FromResult(requirement);
+        }
+    }
+
+    private sealed class RecordingTickets : ISecondFactorTicketService
+    {
+        public List<SecondFactorTicketData> Issued { get; } = [];
+
+        public Task<PendingSecondFactor> IssueAsync(SecondFactorTicketData data, CancellationToken cancellationToken = default)
+        {
+            Issued.Add(data);
+            return Task.FromResult(new PendingSecondFactor(data.UserId, data.Stage, "ticket-1", DateTimeOffset.UtcNow.AddMinutes(5)));
+        }
+
+        public Task<SecondFactorTicketData?> ConsumeAsync(string ticket, CancellationToken cancellationToken = default) =>
+            Task.FromResult<SecondFactorTicketData?>(null);
+    }
+
+    [Theory]
+    [InlineData(SecondFactorRequirement.Verify, SecondFactorStage.Verify)]
+    [InlineData(SecondFactorRequirement.Enrol, SecondFactorStage.Enrol)]
+    public async Task External_login_that_owes_a_second_factor_returns_a_ticket_and_issues_nothing(SecondFactorRequirement requirement, SecondFactorStage stage)
+    {
+        var provider = new FakeExternalAuthProvider { Result = ExternalAuthResult.Success(Identity()) };
+        var user = NewUser();
+        var refresh = new FakeRefreshTokenService();
+        var hooks = new RecordingExternalHooks { Refresh = refresh };
+        var policy = new FixedSecondFactorPolicy(requirement);
+        var tickets = new RecordingTickets();
+        var flow = new ExternalAuthenticationFlow(
+            new FakeProviderRegistry(provider), new FakeExternalLoginService { Result = new ExternalLoginResult(user, true, true) },
+            new FakeClaimsPrincipalFactory(), new FakeAccessTokenService(TimeProvider.System), refresh, hooks, [], new IdentityModuleOptions(),
+            TimeProvider.System, NullLogger<ExternalAuthenticationFlow>.Instance, policy, tickets);
+
+        var result = await flow.AuthenticateAsync(Provider, Request());
+
+        Assert.Equal(ExternalLoginOutcome.SecondFactorRequired, result.Outcome);
+        Assert.False(result.Succeeded);
+        Assert.Null(result.Tokens);
+        Assert.Equal(stage, result.SecondFactor!.Value.Stage);
+        Assert.True(result.WasCreated);
+        Assert.True(result.WasLinked);
+        Assert.Equal(0, refresh.IssueCalls);
+        Assert.DoesNotContain("succeeded", hooks.Calls);
+        Assert.DoesNotContain("failed", hooks.Calls);
+        var ticket = Assert.Single(tickets.Issued);
+        Assert.Equal(SecondFactorMethod.External, ticket.Method);
+        Assert.Equal(Provider, ticket.Provider);
+        Assert.True(ticket.WasCreated && ticket.WasLinked);
+        Assert.Equal(user.SecurityStamp, ticket.SecurityStamp);
+        Assert.Equal(new SecondFactorContext(user.Id, user.TenantId, SecondFactorMethod.External, Provider), Assert.Single(policy.Contexts));
+    }
+
+    [Fact]
+    public async Task External_login_that_owes_a_second_factor_without_a_ticket_service_fails_closed()
+    {
+        var provider = new FakeExternalAuthProvider { Result = ExternalAuthResult.Success(Identity()) };
+        var refresh = new FakeRefreshTokenService();
+        var flow = new ExternalAuthenticationFlow(
+            new FakeProviderRegistry(provider), new FakeExternalLoginService { Result = new ExternalLoginResult(NewUser(), true, true) },
+            new FakeClaimsPrincipalFactory(), new FakeAccessTokenService(TimeProvider.System), refresh, new RecordingExternalHooks { Refresh = refresh }, [],
+            new IdentityModuleOptions(), TimeProvider.System, NullLogger<ExternalAuthenticationFlow>.Instance,
+            new FixedSecondFactorPolicy(SecondFactorRequirement.Verify), null);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => flow.AuthenticateAsync(Provider, Request()));
+
+        Assert.Equal(0, refresh.IssueCalls);
+    }
 
     [Fact]
     public async Task Unknown_provider_returns_provider_not_found_and_fires_failed_hook()
