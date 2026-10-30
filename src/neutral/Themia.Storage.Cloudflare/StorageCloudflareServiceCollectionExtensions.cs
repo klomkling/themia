@@ -16,7 +16,8 @@ public static class StorageCloudflareServiceCollectionExtensions
     /// is set. With it off the registered purger does nothing, so <see cref="PurgingStorageProvider"/> can stay wired
     /// in every environment. With it on, a blank <see cref="CloudflarePurgeOptions.ZoneId"/> or
     /// <see cref="CloudflarePurgeOptions.ApiToken"/> fails host start.
-    /// Wiring the decorator is the app's job; see the package README.
+    /// Wiring the decorator is the app's job; see the package README. With <c>AddThemiaStorageFromConfiguration</c> the
+    /// binding wraps the public slot itself, so do not wrap it again.
     /// </summary>
     /// <param name="services">The service collection.</param>
     /// <param name="configure">Sets the options; bind them from configuration in the app.</param>

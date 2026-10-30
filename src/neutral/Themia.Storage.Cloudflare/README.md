@@ -8,6 +8,8 @@ this package is the Cloudflare implementation.
 
 ## Wiring
 
+**With `AddThemiaStorageFromConfiguration` (Themia.Storage.Configuration) the binding wraps the public slot for you; do not wrap it yourself.** The wiring below is for apps that build their storage by hand.
+
 ```csharp
 services.AddThemiaStorageCloudflarePurge(o =>
 {

@@ -55,7 +55,11 @@ public static class StorageConfigurationServiceCollectionExtensions
 
             return settings;
         });
-        services.AddSingleton(sp => CreateProvider(sp.GetRequiredService<StorageSettings>()));
+        services.AddSingleton(sp => CreateProvider(sp.GetRequiredService<StorageSettings>(), sp.GetService<ICdnPurger>()));
+
+        // MapThemiaLocalStorage verifies presigned tokens with this signer; it must use the provider's SigningKey.
+        // TryAdd: an app that registers its own signer keeps it.
+        services.TryAddSingleton(sp => new LocalUrlSigner(sp.GetRequiredService<StorageSettings>().Local.SigningKey));
 
         // The router (or the Local provider) is what apps inject; the container disposes it, and it disposes its slots.
         services.AddSingleton<IStorageProvider>(sp => sp.GetRequiredService<ConfiguredStorage>().Provider);
@@ -74,32 +78,40 @@ public static class StorageConfigurationServiceCollectionExtensions
         return services;
     }
 
-    private static ConfiguredStorage CreateProvider(StorageSettings settings)
+    private static ConfiguredStorage CreateProvider(StorageSettings settings, ICdnPurger? purger)
     {
         if (settings.Public == PublicSlot.Local)
         {
-            return new ConfiguredStorage(new LocalStorageProvider(settings.Local));
+            return new ConfiguredStorage(new LocalStorageProvider(settings.Local), ownedS3: null);
         }
 
         // Slots are passed by name: the router cannot tell a swapped pair. The S3 slot is public-only, so it can
         // only ever hold public objects; the Local slot has no public container.
-        var publicSlot = new S3StorageProvider(settings.S3!);
+        var s3 = new S3StorageProvider(settings.S3!);
         try
         {
-            return new ConfiguredStorage(new SplitStorageProvider(publicSlot, new LocalStorageProvider(settings.Local)));
+            // With a purger the public slot is wrapped, and the wrapper is not disposable, so the router would leak
+            // the S3 client: ConfiguredStorage disposes it instead. Unwrapped, the router owns and disposes it.
+            IStorageProvider publicSlot = purger is null ? s3 : new PurgingStorageProvider(s3, purger);
+            return new ConfiguredStorage(
+                new SplitStorageProvider(publicSlot, new LocalStorageProvider(settings.Local)),
+                ownedS3: purger is null ? null : s3);
         }
         catch
         {
-            publicSlot.Dispose();
+            s3.Dispose();
             throw;
         }
     }
 
-    /// <summary>The built provider, held so the start-up check can tell it from a later registration. It is not
-    /// disposable: the container disposes the provider once, as the singleton <see cref="IStorageProvider"/>.</summary>
-    internal sealed class ConfiguredStorage(IStorageProvider provider)
+    /// <summary>The built provider, held so the start-up check can tell it from a later registration. The container
+    /// disposes the provider once, as the singleton <see cref="IStorageProvider"/>; this disposes only an S3 client the
+    /// router does not own (the public slot wrapped by <see cref="PurgingStorageProvider"/>).</summary>
+    internal sealed class ConfiguredStorage(IStorageProvider provider, S3StorageProvider? ownedS3) : IDisposable
     {
         public IStorageProvider Provider { get; } = provider;
+
+        public void Dispose() => ownedS3?.Dispose();
     }
 
     /// <summary>The empty options type whose validation builds the provider at host start.</summary>

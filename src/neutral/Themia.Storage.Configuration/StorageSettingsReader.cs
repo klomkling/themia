@@ -11,6 +11,7 @@ namespace Themia.Storage.Configuration;
 /// </summary>
 internal static class StorageSettingsReader
 {
+    private const int MinSigningKeyLength = 32;
     private const string Local = "Local";
     private const string PrivateProvider = "Storage:Private:Provider";
     private const string PublicProvider = "Storage:Public:Provider";
@@ -150,10 +151,16 @@ internal static class StorageSettingsReader
             throw Fail($"Storage:S3:* is set but the public slot is Local; set {PublicProvider}=S3 or remove the S3 keys.");
         }
 
+        var signingKey = Value(configuration, "Storage:Local:SigningKey") ?? string.Empty;
+        if (signingKey.Length is > 0 and < MinSigningKeyLength)
+        {
+            throw Fail($"Storage:Local:SigningKey must be at least {MinSigningKeyLength} characters (use a random value from the secret store).");
+        }
+
         var options = new LocalStorageOptions
         {
             RootPath = root,
-            SigningKey = Value(configuration, "Storage:Local:SigningKey") ?? string.Empty,
+            SigningKey = signingKey,
             PublicRootPath = publicRoot ?? string.Empty,
             PublicBaseUrl = publicBaseUrl ?? string.Empty,
         };
