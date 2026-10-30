@@ -68,12 +68,24 @@ internal sealed class ConversationGuests(
         {
             var participantId = Guid.NewGuid();
             var current = guestOptions.Peppers[guestOptions.CurrentPepperId!];
+            await using var transaction = await connection.BeginTransactionAsync(IsolationLevel.ReadCommitted, cancellationToken);
             try
             {
+                // Lock the conversation row first, so invites to one conversation serialise and the cap below cannot be overshot by a race.
+                var locked = await connection.ExecuteAsync(new CommandDefinition(
+                    "UPDATE conversations SET last_seq = last_seq WHERE tenant_id = @TenantId AND id = @ConversationId AND state = 0 AND retention_state <> 2;",
+                    new { TenantId = tenantId, ConversationId = conversationId },
+                    transaction,
+                    cancellationToken: cancellationToken));
+                if (locked == 0)
+                {
+                    return Failed(GuestInviteOutcome.Refused);
+                }
+
                 var inserted = await connection.ExecuteAsync(new CommandDefinition(
                     "INSERT INTO conversation_participants (id, tenant_id, conversation_id, kind, display_name, contact_hash, pepper_key_id, joined_at, last_read_seq) " +
                     "SELECT @Id, @TenantId, c.id, 1, @DisplayName, @ContactHash, @PepperKeyId, @Now, 0 FROM conversations c " +
-                    "WHERE c.tenant_id = @TenantId AND c.id = @ConversationId AND c.state = 0 AND c.retention_state <> 2 " +
+                    "WHERE c.tenant_id = @TenantId AND c.id = @ConversationId " +
                     "AND (SELECT COUNT(*) FROM conversation_participants g WHERE g.tenant_id = @TenantId AND g.conversation_id = @ConversationId AND g.kind = 1 AND g.left_at IS NULL) < @MaxGuests;",
                     new
                     {
@@ -86,16 +98,19 @@ internal sealed class ConversationGuests(
                         Now = store.Now(),
                         MaxGuests = guestOptions.MaxGuestsPerConversation,
                     },
+                    transaction,
                     cancellationToken: cancellationToken));
                 if (inserted == 0)
                 {
-                    return await ExplainNoInsertAsync(connection, tenantId, conversationId, cancellationToken);
+                    return Failed(GuestInviteOutcome.LimitReached);
                 }
 
+                await transaction.CommitAsync(cancellationToken);
                 return await IssueAsync(GuestInviteOutcome.Invited, participantId, tenantId, conversationId, cancellationToken);
             }
             catch (DbException ex) when (dialect.IsDuplicateKey(ex))
             {
+                await transaction.RollbackAsync(CancellationToken.None); // a PostgreSQL transaction is aborted by the violation
                 // A concurrent invite of the same contact won the unique index: this one is a re-invite of that guest.
                 found = await FindGuestAsync(connection, tenantId, conversationId, input, cancellationToken)
                     ?? throw new InvalidOperationException("A duplicate guest contact was reported but no stored guest was found.");
@@ -246,13 +261,6 @@ internal sealed class ConversationGuests(
             "SELECT COUNT(*) FROM conversations WHERE tenant_id = @TenantId AND id = @ConversationId AND state = 0 AND retention_state <> 2;",
             new { TenantId = tenantId, ConversationId = conversationId },
             cancellationToken: cancellationToken)) == 1;
-
-    private async Task<GuestInvite> ExplainNoInsertAsync(DbConnection connection, string tenantId, Guid conversationId, CancellationToken cancellationToken)
-    {
-        // The insert matched no row: either the conversation is not open (or not this tenant's) or it already holds the most guests.
-        var open = await ConversationOpenAsync(connection, tenantId, conversationId, cancellationToken);
-        return Failed(open ? GuestInviteOutcome.LimitReached : GuestInviteOutcome.Refused);
-    }
 
     private static GuestInvite Failed(GuestInviteOutcome outcome) => new(outcome, null, null, null);
 

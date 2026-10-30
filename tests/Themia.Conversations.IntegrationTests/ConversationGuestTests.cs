@@ -271,6 +271,19 @@ public abstract class ConversationGuestTests(ConversationEngineFixture fixture)
     }
 
     [Fact]
+    public async Task Invite_ShouldNeverExceedTheGuestCap_WhenDifferentContactsAreInvitedConcurrently()
+    {
+        var rig = NewRig(o => o.MaxGuestsPerConversation = 3);
+        var (tenant, conversation) = await OpenWithMemberAsync(rig);
+
+        var results = await Task.WhenAll(Enumerable.Range(0, 10).Select(i => Task.Run(() => rig.Guests.InviteAsync(Member("staff"), tenant, conversation, Email($"g{i}@example.com"), "Guest"))));
+
+        Assert.Equal(3, results.Count(r => r.Outcome == GuestInviteOutcome.Invited));
+        Assert.Equal(7, results.Count(r => r.Outcome == GuestInviteOutcome.LimitReached));
+        Assert.Equal(3, await fixture.ScalarAsync<int>("SELECT COUNT(*) FROM conversation_participants WHERE conversation_id = @Id AND kind = 1;", new { Id = conversation }));
+    }
+
+    [Fact]
     public async Task Invite_ShouldStopAtTheGuestCap_AndReportRateLimitAndInvalidInput()
     {
         var rig = NewRig(o => o.MaxGuestsPerConversation = 2);
