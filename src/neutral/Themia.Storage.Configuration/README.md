@@ -85,7 +85,14 @@ Copy the app's block into its adoption runbook. Names are environment variables.
 | `Storage__Local__RootPath`, `SigningKey` | unchanged |
 | `Storage__DownloadBaseUrl` | `Storage__Local__PresignedBaseUrl` |
 
-## Not covered
+## CDN purge and the Local endpoints
 
-CDN purge: wrap the public slot with `PurgingStorageProvider` through `AddThemiaSplitStorage` yourself
-(see `Themia.Storage.Cloudflare`); this binding does not.
+**Purge.** With an S3/R2 public slot, the binding wraps that slot with `PurgingStorageProvider` when an `ICdnPurger` is
+registered (`AddThemiaStorageCloudflarePurge`, in any order relative to this call). Deleting a `public/` key then purges
+its public URL; private keys are never purged. **Do not wrap the public slot yourself** and do not register your own
+`IStorageProvider` next to this binding: the host stops at start. A Local public slot is not wrapped (the resolved
+provider stays a `LocalStorageProvider`, which apps cast to map the public mount).
+
+**Signer.** The binding registers the `LocalUrlSigner` that `MapThemiaLocalStorage` verifies with, built from
+`Storage:Local:SigningKey` (`TryAdd`: a signer you register yourself is kept). Drop your own registration once you are on
+the binding; a signer built from a different key makes every presigned link 403.
