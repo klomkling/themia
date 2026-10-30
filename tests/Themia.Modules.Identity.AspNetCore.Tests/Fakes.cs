@@ -79,12 +79,15 @@ internal sealed class FakeClaimsPrincipalFactory : IClaimsPrincipalFactory
 
     public bool Called { get; private set; }
 
+    /// <summary>Claims added to every principal built, e.g. one an app later replaces.</summary>
+    public List<Claim> ExtraClaims { get; } = [];
+
     public Task<ClaimsPrincipal> CreateAsync(User user, string authenticationType, CancellationToken cancellationToken = default)
     {
         Called = true;
         TenantSeen = Themia.Framework.Core.Abstractions.Tenancy.TenantContextAccessor.CurrentTenantId;
         return Task.FromResult(new ClaimsPrincipal(new ClaimsIdentity(
-            [new Claim(ClaimTypes.NameIdentifier, user.Id.ToString())], authenticationType)));
+            [new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()), .. ExtraClaims], authenticationType)));
     }
 }
 
@@ -92,9 +95,17 @@ internal sealed class FakeAccessTokenService(TimeProvider? clock = null) : IAcce
 {
     public int IssueCalls { get; private set; }
 
+    /// <summary>When set, <see cref="Issue"/> throws after counting the call.</summary>
+    public bool ThrowOnIssue { get; set; }
+
+    /// <summary>The principal of the last <see cref="Issue"/> call.</summary>
+    public ClaimsPrincipal? LastPrincipal { get; private set; }
+
     public AccessToken Issue(ClaimsPrincipal principal)
     {
         IssueCalls++;
+        LastPrincipal = principal;
+        if (ThrowOnIssue) throw new InvalidOperationException("signing failed");
         return new("access-jwt", (clock ?? TimeProvider.System).GetUtcNow().AddMinutes(15));
     }
 }
@@ -124,10 +135,26 @@ internal sealed class FakeRefreshTokenService : IRefreshTokenService
     /// deliberately does NOT swallow this exception type (see its own remarks).</summary>
     public bool CancelOnResolveOwner { get; set; }
 
+    /// <summary>The family id handed out by the last <see cref="IssueAsync"/>.</summary>
+    public Guid LastFamilyId { get; private set; }
+
+    /// <summary>(user, family) pairs that <see cref="IsSessionLiveAsync"/> reports as live.</summary>
+    public HashSet<(Guid UserId, Guid FamilyId)> LiveSessions { get; } = [];
+
+    /// <summary>When set, <see cref="RevokeAsync"/> throws.</summary>
+    public bool ThrowOnRevoke { get; set; }
+
+    /// <summary>The token passed to the last <see cref="RevokeAsync"/>.</summary>
+    public CancellationToken LastRevokeToken { get; private set; }
+
+    public Task<bool> IsSessionLiveAsync(Guid userId, Guid familyId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(LiveSessions.Contains((userId, familyId)));
+
     public Task<RefreshIssue> IssueAsync(Guid userId, CancellationToken cancellationToken = default)
     {
         IssueCalls++;
-        return Task.FromResult(new RefreshIssue("refresh-raw", DateTimeOffset.UtcNow.AddDays(14), Guid.NewGuid()));
+        LastFamilyId = Guid.NewGuid();
+        return Task.FromResult(new RefreshIssue("refresh-raw", DateTimeOffset.UtcNow.AddDays(14), LastFamilyId));
     }
 
     public Task<RefreshValidationResult> ValidateAndRotateAsync(string rawToken, CancellationToken cancellationToken = default) =>
@@ -163,6 +190,8 @@ internal sealed class FakeRefreshTokenService : IRefreshTokenService
     {
         RevokeCalls++;
         LastRevokeAllForUser = allForUser;
+        LastRevokeToken = cancellationToken;
+        if (ThrowOnRevoke) throw new InvalidOperationException("revoke failed");
         return Task.FromResult(RevokeResult);
     }
 
@@ -248,6 +277,16 @@ internal sealed class RecordingObserver : IIdentityEventObserver
     {
         Calls.Add(nameof(OnLoginSucceededAsync));
         return Task.CompletedTask;
+    }
+
+    public List<(Guid UserId, string Channel, Guid SessionId)> SessionsIssued { get; } = [];
+
+    public bool ThrowOnSessionIssued { get; set; }
+
+    public Task OnSessionIssuedAsync(Guid userId, string channel, Guid sessionId, CancellationToken cancellationToken = default)
+    {
+        SessionsIssued.Add((userId, channel, sessionId));
+        return ThrowOnSessionIssued ? throw new InvalidOperationException("audit failed") : Task.CompletedTask;
     }
 
     public Task OnExternalLoginSucceededAsync(Guid userId, string provider, bool wasCreated, bool wasLinked, CancellationToken cancellationToken = default)

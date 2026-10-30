@@ -119,6 +119,19 @@ public interface IRefreshTokenService
     /// </remarks>
     Task<int> RevokeAllForUserAsync(Guid userId, CancellationToken cancellationToken = default);
 
+    /// <summary>Whether <paramref name="familyId"/> is a live session of <paramref name="userId"/>: a refresh family with a token that
+    /// is neither revoked nor expired, for that user, in the caller's tenant scope.</summary>
+    /// <param name="userId">The owning user (must resolve in scope).</param>
+    /// <param name="familyId">The session id (the refresh family id, as carried in the <c>sid</c> claim).</param>
+    /// <param name="cancellationToken">A cancellation token.</param>
+    /// <returns><see langword="true"/> only for a live session of that user; false for an unknown, revoked, expired or
+    /// foreign family, and when the user does not resolve in scope.</returns>
+    /// <remarks>Default implementation returns <see langword="false"/> (fail closed), so an existing custom
+    /// <see cref="IRefreshTokenService"/> keeps compiling and <see cref="IAuthTokenIssuer.RenewSessionAsync"/> simply refuses until it
+    /// implements this.</remarks>
+    Task<bool> IsSessionLiveAsync(Guid userId, Guid familyId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(false);
+
     /// <summary>Resolves the id of the user who owns a presented raw token, without consuming, rotating,
     /// or revoking it. Used to attribute an audit event (e.g. logout) to a user before the token is
     /// acted upon.</summary>

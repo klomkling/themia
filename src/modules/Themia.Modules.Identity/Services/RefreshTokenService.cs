@@ -194,6 +194,23 @@ public sealed class RefreshTokenService : IRefreshTokenService, ISessionRevoker
     }
 
     /// <inheritdoc />
+    public async Task<bool> IsSessionLiveAsync(Guid userId, Guid familyId, CancellationToken cancellationToken = default)
+    {
+        // The user must resolve in scope, like every user-id operation here: a foreign tenant's user, or one this scope cannot see,
+        // owns no live session as far as the caller can tell.
+        var user = await IdentityScope.ResolveUserAsync(users, userId, cancellationToken).ConfigureAwait(false);
+        if (user is null)
+        {
+            return false;
+        }
+
+        // Revocation is family-wide (reuse, logout) and a successor never expires before its parent, so "any unrevoked unexpired row of
+        // this user's family" is exactly "the session is live". The same spec RevokeAllForUserExceptAsync uses.
+        return await tokens.AnyAsync(
+            new ActiveRefreshTokensByUserAndFamilySpec(user.Id, familyId, timeProvider.GetUtcNow()), cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
     public async Task<int> RevokeAllForUserExceptAsync(Guid userId, string keepSessionId, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(keepSessionId);

@@ -647,3 +647,36 @@ Themia.Modules.Identity.Abstractions.Entities.TokenPurpose.SecondFactorTicket = 
 Themia.Modules.Identity.Abstractions.Authentication.NotRequiredSecondFactorPolicy
 Themia.Modules.Identity.Abstractions.Authentication.NotRequiredSecondFactorPolicy.EvaluateAsync(Themia.Modules.Identity.Abstractions.Authentication.SecondFactorContext context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<Themia.Modules.Identity.Abstractions.Authentication.SecondFactorRequirement>
 static readonly Themia.Modules.Identity.Abstractions.Authentication.NotRequiredSecondFactorPolicy.Instance -> Themia.Modules.Identity.Abstractions.Authentication.NotRequiredSecondFactorPolicy!
+Themia.Modules.Identity.Abstractions.Authentication.SecondFactorMethod.Custom = 3 -> Themia.Modules.Identity.Abstractions.Authentication.SecondFactorMethod
+Themia.Modules.Identity.Abstractions.Authentication.IssueOutcome
+Themia.Modules.Identity.Abstractions.Authentication.IssueOutcome.Issued = 0 -> Themia.Modules.Identity.Abstractions.Authentication.IssueOutcome
+Themia.Modules.Identity.Abstractions.Authentication.IssueOutcome.Inactive = 1 -> Themia.Modules.Identity.Abstractions.Authentication.IssueOutcome
+Themia.Modules.Identity.Abstractions.Authentication.IssueOutcome.LockedOut = 2 -> Themia.Modules.Identity.Abstractions.Authentication.IssueOutcome
+Themia.Modules.Identity.Abstractions.Authentication.IssueOutcome.TenantMismatch = 3 -> Themia.Modules.Identity.Abstractions.Authentication.IssueOutcome
+Themia.Modules.Identity.Abstractions.Authentication.IssueOutcome.SecondFactorRequired = 4 -> Themia.Modules.Identity.Abstractions.Authentication.IssueOutcome
+Themia.Modules.Identity.Abstractions.Authentication.IssueOutcome.SessionNotLive = 5 -> Themia.Modules.Identity.Abstractions.Authentication.IssueOutcome
+Themia.Modules.Identity.Abstractions.Authentication.IssueOutcome.TicketInvalid = 6 -> Themia.Modules.Identity.Abstractions.Authentication.IssueOutcome
+Themia.Modules.Identity.Abstractions.Authentication.IssueResult
+Themia.Modules.Identity.Abstractions.Authentication.IssueResult.IssueResult() -> void
+Themia.Modules.Identity.Abstractions.Authentication.IssueResult.Outcome.get -> Themia.Modules.Identity.Abstractions.Authentication.IssueOutcome
+Themia.Modules.Identity.Abstractions.Authentication.IssueResult.Tokens.get -> Themia.Modules.Identity.Abstractions.Authentication.AuthTokens?
+Themia.Modules.Identity.Abstractions.Authentication.IssueResult.SessionId.get -> System.Guid?
+Themia.Modules.Identity.Abstractions.Authentication.IssueResult.SecondFactor.get -> Themia.Modules.Identity.Abstractions.Authentication.PendingSecondFactor?
+Themia.Modules.Identity.Abstractions.Authentication.IssueResult.Succeeded.get -> bool
+static Themia.Modules.Identity.Abstractions.Authentication.IssueResult.Issued(Themia.Modules.Identity.Abstractions.Authentication.AuthTokens tokens, System.Guid sessionId) -> Themia.Modules.Identity.Abstractions.Authentication.IssueResult
+static Themia.Modules.Identity.Abstractions.Authentication.IssueResult.Refused(Themia.Modules.Identity.Abstractions.Authentication.IssueOutcome outcome) -> Themia.Modules.Identity.Abstractions.Authentication.IssueResult
+static Themia.Modules.Identity.Abstractions.Authentication.IssueResult.RequiresSecondFactor(Themia.Modules.Identity.Abstractions.Authentication.PendingSecondFactor pending) -> Themia.Modules.Identity.Abstractions.Authentication.IssueResult
+Themia.Modules.Identity.Abstractions.Authentication.SessionRequest
+Themia.Modules.Identity.Abstractions.Authentication.SessionRequest.SessionRequest(Themia.Framework.Core.Abstractions.Tenancy.TenantId? ExpectedTenant, string! Channel, System.Collections.Generic.IReadOnlyCollection<System.Security.Claims.Claim!>? AppClaims = null) -> void
+Themia.Modules.Identity.Abstractions.Authentication.SessionRequest.ExpectedTenant.get -> Themia.Framework.Core.Abstractions.Tenancy.TenantId?
+Themia.Modules.Identity.Abstractions.Authentication.SessionRequest.ExpectedTenant.init -> void
+Themia.Modules.Identity.Abstractions.Authentication.SessionRequest.Channel.get -> string!
+Themia.Modules.Identity.Abstractions.Authentication.SessionRequest.Channel.init -> void
+Themia.Modules.Identity.Abstractions.Authentication.SessionRequest.AppClaims.get -> System.Collections.Generic.IReadOnlyCollection<System.Security.Claims.Claim!>?
+Themia.Modules.Identity.Abstractions.Authentication.SessionRequest.AppClaims.init -> void
+Themia.Modules.Identity.Abstractions.Authentication.IAuthTokenIssuer
+Themia.Modules.Identity.Abstractions.Authentication.IAuthTokenIssuer.StartSessionAsync(System.Guid userId, Themia.Modules.Identity.Abstractions.Authentication.SessionRequest! request, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Identity.Abstractions.Authentication.IssueResult>!
+Themia.Modules.Identity.Abstractions.Authentication.IAuthTokenIssuer.CompleteSessionAsync(System.Guid userId, string! ticket, Themia.Modules.Identity.Abstractions.Authentication.SessionRequest! request, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Identity.Abstractions.Authentication.IssueResult>!
+Themia.Modules.Identity.Abstractions.Authentication.IAuthTokenIssuer.RenewSessionAsync(System.Guid userId, System.Guid sessionId, Themia.Modules.Identity.Abstractions.Authentication.SessionRequest! request, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Identity.Abstractions.Authentication.IssueResult>!
+Themia.Modules.Identity.Abstractions.Authentication.IRefreshTokenService.IsSessionLiveAsync(System.Guid userId, System.Guid familyId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!
+Themia.Modules.Identity.Abstractions.Authentication.IIdentityEventObserver.OnSessionIssuedAsync(System.Guid userId, string! channel, System.Guid sessionId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
