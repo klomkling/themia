@@ -24,6 +24,13 @@ public abstract class ConversationServiceTests(ConversationEngineFixture fixture
         }
     }
 
+    /// <summary>Allows opening only <c>B-1</c>, and nothing once a conversation id is named.</summary>
+    private sealed class SubjectOnlyPolicy : IConversationAccessPolicy
+    {
+        public ValueTask<bool> CanAsync(ConversationActor actor, ConversationTarget target, ConversationAction action, CancellationToken cancellationToken = default) =>
+            ValueTask.FromResult(action == ConversationAction.Open && target.ConversationId is null && target.Subject?.SubjectId == "B-1");
+    }
+
     private sealed class ThrowingSink : IConversationEventSink
     {
         public Task RaiseAsync(DbConnection connection, DbTransaction transaction, ConversationEvent conversationEvent, CancellationToken cancellationToken = default) =>
@@ -116,6 +123,34 @@ public abstract class ConversationServiceTests(ConversationEngineFixture fixture
 
         Assert.Equal(OpenOutcome.Refused, result.Outcome);
         Assert.Equal(0, await fixture.ScalarAsync<int>("SELECT COUNT(*) FROM conversations WHERE tenant_id = @Tenant;", new { Tenant = tenant }));
+    }
+
+    [Fact]
+    public async Task Open_ShouldHandThePolicyTheSubject_AndRefuseAnotherSubject()
+    {
+        var service = Service(policy: new SubjectOnlyPolicy());
+        var tenant = NewTenant();
+
+        var other = await service.OpenAsync(Member("a"), tenant, new ConversationSubject("booking", "B-2"));
+
+        Assert.Equal(OpenOutcome.Refused, other.Outcome);
+        Assert.Equal(0, await fixture.ScalarAsync<int>("SELECT COUNT(*) FROM conversations WHERE tenant_id = @Tenant;", new { Tenant = tenant }));
+    }
+
+    [Fact]
+    public async Task Open_ShouldNotRevealOrReopenAnExistingConversation_WhenThePolicyDeniesOnceItIsNamed()
+    {
+        var allow = Service();
+        var (tenant, conversation) = await OpenAsync(allow);
+        await JoinAsync(allow, tenant, conversation, "a");
+        await allow.CloseAsync(Member("a"), tenant, conversation);
+        var service = Service(policy: new SubjectOnlyPolicy());
+
+        var result = await service.OpenAsync(Member("stranger"), tenant, new ConversationSubject("booking", "B-1"));
+
+        Assert.Equal(OpenOutcome.Refused, result.Outcome);
+        Assert.Null(result.ConversationId);
+        Assert.Equal(1, await fixture.ScalarAsync<int>("SELECT state FROM conversations WHERE id = @Id;", new { Id = conversation }));
     }
 
     [Fact]

@@ -100,7 +100,9 @@ Themia.Conversations.ConversationSubject.SubjectType.init -> void
 Themia.Conversations.ConversationTarget
 Themia.Conversations.ConversationTarget.ConversationId.get -> System.Guid?
 Themia.Conversations.ConversationTarget.ConversationId.init -> void
-Themia.Conversations.ConversationTarget.ConversationTarget(string! TenantId, System.Guid? ConversationId) -> void
+Themia.Conversations.ConversationTarget.ConversationTarget(string! TenantId, System.Guid? ConversationId, Themia.Conversations.ConversationSubject? Subject = null) -> void
+Themia.Conversations.ConversationTarget.Subject.get -> Themia.Conversations.ConversationSubject?
+Themia.Conversations.ConversationTarget.Subject.init -> void
 Themia.Conversations.ConversationTarget.TenantId.get -> string!
 Themia.Conversations.ConversationTarget.TenantId.init -> void
 Themia.Conversations.DependencyInjection.ConversationServiceCollectionExtensions

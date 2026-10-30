@@ -10,4 +10,5 @@ public sealed record ConversationActor(ConversationActorKind Kind, string? UserR
 /// <summary>What an access decision is about.</summary>
 /// <param name="TenantId">The tenant.</param>
 /// <param name="ConversationId">The conversation, or <see langword="null"/> when the action is not on an existing one (opening a subject).</param>
-public sealed record ConversationTarget(string TenantId, Guid? ConversationId);
+/// <param name="Subject">The subject being opened, so a policy can authorise per object; set for <see cref="ConversationAction.Open"/> only.</param>
+public sealed record ConversationTarget(string TenantId, Guid? ConversationId, ConversationSubject? Subject = null);
