@@ -689,3 +689,22 @@ Themia.Modules.Identity.Abstractions.IdentityModuleOptions.RefreshReuseGrace.set
 static readonly Themia.Modules.Identity.Abstractions.IdentityModuleOptions.MaxRefreshReuseGrace -> System.TimeSpan
 Themia.Modules.Identity.Abstractions.Entities.RefreshToken.SuccessorCiphertext.get -> string?
 Themia.Modules.Identity.Abstractions.Entities.RefreshToken.SuccessorCiphertext.set -> void
+Themia.Modules.Identity.Abstractions.AnonymiseOutcome
+Themia.Modules.Identity.Abstractions.AnonymiseOutcome.Anonymised = 0 -> Themia.Modules.Identity.Abstractions.AnonymiseOutcome
+Themia.Modules.Identity.Abstractions.AnonymiseOutcome.AlreadyAnonymised = 1 -> Themia.Modules.Identity.Abstractions.AnonymiseOutcome
+Themia.Modules.Identity.Abstractions.AnonymiseOutcome.NotFound = 2 -> Themia.Modules.Identity.Abstractions.AnonymiseOutcome
+Themia.Modules.Identity.Abstractions.AnonymiseOutcome.Refused = 3 -> Themia.Modules.Identity.Abstractions.AnonymiseOutcome
+Themia.Modules.Identity.Abstractions.AnonymiseResult
+Themia.Modules.Identity.Abstractions.AnonymiseResult.AnonymiseResult() -> void
+Themia.Modules.Identity.Abstractions.AnonymiseResult.Outcome.get -> Themia.Modules.Identity.Abstractions.AnonymiseOutcome
+Themia.Modules.Identity.Abstractions.AnonymiseResult.Reason.get -> string?
+Themia.Modules.Identity.Abstractions.AnonymiseResult.RefusalCode.get -> string?
+Themia.Modules.Identity.Abstractions.AnonymiseResult.Succeeded.get -> bool
+static Themia.Modules.Identity.Abstractions.AnonymiseResult.Anonymised() -> Themia.Modules.Identity.Abstractions.AnonymiseResult
+static Themia.Modules.Identity.Abstractions.AnonymiseResult.AlreadyAnonymised() -> Themia.Modules.Identity.Abstractions.AnonymiseResult
+static Themia.Modules.Identity.Abstractions.AnonymiseResult.NotFound() -> Themia.Modules.Identity.Abstractions.AnonymiseResult
+static Themia.Modules.Identity.Abstractions.AnonymiseResult.Refused(string! reason, string? refusalCode) -> Themia.Modules.Identity.Abstractions.AnonymiseResult
+Themia.Modules.Identity.Abstractions.IIdentityAnonymiser
+Themia.Modules.Identity.Abstractions.IIdentityAnonymiser.AnonymiseAsync(System.Guid userId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Identity.Abstractions.AnonymiseResult>!
+Themia.Modules.Identity.Abstractions.IUserLifecycleHooks.OnBeforeAnonymiseAsync(System.Guid userId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<Themia.Modules.Identity.Abstractions.UserMutationDecision>
+Themia.Modules.Identity.Abstractions.UserMutation.Anonymised = 512 -> Themia.Modules.Identity.Abstractions.UserMutation

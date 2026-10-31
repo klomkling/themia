@@ -71,3 +71,20 @@ internal sealed class OtpChallengesExpiredBeforeSpec : Specification<OtpLoginCha
         WithoutTenantFilter();
     }
 }
+
+/// <summary>Challenges tied to a user, plus ones keyed only by the phone the user held (issued before the
+/// user was resolved). Within the ambient tenant: the caller has already matched it to the user's.</summary>
+internal sealed class OtpChallengesByUserOrPhoneSpec : Specification<OtpLoginChallenge>
+{
+    public OtpChallengesByUserOrPhoneSpec(Guid userId, string? normalizedPhone)
+    {
+        if (normalizedPhone is null)
+        {
+            Where(c => c.UserId == userId);
+        }
+        else
+        {
+            Where(c => c.UserId == userId || c.NormalizedPhoneNumber == normalizedPhone);
+        }
+    }
+}

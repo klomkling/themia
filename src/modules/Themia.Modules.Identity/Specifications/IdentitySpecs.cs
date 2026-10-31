@@ -311,3 +311,15 @@ internal sealed class TokenByPurposeAndHashSpec : Specification<UserToken>
     public TokenByPurposeAndHashSpec(TokenPurpose purpose, string tokenHash) =>
         Where(t => t.Purpose == purpose && t.TokenHash == tokenHash);
 }
+
+/// <summary>Every refresh token row of a user, live or not (erasure deletes the hashes too).</summary>
+internal sealed class RefreshTokensByUserSpec : Specification<RefreshToken>
+{
+    public RefreshTokensByUserSpec(Guid userId) => Where(t => t.UserId == userId);
+}
+
+/// <summary>Every one-time token row of a user, whatever its purpose or state.</summary>
+internal sealed class UserTokensByUserSpec : Specification<UserToken>
+{
+    public UserTokensByUserSpec(Guid userId) => Where(t => t.UserId == userId);
+}

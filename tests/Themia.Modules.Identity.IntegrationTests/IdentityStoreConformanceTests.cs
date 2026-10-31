@@ -20,6 +20,11 @@ file sealed class StubCurrentUserAccessor(string? userId) : ICurrentUserAccessor
     public string? UserId { get; } = userId;
 }
 
+file sealed class WhereSpec<T> : Themia.Framework.Data.Abstractions.Specifications.Specification<T>
+{
+    public WhereSpec(System.Linq.Expressions.Expression<Func<T, bool>> predicate) => Where(predicate);
+}
+
 public abstract class IdentityStoreConformanceTests
 {
     /// <summary>Wires the peer-specific data layer (EF or Dapper) against the test connection string.</summary>
@@ -56,6 +61,9 @@ public abstract class IdentityStoreConformanceTests
         public IRepository<ExternalLoginLink, Guid> Links => Inner.ServiceProvider.GetRequiredService<IRepository<ExternalLoginLink, Guid>>();
         public IRepository<User, Guid> UserRepo => Inner.ServiceProvider.GetRequiredService<IRepository<User, Guid>>();
         public IRepository<UserRole, Guid> Memberships => Inner.ServiceProvider.GetRequiredService<IRepository<UserRole, Guid>>();
+        public IIdentityAnonymiser Anonymiser => Inner.ServiceProvider.GetRequiredService<IIdentityAnonymiser>();
+        public IRepository<RefreshToken, Guid> RefreshRows => Inner.ServiceProvider.GetRequiredService<IRepository<RefreshToken, Guid>>();
+        public IRepository<UserClaim, Guid> ClaimRows => Inner.ServiceProvider.GetRequiredService<IRepository<UserClaim, Guid>>();
         public IUnitOfWork UnitOfWork => Inner.ServiceProvider.GetRequiredService<IUnitOfWork>();
 
         public async ValueTask DisposeAsync()
@@ -1312,6 +1320,101 @@ public abstract class IdentityStoreConformanceTests
         await using (var a = NewScope(new TenantId("a")))
         {
             Assert.Equal(RefreshOutcome.Success, (await a.RefreshTokens.ValidateAndRotateAsync(tokenInA.RawToken)).Outcome);
+        }
+    }
+
+    [Fact] // PDPA erasure: the row stays as a tombstone, every personal child row goes, the provider id is free again
+    public async Task Anonymise_scrubs_the_user_and_deletes_children()
+    {
+        await ResetAsync();
+        await using var s = NewScope(new TenantId("acme"));
+        var user = (await s.Users.CreateAsync("anon-me", "pw", "anon@x.com")).UserId!.Value;
+        var bystander = (await s.Users.CreateAsync("anon-bystander", "pw", "by@x.com")).UserId!.Value;
+        await s.Users.SetPhoneNumberAsync(user, "+66812345678");
+        var role = (await s.Roles.CreateAsync("Editor"))!.Value;
+        await s.Roles.AssignRoleAsync(user, role);
+        await s.Claims.AddUserClaimAsync(user, "app:nickname", "Anon Me");
+        var resetToken = await s.Tokens.GenerateAsync(user, TokenPurpose.PasswordReset);
+        await s.Linking.LinkAsync(user, new ExternalIdentity("LINE", "ln-anon", null, false, null));
+        var first = await s.RefreshTokens.IssueAsync(user);
+        var second = (await s.RefreshTokens.ValidateAndRotateAsync(first.RawToken)).TryGetSuccess(out _, out var r2) ? r2 : throw new InvalidOperationException();
+        Assert.True((await s.RefreshTokens.ValidateAndRotateAsync(second.RawToken)).TryGetSuccess(out _, out _));
+        var theirs = await s.RefreshTokens.IssueAsync(bystander);
+
+        var result = await s.Anonymiser.AnonymiseAsync(user);
+
+        Assert.Equal(AnonymiseOutcome.Anonymised, result.Outcome);
+        var row = await s.Users.FindByIdAsync(user);
+        Assert.NotNull(row);
+        Assert.Equal($"anonymised-{user:N}", row!.UserName);
+        Assert.Null(row.Email);
+        Assert.Null(row.PhoneNumber);
+        Assert.Null(row.PasswordHash);
+        Assert.False(row.IsActive);
+        Assert.False(row.IsDeleted);
+        Assert.Empty(await s.RefreshRows.ListAsync(new WhereSpec<RefreshToken>(t => t.UserId == user)));
+        Assert.Empty(await s.ClaimRows.ListAsync(new WhereSpec<UserClaim>(c => c.UserId == user)));
+        Assert.Empty(await s.Linking.GetLoginsAsync(user));
+        Assert.NotEqual(RefreshOutcome.Success, (await s.RefreshTokens.ValidateAndRotateAsync(second.RawToken)).Outcome);
+        Assert.Equal(RefreshOutcome.Success, (await s.RefreshTokens.ValidateAndRotateAsync(theirs.RawToken)).Outcome);
+        Assert.Equal("by@x.com", (await s.Users.FindByIdAsync(bystander))!.Email);
+        Assert.Equal(ExternalLoginLinkOutcome.Linked,
+            (await s.Linking.LinkAsync(bystander, new ExternalIdentity("LINE", "ln-anon", null, false, null))).Outcome);
+        _ = resetToken;
+    }
+
+    [Fact] // idempotent, and a concurrent double call leaves one clean tombstone either way
+    public async Task Anonymise_is_idempotent_and_survives_a_concurrent_double_call()
+    {
+        await ResetAsync();
+        Guid user;
+        await using (var s = NewScope(new TenantId("acme")))
+        {
+            user = (await s.Users.CreateAsync("anon-twice", "pw", "twice@x.com")).UserId!.Value;
+            await s.RefreshTokens.IssueAsync(user);
+        }
+
+        await using var a = NewScope(new TenantId("acme"));
+        await using var b = NewScope(new TenantId("acme"));
+        var both = await Task.WhenAll(a.Anonymiser.AnonymiseAsync(user), b.Anonymiser.AnonymiseAsync(user));
+
+        Assert.All(both, r => Assert.True(r.Succeeded));
+        await using var c = NewScope(new TenantId("acme"));
+        Assert.Equal(AnonymiseOutcome.AlreadyAnonymised, (await c.Anonymiser.AnonymiseAsync(user)).Outcome);
+        Assert.Equal($"anonymised-{user:N}", (await c.Users.FindByIdAsync(user))!.UserName);
+    }
+
+    [Fact] // another tenant's user and a platform user are invisible from the wrong scope; the platform user is erasable from its own
+    public async Task Anonymise_is_tenant_scoped()
+    {
+        await ResetAsync();
+        Guid inA;
+        Guid platform;
+        await using (var a = NewScope(new TenantId("a")))
+        {
+            inA = (await a.Users.CreateAsync("anon-iso-a", "pw", "a@x.com")).UserId!.Value;
+        }
+
+        await using (var p = NewScope(null))
+        {
+            platform = (await p.Users.CreateAsync("anon-root", "pw", "root@x.com")).UserId!.Value;
+        }
+
+        await using (var b = NewScope(new TenantId("b")))
+        {
+            Assert.Equal(AnonymiseOutcome.NotFound, (await b.Anonymiser.AnonymiseAsync(inA)).Outcome);
+            Assert.Equal(AnonymiseOutcome.NotFound, (await b.Anonymiser.AnonymiseAsync(platform)).Outcome);
+        }
+
+        await using (var a = NewScope(new TenantId("a")))
+        {
+            Assert.Equal("a@x.com", (await a.Users.FindByIdAsync(inA))!.Email);
+        }
+
+        await using (var p = NewScope(null))
+        {
+            Assert.Equal(AnonymiseOutcome.Anonymised, (await p.Anonymiser.AnonymiseAsync(platform)).Outcome);
+            Assert.Null((await p.Users.FindByIdAsync(platform))!.Email);
         }
     }
 

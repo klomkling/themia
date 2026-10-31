@@ -160,4 +160,7 @@ public enum UserMutation
 
     /// <summary>An external identity was linked to or unlinked from the user.</summary>
     ExternalLogin = 256,
+
+    /// <summary>The account was anonymised.</summary>
+    Anonymised = 512,
 }
