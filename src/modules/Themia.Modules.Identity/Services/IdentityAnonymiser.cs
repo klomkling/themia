@@ -79,18 +79,19 @@ public sealed class IdentityAnonymiser : IIdentityAnonymiser
     {
         try
         {
-            return await RunAsync(userId, cancellationToken).ConfigureAwait(false);
+            return await RunAsync(userId, askHook: true, cancellationToken).ConfigureAwait(false);
         }
         catch (ConcurrencyException)
         {
             // Lost a race with a concurrent erasure of the same user: it deleted rows this call had loaded. The
             // failed save rolled back and cleared the tracker, so one re-run sees the tombstone and finishes
-            // as AlreadyAnonymised. A second loss is not a race any more and surfaces.
-            return await RunAsync(userId, cancellationToken).ConfigureAwait(false);
+            // as AlreadyAnonymised. A second loss is not a race any more and surfaces. The veto hook already answered
+            // on the first pass, so the re-run does not ask again.
+            return await RunAsync(userId, askHook: false, cancellationToken).ConfigureAwait(false);
         }
     }
 
-    private async Task<AnonymiseResult> RunAsync(Guid userId, CancellationToken cancellationToken)
+    private async Task<AnonymiseResult> RunAsync(Guid userId, bool askHook, CancellationToken cancellationToken)
     {
         var user = await IdentityScope.ResolveUserAsync(users, userId, cancellationToken).ConfigureAwait(false);
         // ResolveUserAsync falls back to a platform row from a tenant scope; erasure is stricter: the user's
@@ -101,8 +102,8 @@ public sealed class IdentityAnonymiser : IIdentityAnonymiser
         }
 
         var tombstone = TombstoneName(user.Id);
-        var already = user.UserName == tombstone && user.Email is null && user.PhoneNumber is null;
-        if (!already)
+        var already = user.UserName == tombstone && user.Email is null && user.PhoneNumber is null && !user.IsActive && user.PasswordHash is null;
+        if (!already && askHook)
         {
             var decision = await hooks.OnBeforeAnonymiseAsync(userId, cancellationToken).ConfigureAwait(false);
             if (!decision.IsAllowed)
@@ -114,7 +115,8 @@ public sealed class IdentityAnonymiser : IIdentityAnonymiser
 
         // The user row and every child delete commit together or not at all, and a failed save clears the
         // tracker so the re-run in AnonymiseAsync starts clean. For a platform user the tenant write-validation
-        // bypass covers the whole save, which is safe here because every child is platform-scoped too.
+        // bypass covers the whole save, which is safe here because a platform scope sees only global rows, so every
+        // staged child is global too.
         var oldPhone = user.NormalizedPhoneNumber;
         await unitOfWork.ExecuteInTransactionAsync(async ct =>
         {
@@ -124,7 +126,7 @@ public sealed class IdentityAnonymiser : IIdentityAnonymiser
                 users.Update(user);
             }
 
-            await RemoveChildrenAsync(user.Id, oldPhone, ct).ConfigureAwait(false);
+            await RemoveChildrenAsync(user.Id, user.TenantId, oldPhone, ct).ConfigureAwait(false);
             await IdentityScope.SaveScopedAsync(unitOfWork, filterScope, user.TenantId is null, ct).ConfigureAwait(false);
         }, cancellationToken).ConfigureAwait(false);
         SecurityStampCache.Evict(stampCache, [user.Id]);
@@ -158,7 +160,7 @@ public sealed class IdentityAnonymiser : IIdentityAnonymiser
         user.SecurityStamp = SecurityStampCache.NewStamp();
     }
 
-    private async Task RemoveChildrenAsync(Guid userId, string? oldPhone, CancellationToken ct)
+    private async Task RemoveChildrenAsync(Guid userId, TenantId? tenantId, string? oldPhone, CancellationToken ct)
     {
         foreach (var token in await refreshTokens.ListAsync(new RefreshTokensByUserSpec(userId), ct).ConfigureAwait(false))
         {
@@ -180,7 +182,7 @@ public sealed class IdentityAnonymiser : IIdentityAnonymiser
             links.Remove(link);
         }
 
-        foreach (var challenge in await challenges.ListAsync(new OtpChallengesByUserOrPhoneSpec(userId, oldPhone), ct).ConfigureAwait(false))
+        foreach (var challenge in await challenges.ListAsync(new OtpChallengesByUserOrPhoneSpec(userId, oldPhone, tenantId), ct).ConfigureAwait(false))
         {
             challenges.Remove(challenge);
         }

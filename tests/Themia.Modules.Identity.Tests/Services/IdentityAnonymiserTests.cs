@@ -184,6 +184,49 @@ public class IdentityAnonymiserTests
     }
 
     [Fact]
+    public async Task Phone_keyed_challenges_of_other_owners_or_other_tenants_are_left_alone()
+    {
+        var u = AddUser(Acme);
+        var theirs = new OtpLoginChallenge { Id = Guid.NewGuid(), TenantId = Acme, UserId = AddUser(Acme, "bob").Id, NormalizedPhoneNumber = Phone };
+        var global = new OtpLoginChallenge { Id = Guid.NewGuid(), TenantId = null, UserId = null, NormalizedPhoneNumber = Phone };
+        var elsewhere = new OtpLoginChallenge { Id = Guid.NewGuid(), TenantId = Beta, UserId = null, NormalizedPhoneNumber = Phone };
+        var unowned = new OtpLoginChallenge { Id = Guid.NewGuid(), TenantId = Acme, UserId = null, NormalizedPhoneNumber = Phone };
+        otp.AddRange([theirs, global, elsewhere, unowned]);
+
+        await Sut(Acme).AnonymiseAsync(u.Id);
+
+        Assert.Equal(new[] { theirs.Id, global.Id, elsewhere.Id }.Order(), otp.Select(c => c.Id).Order());
+        Assert.DoesNotContain(unowned, otp);
+    }
+
+    [Fact]
+    public async Task A_platform_user_leaves_a_tenant_challenge_with_the_same_phone_alone()
+    {
+        var platform = AddUser(null, "root");
+        var tenantRow = new OtpLoginChallenge { Id = Guid.NewGuid(), TenantId = Acme, UserId = null, NormalizedPhoneNumber = Phone };
+        otp.Add(tenantRow);
+
+        await Sut(null).AnonymiseAsync(platform.Id);
+
+        Assert.Same(tenantRow, Assert.Single(otp));
+    }
+
+    [Fact]
+    public async Task An_active_user_who_merely_has_the_tombstone_name_is_still_scrubbed_and_vetoable()
+    {
+        var u = AddUser(Acme);
+        u.UserName = $"anonymised-{u.Id:N}";
+        u.Email = null;
+        u.PhoneNumber = null;
+        hooks.RefuseAnonymise = "legal hold";
+
+        var result = await Sut(Acme).AnonymiseAsync(u.Id);
+
+        Assert.Equal(AnonymiseOutcome.Refused, result.Outcome);
+        Assert.True(u.IsActive);
+    }
+
+    [Fact]
     public async Task Unknown_id_is_NotFound()
     {
         var result = await Sut(Acme).AnonymiseAsync(Guid.NewGuid());

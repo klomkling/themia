@@ -63,6 +63,7 @@ public abstract class IdentityStoreConformanceTests
         public IRepository<UserRole, Guid> Memberships => Inner.ServiceProvider.GetRequiredService<IRepository<UserRole, Guid>>();
         public IIdentityAnonymiser Anonymiser => Inner.ServiceProvider.GetRequiredService<IIdentityAnonymiser>();
         public IRepository<RefreshToken, Guid> RefreshRows => Inner.ServiceProvider.GetRequiredService<IRepository<RefreshToken, Guid>>();
+        public IRepository<OtpLoginChallenge, Guid> OtpRows => Inner.ServiceProvider.GetRequiredService<IRepository<OtpLoginChallenge, Guid>>();
         public IRepository<UserClaim, Guid> ClaimRows => Inner.ServiceProvider.GetRequiredService<IRepository<UserClaim, Guid>>();
         public IUnitOfWork UnitOfWork => Inner.ServiceProvider.GetRequiredService<IUnitOfWork>();
 
@@ -1361,6 +1362,34 @@ public abstract class IdentityStoreConformanceTests
         Assert.Equal(ExternalLoginLinkOutcome.Linked,
             (await s.Linking.LinkAsync(bystander, new ExternalIdentity("LINE", "ln-anon", null, false, null))).Outcome);
         _ = resetToken;
+    }
+
+    [Fact] // a platform-scope challenge for the same phone is not the tenant user's: erasure must neither touch it nor fail on it
+    public async Task Anonymise_leaves_a_global_challenge_with_the_same_phone_alone()
+    {
+        await ResetAsync();
+        var phone = "+66899990000";
+        Guid user;
+        await using (var s = NewScope(new TenantId("acme")))
+        {
+            user = (await s.Users.CreateAsync("anon-global-otp", "pw")).UserId!.Value;
+            await s.Users.SetPhoneNumberAsync(user, phone);
+        }
+
+        Guid globalRow = Guid.NewGuid();
+        await using (var p = NewScope(null))
+        {
+            await p.OtpRows.AddAsync(new OtpLoginChallenge { Id = globalRow, TenantId = null, NormalizedPhoneNumber = phone, CodeHash = "x", CreatedAt = DateTimeOffset.UtcNow, ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(5) });
+            await p.UnitOfWork.SaveChangesAsync();
+        }
+
+        await using (var s = NewScope(new TenantId("acme")))
+        {
+            Assert.Equal(AnonymiseOutcome.Anonymised, (await s.Anonymiser.AnonymiseAsync(user)).Outcome);
+        }
+
+        await using var check = NewScope(null);
+        Assert.NotNull(await check.OtpRows.GetByIdAsync(globalRow));
     }
 
     [Fact] // idempotent, and a concurrent double call leaves one clean tombstone either way

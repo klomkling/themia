@@ -56,8 +56,9 @@ internal static class IdentityScope
     /// <para><b>Contract — call only with a single pending change.</b> The bypass suppresses tenant
     /// write-validation for the WHOLE unit of work, not just the platform entity. Any other tenant
     /// entity co-tracked on the same context would therefore also skip validation when the platform
-    /// branch runs. Every current caller stages exactly one <c>Update</c>/<c>Remove</c> before this
-    /// call, so the bypass is safe by construction. Making the bypass per-entity is a framework
+    /// branch runs. Every caller stages one <c>Update</c>/<c>Remove</c> before this call, except the
+    /// anonymiser, which stages the user plus its child rows: safe there because a platform scope sees only global rows, so every
+    /// staged child is global too. Making the bypass per-entity is a framework
     /// concern tracked as a follow-up; until then, do not flush co-tracked tenant entities here.</para></summary>
     public static async Task SaveScopedAsync(IUnitOfWork unitOfWork, IDataFilterScope filterScope, bool isPlatform, CancellationToken ct)
     {

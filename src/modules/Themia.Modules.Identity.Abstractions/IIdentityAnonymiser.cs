@@ -73,6 +73,11 @@ public readonly record struct AnonymiseResult
 /// scope with <c>TenantContextAccessor.BeginScope(tenantId)</c> before calling.
 /// </para>
 /// <para>
+/// <b>Hooks.</b> <see cref="IUserLifecycleHooks.OnBeforeAnonymiseAsync"/> is asked once per call. <c>OnUserMutatedAsync</c> runs after
+/// the commit; if it throws, the caller sees the exception for an erasure that did commit, and a retry returns
+/// <see cref="AnonymiseOutcome.AlreadyAnonymised"/> without raising the event again. Observers are isolated and cannot do this.
+/// </para>
+/// <para>
 /// <b>Not covered.</b> Only Identity's own tables. Audit actor columns, notification logs, conversations and
 /// application tables have their own erasure. OTP challenges with no user id and a phone number the user never
 /// held cannot be tied to the user and expire by their TTL. The security-stamp cache is per process, so on a

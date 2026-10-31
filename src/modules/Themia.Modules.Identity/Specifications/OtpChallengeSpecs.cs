@@ -1,3 +1,4 @@
+using Themia.Framework.Core.Abstractions.Tenancy;
 using Themia.Framework.Data.Abstractions.Specifications;
 using Themia.Modules.Identity.Abstractions.Entities;
 
@@ -72,11 +73,12 @@ internal sealed class OtpChallengesExpiredBeforeSpec : Specification<OtpLoginCha
     }
 }
 
-/// <summary>Challenges tied to a user, plus ones keyed only by the phone the user held (issued before the
-/// user was resolved). Within the ambient tenant: the caller has already matched it to the user's.</summary>
+/// <summary>Challenges tied to a user, plus unowned ones (no user id) keyed by the phone the user held. The phone clause is pinned to
+/// the user's own tenant: the default tenant filter would also admit global rows (tenant null) from a tenant scope, and a row owned
+/// by another user is not this user's even when it carries the same number.</summary>
 internal sealed class OtpChallengesByUserOrPhoneSpec : Specification<OtpLoginChallenge>
 {
-    public OtpChallengesByUserOrPhoneSpec(Guid userId, string? normalizedPhone)
+    public OtpChallengesByUserOrPhoneSpec(Guid userId, string? normalizedPhone, TenantId? tenantId)
     {
         if (normalizedPhone is null)
         {
@@ -84,7 +86,8 @@ internal sealed class OtpChallengesByUserOrPhoneSpec : Specification<OtpLoginCha
         }
         else
         {
-            Where(c => c.UserId == userId || c.NormalizedPhoneNumber == normalizedPhone);
+            Where(c => c.UserId == userId
+                || (c.UserId == null && c.NormalizedPhoneNumber == normalizedPhone && c.TenantId == tenantId));
         }
     }
 }
