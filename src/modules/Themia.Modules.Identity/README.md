@@ -457,7 +457,9 @@ services.AddThemiaIdentityCore(o => o.RefreshReuseGrace = TimeSpan.FromSeconds(3
   whose family or successor was revoked or expired, a deactivated user, and any token rotated before the grace was switched on.
 - **The trade-off:** inside the window a captured token and the user's own token yield the same successor, so the reuse tripwire does not
   fire for that window. It is bounded by the 2-minute cap and off by default; 30 seconds covers a BFF fan-out. `RevokeAllForUserAsync` still ends a
-  family at once, and a family revoked during the window is not replayable.
+  family at once, and a family revoked during the window is not replayable. The shared successor is an ordinary token, so the two holders cannot both
+  keep going: the first to rotate it makes the other's copy a consumed token, and presenting that revokes the family. A replay count would break the
+  fan-out the grace exists for (several tabs at once), so there is none; the window is the limit.
 - **How it works, and what it stores:** while the grace is on, the rotated row keeps `successor_ciphertext`: the successor's raw token sealed with
   AES-GCM under a key derived (HKDF-SHA256) from the rotated token's own raw value, with the row id as associated data. Only a holder of that raw value can
   read it, and the raw value is never stored, so a database copy alone yields nothing. There is **no server secret to provision or rotate**. The column is
