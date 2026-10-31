@@ -672,6 +672,40 @@ public abstract class IdentityStoreConformanceTests
     }
 
     [Fact]
+    public async Task Sealed_successors_are_cleared_when_the_successor_rotates_when_the_family_is_revoked_and_once_the_grace_has_passed()
+    {
+        await ResetAsync();
+        var clock = new FakeTimeProvider(DateTimeOffset.Parse("2026-06-15T00:00:00Z"));
+        await using var s = NewScope(new TenantId("acme"), timeProvider: clock, refreshReuseGrace: Grace);
+        var repository = s.Inner.ServiceProvider.GetRequiredService<IRepository<RefreshToken, Guid>>();
+        var userId = (await s.Users.CreateAsync("grace-clearing", "pw")).UserId!.Value;
+
+        async Task<bool> HasSealedSuccessorAsync(string raw) =>
+            (await repository.FirstOrDefaultAsync(new Themia.Modules.Identity.Specifications.RefreshTokenByHashSpec(Themia.Modules.Identity.Hashing.TokenHasher.Hash(raw))))!.SuccessorCiphertext is not null;
+
+        // Rotating gives the parent a sealed successor; rotating the successor clears it again.
+        var a0 = await s.RefreshTokens.IssueAsync(userId);
+        Assert.True((await s.RefreshTokens.ValidateAndRotateAsync(a0.RawToken)).TryGetSuccess(out _, out var a1));
+        Assert.True(await HasSealedSuccessorAsync(a0.RawToken));
+        Assert.True((await s.RefreshTokens.ValidateAndRotateAsync(a1.RawToken)).TryGetSuccess(out _, out var a2));
+        Assert.False(await HasSealedSuccessorAsync(a0.RawToken));
+        Assert.True(await HasSealedSuccessorAsync(a1.RawToken));
+
+        // Once the grace has passed, the next rotation of ANY of the user's tokens clears the aged ones (here: another session's).
+        var b0 = await s.RefreshTokens.IssueAsync(userId);
+        clock.Advance(Grace + TimeSpan.FromSeconds(1));
+        Assert.True(await HasSealedSuccessorAsync(a1.RawToken));
+        Assert.True((await s.RefreshTokens.ValidateAndRotateAsync(b0.RawToken)).TryGetSuccess(out _, out _));
+        Assert.False(await HasSealedSuccessorAsync(a1.RawToken));
+
+        // A revoked family keeps none.
+        Assert.True((await s.RefreshTokens.ValidateAndRotateAsync(a2.RawToken)).TryGetSuccess(out _, out var a3));
+        Assert.True(await HasSealedSuccessorAsync(a2.RawToken));
+        await s.RefreshTokens.RevokeAsync(a3.RawToken, allForUser: false);
+        Assert.False(await HasSealedSuccessorAsync(a2.RawToken));
+    }
+
+    [Fact]
     public async Task A_replay_inside_the_grace_is_refused_once_the_successor_has_rotated_again()
     {
         await ResetAsync();

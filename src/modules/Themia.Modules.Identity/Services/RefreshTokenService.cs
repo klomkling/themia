@@ -165,6 +165,11 @@ public sealed class RefreshTokenService : IRefreshTokenService, ISessionRevoker
             return await ReplayAfterLostRaceAsync(rawToken, hash, user, cancellationToken).ConfigureAwait(false);
         }
 
+        if (graceOn)
+        {
+            await ClearAgedSuccessorCiphertextsAsync(match.UserId, now, cancellationToken).ConfigureAwait(false);
+        }
+
         return RefreshValidationResult.Success(user, new RefreshIssue(raw, successor.ExpiresAt, successor.FamilyId));
     }
 
@@ -282,6 +287,24 @@ public sealed class RefreshTokenService : IRefreshTokenService, ISessionRevoker
             cancellationToken).ConfigureAwait(false);
         logger.LogInformation("Revoked all active refresh tokens for user {UserId} ({Count} tokens).", user.Id, revoked);
         return revoked;
+    }
+
+    // Hygiene, not security (a sealed value needs the rotated token's raw value to open): once the grace has passed nothing can replay a rotated
+    // token, so clear the sealed successors of this user's older rotations. Best-effort and outside the rotation transaction: a failure here must never
+    // fail a refresh that already succeeded.
+    private async Task ClearAgedSuccessorCiphertextsAsync(Guid userId, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await tokens.UpdateWhereAsync(
+                new AgedSuccessorCiphertextByUserSpec(userId, now - options.RefreshReuseGrace),
+                set => set.Set(t => t.SuccessorCiphertext, null),
+                cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogWarning(ex, "Clearing aged sealed refresh successors failed for user {UserId}; the next rotation retries.", userId);
+        }
     }
 
     // Reuse grace: a token that was just rotated and is presented again within RefreshReuseGrace gets the successor it already produced.
