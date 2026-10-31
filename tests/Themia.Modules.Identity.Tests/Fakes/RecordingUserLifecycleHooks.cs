@@ -19,6 +19,7 @@ internal sealed class RecordingUserLifecycleHooks : IUserLifecycleHooks
     public string? RefuseSetPassword { get; set; }
     public string? RefuseSetActive { get; set; }
     public string? RefuseDelete { get; set; }
+    public string? RefuseAnonymise { get; set; }
 
     /// <summary>The machine code every refusal carries; null refuses with a reason only.</summary>
     public string? RefusalCode { get; set; }
@@ -88,6 +89,13 @@ internal sealed class RecordingUserLifecycleHooks : IUserLifecycleHooks
     {
         Asked.Add(nameof(OnBeforeDeleteAsync));
         return Decide(RefuseDelete);
+    }
+
+    public ValueTask<UserMutationDecision> OnBeforeAnonymiseAsync(
+        Guid userId, CancellationToken cancellationToken = default)
+    {
+        Asked.Add(nameof(OnBeforeAnonymiseAsync));
+        return Decide(RefuseAnonymise);
     }
 
     public ValueTask OnUserMutatedAsync(

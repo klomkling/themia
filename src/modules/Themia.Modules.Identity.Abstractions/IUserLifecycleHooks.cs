@@ -97,6 +97,18 @@ public interface IUserLifecycleHooks
         Guid userId, CancellationToken cancellationToken = default)
         => ValueTask.FromResult(UserMutationDecision.Allow());
 
+    /// <summary>Called before the account is anonymised.</summary>
+    /// <param name="userId">The user.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>Whether to proceed.</returns>
+    /// <remarks>
+    /// Where a consumer vetoes erasure, for example under a legal hold. The reason reaches the caller and the
+    /// observers, so it must not contain personal data.
+    /// </remarks>
+    ValueTask<UserMutationDecision> OnBeforeAnonymiseAsync(
+        Guid userId, CancellationToken cancellationToken = default)
+        => ValueTask.FromResult(UserMutationDecision.Allow());
+
     /// <summary>Called before an external identity is linked to the user.</summary>
     /// <param name="userId">The user.</param>
     /// <param name="provider">The provider key, lower-cased.</param>

@@ -110,6 +110,7 @@ public static class IdentityServiceCollectionExtensions
         services.TryAddScoped<IUserLifecycleHooks, NoOpUserLifecycleHooks>();
 
         services.TryAddScoped<IUserService, UserService>();
+        services.TryAddScoped<IIdentityAnonymiser, IdentityAnonymiser>();
         services.TryAddScoped<IRoleService, RoleService>();
         services.TryAddScoped<IRoleLevelService, RoleLevelService>();
         services.TryAddScoped<IUserLevelReader, UserLevelReader>();

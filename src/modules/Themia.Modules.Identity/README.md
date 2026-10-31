@@ -207,6 +207,29 @@ hook holding a transaction there turns a refusal into a deadlock. Read freely; w
 connection if you must write at all. `OnUserMutatedAsync` runs after the save: the change is already
 committed, and throwing does not undo it.
 
+## Erasing an account (`IIdentityAnonymiser`)
+
+`IIdentityAnonymiser.AnonymiseAsync(userId)` scrubs a closed account while keeping the user row, so foreign keys from
+your tables still resolve. In one transaction it:
+
+- rewrites the row into an inactive tombstone: user name `anonymised-{id:N}`, no e-mail, phone or password hash,
+  confirmations and two-factor off, a new security stamp. The row is not soft-deleted, so `FindByIdAsync` still finds it;
+- deletes the user's refresh tokens, one-time tokens, claims, external logins and OTP challenges, including challenges
+  keyed only by the phone number the user held;
+- keeps role memberships (they are not personal data).
+
+It is idempotent (`AlreadyAnonymised` still removes any stray child rows). A tenant user can be anonymised only from
+that tenant's scope and a platform user only from the platform scope; otherwise the outcome is `NotFound`. A background
+job sets the scope with `TenantContextAccessor.BeginScope(tenantId)` first. Register an
+`IUserLifecycleHooks.OnBeforeAnonymiseAsync` to veto (for example under a legal hold); the reason it returns must not
+contain personal data. Afterwards `OnUserMutatedAsync(userId, UserMutation.Anonymised)` fires with the id only.
+
+Not covered, so put them in your closure runbook: audit actor columns, notification logs, conversations (they have their
+own erasure) and your own tables; OTP challenges with no user id for a phone the user never held (they expire by TTL).
+The security-stamp cache is per process: with `ValidateSecurityStampOnEachRequest` on a multi-instance host an old access
+token can stay valid for up to `SecurityStampCacheDuration`. A concurrent erasure of the same user is re-run once, so
+both callers succeed.
+
 ## Linking external identities to an existing user
 
 `IExternalLoginService.ResolveOrProvisionAsync` is the sign-in path: it resolves an identity, and opens an
