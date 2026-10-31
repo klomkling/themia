@@ -144,14 +144,21 @@ internal sealed partial class ConversationService(
             return refused;
         }
 
+        return new MessagePage(ListOutcome.Listed, await QueryPageAsync(connection, null, actor.Kind, tenantId, conversationId, afterSeq, limit, cancellationToken));
+    }
+
+    /// <summary>One page of messages after <paramref name="afterSeq"/>, each as <paramref name="viewer"/> may see it. The caller has already proved the right to read.</summary>
+    internal async Task<IReadOnlyList<ConversationMessage>> QueryPageAsync(DbConnection connection, DbTransaction? transaction, ConversationActorKind viewer, string tenantId, Guid conversationId, long afterSeq, int limit, CancellationToken cancellationToken)
+    {
         var rows = await connection.QueryAsync<MessageRow>(new CommandDefinition(
             "SELECT m.id AS Id, m.seq AS Seq, m.participant_id AS ParticipantId, m.kind AS Kind, m.body AS Body, m.created_at AS CreatedAt, m.redacted_at AS RedactedAt, " +
             "p.kind AS SenderKind, p.display_name AS SenderName, p.role_label AS SenderRole " +
             "FROM conversation_messages m LEFT JOIN conversation_participants p ON p.tenant_id = m.tenant_id AND p.conversation_id = m.conversation_id AND p.id = m.participant_id " +
             "WHERE m.tenant_id = @TenantId AND m.conversation_id = @ConversationId AND m.seq > @AfterSeq ORDER BY m.seq " + dialect.LimitClause + ";",
             new { TenantId = tenantId, ConversationId = conversationId, AfterSeq = afterSeq, Limit = Math.Min(limit, options.MaxListLimit) },
+            transaction,
             cancellationToken: cancellationToken));
-        return new MessagePage(ListOutcome.Listed, rows.Select(r => ViewOf(actor.Kind, r.ToMessage(actor.Kind), conversationId)).ToList());
+        return rows.Select(r => ViewOf(viewer, r.ToMessage(viewer), conversationId)).ToList();
     }
 
     /// <summary>The message as the viewer may see it. A masker that throws (or times out) hides the body: fail closed, never the raw text.</summary>

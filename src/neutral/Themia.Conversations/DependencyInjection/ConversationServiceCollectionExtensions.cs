@@ -39,6 +39,11 @@ public static class ConversationServiceCollectionExtensions
             sp.GetRequiredService<TimeProvider>(),
             sp.GetRequiredService<ILogger<ConversationService>>()));
         services.TryAddSingleton<IConversationService>(sp => sp.GetRequiredService<ConversationService>());
+        services.TryAddSingleton<IConversationOversight>(sp => new ConversationOversightService(
+            sp.GetRequiredService<ConversationService>(),
+            sp.GetService<IConversationReadAudit>(),
+            sp.GetRequiredService<TimeProvider>(),
+            sp.GetRequiredService<ILogger<ConversationOversightService>>()));
         services.TryAddSingleton<IConversationLifecycleSink, DefaultConversationLifecycleSink>();
         services.TryAddSingleton(sp => new ConversationRetentionService(
             sp.GetRequiredService<IConversationDialect>(),

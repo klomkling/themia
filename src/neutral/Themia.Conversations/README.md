@@ -109,3 +109,16 @@ var erased = await dataSubject.ErasePersonAsync(dsrActor, tenantId, PersonRef.Fo
   a sink that throws rolls the change back.
 - **A post re-checks its participant** under the counter lock, so a person erased (or gone) while their post waited leaves no message behind; the post answers `Refused`.
 - **Your policy must handle the new actions explicitly.** `ConversationAction.Hold`, `ReleaseHold` and `Erase` are new; the default policy denies them like everything else, but a policy that allows by exhaustive `switch` or by "any staff actor" needs a deliberate case. `Erase` is tenant-wide: its target has `ConversationId = null`, so decide it on the actor and tenant alone. `Hold` and `ReleaseHold` name the conversation.
+
+## Staff oversight read
+
+`IConversationOversight.ReadAsync(actor, tenantId, conversationId, afterSeq, limit)` lets staff read a room they are not a participant of. It does not join the reader and does not move any read marker.
+
+- Only a **member with a user reference** can use it; a partner, guest or system actor is refused inside the package, whatever the policy says. The policy must also allow `ConversationAction.OversightRead` (the default policy denies it, like every action). Allow it narrowly: bodies are shown as they are to a member participant (through the masker), so the policy is what decides who may read customer conversations.
+- **Every read is audited, or nothing is returned.** Register an `IConversationReadAudit`; there is no default. Without one the call answers `OversightReadOutcome.AuditPortMissing` before it touches any conversation. The port is called inside the read transaction (same connection), so what it writes commits with the read; if it throws, the read is rolled back and the call answers `AuditFailed` with no messages (cancellation is rethrown).
+- The audit entry carries ids, the reader's kind and user reference, the number of messages in the page (0 for an empty page: the room was still opened) and the read time. Never message text, names or contacts.
+- The port must let a failure propagate and be safe for concurrent use (one registration serves every read). A port that catches its own SQL error and carries on can leave the transaction unusable (PostgreSQL aborts it); the read then answers `AuditFailed` and returns nothing.
+- Deduplication (for example one row per reader and conversation per 15 minutes, bucketing on `ReadAt`) and the retention of the audit trail belong to the app's port; the package keeps no table for it.
+- A conversation on legal hold or past its retention date is readable; one being purged (`Purging`) is refused, as is an unknown conversation or another tenant's (the same answer, so the call is not an existence check). A refusal is not audited by the package; the policy saw it.
+- The audit row and the page are committed together, then the page is returned. A crash between the commit and the return leaves an audited read with no data delivered, which is the safe direction.
+- The state check and the page select are separate statements without a lock: a purge that claims the conversation in between can leave a partial page, which is audited with its count. Accepted (the purge deletes the room right after).

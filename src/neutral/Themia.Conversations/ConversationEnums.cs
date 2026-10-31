@@ -100,6 +100,9 @@ public enum ConversationAction
 
     /// <summary>Erase one person's data across conversations (<see cref="IConversationDataSubject.ErasePersonAsync"/>).</summary>
     Erase = 10,
+
+    /// <summary>Read a conversation as staff without being a participant (<see cref="IConversationOversight.ReadAsync"/>). Allow it narrowly: every read is audited, but it shows message bodies.</summary>
+    OversightRead = 11,
 }
 
 /// <summary>How <see cref="IConversationService.OpenAsync"/> ended.</summary>
