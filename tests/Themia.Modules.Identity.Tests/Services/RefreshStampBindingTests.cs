@@ -206,20 +206,41 @@ public class RefreshStampBindingTests
     }
 
     [Fact]
-    public async Task A_rotation_that_lost_the_race_to_a_password_reset_neither_overwrites_it_nor_revives_old_sessions()
+    public async Task A_rotation_that_lost_the_race_still_rotates_from_the_current_stamp_and_revives_nothing()
     {
         var user = AddUser();
         var stale = await Tokens().IssueAsync(user.Id);   // bound to S1
         var s1 = user.SecurityStamp;
         RotateStamp(user);                                  // a password reset commits S2 after the role change read S1
         var s2 = user.SecurityStamp;
+        var afterReset = await Tokens().IssueAsync(user.Id); // the user signs in again: bound to S2, token carries S2
+        var changed = SecurityStampCache.NewStamp();
 
         await RefreshStampBinding.RotateAndRebindAsync(
-            userRepo, tokenRepo, new Dictionary<Guid, string> { [user.Id] = s1 }, SecurityStampCache.NewStamp(), CancellationToken.None);
+            userRepo, tokenRepo, new Dictionary<Guid, string> { [user.Id] = s1 }, changed, CancellationToken.None);
 
-        Assert.Equal(s2, user.SecurityStamp);
-        Assert.Equal(s1, tokens.Single().SecurityStamp);
+        // The change still cuts the token minted after the reset (it carries S2): the stamp moved on from S2, not stayed on it.
+        Assert.Equal(changed, user.SecurityStamp);
+        Assert.NotEqual(s2, user.SecurityStamp);
+        // The session opened after the reset follows; the one the reset ended stays ended.
+        Assert.True((await Tokens().ValidateAndRotateAsync(afterReset.RawToken)).TryGetSuccess(out _, out _));
         Assert.Equal(RefreshOutcome.Invalid, (await Tokens().ValidateAndRotateAsync(stale.RawToken)).Outcome);
+    }
+
+    [Fact]
+    public async Task A_rotation_that_keeps_losing_the_race_gives_up_and_leaves_the_other_writers_stamp()
+    {
+        var user = AddUser();
+        var issued = await Tokens().IssueAsync(user.Id);
+        var other = user.SecurityStamp;
+
+        // The user is deleted between the read and the swaps: nothing to rotate, nothing thrown.
+        users.Clear();
+        await RefreshStampBinding.RotateAndRebindAsync(
+            userRepo, tokenRepo, new Dictionary<Guid, string> { [user.Id] = "gone" }, "new", CancellationToken.None);
+
+        Assert.Equal(other, tokens.Single().SecurityStamp);
+        _ = issued;
     }
 
     [Fact]

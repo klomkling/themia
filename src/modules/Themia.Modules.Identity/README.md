@@ -480,6 +480,9 @@ revoked; `IRefreshTokenService.IsSessionLiveAsync` (and so `IAuthTokenIssuer.Ren
 - **Upgrade:** the migration binds the live sessions open at that moment to their user's current stamp, so the first credential event after
   the upgrade ends them. A row written later by a node that has not been upgraded yet stays unbound (NULL): it is accepted once and bound to
   the stamp current at its next refresh, so during a rolling deploy keep `RevokeAllForUserAsync` after a password reset until every node runs this version.
+- A role or claim change that loses a race with another stamp change still rotates the stamp (it swaps from whatever is current), so an access
+  token minted after the other change is cut too. Only a user who keeps losing the race through three swaps keeps the other writer's stamp: their
+  sessions end at the next refresh and an access token minted in that window keeps its old roles until it expires.
 - A refresh replayed inside `RefreshReuseGrace` after such a change revokes the family and returns `Invalid` (not `ReuseDetected`, which
   is the theft path).
 

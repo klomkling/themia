@@ -3,10 +3,10 @@ using FluentMigrator;
 
 namespace Themia.Modules.Identity.Migrations;
 
-/// <summary>Adds <c>identity.refresh_tokens.security_stamp</c>, a nullable column (backfilled for live sessions) holding the user's security stamp a refresh
-/// session is bound to, so a password reset or reactivation ends sessions that predate it. Forward-only, nullable, no index, no
-/// default: rows issued before it stay NULL and are accepted once, then bound. Same length as <c>users.security_stamp</c>.
-/// PostgreSQL and SQL Server only.</summary>
+/// <summary>Adds <c>identity.refresh_tokens.security_stamp</c>, a nullable column holding the user's security stamp a refresh session is
+/// bound to, so a password reset or reactivation ends sessions that predate it. The sessions live at upgrade time are bound to their
+/// user's current stamp here. Forward-only, no index, no default; a row written later by a node that does not know the column stays NULL and
+/// is bound at its next refresh. Same length as <c>users.security_stamp</c>. PostgreSQL and SQL Server only.</summary>
 [Migration(202610310002, "Themia.Identity: add refresh_tokens.security_stamp (nullable)")]
 public sealed class AddRefreshTokenSecurityStampMigration : Migration
 {

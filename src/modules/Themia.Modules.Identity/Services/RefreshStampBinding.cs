@@ -17,16 +17,22 @@ namespace Themia.Modules.Identity.Services;
 /// </remarks>
 internal static class RefreshStampBinding
 {
+    private const int MaxSwapAttempts = 3;
+
     /// <summary>
-    /// Rotates each user's stamp from <paramref name="previousStamps"/> to <paramref name="newStamp"/> with a conditional write, then
-    /// moves the user's live sessions bound to the previous stamp to the new one. Run inside the transaction of the change that needs
+    /// Rotates each user's stamp to <paramref name="newStamp"/> with a compare-and-swap from <paramref name="previousStamps"/>, then moves
+    /// the user's live sessions bound to the stamp it swapped FROM to the new one. Run inside the transaction of the change that needs
     /// the rotation.
     /// </summary>
     /// <remarks>
-    /// The previous stamp was read earlier, and a password reset can commit in between. The write is therefore
-    /// <c>WHERE security_stamp = previous</c>: on a miss the user keeps the concurrent rotation's stamp (which already cut the
-    /// access tokens) and is NOT rebound, so the sessions the reset ended stay ended. The rebind is a set-based UPDATE of the stamp column
-    /// only, so a logout or reuse revoke that commits meanwhile is never overwritten. Without a repository it only rotates.
+    /// The previous stamp was read earlier and another writer (a password reset, a second admin) can commit in between. The swap is
+    /// <c>WHERE security_stamp = previous</c>, so it never overwrites that write; on a miss it re-reads the stamp that is current and swaps from
+    /// it, up to <see cref="MaxSwapAttempts"/> times. The rotation must still happen: a token minted after the other commit carries that
+    /// stamp and the roles as they were then, and only a new stamp cuts it. Sessions are rebound from the stamp actually swapped from, never
+    /// from the stale one, so a session the other writer ended stays ended while one opened after it follows. A user who vanishes or keeps
+    /// losing the race is left on the other writer's stamp (their sessions end at the next refresh: the safe direction). Without a repository
+    /// it only rotates. The rebind is a set-based UPDATE of the stamp column only, so a logout or reuse revoke that commits meanwhile is never
+    /// overwritten.
     /// </remarks>
     public static async Task RotateAndRebindAsync(
         IRepository<User, Guid> users,
@@ -35,18 +41,35 @@ internal static class RefreshStampBinding
         string newStamp,
         CancellationToken cancellationToken)
     {
-        foreach (var (userId, previous) in previousStamps)
+        foreach (var (userId, readStamp) in previousStamps)
         {
-            var affected = await users.UpdateWhereAsync(
-                new UserByIdAndStampAnyTenantSpec(userId, previous),
-                set => set.Set(u => u.SecurityStamp, newStamp),
-                cancellationToken).ConfigureAwait(false);
-            if (affected == 1 && refreshTokens is not null)
+            var previous = readStamp;
+            for (var attempt = 0; attempt < MaxSwapAttempts; attempt++)
             {
-                await refreshTokens.UpdateWhereAsync(
-                    new UnrevokedRefreshTokensBoundToSpec(userId, previous),
-                    set => set.Set(t => t.SecurityStamp, newStamp),
+                var affected = await users.UpdateWhereAsync(
+                    new UserByIdAndStampAnyTenantSpec(userId, previous),
+                    set => set.Set(u => u.SecurityStamp, newStamp),
                     cancellationToken).ConfigureAwait(false);
+                if (affected == 1)
+                {
+                    if (refreshTokens is not null)
+                    {
+                        await refreshTokens.UpdateWhereAsync(
+                            new UnrevokedRefreshTokensBoundToSpec(userId, previous),
+                            set => set.Set(t => t.SecurityStamp, newStamp),
+                            cancellationToken).ConfigureAwait(false);
+                    }
+
+                    break;
+                }
+
+                var current = await users.FirstOrDefaultAsync(new UserByIdAnyTenantSpec(userId), cancellationToken).ConfigureAwait(false);
+                if (current is null)
+                {
+                    break;
+                }
+
+                previous = current.SecurityStamp;
             }
         }
     }
