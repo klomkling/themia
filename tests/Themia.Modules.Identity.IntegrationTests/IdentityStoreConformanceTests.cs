@@ -660,6 +660,57 @@ public abstract class IdentityStoreConformanceTests
     }
 
     [Fact]
+    public async Task A_session_is_live_for_its_own_user_across_a_rotation_and_not_after_revocation_reuse_expiry_or_for_a_stranger()
+    {
+        await ResetAsync();
+        var clock = new FakeTimeProvider(DateTimeOffset.Parse("2026-06-15T00:00:00Z"));
+        await using var s = NewScope(new TenantId("acme"), timeProvider: clock);
+        var ann = (await s.Users.CreateAsync("live-ann", "pw")).UserId!.Value;
+        var bob = (await s.Users.CreateAsync("live-bob", "pw")).UserId!.Value;
+        var live = await s.RefreshTokens.IssueAsync(ann);
+
+        Assert.True(await s.RefreshTokens.IsSessionLiveAsync(ann, live.FamilyId));
+        Assert.False(await s.RefreshTokens.IsSessionLiveAsync(bob, live.FamilyId));            // another user's family
+        Assert.False(await s.RefreshTokens.IsSessionLiveAsync(ann, Guid.NewGuid()));           // unknown id
+        Assert.False(await s.RefreshTokens.IsSessionLiveAsync(Guid.NewGuid(), live.FamilyId)); // unknown user
+
+        // A rotated family is live through its successor even though the parent is consumed.
+        Assert.True((await s.RefreshTokens.ValidateAndRotateAsync(live.RawToken)).TryGetSuccess(out _, out var successor));
+        Assert.True((await s.RefreshTokens.ValidateAndRotateAsync(successor.RawToken)).TryGetSuccess(out _, out _));
+        Assert.True(await s.RefreshTokens.IsSessionLiveAsync(ann, live.FamilyId));
+
+        // Replaying a consumed token revokes the whole family.
+        await s.RefreshTokens.ValidateAndRotateAsync(live.RawToken);
+        Assert.False(await s.RefreshTokens.IsSessionLiveAsync(ann, live.FamilyId));
+
+        var revoked = await s.RefreshTokens.IssueAsync(ann);
+        Assert.True(await s.RefreshTokens.IsSessionLiveAsync(ann, revoked.FamilyId));
+        await s.RefreshTokens.RevokeAllForUserAsync(ann);
+        Assert.False(await s.RefreshTokens.IsSessionLiveAsync(ann, revoked.FamilyId));
+
+        var aging = await s.RefreshTokens.IssueAsync(ann);
+        clock.SetUtcNow(clock.GetUtcNow() + TimeSpan.FromDays(15)); // past the 14-day default lifetime
+        Assert.False(await s.RefreshTokens.IsSessionLiveAsync(ann, aging.FamilyId));
+    }
+
+    [Fact]
+    public async Task A_session_of_another_tenant_is_not_live_from_this_tenants_scope()
+    {
+        await ResetAsync();
+        Guid userId;
+        Guid family;
+        await using (var other = NewScope(new TenantId("globex")))
+        {
+            userId = (await other.Users.CreateAsync("live-gus", "pw")).UserId!.Value;
+            family = (await other.RefreshTokens.IssueAsync(userId)).FamilyId;
+            Assert.True(await other.RefreshTokens.IsSessionLiveAsync(userId, family));
+        }
+
+        await using var acme = NewScope(new TenantId("acme"));
+        Assert.False(await acme.RefreshTokens.IsSessionLiveAsync(userId, family));
+    }
+
+    [Fact]
     public async Task Refresh_rejects_an_expired_token()
     {
         await ResetAsync();

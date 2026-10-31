@@ -13,6 +13,10 @@ public enum SecondFactorMethod
 
     /// <summary>An external identity provider.</summary>
     External,
+
+    /// <summary>A session the app mints itself through <see cref="IAuthTokenIssuer"/> (federation, chat sign-in, ...). The
+    /// <see cref="SecondFactorContext.Provider"/> then carries the app's channel label.</summary>
+    Custom,
 }
 
 /// <summary>What the app's policy says about a user who has just passed the primary check.</summary>

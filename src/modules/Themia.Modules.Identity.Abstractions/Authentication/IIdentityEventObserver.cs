@@ -35,6 +35,17 @@ namespace Themia.Modules.Identity.Abstractions.Authentication;
 /// </remarks>
 public interface IIdentityEventObserver
 {
+    // ── Sessions minted by the app ──────────────────────────────────────────
+
+    /// <summary>Raised after <see cref="IAuthTokenIssuer"/> started a session for an app channel (federation, chat sign-in, ...).
+    /// Not raised for a renewal, which is per access token.</summary>
+    /// <param name="userId">The user.</param>
+    /// <param name="channel">The app's channel label.</param>
+    /// <param name="sessionId">The new session (refresh family) id.</param>
+    /// <param name="cancellationToken">A cancellation token.</param>
+    Task OnSessionIssuedAsync(Guid userId, string channel, Guid sessionId, CancellationToken cancellationToken = default) =>
+        Task.CompletedTask;
+
     // ── Password login ──────────────────────────────────────────────────────
 
     /// <summary>Raised after a password login succeeds and tokens are issued.</summary>

@@ -79,6 +79,13 @@ internal sealed class SecondFactorCompletion : ISecondFactorCompletion
             return SecondFactorCompletionResult.Refused();
         }
 
+        // A ticket from an app channel is finished by IAuthTokenIssuer, which keeps the app's claims and fires no credential-login hook.
+        if (data.Method == SecondFactorMethod.Custom)
+        {
+            logger.LogWarning("Second-factor completion refused: an app-channel ticket is completed through IAuthTokenIssuer.");
+            return SecondFactorCompletionResult.Refused();
+        }
+
         // The ticket is burnt by now. It must be for the user and stage the app just handled: otherwise an attacker holding a
         // victim's ticket could pass their own factor at a verify endpoint, or spend a verify ticket at an enrol endpoint.
         if (data.UserId != expectedUserId || data.Stage != expectedStage)
@@ -215,6 +222,6 @@ internal sealed class SecondFactorCompletion : ISecondFactorCompletion
         SecondFactorMethod.Password => LoginMethods.Password,
         SecondFactorMethod.Otp => LoginMethods.Otp,
         SecondFactorMethod.External => LoginMethods.External,
-        _ => LoginMethods.None,
+        _ => throw new ArgumentOutOfRangeException(nameof(method), method, "No login method gate for this second-factor method."),
     };
 }

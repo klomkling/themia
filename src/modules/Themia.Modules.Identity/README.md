@@ -395,6 +395,51 @@ services.AddSingleton<ISecondFactorPolicy, StaffMfaPolicy>();   // after AddThem
 - Breaking for source: `LoginOutcome` and `ExternalLoginOutcome` gain a member, so an exhaustive `switch` without a discard stops
   compiling until it handles `SecondFactorRequired`. `result.Succeeded` is unchanged, so `if (!result.Succeeded)` callers fail closed.
 
+## Minting a session yourself (`IAuthTokenIssuer`)
+
+Some sign-ins do not go through the Themia flows: a federation redirect, a chat-provider login, a renewal for a session you
+already hold. Do not call `IRefreshTokenService`/`IAccessTokenService` directly for them: that skips the `sid` claim, the active and
+lockout checks, the tenant check and the second-factor policy. Use `IAuthTokenIssuer`:
+
+```csharp
+var request = new SessionRequest(tenantId, "federation", AppClaims: [new Claim("app:session_start", startUnix)]);
+var r = await issuer.StartSessionAsync(userId, request, ct);
+switch (r.Outcome)
+{
+    case IssueOutcome.Issued: return Ok(r.Tokens);                                  // r.SessionId is the sid
+    case IssueOutcome.SecondFactorRequired: return Accepted(r.SecondFactor!.Value);  // verify the factor, then:
+    default: return Unauthorized();                                                 // Inactive, LockedOut, TenantMismatch
+}
+// after YOUR factor check passed for exactly this user:
+var done = await issuer.CompleteSessionAsync(userId, ticket, SecondFactorStage.Verify, request, ct);   // the stage you handled
+// a new access token for a session you already hold (a cookie renewal, say):
+var renewed = await issuer.RenewSessionAsync(userId, sessionId, request, ct);       // access token only; r.Tokens.RefreshToken is empty
+```
+
+- **Pass the user id, not a loaded `User`**: the issuer reloads the user in `ExpectedTenant` on every call, so a user locked or
+  deactivated after you read them is refused (`Inactive`/`LockedOut`). A user outside that tenant, an unknown id and a platform user
+  while platform login is off all answer `TenantMismatch` (it does not say which).
+- **The second-factor policy runs for a new session** with `SecondFactorMethod.Custom` and your channel label as `Provider`. Key a
+  staff-MFA policy on the user, role or tenant, never on the channel label: a typo in a free label would be a bypass. An app-channel
+  ticket is finished only through `CompleteSessionAsync` (`ISecondFactorCompletion` refuses it), which checks the user, channel, tenant and
+  security stamp again and keeps your claims; it fires no credential-login hook.
+- **A renewal skips the policy, so it must name a live session of this very user**: not revoked, not expired, same tenant. Otherwise
+  `SessionNotLive`. After enabling a policy for existing users, `IRefreshTokenService.RevokeAllForUserAsync` therefore ends their old
+  sessions for good: renewals of those families are refused too.
+- **`AppClaims`** replace claims of the same type already on the principal (carry a session-start claim forward without duplicating it). A
+  reserved type (`sid`, `sub`, `role`, `tenant_id`, `themia:*`, ...) throws `ArgumentException` before anything is issued. The channel
+  must be 1 to 64 characters of `a-z 0-9 . _ -`.
+- The refresh token is issued first (its family is the session) and revoked again, even if the request was cancelled, when the access
+  token cannot be issued. `IIdentityEventObserver.OnSessionIssuedAsync` is raised for a new session (not a renewal); an observer that
+  throws does not fail it.
+- **A renewal does not look at the security stamp**, like a refresh: rotating the stamp (a password or phone change) does not end a session by
+  itself. End the user's sessions explicitly when that matters (`RevokeAllForUserAsync`, or `RevokeAllForUserExceptAsync` to keep the
+  caller's), and renewals of those families are then refused (`SessionNotLive`).
+- **`AppClaims` are the app's to compute on the server** from its own data, never copied from a request: Themia only refuses the reserved
+  types, it cannot tell a legitimate app claim from a forged one.
+- Not covered: principals that are not `User` rows (a service or bot token) stay in the app.
+- A custom `IRefreshTokenService` must implement `IsSessionLiveAsync` for `RenewSessionAsync` to work; the default answers false (fail closed).
+
 ## Refresh, logout and one-time-code login with no tenant scope
 
 With a claims-only tenant strategy the tenant comes from the JWT, but `refresh`, `logout`, `otp/start` and `otp/verify` carry no JWT, so
