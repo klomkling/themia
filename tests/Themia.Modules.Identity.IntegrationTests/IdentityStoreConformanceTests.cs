@@ -1392,6 +1392,43 @@ public abstract class IdentityStoreConformanceTests
         Assert.NotNull(await check.OtpRows.GetByIdAsync(globalRow));
     }
 
+    [Fact] // a platform user (no tenant): the userless challenge of the platform scope goes with the phone, a tenant's challenge for the same phone stays
+    public async Task Anonymise_of_a_platform_user_removes_the_platform_phone_challenge_and_keeps_a_tenants()
+    {
+        await ResetAsync();
+        var phone = "+66899991111";
+        Guid user;
+        await using (var s = NewScope(null))
+        {
+            user = (await s.Users.CreateAsync("anon-platform-otp", "pw")).UserId!.Value;
+            await s.Users.SetPhoneNumberAsync(user, phone);
+        }
+
+        Guid platformRow = Guid.NewGuid();
+        Guid tenantRow = Guid.NewGuid();
+        await using (var p = NewScope(null))
+        {
+            await p.OtpRows.AddAsync(new OtpLoginChallenge { Id = platformRow, TenantId = null, NormalizedPhoneNumber = phone, CodeHash = "x", CreatedAt = DateTimeOffset.UtcNow, ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(5) });
+            await p.UnitOfWork.SaveChangesAsync();
+        }
+
+        await using (var t = NewScope(new TenantId("acme")))
+        {
+            await t.OtpRows.AddAsync(new OtpLoginChallenge { Id = tenantRow, TenantId = new TenantId("acme"), NormalizedPhoneNumber = phone, CodeHash = "x", CreatedAt = DateTimeOffset.UtcNow, ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(5) });
+            await t.UnitOfWork.SaveChangesAsync();
+        }
+
+        await using (var s = NewScope(null))
+        {
+            Assert.Equal(AnonymiseOutcome.Anonymised, (await s.Anonymiser.AnonymiseAsync(user)).Outcome);
+        }
+
+        await using var checkPlatform = NewScope(null);
+        Assert.Null(await checkPlatform.OtpRows.GetByIdAsync(platformRow));
+        await using var checkTenant = NewScope(new TenantId("acme"));
+        Assert.NotNull(await checkTenant.OtpRows.GetByIdAsync(tenantRow));
+    }
+
     [Fact] // idempotent, and a concurrent double call leaves one clean tombstone either way
     public async Task Anonymise_is_idempotent_and_survives_a_concurrent_double_call()
     {
@@ -1464,6 +1501,39 @@ public abstract class IdentityStoreConformanceTests
         Assert.Equal(RefreshOutcome.Success, (await s.RefreshTokens.ValidateAndRotateAsync(kept.RawToken)).Outcome);
         Assert.Equal(RefreshOutcome.ReuseDetected, (await s.RefreshTokens.ValidateAndRotateAsync(other.RawToken)).Outcome);
         Assert.Equal(RefreshOutcome.ReuseDetected, (await s.RefreshTokens.ValidateAndRotateAsync(doomed.RawToken)).Outcome);
+    }
+
+    [Fact] // the swap that lost a race re-reads the CURRENT stamp even when this scope already tracks the user with the stale one
+    public async Task A_stamp_swap_that_lost_a_race_swaps_again_from_the_current_stamp()
+    {
+        await ResetAsync();
+        Guid user;
+        RefreshIssue stale;
+        await using (var setup = NewScope(new TenantId("acme")))
+        {
+            user = (await setup.Users.CreateAsync("stamp-race", "pw")).UserId!.Value;
+            stale = await setup.RefreshTokens.IssueAsync(user);
+        }
+
+        await using var a = NewScope(new TenantId("acme"));
+        var tracked = await a.UserRepo.GetByIdAsync(user);   // tracked with the stamp the role change read
+        var readStamp = tracked!.SecurityStamp;
+
+        RefreshIssue afterReset;
+        await using (var b = NewScope(new TenantId("acme")))
+        {
+            Assert.True((await b.Users.SetPasswordAsync(user, "new-pw")).Succeeded);   // the competing commit
+            afterReset = await b.RefreshTokens.IssueAsync(user);
+        }
+
+        await Themia.Modules.Identity.Services.RefreshStampBinding.RotateAndRebindAsync(
+            a.UserRepo, a.RefreshRows, new Dictionary<Guid, string> { [user] = readStamp }, "swapped-stamp", CancellationToken.None);
+
+        await using var check = NewScope(new TenantId("acme"));
+        Assert.Equal("swapped-stamp", (await check.UserRepo.GetByIdAsync(user))!.SecurityStamp);
+        // Swapped from the current stamp (not forced): the session opened after the reset follows, the one the reset ended stays ended.
+        Assert.Equal(RefreshOutcome.Success, (await check.RefreshTokens.ValidateAndRotateAsync(afterReset.RawToken)).Outcome);
+        Assert.Equal(RefreshOutcome.Invalid, (await check.RefreshTokens.ValidateAndRotateAsync(stale.RawToken)).Outcome);
     }
 
     [Fact] // without the keep-session call the old session simply ends at its next refresh
