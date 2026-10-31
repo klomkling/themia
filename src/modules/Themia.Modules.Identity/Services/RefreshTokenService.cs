@@ -371,7 +371,8 @@ public sealed class RefreshTokenService : IRefreshTokenService, ISessionRevoker
 
         // Everything else says "legitimate replay", but the session predates a credential event: end it without
         // handing out the successor, and without the theft path (a client that double-sent right after a reset is not a thief).
-        if (rotated.SecurityStamp is not null && rotated.SecurityStamp != user.SecurityStamp)
+        var boundStamp = rotated.SecurityStamp ?? successor.SecurityStamp;
+        if (boundStamp is not null && boundStamp != user.SecurityStamp)
         {
             logger.LogWarning("Refresh replay refused for user {UserId}: security stamp rotated since family {FamilyId} was issued; revoking it.", user.Id, rotated.FamilyId);
             await RevokeFamilyAsync(rotated.FamilyId, now, cancellationToken).ConfigureAwait(false);

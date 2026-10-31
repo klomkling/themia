@@ -176,13 +176,11 @@ public sealed class RoleService : IRoleService
         await unitOfWork.ExecuteInTransactionAsync(
             async ct =>
             {
-                var previousStamp = user.SecurityStamp;
-                user.SecurityStamp = SecurityStampCache.NewStamp();
-                users.Update(user);
-                await IdentityScope.SaveScopedAsync(unitOfWork, filterScope, user.TenantId is null, ct).ConfigureAwait(false);
-                // The session is still legitimate (refresh rebuilds the roles from the database): follow the new stamp, not end.
-                await RefreshStampBinding.RebindAsync(
-                    refreshTokens, unitOfWork, new Dictionary<Guid, string> { [user.Id] = previousStamp }, user.SecurityStamp, ct).ConfigureAwait(false);
+                // Conditional on the stamp read above, so a password reset that committed meanwhile is not overwritten (and its ended
+                // sessions not revived). The session itself is still legitimate (refresh rebuilds the roles from the database): follow, not end.
+                await RefreshStampBinding.RotateAndRebindAsync(
+                    users, refreshTokens, new Dictionary<Guid, string> { [user.Id] = user.SecurityStamp },
+                    SecurityStampCache.NewStamp(), ct).ConfigureAwait(false);
                 await change(ct).ConfigureAwait(false);
             },
             cancellationToken).ConfigureAwait(false);
