@@ -680,3 +680,12 @@ Themia.Modules.Identity.Abstractions.Authentication.IAuthTokenIssuer.CompleteSes
 Themia.Modules.Identity.Abstractions.Authentication.IAuthTokenIssuer.RenewSessionAsync(System.Guid userId, System.Guid sessionId, Themia.Modules.Identity.Abstractions.Authentication.SessionRequest! request, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Identity.Abstractions.Authentication.IssueResult>!
 Themia.Modules.Identity.Abstractions.Authentication.IRefreshTokenService.IsSessionLiveAsync(System.Guid userId, System.Guid familyId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!
 Themia.Modules.Identity.Abstractions.Authentication.IIdentityEventObserver.OnSessionIssuedAsync(System.Guid userId, string! channel, System.Guid sessionId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Modules.Identity.Abstractions.Authentication.RefreshOutcome.ReplayedWithinGrace = 3 -> Themia.Modules.Identity.Abstractions.Authentication.RefreshOutcome
+Themia.Modules.Identity.Abstractions.Authentication.RefreshValidationResult.IsSuccess.get -> bool
+static Themia.Modules.Identity.Abstractions.Authentication.RefreshValidationResult.ReplayedWithinGrace(Themia.Modules.Identity.Abstractions.Entities.User! user, Themia.Modules.Identity.Abstractions.Authentication.RefreshIssue replacement) -> Themia.Modules.Identity.Abstractions.Authentication.RefreshValidationResult
+Themia.Modules.Identity.Abstractions.Authentication.IIdentityEventObserver.OnRefreshReplayedAsync(System.Guid userId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Modules.Identity.Abstractions.IdentityModuleOptions.RefreshReuseGrace.get -> System.TimeSpan
+Themia.Modules.Identity.Abstractions.IdentityModuleOptions.RefreshReuseGrace.set -> void
+static readonly Themia.Modules.Identity.Abstractions.IdentityModuleOptions.MaxRefreshReuseGrace -> System.TimeSpan
+Themia.Modules.Identity.Abstractions.Entities.RefreshToken.SuccessorCiphertext.get -> string?
+Themia.Modules.Identity.Abstractions.Entities.RefreshToken.SuccessorCiphertext.set -> void

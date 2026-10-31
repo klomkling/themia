@@ -65,7 +65,7 @@ public abstract class IdentityStoreConformanceTests
         }
     }
 
-    protected Scope NewScope(TenantId? tenant, bool allowPlatformLogin = true, string auditUserId = "test-user", int? maxFailedAccessAttempts = null, TimeProvider? timeProvider = null, Action<IServiceCollection>? configureServices = null)
+    protected Scope NewScope(TenantId? tenant, bool allowPlatformLogin = true, string auditUserId = "test-user", int? maxFailedAccessAttempts = null, TimeProvider? timeProvider = null, Action<IServiceCollection>? configureServices = null, TimeSpan? refreshReuseGrace = null)
     {
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?> { ["ConnectionStrings:Default"] = ConnectionString })
@@ -86,6 +86,11 @@ public abstract class IdentityStoreConformanceTests
             if (maxFailedAccessAttempts is { } max)
             {
                 o.MaxFailedAccessAttempts = max;
+            }
+
+            if (refreshReuseGrace is { } grace)
+            {
+                o.RefreshReuseGrace = grace;
             }
         });
         // Override the framework null accessor with a deterministic audit user (no HttpContext here).
@@ -657,6 +662,202 @@ public abstract class IdentityStoreConformanceTests
         // Victim's token is revoked (reuse on a revoked token => ReuseDetected); bystander's still rotates.
         Assert.Equal(RefreshOutcome.ReuseDetected, (await s.RefreshTokens.ValidateAndRotateAsync(victimToken.RawToken)).Outcome);
         Assert.Equal(RefreshOutcome.Success, (await s.RefreshTokens.ValidateAndRotateAsync(bystanderToken.RawToken)).Outcome);
+    }
+
+    // ---- refresh reuse grace (coord #0188)
+
+    private static readonly TimeSpan Grace = TimeSpan.FromSeconds(30);
+
+    [Fact]
+    public async Task A_rotated_token_replayed_inside_the_grace_returns_the_same_successor_and_after_it_revokes_the_family()
+    {
+        await ResetAsync();
+        var clock = new FakeTimeProvider(DateTimeOffset.Parse("2026-06-15T00:00:00Z"));
+        await using var s = NewScope(new TenantId("acme"), timeProvider: clock, refreshReuseGrace: Grace);
+        var userId = (await s.Users.CreateAsync("grace-sequential", "pw")).UserId!.Value;
+        var issue = await s.RefreshTokens.IssueAsync(userId);
+
+        var first = await s.RefreshTokens.ValidateAndRotateAsync(issue.RawToken);
+        Assert.Equal(RefreshOutcome.Success, first.Outcome);
+        Assert.True(first.TryGetSuccess(out _, out var winner));
+
+        clock.Advance(TimeSpan.FromSeconds(10));
+        var replay = await s.RefreshTokens.ValidateAndRotateAsync(issue.RawToken);
+        Assert.Equal(RefreshOutcome.ReplayedWithinGrace, replay.Outcome);
+        Assert.True(replay.TryGetSuccess(out _, out var replayed));
+        Assert.Equal(winner.RawToken, replayed.RawToken);
+        Assert.Equal(winner.FamilyId, replayed.FamilyId);
+
+        // The shared successor is a real token: it rotates, and then it is the only live one.
+        Assert.True((await s.RefreshTokens.ValidateAndRotateAsync(winner.RawToken)).TryGetSuccess(out _, out _));
+
+        // Outside the grace (and with the successor already rotated) the old token is theft: the family is revoked.
+        clock.Advance(TimeSpan.FromMinutes(1));
+        Assert.Equal(RefreshOutcome.ReuseDetected, (await s.RefreshTokens.ValidateAndRotateAsync(issue.RawToken)).Outcome);
+    }
+
+    [Fact]
+    public async Task Sealed_successors_are_cleared_by_a_family_revoke_and_by_the_next_rotation_once_the_grace_has_passed()
+    {
+        await ResetAsync();
+        var clock = new FakeTimeProvider(DateTimeOffset.Parse("2026-06-15T00:00:00Z"));
+        await using var s = NewScope(new TenantId("acme"), timeProvider: clock, refreshReuseGrace: Grace);
+        var repository = s.Inner.ServiceProvider.GetRequiredService<IRepository<RefreshToken, Guid>>();
+        var userId = (await s.Users.CreateAsync("grace-clearing", "pw")).UserId!.Value;
+
+        async Task<bool> HasSealedSuccessorAsync(string raw) =>
+            (await repository.FirstOrDefaultAsync(new Themia.Modules.Identity.Specifications.RefreshTokenByHashSpec(Themia.Modules.Identity.Hashing.TokenHasher.Hash(raw))))!.SuccessorCiphertext is not null;
+
+        // Rotating gives the parent a sealed successor.
+        var a0 = await s.RefreshTokens.IssueAsync(userId);
+        Assert.True((await s.RefreshTokens.ValidateAndRotateAsync(a0.RawToken)).TryGetSuccess(out _, out var a1));
+        Assert.True(await HasSealedSuccessorAsync(a0.RawToken));
+
+        // Rotating the successor leaves it (unusable: the successor is consumed), until the grace has passed and a later rotation sweeps it.
+        Assert.True((await s.RefreshTokens.ValidateAndRotateAsync(a1.RawToken)).TryGetSuccess(out _, out var a2));
+        Assert.True(await HasSealedSuccessorAsync(a0.RawToken));
+        var b0 = await s.RefreshTokens.IssueAsync(userId);
+        Assert.True((await s.RefreshTokens.ValidateAndRotateAsync(b0.RawToken)).TryGetSuccess(out _, out _));   // inside the grace: nothing is aged yet
+        Assert.True(await HasSealedSuccessorAsync(a0.RawToken));
+        clock.Advance(Grace + TimeSpan.FromSeconds(1));
+        Assert.True((await s.RefreshTokens.ValidateAndRotateAsync(a2.RawToken)).TryGetSuccess(out _, out var a3));
+        Assert.False(await HasSealedSuccessorAsync(a0.RawToken));
+        Assert.False(await HasSealedSuccessorAsync(a1.RawToken));
+        Assert.True(await HasSealedSuccessorAsync(a2.RawToken));   // the fresh one is kept
+
+        // A revoked family keeps none.
+        await s.RefreshTokens.RevokeAsync(a3.RawToken, allForUser: false);
+        Assert.False(await HasSealedSuccessorAsync(a2.RawToken));
+    }
+
+    [Fact]
+    public async Task A_replay_inside_the_grace_is_refused_after_the_user_s_sessions_were_revoked()
+    {
+        await ResetAsync();
+        var clock = new FakeTimeProvider(DateTimeOffset.Parse("2026-06-15T00:00:00Z"));
+        await using var s = NewScope(new TenantId("acme"), timeProvider: clock, refreshReuseGrace: Grace);
+        var userId = (await s.Users.CreateAsync("grace-revoke-all", "pw")).UserId!.Value;
+        var issue = await s.RefreshTokens.IssueAsync(userId);
+        Assert.True((await s.RefreshTokens.ValidateAndRotateAsync(issue.RawToken)).TryGetSuccess(out _, out var next));
+
+        await s.RefreshTokens.RevokeAllForUserAsync(userId);
+
+        Assert.False((await s.RefreshTokens.ValidateAndRotateAsync(issue.RawToken)).IsSuccess);
+        Assert.False((await s.RefreshTokens.ValidateAndRotateAsync(next.RawToken)).IsSuccess);
+    }
+
+    [Fact]
+    public async Task A_replay_inside_the_grace_is_refused_once_the_successor_has_rotated_again()
+    {
+        await ResetAsync();
+        var clock = new FakeTimeProvider(DateTimeOffset.Parse("2026-06-15T00:00:00Z"));
+        await using var s = NewScope(new TenantId("acme"), timeProvider: clock, refreshReuseGrace: Grace);
+        var userId = (await s.Users.CreateAsync("grace-second-gen", "pw")).UserId!.Value;
+        var issue = await s.RefreshTokens.IssueAsync(userId);
+        Assert.True((await s.RefreshTokens.ValidateAndRotateAsync(issue.RawToken)).TryGetSuccess(out _, out var second));
+        Assert.True((await s.RefreshTokens.ValidateAndRotateAsync(second.RawToken)).TryGetSuccess(out _, out _));
+
+        clock.Advance(TimeSpan.FromSeconds(5));
+
+        Assert.Equal(RefreshOutcome.ReuseDetected, (await s.RefreshTokens.ValidateAndRotateAsync(issue.RawToken)).Outcome);
+        Assert.False((await s.RefreshTokens.ValidateAndRotateAsync(second.RawToken)).IsSuccess);   // the family is revoked
+    }
+
+    [Fact]
+    public async Task With_the_grace_off_a_rotated_token_replayed_at_once_still_revokes_the_family()
+    {
+        await ResetAsync();
+        await using var s = NewScope(new TenantId("acme"));
+        var userId = (await s.Users.CreateAsync("grace-off", "pw")).UserId!.Value;
+        var issue = await s.RefreshTokens.IssueAsync(userId);
+        Assert.True((await s.RefreshTokens.ValidateAndRotateAsync(issue.RawToken)).TryGetSuccess(out _, out var next));
+
+        Assert.Equal(RefreshOutcome.ReuseDetected, (await s.RefreshTokens.ValidateAndRotateAsync(issue.RawToken)).Outcome);
+        Assert.False((await s.RefreshTokens.ValidateAndRotateAsync(next.RawToken)).IsSuccess);
+    }
+
+    [Fact]
+    public async Task A_replay_inside_the_grace_is_refused_when_the_user_was_deactivated_in_between()
+    {
+        await ResetAsync();
+        var clock = new FakeTimeProvider(DateTimeOffset.Parse("2026-06-15T00:00:00Z"));
+        await using var s = NewScope(new TenantId("acme"), timeProvider: clock, refreshReuseGrace: Grace);
+        var userId = (await s.Users.CreateAsync("grace-inactive", "pw")).UserId!.Value;
+        var issue = await s.RefreshTokens.IssueAsync(userId);
+        Assert.True((await s.RefreshTokens.ValidateAndRotateAsync(issue.RawToken)).TryGetSuccess(out _, out _));
+
+        await s.Users.SetActiveAsync(userId, false);
+
+        Assert.False((await s.RefreshTokens.ValidateAndRotateAsync(issue.RawToken)).TryGetSuccess(out _, out _));
+    }
+
+    [Theory]
+    [InlineData(2)]
+    [InlineData(5)]
+    public async Task Parallel_refreshes_of_one_token_all_get_the_same_successor_and_the_family_survives(int callers)
+    {
+        await ResetAsync();
+        await using var setup = NewScope(new TenantId("acme"), refreshReuseGrace: Grace);
+        var userId = (await setup.Users.CreateAsync($"grace-parallel-{callers}", "pw")).UserId!.Value;
+        var issue = await setup.RefreshTokens.IssueAsync(userId);
+
+        // Every caller reads the token unconsumed before any of them writes: the barrier sits in front of the rotation write, so the
+        // losers genuinely hit the unique violation instead of arriving after the winner committed.
+        using var barrier = new Barrier(callers);
+        var scopes = Enumerable.Range(0, callers)
+            .Select(_ => NewScope(new TenantId("acme"), refreshReuseGrace: Grace, configureServices: services => BarrierBeforeWrite(services, barrier)))
+            .ToList();
+        try
+        {
+            var results = await Task.WhenAll(scopes.Select(sc => Task.Run(() => sc.RefreshTokens.ValidateAndRotateAsync(issue.RawToken))));
+
+            Assert.All(results, r => Assert.True(r.IsSuccess, $"outcome {r.Outcome}"));
+            Assert.Equal(1, results.Count(r => r.Outcome == RefreshOutcome.Success));
+            var raws = results.Select(r => { r.TryGetSuccess(out _, out var next); return next.RawToken; }).Distinct().ToList();
+            Assert.Single(raws);
+
+            // The family survived: the shared successor still rotates.
+            Assert.True((await setup.RefreshTokens.ValidateAndRotateAsync(raws[0])).TryGetSuccess(out _, out _));
+
+            // A loser's scope is still healthy: nothing it staged is left to be re-saved.
+            foreach (var sc in scopes)
+            {
+                await sc.UnitOfWork.SaveChangesAsync();
+            }
+        }
+        finally
+        {
+            foreach (var sc in scopes)
+            {
+                await sc.DisposeAsync();
+            }
+        }
+    }
+
+    private static void BarrierBeforeWrite(IServiceCollection services, Barrier barrier)
+    {
+        var original = services.Last(d => d.ServiceType == typeof(IUnitOfWork));
+        services.Remove(original);
+        services.Add(ServiceDescriptor.Describe(typeof(IUnitOfWork), sp =>
+        {
+            var inner = original.ImplementationFactory is { } factory
+                ? (IUnitOfWork)factory(sp)
+                : (IUnitOfWork)ActivatorUtilities.CreateInstance(sp, original.ImplementationType!);
+            return new BarrierUnitOfWork(inner, barrier);
+        }, original.Lifetime));
+    }
+
+    private sealed class BarrierUnitOfWork(IUnitOfWork inner, Barrier barrier) : IUnitOfWork
+    {
+        public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default) => inner.SaveChangesAsync(cancellationToken);
+
+        public Task<ITransactionScope> BeginTransactionAsync(CancellationToken cancellationToken = default) => inner.BeginTransactionAsync(cancellationToken);
+
+        public Task ExecuteInTransactionAsync(Func<CancellationToken, Task> work, CancellationToken cancellationToken = default)
+        {
+            barrier.SignalAndWait(TimeSpan.FromSeconds(30));
+            return inner.ExecuteInTransactionAsync(work, cancellationToken);
+        }
     }
 
     [Fact]

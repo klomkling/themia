@@ -98,4 +98,31 @@ public class IdentityModuleOptionsTests
         var options = new IdentityModuleOptions();
         options.Validate();
     }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(30)]
+    [InlineData(120)]
+    public void RefreshReuseGrace_within_zero_and_two_minutes_is_valid(int seconds)
+    {
+        var options = new IdentityModuleOptions { RefreshReuseGrace = TimeSpan.FromSeconds(seconds) };
+
+        options.Validate();
+    }
+
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(121)]
+    public void RefreshReuseGrace_outside_zero_and_two_minutes_is_refused(int seconds)
+    {
+        var options = new IdentityModuleOptions { RefreshReuseGrace = TimeSpan.FromSeconds(seconds) };
+
+        Assert.Throws<ArgumentOutOfRangeException>(options.Validate);
+    }
+
+    [Fact]
+    public void RefreshReuseGrace_is_off_by_default()
+    {
+        Assert.Equal(TimeSpan.Zero, new IdentityModuleOptions().RefreshReuseGrace);
+    }
 }

@@ -194,6 +194,20 @@ internal sealed class RefreshTokenByHashSpec : Specification<RefreshToken>
     public RefreshTokenByHashSpec(string tokenHash) => Where(t => t.TokenHash == tokenHash);
 }
 
+/// <summary>The single refresh token with the given id. No tenant column; the owning user is resolved in scope by the service.</summary>
+internal sealed class RefreshTokenByIdSpec : Specification<RefreshToken>
+{
+    public RefreshTokenByIdSpec(Guid id) => Where(t => t.Id == id);
+}
+
+/// <summary>A user's rotated tokens whose sealed successor is older than the reuse grace: nothing can replay them any more, so the sealed value
+/// is dead weight to clear.</summary>
+internal sealed class AgedSuccessorCiphertextByUserSpec : Specification<RefreshToken>
+{
+    public AgedSuccessorCiphertextByUserSpec(Guid userId, DateTimeOffset consumedBefore) =>
+        Where(t => t.UserId == userId && t.SuccessorCiphertext != null && t.ConsumedAt < consumedBefore);
+}
+
 /// <summary>A family's not-yet-revoked tokens — the rows a family revocation actually flips.</summary>
 internal sealed class ActiveRefreshTokensByFamilySpec : Specification<RefreshToken>
 {

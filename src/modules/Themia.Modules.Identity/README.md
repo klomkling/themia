@@ -439,6 +439,36 @@ var renewed = await issuer.RenewSessionAsync(userId, sessionId, request, ct);   
   types, it cannot tell a legitimate app claim from a forged one.
 - Not covered: principals that are not `User` rows (a service or bot token) stay in the app.
 - A custom `IRefreshTokenService` must implement `IsSessionLiveAsync` for `RenewSessionAsync` to work; the default answers false (fail closed).
+## Refresh reuse grace (parallel refreshes)
+
+A web app that refreshes per request with no shared memory can present the same refresh token twice within milliseconds (two tabs, parallel
+loads, polling). Without a grace the second request either loses the rotation race or arrives after it and counts as token theft: the whole
+family is revoked and the user is signed out everywhere. Opt in to a grace:
+
+```csharp
+services.AddThemiaIdentityCore(o => o.RefreshReuseGrace = TimeSpan.FromSeconds(30));   // default Zero = off; at most 2 minutes
+```
+
+- Within the grace after a rotation, presenting the **just-rotated token again returns the same successor** the first request already
+  got (`RefreshOutcome.ReplayedWithinGrace`; `TryGetSuccess` is true, the access token is issued fresh with the same `sid`). Nothing is rotated
+  again and nothing is revoked. `IIdentityEventObserver.OnRefreshReplayedAsync` is raised in addition to `OnRefreshSucceededAsync`. A request that
+  loses the rotation race itself takes the same path and gets the winner's successor.
+- **Everything else still revokes the family**: a replay after the grace, a replay once the successor has itself been rotated again, a token
+  whose family or successor was revoked or expired, a deactivated user, and any token rotated before the grace was switched on.
+- **The trade-off:** inside the window a captured token and the user's own token yield the same successor, so the reuse tripwire does not
+  fire for that window. It is bounded by the 2-minute cap and off by default; 30 seconds covers a BFF fan-out. `RevokeAllForUserAsync` still ends a
+  family at once, and a family revoked during the window is not replayable. The shared successor is an ordinary token, so the two holders cannot both
+  keep going: the first to rotate it makes the other's copy a consumed token, and presenting that revokes the family. A replay count would break the
+  fan-out the grace exists for (several tabs at once), so there is none; the window is the limit.
+- **How it works, and what it stores:** while the grace is on, the rotated row keeps `successor_ciphertext`: the successor's raw token sealed with
+  AES-GCM under a key derived (HKDF-SHA256) from the rotated token's own raw value, with the row id as associated data. Only a holder of that raw value can
+  read it, and the raw value is never stored, so a database copy alone yields nothing. There is **no server secret to provision or rotate**. The column is
+  cleared by a family revoke (reuse detected, logout of one session) and by the next rotation of any of the user's tokens once the grace has passed, and is never read
+  after the grace. A revoke-all or a rotated successor leaves it in place but unusable (a revoked or consumed successor is refused); a deployment that switches the
+  grace off later keeps old values, which cannot be opened without the rotated token's raw value.
+- **Schema:** one nullable column `identity.refresh_tokens.successor_ciphertext` (migration `202610310001`, PostgreSQL and SQL Server like the rest of Identity;
+  MySQL is not supported by this module). It stays empty for a deployment that never enables the grace.
+- The window is measured with the clock of the node that wrote the rotation; with several nodes keep their clocks in sync (or keep the grace short).
 
 ## Refresh, logout and one-time-code login with no tenant scope
 

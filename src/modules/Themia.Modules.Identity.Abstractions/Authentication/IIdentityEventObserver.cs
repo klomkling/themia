@@ -46,6 +46,15 @@ public interface IIdentityEventObserver
     Task OnSessionIssuedAsync(Guid userId, string channel, Guid sessionId, CancellationToken cancellationToken = default) =>
         Task.CompletedTask;
 
+    // ── Refresh ─────────────────────────────────────────────────────────────
+
+    /// <summary>Raised, in addition to <see cref="OnRefreshSucceededAsync"/>, when a refresh was answered by replaying the successor of
+    /// a just-rotated token inside <see cref="IdentityModuleOptions.RefreshReuseGrace"/>.</summary>
+    /// <param name="userId">The user.</param>
+    /// <param name="cancellationToken">A cancellation token.</param>
+    Task OnRefreshReplayedAsync(Guid userId, CancellationToken cancellationToken = default) =>
+        Task.CompletedTask;
+
     // ── Password login ──────────────────────────────────────────────────────
 
     /// <summary>Raised after a password login succeeds and tokens are issued.</summary>
