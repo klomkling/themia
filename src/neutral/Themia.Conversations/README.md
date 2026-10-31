@@ -108,3 +108,4 @@ var erased = await dataSubject.ErasePersonAsync(dsrActor, tenantId, PersonRef.Fo
   counts, never text, names or contacts). The default does nothing: `conversation_events` is not used, because a purge deletes it. Register your own sink for an audit trail;
   a sink that throws rolls the change back.
 - **A post re-checks its participant** under the counter lock, so a person erased (or gone) while their post waited leaves no message behind; the post answers `Refused`.
+- **Your policy must handle the new actions explicitly.** `ConversationAction.Hold`, `ReleaseHold` and `Erase` are new; the default policy denies them like everything else, but a policy that allows by exhaustive `switch` or by "any staff actor" needs a deliberate case. `Erase` is tenant-wide: its target has `ConversationId = null`, so decide it on the actor and tenant alone. `Hold` and `ReleaseHold` name the conversation.
