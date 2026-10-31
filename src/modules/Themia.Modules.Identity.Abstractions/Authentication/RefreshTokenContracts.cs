@@ -13,6 +13,10 @@ public enum RefreshOutcome
 
     /// <summary>A consumed/revoked token was replayed; the family was revoked.</summary>
     ReuseDetected,
+
+    /// <summary>A just-rotated token was presented again within <see cref="IdentityModuleOptions.RefreshReuseGrace"/> and got the same
+    /// successor it already produced. Nothing was rotated again and nothing was revoked; treat it as a success.</summary>
+    ReplayedWithinGrace,
 }
 
 /// <summary>A newly issued refresh token. The raw value is returned exactly once.</summary>
@@ -48,12 +52,19 @@ public readonly record struct RefreshValidationResult
     {
         user = User;
         replacement = Replacement ?? default;
-        return Outcome == RefreshOutcome.Success;
+        return IsSuccess;
     }
+
+    /// <summary>Whether a successor was returned: a rotation, or a replay inside the reuse grace.</summary>
+    public bool IsSuccess => Outcome is RefreshOutcome.Success or RefreshOutcome.ReplayedWithinGrace;
 
     /// <summary>Creates a success result.</summary>
     public static RefreshValidationResult Success(User user, RefreshIssue replacement) =>
         new(RefreshOutcome.Success, user, replacement);
+
+    /// <summary>Creates a result for a replay within the reuse grace, carrying the successor the first request already got.</summary>
+    public static RefreshValidationResult ReplayedWithinGrace(User user, RefreshIssue replacement) =>
+        new(RefreshOutcome.ReplayedWithinGrace, user, replacement);
 
     /// <summary>Creates an invalid result.</summary>
     public static RefreshValidationResult Invalid() => new(RefreshOutcome.Invalid, null, null);

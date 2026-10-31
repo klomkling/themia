@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using System.Text;
 using Microsoft.Extensions.Logging;
 using Themia.Framework.Data.Abstractions.Exceptions;
 using Themia.Framework.Data.Abstractions.Repositories;
@@ -90,6 +91,11 @@ public sealed class RefreshTokenService : IRefreshTokenService, ISessionRevoker
         // revoke the family even if it has since expired.
         if (match.ConsumedAt is not null || match.RevokedAt is not null)
         {
+            if (await TryReplayAsync(match, rawToken, user, now, cancellationToken).ConfigureAwait(false) is { } replay)
+            {
+                return replay;
+            }
+
             logger.LogWarning("Refresh token reuse detected; revoking token family {FamilyId} for user {UserId}.", match.FamilyId, match.UserId);
             await RevokeFamilyAsync(match.FamilyId, now, cancellationToken).ConfigureAwait(false);
             return RefreshValidationResult.ReuseDetected();
@@ -113,16 +119,40 @@ public sealed class RefreshTokenService : IRefreshTokenService, ISessionRevoker
         var (successor, raw) = Create(match.UserId, match.FamilyId);
         // Compare-and-set: the successor carries the parent's id in replaced_token_id, which has a filtered
         // unique index. Two simultaneous rotations of the same token both try to insert a successor with the
-        // same replaced_token_id; the index lets only one commit. The loser hits a unique violation here —
-        // caught below — and returns Invalid (the legitimate winner already rotated).
+        // same replaced_token_id; the index lets only one commit. The loser hits a unique violation in the
+        // transaction below. Without the reuse grace it returns Invalid (the legitimate winner already rotated);
+        // with it, it takes the replay path and gets the winner's successor.
         successor.ReplacedTokenId = match.Id;
-        await tokens.AddAsync(successor, cancellationToken).ConfigureAwait(false);
-        match.ConsumedAt = now;
-        match.ReplacedById = successor.Id;
-        tokens.Update(match);
+        var graceOn = options.RefreshReuseGrace > TimeSpan.Zero;
         try
         {
-            await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+            // In a transaction so that a lost race also DISCARDS the change tracker (EF keeps the failed entities as
+            // Modified/Added otherwise, and the loser's re-read below would see its own uncommitted values).
+            await unitOfWork.ExecuteInTransactionAsync(
+                async ct =>
+                {
+                    await tokens.AddAsync(successor, ct).ConfigureAwait(false);
+                    match.ConsumedAt = now;
+                    match.ReplacedById = successor.Id;
+                    if (graceOn)
+                    {
+                        match.SuccessorCiphertext = RefreshSuccessorProtector.Protect(rawToken, match.Id, raw);
+                    }
+
+                    tokens.Update(match);
+
+                    // The grandparent's sealed successor (this token) can no longer be replayed: its successor has rotated.
+                    if (match.ReplacedTokenId is { } predecessorId)
+                    {
+                        var predecessor = await tokens.FirstOrDefaultAsync(new RefreshTokenByIdSpec(predecessorId), ct).ConfigureAwait(false);
+                        if (predecessor is { SuccessorCiphertext: not null })
+                        {
+                            predecessor.SuccessorCiphertext = null;
+                            tokens.Update(predecessor);
+                        }
+                    }
+                },
+                cancellationToken).ConfigureAwait(false);
         }
         // ConcurrencyException is deliberately NOT caught here: RefreshToken carries no optimistic-concurrency
         // token today, so the parent UPDATE always affects its row and the filtered unique index on
@@ -131,7 +161,8 @@ public sealed class RefreshTokenService : IRefreshTokenService, ISessionRevoker
         // it would handle a currently-impossible scenario.
         catch (UniqueConstraintException)
         {
-            return RefreshValidationResult.Invalid();
+            // Lost the race. The tracker was cleared by the failed transaction, so this read sees the winner's row.
+            return await ReplayAfterLostRaceAsync(rawToken, hash, user, cancellationToken).ConfigureAwait(false);
         }
 
         return RefreshValidationResult.Success(user, new RefreshIssue(raw, successor.ExpiresAt, successor.FamilyId));
@@ -253,13 +284,71 @@ public sealed class RefreshTokenService : IRefreshTokenService, ISessionRevoker
         return revoked;
     }
 
+    // Reuse grace: a token that was just rotated and is presented again within RefreshReuseGrace gets the successor it already produced.
+    // Every condition fails closed into the caller's reuse path (revoke the family).
+    private async Task<RefreshValidationResult?> TryReplayAsync(
+        RefreshToken rotated, string rawToken, User user, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        var grace = options.RefreshReuseGrace;
+        if (grace <= TimeSpan.Zero
+            || rotated.RevokedAt is not null
+            || rotated.ConsumedAt is not { } consumedAt
+            || now - consumedAt > grace
+            || rotated.ReplacedById is not { } successorId
+            || string.IsNullOrEmpty(rotated.SuccessorCiphertext)
+            || !user.IsActive
+            || (user.TenantId is null && !options.AllowPlatformLogin))
+        {
+            return null;
+        }
+
+        var successor = await tokens.FirstOrDefaultAsync(new RefreshTokenByIdSpec(successorId), cancellationToken).ConfigureAwait(false);
+        if (successor is null
+            || successor.FamilyId != rotated.FamilyId
+            || successor.UserId != rotated.UserId
+            || successor.ConsumedAt is not null
+            || successor.RevokedAt is not null
+            || successor.ExpiresAt <= now)
+        {
+            return null;
+        }
+
+        var successorRaw = RefreshSuccessorProtector.Unprotect(rawToken, rotated.Id, rotated.SuccessorCiphertext);
+        if (successorRaw is null
+            || !CryptographicOperations.FixedTimeEquals(
+                Encoding.UTF8.GetBytes(TokenHasher.Hash(successorRaw)), Encoding.UTF8.GetBytes(successor.TokenHash)))
+        {
+            return null;
+        }
+
+        logger.LogInformation("Refresh token replayed within the reuse grace; returning the existing successor (family {FamilyId}, user {UserId}).", rotated.FamilyId, rotated.UserId);
+        return RefreshValidationResult.ReplayedWithinGrace(user, new RefreshIssue(successorRaw, successor.ExpiresAt, successor.FamilyId));
+    }
+
+    private async Task<RefreshValidationResult> ReplayAfterLostRaceAsync(string rawToken, string hash, User user, CancellationToken cancellationToken)
+    {
+        if (options.RefreshReuseGrace <= TimeSpan.Zero)
+        {
+            return RefreshValidationResult.Invalid();
+        }
+
+        var rotated = await tokens.FirstOrDefaultAsync(new RefreshTokenByHashSpec(hash), cancellationToken).ConfigureAwait(false);
+        if (rotated is null)
+        {
+            return RefreshValidationResult.Invalid();
+        }
+
+        return await TryReplayAsync(rotated, rawToken, user, timeProvider.GetUtcNow(), cancellationToken).ConfigureAwait(false)
+            ?? RefreshValidationResult.Invalid();
+    }
+
     private async Task<int> RevokeFamilyAsync(Guid familyId, DateTimeOffset now, CancellationToken cancellationToken)
     {
         // One set-based UPDATE over the family's not-yet-revoked tokens — the spec's RevokedAt == null
         // predicate means already-revoked rows are not needlessly rewritten.
         return await tokens.UpdateWhereAsync(
             new ActiveRefreshTokensByFamilySpec(familyId),
-            set => set.Set(t => t.RevokedAt, now),
+            set => set.Set(t => t.RevokedAt, now).Set(t => t.SuccessorCiphertext, null),
             cancellationToken).ConfigureAwait(false);
     }
 

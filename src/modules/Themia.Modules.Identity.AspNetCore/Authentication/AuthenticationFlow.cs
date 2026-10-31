@@ -370,11 +370,11 @@ public sealed class AuthenticationFlow : IAuthenticationFlow
         // and claims resolve and an app hook sees the right tenant. The scope ends with this call.
         using (TenantContextAccessor.BeginScope(user.TenantId))
         {
-            return await CompleteRefreshAsync(user, replacement, cancellationToken).ConfigureAwait(false);
+            return await CompleteRefreshAsync(user, replacement, rotation.Outcome == RefreshOutcome.ReplayedWithinGrace, cancellationToken).ConfigureAwait(false);
         }
     }
 
-    private async Task<RefreshRotationResult> CompleteRefreshAsync(User user, RefreshIssue replacement, CancellationToken cancellationToken)
+    private async Task<RefreshRotationResult> CompleteRefreshAsync(User user, RefreshIssue replacement, bool replayed, CancellationToken cancellationToken)
     {
         // A deactivated or locked-out account must not keep minting tokens via refresh — otherwise
         // deactivation/lockout only takes effect when the refresh token finally expires (up to its full
@@ -408,6 +408,11 @@ public sealed class AuthenticationFlow : IAuthenticationFlow
 
         logger.LogInformation("Access token refreshed for user {UserId}.", user.Id);
         await RaiseAsync((o, ct) => o.OnRefreshSucceededAsync(user.Id, ct), cancellationToken).ConfigureAwait(false);
+        if (replayed)
+        {
+            await RaiseAsync((o, ct) => o.OnRefreshReplayedAsync(user.Id, ct), cancellationToken).ConfigureAwait(false);
+        }
+
         return RefreshRotationResult.Success(tokens);
     }
 

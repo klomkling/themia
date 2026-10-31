@@ -29,6 +29,42 @@ public sealed class AuthenticationFlowRefreshTests
     }
 
     [Fact]
+    public async Task A_replay_inside_the_reuse_grace_is_a_success_with_the_same_successor_and_raises_the_replay_observer_after_the_success_one()
+    {
+        var refresh = new FakeRefreshTokenService
+        {
+            RotateResult = RefreshValidationResult.ReplayedWithinGrace(new User { UserName = "u" }, Successor()),
+        };
+        var observer = new RecordingObserver();
+        var flow = new AuthenticationFlow(new FakeUserService(), new FakeClaimsPrincipalFactory(), new FakeAccessTokenService(),
+            refresh, new FakePasswordHasher(), new RecordingHooks(), [observer], TimeProvider.System, NullLogger<AuthenticationFlow>.Instance);
+
+        var result = await flow.RefreshAsync("token");
+
+        Assert.True(result.Succeeded);
+        Assert.Equal("new-refresh", result.Tokens!.Value.RefreshToken);
+        Assert.Equal(
+            [nameof(IIdentityEventObserver.OnRefreshSucceededAsync), nameof(IIdentityEventObserver.OnRefreshReplayedAsync)],
+            observer.Calls.Where(c => c.StartsWith("OnRefresh", StringComparison.Ordinal)));
+    }
+
+    [Fact]
+    public async Task A_normal_rotation_does_not_raise_the_replay_observer()
+    {
+        var refresh = new FakeRefreshTokenService
+        {
+            RotateResult = RefreshValidationResult.Success(new User { UserName = "u" }, Successor()),
+        };
+        var observer = new RecordingObserver();
+        var flow = new AuthenticationFlow(new FakeUserService(), new FakeClaimsPrincipalFactory(), new FakeAccessTokenService(),
+            refresh, new FakePasswordHasher(), new RecordingHooks(), [observer], TimeProvider.System, NullLogger<AuthenticationFlow>.Instance);
+
+        await flow.RefreshAsync("token");
+
+        Assert.DoesNotContain(nameof(IIdentityEventObserver.OnRefreshReplayedAsync), observer.Calls);
+    }
+
+    [Fact]
     public async Task Refresh_rejected_when_user_is_inactive()
     {
         // A deactivated account must not keep minting tokens via refresh even with a valid refresh token.
