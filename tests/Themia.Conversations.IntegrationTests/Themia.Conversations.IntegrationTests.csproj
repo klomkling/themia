@@ -28,6 +28,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/neutral/Themia.Conversations/Themia.Conversations.csproj" />
+    <ProjectReference Include="../../src/neutral/Themia.Storage/Themia.Storage.csproj" />
     <ProjectReference Include="../../src/neutral/Themia.Conversations.PostgreSql/Themia.Conversations.PostgreSql.csproj" />
     <ProjectReference Include="../../src/neutral/Themia.Conversations.MySql/Themia.Conversations.MySql.csproj" />
     <ProjectReference Include="../../src/neutral/Themia.Conversations.SqlServer/Themia.Conversations.SqlServer.csproj" />

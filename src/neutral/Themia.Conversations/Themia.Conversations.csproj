@@ -15,6 +15,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Themia.Challenges\Themia.Challenges.csproj" />
+    <ProjectReference Include="..\Themia.Storage\Themia.Storage.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers">

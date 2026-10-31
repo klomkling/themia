@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Themia.Conversations.Internal;
+using Themia.Storage;
 
 namespace Themia.Conversations.DependencyInjection;
 
@@ -38,6 +39,25 @@ public static class ConversationServiceCollectionExtensions
             sp.GetRequiredService<TimeProvider>(),
             sp.GetRequiredService<ILogger<ConversationService>>()));
         services.TryAddSingleton<IConversationService>(sp => sp.GetRequiredService<ConversationService>());
+        services.TryAddSingleton<IConversationLifecycleSink, DefaultConversationLifecycleSink>();
+        services.TryAddSingleton(sp => new ConversationRetentionService(
+            sp.GetRequiredService<IConversationDialect>(),
+            sp.GetRequiredService<ConversationOptions>(),
+            sp.GetRequiredService<IConversationAccessPolicy>(),
+            sp.GetRequiredService<IConversationLifecycleSink>(),
+            sp.GetService<ILegalHoldPort>(),
+            sp.GetService<IStorageProvider>(),
+            sp.GetRequiredService<TimeProvider>(),
+            sp.GetRequiredService<ILogger<ConversationRetentionService>>()));
+        services.TryAddSingleton<IConversationRetention>(sp => sp.GetRequiredService<ConversationRetentionService>());
+        services.TryAddSingleton<IConversationDataSubject>(sp => new ConversationDataSubjectService(
+            sp.GetRequiredService<IConversationDialect>(),
+            sp.GetRequiredService<IConversationAccessPolicy>(),
+            sp.GetRequiredService<IConversationLifecycleSink>(),
+            sp.GetService<ConversationGuestOptions>(),
+            sp.GetService<IStorageProvider>(),
+            sp.GetRequiredService<TimeProvider>(),
+            sp.GetRequiredService<ILogger<ConversationDataSubjectService>>()));
         return services;
     }
 

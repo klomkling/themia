@@ -63,6 +63,19 @@ internal sealed partial class ConversationService
             return new PostResult(PostOutcome.Closed, null, null);
         }
 
+        // The counter lock serialises this post with an erasure or a leave of the same conversation, both of which change participants under it. The participant
+        // was resolved before that lock, so ask again now: a person erased or gone while this post waited must not leave a message behind.
+        var stillActive = await connection.ExecuteScalarAsync<int>(new CommandDefinition(
+            "SELECT COUNT(*) FROM conversation_participants WHERE tenant_id = @TenantId AND conversation_id = @ConversationId AND id = @ParticipantId AND left_at IS NULL;",
+            new { TenantId = tenantId, ConversationId = conversationId, ParticipantId = participantId },
+            transaction,
+            cancellationToken: cancellationToken));
+        if (stillActive == 0)
+        {
+            await transaction.RollbackAsync(CancellationToken.None); // the counter bump goes with it, so the sequence stays dense
+            return new PostResult(PostOutcome.Refused, null, null);
+        }
+
         var messageId = Guid.NewGuid();
         try
         {

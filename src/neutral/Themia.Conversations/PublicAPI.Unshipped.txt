@@ -274,3 +274,99 @@ static Themia.Conversations.ConversationGuestChallengeExtensions.ConfigureConver
 static Themia.Conversations.DependencyInjection.ConversationServiceCollectionExtensions.AddThemiaConversationGuests(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Themia.Conversations.ConversationGuestOptions!>! configure) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
 static Themia.Conversations.DependencyInjection.ConversationServiceCollectionExtensions.AddThemiaConversations(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Themia.Conversations.ConversationOptions!>? configure = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
 static Themia.Conversations.GuestSessionKey.TryParse(string? value, out Themia.Conversations.GuestSessionKey? key) -> bool
+Themia.Conversations.ConversationAction.Erase = 10 -> Themia.Conversations.ConversationAction
+Themia.Conversations.ConversationAction.Hold = 8 -> Themia.Conversations.ConversationAction
+Themia.Conversations.ConversationAction.ReleaseHold = 9 -> Themia.Conversations.ConversationAction
+Themia.Conversations.ConversationLifecycleEvent
+Themia.Conversations.ConversationLifecycleEvent.ConversationId.get -> System.Guid
+Themia.Conversations.ConversationLifecycleEvent.ConversationId.init -> void
+Themia.Conversations.ConversationLifecycleEvent.ConversationLifecycleEvent(System.Guid Id, string! TenantId, System.Guid ConversationId, Themia.Conversations.ConversationLifecycleKind Kind, System.Guid? ParticipantId, long Count) -> void
+Themia.Conversations.ConversationLifecycleEvent.Count.get -> long
+Themia.Conversations.ConversationLifecycleEvent.Count.init -> void
+Themia.Conversations.ConversationLifecycleEvent.Id.get -> System.Guid
+Themia.Conversations.ConversationLifecycleEvent.Id.init -> void
+Themia.Conversations.ConversationLifecycleEvent.Kind.get -> Themia.Conversations.ConversationLifecycleKind
+Themia.Conversations.ConversationLifecycleEvent.Kind.init -> void
+Themia.Conversations.ConversationLifecycleEvent.ParticipantId.get -> System.Guid?
+Themia.Conversations.ConversationLifecycleEvent.ParticipantId.init -> void
+Themia.Conversations.ConversationLifecycleEvent.TenantId.get -> string!
+Themia.Conversations.ConversationLifecycleEvent.TenantId.init -> void
+Themia.Conversations.ConversationLifecycleKind
+Themia.Conversations.ConversationLifecycleKind.HoldPlaced = 2 -> Themia.Conversations.ConversationLifecycleKind
+Themia.Conversations.ConversationLifecycleKind.HoldReleased = 3 -> Themia.Conversations.ConversationLifecycleKind
+Themia.Conversations.ConversationLifecycleKind.ParticipantErased = 1 -> Themia.Conversations.ConversationLifecycleKind
+Themia.Conversations.ConversationLifecycleKind.Purged = 0 -> Themia.Conversations.ConversationLifecycleKind
+Themia.Conversations.ConversationOptions.NoLegalHoldPort.get -> bool
+Themia.Conversations.ConversationOptions.NoLegalHoldPort.set -> void
+Themia.Conversations.ConversationRetentionState.Purging = 3 -> Themia.Conversations.ConversationRetentionState
+Themia.Conversations.ErasureOutcome
+Themia.Conversations.ErasureOutcome.Deferred = 2 -> Themia.Conversations.ErasureOutcome
+Themia.Conversations.ErasureOutcome.Erased = 0 -> Themia.Conversations.ErasureOutcome
+Themia.Conversations.ErasureOutcome.Invalid = 4 -> Themia.Conversations.ErasureOutcome
+Themia.Conversations.ErasureOutcome.PartiallyErased = 1 -> Themia.Conversations.ErasureOutcome
+Themia.Conversations.ErasureOutcome.Refused = 3 -> Themia.Conversations.ErasureOutcome
+Themia.Conversations.ErasureResult
+Themia.Conversations.ErasureResult.AttachmentsDeleted.get -> int
+Themia.Conversations.ErasureResult.AttachmentsDeleted.init -> void
+Themia.Conversations.ErasureResult.Complete.get -> bool
+Themia.Conversations.ErasureResult.Conversations.get -> int
+Themia.Conversations.ErasureResult.Conversations.init -> void
+Themia.Conversations.ErasureResult.DeferredConversationIds.get -> System.Collections.Generic.IReadOnlyList<System.Guid>!
+Themia.Conversations.ErasureResult.DeferredConversationIds.init -> void
+Themia.Conversations.ErasureResult.ErasureResult(Themia.Conversations.ErasureOutcome Outcome, int Conversations, int MessagesRedacted, int AttachmentsDeleted, System.Collections.Generic.IReadOnlyList<System.Guid>! DeferredConversationIds, System.Collections.Generic.IReadOnlyList<System.Guid>! FailedConversationIds) -> void
+Themia.Conversations.ErasureResult.FailedConversationIds.get -> System.Collections.Generic.IReadOnlyList<System.Guid>!
+Themia.Conversations.ErasureResult.FailedConversationIds.init -> void
+Themia.Conversations.ErasureResult.MessagesRedacted.get -> int
+Themia.Conversations.ErasureResult.MessagesRedacted.init -> void
+Themia.Conversations.ErasureResult.Outcome.get -> Themia.Conversations.ErasureOutcome
+Themia.Conversations.ErasureResult.Outcome.init -> void
+Themia.Conversations.HoldOutcome
+Themia.Conversations.HoldOutcome.AlreadyHeld = 1 -> Themia.Conversations.HoldOutcome
+Themia.Conversations.HoldOutcome.NotFound = 5 -> Themia.Conversations.HoldOutcome
+Themia.Conversations.HoldOutcome.NotHeld = 3 -> Themia.Conversations.HoldOutcome
+Themia.Conversations.HoldOutcome.Placed = 0 -> Themia.Conversations.HoldOutcome
+Themia.Conversations.HoldOutcome.PurgeInProgress = 4 -> Themia.Conversations.HoldOutcome
+Themia.Conversations.HoldOutcome.Refused = 6 -> Themia.Conversations.HoldOutcome
+Themia.Conversations.HoldOutcome.Released = 2 -> Themia.Conversations.HoldOutcome
+Themia.Conversations.HoldResult
+Themia.Conversations.HoldResult.HoldResult(Themia.Conversations.HoldOutcome Outcome) -> void
+Themia.Conversations.HoldResult.IsHeld.get -> bool
+Themia.Conversations.HoldResult.Outcome.get -> Themia.Conversations.HoldOutcome
+Themia.Conversations.HoldResult.Outcome.init -> void
+Themia.Conversations.IConversationDataSubject
+Themia.Conversations.IConversationDataSubject.ErasePersonAsync(Themia.Conversations.ConversationActor! actor, string! tenantId, Themia.Conversations.PersonRef! person, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Conversations.ErasureResult!>!
+Themia.Conversations.IConversationLifecycleSink
+Themia.Conversations.IConversationLifecycleSink.RaiseAsync(System.Data.Common.DbConnection! connection, System.Data.Common.DbTransaction! transaction, Themia.Conversations.ConversationLifecycleEvent! lifecycleEvent, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Conversations.IConversationRetention
+Themia.Conversations.IConversationRetention.PlaceHoldAsync(Themia.Conversations.ConversationActor! actor, string! tenantId, System.Guid conversationId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Conversations.HoldResult!>!
+Themia.Conversations.IConversationRetention.ReleaseHoldAsync(Themia.Conversations.ConversationActor! actor, string! tenantId, System.Guid conversationId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Conversations.HoldResult!>!
+Themia.Conversations.IConversationRetention.SweepAsync(string! tenantId, Themia.Conversations.SweepOptions? options = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Conversations.SweepResult!>!
+Themia.Conversations.ILegalHoldPort
+Themia.Conversations.ILegalHoldPort.IsHeldAsync(string! tenantId, Themia.Conversations.ConversationSubject! subject, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<bool>
+Themia.Conversations.PersonRef
+Themia.Conversations.PersonRef.Contact.get -> Themia.Conversations.GuestContact?
+Themia.Conversations.PersonRef.Kind.get -> Themia.Conversations.ConversationActorKind
+Themia.Conversations.PersonRef.UserRef.get -> string?
+Themia.Conversations.SweepOptions
+Themia.Conversations.SweepOptions.BatchSize.get -> int
+Themia.Conversations.SweepOptions.BatchSize.init -> void
+Themia.Conversations.SweepOptions.SweepOptions(int BatchSize = 100) -> void
+Themia.Conversations.SweepOutcome
+Themia.Conversations.SweepOutcome.Completed = 0 -> Themia.Conversations.SweepOutcome
+Themia.Conversations.SweepOutcome.HoldPortMissing = 1 -> Themia.Conversations.SweepOutcome
+Themia.Conversations.SweepResult
+Themia.Conversations.SweepResult.Completed.get -> bool
+Themia.Conversations.SweepResult.Expired.get -> int
+Themia.Conversations.SweepResult.Expired.init -> void
+Themia.Conversations.SweepResult.Failed.get -> int
+Themia.Conversations.SweepResult.Failed.init -> void
+Themia.Conversations.SweepResult.HeldSkipped.get -> int
+Themia.Conversations.SweepResult.HeldSkipped.init -> void
+Themia.Conversations.SweepResult.Outcome.get -> Themia.Conversations.SweepOutcome
+Themia.Conversations.SweepResult.Outcome.init -> void
+Themia.Conversations.SweepResult.Purged.get -> int
+Themia.Conversations.SweepResult.Purged.init -> void
+Themia.Conversations.SweepResult.SweepResult(Themia.Conversations.SweepOutcome Outcome, int Expired, int Purged, int HeldSkipped, int Failed) -> void
+static Themia.Conversations.PersonRef.ForGuest(Themia.Conversations.GuestContact! contact) -> Themia.Conversations.PersonRef!
+static Themia.Conversations.PersonRef.ForMember(string! userRef) -> Themia.Conversations.PersonRef!
+static Themia.Conversations.PersonRef.ForPartner(string! userRef) -> Themia.Conversations.PersonRef!
