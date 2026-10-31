@@ -54,11 +54,11 @@ Setting an old key together with its new one is refused (`DownloadBaseUrl` may r
 `RootPath` has no default; an app that relied on the `uploads` default sets `Storage:Local:RootPath=uploads`.
 `SigningKey` is required even with a Local-only public slot.
 
-## Per app: old key -> new key
+## Per setup: old key -> new key
 
-Copy the app's block into its adoption runbook. Names are environment variables.
+Copy the block that matches your setup into your adoption runbook. Names are environment variables.
 
-**Propertiezy** (today `Split`)
+**Setup A: public photos on R2 (S3), private files on Local, selected with the single provider key (`Split`)**
 
 | Old | New |
 |---|---|
@@ -66,7 +66,7 @@ Copy the app's block into its adoption runbook. Names are environment variables.
 | `Storage__S3__*` (`ServiceUrl`, `ForcePathStyle`, `Region`, `PublicBucketName`, `PublicBaseUrl`, `AccessKey`, `SecretKey`) | unchanged |
 | `Storage__Local__RootPath`, `SigningKey`, `PresignedBaseUrl` | unchanged |
 
-**EzyAssets**
+**Setup B: public and private providers selected separately, the S3 bucket key meaning the public bucket**
 
 | Old | New |
 |---|---|
@@ -75,9 +75,9 @@ Copy the app's block into its adoption runbook. Names are environment variables.
 | `Storage__S3__PublicBaseUrl`, `ServiceUrl`, `Region`, `AccessKey`, `SecretKey`, `ForcePathStyle` | unchanged (`AccessKey` and `SecretKey` both required) |
 | `Storage__Local__UploadsDirectory` (default `uploads`) | `Storage__Local__RootPath=uploads` (no default; set it explicitly) |
 | `Storage__Local__PublicBaseUrl` | unchanged (Local public slot only) |
-| (none) | `Storage__Local__SigningKey`: new and required. Generate a random value of 32+ characters in the secret store (Coolify); never a file |
+| (none) | `Storage__Local__SigningKey`: new and required. Generate a random value of 32+ characters in the secret store; never a file |
 
-**EzyServices** (Local only)
+**Setup C: Local only, with the presigned base URL under the old name**
 
 | Old | New |
 |---|---|
