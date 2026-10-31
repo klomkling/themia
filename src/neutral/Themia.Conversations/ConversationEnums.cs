@@ -21,6 +21,9 @@ public enum ConversationRetentionState
 
     /// <summary>Past its retention date and waiting for the purge run; it can no longer be opened.</summary>
     Expired = 2,
+
+    /// <summary>A purge has claimed the conversation: its files are being deleted and its rows follow. It can no longer be reopened, joined or put on hold.</summary>
+    Purging = 3,
 }
 
 /// <summary>What kind of party a participant is.</summary>
@@ -88,6 +91,15 @@ public enum ConversationAction
 
     /// <summary>Become a participant (a member or partner agent joining by its user reference).</summary>
     Join = 7,
+
+    /// <summary>Place a legal hold on a conversation (<see cref="IConversationRetention.PlaceHoldAsync"/>).</summary>
+    Hold = 8,
+
+    /// <summary>Lift a legal hold (<see cref="IConversationRetention.ReleaseHoldAsync"/>).</summary>
+    ReleaseHold = 9,
+
+    /// <summary>Erase one person's data across conversations (<see cref="IConversationDataSubject.ErasePersonAsync"/>).</summary>
+    Erase = 10,
 }
 
 /// <summary>How <see cref="IConversationService.OpenAsync"/> ended.</summary>

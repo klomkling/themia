@@ -33,6 +33,9 @@ public sealed class ConversationOptions
     /// </summary>
     public TimeSpan DefaultRetention { get; set; } = TimeSpan.FromDays(180);
 
+    /// <summary>Lets the retention sweep purge without an <see cref="ILegalHoldPort"/>. Off by default: without a port the sweep purges nothing and reports <see cref="SweepOutcome.HoldPortMissing"/>.</summary>
+    public bool NoLegalHoldPort { get; set; }
+
     /// <summary>Retention per <c>SubjectType</c> (matched exactly, case-sensitive); a subject type not listed uses <see cref="DefaultRetention"/>.</summary>
     public IDictionary<string, TimeSpan> RetentionBySubjectType { get; } = new Dictionary<string, TimeSpan>(StringComparer.Ordinal);
 

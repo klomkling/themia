@@ -75,7 +75,7 @@ internal sealed partial class ConversationService(
             }
 
             var reopened = await connection.ExecuteAsync(new CommandDefinition(
-                "UPDATE conversations SET state = 0, closed_at = NULL, retention_until = NULL WHERE tenant_id = @TenantId AND id = @Id AND state = 1 AND retention_state <> 2 AND (retention_until IS NULL OR retention_until > @Now);",
+                "UPDATE conversations SET state = 0, closed_at = NULL, retention_until = NULL WHERE tenant_id = @TenantId AND id = @Id AND state = 1 AND retention_state IN (0, 1) AND (retention_until IS NULL OR retention_until > @Now);",
                 new { TenantId = tenantId, existing.Id, Now = Now() },
                 cancellationToken: cancellationToken));
             if (reopened == 1)
@@ -293,7 +293,7 @@ internal sealed partial class ConversationService(
         public object? RetentionUntil { get; set; }
 
         public bool IsPastRetention(DateTimeOffset now) =>
-            RetentionState == (int)ConversationRetentionState.Expired || (RetentionUntil is not null && ConversationTime.ToUtc(RetentionUntil) <= now);
+            RetentionState is (int)ConversationRetentionState.Expired or (int)ConversationRetentionState.Purging || (RetentionUntil is not null && ConversationTime.ToUtc(RetentionUntil) <= now);
     }
 
     private sealed class MessageRow

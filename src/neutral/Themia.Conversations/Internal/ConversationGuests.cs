@@ -207,7 +207,7 @@ internal sealed class ConversationGuests(
             cancellationToken: cancellationToken));
         var active = await connection.ExecuteScalarAsync<int>(new CommandDefinition(
             "SELECT COUNT(*) FROM conversation_participants p JOIN conversations c ON c.tenant_id = p.tenant_id AND c.id = p.conversation_id " +
-            "WHERE p.tenant_id = @TenantId AND p.id = @ParticipantId AND p.conversation_id = @ConversationId AND p.kind = 1 AND p.left_at IS NULL AND c.state = 0 AND c.retention_state <> 2;",
+            "WHERE p.tenant_id = @TenantId AND p.id = @ParticipantId AND p.conversation_id = @ConversationId AND p.kind = 1 AND p.left_at IS NULL AND c.state = 0 AND c.retention_state IN (0, 1);",
             new { TenantId = tenantId, ParticipantId = participantId, ConversationId = conversationId },
             transaction,
             cancellationToken: cancellationToken));
@@ -286,7 +286,7 @@ internal sealed class ConversationGuests(
 
     private static async Task<bool> ConversationOpenAsync(DbConnection connection, DbTransaction? transaction, string tenantId, Guid conversationId, CancellationToken cancellationToken) =>
         await connection.ExecuteScalarAsync<int>(new CommandDefinition(
-            "SELECT COUNT(*) FROM conversations WHERE tenant_id = @TenantId AND id = @ConversationId AND state = 0 AND retention_state <> 2;",
+            "SELECT COUNT(*) FROM conversations WHERE tenant_id = @TenantId AND id = @ConversationId AND state = 0 AND retention_state IN (0, 1);",
             new { TenantId = tenantId, ConversationId = conversationId },
             transaction,
             cancellationToken: cancellationToken)) == 1;

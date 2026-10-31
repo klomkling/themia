@@ -17,11 +17,13 @@ public sealed class MySqlConversationDialect : IConversationDialect
         // GuidFormat is pinned whatever the caller passed: ConversationSchemaMigration declares its ids with .AsGuid(), which FluentMigrator renders as
         // CHAR(36) on MySQL. A shared application connection string carrying GuidFormat=Binary16 or OldGuids=true would serialise Guid parameters as 16 raw
         // bytes against a CHAR(36) column, and every lookup by id would silently stop matching. The connection is pinned to UTC for the same
-        // reason ContentSchemaMigration's DATETIME(6) columns are read back as the instant that was written.
+        // reason ContentSchemaMigration's DATETIME(6) columns are read back as the instant that was written. UseAffectedRows is pinned to false (matched rows): the
+        // store takes a row lock with a no-op UPDATE (x = x) and decides on the row count, which would read 0 under UseAffectedRows=true and skip the work silently.
         this.connectionString = new MySqlConnectionStringBuilder(connectionString)
         {
             GuidFormat = MySqlGuidFormat.Char36,
             DateTimeKind = MySqlDateTimeKind.Utc,
+            UseAffectedRows = false,
         }.ConnectionString;
     }
 

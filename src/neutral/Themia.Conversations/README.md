@@ -4,7 +4,7 @@ A per-object chat for members and guests: tenant-scoped conversations, participa
 `docs/superpowers/specs/2026-10-29-themia-conversations-design.md`.
 
 **Status: the store and guests.** Schema, engine packages, options and the default-deny policy shipped first; this part adds `IConversationService` (open, join, post, list,
-mark read, close) and the transaction-aware `IConversationEventSink`. Guest invites, the token exchange and read-time masking are in; self-service re-invite, notification delivery, retention and erasure, export and the ASP.NET Core
+mark read, close) and the transaction-aware `IConversationEventSink`. Guest invites, the token exchange and read-time masking are in, and so are the retention sweep, legal hold and per-person erasure (see the last section); self-service re-invite, notification delivery, export and the ASP.NET Core
 endpoints follow in later releases.
 
 ```csharp
@@ -71,3 +71,41 @@ var actor = ConversationActor.ForGuest(new GuestSessionKey(cookieValue));
 - **Masking is a read-time projection** (`IConversationMasker`, default regex): for a guest viewer e-mail, phone numbers and handles in the text are replaced and staff show
   their role label (or "Staff"). Best effort, not a control. If the masker throws, the body is hidden (`[message hidden]`), never shown raw. The stored text stays whole.
 - A guest who left is not re-added by an invite; a call to add them back arrives with the retention part.
+
+## Retention, legal hold and erasure
+
+```csharp
+services.AddSingleton<ILegalHoldPort, MyHoldPort>();   // the app's authority on holds; or o.NoLegalHoldPort = true to opt out
+services.AddSingleton<IStorageProvider>(storage);       // the attachment files; deleted before their rows
+
+var swept = await retention.SweepAsync(tenantId, new SweepOptions(BatchSize: 100));   // schedule it per tenant
+await retention.PlaceHoldAsync(staffActor, tenantId, conversationId);                // policy action Hold
+var erased = await dataSubject.ErasePersonAsync(dsrActor, tenantId, PersonRef.ForMember("42"));   // policy action Erase
+```
+
+- **Sweep.** `IConversationRetention.SweepAsync` moves closed conversations past `retention_until` to `Expired` (`OpenAsync` already answers `PendingPurge` for them), then
+  purges the expired ones, at most `BatchSize` purges per call (marking is one statement, and conversations that fail or are held do not use up the batch, so a stuck one cannot starve the rest): call again to continue. It returns `Expired`, `Purged`, `HeldSkipped` and `Failed` counts.
+- **No hold port, no purge.** There is no default `ILegalHoldPort`: one that said "not held" would purge under a hold. Without a port the sweep still marks `Expired`, purges
+  nothing, logs one warning and returns `SweepOutcome.HoldPortMissing`. Register a port, or set `ConversationOptions.NoLegalHoldPort` to say you have none. A port that throws
+  counts as held-or-unknown: the conversation is kept and counted in `Failed`.
+- **Purge protocol.** The port is asked just before the conversation is claimed (`Expired` to `Purging`; a port answer of "held" makes it `LegalHold` and skips it). The files
+  are then deleted outside any transaction (`IStorageProvider.DeleteAsync` is idempotent; the key is the stored `storage_key` verbatim). One transaction then re-verifies
+  `Purging`, writes the tombstone (subject, message and attachment counts), deletes attachments, guest sessions, messages, participants, events and finally the conversation (so
+  the subject opens a new one), and raises `ConversationLifecycleKind.Purged`. A failed file delete or database step leaves the conversation `Purging`; the next sweep resumes it and asks the port again, so a hold placed in between
+  stops the purge (files already deleted stay deleted). Do not run two sweeps of one tenant at the same time: the claim is re-verified before the files go, but the file deletes themselves are not under a lock. A `Purging` conversation cannot be reopened, joined or held (`HoldOutcome.PurgeInProgress`).
+- **The accepted race.** A hold the app places between the port answering "not held" and the claim is not seen. Place holds through `PlaceHoldAsync` as well (it locks the row and
+  sets `LegalHold`), and keep the port the source of truth at sweep time. `ReleaseHoldAsync` returns the conversation to `Active` and leaves `retention_until`, so the next sweep
+  may expire it at once. The package never lifts a hold by itself.
+- **Erasure.** `IConversationDataSubject.ErasePersonAsync` finds the person in the tenant (a member or partner by user reference, which keeps the `m:`/`p:` prefix apart; a guest
+  by the hash of the contact they were invited with, trying every configured pepper) and, per conversation: deletes their attachment files, then in one transaction removes
+  their attachment rows and guest sessions, redacts their messages (`body` NULL, `redacted_at` set; sequence numbers and the other participants' rows are unchanged) and
+  anonymises the participant (display name `Erased participant`, user reference and contact hash cleared, marked left). It is idempotent: a second call erases nothing and
+  returns `Erased`. A person who joins again afterwards is a new participant.
+- **Holds defer erasure.** A conversation under legal hold or being purged is reported in `DeferredConversationIds` (outcome `PartiallyErased` or `Deferred`) and untouched; the
+  package keeps no queue, so the app's DSR record re-issues the call once the hold is lifted. A file that cannot be deleted lands in `FailedConversationIds`; its rows are untouched.
+  If a hold lands after the files were deleted but before the transaction, the conversation is deferred with its files already gone (the accepted race again).
+- **Lifecycle events.** `IConversationLifecycleSink` receives `Purged`, `ParticipantErased`, `HoldPlaced` and `HoldReleased` inside the transaction that made the change (ids and
+  counts, never text, names or contacts). The default does nothing: `conversation_events` is not used, because a purge deletes it. Register your own sink for an audit trail;
+  a sink that throws rolls the change back.
+- **A post re-checks its participant** under the counter lock, so a person erased (or gone) while their post waited leaves no message behind; the post answers `Refused`.
+- **Your policy must handle the new actions explicitly.** `ConversationAction.Hold`, `ReleaseHold` and `Erase` are new; the default policy denies them like everything else, but a policy that allows by exhaustive `switch` or by "any staff actor" needs a deliberate case. `Erase` is tenant-wide: its target has `ConversationId = null`, so decide it on the actor and tenant alone. `Hold` and `ReleaseHold` name the conversation.

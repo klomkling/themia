@@ -29,6 +29,9 @@ public abstract class ConversationEngineFixture : IAsyncLifetime
     /// <summary>The engine's dialect (its connection is what the tests use for raw SQL).</summary>
     public IConversationDialect Dialect { get; private set; } = null!;
 
+    /// <summary>The container built by <c>AddThemiaConversations</c> plus the engine registration, the way an adopter builds it.</summary>
+    public IServiceProvider Services => provider;
+
     /// <summary>The engine's migration adapter, for re-running the migration.</summary>
     public abstract IMigrationEngineAdapter MigrationAdapter { get; }
 
@@ -55,6 +58,7 @@ public abstract class ConversationEngineFixture : IAsyncLifetime
     {
         ConnectionString = await StartContainerAsync();
         var services = new ServiceCollection();
+        services.AddLogging();
         services.AddThemiaConversations();
         RegisterEngine(services, ConnectionString);
         provider = services.BuildServiceProvider();
