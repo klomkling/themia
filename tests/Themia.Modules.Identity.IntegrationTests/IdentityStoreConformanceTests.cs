@@ -1447,6 +1447,56 @@ public abstract class IdentityStoreConformanceTests
         }
     }
 
+    [Fact] // a password reset ends sessions that predate it; the caller's own kept session follows the new stamp
+    public async Task Refresh_follows_the_security_stamp_across_a_password_reset()
+    {
+        await ResetAsync();
+        await using var s = NewScope(new TenantId("acme"));
+        var user = (await s.Users.CreateAsync("stamp-user", "pw")).UserId!.Value;
+        var kept = await s.RefreshTokens.IssueAsync(user);
+        var other = await s.RefreshTokens.IssueAsync(user);
+        var doomed = await s.RefreshTokens.IssueAsync(user);
+
+        Assert.True((await s.Users.SetPasswordAsync(user, "new-pw")).Succeeded);
+        Assert.False(await s.RefreshTokens.IsSessionLiveAsync(user, other.FamilyId));
+        await s.Sessions.RevokeAllForUserExceptAsync(user, kept.FamilyId.ToString());
+
+        Assert.Equal(RefreshOutcome.Success, (await s.RefreshTokens.ValidateAndRotateAsync(kept.RawToken)).Outcome);
+        Assert.Equal(RefreshOutcome.ReuseDetected, (await s.RefreshTokens.ValidateAndRotateAsync(other.RawToken)).Outcome);
+        Assert.Equal(RefreshOutcome.ReuseDetected, (await s.RefreshTokens.ValidateAndRotateAsync(doomed.RawToken)).Outcome);
+    }
+
+    [Fact] // without the keep-session call the old session simply ends at its next refresh
+    public async Task Refresh_after_a_password_reset_is_Invalid()
+    {
+        await ResetAsync();
+        await using var s = NewScope(new TenantId("acme"));
+        var user = (await s.Users.CreateAsync("stamp-user-2", "pw")).UserId!.Value;
+        var old = await s.RefreshTokens.IssueAsync(user);
+
+        await s.Users.SetPasswordAsync(user, "new-pw");
+
+        Assert.Equal(RefreshOutcome.Invalid, (await s.RefreshTokens.ValidateAndRotateAsync(old.RawToken)).Outcome);
+    }
+
+    [Fact] // a role or claim edit rotates the stamp for access tokens but must not end the holders' sessions
+    public async Task Role_and_claim_edits_rebind_sessions_instead_of_ending_them()
+    {
+        await ResetAsync();
+        await using var s = NewScope(new TenantId("acme"));
+        var user = (await s.Users.CreateAsync("stamp-role", "pw")).UserId!.Value;
+        var role = (await s.Roles.CreateAsync("Agent"))!.Value;
+        var issued = await s.RefreshTokens.IssueAsync(user);
+
+        await s.Roles.AssignRoleAsync(user, role);
+        await s.Claims.AddRoleClaimAsync(role, "perm", "read");
+        Assert.True((await s.RefreshTokens.ValidateAndRotateAsync(issued.RawToken)).TryGetSuccess(out _, out var second));
+
+        await s.Roles.RemoveRoleAsync(user, role);
+        Assert.True((await s.RefreshTokens.ValidateAndRotateAsync(second.RawToken)).TryGetSuccess(out _, out _));
+        Assert.True(await s.RefreshTokens.IsSessionLiveAsync(user, issued.FamilyId));
+    }
+
     [Fact] // a deactivated account is never auto-linked: returned un-linked for the flow gate to block
     public async Task External_auto_link_skipped_for_inactive_user()
     {

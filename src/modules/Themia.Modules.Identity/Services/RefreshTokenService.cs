@@ -57,7 +57,7 @@ public sealed class RefreshTokenService : IRefreshTokenService, ISessionRevoker
         var user = await IdentityScope.ResolveUserAsync(users, userId, cancellationToken).ConfigureAwait(false)
             ?? throw new InvalidOperationException($"User '{userId}' was not found in the current tenant scope.");
 
-        var (entity, raw) = Create(user.Id, Guid.CreateVersion7());
+        var (entity, raw) = Create(user.Id, Guid.CreateVersion7(), user.SecurityStamp);
         await tokens.AddAsync(entity, cancellationToken).ConfigureAwait(false);
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         return new RefreshIssue(raw, entity.ExpiresAt, entity.FamilyId);
@@ -116,7 +116,17 @@ public sealed class RefreshTokenService : IRefreshTokenService, ISessionRevoker
             return RefreshValidationResult.Invalid();
         }
 
-        var (successor, raw) = Create(match.UserId, match.FamilyId);
+        // The family is bound to the stamp it was issued under. A rotation by a credential event (password reset,
+        // reactivation) ends the session here; role and claim changes rebind the live rows instead (RefreshStampBinding).
+        // A row issued before the column existed is accepted once and bound to the current stamp by its successor.
+        if (match.SecurityStamp is not null && match.SecurityStamp != user.SecurityStamp)
+        {
+            logger.LogWarning("Refresh refused for user {UserId}: security stamp rotated since family {FamilyId} was issued; revoking it.", user.Id, match.FamilyId);
+            await RevokeFamilyAsync(match.FamilyId, now, cancellationToken).ConfigureAwait(false);
+            return RefreshValidationResult.Invalid();
+        }
+
+        var (successor, raw) = Create(match.UserId, match.FamilyId, match.SecurityStamp ?? user.SecurityStamp);
         // Compare-and-set: the successor carries the parent's id in replaced_token_id, which has a filtered
         // unique index. Two simultaneous rotations of the same token both try to insert a successor with the
         // same replaced_token_id; the index lets only one commit. The loser hits a unique violation in the
@@ -231,8 +241,9 @@ public sealed class RefreshTokenService : IRefreshTokenService, ISessionRevoker
 
         // Revocation is family-wide (reuse, logout) and a successor never expires before its parent, so "any unrevoked unexpired row of
         // this user's family" is exactly "the session is live". The same spec RevokeAllForUserExceptAsync uses.
+        // Bound to the user's current stamp (or not bound yet): a session that predates a password reset or reactivation is not live.
         return await tokens.AnyAsync(
-            new ActiveRefreshTokensByUserAndFamilySpec(user.Id, familyId, timeProvider.GetUtcNow()), cancellationToken).ConfigureAwait(false);
+            new LiveRefreshSessionSpec(user.Id, familyId, timeProvider.GetUtcNow(), user.SecurityStamp), cancellationToken).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -265,6 +276,14 @@ public sealed class RefreshTokenService : IRefreshTokenService, ISessionRevoker
         var revoked = await tokens.UpdateWhereAsync(
             new ActiveRefreshTokensByUserExceptFamilySpec(user.Id, keepFamilyId, now),
             set => set.Set(t => t.RevokedAt, now),
+            cancellationToken).ConfigureAwait(false);
+        // The kept session is the caller's own (they just changed the password, say): bind it to the current stamp so it survives
+        // the rotation. Call this AFTER the mutation that rotated the stamp; before it, the kept session ends at its next refresh.
+        // keepSessionId is the caller's assertion that it is the authenticated session (the `sid` of the principal): the family is
+        // checked to be live and the user's, not to be current, so an app must never take it from unauthenticated input.
+        await tokens.UpdateWhereAsync(
+            new ActiveRefreshTokensByUserAndFamilySpec(user.Id, keepFamilyId, now),
+            set => set.Set(t => t.SecurityStamp, user.SecurityStamp),
             cancellationToken).ConfigureAwait(false);
         logger.LogInformation("Revoked {Count} refresh tokens for user {UserId}, keeping one session.", revoked, user.Id);
         return revoked;
@@ -350,6 +369,16 @@ public sealed class RefreshTokenService : IRefreshTokenService, ISessionRevoker
             return null;
         }
 
+        // Everything else says "legitimate replay", but the session predates a credential event: end it without
+        // handing out the successor, and without the theft path (a client that double-sent right after a reset is not a thief).
+        var boundStamp = rotated.SecurityStamp ?? successor.SecurityStamp;
+        if (boundStamp is not null && boundStamp != user.SecurityStamp)
+        {
+            logger.LogWarning("Refresh replay refused for user {UserId}: security stamp rotated since family {FamilyId} was issued; revoking it.", user.Id, rotated.FamilyId);
+            await RevokeFamilyAsync(rotated.FamilyId, now, cancellationToken).ConfigureAwait(false);
+            return RefreshValidationResult.Invalid();
+        }
+
         logger.LogInformation("Refresh token replayed within the reuse grace; returning the existing successor (family {FamilyId}, user {UserId}).", rotated.FamilyId, rotated.UserId);
         return RefreshValidationResult.ReplayedWithinGrace(user, new RefreshIssue(successorRaw, successor.ExpiresAt, successor.FamilyId));
     }
@@ -381,7 +410,7 @@ public sealed class RefreshTokenService : IRefreshTokenService, ISessionRevoker
             cancellationToken).ConfigureAwait(false);
     }
 
-    private (RefreshToken Entity, string Raw) Create(Guid userId, Guid familyId)
+    private (RefreshToken Entity, string Raw) Create(Guid userId, Guid familyId, string? securityStamp)
     {
         var raw = Base64UrlEncode(RandomNumberGenerator.GetBytes(TokenByteLength));
         var now = timeProvider.GetUtcNow();
@@ -392,6 +421,7 @@ public sealed class RefreshTokenService : IRefreshTokenService, ISessionRevoker
             FamilyId = familyId,
             CreatedAt = now,
             ExpiresAt = now.Add(options.RefreshTokenLifetime),
+            SecurityStamp = securityStamp,
         };
         token.SetId(Guid.CreateVersion7());
         return (token, raw);

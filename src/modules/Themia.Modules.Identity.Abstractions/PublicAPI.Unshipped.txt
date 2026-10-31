@@ -708,3 +708,5 @@ Themia.Modules.Identity.Abstractions.IIdentityAnonymiser
 Themia.Modules.Identity.Abstractions.IIdentityAnonymiser.AnonymiseAsync(System.Guid userId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Identity.Abstractions.AnonymiseResult>!
 Themia.Modules.Identity.Abstractions.IUserLifecycleHooks.OnBeforeAnonymiseAsync(System.Guid userId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<Themia.Modules.Identity.Abstractions.UserMutationDecision>
 Themia.Modules.Identity.Abstractions.UserMutation.Anonymised = 512 -> Themia.Modules.Identity.Abstractions.UserMutation
+Themia.Modules.Identity.Abstractions.Entities.RefreshToken.SecurityStamp.get -> string?
+Themia.Modules.Identity.Abstractions.Entities.RefreshToken.SecurityStamp.set -> void

@@ -20,6 +20,7 @@ public sealed class ClaimService : IClaimService
     private readonly IRepository<Role, Guid> roles;
     private readonly IUnitOfWork unitOfWork;
     private readonly IMemoryCache? stampCache;
+    private readonly IRepository<RefreshToken, Guid>? refreshTokens;
 
     /// <summary>Creates the service without a stamp cache to evict.</summary>
     public ClaimService(
@@ -49,6 +50,29 @@ public sealed class ClaimService : IClaimService
         IRepository<Role, Guid> roles,
         IUnitOfWork unitOfWork,
         IMemoryCache? stampCache)
+        : this(userClaims, roleClaims, memberships, users, roles, unitOfWork, stampCache, null)
+    {
+    }
+
+    /// <summary>Creates the service.</summary>
+    /// <param name="userClaims">The user-claim repository.</param>
+    /// <param name="roleClaims">The role-claim repository.</param>
+    /// <param name="memberships">The user-role repository.</param>
+    /// <param name="users">The user repository.</param>
+    /// <param name="roles">The role repository.</param>
+    /// <param name="unitOfWork">The unit of work.</param>
+    /// <param name="stampCache">The cache the security-stamp validator uses; may be null.</param>
+    /// <param name="refreshTokens">The refresh-token repository: a role-claim change rebinds the holders' live sessions to
+    /// their new stamp. When null the sessions end at their next refresh instead.</param>
+    public ClaimService(
+        IRepository<UserClaim, Guid> userClaims,
+        IRepository<RoleClaim, Guid> roleClaims,
+        IRepository<UserRole, Guid> memberships,
+        IRepository<User, Guid> users,
+        IRepository<Role, Guid> roles,
+        IUnitOfWork unitOfWork,
+        IMemoryCache? stampCache,
+        IRepository<RefreshToken, Guid>? refreshTokens)
     {
         ArgumentNullException.ThrowIfNull(userClaims);
         ArgumentNullException.ThrowIfNull(roleClaims);
@@ -63,6 +87,7 @@ public sealed class ClaimService : IClaimService
         this.roles = roles;
         this.unitOfWork = unitOfWork;
         this.stampCache = stampCache;
+        this.refreshTokens = refreshTokens;
     }
 
     /// <inheritdoc />
@@ -191,10 +216,11 @@ public sealed class ClaimService : IClaimService
                 rotated = await affectedUserIds(ct).ConfigureAwait(false);
                 foreach (var batch in rotated.Chunk(StampRotationBatchSize))
                 {
-                    await users.UpdateWhereAsync(
-                        new UsersByIdsAnyTenantSpec(batch),
-                        set => set.Set(u => u.SecurityStamp, SecurityStampCache.NewStamp()),
-                        ct).ConfigureAwait(false);
+                    // The stamps being replaced, read first; the write below is conditional on them (see RotateAndRebindAsync).
+                    var previous = (await users.ListAsync(new UsersByIdsAnyTenantSpec(batch), ct).ConfigureAwait(false))
+                        .ToDictionary(u => u.Id, u => u.SecurityStamp);
+                    await RefreshStampBinding.RotateAndRebindAsync(
+                        users, refreshTokens, previous, SecurityStampCache.NewStamp(), ct).ConfigureAwait(false);
                 }
             },
             cancellationToken).ConfigureAwait(false);

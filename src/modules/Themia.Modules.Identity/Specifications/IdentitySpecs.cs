@@ -229,6 +229,23 @@ internal sealed class ActiveRefreshTokensByUserAndFamilySpec : Specification<Ref
         Where(t => t.UserId == userId && t.FamilyId == familyId && t.RevokedAt == null && t.ExpiresAt > now);
 }
 
+/// <summary>A live session as the owner's CURRENT stamp sees it: unrevoked, unexpired, and bound to that stamp (or not bound
+/// yet, a row issued before the column existed).</summary>
+internal sealed class LiveRefreshSessionSpec : Specification<RefreshToken>
+{
+    public LiveRefreshSessionSpec(Guid userId, Guid familyId, DateTimeOffset now, string currentStamp) =>
+        Where(t => t.UserId == userId && t.FamilyId == familyId && t.RevokedAt == null && t.ExpiresAt > now
+            && (t.SecurityStamp == currentStamp || t.SecurityStamp == null));
+}
+
+/// <summary>A user's unrevoked tokens still bound to <c>stamp</c>: exactly the rows a role or claim change moves to the new stamp. Used by a
+/// set-based UPDATE, so only the stamp column is written and a revoke committed meanwhile cannot be overwritten.</summary>
+internal sealed class UnrevokedRefreshTokensBoundToSpec : Specification<RefreshToken>
+{
+    public UnrevokedRefreshTokensBoundToSpec(Guid userId, string stamp) =>
+        Where(t => t.UserId == userId && t.RevokedAt == null && t.SecurityStamp == stamp);
+}
+
 /// <summary>A user's non-expired, non-revoked tokens in every family but one (for revoke-all-except-session).</summary>
 internal sealed class ActiveRefreshTokensByUserExceptFamilySpec : Specification<RefreshToken>
 {
@@ -300,6 +317,17 @@ internal sealed class UsersByIdsAnyTenantSpec : Specification<User>
     public UsersByIdsAnyTenantSpec(IReadOnlyCollection<Guid> ids)
     {
         Where(u => ids.Contains(u.Id));
+        WithoutTenantFilter();
+    }
+}
+
+/// <summary>One user in any tenant, only while the stored stamp is still the one the caller read: the conditional write that makes
+/// "rotate from S1" fail instead of overwriting a rotation that committed in between. The caller has already resolved the user in its scope.</summary>
+internal sealed class UserByIdAndStampAnyTenantSpec : Specification<User>
+{
+    public UserByIdAndStampAnyTenantSpec(Guid id, string stamp)
+    {
+        Where(u => u.Id == id && u.SecurityStamp == stamp);
         WithoutTenantFilter();
     }
 }
