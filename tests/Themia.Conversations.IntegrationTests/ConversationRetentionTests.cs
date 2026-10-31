@@ -437,3 +437,30 @@ public sealed class MySqlConversationRetentionTests(MySqlConversationFixture fix
 [Collection(SqlServerConversationCollection.Name)]
 [Trait("Category", "Integration")]
 public sealed class SqlServerConversationRetentionTests(SqlServerConversationFixture fixture) : ConversationRetentionTests(fixture);
+
+public sealed class MySqlConversationDialectPinTests
+{
+    [Fact]
+    public async Task Dialect_ShouldReportMatchedRows_ForANoOpUpdate_WhateverTheCallersConnectionStringSays()
+    {
+        var fixture = new MySqlConversationFixture();
+        await fixture.InitializeAsync();
+        try
+        {
+            var shared = fixture.ConnectionString + ";UseAffectedRows=true";
+            var dialect = new Themia.Conversations.MySql.MySqlConversationDialect(shared);
+            await using var connection = dialect.CreateConnection();
+            await connection.OpenAsync();
+            var id = Guid.NewGuid();
+            await Dapper.SqlMapper.ExecuteAsync(connection, "INSERT INTO conversations (id, tenant_id, subject_type, subject_id, state, retention_state, last_seq, created_at) VALUES (@Id, 't', 'booking', 'B', 1, 3, 0, @Now);", new { Id = id, Now = DateTime.UtcNow });
+
+            var matched = await Dapper.SqlMapper.ExecuteAsync(connection, "UPDATE conversations SET retention_state = 3 WHERE tenant_id = 't' AND id = @Id AND retention_state = 3;", new { Id = id });
+
+            Assert.Equal(1, matched);
+        }
+        finally
+        {
+            await fixture.DisposeAsync();
+        }
+    }
+}
