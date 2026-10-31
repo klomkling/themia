@@ -279,6 +279,8 @@ public sealed class RefreshTokenService : IRefreshTokenService, ISessionRevoker
             cancellationToken).ConfigureAwait(false);
         // The kept session is the caller's own (they just changed the password, say): bind it to the current stamp so it survives
         // the rotation. Call this AFTER the mutation that rotated the stamp; before it, the kept session ends at its next refresh.
+        // keepSessionId is the caller's assertion that it is the authenticated session (the `sid` of the principal): the family is
+        // checked to be live and the user's, not to be current, so an app must never take it from unauthenticated input.
         await tokens.UpdateWhereAsync(
             new ActiveRefreshTokensByUserAndFamilySpec(user.Id, keepFamilyId, now),
             set => set.Set(t => t.SecurityStamp, user.SecurityStamp),
