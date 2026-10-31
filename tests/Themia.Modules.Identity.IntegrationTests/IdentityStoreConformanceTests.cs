@@ -1445,6 +1445,8 @@ public abstract class IdentityStoreConformanceTests
             Assert.Equal(AnonymiseOutcome.Anonymised, (await p.Anonymiser.AnonymiseAsync(platform)).Outcome);
             Assert.Null((await p.Users.FindByIdAsync(platform))!.Email);
         }
+    }
+
     [Fact] // a password reset ends sessions that predate it; the caller's own kept session follows the new stamp
     public async Task Refresh_follows_the_security_stamp_across_a_password_reset()
     {
