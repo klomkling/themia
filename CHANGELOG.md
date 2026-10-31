@@ -27,6 +27,31 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.50.0] - 2026-10-31
+
+### Added
+
+- **`Themia.Modules.Identity`: `IIdentityAnonymiser`**, the GDPR/PDPA erasure of a user that keeps the row. `AnonymiseAsync(userId)` returns an `AnonymiseResult` (`AnonymiseOutcome` `Anonymised`, `AlreadyAnonymised`, `NotFound`, `Refused`). It blanks the e-mail, phone, names and credentials to a tombstone (`anonymised-{id:N}`), deactivates the user, rotates the security stamp, and deletes the user's claims, external logins, user tokens, refresh sessions and one-time codes (including codes for the old phone number). The row stays so foreign keys held by app tables still resolve. Calling it again reports `AlreadyAnonymised`. The new hook `IUserLifecycleHooks.OnBeforeAnonymiseAsync` can veto it (asked once; a veto is `Refused` with the hook's reason and code), and `UserMutation.Anonymised = 512` is raised for observers. App-owned data (profiles, documents) is yours to erase.
+
+### Changed
+
+- **Refresh sessions now follow the security stamp.** `identity.refresh_tokens` gets a nullable `security_stamp` column (migration `202610310002`, PostgreSQL and SQL Server) that records the user's stamp when a session is issued. Renewing a session whose stamp no longer matches the user's revokes its family and returns `Invalid` (a replay inside the refresh grace after a stamp change is `Invalid` too, not `ReuseDetected`, so it does not raise the theft path). In practice:
+  - A password reset (`SetPasswordAsync`) or a change of active state (`SetActiveAsync`, deactivation or reactivation) ends every older refresh session of the user. Before, those sessions kept refreshing.
+  - Role and claim edits (`RoleService.ChangeMembershipAsync`, `ClaimService.ChangeAsync`) rebind the affected users' live sessions to the new stamp, so nobody is logged out by them; the next access token carries the new roles and claims as before.
+  - `ISessionRevoker.RevokeAllForUserExceptAsync` rebinds the kept session to the user's current stamp. Change a password with `SetPasswordAsync` first and `RevokeAllForUserExceptAsync` (with the caller's `sid`) after it; in the other order the kept session ends at its next refresh.
+  - A password rehash at login (`NeedsRehash`) no longer rotates the security stamp: the password did not change, so other devices stay signed in.
+  - The stamp swap is conditional on the previous stamp and the rebind is one set-based `UPDATE` bound to the stamp actually swapped from. A swap that loses a race swaps again from the current stamp (up to three times, then the rotation is forced and nothing is rebound).
+  - `IsSessionLiveAsync` (and so `IAuthTokenIssuer.RenewSessionAsync`) also requires the stamp to match.
+- **`RoleService` and `ClaimService` have a new constructor overload** that takes `IRepository<RefreshToken, Guid>? refreshTokens`; the existing constructors are kept and do not rebind sessions. Containers using the default registration pick the new one. A hand-built `RoleService`/`ClaimService` should be given the repository, or its role and claim edits will end the affected sessions at their next refresh (the safe direction).
+- **(breaking) New enum member** `UserMutation.Anonymised`. It is a `[Flags]` value (512): code that treats `UserMutation` as a closed set, or an exhaustive `switch` without a discard, needs a case for it.
+- **New migration `202610310002`** adds one nullable column and backfills every refresh row that is not revoked with its user's current stamp. Rows from before the migration are bound at the backfill; a session issued by an older node during a rolling deploy has `NULL` and is accepted once, then bound when it next rotates.
+
+### Needs a human look
+
+- The anonymiser deletes credentials and sessions and blanks identifying columns for good: check what your `OnBeforeAnonymiseAsync` hook refuses (a user who owns open invoices, the last admin of a tenant) and erase your own tables around it.
+- Stamp binding changes who stays signed in after a password reset or reactivation. Apps that call `RevokeAllForUserAsync` after a reset keep working; apps that relied on sessions surviving a reset do not. A change-password handler must write the new password, then call `RevokeAllForUserExceptAsync`.
+- The backfill is one `UPDATE` over the unrevoked rows of `identity.refresh_tokens`; on a very large table run it in a quiet window.
+
 ## [0.49.0] - 2026-10-31
 
 ### Added
