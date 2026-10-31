@@ -295,6 +295,12 @@ internal sealed class RecordingObserver : IIdentityEventObserver
         return Task.CompletedTask;
     }
 
+    public Task OnRefreshReplayedAsync(Guid userId, CancellationToken cancellationToken = default)
+    {
+        Calls.Add(nameof(OnRefreshReplayedAsync));
+        return Task.CompletedTask;
+    }
+
     public Task OnLoginFailedAsync(string userName, LoginFailureReason reason, CancellationToken cancellationToken = default)
     {
         Calls.Add(nameof(OnLoginFailedAsync));

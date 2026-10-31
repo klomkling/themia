@@ -36,6 +36,12 @@ public sealed class RefreshToken
     /// <summary>Issue time, set by the service via <see cref="TimeProvider"/> (forensics).</summary>
     public DateTimeOffset CreatedAt { get; set; }
 
+    /// <summary>Only when <see cref="IdentityModuleOptions.RefreshReuseGrace"/> is on: the successor's raw token, encrypted so that
+    /// only a holder of THIS token's raw value can read it back. Lets a concurrent refresh with the same just-rotated token receive the
+    /// same successor instead of revoking the family. Cleared when the successor rotates or the family is revoked; never read after
+    /// the grace.</summary>
+    public string? SuccessorCiphertext { get; set; }
+
     /// <summary>Assigns the identifier for a new (transient) token.</summary>
     /// <param name="id">A client-generated identifier.</param>
     public void SetId(Guid id) => Id = id;

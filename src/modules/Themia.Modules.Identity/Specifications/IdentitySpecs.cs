@@ -194,6 +194,12 @@ internal sealed class RefreshTokenByHashSpec : Specification<RefreshToken>
     public RefreshTokenByHashSpec(string tokenHash) => Where(t => t.TokenHash == tokenHash);
 }
 
+/// <summary>The single refresh token with the given id. No tenant column; the owning user is resolved in scope by the service.</summary>
+internal sealed class RefreshTokenByIdSpec : Specification<RefreshToken>
+{
+    public RefreshTokenByIdSpec(Guid id) => Where(t => t.Id == id);
+}
+
 /// <summary>A family's not-yet-revoked tokens — the rows a family revocation actually flips.</summary>
 internal sealed class ActiveRefreshTokensByFamilySpec : Specification<RefreshToken>
 {

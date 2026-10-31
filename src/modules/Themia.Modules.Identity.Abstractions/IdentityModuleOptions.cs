@@ -54,6 +54,24 @@ public sealed class IdentityModuleOptions
     /// <summary>The lifetime of an issued refresh token. Default 14 days.</summary>
     public TimeSpan RefreshTokenLifetime { get; set; } = TimeSpan.FromDays(14);
 
+    /// <summary>
+    /// How long after a refresh token has been rotated that presenting it again returns the <b>same</b> successor instead of treating it as
+    /// theft and revoking the whole family. Default <see cref="TimeSpan.Zero"/>: off, a rotated token replayed at any time revokes its family.
+    /// </summary>
+    /// <remarks>
+    /// For web apps that refresh per request with no shared memory: two near-simultaneous requests present the same refresh token and
+    /// without a grace the second logs the user out everywhere. Recommended 30 seconds, at most <see cref="MaxRefreshReuseGrace"/>.
+    /// <para>
+    /// The trade-off: inside the window a captured token and the user's own token both yield the same successor, so the reuse
+    /// tripwire does not fire for that window. After it, a replay revokes the family as before, as does a replay of a token whose
+    /// successor has already been rotated again.
+    /// </para>
+    /// </remarks>
+    public TimeSpan RefreshReuseGrace { get; set; } = TimeSpan.Zero;
+
+    /// <summary>The longest <see cref="RefreshReuseGrace"/> accepted.</summary>
+    public static readonly TimeSpan MaxRefreshReuseGrace = TimeSpan.FromMinutes(2);
+
     /// <summary>The <see cref="UserMutationResult.RefusalCode"/> of a phone number refused because an
     /// active user in another tenant already holds it (see <see cref="RejectPhoneNumberHeldInAnotherTenant"/>).</summary>
     public const string PhoneNumberInAnotherTenantRefusalCode = "phone_number_in_another_tenant";
@@ -125,6 +143,12 @@ public sealed class IdentityModuleOptions
         {
             throw new ArgumentOutOfRangeException(
                 nameof(RefreshTokenLifetime), RefreshTokenLifetime, "Must be a positive duration.");
+        }
+
+        if (RefreshReuseGrace < TimeSpan.Zero || RefreshReuseGrace > MaxRefreshReuseGrace)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(RefreshReuseGrace), RefreshReuseGrace, $"Must be between zero (off) and {MaxRefreshReuseGrace}.");
         }
 
         if (string.IsNullOrWhiteSpace(ConnectionStringName))
