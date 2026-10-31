@@ -228,19 +228,35 @@ public class RefreshStampBindingTests
     }
 
     [Fact]
-    public async Task A_rotation_that_keeps_losing_the_race_gives_up_and_leaves_the_other_writers_stamp()
+    public async Task A_rotation_whose_swaps_run_out_still_moves_the_stamp_and_rebinds_nothing()
     {
         var user = AddUser();
-        var issued = await Tokens().IssueAsync(user.Id);
-        var other = user.SecurityStamp;
+        var stale = await Tokens().IssueAsync(user.Id);
+        var s1 = user.SecurityStamp;
+        RotateStamp(user);
+        var afterReset = await Tokens().IssueAsync(user.Id);
+        var changed = SecurityStampCache.NewStamp();
 
-        // The user is deleted between the read and the swaps: nothing to rotate, nothing thrown.
+        // One attempt: the swap from the stale S1 misses and the loop ends, so the rotation is forced.
+        await RefreshStampBinding.RotateAndRebindAsync(
+            userRepo, tokenRepo, new Dictionary<Guid, string> { [user.Id] = s1 }, changed, CancellationToken.None, maxSwapAttempts: 1);
+
+        Assert.Equal(changed, user.SecurityStamp);
+        Assert.Equal(RefreshOutcome.Invalid, (await Tokens().ValidateAndRotateAsync(stale.RawToken)).Outcome);
+        Assert.Equal(RefreshOutcome.Invalid, (await Tokens().ValidateAndRotateAsync(afterReset.RawToken)).Outcome);
+    }
+
+    [Fact]
+    public async Task A_rotation_for_a_user_who_no_longer_exists_does_nothing_and_does_not_throw()
+    {
+        var user = AddUser();
+        await Tokens().IssueAsync(user.Id);
         users.Clear();
+
         await RefreshStampBinding.RotateAndRebindAsync(
             userRepo, tokenRepo, new Dictionary<Guid, string> { [user.Id] = "gone" }, "new", CancellationToken.None);
 
-        Assert.Equal(other, tokens.Single().SecurityStamp);
-        _ = issued;
+        Assert.Empty(users);
     }
 
     [Fact]

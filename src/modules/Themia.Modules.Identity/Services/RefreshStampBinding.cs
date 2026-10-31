@@ -29,9 +29,8 @@ internal static class RefreshStampBinding
     /// <c>WHERE security_stamp = previous</c>, so it never overwrites that write; on a miss it re-reads the stamp that is current and swaps from
     /// it, up to <see cref="MaxSwapAttempts"/> times. The rotation must still happen: a token minted after the other commit carries that
     /// stamp and the roles as they were then, and only a new stamp cuts it. Sessions are rebound from the stamp actually swapped from, never
-    /// from the stale one, so a session the other writer ended stays ended while one opened after it follows. A user who vanishes or keeps
-    /// losing the race is left on the other writer's stamp (their sessions end at the next refresh: the safe direction). Without a repository
-    /// it only rotates. The rebind is a set-based UPDATE of the stamp column only, so a logout or reuse revoke that commits meanwhile is never
+    /// from the stale one, so a session the other writer ended stays ended while one opened after it follows. Without a repository
+    /// it only rotates. When the swaps run out the stamp is rotated unconditionally (no rebind), so tokens minted since are cut and nothing stale is revived. The rebind is a set-based UPDATE of the stamp column only, so a logout or reuse revoke that commits meanwhile is never
     /// overwritten.
     /// </remarks>
     public static async Task RotateAndRebindAsync(
@@ -39,12 +38,14 @@ internal static class RefreshStampBinding
         IRepository<RefreshToken, Guid>? refreshTokens,
         IReadOnlyDictionary<Guid, string> previousStamps,
         string newStamp,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        int maxSwapAttempts = MaxSwapAttempts)
     {
         foreach (var (userId, readStamp) in previousStamps)
         {
             var previous = readStamp;
-            for (var attempt = 0; attempt < MaxSwapAttempts; attempt++)
+            var swapped = false;
+            for (var attempt = 0; attempt < maxSwapAttempts; attempt++)
             {
                 var affected = await users.UpdateWhereAsync(
                     new UserByIdAndStampAnyTenantSpec(userId, previous),
@@ -60,6 +61,7 @@ internal static class RefreshStampBinding
                             cancellationToken).ConfigureAwait(false);
                     }
 
+                    swapped = true;
                     break;
                 }
 
@@ -71,6 +73,20 @@ internal static class RefreshStampBinding
 
                 previous = current.SecurityStamp;
             }
+
+            if (!swapped)
+            {
+                await ForceRotateAsync(users, userId, newStamp, cancellationToken).ConfigureAwait(false);
+            }
         }
     }
+
+    // The swaps ran out (or kept missing): rotate unconditionally and rebind nothing. The change that called us has already committed its
+    // roles/claims, so a stamp that stays put would leave tokens minted since with the old ones valid; moving it cuts them, and the sessions
+    // bound to the old stamp end at their next refresh (the safe direction). A user who no longer exists has nothing to rotate.
+    private static Task ForceRotateAsync(IRepository<User, Guid> users, Guid userId, string newStamp, CancellationToken cancellationToken) =>
+        users.UpdateWhereAsync(
+            new UsersByIdsAnyTenantSpec([userId]),
+            set => set.Set(u => u.SecurityStamp, newStamp),
+            cancellationToken);
 }
