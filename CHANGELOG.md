@@ -27,6 +27,30 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.51.0] - 2026-11-01
+
+### Added
+
+- **`Themia.Conversations`: retention sweep, legal hold and per-person erasure.** `IConversationRetention.SweepAsync(tenantId, SweepOptions)` marks closed conversations past `retention_until` as `Expired` (one set-based `UPDATE`) and purges expired ones in batches, returning a `SweepResult` (`SweepOutcome` `Completed`, `HoldPortMissing`; counts of expired, purged, held and failed). A purge asks `ILegalHoldPort` just before it claims the conversation (`Expired` to `Purging`), deletes the attachment files outside any transaction, then in one transaction writes the tombstone, deletes the children and the conversation (which frees the subject key) and raises a lifecycle event. A failed file or database step leaves `Purging`; the next sweep resumes it and asks the hold port again. Conversations that fail or are held do not use up the batch. `PlaceHoldAsync` and `ReleaseHoldAsync` (`HoldOutcome`, `HoldResult`) put a conversation on and off `LegalHold`; a `Purging` conversation answers `PurgeInProgress`.
+- **`IConversationDataSubject.ErasePersonAsync(actor, tenantId, PersonRef)`** erases one person (`PersonRef.ForMember`, `ForPartner`, `ForGuest`) across a tenant's conversations: their attachment files are deleted first, then per conversation, under the conversation row lock, their attachment rows and guest sessions are deleted, their messages redacted and the participant anonymised. Sequence numbers and the other participants are untouched; a second call is a no-op. Conversations under hold or being purged are deferred and listed in the `ErasureResult` (`ErasureOutcome` `Erased`, `PartiallyErased`, `Deferred`, `Refused`, `Invalid`); a file that cannot be deleted lists the conversation as failed with its rows untouched. There is no request queue in the package: the app calls again after a hold lifts.
+- **`IConversationLifecycleSink`** (default no-op) receives `Purged`, `ParticipantErased`, `HoldPlaced` and `HoldReleased` inside the transaction of the change, with ids and counts only. A sink that throws rolls the change back. `ConversationEvent` is unchanged.
+- **`ILegalHoldPort`** has no default. Without one, or with `ConversationOptions.NoLegalHoldPort` set, the sweep marks `Expired` but purges nothing and answers `HoldPortMissing`. A port that throws counts as held-or-unknown.
+- **`Themia.Conversations`: `IConversationOversight`**, staff reading a conversation they are not a participant of (`ReadAsync(actor, tenantId, conversationId, afterSeq, limit)` returning an `OversightPage` with an `OversightReadOutcome` `Listed`, `Refused`, `AuditPortMissing`, `AuditFailed`). It needs the new policy action `ConversationAction.OversightRead` and a `Member` actor with a user reference (partner, guest and system actors are refused in the package). It does not join the reader or move a read marker. **Every read is audited or nothing is returned**: `IConversationReadAudit.RecordAsync(connection, transaction, OversightRead, ...)` has no default and runs in the read transaction; the page is returned only after the commit. The entry carries ids, the reader's kind and user reference, a count and the read time, never text. Deduplication and audit retention belong to the app's port.
+- `Themia.Conversations` now references `Themia.Storage` (`IStorageProvider.DeleteAsync` for attachment files).
+
+### Changed
+
+- **(breaking) New enum members:** `ConversationRetentionState.Purging = 3`, and `ConversationAction.Hold = 8`, `ReleaseHold = 9`, `Erase = 10`, `OversightRead = 11`. A policy that allows by an exhaustive `switch` needs the new cases (the default policy still denies everything). `Erase` is tenant-wide: the target's `ConversationId` is `null`.
+- Predicates that read `retention_state <> 2` are now `IN (0, 1)`, so a `Purging` conversation cannot be reopened or joined; `OpenAsync` answers `PendingPurge` for it. No migration: `retention_state` is a smallint.
+- **`PostAsync` re-checks that the participant has not left** under the counter lock. A post that resolved its participant and then waited while an erasure committed used to leave an unredacted message behind; it now answers `Refused` and rolls the counter bump back. The same applies to a participant who left in the meantime.
+- **`MySqlConversationDialect` pins `UseAffectedRows=false`** on its connections (affected-row counts decide the claim and erase steps and must count matched rows). A test pins it.
+
+### Needs a human look
+
+- The oversight read shows message bodies as they are shown to a member participant (through the masker, unmasked by default). Allow `OversightRead` narrowly in your policy. Your `IConversationReadAudit` must let failures propagate: a port that catches its own SQL error and carries on can leave the transaction aborted (PostgreSQL); the read then answers `AuditFailed` and returns nothing. It must be safe for concurrent use. The state check and the page select are not locked together, so a purge that claims the room in between can leave a partial page (audited with its count).
+- Purge and erasure delete files outside the transaction. A hold that lands after the files were deleted but before the database transaction defers the conversation with its files already gone; a hold placed between the port's answer and the claim is not seen. Do not run two sweeps of one tenant at the same time.
+- Erasure and purge delete personal data for good. Decide `Hold`, `ReleaseHold`, `Erase` and `OversightRead` in your policy before you wire them, and check what your `ILegalHoldPort` treats as held.
+
 ## [0.50.0] - 2026-10-31
 
 ### Added
