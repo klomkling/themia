@@ -697,7 +697,7 @@ public abstract class IdentityStoreConformanceTests
     }
 
     [Fact]
-    public async Task Sealed_successors_are_cleared_when_the_successor_rotates_when_the_family_is_revoked_and_once_the_grace_has_passed()
+    public async Task Sealed_successors_are_cleared_by_a_family_revoke_and_by_the_next_rotation_once_the_grace_has_passed()
     {
         await ResetAsync();
         var clock = new FakeTimeProvider(DateTimeOffset.Parse("2026-06-15T00:00:00Z"));
@@ -708,26 +708,42 @@ public abstract class IdentityStoreConformanceTests
         async Task<bool> HasSealedSuccessorAsync(string raw) =>
             (await repository.FirstOrDefaultAsync(new Themia.Modules.Identity.Specifications.RefreshTokenByHashSpec(Themia.Modules.Identity.Hashing.TokenHasher.Hash(raw))))!.SuccessorCiphertext is not null;
 
-        // Rotating gives the parent a sealed successor; rotating the successor clears it again.
+        // Rotating gives the parent a sealed successor.
         var a0 = await s.RefreshTokens.IssueAsync(userId);
         Assert.True((await s.RefreshTokens.ValidateAndRotateAsync(a0.RawToken)).TryGetSuccess(out _, out var a1));
         Assert.True(await HasSealedSuccessorAsync(a0.RawToken));
-        Assert.True((await s.RefreshTokens.ValidateAndRotateAsync(a1.RawToken)).TryGetSuccess(out _, out var a2));
-        Assert.False(await HasSealedSuccessorAsync(a0.RawToken));
-        Assert.True(await HasSealedSuccessorAsync(a1.RawToken));
 
-        // Once the grace has passed, the next rotation of ANY of the user's tokens clears the aged ones (here: another session's).
+        // Rotating the successor leaves it (unusable: the successor is consumed), until the grace has passed and a later rotation sweeps it.
+        Assert.True((await s.RefreshTokens.ValidateAndRotateAsync(a1.RawToken)).TryGetSuccess(out _, out var a2));
+        Assert.True(await HasSealedSuccessorAsync(a0.RawToken));
         var b0 = await s.RefreshTokens.IssueAsync(userId);
+        Assert.True((await s.RefreshTokens.ValidateAndRotateAsync(b0.RawToken)).TryGetSuccess(out _, out _));   // inside the grace: nothing is aged yet
+        Assert.True(await HasSealedSuccessorAsync(a0.RawToken));
         clock.Advance(Grace + TimeSpan.FromSeconds(1));
-        Assert.True(await HasSealedSuccessorAsync(a1.RawToken));
-        Assert.True((await s.RefreshTokens.ValidateAndRotateAsync(b0.RawToken)).TryGetSuccess(out _, out _));
+        Assert.True((await s.RefreshTokens.ValidateAndRotateAsync(a2.RawToken)).TryGetSuccess(out _, out var a3));
+        Assert.False(await HasSealedSuccessorAsync(a0.RawToken));
         Assert.False(await HasSealedSuccessorAsync(a1.RawToken));
+        Assert.True(await HasSealedSuccessorAsync(a2.RawToken));   // the fresh one is kept
 
         // A revoked family keeps none.
-        Assert.True((await s.RefreshTokens.ValidateAndRotateAsync(a2.RawToken)).TryGetSuccess(out _, out var a3));
-        Assert.True(await HasSealedSuccessorAsync(a2.RawToken));
         await s.RefreshTokens.RevokeAsync(a3.RawToken, allForUser: false);
         Assert.False(await HasSealedSuccessorAsync(a2.RawToken));
+    }
+
+    [Fact]
+    public async Task A_replay_inside_the_grace_is_refused_after_the_user_s_sessions_were_revoked()
+    {
+        await ResetAsync();
+        var clock = new FakeTimeProvider(DateTimeOffset.Parse("2026-06-15T00:00:00Z"));
+        await using var s = NewScope(new TenantId("acme"), timeProvider: clock, refreshReuseGrace: Grace);
+        var userId = (await s.Users.CreateAsync("grace-revoke-all", "pw")).UserId!.Value;
+        var issue = await s.RefreshTokens.IssueAsync(userId);
+        Assert.True((await s.RefreshTokens.ValidateAndRotateAsync(issue.RawToken)).TryGetSuccess(out _, out var next));
+
+        await s.RefreshTokens.RevokeAllForUserAsync(userId);
+
+        Assert.False((await s.RefreshTokens.ValidateAndRotateAsync(issue.RawToken)).IsSuccess);
+        Assert.False((await s.RefreshTokens.ValidateAndRotateAsync(next.RawToken)).IsSuccess);
     }
 
     [Fact]

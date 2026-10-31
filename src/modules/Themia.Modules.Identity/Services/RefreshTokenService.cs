@@ -140,17 +140,6 @@ public sealed class RefreshTokenService : IRefreshTokenService, ISessionRevoker
                     }
 
                     tokens.Update(match);
-
-                    // The grandparent's sealed successor (this token) can no longer be replayed: its successor has rotated.
-                    if (match.ReplacedTokenId is { } predecessorId)
-                    {
-                        var predecessor = await tokens.FirstOrDefaultAsync(new RefreshTokenByIdSpec(predecessorId), ct).ConfigureAwait(false);
-                        if (predecessor is { SuccessorCiphertext: not null })
-                        {
-                            predecessor.SuccessorCiphertext = null;
-                            tokens.Update(predecessor);
-                        }
-                    }
                 },
                 cancellationToken).ConfigureAwait(false);
         }

@@ -463,7 +463,9 @@ services.AddThemiaIdentityCore(o => o.RefreshReuseGrace = TimeSpan.FromSeconds(3
 - **How it works, and what it stores:** while the grace is on, the rotated row keeps `successor_ciphertext`: the successor's raw token sealed with
   AES-GCM under a key derived (HKDF-SHA256) from the rotated token's own raw value, with the row id as associated data. Only a holder of that raw value can
   read it, and the raw value is never stored, so a database copy alone yields nothing. There is **no server secret to provision or rotate**. The column is
-  cleared when the successor rotates or the family is revoked, and is never read after the grace.
+  cleared by a family revoke (reuse detected, logout of one session) and by the next rotation of any of the user's tokens once the grace has passed, and is never read
+  after the grace. A revoke-all or a rotated successor leaves it in place but unusable (a revoked or consumed successor is refused); a deployment that switches the
+  grace off later keeps old values, which cannot be opened without the rotated token's raw value.
 - **Schema:** one nullable column `identity.refresh_tokens.successor_ciphertext` (migration `202610310001`, PostgreSQL and SQL Server like the rest of Identity;
   MySQL is not supported by this module). It stays empty for a deployment that never enables the grace.
 - The window is measured with the clock of the node that wrote the rotation; with several nodes keep their clocks in sync (or keep the grace short).
