@@ -370,3 +370,34 @@ Themia.Conversations.SweepResult.SweepResult(Themia.Conversations.SweepOutcome O
 static Themia.Conversations.PersonRef.ForGuest(Themia.Conversations.GuestContact! contact) -> Themia.Conversations.PersonRef!
 static Themia.Conversations.PersonRef.ForMember(string! userRef) -> Themia.Conversations.PersonRef!
 static Themia.Conversations.PersonRef.ForPartner(string! userRef) -> Themia.Conversations.PersonRef!
+Themia.Conversations.ConversationAction.OversightRead = 11 -> Themia.Conversations.ConversationAction
+Themia.Conversations.OversightReadOutcome
+Themia.Conversations.OversightReadOutcome.Listed = 0 -> Themia.Conversations.OversightReadOutcome
+Themia.Conversations.OversightReadOutcome.Refused = 1 -> Themia.Conversations.OversightReadOutcome
+Themia.Conversations.OversightReadOutcome.AuditPortMissing = 2 -> Themia.Conversations.OversightReadOutcome
+Themia.Conversations.OversightReadOutcome.AuditFailed = 3 -> Themia.Conversations.OversightReadOutcome
+Themia.Conversations.OversightPage
+Themia.Conversations.OversightPage.OversightPage(Themia.Conversations.OversightReadOutcome Outcome, System.Collections.Generic.IReadOnlyList<Themia.Conversations.ConversationMessage!>! Messages) -> void
+Themia.Conversations.OversightPage.Listed.get -> bool
+Themia.Conversations.OversightPage.Outcome.get -> Themia.Conversations.OversightReadOutcome
+Themia.Conversations.OversightPage.Outcome.init -> void
+Themia.Conversations.OversightPage.Messages.get -> System.Collections.Generic.IReadOnlyList<Themia.Conversations.ConversationMessage!>!
+Themia.Conversations.OversightPage.Messages.init -> void
+Themia.Conversations.OversightRead
+Themia.Conversations.OversightRead.OversightRead(string! TenantId, System.Guid ConversationId, Themia.Conversations.ConversationActorKind ActorKind, string! ActorUserRef, int Count, System.DateTimeOffset ReadAt) -> void
+Themia.Conversations.OversightRead.TenantId.get -> string!
+Themia.Conversations.OversightRead.TenantId.init -> void
+Themia.Conversations.OversightRead.ConversationId.get -> System.Guid
+Themia.Conversations.OversightRead.ConversationId.init -> void
+Themia.Conversations.OversightRead.ActorKind.get -> Themia.Conversations.ConversationActorKind
+Themia.Conversations.OversightRead.ActorKind.init -> void
+Themia.Conversations.OversightRead.ActorUserRef.get -> string!
+Themia.Conversations.OversightRead.ActorUserRef.init -> void
+Themia.Conversations.OversightRead.Count.get -> int
+Themia.Conversations.OversightRead.Count.init -> void
+Themia.Conversations.OversightRead.ReadAt.get -> System.DateTimeOffset
+Themia.Conversations.OversightRead.ReadAt.init -> void
+Themia.Conversations.IConversationOversight
+Themia.Conversations.IConversationOversight.ReadAsync(Themia.Conversations.ConversationActor! actor, string! tenantId, System.Guid conversationId, long afterSeq, int limit, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Conversations.OversightPage!>!
+Themia.Conversations.IConversationReadAudit
+Themia.Conversations.IConversationReadAudit.RecordAsync(System.Data.Common.DbConnection! connection, System.Data.Common.DbTransaction! transaction, Themia.Conversations.OversightRead! entry, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
