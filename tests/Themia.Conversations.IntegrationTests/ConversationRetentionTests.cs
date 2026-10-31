@@ -247,7 +247,7 @@ public abstract class ConversationRetentionTests(ConversationEngineFixture fixtu
     }
 
     [Fact]
-    public async Task Sweep_ShouldKeepTheRows_WhenAStorageDeleteFails_AndResumeWithoutAskingThePortAgain()
+    public async Task Sweep_ShouldKeepTheRows_WhenAStorageDeleteFails_AndResumeAskingThePortAgain()
     {
         var tenant = NewTenant();
         var (conversation, key) = await ClosedConversationAsync(tenant, "B-1");
@@ -266,8 +266,52 @@ public abstract class ConversationRetentionTests(ConversationEngineFixture fixtu
         var second = await Retention(port, storage).SweepAsync(tenant);
 
         Assert.Equal(1, second.Purged);
-        Assert.Empty(port.Asked);
+        Assert.Equal(["B-1"], port.Asked);
         Assert.Equal(0, await fixture.ScalarAsync<int>("SELECT COUNT(*) FROM conversations WHERE id = @Id;", new { Id = conversation }));
+    }
+
+    [Fact]
+    public async Task Sweep_ShouldStopAResumedPurge_WhenAHoldWasPlacedAfterTheClaim()
+    {
+        var tenant = NewTenant();
+        var (conversation, key) = await ClosedConversationAsync(tenant, "B-1");
+        var storage = new RecordingStorage();
+        storage.FailOn.Add(key);
+        await Retention(new FakeHoldPort(), storage).SweepAsync(tenant);
+        Assert.Equal((int)ConversationRetentionState.Purging, await StateOfAsync(conversation));
+        storage.FailOn.Clear();
+
+        var resumed = await Retention(new FakeHoldPort("B-1"), storage).SweepAsync(tenant);
+
+        Assert.Equal(1, resumed.HeldSkipped);
+        Assert.Equal(0, resumed.Purged);
+        Assert.Equal((int)ConversationRetentionState.LegalHold, await StateOfAsync(conversation));
+        Assert.Equal(2, await CountAsync("conversation_messages", conversation));
+    }
+
+    [Fact]
+    public async Task Sweep_ShouldNotLetConversationsThatKeepFailingStarveTheBatch()
+    {
+        var tenant = NewTenant();
+        var storage = new RecordingStorage();
+        var survivors = new List<Guid>();
+        for (var i = 0; i < 3; i++)
+        {
+            var (conversation, key) = await ClosedConversationAsync(tenant, $"B-{i}");
+            if (i < 2)
+            {
+                storage.FailOn.Add(key); // two of the three can never be purged
+            }
+            else
+            {
+                survivors.Add(conversation);
+            }
+        }
+
+        var result = await Retention(new FakeHoldPort(), storage).SweepAsync(tenant, new SweepOptions(1));
+
+        Assert.Equal(1, result.Purged);
+        Assert.Equal(0, await fixture.ScalarAsync<int>("SELECT COUNT(*) FROM conversations WHERE id = @Id;", new { Id = survivors[0] }));
     }
 
     [Fact]

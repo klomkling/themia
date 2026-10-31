@@ -35,7 +35,7 @@ internal sealed class ConversationRetentionService(
         ArgumentOutOfRangeException.ThrowIfGreaterThan(batch, MaxBatchSize);
 
         await using var connection = await OpenConnectionAsync(cancellationToken);
-        var expired = await MarkExpiredAsync(connection, tenantId, batch, cancellationToken);
+        var expired = await MarkExpiredAsync(connection, tenantId, cancellationToken);
 
         var portMissing = holdPort is null && !options.NoLegalHoldPort;
         if (portMissing)
@@ -47,20 +47,38 @@ internal sealed class ConversationRetentionService(
         var purged = 0;
         var held = 0;
         var failed = 0;
-        foreach (var candidate in await ClaimableAsync(connection, tenantId, batch, cancellationToken))
+        Guid? after = null;
+
+        // Page by id so a conversation that keeps failing is passed over within this call instead of heading every batch: only purges use up the batch size.
+        while (purged < batch)
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            switch (await PurgeOneAsync(connection, tenantId, candidate, cancellationToken))
+            var page = await ClaimableAsync(connection, tenantId, after, batch, cancellationToken);
+            if (page.Count == 0)
             {
-                case PurgeStep.Purged:
-                    purged++;
+                break;
+            }
+
+            foreach (var candidate in page)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                after = candidate.Id;
+                switch (await PurgeOneAsync(connection, tenantId, candidate, cancellationToken))
+                {
+                    case PurgeStep.Purged:
+                        purged++;
+                        break;
+                    case PurgeStep.Held:
+                        held++;
+                        break;
+                    case PurgeStep.Failed:
+                        failed++;
+                        break;
+                }
+
+                if (purged >= batch)
+                {
                     break;
-                case PurgeStep.Held:
-                    held++;
-                    break;
-                case PurgeStep.Failed:
-                    failed++;
-                    break;
+                }
             }
         }
 
@@ -68,50 +86,36 @@ internal sealed class ConversationRetentionService(
         return new SweepResult(SweepOutcome.Completed, expired, purged, held, failed);
     }
 
-    private async Task<int> MarkExpiredAsync(DbConnection connection, string tenantId, int batch, CancellationToken cancellationToken)
-    {
-        var now = Now();
-        var due = (await connection.QueryAsync<Guid>(new CommandDefinition(
-            "SELECT id FROM conversations WHERE tenant_id = @TenantId AND state = 1 AND retention_state = 0 AND retention_until <= @Now ORDER BY retention_until, id " + dialect.LimitClause + ";",
-            new { TenantId = tenantId, Now = now, Limit = batch },
-            cancellationToken: cancellationToken))).ToList();
+    /// <summary>One set-based statement for every due conversation of the tenant: cheap, and it keeps a stuck conversation from holding the others back as Active.</summary>
+    private async Task<int> MarkExpiredAsync(DbConnection connection, string tenantId, CancellationToken cancellationToken) =>
+        await connection.ExecuteAsync(new CommandDefinition(
+            "UPDATE conversations SET retention_state = 2 WHERE tenant_id = @TenantId AND state = 1 AND retention_state = 0 AND retention_until <= @Now;",
+            new { TenantId = tenantId, Now = Now() },
+            cancellationToken: cancellationToken));
 
-        var marked = 0;
-        foreach (var id in due)
-        {
-            // The same predicate again: a conversation reopened or held since the read is left alone.
-            marked += await connection.ExecuteAsync(new CommandDefinition(
-                "UPDATE conversations SET retention_state = 2 WHERE tenant_id = @TenantId AND id = @Id AND state = 1 AND retention_state = 0 AND retention_until <= @Now;",
-                new { TenantId = tenantId, Id = id, Now = now },
-                cancellationToken: cancellationToken));
-        }
-
-        return marked;
-    }
-
-    private async Task<List<Candidate>> ClaimableAsync(DbConnection connection, string tenantId, int batch, CancellationToken cancellationToken) =>
+    private async Task<List<Candidate>> ClaimableAsync(DbConnection connection, string tenantId, Guid? after, int pageSize, CancellationToken cancellationToken) =>
         (await connection.QueryAsync<Candidate>(new CommandDefinition(
             "SELECT id AS Id, subject_type AS SubjectType, subject_id AS SubjectId, retention_state AS RetentionState FROM conversations " +
-            "WHERE tenant_id = @TenantId AND retention_state IN (2, 3) ORDER BY retention_until, id " + dialect.LimitClause + ";",
-            new { TenantId = tenantId, Limit = batch },
+            "WHERE tenant_id = @TenantId AND retention_state IN (2, 3)" + (after is null ? string.Empty : " AND id > @After") + " ORDER BY id " + dialect.LimitClause + ";",
+            new { TenantId = tenantId, After = after, Limit = pageSize },
             cancellationToken: cancellationToken))).ToList();
 
     private async Task<PurgeStep> PurgeOneAsync(DbConnection connection, string tenantId, Candidate candidate, CancellationToken cancellationToken)
     {
         try
         {
-            // A conversation already claimed by an earlier sweep resumes without asking the port again: the hold was decided before the claim.
+            // The port is asked on every attempt, a resumed claim included: a hold placed after an earlier sweep claimed the conversation still stops the purge.
+            if (holdPort is not null && await holdPort.IsHeldAsync(tenantId, new ConversationSubject(candidate.SubjectType, candidate.SubjectId), cancellationToken))
+            {
+                var held = await connection.ExecuteAsync(new CommandDefinition(
+                    "UPDATE conversations SET retention_state = 1 WHERE tenant_id = @TenantId AND id = @Id AND retention_state IN (2, 3);",
+                    new { TenantId = tenantId, candidate.Id },
+                    cancellationToken: cancellationToken));
+                return held == 1 ? PurgeStep.Held : PurgeStep.Skipped;
+            }
+
             if (candidate.RetentionState == Expired)
             {
-                if (holdPort is not null && await holdPort.IsHeldAsync(tenantId, new ConversationSubject(candidate.SubjectType, candidate.SubjectId), cancellationToken))
-                {
-                    var held = await connection.ExecuteAsync(new CommandDefinition(
-                        "UPDATE conversations SET retention_state = 1 WHERE tenant_id = @TenantId AND id = @Id AND retention_state = 2;",
-                        new { TenantId = tenantId, candidate.Id },
-                        cancellationToken: cancellationToken));
-                    return held == 1 ? PurgeStep.Held : PurgeStep.Skipped;
-                }
-
                 var claimed = await connection.ExecuteAsync(new CommandDefinition(
                     "UPDATE conversations SET retention_state = 3 WHERE tenant_id = @TenantId AND id = @Id AND retention_state = 2;",
                     new { TenantId = tenantId, candidate.Id },

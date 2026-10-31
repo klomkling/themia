@@ -12,7 +12,7 @@ public enum SweepOutcome
 }
 
 /// <summary>What a retention sweep does in one call.</summary>
-/// <param name="BatchSize">The most conversations to mark and the most to purge in this call (1 to 1000). Call again to continue.</param>
+/// <param name="BatchSize">The most conversations to purge in this call (1 to 1000); conversations that fail or are held do not count against it. Call again to continue. Marking expired is not limited.</param>
 public sealed record SweepOptions(int BatchSize = 100);
 
 /// <summary>The result of <see cref="IConversationRetention.SweepAsync"/>.</summary>
@@ -79,7 +79,7 @@ public interface ILegalHoldPort
 /// <summary>Retention: expire closed conversations, purge them, and hold them back.</summary>
 public interface IConversationRetention
 {
-    /// <summary>Marks the tenant's closed conversations past their retention date as expired and purges the expired ones, a batch at a time.</summary>
+    /// <summary>Marks the tenant's closed conversations past their retention date as expired and purges the expired ones, up to a batch per call.</summary>
     /// <param name="tenantId">The tenant.</param>
     /// <param name="options">The batch size.</param>
     /// <param name="cancellationToken">The cancellation token.</param>

@@ -84,15 +84,15 @@ var erased = await dataSubject.ErasePersonAsync(dsrActor, tenantId, PersonRef.Fo
 ```
 
 - **Sweep.** `IConversationRetention.SweepAsync` moves closed conversations past `retention_until` to `Expired` (`OpenAsync` already answers `PendingPurge` for them), then
-  purges the expired ones, at most `BatchSize` of each per call: call again to continue. It returns `Expired`, `Purged`, `HeldSkipped` and `Failed` counts.
+  purges the expired ones, at most `BatchSize` purges per call (marking is one statement, and conversations that fail or are held do not use up the batch, so a stuck one cannot starve the rest): call again to continue. It returns `Expired`, `Purged`, `HeldSkipped` and `Failed` counts.
 - **No hold port, no purge.** There is no default `ILegalHoldPort`: one that said "not held" would purge under a hold. Without a port the sweep still marks `Expired`, purges
   nothing, logs one warning and returns `SweepOutcome.HoldPortMissing`. Register a port, or set `ConversationOptions.NoLegalHoldPort` to say you have none. A port that throws
   counts as held-or-unknown: the conversation is kept and counted in `Failed`.
 - **Purge protocol.** The port is asked just before the conversation is claimed (`Expired` to `Purging`; a port answer of "held" makes it `LegalHold` and skips it). The files
   are then deleted outside any transaction (`IStorageProvider.DeleteAsync` is idempotent; the key is the stored `storage_key` verbatim). One transaction then re-verifies
   `Purging`, writes the tombstone (subject, message and attachment counts), deletes attachments, guest sessions, messages, participants, events and finally the conversation (so
-  the subject opens a new one), and raises `ConversationLifecycleKind.Purged`. A failed file delete or database step leaves the conversation `Purging`; the next sweep resumes it
-  without asking the port again. A `Purging` conversation cannot be reopened, joined or held (`HoldOutcome.PurgeInProgress`).
+  the subject opens a new one), and raises `ConversationLifecycleKind.Purged`. A failed file delete or database step leaves the conversation `Purging`; the next sweep resumes it and asks the port again, so a hold placed in between
+  stops the purge (files already deleted stay deleted). A `Purging` conversation cannot be reopened, joined or held (`HoldOutcome.PurgeInProgress`).
 - **The accepted race.** A hold the app places between the port answering "not held" and the claim is not seen. Place holds through `PlaceHoldAsync` as well (it locks the row and
   sets `LegalHold`), and keep the port the source of truth at sweep time. `ReleaseHoldAsync` returns the conversation to `Active` and leaves `retention_until`, so the next sweep
   may expire it at once. The package never lifts a hold by itself.
