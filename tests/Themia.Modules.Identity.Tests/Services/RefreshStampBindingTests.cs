@@ -206,6 +206,49 @@ public class RefreshStampBindingTests
     }
 
     [Fact]
+    public async Task A_rotation_that_lost_the_race_to_a_password_reset_neither_overwrites_it_nor_revives_old_sessions()
+    {
+        var user = AddUser();
+        var stale = await Tokens().IssueAsync(user.Id);   // bound to S1
+        var s1 = user.SecurityStamp;
+        RotateStamp(user);                                  // a password reset commits S2 after the role change read S1
+        var s2 = user.SecurityStamp;
+
+        await RefreshStampBinding.RotateAndRebindAsync(
+            userRepo, tokenRepo, new Dictionary<Guid, string> { [user.Id] = s1 }, SecurityStampCache.NewStamp(), CancellationToken.None);
+
+        Assert.Equal(s2, user.SecurityStamp);
+        Assert.Equal(s1, tokens.Single().SecurityStamp);
+        Assert.Equal(RefreshOutcome.Invalid, (await Tokens().ValidateAndRotateAsync(stale.RawToken)).Outcome);
+    }
+
+    [Fact]
+    public async Task Rebind_writes_only_the_stamp_column_and_leaves_revoked_and_rotated_rows_as_they_are()
+    {
+        var user = AddUser();
+        var issued = await Tokens().IssueAsync(user.Id);
+        Assert.True((await Tokens().ValidateAndRotateAsync(issued.RawToken)).TryGetSuccess(out _, out var next));
+        var other = await Tokens().IssueAsync(user.Id);
+        await Tokens().RevokeAsync(other.RawToken, allForUser: false);
+        var snapshot = tokens.Select(t => (t.Id, t.ConsumedAt, t.RevokedAt, t.ReplacedById, t.SecurityStamp)).ToList();
+
+        await RefreshStampBinding.RotateAndRebindAsync(
+            userRepo, tokenRepo, new Dictionary<Guid, string> { [user.Id] = user.SecurityStamp }, "new-stamp", CancellationToken.None);
+
+        foreach (var before in snapshot)
+        {
+            var after = tokens.Single(t => t.Id == before.Id);
+            Assert.Equal(before.ConsumedAt, after.ConsumedAt);
+            Assert.Equal(before.RevokedAt, after.RevokedAt);
+            Assert.Equal(before.ReplacedById, after.ReplacedById);
+        }
+
+        Assert.Equal("new-stamp", user.SecurityStamp);
+        Assert.Equal(["new-stamp"], tokens.Where(t => t.RevokedAt is null).Select(t => t.SecurityStamp).Distinct());
+        Assert.True((await Tokens().ValidateAndRotateAsync(next.RawToken)).TryGetSuccess(out _, out _));
+    }
+
+    [Fact]
     public async Task Editing_a_role_claim_keeps_every_holders_session_alive_but_not_a_revoked_one()
     {
         var holder = AddUser("holder");

@@ -1,5 +1,4 @@
 using Themia.Framework.Data.Abstractions.Repositories;
-using Themia.Framework.Data.Abstractions.UnitOfWork;
 using Themia.Modules.Identity.Abstractions.Entities;
 using Themia.Modules.Identity.Specifications;
 
@@ -18,38 +17,37 @@ namespace Themia.Modules.Identity.Services;
 /// </remarks>
 internal static class RefreshStampBinding
 {
-    private const int BatchSize = 500;
-
     /// <summary>
-    /// Stages the rebind of each user's live rows from that user's previous stamp to <paramref name="newStamp"/> and saves it.
-    /// Call inside the transaction that rotates the users' stamps. No-op without a repository.
+    /// Rotates each user's stamp from <paramref name="previousStamps"/> to <paramref name="newStamp"/> with a conditional write, then
+    /// moves the user's live sessions bound to the previous stamp to the new one. Run inside the transaction of the change that needs
+    /// the rotation.
     /// </summary>
-    public static async Task RebindAsync(
+    /// <remarks>
+    /// The previous stamp was read earlier, and a password reset can commit in between. The write is therefore
+    /// <c>WHERE security_stamp = previous</c>: on a miss the user keeps the concurrent rotation's stamp (which already cut the
+    /// access tokens) and is NOT rebound, so the sessions the reset ended stay ended. The rebind is a set-based UPDATE of the stamp column
+    /// only, so a logout or reuse revoke that commits meanwhile is never overwritten. Without a repository it only rotates.
+    /// </remarks>
+    public static async Task RotateAndRebindAsync(
+        IRepository<User, Guid> users,
         IRepository<RefreshToken, Guid>? refreshTokens,
-        IUnitOfWork unitOfWork,
         IReadOnlyDictionary<Guid, string> previousStamps,
         string newStamp,
         CancellationToken cancellationToken)
     {
-        if (refreshTokens is null || previousStamps.Count == 0)
+        foreach (var (userId, previous) in previousStamps)
         {
-            return;
-        }
-
-        // Batched: Dapper sends one parameter per id and SQL Server caps a command at 2,100.
-        foreach (var batch in previousStamps.Keys.Chunk(BatchSize))
-        {
-            var rows = await refreshTokens.ListAsync(new UnrevokedRefreshTokensByUsersSpec(batch), cancellationToken).ConfigureAwait(false);
-            foreach (var row in rows)
+            var affected = await users.UpdateWhereAsync(
+                new UserByIdAndStampAnyTenantSpec(userId, previous),
+                set => set.Set(u => u.SecurityStamp, newStamp),
+                cancellationToken).ConfigureAwait(false);
+            if (affected == 1 && refreshTokens is not null)
             {
-                if (row.SecurityStamp is not null && row.SecurityStamp == previousStamps[row.UserId])
-                {
-                    row.SecurityStamp = newStamp;
-                    refreshTokens.Update(row);
-                }
+                await refreshTokens.UpdateWhereAsync(
+                    new UnrevokedRefreshTokensBoundToSpec(userId, previous),
+                    set => set.Set(t => t.SecurityStamp, newStamp),
+                    cancellationToken).ConfigureAwait(false);
             }
         }
-
-        await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
     }
 }

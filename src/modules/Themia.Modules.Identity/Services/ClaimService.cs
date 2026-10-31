@@ -216,18 +216,11 @@ public sealed class ClaimService : IClaimService
                 rotated = await affectedUserIds(ct).ConfigureAwait(false);
                 foreach (var batch in rotated.Chunk(StampRotationBatchSize))
                 {
-                    var stamp = SecurityStampCache.NewStamp();
-                    // The stamps being replaced, read first: only sessions bound to them follow the rotation.
-                    var previous = refreshTokens is null
-                        ? new Dictionary<Guid, string>()
-                        : (await users.ListAsync(new UsersByIdsAnyTenantSpec(batch), ct).ConfigureAwait(false))
-                            .ToDictionary(u => u.Id, u => u.SecurityStamp);
-                    await users.UpdateWhereAsync(
-                        new UsersByIdsAnyTenantSpec(batch),
-                        set => set.Set(u => u.SecurityStamp, stamp),
-                        ct).ConfigureAwait(false);
-                    // The sessions are still legitimate (refresh rebuilds the claims from the database): they follow the stamp.
-                    await RefreshStampBinding.RebindAsync(refreshTokens, unitOfWork, previous, stamp, ct).ConfigureAwait(false);
+                    // The stamps being replaced, read first; the write below is conditional on them (see RotateAndRebindAsync).
+                    var previous = (await users.ListAsync(new UsersByIdsAnyTenantSpec(batch), ct).ConfigureAwait(false))
+                        .ToDictionary(u => u.Id, u => u.SecurityStamp);
+                    await RefreshStampBinding.RotateAndRebindAsync(
+                        users, refreshTokens, previous, SecurityStampCache.NewStamp(), ct).ConfigureAwait(false);
                 }
             },
             cancellationToken).ConfigureAwait(false);

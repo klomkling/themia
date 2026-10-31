@@ -224,9 +224,14 @@ public class SecurityStampRotationTests
         var user = SeedUser();
         var role = SeedRole();
 
+        var before = user.SecurityStamp;
+
         await service.AssignRoleAsync(user.Id, role.Id);
 
-        Assert.Equal(2, uow.SavesInsideTransaction.Count);
+        // The stamp is now a conditional set-based write (it needs no SaveChanges of its own) that runs inside the same transaction
+        // as the membership save, which is the only save left.
+        Assert.NotEqual(before, user.SecurityStamp);
+        Assert.Single(uow.SavesInsideTransaction);
         Assert.All(uow.SavesInsideTransaction, inside => Assert.True(inside));
     }
 
@@ -242,9 +247,12 @@ public class SecurityStampRotationTests
         var user = SeedUser();
         var role = SeedRole(user);
 
+        var before = user.SecurityStamp;
+
         Assert.True(await service.RemoveRoleAsync(user.Id, role.Id));
 
-        Assert.Equal(2, uow.SavesInsideTransaction.Count);
+        Assert.NotEqual(before, user.SecurityStamp);
+        Assert.Single(uow.SavesInsideTransaction);
         Assert.All(uow.SavesInsideTransaction, inside => Assert.True(inside));
     }
 }

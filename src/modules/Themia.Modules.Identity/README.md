@@ -454,9 +454,9 @@ revoked; `IRefreshTokenService.IsSessionLiveAsync` (and so `IAuthTokenIssuer.Ren
 - **Change password, keep this device:** call `SetPasswordAsync` first, THEN `ISessionRevoker.RevokeAllForUserExceptAsync(userId, sid)`.
   The kept session is rebound to the new stamp; in the reverse order it ends at its next refresh. `sid` must be the authenticated
   principal's session id, never unauthenticated input: the method checks the family is the user's and live, not that it is the caller's.
-- **Upgrade:** sessions opened before the migration have no stamp. They are accepted once and bound to the stamp current at their next
-  refresh, so they are protected only from then on. If that matters, call `RevokeAllForUserAsync` once for users whose password was
-  reset recently.
+- **Upgrade:** the migration binds the live sessions open at that moment to their user's current stamp, so the first credential event after
+  the upgrade ends them. A row written later by a node that has not been upgraded yet stays unbound (NULL): it is accepted once and bound to
+  the stamp current at its next refresh, so during a rolling deploy keep `RevokeAllForUserAsync` after a password reset until every node runs this version.
 - A refresh replayed inside `RefreshReuseGrace` after such a change revokes the family and returns `Invalid` (not `ReuseDetected`, which
   is the theft path).
 
