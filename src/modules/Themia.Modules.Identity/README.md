@@ -462,6 +462,27 @@ var renewed = await issuer.RenewSessionAsync(userId, sessionId, request, ct);   
   types, it cannot tell a legitimate app claim from a forged one.
 - Not covered: principals that are not `User` rows (a service or bot token) stay in the app.
 - A custom `IRefreshTokenService` must implement `IsSessionLiveAsync` for `RenewSessionAsync` to work; the default answers false (fail closed).
+## Sessions follow the security stamp
+
+A refresh session is bound to the user's security stamp at the moment it was issued (`identity.refresh_tokens.security_stamp`,
+migration `202610310002`, nullable). When the stamp has changed, the next refresh is refused (`Invalid`) and the family is
+revoked; `IRefreshTokenService.IsSessionLiveAsync` (and so `IAuthTokenIssuer.RenewSessionAsync`) is false.
+
+- **Ends sessions:** a password reset (`SetPasswordAsync`) and a deactivate or reactivate (`SetActiveAsync`). You no longer need to
+  remember `RevokeAllForUserAsync` after these; an app that already calls it keeps working.
+- **Keeps sessions:** a role or role-claim change rotates the stamp (to cut stale access tokens) but rebinds the user's live sessions
+  to the new stamp, because refresh rebuilds the principal from the database. Only sessions bound to the stamp the user held just
+  before the rotation follow it, so a session that predates a password reset is not revived by a later role edit.
+  A re-hash of the password at login (a hasher cost bump) no longer rotates the stamp at all.
+- **Change password, keep this device:** call `SetPasswordAsync` first, THEN `ISessionRevoker.RevokeAllForUserExceptAsync(userId, sid)`.
+  The kept session is rebound to the new stamp; in the reverse order it ends at its next refresh. `sid` must be the authenticated
+  principal's session id, never unauthenticated input: the method checks the family is the user's and live, not that it is the caller's.
+- **Upgrade:** sessions opened before the migration have no stamp. They are accepted once and bound to the stamp current at their next
+  refresh, so they are protected only from then on. If that matters, call `RevokeAllForUserAsync` once for users whose password was
+  reset recently.
+- A refresh replayed inside `RefreshReuseGrace` after such a change revokes the family and returns `Invalid` (not `ReuseDetected`, which
+  is the theft path).
+
 ## Refresh reuse grace (parallel refreshes)
 
 A web app that refreshes per request with no shared memory can present the same refresh token twice within milliseconds (two tabs, parallel

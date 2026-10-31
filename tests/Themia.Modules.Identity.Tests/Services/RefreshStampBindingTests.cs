@@ -173,6 +173,39 @@ public class RefreshStampBindingTests
     }
 
     [Fact]
+    public async Task A_role_edit_does_not_revive_a_session_that_predates_a_password_reset()
+    {
+        var user = AddUser();
+        var role = new Role { Name = "r", NormalizedName = "R", TenantId = Acme };
+        role.SetId(Guid.NewGuid());
+        roles.Add(role);
+        var stale = await Tokens().IssueAsync(user.Id);   // e.g. a stolen session
+        RotateStamp(user);                                  // password reset: stale is dead at its next refresh, not yet refused
+        var current = await Tokens().IssueAsync(user.Id);   // the user signs in again afterwards
+
+        await Roles().AssignRoleAsync(user.Id, role.Id);
+
+        Assert.Equal(RefreshOutcome.Invalid, (await Tokens().ValidateAndRotateAsync(stale.RawToken)).Outcome);
+        Assert.True((await Tokens().ValidateAndRotateAsync(current.RawToken)).TryGetSuccess(out _, out _));
+    }
+
+    [Fact]
+    public async Task A_claim_edit_does_not_revive_a_stale_session_of_a_holder()
+    {
+        var holder = AddUser("holder");
+        var role = new Role { Name = "r", NormalizedName = "R", TenantId = Acme };
+        role.SetId(Guid.NewGuid());
+        roles.Add(role);
+        await Roles().AssignRoleAsync(holder.Id, role.Id);
+        var stale = await Tokens().IssueAsync(holder.Id);
+        RotateStamp(holder);   // password reset
+
+        await Claims().AddRoleClaimAsync(role.Id, "perm", "x");
+
+        Assert.Equal(RefreshOutcome.Invalid, (await Tokens().ValidateAndRotateAsync(stale.RawToken)).Outcome);
+    }
+
+    [Fact]
     public async Task Editing_a_role_claim_keeps_every_holders_session_alive_but_not_a_revoked_one()
     {
         var holder = AddUser("holder");
