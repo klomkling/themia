@@ -28,12 +28,26 @@ public abstract class ConversationOversightTests(ConversationEngineFixture fixtu
 
         public Exception? Fail { get; set; }
 
+        /// <summary>Runs a failing statement on the transaction and swallows the error, like a port that dedupes on a unique violation.</summary>
+        public bool SwallowSqlError { get; set; }
+
         public async Task RecordAsync(DbConnection connection, DbTransaction transaction, OversightRead entry, CancellationToken cancellationToken = default)
         {
             Entries.Add(entry);
             if (table is not null)
             {
                 await connection.ExecuteAsync(new CommandDefinition($"INSERT INTO {table} (id) VALUES (@Id);", new { Id = entry.ConversationId.ToString("N") }, transaction, cancellationToken: cancellationToken));
+            }
+
+            if (SwallowSqlError)
+            {
+                try
+                {
+                    await connection.ExecuteAsync(new CommandDefinition("SELECT * FROM table_that_does_not_exist_oversight;", transaction: transaction, cancellationToken: cancellationToken));
+                }
+                catch (DbException)
+                {
+                }
             }
 
             if (Fail is not null)
@@ -250,6 +264,26 @@ public abstract class ConversationOversightTests(ConversationEngineFixture fixtu
         var audit = new SpyAudit(table) { Fail = new InvalidOperationException("audit store down") };
 
         var page = await Oversight(store, audit).ReadAsync(Member("staff"), tenant, room, 0, 50);
+
+        Assert.Equal(OversightReadOutcome.AuditFailed, page.Outcome);
+        Assert.Empty(page.Messages);
+        Assert.Equal(0, await fixture.ScalarAsync<int>($"SELECT COUNT(*) FROM {table};"));
+    }
+
+    [Fact]
+    public async Task Read_ShouldAnswerAuditFailed_WhenThePortSwallowedASqlErrorThatAbortedTheTransaction()
+    {
+        if (fixture is not PostgresConversationFixture)
+        {
+            return; // only PostgreSQL aborts the whole transaction on a failed statement
+        }
+
+        var tenant = NewTenant();
+        var store = Store();
+        var room = await RoomAsync(store, tenant, "one");
+        var table = await AuditTableAsync();
+
+        var page = await Oversight(store, new SpyAudit(table) { SwallowSqlError = true }).ReadAsync(Member("staff"), tenant, room, 0, 50);
 
         Assert.Equal(OversightReadOutcome.AuditFailed, page.Outcome);
         Assert.Empty(page.Messages);

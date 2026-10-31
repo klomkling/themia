@@ -59,7 +59,8 @@ public interface IConversationOversight
 /// <summary>
 /// The audit trail of oversight reads. No default is registered: without one, <see cref="IConversationOversight.ReadAsync"/> answers
 /// <see cref="OversightReadOutcome.AuditPortMissing"/>. Called inside the read transaction, so what it writes commits with the read or not at all.
-/// The app owns deduplication (for example one row per reader and conversation per 15 minutes, using <see cref="OversightRead.ReadAt"/>) and the retention of the trail.
+/// The port must let a failure propagate: one that catches its own SQL error and carries on can leave the transaction unusable (PostgreSQL aborts it),
+/// and the read then answers <see cref="OversightReadOutcome.AuditFailed"/>. A single registration serves every read, so it must be safe for concurrent use. The app owns deduplication (for example one row per reader and conversation per 15 minutes, using <see cref="OversightRead.ReadAt"/>) and the retention of the trail.
 /// </summary>
 public interface IConversationReadAudit
 {

@@ -48,6 +48,9 @@ internal sealed class ConversationOversightService(
         try
         {
             await audit.RecordAsync(connection, transaction, new OversightRead(tenantId, conversationId, actor.Kind, actor.UserRef, messages.Count, time.GetUtcNow()), cancellationToken);
+            // A port that swallowed its own SQL error leaves a PostgreSQL transaction aborted, and COMMIT of an aborted transaction rolls back
+            // without an error. A trivial command on it raises 25P02 instead, so that case answers AuditFailed and not Listed with no audit row.
+            await connection.ExecuteScalarAsync<int>(new CommandDefinition("SELECT 1;", transaction: transaction, cancellationToken: cancellationToken));
             await transaction.CommitAsync(cancellationToken);
         }
         catch (OperationCanceledException)
