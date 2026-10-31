@@ -239,7 +239,7 @@ public class UserServiceTests
     }
 
     [Fact]
-    public async Task VerifyPasswordAsync_rehashes_and_rotates_stamp_when_hash_is_outdated()
+    public async Task VerifyPasswordAsync_rehashes_without_rotating_the_stamp_when_hash_is_outdated()
     {
         var stub = new StubPasswordHasher { VerifyResult = true, NeedsRehashResult = true, HashResult = "rehashed" };
         var service = new UserService(repo, uow, stub, clock, options, new DataFilterScope(), new FormattingOnlyPhoneNumberNormalizer(), hooks);
@@ -254,7 +254,8 @@ public class UserServiceTests
 
         var after = Assert.Single(store);
         Assert.Equal("rehashed", after.PasswordHash);
-        Assert.NotEqual(stampBefore, after.SecurityStamp);
+        // Same password, stronger hash: not a credential event, so the user's other sessions must survive it.
+        Assert.Equal(stampBefore, after.SecurityStamp);
     }
 
     [Fact]

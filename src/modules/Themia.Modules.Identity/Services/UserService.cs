@@ -502,8 +502,8 @@ public sealed class UserService : IUserService
         }
         if (passwordHasher.NeedsRehash(user.PasswordHash))
         {
+            // Same password, stronger hash: not a credential event, so the stamp stays and the user's other sessions live.
             user.PasswordHash = passwordHasher.Hash(password);
-            user.SecurityStamp = SecurityStampCache.NewStamp();
             changed = true;
         }
         if (changed)
