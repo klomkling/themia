@@ -92,7 +92,7 @@ var erased = await dataSubject.ErasePersonAsync(dsrActor, tenantId, PersonRef.Fo
   are then deleted outside any transaction (`IStorageProvider.DeleteAsync` is idempotent; the key is the stored `storage_key` verbatim). One transaction then re-verifies
   `Purging`, writes the tombstone (subject, message and attachment counts), deletes attachments, guest sessions, messages, participants, events and finally the conversation (so
   the subject opens a new one), and raises `ConversationLifecycleKind.Purged`. A failed file delete or database step leaves the conversation `Purging`; the next sweep resumes it and asks the port again, so a hold placed in between
-  stops the purge (files already deleted stay deleted). A `Purging` conversation cannot be reopened, joined or held (`HoldOutcome.PurgeInProgress`).
+  stops the purge (files already deleted stay deleted). Do not run two sweeps of one tenant at the same time: the claim is re-verified before the files go, but the file deletes themselves are not under a lock. A `Purging` conversation cannot be reopened, joined or held (`HoldOutcome.PurgeInProgress`).
 - **The accepted race.** A hold the app places between the port answering "not held" and the claim is not seen. Place holds through `PlaceHoldAsync` as well (it locks the row and
   sets `LegalHold`), and keep the port the source of truth at sweep time. `ReleaseHoldAsync` returns the conversation to `Active` and leaves `retention_until`, so the next sweep
   may expire it at once. The package never lifts a hold by itself.

@@ -114,16 +114,17 @@ internal sealed class ConversationRetentionService(
                 return held == 1 ? PurgeStep.Held : PurgeStep.Skipped;
             }
 
-            if (candidate.RetentionState == Expired)
+            // Claim a fresh one (Expired to Purging) or re-verify a resumed one (still Purging): either way the files are only deleted while the claim is held, so a conversation
+            // another sweep moved to LegalHold since the read is skipped. Two sweeps of one tenant should not run at once; this keeps the window to a single statement.
+            var claimed = await connection.ExecuteAsync(new CommandDefinition(
+                candidate.RetentionState == Expired
+                    ? "UPDATE conversations SET retention_state = 3 WHERE tenant_id = @TenantId AND id = @Id AND retention_state = 2;"
+                    : "UPDATE conversations SET retention_state = 3 WHERE tenant_id = @TenantId AND id = @Id AND retention_state = 3;",
+                new { TenantId = tenantId, candidate.Id },
+                cancellationToken: cancellationToken));
+            if (claimed == 0)
             {
-                var claimed = await connection.ExecuteAsync(new CommandDefinition(
-                    "UPDATE conversations SET retention_state = 3 WHERE tenant_id = @TenantId AND id = @Id AND retention_state = 2;",
-                    new { TenantId = tenantId, candidate.Id },
-                    cancellationToken: cancellationToken));
-                if (claimed == 0)
-                {
-                    return PurgeStep.Skipped; // reopened, held or purged since the read
-                }
+                return PurgeStep.Skipped; // reopened, held or purged since the read
             }
 
             if (!await DeleteFilesAsync(connection, tenantId, candidate.Id, cancellationToken))
