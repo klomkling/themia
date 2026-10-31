@@ -367,14 +367,20 @@ services.AddSingleton<ISecondFactorPolicy, StaffMfaPolicy>();   // after AddThem
   no failure hook, no lockout count, and `OnLoginSucceeded` fires only when the login completes. The built-in endpoints answer
   it with their uniform 401 because they cannot complete the factor; use your own controller.
 - The app verifies (or enrols and confirms) the factor itself, for example with `Themia.Totp`, then calls
-  `ISecondFactorCompletion.CompleteAsync(ticket)`. It consumes the ticket, **repeats the original flow's gates** in the ticket's
+  `ISecondFactorCompletion.CompleteAsync(ticket, userId, stage)`. It consumes the ticket, **repeats the original flow's gates** in the ticket's
   tenant scope (the user still exists in that tenant, is active and not locked out, has the same security stamp, the login method
   is still switched on, a one-time-code user still has a confirmed phone), runs the method's own success hook and observer
   (external logins get the external ones, with `WasCreated`/`WasLinked`), and issues the session exactly as a normal login would
-  (same claims, same `sid`). A hook that denies at completion returns `Denied`. After too many wrong codes call
+  (same claims, same `sid`). A hook that denies at completion returns `Denied`. The single-use claim is one conditional `UPDATE` (the first of two parallel
+  completions wins, the other is refused). After too many wrong codes call
   `RejectAsync(ticket)` to burn the ticket; the attempt limits are the app's.
 - A policy that throws stops the login with that exception and nothing is issued (it is not turned into a "bad password").
   A policy that asks for a second factor while no `ISecondFactorTicketService` is registered also throws.
+- **Pass the user and stage you just verified.** `CompleteAsync` refuses (and burns) a ticket that is not for exactly that user and
+  stage. Take `userId` from the account whose factor you checked, never from the request body: otherwise someone holding a
+  victim's ticket could pass their own factor and receive the victim's session, or spend a verify ticket at an enrol endpoint.
+  Your endpoint should look the pending login up by your own record of it (keyed by the ticket you handed out), not by a
+  client-supplied user id.
 - **Call `CompleteAsync` only after your own factor check has passed**: completion trusts that the app verified (or enrolled and confirmed)
   the factor; Themia cannot tell. The ticket proves the primary check passed, not that the second factor did.
 - **Enrol is only as strong as the primary check.** Return `Enrol` only for accounts that have no factor yet, and notify the user

@@ -94,10 +94,17 @@ public sealed class UserTokenService : IUserTokenService, IUserTokenValidator
             return TokenConsumeResult.Expired;
         }
 
-        match.ConsumedAt = timeProvider.GetUtcNow();
-        tokens.Update(match);
-        await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-        return TokenConsumeResult.Success;
+        // Claimed with one conditional UPDATE (… WHERE consumed_at IS NULL AND expires_at > now) and the affected-row count
+        // decides who won. Read-check-then-save let two concurrent callers both see an unconsumed row and both succeed, so a
+        // single-use token (a second-factor ticket, a reset link) could be spent twice.
+        var now = timeProvider.GetUtcNow();
+        var claimed = await tokens.UpdateWhereAsync(
+            new ClaimableUserTokenSpec(match.Id, now),
+            set => set.Set(t => t.ConsumedAt, now),
+            cancellationToken).ConfigureAwait(false);
+        return claimed == 1
+            ? TokenConsumeResult.Success
+            : match.ExpiresAt <= now ? TokenConsumeResult.Expired : TokenConsumeResult.AlreadyConsumed;
     }
 
     /// <inheritdoc />

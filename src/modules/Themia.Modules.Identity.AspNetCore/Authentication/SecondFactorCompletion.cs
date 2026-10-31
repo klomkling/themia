@@ -67,7 +67,8 @@ internal sealed class SecondFactorCompletion : ISecondFactorCompletion
         this.logger = logger;
     }
 
-    public async Task<SecondFactorCompletionResult> CompleteAsync(string ticket, CancellationToken cancellationToken = default)
+    public async Task<SecondFactorCompletionResult> CompleteAsync(
+        string ticket, Guid expectedUserId, SecondFactorStage expectedStage, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(ticket);
 
@@ -75,6 +76,14 @@ internal sealed class SecondFactorCompletion : ISecondFactorCompletion
         if (data is null)
         {
             logger.LogWarning("Second-factor completion refused: the ticket is unknown, expired, tampered with or already used.");
+            return SecondFactorCompletionResult.Refused();
+        }
+
+        // The ticket is burnt by now. It must be for the user and stage the app just handled: otherwise an attacker holding a
+        // victim's ticket could pass their own factor at a verify endpoint, or spend a verify ticket at an enrol endpoint.
+        if (data.UserId != expectedUserId || data.Stage != expectedStage)
+        {
+            logger.LogWarning("Second-factor completion refused: the ticket is not for the user or stage the caller verified.");
             return SecondFactorCompletionResult.Refused();
         }
 

@@ -164,9 +164,15 @@ public interface ISecondFactorCompletion
 {
     /// <summary>Redeems the ticket and issues the session, repeating the original flow's gates.</summary>
     /// <param name="ticket">The ticket from <see cref="PendingSecondFactor.Ticket"/>.</param>
+    /// <param name="expectedUserId">The user whose second factor the app just verified. The ticket must be for exactly this
+    /// user, otherwise the call is refused and the ticket is burnt: without this binding a verify endpoint that checked one
+    /// person's factor could complete another person's ticket.</param>
+    /// <param name="expectedStage">The stage the app just handled (verify or enrol). A ticket issued for the other stage is
+    /// refused and burnt, so a verify ticket cannot be spent at an enrol endpoint.</param>
     /// <param name="cancellationToken">A cancellation token.</param>
     /// <returns>The completion result.</returns>
-    Task<SecondFactorCompletionResult> CompleteAsync(string ticket, CancellationToken cancellationToken = default);
+    Task<SecondFactorCompletionResult> CompleteAsync(
+        string ticket, Guid expectedUserId, SecondFactorStage expectedStage, CancellationToken cancellationToken = default);
 
     /// <summary>Burns a ticket without completing, for example after too many wrong codes.</summary>
     /// <param name="ticket">The ticket to burn.</param>

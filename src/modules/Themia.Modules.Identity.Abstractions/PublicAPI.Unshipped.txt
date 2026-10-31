@@ -641,7 +641,7 @@ static Themia.Modules.Identity.Abstractions.Authentication.SecondFactorCompletio
 static Themia.Modules.Identity.Abstractions.Authentication.SecondFactorCompletionResult.Refused() -> Themia.Modules.Identity.Abstractions.Authentication.SecondFactorCompletionResult
 static Themia.Modules.Identity.Abstractions.Authentication.SecondFactorCompletionResult.Denied() -> Themia.Modules.Identity.Abstractions.Authentication.SecondFactorCompletionResult
 Themia.Modules.Identity.Abstractions.Authentication.ISecondFactorCompletion
-Themia.Modules.Identity.Abstractions.Authentication.ISecondFactorCompletion.CompleteAsync(string! ticket, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Identity.Abstractions.Authentication.SecondFactorCompletionResult>!
+Themia.Modules.Identity.Abstractions.Authentication.ISecondFactorCompletion.CompleteAsync(string! ticket, System.Guid expectedUserId, Themia.Modules.Identity.Abstractions.Authentication.SecondFactorStage expectedStage, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Identity.Abstractions.Authentication.SecondFactorCompletionResult>!
 Themia.Modules.Identity.Abstractions.Authentication.ISecondFactorCompletion.RejectAsync(string! ticket, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
 Themia.Modules.Identity.Abstractions.Entities.TokenPurpose.SecondFactorTicket = 4 -> Themia.Modules.Identity.Abstractions.Entities.TokenPurpose
 Themia.Modules.Identity.Abstractions.Authentication.NotRequiredSecondFactorPolicy
