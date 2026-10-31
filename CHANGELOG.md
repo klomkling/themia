@@ -27,6 +27,32 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.49.0] - 2026-10-31
+
+### Added
+
+- **`Themia.Modules.Identity` / `.AspNetCore`: second factor for staff (coord #0185).** `ISecondFactorPolicy` is asked after the primary check succeeds and before anything is issued, in all three Themia login flows (password, one-time code, external). The default policy asks nobody. A login that owes a factor returns `LoginOutcome.SecondFactorRequired` / `ExternalLoginOutcome.SecondFactorRequired` with a `PendingSecondFactor` (user, stage `Verify`|`Enrol`, single-use ticket, expiry): nothing is issued and it is not counted as a failed login. `ISecondFactorCompletion.CompleteAsync(ticket, expectedUserId, expectedStage)` finishes the login after the app's own verify/enrol, repeating the original gates in the ticket's tenant scope. Tickets are an ASP.NET Core data-protection payload plus a single-use `TokenPurpose.SecondFactorTicket` user token (Verify 5 min, Enrol 15 min). Persist the data-protection keys in production. See the Identity README.
+- **`Themia.Modules.Identity`: `IAuthTokenIssuer` (coord #0186)**, the guarded way for an app to mint a session outside the Themia flows: `StartSessionAsync`, `CompleteSessionAsync` (the only completion path for an app-channel ticket) and `RenewSessionAsync` (access token only; the session must be a live family of this user and tenant, via the new `IRefreshTokenService.IsSessionLiveAsync`, a default interface method that answers false). It reloads the user, checks active/lockout/tenant, asks the policy with `SecondFactorMethod.Custom`, sets `sid`, refuses reserved app claim types, and revokes the refresh row if the access token cannot be issued. `IIdentityEventObserver.OnSessionIssuedAsync`.
+- **`Themia.Modules.Identity`: refresh reuse grace (coord #0188).** `IdentityModuleOptions.RefreshReuseGrace` (default off, at most 2 minutes). Within the grace, presenting a just-rotated refresh token again returns the same successor instead of revoking the family (`RefreshOutcome.ReplayedWithinGrace`; `IIdentityEventObserver.OnRefreshReplayedAsync`); the request that loses the rotation race gets it too. A replay after the grace, after the successor has rotated again, or for a revoked/expired family still revokes it. The successor is stored sealed (AES-GCM under a key derived from the rotated token's own raw value, so there is no server secret) in the new nullable column `identity.refresh_tokens.successor_ciphertext` (migration `202610310001`, PostgreSQL and SQL Server like all Identity migrations). Inside the window a captured token and the user's own token yield the same successor; keep it to seconds.
+
+### Changed
+
+- **(breaking) New enum members:** `LoginOutcome.SecondFactorRequired`, `ExternalLoginOutcome.SecondFactorRequired`, `SecondFactorMethod.Custom` and `RefreshOutcome.ReplayedWithinGrace`. An exhaustive `switch` without a discard stops compiling until it handles them; `LoginResult.Succeeded` and `RefreshValidationResult.TryGetSuccess` keep their meaning (a replay inside the grace is a success). The sources of the consuming apps were checked: none switches on these enums.
+- **`IUserTokenService.ConsumeAsync` is now one conditional `UPDATE`** (`... WHERE consumed_at IS NULL AND expires_at > now`, decided on the affected-row count) for **every** purpose: password reset, e-mail and phone confirmation, two-factor and the new second-factor ticket. Before, two parallel consumes could both succeed. An expired token that loses the race reports `Expired`, a consumed one `AlreadyConsumed`.
+
+- **Signatures first shipped here:** `ISecondFactorCompletion.CompleteAsync(ticket, expectedUserId, expectedStage)` and `IAuthTokenIssuer.CompleteSessionAsync(userId, ticket, expectedStage, request)` take the user and stage the app verified, and refuse and burn a ticket that is not for exactly that user and stage. They are new in this release, so no released caller changes.
+
+### Fixed
+
+- A just-rotated refresh token raced by a parallel request no longer revokes the user's whole family when the grace is on (see above).
+
+### Needs a human look
+
+- The second-factor seam and `IAuthTokenIssuer` decide who gets a session: review the policy you register (key it on user, role or tenant, never on the free channel label), call `CompleteAsync`/`CompleteSessionAsync` only after your own factor check and pass the user and stage you verified, and revoke existing sessions (`RevokeAllForUserAsync`) when a policy starts to cover a user.
+- Code that mints sessions with `IRefreshTokenService`/`IAccessTokenService` directly bypasses the seam: move it to `IAuthTokenIssuer` or call the policy yourself.
+- The atomic consume changes `IUserTokenService.ConsumeAsync` for all purposes.
+- New migration `202610310001` (one nullable column). A deployment that never enables the grace leaves it empty.
+
 ## [0.48.0] - 2026-10-31
 
 ### Added
