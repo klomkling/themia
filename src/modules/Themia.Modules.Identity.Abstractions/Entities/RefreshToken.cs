@@ -42,6 +42,11 @@ public sealed class RefreshToken
     /// the grace.</summary>
     public string? SuccessorCiphertext { get; set; }
 
+    /// <summary>The user's <see cref="User.SecurityStamp"/> this token is bound to. A rotation of the stamp by a credential
+    /// event (password reset, reactivation) ends the session at its next refresh; a role or claim change rebinds the live rows
+    /// instead. Null on a row issued before the column existed: accepted once, then bound to the current stamp.</summary>
+    public string? SecurityStamp { get; set; }
+
     /// <summary>Assigns the identifier for a new (transient) token.</summary>
     /// <param name="id">A client-generated identifier.</param>
     public void SetId(Guid id) => Id = id;

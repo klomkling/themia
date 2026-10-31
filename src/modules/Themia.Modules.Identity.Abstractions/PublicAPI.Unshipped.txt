@@ -689,3 +689,5 @@ Themia.Modules.Identity.Abstractions.IdentityModuleOptions.RefreshReuseGrace.set
 static readonly Themia.Modules.Identity.Abstractions.IdentityModuleOptions.MaxRefreshReuseGrace -> System.TimeSpan
 Themia.Modules.Identity.Abstractions.Entities.RefreshToken.SuccessorCiphertext.get -> string?
 Themia.Modules.Identity.Abstractions.Entities.RefreshToken.SuccessorCiphertext.set -> void
+Themia.Modules.Identity.Abstractions.Entities.RefreshToken.SecurityStamp.get -> string?
+Themia.Modules.Identity.Abstractions.Entities.RefreshToken.SecurityStamp.set -> void

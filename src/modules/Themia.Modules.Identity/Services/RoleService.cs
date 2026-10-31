@@ -17,6 +17,7 @@ public sealed class RoleService : IRoleService
     private readonly IUnitOfWork unitOfWork;
     private readonly IDataFilterScope filterScope;
     private readonly IMemoryCache? stampCache;
+    private readonly IRepository<RefreshToken, Guid>? refreshTokens;
 
     /// <summary>Creates the service with a default filter scope.</summary>
     public RoleService(
@@ -28,7 +29,10 @@ public sealed class RoleService : IRoleService
     {
     }
 
-    /// <summary>Creates the service.</summary>
+    /// <summary>Creates the service without a refresh-token store to rebind.</summary>
+    // RS0027: this overload shipped with the optional stamp cache; the one below adds the refresh-token store and, without a
+    // default, keeps a call with six or fewer arguments unambiguous.
+#pragma warning disable RS0027
     public RoleService(
         IRepository<User, Guid> users,
         IRepository<Role, Guid> roles,
@@ -36,6 +40,28 @@ public sealed class RoleService : IRoleService
         IUnitOfWork unitOfWork,
         IDataFilterScope filterScope,
         IMemoryCache? stampCache = null)
+        : this(users, roles, memberships, unitOfWork, filterScope, stampCache, null)
+    {
+    }
+#pragma warning restore RS0027
+
+    /// <summary>Creates the service.</summary>
+    /// <param name="users">The user repository.</param>
+    /// <param name="roles">The role repository.</param>
+    /// <param name="memberships">The user-role repository.</param>
+    /// <param name="unitOfWork">The unit of work.</param>
+    /// <param name="filterScope">The data filter scope used for platform-aware writes.</param>
+    /// <param name="stampCache">The cache the security-stamp validator uses; may be null.</param>
+    /// <param name="refreshTokens">The refresh-token repository: a membership change rebinds the user's live sessions to the
+    /// new stamp. When null the sessions end at their next refresh instead.</param>
+    public RoleService(
+        IRepository<User, Guid> users,
+        IRepository<Role, Guid> roles,
+        IRepository<UserRole, Guid> memberships,
+        IUnitOfWork unitOfWork,
+        IDataFilterScope filterScope,
+        IMemoryCache? stampCache,
+        IRepository<RefreshToken, Guid>? refreshTokens)
     {
         ArgumentNullException.ThrowIfNull(users);
         ArgumentNullException.ThrowIfNull(roles);
@@ -44,6 +70,7 @@ public sealed class RoleService : IRoleService
         ArgumentNullException.ThrowIfNull(filterScope);
         this.filterScope = filterScope;
         this.stampCache = stampCache;
+        this.refreshTokens = refreshTokens;
         this.users = users;
         this.roles = roles;
         this.memberships = memberships;
@@ -152,6 +179,8 @@ public sealed class RoleService : IRoleService
                 user.SecurityStamp = SecurityStampCache.NewStamp();
                 users.Update(user);
                 await IdentityScope.SaveScopedAsync(unitOfWork, filterScope, user.TenantId is null, ct).ConfigureAwait(false);
+                // The session is still legitimate (refresh rebuilds the roles from the database): follow the new stamp, not end.
+                await RefreshStampBinding.RebindAsync(refreshTokens, [user.Id], user.SecurityStamp, ct).ConfigureAwait(false);
                 await change(ct).ConfigureAwait(false);
             },
             cancellationToken).ConfigureAwait(false);

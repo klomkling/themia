@@ -229,6 +229,22 @@ internal sealed class ActiveRefreshTokensByUserAndFamilySpec : Specification<Ref
         Where(t => t.UserId == userId && t.FamilyId == familyId && t.RevokedAt == null && t.ExpiresAt > now);
 }
 
+/// <summary>A live session as the owner's CURRENT stamp sees it: unrevoked, unexpired, and bound to that stamp (or not bound
+/// yet, a row issued before the column existed).</summary>
+internal sealed class LiveRefreshSessionSpec : Specification<RefreshToken>
+{
+    public LiveRefreshSessionSpec(Guid userId, Guid familyId, DateTimeOffset now, string currentStamp) =>
+        Where(t => t.UserId == userId && t.FamilyId == familyId && t.RevokedAt == null && t.ExpiresAt > now
+            && (t.SecurityStamp == currentStamp || t.SecurityStamp == null));
+}
+
+/// <summary>The unrevoked tokens of a set of users: the rows a role or claim change rebinds to the users' new stamp.</summary>
+internal sealed class UnrevokedRefreshTokensByUsersSpec : Specification<RefreshToken>
+{
+    public UnrevokedRefreshTokensByUsersSpec(IReadOnlyCollection<Guid> userIds) =>
+        Where(t => userIds.Contains(t.UserId) && t.RevokedAt == null);
+}
+
 /// <summary>A user's non-expired, non-revoked tokens in every family but one (for revoke-all-except-session).</summary>
 internal sealed class ActiveRefreshTokensByUserExceptFamilySpec : Specification<RefreshToken>
 {
