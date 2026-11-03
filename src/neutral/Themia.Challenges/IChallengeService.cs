@@ -51,6 +51,12 @@ public interface IChallengeService
     /// acts. <see cref="VerifyAsync"/> remains the step that authorises, and its result is the one to
     /// act on.
     /// </para>
+    /// <para>
+    /// A matching peek is not charged against <see cref="PurposeOptions.MaxAttempts"/> and does not consume,
+    /// so the attempt bound is enforced on <see cref="VerifyAsync"/> (and on wrong guesses here), not on a
+    /// peek that is right: parallel peeks can confirm a correct secret after the budget was spent, but the
+    /// row is then dead for <see cref="VerifyAsync"/>, which is the only call that authorises.
+    /// </para>
     /// </remarks>
     /// <param name="scope">The identity of the challenge being checked.</param>
     /// <param name="secret">The plaintext secret the caller submitted.</param>

@@ -61,6 +61,14 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
   refused when the account locked while it was being judged. A locked or inactive account still answers without hash work,
   and a successful sign-in now writes the user row once, even when nothing changed. No API, schema or option changes.
 
+- **`Themia.Challenges`: the `MaxAttempts` bound now holds under parallel guesses.** The attempt counter was incremented
+  without a bound and a correct guess could consume a row after concurrent guesses had spent its budget, so guesses sent at
+  the same moment were answered beyond the cap. `RecordAttemptSql` and `ConsumeSql` now carry `attempts < @MaxAttempts`, and
+  a guess refused by the budget is answered `AttemptsExhausted` (or `Consumed`/`NotFound` when the row is gone). **A custom
+  `IChallengeDialect` must add the same condition and accept the `@MaxAttempts` parameter** to get the bound; without it the
+  dialect keeps the old, unbounded behaviour. The bound applies to `VerifyAsync` and `VerifyByTokenAsync`; a correct
+  `PeekAsync` is still neither charged nor consuming (documented on `IChallengeService.PeekAsync`).
+
 ## [0.51.0] - 2026-11-01
 
 ### Added

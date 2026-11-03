@@ -141,8 +141,8 @@ public interface IChallengeDialect
 
     /// <summary>
     /// Atomically consumes one challenge by id: sets <c>consumed_at = @ConsumedAt</c> for the row
-    /// matching <c>@Id</c> where <c>consumed_at IS NULL AND expires_at &gt; @Now</c>. Params:
-    /// <c>@Id</c>, <c>@Now</c>, <c>@ConsumedAt</c>.
+    /// matching <c>@Id</c> where <c>consumed_at IS NULL AND expires_at &gt; @Now AND attempts &lt; @MaxAttempts</c>.
+    /// Params: <c>@Id</c>, <c>@Now</c>, <c>@ConsumedAt</c>, <c>@MaxAttempts</c>.
     /// <para>
     /// This MUST be a single conditional <c>UPDATE</c> that carries its own guard, never a
     /// <c>SELECT</c> followed by a separate <c>UPDATE</c>. The guard is what makes verification
@@ -152,18 +152,26 @@ public interface IChallengeDialect
     /// the row first and then writes introduces a window in which two concurrent verifications can
     /// both observe "still live" and both report success, defeating single-use consumption. Rows
     /// affected is the entire result the caller needs: 1 means this call won, 0 means it lost
-    /// (already consumed, expired, or the id does not exist) — the caller does not need to
-    /// distinguish those three cases from this statement alone, since a prior read (or
-    /// <see cref="SelectLiveByScopeSql(ChallengeTenancy)"/> / <see cref="SelectLiveByTokenHashSql"/>) already
-    /// established which applies.
+    /// (already consumed, expired, out of attempts, or the id does not exist) — the caller reads the row
+    /// back when it needs to tell those apart, since a prior read (or
+    /// <see cref="SelectLiveByScopeSql(ChallengeTenancy)"/> / <see cref="SelectLiveByTokenHashSql"/>) cannot see a change that
+    /// landed after it.
+    /// </para>
+    /// <para>
+    /// <b>The attempt budget is part of the statement.</b> It also carries <c>AND attempts &lt; @MaxAttempts</c>
+    /// (parameter <c>@MaxAttempts</c>, the purpose's cap), so a correct guess that was judged against a stale read
+    /// cannot consume a row whose budget concurrent guesses have since spent. A custom dialect MUST include the
+    /// condition: without it the dialect still runs, but the bound on guessing is not enforced under parallel requests.
     /// </para>
     /// </summary>
     string ConsumeSql { get; }
 
     /// <summary>
     /// Records one incorrect verify attempt: increments <c>attempts</c> by 1 for the row matching
-    /// <c>@Id</c> where <c>consumed_at IS NULL</c>. Params: <c>@Id</c>. Returns rows affected (0 if
-    /// the row was consumed or removed between the failed comparison and this call).
+    /// <c>@Id</c> where <c>consumed_at IS NULL AND attempts &lt; @MaxAttempts</c>. Params: <c>@Id</c>,
+    /// <c>@MaxAttempts</c> (the purpose's cap). Returns rows affected: 0 if the row was consumed or removed
+    /// between the failed comparison and this call, or if concurrent guesses already spent the budget. The
+    /// condition is what makes the cap hold under parallel requests, so a custom dialect MUST include it.
     /// </summary>
     string RecordAttemptSql { get; }
 

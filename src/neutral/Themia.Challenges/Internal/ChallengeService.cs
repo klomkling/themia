@@ -349,7 +349,7 @@ internal sealed class ChallengeService : IChallengeService
         if (!purpose.InvalidateSiblingsOnVerify)
         {
             var rows = await connection.ExecuteAsync(new CommandDefinition(
-                dialect.ConsumeSql, new { Id = rowId, Now = now, ConsumedAt = now }, cancellationToken: cancellationToken));
+                dialect.ConsumeSql, new { Id = rowId, Now = now, ConsumedAt = now, purpose.MaxAttempts }, cancellationToken: cancellationToken));
             return rows > 0;
         }
 
@@ -362,7 +362,7 @@ internal sealed class ChallengeService : IChallengeService
 
             await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
             var consumed = await connection.ExecuteAsync(new CommandDefinition(
-                dialect.ConsumeSql, new { Id = rowId, Now = now, ConsumedAt = now }, transaction, cancellationToken: cancellationToken));
+                dialect.ConsumeSql, new { Id = rowId, Now = now, ConsumedAt = now, purpose.MaxAttempts }, transaction, cancellationToken: cancellationToken));
             if (consumed == 0)
             {
                 return false;
@@ -580,6 +580,14 @@ internal sealed class ChallengeService : IChallengeService
             // exact row between our SELECT and our UPDATE) must not report Verified, or the same secret
             // would succeed twice.
             var won = await TryConsumeAsync(connection, row.Id, scope, purpose, now, cancellationToken);
+            if (!won && await IsSpentBudgetAsync(connection, row.Id, purpose, cancellationToken))
+            {
+                // Not consumed by anyone: the budget ran out between our SELECT and the guarded consume. This
+                // row is dead for verification like any other exhausted row, so this guess is treated like a
+                // wrong one — on to the next row and the charge below, never Verified.
+                continue;
+            }
+
             var matchOutcome = won ? ChallengeVerifyResult.Verified(scope) : ChallengeVerifyResult.Consumed(scope);
             logger.LogInformation("Challenge verify {Outcome} for purpose {Purpose}", matchOutcome.Outcome, scope.Purpose);
             return matchOutcome;
@@ -595,20 +603,39 @@ internal sealed class ChallengeService : IChallengeService
         // design spec's re-issue-policy note that "the brute-force surface does not widen" with a higher
         // MaxLiveChallenges. Already-exhausted rows are skipped here too — incrementing a dead row's
         // counter further serves no purpose.
+        var refused = new HashSet<Guid>();
         foreach (var row in guessable)
         {
-            await connection.ExecuteAsync(new CommandDefinition(
-                dialect.RecordAttemptSql, new { row.Id }, cancellationToken: cancellationToken));
+            // The increment is conditional on the budget, so concurrent guesses cannot charge past MaxAttempts:
+            // rows affected 0 means the budget was already spent (or the row was consumed or voided meanwhile).
+            var charged = await connection.ExecuteAsync(new CommandDefinition(
+                dialect.RecordAttemptSql, new { row.Id, purpose.MaxAttempts }, cancellationToken: cancellationToken));
+            if (charged == 0)
+            {
+                refused.Add(row.Id);
+            }
         }
 
-        // Exhausted only once every live row — the ones just incremented, and any that were already
-        // exhausted before this call — has hit the cap. As long as one guessable row remains, the caller
-        // has a genuine remaining path to success and reporting AttemptsExhausted would be wrong for it,
-        // not just imprecise.
-        // (row.Attempts + 1 covers both cases: for a just-incremented guessable row it reflects the new
-        // count; for an already-exhausted row, Attempts was already >= MaxAttempts, so Attempts + 1 is
-        // too — no separate branch needed.)
-        var allExhausted = liveRows.TrueForAll(row => row.Attempts + 1 >= purpose.MaxAttempts);
+        if (guessable.Count > 0 && refused.Count == guessable.Count)
+        {
+            // Every row we could guess against refused the charge. If none of them is live any more (consumed by a
+            // double-submit, voided by a sibling, superseded by a re-issue) that is not an exhausted budget.
+            var stillLive = await connection.QueryAsync<ChallengeRow>(new CommandDefinition(
+                dialect.SelectLiveByScopeSql(TenancyOf(scope)), LiveByScopeParams(scope, now), cancellationToken: cancellationToken));
+            if (!stillLive.Any())
+            {
+                var gone = await ClassifyMissingAsync(connection, scope, cancellationToken);
+                logger.LogInformation("Challenge verify {Outcome} for purpose {Purpose}", gone.Outcome, scope.Purpose);
+                return gone;
+            }
+        }
+
+        // Exhausted only once every live row — the ones just charged, the ones whose charge was refused, and any that
+        // were already exhausted before this call — has hit the cap. As long as one guessable row remains, the caller
+        // has a genuine remaining path to success and reporting AttemptsExhausted would be wrong for it.
+        // (row.Attempts + 1 is exact when guesses are sequential; under a race the charge that takes the last slot
+        // may still be answered Incorrect and the next one AttemptsExhausted, which stays inside the bound.)
+        var allExhausted = liveRows.TrueForAll(row => refused.Contains(row.Id) || row.Attempts + 1 >= purpose.MaxAttempts);
         var mismatchOutcome = allExhausted
             ? ChallengeVerifyResult.AttemptsExhausted(scope)
             : ChallengeVerifyResult.Incorrect(scope);
@@ -700,7 +727,9 @@ internal sealed class ChallengeService : IChallengeService
         var won = await TryConsumeAsync(connection, row.Id, scope, purposeOptions, now, cancellationToken);
         var outcome = won
             ? ChallengeVerifyResult.Verified(scope)
-            : ChallengeVerifyResult.Consumed(scope);
+            : await IsSpentBudgetAsync(connection, row.Id, purposeOptions, cancellationToken)
+                ? ChallengeVerifyResult.AttemptsExhausted(scope)
+                : ChallengeVerifyResult.Consumed(scope);
         logger.LogInformation("Challenge token verify {Outcome} for purpose {Purpose}", outcome.Outcome, purpose);
         return outcome;
     }
@@ -771,6 +800,20 @@ internal sealed class ChallengeService : IChallengeService
 
         logger.LogInformation("Challenge quota refunded for purpose {Purpose}", scope.Purpose);
         return true;
+    }
+
+    /// <summary>
+    /// After a guarded consume affected no row: is it because the attempt budget ran out (the row is still
+    /// unconsumed, with <c>attempts &gt;= MaxAttempts</c>) rather than because it was consumed, voided or expired?
+    /// Read after the consume's transaction is gone, so a deadlock rollback reads back as not spent and stays
+    /// answered <c>Consumed</c>.
+    /// </summary>
+    private async Task<bool> IsSpentBudgetAsync(
+        System.Data.Common.DbConnection connection, Guid rowId, PurposeOptions purpose, CancellationToken cancellationToken)
+    {
+        var row = await connection.QueryFirstOrDefaultAsync<ChallengeRow>(new CommandDefinition(
+            dialect.SelectByIdSql, new { Id = rowId }, cancellationToken: cancellationToken));
+        return row is not null && row.ConsumedAt is null && row.Attempts >= purpose.MaxAttempts;
     }
 
     /// <summary>
