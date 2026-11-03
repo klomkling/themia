@@ -478,6 +478,28 @@ public abstract class IdentityStoreConformanceTests
             var userId = (await setup.Users.CreateAsync("otp-user", "pw")).UserId!.Value;
             var service = new Themia.Modules.Identity.Services.OtpChallengeService(setup.OtpRows, setup.Inner.ServiceProvider.GetRequiredService<IUnitOfWork>(), TimeProvider.System, options);
             challengeId = (await service.IssueAsync("+66811110000", userId)).ChallengeId;
+        }
+
+        using var start = new ManualResetEventSlim(false);
+        var attempts = Enumerable.Range(0, guesses).Select(_ => Task.Run(async () =>
+        {
+            await using var scope = NewScope(new TenantId("acme"));
+            var service = new Themia.Modules.Identity.Services.OtpChallengeService(scope.OtpRows, scope.Inner.ServiceProvider.GetRequiredService<IUnitOfWork>(), TimeProvider.System, options);
+            start.Wait();
+            return (await service.VerifyAsync(challengeId, "abcdef")).Outcome;
+        })).ToArray();
+        start.Set();
+        var outcomes = await Task.WhenAll(attempts);
+
+        await using var check = NewScope(new TenantId("acme"));
+        var charged = (await check.OtpRows.GetByIdAsync(challengeId))!.AttemptCount;
+        var invalid = outcomes.Count(o => o == Themia.Modules.Identity.Abstractions.OtpVerifyOutcome.Invalid);
+        var lockedOut = outcomes.Count(o => o == Themia.Modules.Identity.Abstractions.OtpVerifyOutcome.LockedOut);
+        Assert.True(
+            charged == options.MaxAttempts && invalid <= options.MaxAttempts,
+            $"maxAttempts={options.MaxAttempts} invalid={invalid} lockedOut={lockedOut} charged={charged}");
+    }
+
     /// <summary>
     /// Wrong guesses sent in parallel: every guess that was answered <c>Failed</c> must be charged to the
     /// account's failure counter. The numbers go into the failure message so the measurement is readable
@@ -496,10 +518,6 @@ public abstract class IdentityStoreConformanceTests
         using var start = new ManualResetEventSlim(false);
         var attempts = Enumerable.Range(0, guesses).Select(_ => Task.Run(async () =>
         {
-            await using var scope = NewScope(new TenantId("acme"));
-            var service = new Themia.Modules.Identity.Services.OtpChallengeService(scope.OtpRows, scope.Inner.ServiceProvider.GetRequiredService<IUnitOfWork>(), TimeProvider.System, options);
-            start.Wait();
-            return (await service.VerifyAsync(challengeId, "abcdef")).Outcome;
             await using var scope = NewScope(new TenantId("acme"), maxFailedAccessAttempts: 1000);
             start.Wait();
             try
@@ -514,13 +532,6 @@ public abstract class IdentityStoreConformanceTests
         start.Set();
         var outcomes = await Task.WhenAll(attempts);
 
-        await using var check = NewScope(new TenantId("acme"));
-        var charged = (await check.OtpRows.GetByIdAsync(challengeId))!.AttemptCount;
-        var invalid = outcomes.Count(o => o == Themia.Modules.Identity.Abstractions.OtpVerifyOutcome.Invalid);
-        var lockedOut = outcomes.Count(o => o == Themia.Modules.Identity.Abstractions.OtpVerifyOutcome.LockedOut);
-        Assert.True(
-            charged == options.MaxAttempts && invalid <= options.MaxAttempts,
-            $"maxAttempts={options.MaxAttempts} invalid={invalid} lockedOut={lockedOut} charged={charged}");
         var answeredFailed = outcomes.Count(o => o.Result == PasswordVerificationResult.Failed);
         var errors = string.Join(", ", outcomes.Where(o => o.Error is not null).GroupBy(o => o.Error).Select(g => $"{g.Key}x{g.Count()}"));
         await using var check = NewScope(new TenantId("acme"), maxFailedAccessAttempts: 1000);
