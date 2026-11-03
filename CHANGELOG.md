@@ -35,6 +35,13 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 ### Changed
 
 - **`Themia.Challenges.MySql`: the connection no longer retries a single command that belongs to a transaction.** InnoDB rolls the whole transaction back on a deadlock, so re-running only the failed statement continued a transaction that no longer existed. `IssueAsync` now re-runs its whole supersede-and-insert transaction (up to 30 attempts, jittered backoff, no second charge of the rate-limit counters) when the dialect classifies the failure as a deadlock; this also closes a latent case where a deadlock on the insert could leave the old challenge live beside the new one under `MaxLiveChallenges` 1. The rate-limit counter increment (`IncrementWindowSql`, one autocommit batch: an idempotent seed insert that may commit on its own, then the counting update) is re-run the same way, and counts once because only the update that lost the deadlock is rolled back (on MySQL the connection already retries it, so this applies once that bound is exhausted): on SQL Server a 64-way burst on one key could fail with error 1205 there (the `ConcurrentIssues_ForTheSameKey_ShouldNotLoseACount` test failed 2 runs in 5 once more tests ran beside it), and a double-tapped "send code" could throw to the user. Neither retry runs inside an ambient `System.Transactions` transaction, which the deadlock already doomed. Statements outside a transaction on MySQL are retried exactly as before.
+### Fixed
+
+- **`IUserService.VerifyPasswordAsync`: the access failure counter is now atomic.** Charging a wrong guess, locking at the
+  threshold and clearing the state on success are now compare-and-set updates against the failure state each guess read,
+  instead of a read-modify-write of the whole user row. A right guess is checked against the state it read too, so it is
+  refused when the account locked while it was being judged. A locked or inactive account still answers without hash work,
+  and a successful sign-in now writes the user row once, even when nothing changed. No API, schema or option changes.
 
 ## [0.51.0] - 2026-11-01
 
