@@ -97,7 +97,7 @@ public sealed class RefreshTokenService : IRefreshTokenService, ISessionRevoker
             }
 
             logger.LogWarning("Refresh token reuse detected; revoking token family {FamilyId} for user {UserId}.", match.FamilyId, match.UserId);
-            await RevokeFamilyAsync(match.FamilyId, now, cancellationToken).ConfigureAwait(false);
+            await RevokeFamilyAsync(match.FamilyId, now).ConfigureAwait(false);
             return RefreshValidationResult.ReuseDetected();
         }
 
@@ -122,7 +122,7 @@ public sealed class RefreshTokenService : IRefreshTokenService, ISessionRevoker
         if (match.SecurityStamp is not null && match.SecurityStamp != user.SecurityStamp)
         {
             logger.LogWarning("Refresh refused for user {UserId}: security stamp rotated since family {FamilyId} was issued; revoking it.", user.Id, match.FamilyId);
-            await RevokeFamilyAsync(match.FamilyId, now, cancellationToken).ConfigureAwait(false);
+            await RevokeFamilyAsync(match.FamilyId, now).ConfigureAwait(false);
             return RefreshValidationResult.Invalid();
         }
 
@@ -225,7 +225,7 @@ public sealed class RefreshTokenService : IRefreshTokenService, ISessionRevoker
             return revoked;
         }
 
-        return await RevokeFamilyAsync(match.FamilyId, now, cancellationToken).ConfigureAwait(false);
+        return await RevokeFamilyAsync(match.FamilyId, now).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -326,8 +326,10 @@ public sealed class RefreshTokenService : IRefreshTokenService, ISessionRevoker
                 set => set.Set(t => t.SuccessorCiphertext, null),
                 cancellationToken).ConfigureAwait(false);
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (Exception ex)
         {
+            // Cancellation included: the rotation has already committed, and a client that aborts right after it must not turn
+            // that success into an exception (the caller would then raise no event for a token that is already consumed).
             logger.LogWarning(ex, "Clearing aged sealed refresh successors failed for user {UserId}; the next rotation retries.", userId);
         }
     }
@@ -375,7 +377,7 @@ public sealed class RefreshTokenService : IRefreshTokenService, ISessionRevoker
         if (boundStamp is not null && boundStamp != user.SecurityStamp)
         {
             logger.LogWarning("Refresh replay refused for user {UserId}: security stamp rotated since family {FamilyId} was issued; revoking it.", user.Id, rotated.FamilyId);
-            await RevokeFamilyAsync(rotated.FamilyId, now, cancellationToken).ConfigureAwait(false);
+            await RevokeFamilyAsync(rotated.FamilyId, now).ConfigureAwait(false);
             return RefreshValidationResult.Invalid();
         }
 
@@ -400,14 +402,16 @@ public sealed class RefreshTokenService : IRefreshTokenService, ISessionRevoker
             ?? RefreshValidationResult.Invalid();
     }
 
-    private async Task<int> RevokeFamilyAsync(Guid familyId, DateTimeOffset now, CancellationToken cancellationToken)
+    private async Task<int> RevokeFamilyAsync(Guid familyId, DateTimeOffset now)
     {
         // One set-based UPDATE over the family's not-yet-revoked tokens — the spec's RevokedAt == null
-        // predicate means already-revoked rows are not needlessly rewritten.
+        // predicate means already-revoked rows are not needlessly rewritten. Deliberately NOT bound to the
+        // caller's token: every caller has already decided to revoke (reuse, a stamp mismatch, logout), and a
+        // client that aborts the request must not be able to cancel that decision half-applied.
         return await tokens.UpdateWhereAsync(
             new ActiveRefreshTokensByFamilySpec(familyId),
             set => set.Set(t => t.RevokedAt, now).Set(t => t.SuccessorCiphertext, null),
-            cancellationToken).ConfigureAwait(false);
+            CancellationToken.None).ConfigureAwait(false);
     }
 
     private (RefreshToken Entity, string Raw) Create(Guid userId, Guid familyId, string? securityStamp)

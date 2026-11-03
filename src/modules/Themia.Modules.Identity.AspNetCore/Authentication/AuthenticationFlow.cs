@@ -141,16 +141,19 @@ public sealed class AuthenticationFlow : IAuthenticationFlow
     /// <summary>Invokes <paramref name="invoke"/> against every registered observer. A throwing observer
     /// must not change the flow it observes, so each invocation is individually caught and logged at
     /// <c>Error</c> — including <see cref="OperationCanceledException"/>. By the time this runs, the
-    /// flow's own outcome (success or failure) is already decided; an observer's own database write
-    /// throwing OCE because the client disconnected must not turn that into an unhandled exception. The
-    /// caller is not waiting on the observer, so there is nothing for the cancellation to usefully abort.</summary>
+    /// flow's own outcome (success or failure) is already decided, so a client that aborts the request
+    /// must not cost the audit row: each observer gets a token that is signalled
+    /// <see cref="PostDecisionGrace"/> AFTER the caller's token is cancelled (never earlier, and never on a
+    /// live request). The grace is per observer, so a stuck one cannot starve the next. An observer that
+    /// ignores its token holds the request until it finishes, exactly as before.</summary>
     private async Task RaiseAsync(Func<IIdentityEventObserver, CancellationToken, Task> invoke, CancellationToken cancellationToken)
     {
         foreach (var observer in observers)
         {
             try
             {
-                await invoke(observer, cancellationToken).ConfigureAwait(false);
+                using var grace = new AbortGrace(cancellationToken, timeProvider);
+                await invoke(observer, grace.Token).ConfigureAwait(false);
             }
             catch (Exception ex)
             {
@@ -159,16 +162,45 @@ public sealed class AuthenticationFlow : IAuthenticationFlow
         }
     }
 
+    /// <summary>How long after the client aborts a decided refresh may keep running to record its outcome.</summary>
+    private static readonly TimeSpan PostDecisionGrace = TimeSpan.FromSeconds(10);
+
+    /// <summary>A token that follows the caller's only <see cref="PostDecisionGrace"/> after the caller is
+    /// cancelled. A live request is unaffected: there is no timeout of its own.</summary>
+    private sealed class AbortGrace : IDisposable
+    {
+        private readonly CancellationTokenSource grace;
+        private readonly CancellationTokenRegistration link;
+
+        public AbortGrace(CancellationToken caller, TimeProvider timeProvider)
+        {
+            grace = new CancellationTokenSource(Timeout.InfiniteTimeSpan, timeProvider);
+            link = caller.Register(static state => ((CancellationTokenSource)state!).CancelAfter(PostDecisionGrace), grace);
+        }
+
+        public CancellationToken Token => grace.Token;
+
+        public void Dispose()
+        {
+            link.Dispose();
+            grace.Dispose();
+        }
+    }
+
     /// <summary>Resolves a reused refresh token's owner for audit attribution. A failure here must not
     /// turn a refresh rejection into a 500 — losing attribution is acceptable, breaking the flow is
-    /// not — so any exception is logged at <c>Error</c> and swallowed to <see langword="null"/>.</summary>
+    /// not — so any exception is logged at <c>Error</c> and swallowed to <see langword="null"/>. That
+    /// includes cancellation: the reuse is already decided, and a client that aborted must not cost the
+    /// event (it is raised without an owner instead). Runs on a token that follows the caller's only
+    /// <see cref="PostDecisionGrace"/> after an abort.</summary>
     private async Task<Guid?> TryResolveOwnerAsync(string rawToken, CancellationToken cancellationToken)
     {
         try
         {
-            return await refreshTokens.ResolveOwnerAsync(rawToken, cancellationToken).ConfigureAwait(false);
+            using var grace = new AbortGrace(cancellationToken, timeProvider);
+            return await refreshTokens.ResolveOwnerAsync(rawToken, grace.Token).ConfigureAwait(false);
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (Exception ex)
         {
             logger.LogError(ex, "Failed to resolve the owner of a reused refresh token for audit attribution.");
             return null;
@@ -388,15 +420,19 @@ public sealed class AuthenticationFlow : IAuthenticationFlow
             return RefreshRotationResult.Invalid();
         }
 
-        var principal = await principalFactory.CreateAsync(user, AuthenticationType, cancellationToken).ConfigureAwait(false);
+        // The rotation has already persisted, so a client abort from here on must end in the same audit row
+        // as no abort: the principal factory and the hook run on a token that is only signalled
+        // PostDecisionGrace after the abort.
+        using var decided = new AbortGrace(cancellationToken, timeProvider);
+        var principal = await principalFactory.CreateAsync(user, AuthenticationType, decided.Token).ConfigureAwait(false);
         AuthTokenIssuer.AddSession(principal, replacement.FamilyId);   // rotation keeps the family, so the session id is stable
         var access = accessTokens.Issue(principal);
         var tokens = new AuthTokens(access.Token, AuthTokenIssuer.ExpiresInSeconds(timeProvider, access.ExpiresAt), replacement.RawToken);
 
-        // The rotation has already persisted. A late deny here returns a uniform 401; the (valid but
-        // undelivered) successor simply expires unused — acceptable per the access-token tradeoff.
+        // A late deny here returns a uniform 401; the (valid but undelivered) successor simply expires
+        // unused — acceptable per the access-token tradeoff.
         var refreshSucceeded = new RefreshSucceededContext(user);
-        await hooks.OnRefreshSucceededAsync(refreshSucceeded, cancellationToken).ConfigureAwait(false);
+        await hooks.OnRefreshSucceededAsync(refreshSucceeded, decided.Token).ConfigureAwait(false);
         if (refreshSucceeded.IsDenied)
         {
             logger.LogWarning("Refresh denied by hook: {DenialReason}.", refreshSucceeded.DenialReason);
@@ -421,8 +457,8 @@ public sealed class AuthenticationFlow : IAuthenticationFlow
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(refreshToken);
 
-        // Revoked BEFORE attribution is resolved: TryResolveOwnerAsync only swallows exceptions that are
-        // NOT OperationCanceledException (see its own remarks), so a client that POSTs /logout and
+        // Revoked BEFORE attribution is resolved: the owner lookup (TryFindOwnerAsync) deliberately
+        // lets OperationCanceledException through, so a client that POSTs /logout and
         // immediately disconnects — the most likely failure on a logout — would otherwise propagate an
         // OperationCanceledException out of a resolve-then-revoke ordering and skip RevokeAsync entirely,
         // leaving the refresh token valid. RevokeAsync looks the token up by hash and only stamps

@@ -82,8 +82,12 @@ internal sealed class FakeClaimsPrincipalFactory : IClaimsPrincipalFactory
     /// <summary>Claims added to every principal built, e.g. one an app later replaces.</summary>
     public List<Claim> ExtraClaims { get; } = [];
 
+    /// <summary>When set, <see cref="CreateAsync"/> honours its token like the real factory's DB reads do.</summary>
+    public bool HonourCancellation { get; set; }
+
     public Task<ClaimsPrincipal> CreateAsync(User user, string authenticationType, CancellationToken cancellationToken = default)
     {
+        if (HonourCancellation) cancellationToken.ThrowIfCancellationRequested();
         Called = true;
         TenantSeen = Themia.Framework.Core.Abstractions.Tenancy.TenantContextAccessor.CurrentTenantId;
         return Task.FromResult(new ClaimsPrincipal(new ClaimsIdentity(
@@ -157,8 +161,18 @@ internal sealed class FakeRefreshTokenService : IRefreshTokenService
         return Task.FromResult(new RefreshIssue("refresh-raw", DateTimeOffset.UtcNow.AddDays(14), LastFamilyId));
     }
 
-    public Task<RefreshValidationResult> ValidateAndRotateAsync(string rawToken, CancellationToken cancellationToken = default) =>
-        Task.FromResult(RotateResult);
+    /// <summary>Runs inside <see cref="ValidateAndRotateAsync"/> just before it returns: where a real client
+    /// abort lands once the rotation is decided (cancel the request's source here).</summary>
+    public Action? OnRotated { get; set; }
+
+    /// <summary>When set, <see cref="ResolveOwnerAsync"/> honours its token like the real store does.</summary>
+    public bool HonourCancellationOnResolveOwner { get; set; }
+
+    public Task<RefreshValidationResult> ValidateAndRotateAsync(string rawToken, CancellationToken cancellationToken = default)
+    {
+        OnRotated?.Invoke();
+        return Task.FromResult(RotateResult);
+    }
 
     /// <summary>The tenant <see cref="FindOwnerAsync"/> reports for <see cref="OwnerId"/>.</summary>
     public Themia.Framework.Core.Abstractions.Tenancy.TenantId? OwnerTenant { get; set; }
@@ -169,9 +183,14 @@ internal sealed class FakeRefreshTokenService : IRefreshTokenService
         return id is null ? null : new RefreshTokenOwner(id.Value, OwnerTenant);
     }
 
-    public Task<Guid?> ResolveOwnerAsync(string rawToken, CancellationToken cancellationToken = default)
+    /// <summary>When set, <see cref="ResolveOwnerAsync"/> waits on its token (a stalled lookup).</summary>
+    public bool HangResolveOwner { get; set; }
+
+    public async Task<Guid?> ResolveOwnerAsync(string rawToken, CancellationToken cancellationToken = default)
     {
         ResolveOwnerCalls++;
+        if (HangResolveOwner) await Task.Delay(Timeout.Infinite, cancellationToken);
+        if (HonourCancellationOnResolveOwner) cancellationToken.ThrowIfCancellationRequested();
         if (CancelOnResolveOwner)
         {
             throw new OperationCanceledException("owner lookup cancelled");
@@ -180,7 +199,7 @@ internal sealed class FakeRefreshTokenService : IRefreshTokenService
         {
             throw new InvalidOperationException("owner lookup failure");
         }
-        return Task.FromResult(OwnerId);
+        return OwnerId;
     }
 
     /// <summary>What <see cref="RevokeAsync"/> reports: how many tokens it revoked. 1 by default, the common case.</summary>
@@ -252,8 +271,12 @@ internal sealed class RecordingHooks : Themia.Modules.Identity.AspNetCore.Authen
 
     public bool DenyRefreshSucceeded { get; set; }
 
+    /// <summary>When set, <see cref="OnRefreshSucceededAsync"/> honours its token.</summary>
+    public bool HonourCancellationOnRefreshSucceeded { get; set; }
+
     public override Task OnRefreshSucceededAsync(RefreshSucceededContext context, CancellationToken cancellationToken = default)
     {
+        if (HonourCancellationOnRefreshSucceeded) cancellationToken.ThrowIfCancellationRequested();
         Calls.Add("refresh-succeeded");
         if (DenyRefreshSucceeded) context.Deny("blocked-after-refresh");
         return Task.CompletedTask;

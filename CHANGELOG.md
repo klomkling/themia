@@ -27,6 +27,19 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+### Changed
+
+- **`AuthenticationFlow` observers get a grace after a client abort (coord #0193).** Once a refresh outcome is
+  decided (`ReuseDetected`, `Invalid`, replay inside the grace, success, a hook deny after the rotation), and for
+  login and logout events, the `IIdentityEventObserver` event is raised on a token that is signalled 10 seconds
+  after the abort (per observer, never on a live request) instead of at it. The reuse owner lookup falls back to no
+  owner rather than skipping the event. Family revocation after a detected reuse is no longer cancellable by the
+  caller (it has no timeout of its own beyond the provider's), and an abort during the post-rotation ciphertext
+  cleanup no longer turns a committed rotation into an exception. Not guaranteed: awaits that run before the raise
+  still use the caller's token, so an abort during the login hooks and token issue, the logout owner lookup and
+  logout hook (revoked but not audited), a refresh's principal factory or hook past the grace, or the rotation
+  commit can still skip the event. Events raised by other classes (external login, OTP login, user mutations) are
+  unchanged.
 ### Added
 
 - **`Themia.Modules.Identity`: `IOtpLoginFlow.VerifyAsync(challengeId, code, SessionRequest session, ct)` (coord #0191).** The one-time-code login with every check and hook of the plain overload (the one-time-code login switch, `OnBeforeLogin`, active, lockout, tenant, the confirmed-phone binding on the Themia user, `OnLoginSucceeded`, observers), minted on an app channel like `IAuthTokenIssuer.StartSessionAsync`: `OnSessionIssuedAsync` carries the channel and the access token carries `sid`. An app that checked the code itself with `IOtpChallengeService` and then called the issuer skipped all of those; this overload is the supported way. The session is checked before the code is read (null, a bad channel, or non-empty `AppClaims`, which this overload does not support, throw and spend nothing); `ExpectedTenant` must equal the challenge's tenant, decided before any hook or the policy (a mismatch is `InvalidCredentials`, so a wrong tenant can never earn a ticket). A user who owes a second factor gets a ticket, and `ISecondFactorCompletion.CompleteAsync` finishes it on the same channel (`OnLoginSucceeded` and `OnSessionIssued` once each); `IAuthTokenIssuer.CompleteSessionAsync` refuses and burns that ticket. The new overload takes its `CancellationToken` with a default like the plain one; the optional-parameter analyzers RS0026/RS0027 are suppressed on the two overloads with a comment, since they differ by a required `SessionRequest`.

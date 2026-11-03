@@ -66,6 +66,10 @@ internal sealed class FakeRepository<T>(List<T> store, Func<T, Guid> idSelector)
 
     public void Update(T entity) { /* in-memory: the instance is already mutated */ }
 
+    /// <summary>When set, <see cref="UpdateWhereAsync"/> honours its token for the specifications it returns true
+    /// for, like a real set-based UPDATE aborted by the client.</summary>
+    public Func<ISpecification<T>, bool>? HonourCancellationFor { get; set; }
+
     public Task<int> UpdateWhereAsync(
         ISpecification<T> specification,
         Action<IBulkUpdateSetters<T>> set,
@@ -73,6 +77,7 @@ internal sealed class FakeRepository<T>(List<T> store, Func<T, Guid> idSelector)
     {
         // Mirror the real set-based path: target rows by the spec's WHERE (tenant filter + criteria),
         // then write each named property directly on the matched instances.
+        if (HonourCancellationFor?.Invoke(specification) == true) cancellationToken.ThrowIfCancellationRequested();
         var setters = new FakeBulkUpdateSetters();
         set(setters);
         if (setters.Assignments.Count == 0)
