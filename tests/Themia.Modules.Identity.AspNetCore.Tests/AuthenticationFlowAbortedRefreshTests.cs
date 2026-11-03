@@ -154,13 +154,31 @@ public sealed class AuthenticationFlowAbortedRefreshTests
     public async Task Logout_ReceivesAToken_ThatIsNotCancelledAtTheAbort()
     {
         await abort.CancelAsync();
-        refresh.HonourCancellationOnResolveOwner = false;   // logout's owner lookup lets OCE through on purpose; this pins the raise only
         var observer = new TokenProbeObserver();
 
         await Build(observer).LogoutAsync("token", allSessions: false, abort.Token);
 
         var seen = Assert.Single(observer.Events);
         Assert.Equal(nameof(IIdentityEventObserver.OnLogoutAsync), seen.Name);
+        Assert.False(seen.TokenCancelled);
+    }
+
+    [Fact]
+    public async Task Logout_RevokesAndIsAudited_WhenTheClientAbortsBeforeTheRevoke()
+    {
+        await abort.CancelAsync();
+        var owner = Guid.NewGuid();
+        refresh.OwnerId = owner;
+        refresh.HonourCancellationOnRevoke = true;
+        var observer = new TokenProbeObserver();
+
+        var outcome = await Build(observer).LogoutAsync("token", allSessions: true, abort.Token);
+
+        Assert.Equal(LogoutOutcome.Revoked, outcome);
+        Assert.Equal(1, refresh.RevokeCalls);
+        var seen = Assert.Single(observer.Events);
+        Assert.Equal(nameof(IIdentityEventObserver.OnLogoutAsync), seen.Name);
+        Assert.Equal(owner, seen.UserId);
         Assert.False(seen.TokenCancelled);
     }
 

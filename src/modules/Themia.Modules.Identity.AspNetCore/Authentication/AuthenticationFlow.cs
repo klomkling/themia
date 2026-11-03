@@ -162,35 +162,22 @@ public sealed class AuthenticationFlow : IAuthenticationFlow
         }
     }
 
-    /// <summary>Resolves a reused refresh token's owner for audit attribution. A failure here must not
-    /// turn a refresh rejection into a 500 — losing attribution is acceptable, breaking the flow is
-    /// not — so any exception is logged at <c>Error</c> and swallowed to <see langword="null"/>. That
-    /// includes cancellation: the reuse is already decided, and a client that aborted must not cost the
-    /// event (it is raised without an owner instead). Runs on a token that follows the caller's only
-    /// <see cref="AbortGrace.Duration"/> after an abort.</summary>
-    private async Task<Guid?> TryResolveOwnerAsync(string rawToken, CancellationToken cancellationToken)
-    {
-        try
-        {
-            using var grace = new AbortGrace(cancellationToken, timeProvider);
-            return await refreshTokens.ResolveOwnerAsync(rawToken, grace.Token).ConfigureAwait(false);
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Failed to resolve the owner of a reused refresh token for audit attribution.");
-            return null;
-        }
-    }
-
+    /// <summary>Finds the owner (and tenant) of a refresh token whose outcome is already decided — a reuse, a
+    /// logout — for audit attribution and tenant scope. A failure here must not turn a decided outcome into a
+    /// 500 — losing attribution is acceptable, breaking the flow is not — so any exception is logged at
+    /// <c>Error</c> and swallowed to <see langword="null"/>. That includes cancellation: the outcome is
+    /// decided, and a client that aborted must not cost the event (it is raised without an owner instead).
+    /// Runs on a token that follows the caller's only <see cref="AbortGrace.Duration"/> after an abort.</summary>
     private async Task<RefreshTokenOwner?> TryFindOwnerAsync(string rawToken, CancellationToken cancellationToken)
     {
         try
         {
-            return await refreshTokens.FindOwnerAsync(rawToken, cancellationToken).ConfigureAwait(false);
+            using var grace = new AbortGrace(cancellationToken, timeProvider);
+            return await refreshTokens.FindOwnerAsync(rawToken, grace.Token).ConfigureAwait(false);
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (Exception ex)
         {
-            logger.LogError(ex, "Failed to find the owner of a revoked refresh token for audit attribution.");
+            logger.LogError(ex, "Failed to find the owner of a refresh token for audit attribution.");
             return null;
         }
     }
@@ -360,10 +347,17 @@ public sealed class AuthenticationFlow : IAuthenticationFlow
             // (rotation stamps ConsumedAt/RevokedAt on it rather than deleting it), so it resolves.
             // Invalid has no owner by construction — an unknown/expired/out-of-scope token — and is left
             // null rather than paying for a lookup on every bad token an attacker sprays at the endpoint.
-            var reuseUserId = rotation.Outcome == RefreshOutcome.ReuseDetected
-                ? await TryResolveOwnerAsync(refreshToken, cancellationToken).ConfigureAwait(false)
+            var reuseOwner = rotation.Outcome == RefreshOutcome.ReuseDetected
+                ? await TryFindOwnerAsync(refreshToken, cancellationToken).ConfigureAwait(false)
                 : null;
-            await RaiseAsync((o, ct) => o.OnRefreshFailedAsync(reuseUserId, rotation.Outcome, ct), cancellationToken).ConfigureAwait(false);
+            // The token proved the owner, so the event is raised as the owner's tenant, like every other outcome
+            // of a refresh: a refresh carries no JWT, so under a claims-only tenant strategy the caller's scope is empty
+            // and an audit row for a tenant user's reuse would otherwise be written without its tenant.
+            using (reuseOwner is { TenantKnown: true } ? TenantContextAccessor.BeginScope(reuseOwner.TenantId) : null)
+            {
+                await RaiseAsync((o, ct) => o.OnRefreshFailedAsync(reuseOwner?.UserId, rotation.Outcome, ct), cancellationToken).ConfigureAwait(false);
+            }
+
             return rotation.Outcome switch
             {
                 RefreshOutcome.ReuseDetected => RefreshRotationResult.ReuseDetected(),
@@ -432,14 +426,22 @@ public sealed class AuthenticationFlow : IAuthenticationFlow
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(refreshToken);
 
-        // Revoked BEFORE attribution is resolved: the owner lookup (TryFindOwnerAsync) deliberately
-        // lets OperationCanceledException through, so a client that POSTs /logout and
-        // immediately disconnects — the most likely failure on a logout — would otherwise propagate an
-        // OperationCanceledException out of a resolve-then-revoke ordering and skip RevokeAsync entirely,
-        // leaving the refresh token valid. RevokeAsync looks the token up by hash and only stamps
-        // RevokedAt (see RefreshTokenService) — the row is never deleted — so the owner is still
+        // Revoked BEFORE attribution is resolved: a client that POSTs /logout and immediately disconnects —
+        // the most likely failure on a logout — must not be able to skip RevokeAsync through a
+        // resolve-then-revoke ordering and leave the refresh token valid. RevokeAsync looks the token up by hash
+        // and only stamps RevokedAt (see RefreshTokenService) — the row is never deleted — so the owner is still
         // resolvable afterward and attribution is not lost by reordering.
-        var revoked = await refreshTokens.RevokeAsync(refreshToken, allSessions, cancellationToken).ConfigureAwait(false);
+        //
+        // The revoke itself, reads included (token hash, owner), runs on a token that follows the caller's only
+        // AbortGrace.Duration after an abort: the client asked to be signed out, so a disconnect at the lookup
+        // must not leave the session valid while the app believes it is gone. This also covers an adopter's own
+        // IRefreshTokenService, whose revoke does not have to ignore the token.
+        int revoked;
+        using (var revoking = new AbortGrace(cancellationToken, timeProvider))
+        {
+            revoked = await refreshTokens.RevokeAsync(refreshToken, allSessions, revoking.Token).ConfigureAwait(false);
+        }
+
         if (revoked == 0)
         {
             // Nothing changed, so there is no logout to audit and none to report as done.
@@ -456,7 +458,9 @@ public sealed class AuthenticationFlow : IAuthenticationFlow
 
         using (owner is { TenantKnown: true } ? TenantContextAccessor.BeginScope(owner.TenantId) : null)
         {
-            await hooks.OnLogoutAsync(new LogoutContext(userId, allSessions), cancellationToken).ConfigureAwait(false);
+            // The revoke is committed, so the hook is part of recording a decided logout: same grace as the raise.
+            using var hookGrace = new AbortGrace(cancellationToken, timeProvider);
+            await hooks.OnLogoutAsync(new LogoutContext(userId, allSessions), hookGrace.Token).ConfigureAwait(false);
             await RaiseAsync((o, ct) => o.OnLogoutAsync(userId, allSessions, ct), cancellationToken).ConfigureAwait(false);
         }
 
