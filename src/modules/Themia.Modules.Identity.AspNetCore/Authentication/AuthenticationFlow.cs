@@ -490,7 +490,12 @@ public sealed class AuthenticationFlow : IAuthenticationFlow
         // Hooks get the identifier UNMASKED: they are the adopter's own code, run in-process, and are the
         // documented place to build lockout, alerting or abuse detection — all of which need the real
         // value. The masking above is about what leaves the process in a log line.
-        await hooks.OnLoginFailedAsync(new LoginFailedContext(identifier, reason), cancellationToken).ConfigureAwait(false);
+        // The failure is decided by now, so recording it is not abortable by the client: the hook runs on a token that
+        // follows the caller's only AbortGrace.Duration after an abort, like the event raised right after it.
+        using (var hookGrace = new AbortGrace(cancellationToken, timeProvider))
+        {
+            await hooks.OnLoginFailedAsync(new LoginFailedContext(identifier, reason), hookGrace.Token).ConfigureAwait(false);
+        }
 
         // A hook denial is a distinct event from every other failure reason — it is the adopter's own
         // policy refusing the attempt, not a bad credential — so it gets its own observer method.

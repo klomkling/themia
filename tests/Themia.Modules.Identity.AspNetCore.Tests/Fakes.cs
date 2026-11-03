@@ -255,16 +255,24 @@ internal sealed class RecordingHooks : Themia.Modules.Identity.AspNetCore.Authen
         return Task.CompletedTask;
     }
 
+    /// <summary>Runs inside <see cref="OnLoginSucceededAsync"/>: where a real client abort lands during the hooks.</summary>
+    public Action? OnSucceededHook { get; set; }
+
     public override Task OnLoginSucceededAsync(LoginSucceededContext context, CancellationToken cancellationToken = default)
     {
         Calls.Add("login-succeeded");
+        OnSucceededHook?.Invoke();
         if (Refresh is not null) SucceededRanBeforeIssue = Refresh.IssueCalls == 0;
         if (DenyOnSucceeded) context.Deny("gated");
         return Task.CompletedTask;
     }
 
+    /// <summary>When set, <see cref="OnLoginFailedAsync"/> honours its token.</summary>
+    public bool HonourCancellationOnLoginFailed { get; set; }
+
     public override Task OnLoginFailedAsync(LoginFailedContext context, CancellationToken cancellationToken = default)
     {
+        if (HonourCancellationOnLoginFailed) cancellationToken.ThrowIfCancellationRequested();
         Calls.Add("login-failed");
         FailedReason = context.Reason;
         return Task.CompletedTask;

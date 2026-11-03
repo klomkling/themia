@@ -306,6 +306,28 @@ public sealed class SecondFactorTests : IDisposable
     }
 
     [Fact]
+    public async Task A_denial_is_recorded_when_the_client_aborts_after_the_ticket_was_consumed()
+    {
+        var pending = await PendingPasswordLoginAsync();
+        hooks.DenyOnSucceeded = true;
+        hooks.HonourCancellationOnLoginFailed = true;
+        var probe = new TokenProbeObserver();
+        var completion = new SecondFactorCompletion(ticketService, users, principals, access, refresh, hooks, [probe], options, clock,
+            NullLogger<SecondFactorCompletion>.Instance);
+        using var abort = new CancellationTokenSource();
+        // The ticket is consumed first, so the abort lands after it, as a real disconnect during the hooks would.
+        hooks.OnSucceededHook = abort.Cancel;
+
+        var result = await completion.CompleteAsync(pending.Ticket, pending.UserId, pending.Stage, abort.Token);
+
+        Assert.Equal(SecondFactorCompletionOutcome.Denied, result.Outcome);
+        Assert.Contains("login-failed", hooks.Calls);
+        var seen = Assert.Single(probe.Events);
+        Assert.Equal(nameof(IIdentityEventObserver.OnLoginDeniedAsync), seen.Name);
+        Assert.False(seen.TokenCancelled);
+    }
+
+    [Fact]
     public async Task A_hook_that_denies_at_completion_returns_denied_and_issues_nothing()
     {
         var pending = await PendingPasswordLoginAsync();

@@ -151,6 +151,26 @@ public sealed class AuthenticationFlowAbortedRefreshTests
     }
 
     [Fact]
+    public async Task LoginFailed_RunsTheHookAndRaisesTheEvent_WhenTheClientAbortsBeforeTheHook()
+    {
+        await abort.CancelAsync();
+        hooks.HonourCancellationOnLoginFailed = true;
+        var observer = new TokenProbeObserver();
+        var flow = new AuthenticationFlow(
+            new FakeUserService { VerifyResult = PasswordVerificationResult.Failed, UserToReturn = new User { UserName = "alice" } },
+            factory, new FakeAccessTokenService(), refresh, new FakePasswordHasher(), hooks, [observer], clock,
+            NullLogger<AuthenticationFlow>.Instance);
+
+        var result = await flow.LoginAsync("alice", "bad", abort.Token);
+
+        Assert.False(result.Succeeded);
+        Assert.Contains("login-failed", hooks.Calls);
+        var seen = Assert.Single(observer.Events);
+        Assert.Equal(nameof(IIdentityEventObserver.OnLoginFailedAsync), seen.Name);
+        Assert.False(seen.TokenCancelled);
+    }
+
+    [Fact]
     public async Task Logout_ReceivesAToken_ThatIsNotCancelledAtTheAbort()
     {
         await abort.CancelAsync();
@@ -236,6 +256,9 @@ internal sealed class TokenProbeObserver : IIdentityEventObserver
 
     public Task OnLogoutAsync(Guid? userId, bool allSessions, CancellationToken cancellationToken = default) =>
         RecordAsync(nameof(OnLogoutAsync), userId, cancellationToken);
+
+    public Task OnLoginDeniedAsync(string userName, string? denialReason, CancellationToken cancellationToken = default) =>
+        RecordAsync(nameof(OnLoginDeniedAsync), null, cancellationToken);
 
     public Task OnRefreshFailedAsync(Guid? userId, RefreshOutcome outcome, CancellationToken cancellationToken = default) =>
         RecordAsync(nameof(OnRefreshFailedAsync), userId, cancellationToken);

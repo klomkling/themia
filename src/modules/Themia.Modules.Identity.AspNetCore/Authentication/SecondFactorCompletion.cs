@@ -195,7 +195,11 @@ internal sealed class SecondFactorCompletion : ISecondFactorCompletion
     private async Task<SecondFactorCompletionResult> DenyAsync(string userName, string? denialReason, CancellationToken cancellationToken)
     {
         logger.LogWarning("Second-factor completion denied by a hook ({DenialReason}).", denialReason);
-        await hooks.OnLoginFailedAsync(new LoginFailedContext(userName, LoginFailureReason.Denied), cancellationToken).ConfigureAwait(false);
+        using (var hookGrace = new AbortGrace(cancellationToken, timeProvider))
+        {
+            await hooks.OnLoginFailedAsync(new LoginFailedContext(userName, LoginFailureReason.Denied), hookGrace.Token).ConfigureAwait(false);
+        }
+
         await RaiseAsync((o, ct) => o.OnLoginDeniedAsync(userName, denialReason, ct), cancellationToken).ConfigureAwait(false);
         return SecondFactorCompletionResult.Denied();
     }
@@ -203,7 +207,11 @@ internal sealed class SecondFactorCompletion : ISecondFactorCompletion
     private async Task<SecondFactorCompletionResult> DenyExternalAsync(string provider, string? denialReason, CancellationToken cancellationToken)
     {
         logger.LogWarning("Second-factor completion for provider {Provider} denied by a hook ({DenialReason}).", provider, denialReason);
-        await externalHooks!.OnExternalLoginFailedAsync(new ExternalLoginFailedContext(provider, ExternalLoginOutcome.Denied), cancellationToken).ConfigureAwait(false);
+        using (var hookGrace = new AbortGrace(cancellationToken, timeProvider))
+        {
+            await externalHooks!.OnExternalLoginFailedAsync(new ExternalLoginFailedContext(provider, ExternalLoginOutcome.Denied), hookGrace.Token).ConfigureAwait(false);
+        }
+
         await RaiseAsync((o, ct) => o.OnExternalLoginDeniedAsync(provider, denialReason, ct), cancellationToken).ConfigureAwait(false);
         return SecondFactorCompletionResult.Denied();
     }
@@ -214,7 +222,10 @@ internal sealed class SecondFactorCompletion : ISecondFactorCompletion
         {
             try
             {
-                await invoke(observer, cancellationToken).ConfigureAwait(false);
+                // The outcome is decided by now: a client that aborts must not cost the audit row, so each observer gets a
+                // token that follows the caller's only AbortGrace.Duration after an abort (see AuthenticationFlow).
+                using var grace = new AbortGrace(cancellationToken, timeProvider);
+                await invoke(observer, grace.Token).ConfigureAwait(false);
             }
             catch (Exception ex)
             {

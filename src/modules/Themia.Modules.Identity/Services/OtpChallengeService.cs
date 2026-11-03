@@ -133,15 +133,20 @@ public sealed class OtpChallengeService : IOtpChallengeService
 
             // A decoy can never match: it was never delivered, and the comparison still runs.
             var matches = Matches(challenge, code) && challenge.UserId is not null;
+
+            // A wrong guess is decided once it has been compared: charging it (and the re-read after a lost race) runs on
+            // None, so a client that aborts here cannot make it a free guess. A right guess decides nothing until the row is
+            // consumed, so consuming stays on the caller's token and the code is still usable if the request is aborted.
+            var storeToken = matches ? cancellationToken : CancellationToken.None;
             var updated = matches
                 ? await challenges.UpdateWhereAsync(
                     new OtpChallengeAttemptGateSpec(challengeId, used, now),
                     set => set.Set(c => c.AttemptCount, used + 1).Set(c => c.ClosedAt, now),
-                    cancellationToken).ConfigureAwait(false)
+                    storeToken).ConfigureAwait(false)
                 : await challenges.UpdateWhereAsync(
                     new OtpChallengeAttemptGateSpec(challengeId, used, now),
                     set => set.Set(c => c.AttemptCount, used + 1),
-                    cancellationToken).ConfigureAwait(false);
+                    storeToken).ConfigureAwait(false);
 
             if (updated == 1)
             {
@@ -155,7 +160,7 @@ public sealed class OtpChallengeService : IOtpChallengeService
             }
 
             // Lost the slot to a parallel guess: re-read and decide again on the new count.
-            var reloaded = await challenges.FirstOrDefaultAsync(new OtpChallengeByIdSpec(challengeId), cancellationToken).ConfigureAwait(false);
+            var reloaded = await challenges.FirstOrDefaultAsync(new OtpChallengeByIdSpec(challengeId), storeToken).ConfigureAwait(false);
             if (reloaded is null)
             {
                 return Invalid();
