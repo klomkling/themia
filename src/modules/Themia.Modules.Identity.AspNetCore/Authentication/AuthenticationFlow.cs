@@ -143,7 +143,7 @@ public sealed class AuthenticationFlow : IAuthenticationFlow
     /// <c>Error</c> — including <see cref="OperationCanceledException"/>. By the time this runs, the
     /// flow's own outcome (success or failure) is already decided, so a client that aborts the request
     /// must not cost the audit row: each observer gets a token that is signalled
-    /// <see cref="PostDecisionGrace"/> AFTER the caller's token is cancelled (never earlier, and never on a
+    /// <see cref="AbortGrace.Duration"/> AFTER the caller's token is cancelled (never earlier, and never on a
     /// live request). The grace is per observer, so a stuck one cannot starve the next. An observer that
     /// ignores its token holds the request until it finishes, exactly as before.</summary>
     private async Task RaiseAsync(Func<IIdentityEventObserver, CancellationToken, Task> invoke, CancellationToken cancellationToken)
@@ -162,37 +162,12 @@ public sealed class AuthenticationFlow : IAuthenticationFlow
         }
     }
 
-    /// <summary>How long after the client aborts a decided refresh may keep running to record its outcome.</summary>
-    private static readonly TimeSpan PostDecisionGrace = TimeSpan.FromSeconds(10);
-
-    /// <summary>A token that follows the caller's only <see cref="PostDecisionGrace"/> after the caller is
-    /// cancelled. A live request is unaffected: there is no timeout of its own.</summary>
-    private sealed class AbortGrace : IDisposable
-    {
-        private readonly CancellationTokenSource grace;
-        private readonly CancellationTokenRegistration link;
-
-        public AbortGrace(CancellationToken caller, TimeProvider timeProvider)
-        {
-            grace = new CancellationTokenSource(Timeout.InfiniteTimeSpan, timeProvider);
-            link = caller.Register(static state => ((CancellationTokenSource)state!).CancelAfter(PostDecisionGrace), grace);
-        }
-
-        public CancellationToken Token => grace.Token;
-
-        public void Dispose()
-        {
-            link.Dispose();
-            grace.Dispose();
-        }
-    }
-
     /// <summary>Resolves a reused refresh token's owner for audit attribution. A failure here must not
     /// turn a refresh rejection into a 500 — losing attribution is acceptable, breaking the flow is
     /// not — so any exception is logged at <c>Error</c> and swallowed to <see langword="null"/>. That
     /// includes cancellation: the reuse is already decided, and a client that aborted must not cost the
     /// event (it is raised without an owner instead). Runs on a token that follows the caller's only
-    /// <see cref="PostDecisionGrace"/> after an abort.</summary>
+    /// <see cref="AbortGrace.Duration"/> after an abort.</summary>
     private async Task<Guid?> TryResolveOwnerAsync(string rawToken, CancellationToken cancellationToken)
     {
         try
@@ -422,7 +397,7 @@ public sealed class AuthenticationFlow : IAuthenticationFlow
 
         // The rotation has already persisted, so a client abort from here on must end in the same audit row
         // as no abort: the principal factory and the hook run on a token that is only signalled
-        // PostDecisionGrace after the abort.
+        // AbortGrace.Duration after the abort.
         using var decided = new AbortGrace(cancellationToken, timeProvider);
         var principal = await principalFactory.CreateAsync(user, AuthenticationType, decided.Token).ConfigureAwait(false);
         AuthTokenIssuer.AddSession(principal, replacement.FamilyId);   // rotation keeps the family, so the session id is stable
