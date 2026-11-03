@@ -17,3 +17,4 @@ Themia.Challenges.PostgreSql.PostgresChallengeDialect.SelectLiveByTokenHashSql.g
 Themia.Challenges.PostgreSql.PostgresChallengeDialect.SelectMostRecentByScopeSql(Themia.Challenges.ChallengeTenancy tenancy) -> string!
 Themia.Challenges.PostgreSql.ServiceCollectionExtensions
 static Themia.Challenges.PostgreSql.ServiceCollectionExtensions.AddThemiaChallengesPostgres(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, string! connectionString) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+Themia.Challenges.PostgreSql.PostgresChallengeDialect.IsDeadlock(System.Data.Common.DbException! exception) -> bool
