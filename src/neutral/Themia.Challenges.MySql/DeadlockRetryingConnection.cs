@@ -36,11 +36,15 @@ namespace Themia.Challenges.MySql;
 /// sync-wrapped-in-a-task default — so only retrying the sync methods would silently never run.
 /// </para>
 /// <para>
-/// <b>Retrying a whole command, not resuming mid-statement, is safe here.</b> A deadlock is per-statement:
-/// InnoDB rolls back only the statement that lost the deadlock arbitration, and every statement this
-/// dialect issues runs under autocommit (no explicit transaction spans more than one
-/// <see cref="DbCommand"/>), so a retried command re-executes against whatever the database now holds,
-/// never a partially-applied prior attempt. The one multi-statement command,
+/// <b>Retrying a whole command, not resuming mid-statement, is safe for a command in autocommit.</b> A
+/// deadlock rolls back the statement that lost the arbitration, and a command with no transaction attached
+/// runs under autocommit, so a retried command re-executes against whatever the database now holds, never a
+/// partially-applied prior attempt. <b>A command that belongs to a transaction is never retried here:</b>
+/// InnoDB rolls back the WHOLE transaction on a deadlock, so re-running only the failed statement would
+/// continue a transaction that no longer exists (the retried statement then runs in autocommit, and work the
+/// caller already counted as done is gone). The error propagates, and the code that owns the transaction
+/// (<c>ChallengeService</c>, through <see cref="IChallengeDialect.IsDeadlock"/>) decides: re-run the whole
+/// transaction for an issue, answer "already consumed" for a verify. The one multi-statement command,
 /// <see cref="MySqlChallengeDialect.IncrementWindowSql"/>, is safe to retry as a whole for the same
 /// reason its own remarks give for using <c>ON DUPLICATE KEY UPDATE id = id</c>: if the seed
 /// <c>INSERT</c> already committed before the following <c>UPDATE</c> deadlocked, re-running the
@@ -228,6 +232,11 @@ internal sealed class DeadlockRetryingConnection : DbConnection
         // the async path, which does.
         private T Retry<T>(Func<T> execute)
         {
+            if (transaction is not null)
+            {
+                return execute();
+            }
+
             for (var attempt = 1; ; attempt++)
             {
                 try
@@ -250,6 +259,11 @@ internal sealed class DeadlockRetryingConnection : DbConnection
 
         private async Task<T> RetryAsync<T>(Func<Task<T>> execute, CancellationToken cancellationToken)
         {
+            if (transaction is not null)
+            {
+                return await execute().ConfigureAwait(false);
+            }
+
             for (var attempt = 1; ; attempt++)
             {
                 try

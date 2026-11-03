@@ -263,4 +263,18 @@ public interface IChallengeDialect
     /// </para>
     /// </summary>
     string PurgeElapsedWindowsSql { get; }
+
+    /// <summary>
+    /// Whether <paramref name="exception"/> is this engine's deadlock (or serialization-failure) abort: the
+    /// engine rolled the whole transaction back and the work can be run again. Used by
+    /// <see cref="IChallengeService"/> to retry the issue transaction and to answer a verify that lost a
+    /// deadlock to its sibling as <see cref="ChallengeVerifyOutcome.Consumed"/>. Defaults to
+    /// <see langword="false"/>: a dialect that does not classify gets no retry and every error propagates.
+    /// <para>
+    /// Match the exact engine codes only — PostgreSQL <c>40P01</c> and <c>40001</c>, MySQL <c>1213</c>,
+    /// SQL Server <c>1205</c>. Do not include lock-wait timeouts or <c>DbException.IsTransient</c>: a
+    /// timeout or an outage must propagate, never read as "link already used".
+    /// </para>
+    /// </summary>
+    bool IsDeadlock(DbException exception) => false;
 }

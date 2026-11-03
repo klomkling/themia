@@ -60,6 +60,13 @@ public abstract class ChallengeEngineFixture : IAsyncLifetime
     /// testable against a purpose that is itself token-shaped rather than against a numeric one.</summary>
     public const string OtherTokenPurpose = "token-link-other";
 
+    /// <summary>A numeric purpose that keeps three links live and voids the siblings of a verified one
+    /// (<see cref="PurposeOptions.InvalidateSiblingsOnVerify"/>, coord #0192).</summary>
+    public const string SiblingPurpose = "sibling-void";
+
+    /// <summary><see cref="SiblingPurpose"/> as an opaque-token link, redeemed by <c>VerifyByTokenAsync</c>.</summary>
+    public const string SiblingTokenPurpose = "sibling-void-token";
+
     private ServiceProvider provider = null!;
 
     /// <summary>The live <see cref="IChallengeService"/>, resolved from DI exactly as an adopter would —
@@ -169,6 +176,19 @@ public abstract class ChallengeEngineFixture : IAsyncLifetime
         options.ConfigurePurpose(OtherTokenPurpose, p =>
         {
             p.Format = ChallengeFormat.OpaqueToken(32);
+            p.PerScopeWindow = (1_000, TimeSpan.FromMinutes(15));
+        });
+        options.ConfigurePurpose(SiblingPurpose, p =>
+        {
+            p.MaxLiveChallenges = 3;
+            p.InvalidateSiblingsOnVerify = true;
+            p.PerScopeWindow = (1_000, TimeSpan.FromMinutes(15));
+        });
+        options.ConfigurePurpose(SiblingTokenPurpose, p =>
+        {
+            p.Format = ChallengeFormat.OpaqueToken(32);
+            p.MaxLiveChallenges = 3;
+            p.InvalidateSiblingsOnVerify = true;
             p.PerScopeWindow = (1_000, TimeSpan.FromMinutes(15));
         });
     }

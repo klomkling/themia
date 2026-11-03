@@ -121,3 +121,6 @@ Themia.Challenges.ChallengeIssueResult.RetryAfter.get -> System.TimeSpan?
 Themia.Challenges.ChallengeVerifyResult.RetryAfter.get -> System.TimeSpan?
 static Themia.Challenges.ChallengeIssueResult.RateLimited(System.TimeSpan retryAfter) -> Themia.Challenges.ChallengeIssueResult!
 static Themia.Challenges.ChallengeVerifyResult.RateLimited(Themia.Challenges.ChallengeScope! scope, System.TimeSpan retryAfter) -> Themia.Challenges.ChallengeVerifyResult!
+Themia.Challenges.IChallengeDialect.IsDeadlock(System.Data.Common.DbException! exception) -> bool
+Themia.Challenges.PurposeOptions.InvalidateSiblingsOnVerify.get -> bool
+Themia.Challenges.PurposeOptions.InvalidateSiblingsOnVerify.set -> void

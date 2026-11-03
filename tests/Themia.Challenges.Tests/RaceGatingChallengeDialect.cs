@@ -65,6 +65,9 @@ internal sealed class RaceGatingChallengeDialect : IChallengeDialect
     public string DecrementWindowSql(RateWindowBucket bucket) => inner.DecrementWindowSql(bucket);
     public string PurgeElapsedWindowsSql => inner.PurgeElapsedWindowsSql;
 
+    /// <inheritdoc />
+    public bool IsDeadlock(DbException exception) => ((IChallengeDialect)inner).IsDeadlock(exception);
+
     private sealed class GatingConnection : SqliteConnection
     {
         private readonly string gatedCommandText;
