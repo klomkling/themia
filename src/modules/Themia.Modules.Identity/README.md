@@ -308,6 +308,17 @@ absent, so a rule that must hold under concurrency needs a constraint of its own
 `IOtpLoginFlow` signs a user in with a short numeric code sent to their confirmed phone, and issues the same tokens as
 `IAuthenticationFlow.LoginAsync`, so `refresh`, `logout` and your hooks and observers work unchanged. It is opt in.
 
+**On an app channel (coord #0191).** An app that labels its entry points for audit and policy (`IAuthTokenIssuer`, `SessionRequest`) signs the
+code in with `VerifyAsync(challengeId, code, new SessionRequest(tenant, "myapp.otp"), ct)` instead of checking the code itself and calling
+the issuer: the overload runs every check and hook of the plain one (the one-time-code login switch, `OnBeforeLogin`, active, lockout, tenant,
+the confirmed-phone binding on the Themia user, `OnLoginSucceeded`, the observers) and then mints the session on that channel (`OnSessionIssuedAsync`
+carries it, the access token carries `sid`). Three rules: the session is checked before the code is read, so a bad channel, a null session
+or non-empty `AppClaims` (not supported here) throws and spends nothing; `ExpectedTenant` must equal the tenant the challenge was issued in,
+else the answer is `InvalidCredentials` and neither a hook nor the policy ran; and the policy is asked as `SecondFactorMethod.Otp` with the
+channel in `SecondFactorContext.Provider`, so a policy that reads `Provider` must check `Method` too. A user who owes a second factor gets
+`LoginOutcome.SecondFactorRequired` and finishes through `ISecondFactorCompletion.CompleteAsync`, which mints on the same channel (the
+ticket carries it); `IAuthTokenIssuer.CompleteSessionAsync` refuses such a ticket. Ticket completion cannot carry app claims.
+
 ```csharp
 services.AddThemiaIdentityAspNetCore(/* jwt */);
 services.AddScoped<IOtpCodeSender, SmsCodeSender>();          // yours: delivery stays in the application

@@ -15,7 +15,7 @@ public enum OtpStartOutcome
 
 /// <summary>Result of <see cref="IOtpLoginFlow.StartAsync"/>.</summary>
 /// <param name="Outcome">Issued or throttled.</param>
-/// <param name="ChallengeId">Pass to <see cref="IOtpLoginFlow.VerifyAsync"/>; <see cref="Guid.Empty"/> when throttled.</param>
+/// <param name="ChallengeId">Pass to <see cref="IOtpLoginFlow.VerifyAsync(Guid, string, CancellationToken)"/>; <see cref="Guid.Empty"/> when throttled.</param>
 /// <param name="ExpiresAt">When the code stops being accepted; default when throttled.</param>
 public readonly record struct OtpStartResult(OtpStartOutcome Outcome, Guid ChallengeId, DateTimeOffset ExpiresAt)
 {
@@ -25,7 +25,7 @@ public readonly record struct OtpStartResult(OtpStartOutcome Outcome, Guid Chall
 
 /// <summary>
 /// Passwordless phone-code login. <see cref="StartAsync"/> sends a short numeric code to a confirmed
-/// phone; <see cref="VerifyAsync"/> exchanges it for the same session as password login.
+/// phone; <see cref="VerifyAsync(Guid, string, CancellationToken)"/> exchanges it for the same session as password login.
 /// </summary>
 public interface IOtpLoginFlow
 {
@@ -43,7 +43,36 @@ public interface IOtpLoginFlow
     /// <see cref="LoginOutcome.LockedOut"/> once the attempt cap is hit, and
     /// <see cref="LoginOutcome.Denied"/> when a hook refuses.
     /// </summary>
+    // The existing overload keeps its optional token (a breaking change otherwise); the channel overload mirrors it, so a caller
+    // writes the same call with and without a channel. RS0026/RS0027 guard against ambiguous optional-parameter overloads, which
+    // these two cannot be: they differ by a required SessionRequest.
+#pragma warning disable RS0026, RS0027
     Task<LoginResult> VerifyAsync(Guid challengeId, string code, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Same checks, hooks and observers as <see cref="VerifyAsync(Guid, string, CancellationToken)"/> (the one-time-code
+    /// login switch, <c>OnBeforeLogin</c>, the active, lockout, tenant and phone-binding checks, <c>OnLoginSucceeded</c>,
+    /// and the second-factor policy asked as <see cref="SecondFactorMethod.Otp"/>), but the session is minted on the
+    /// app's channel as <see cref="IAuthTokenIssuer.StartSessionAsync"/> does: the channel goes into the audit event
+    /// <c>OnSessionIssuedAsync</c>, and the tokens carry <c>sid</c>.
+    /// <para>
+    /// <paramref name="session"/> is checked before the challenge is read, so a mistake in it never burns a code: a null
+    /// value, a channel that is not 1 to 64 characters of <c>a-z 0-9 . _ -</c>, and a non-empty
+    /// <see cref="SessionRequest.AppClaims"/> (not supported on this overload) throw <see cref="ArgumentException"/>.
+    /// <see cref="SessionRequest.ExpectedTenant"/> must equal the tenant the challenge was issued in; a mismatch is
+    /// <see cref="LoginOutcome.InvalidCredentials"/> (the code is already spent, as for any wrong-tenant login), and it is
+    /// decided before any hook or the second-factor policy runs.
+    /// </para>
+    /// <para>
+    /// A user who owes a second factor gets <see cref="LoginOutcome.SecondFactorRequired"/> with a ticket whose
+    /// <see cref="PendingSecondFactor"/> is for <see cref="SecondFactorMethod.Otp"/>; finish it with
+    /// <see cref="ISecondFactorCompletion"/>, which mints on the same channel. A policy sees the channel in
+    /// <see cref="SecondFactorContext.Provider"/> for an <see cref="SecondFactorMethod.Otp"/> login made through this
+    /// overload; a policy that branches on <c>Provider</c> must check <see cref="SecondFactorContext.Method"/> too.
+    /// </para>
+    /// </summary>
+    Task<LoginResult> VerifyAsync(Guid challengeId, string code, SessionRequest session, CancellationToken cancellationToken = default);
+#pragma warning restore RS0026, RS0027
 }
 
 /// <summary>What <see cref="IOtpCodeSender"/> must deliver.</summary>

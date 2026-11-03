@@ -437,8 +437,14 @@ internal sealed class FakeOtpChallengeService : IOtpChallengeService
             : new OtpIssueResult(OtpIssueOutcome.Throttled, Guid.Empty, default, null));
     }
 
-    public Task<OtpVerifyResult> VerifyAsync(Guid challengeId, string code, CancellationToken cancellationToken = default) =>
-        Task.FromResult(VerifyResult);
+    /// <summary>How many times a code was checked (a spent or counted guess).</summary>
+    public int VerifyCalls { get; private set; }
+
+    public Task<OtpVerifyResult> VerifyAsync(Guid challengeId, string code, CancellationToken cancellationToken = default)
+    {
+        VerifyCalls++;
+        return Task.FromResult(VerifyResult);
+    }
 }
 
 internal sealed class FakeOtpCodeSender : IOtpCodeSender
