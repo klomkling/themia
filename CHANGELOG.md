@@ -27,6 +27,20 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+### Changed
+
+- **`AuthenticationFlow` observers get a grace after a client abort (coord #0193).** Once a refresh outcome is
+  decided (`ReuseDetected`, `Invalid`, replay inside the grace, success, a hook deny after the rotation), and for
+  login and logout events, the `IIdentityEventObserver` event is raised on a token that is signalled 10 seconds
+  after the abort (per observer, never on a live request) instead of at it. The reuse owner lookup falls back to no
+  owner rather than skipping the event. Family revocation after a detected reuse is no longer cancellable by the
+  caller (it has no timeout of its own beyond the provider's), and an abort during the post-rotation ciphertext
+  cleanup no longer turns a committed rotation into an exception. Not guaranteed: awaits that run before the raise
+  still use the caller's token, so an abort during the login hooks and token issue, the logout owner lookup and
+  logout hook (revoked but not audited), a refresh's principal factory or hook past the grace, or the rotation
+  commit can still skip the event. Events raised by other classes (external login, OTP login, user mutations) are
+  unchanged.
+
 ## [0.51.0] - 2026-11-01
 
 ### Added
