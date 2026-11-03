@@ -29,6 +29,10 @@ public sealed class PostgresChallengeDialect : IChallengeDialect
     public DbConnection CreateConnection() => new NpgsqlConnection(connectionString);
 
     /// <inheritdoc />
+    public bool IsDeadlock(DbException exception) =>
+        exception is PostgresException { SqlState: PostgresErrorCodes.DeadlockDetected or PostgresErrorCodes.SerializationFailure };
+
+    /// <inheritdoc />
     public string InsertSql => """
         INSERT INTO challenges (id, tenant_id, "key", purpose, secret_hash, secret_salt, token_hash, attempts, expires_at, created_at)
         VALUES (@Id, @TenantId, @Key, @Purpose, @SecretHash, @SecretSalt, @TokenHash, @Attempts, @ExpiresAt, @CreatedAt);

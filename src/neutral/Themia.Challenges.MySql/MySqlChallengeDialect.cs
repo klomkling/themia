@@ -86,6 +86,9 @@ public sealed class MySqlChallengeDialect : IChallengeDialect
     /// </remarks>
     public DbConnection CreateConnection() => new DeadlockRetryingConnection(connectionString, logger);
 
+    /// <inheritdoc />
+    public bool IsDeadlock(DbException exception) => exception is MySqlException { ErrorCode: MySqlErrorCode.LockDeadlock };
+
     /// <summary>The engine-appropriate quoting of the reserved <c>key</c> column.</summary>
     private const string KeyColumn = "`key`";
 

@@ -102,4 +102,7 @@ internal sealed class RaceGatingChallengeDialect : IChallengeDialect
 
     /// <inheritdoc />
     public string PurgeElapsedWindowsSql => inner.PurgeElapsedWindowsSql;
+
+    /// <inheritdoc />
+    public bool IsDeadlock(DbException exception) => inner.IsDeadlock(exception);
 }

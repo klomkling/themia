@@ -192,51 +192,8 @@ internal sealed class ChallengeService : IChallengeService
                 await connection.OpenAsync(cancellationToken);
             }
 
-            // The supersede-then-insert pair is atomic. Without the transaction, an insert that fails
-            // after a successful invalidate leaves the user with their previous code already killed and
-            // no new one — strictly worse than either operation not having run at all. The rate-limit
-            // counters are deliberately NOT in this transaction: they are separate statements precisely
-            // so concurrent callers serialize on their own row locks, and enrolling them here would
-            // hold those locks for the whole issuance.
-            await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
-
-            // Re-issue policy: only MaxLiveChallenges == 1 is exactly enforceable with this dialect's
-            // statements (see the type-level remarks) — invalidating on every issue is safe even when
-            // nothing was previously live, since InvalidateLiveForScopeSql is a no-op UPDATE in that case.
-            if (purpose.MaxLiveChallenges == 1)
-            {
-                await connection.ExecuteAsync(new CommandDefinition(
-                    dialect.InvalidateLiveForScopeSql(TenancyOf(scope)),
-                    new { TenantId = scope.TenantId, Key = scope.Key, Purpose = scope.Purpose, Now = now, ConsumedAt = now },
-                    transaction,
-                    cancellationToken: cancellationToken));
-            }
-
-            await connection.ExecuteAsync(new CommandDefinition(
-                dialect.InsertSql,
-                new
-                {
-                    Id = challengeId,
-                    TenantId = scope.TenantId,
-                    Key = scope.Key,
-                    Purpose = scope.Purpose,
-                    SecretHash = hash,
-                    SecretSalt = salt,
-                    // Only an opaque-token challenge gets a lookup hash, and only it can afford one:
-                    // TokenHasher is deterministic (see its remarks), which is safe for 256 random bits
-                    // and would be a disclosure for a 6-digit code. A numeric row stays null here, so
-                    // VerifyByTokenAsync can never resolve one — a numeric code is not a magic link.
-                    TokenHash = purpose.Format.Kind == ChallengeFormatKind.OpaqueToken
-                        ? TokenHasher.Hash(secret)
-                        : null,
-                    Attempts = 0,
-                    ExpiresAt = expiresAt,
-                    CreatedAt = now,
-                },
-                transaction,
-                cancellationToken: cancellationToken));
-
-            await transaction.CommitAsync(cancellationToken);
+            await RunIssueTransactionAsync(
+                connection, scope, purpose, challengeId, hash, salt, TokenHashFor(purpose, secret), now, expiresAt, cancellationToken);
         }
         catch
         {
@@ -246,6 +203,185 @@ internal sealed class ChallengeService : IChallengeService
 
         logger.LogInformation("Challenge issued for purpose {Purpose}", scope.Purpose);
         return ChallengeIssueResult.Issued(challengeId, secret, expiresAt);
+    }
+
+    /// <summary>Attempts allowed for a unit of work the engine aborts as a deadlock victim (matches the MySQL wrapper's bound).</summary>
+    private const int MaxDeadlockAttempts = 30;
+
+    /// <summary>The opaque-token lookup hash, or null for a numeric code: <see cref="TokenHasher"/> is deterministic,
+    /// which is safe for 256 random bits and would be a disclosure for a 6-digit code.</summary>
+    private static string? TokenHashFor(PurposeOptions purpose, string secret) =>
+        purpose.Format.Kind == ChallengeFormatKind.OpaqueToken ? TokenHasher.Hash(secret) : null;
+
+    /// <summary>
+    /// Runs the supersede-then-insert transaction, re-running the WHOLE transaction when the dialect classifies the
+    /// failure as a deadlock (the engine already rolled it back). The rate-limit counters were charged before and are
+    /// not charged again.
+    /// </summary>
+    private Task RunIssueTransactionAsync(
+        System.Data.Common.DbConnection connection,
+        ChallengeScope scope,
+        PurposeOptions purpose,
+        Guid challengeId,
+        string hash,
+        string salt,
+        string? tokenHash,
+        DateTimeOffset now,
+        DateTimeOffset expiresAt,
+        CancellationToken cancellationToken) =>
+        WithDeadlockRetryAsync(
+            scope.Purpose,
+            async () =>
+            {
+                await InsertSupersedingAsync(connection, scope, purpose, challengeId, hash, salt, tokenHash, now, expiresAt, cancellationToken);
+                return 0;
+            },
+            cancellationToken);
+
+    /// <summary>
+    /// Runs <paramref name="work"/> again when it fails with an engine deadlock the dialect classifies
+    /// (<see cref="IChallengeDialect.IsDeadlock"/>): bounded, jittered backoff, and the work must be safe to run again: a whole
+    /// transaction (the engine rolled all of it back), or one autocommit batch whose earlier statements are idempotent (the
+    /// window increment: its seed INSERT may already have committed, the counting UPDATE that lost the deadlock did not, so a
+    /// re-run counts once). Never retried inside an ambient
+    /// <see cref="System.Transactions.Transaction"/>, which the deadlock already doomed. A dialect that does not
+    /// classify gets one attempt and every error propagates.
+    /// </summary>
+    private async Task<T> WithDeadlockRetryAsync<T>(string purposeName, Func<Task<T>> work, CancellationToken cancellationToken)
+    {
+        for (var attempt = 1; ; attempt++)
+        {
+            try
+            {
+                return await work();
+            }
+            catch (System.Data.Common.DbException ex) when (dialect.IsDeadlock(ex) && System.Transactions.Transaction.Current is null)
+            {
+                if (attempt >= MaxDeadlockAttempts)
+                {
+                    logger.LogWarning("Challenge deadlock retry bound ({Max}) exhausted for purpose {Purpose}", MaxDeadlockAttempts, purposeName);
+                    throw;
+                }
+
+                logger.LogDebug("Retrying challenge statement after deadlock, attempt {Attempt} for purpose {Purpose}", attempt, purposeName);
+            }
+
+            // Full jitter, exponential, capped; outside the catch, after the transaction was disposed.
+            var capMs = Math.Min(500, 10 * (1 << Math.Min(attempt, 10)));
+            await Task.Delay(TimeSpan.FromMilliseconds(Random.Shared.Next(1, capMs)), cancellationToken);
+        }
+    }
+
+    /// <summary>
+    /// The supersede-then-insert pair is atomic. Without the transaction, an insert that fails after a successful
+    /// invalidate leaves the user with their previous code already killed and no new one — strictly worse than
+    /// either operation not having run at all. The rate-limit counters are deliberately NOT in this transaction:
+    /// they are separate statements precisely so concurrent callers serialize on their own row locks, and enrolling
+    /// them here would hold those locks for the whole issuance.
+    /// </summary>
+    private async Task InsertSupersedingAsync(
+        System.Data.Common.DbConnection connection,
+        ChallengeScope scope,
+        PurposeOptions purpose,
+        Guid challengeId,
+        string hash,
+        string salt,
+        string? tokenHash,
+        DateTimeOffset now,
+        DateTimeOffset expiresAt,
+        CancellationToken cancellationToken)
+    {
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+
+        // Re-issue policy: only MaxLiveChallenges == 1 is exactly enforceable with this dialect's statements (see
+        // the type-level remarks) — invalidating on every issue is safe even when nothing was previously live,
+        // since InvalidateLiveForScopeSql is a no-op UPDATE in that case.
+        if (purpose.MaxLiveChallenges == 1)
+        {
+            await connection.ExecuteAsync(new CommandDefinition(
+                dialect.InvalidateLiveForScopeSql(TenancyOf(scope)),
+                new { TenantId = scope.TenantId, Key = scope.Key, Purpose = scope.Purpose, Now = now, ConsumedAt = now },
+                transaction,
+                cancellationToken: cancellationToken));
+        }
+
+        await connection.ExecuteAsync(new CommandDefinition(
+            dialect.InsertSql,
+            new
+            {
+                Id = challengeId,
+                TenantId = scope.TenantId,
+                Key = scope.Key,
+                Purpose = scope.Purpose,
+                SecretHash = hash,
+                SecretSalt = salt,
+                TokenHash = tokenHash,
+                Attempts = 0,
+                ExpiresAt = expiresAt,
+                CreatedAt = now,
+            },
+            transaction,
+            cancellationToken: cancellationToken));
+
+        await transaction.CommitAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Consumes one matched challenge. Returns <see langword="true"/> only when this call won the row, and,
+    /// when <see cref="PurposeOptions.InvalidateSiblingsOnVerify"/> is on, only after the consume and the
+    /// void of the scope's other live challenges have committed together.
+    /// </summary>
+    /// <remarks>
+    /// Consume first, then void, in one transaction. Two sibling links redeemed at once each consume their own
+    /// row (uncommitted), then each void blocks on the other's locked row; the engine's deadlock detector aborts
+    /// one and the survivor commits, so there is never a second winner. A deadlock the dialect classifies is
+    /// answered as lost (fail closed: the sibling holds the win, request a new link); anything else propagates.
+    /// A lost consume (0 rows) rolls back before the void is issued, so a fresh link is never voided by a loser.
+    /// </remarks>
+    private async Task<bool> TryConsumeAsync(
+        System.Data.Common.DbConnection connection,
+        Guid rowId,
+        ChallengeScope scope,
+        PurposeOptions purpose,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        if (!purpose.InvalidateSiblingsOnVerify)
+        {
+            var rows = await connection.ExecuteAsync(new CommandDefinition(
+                dialect.ConsumeSql, new { Id = rowId, Now = now, ConsumedAt = now }, cancellationToken: cancellationToken));
+            return rows > 0;
+        }
+
+        try
+        {
+            if (connection.State != System.Data.ConnectionState.Open)
+            {
+                await connection.OpenAsync(cancellationToken);
+            }
+
+            await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+            var consumed = await connection.ExecuteAsync(new CommandDefinition(
+                dialect.ConsumeSql, new { Id = rowId, Now = now, ConsumedAt = now }, transaction, cancellationToken: cancellationToken));
+            if (consumed == 0)
+            {
+                return false;
+            }
+
+            var voided = await connection.ExecuteAsync(new CommandDefinition(
+                dialect.InvalidateLiveForScopeSql(TenancyOf(scope)),
+                new { scope.TenantId, scope.Key, scope.Purpose, Now = now, ConsumedAt = now },
+                transaction,
+                cancellationToken: cancellationToken));
+            await transaction.CommitAsync(cancellationToken);
+            logger.LogInformation("Challenge verify voided {Count} sibling challenges for purpose {Purpose}", voided, scope.Purpose);
+            return true;
+        }
+        catch (System.Data.Common.DbException ex) when (dialect.IsDeadlock(ex))
+        {
+            logger.LogWarning("Challenge verify lost a deadlock to a sibling for purpose {Purpose}; answered as consumed", scope.Purpose);
+            return false;
+        }
     }
 
     /// <summary>One rate-limit bucket this issuance actually incremented, and therefore owes back if the
@@ -318,10 +454,17 @@ internal sealed class ChallengeService : IChallengeService
         DateTimeOffset windowStart,
         CancellationToken cancellationToken)
     {
-        var count = await connection.ExecuteScalarAsync<int?>(new CommandDefinition(
-            dialect.IncrementWindowSql(BucketOf(scope, purpose)),
-            new { Id = Guid.NewGuid(), TenantId = scope.TenantId, Key = scope.Key, Purpose = purpose, WindowStart = windowStart },
-            cancellationToken: cancellationToken));
+        // One autocommit batch: an idempotent seed INSERT (which may commit on its own) and the counting UPDATE. A deadlock rolls
+        // back the statement that lost, never a count, so the whole batch is re-run and counts once (SQL Server's 64-way
+        // same-bucket contention deadlocks here; the MySQL connection already retries below this, so on MySQL this only
+        // applies once that bound is exhausted).
+        var count = await WithDeadlockRetryAsync(
+            scope.Purpose,
+            () => connection.ExecuteScalarAsync<int?>(new CommandDefinition(
+                dialect.IncrementWindowSql(BucketOf(scope, purpose)),
+                new { Id = Guid.NewGuid(), TenantId = scope.TenantId, Key = scope.Key, Purpose = purpose, WindowStart = windowStart },
+                cancellationToken: cancellationToken)),
+            cancellationToken);
 
         return count ?? throw new InvalidOperationException(
             "IncrementWindowSql returned no count. The rate-limit ceiling is decided by that value, so "
@@ -433,13 +576,11 @@ internal sealed class ChallengeService : IChallengeService
                 return ChallengeVerifyResult.Verified(scope);
             }
 
-            var consumedRows = await connection.ExecuteAsync(new CommandDefinition(
-                dialect.ConsumeSql, new { row.Id, Now = now, ConsumedAt = now }, cancellationToken: cancellationToken));
-
-            // Rows-affected 0 means someone else's concurrent VerifyAsync already consumed this exact
-            // row between our SELECT and our UPDATE — they won the race. Reporting Verified here too
-            // would let the same secret succeed twice.
-            var matchOutcome = consumedRows > 0 ? ChallengeVerifyResult.Verified(scope) : ChallengeVerifyResult.Consumed(scope);
+            // Losing the race (rows-affected 0: someone else's concurrent VerifyAsync already consumed this
+            // exact row between our SELECT and our UPDATE) must not report Verified, or the same secret
+            // would succeed twice.
+            var won = await TryConsumeAsync(connection, row.Id, scope, purpose, now, cancellationToken);
+            var matchOutcome = won ? ChallengeVerifyResult.Verified(scope) : ChallengeVerifyResult.Consumed(scope);
             logger.LogInformation("Challenge verify {Outcome} for purpose {Purpose}", matchOutcome.Outcome, scope.Purpose);
             return matchOutcome;
         }
@@ -552,14 +693,12 @@ internal sealed class ChallengeService : IChallengeService
             return ChallengeVerifyResult.Incorrect(scope);
         }
 
-        var consumedRows = await connection.ExecuteAsync(new CommandDefinition(
-            dialect.ConsumeSql, new { row.Id, Now = now, ConsumedAt = now }, cancellationToken: cancellationToken));
-
-        // Rows-affected 0 means a concurrent verify consumed this row between the SELECT and the UPDATE.
-        // This matters more here than on the numeric path: a link in an inbox is fetched by scanners and
-        // preview bots as well as by the recipient, so genuine double-redemption is routine rather than
-        // exotic. Reporting Verified twice would let one token confirm two requests.
-        var outcome = consumedRows > 0
+        // Losing the race (a concurrent verify consumed this row between the SELECT and the UPDATE) matters
+        // more here than on the numeric path: a link in an inbox is fetched by scanners and preview bots as
+        // well as by the recipient, so genuine double-redemption is routine rather than exotic. Reporting
+        // Verified twice would let one token confirm two requests.
+        var won = await TryConsumeAsync(connection, row.Id, scope, purposeOptions, now, cancellationToken);
+        var outcome = won
             ? ChallengeVerifyResult.Verified(scope)
             : ChallengeVerifyResult.Consumed(scope);
         logger.LogInformation("Challenge token verify {Outcome} for purpose {Purpose}", outcome.Outcome, purpose);

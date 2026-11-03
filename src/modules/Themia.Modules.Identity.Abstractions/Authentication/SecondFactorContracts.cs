@@ -46,7 +46,11 @@ public enum SecondFactorStage
 /// <param name="UserId">The user who passed the primary check.</param>
 /// <param name="TenantId">The user's tenant, or null for a platform user.</param>
 /// <param name="Method">The primary check they passed.</param>
-/// <param name="Provider">The external provider key when <paramref name="Method"/> is <see cref="SecondFactorMethod.External"/>; otherwise null.</param>
+/// <param name="Provider">What <paramref name="Provider"/> means depends on <paramref name="Method"/>, so <b>read <paramref name="Method"/> first</b>:
+/// for <see cref="SecondFactorMethod.External"/> it is the external provider key; for <see cref="SecondFactorMethod.Custom"/> it is the app's channel
+/// label; for <see cref="SecondFactorMethod.Otp"/> it is the channel label when the login was made through the channel overload of
+/// <c>IOtpLoginFlow.VerifyAsync</c>, otherwise null; for <see cref="SecondFactorMethod.Password"/> it is null. A channel label is free text chosen
+/// by the app: never exempt or relax a second factor because <paramref name="Provider"/> has a certain value or is non-null without checking the method.</param>
 public readonly record struct SecondFactorContext(Guid UserId, TenantId? TenantId, SecondFactorMethod Method, string? Provider = null);
 
 /// <summary>The app's decision whether a login needs a second factor. Evaluated after the primary check
@@ -77,7 +81,7 @@ public readonly record struct PendingSecondFactor(Guid UserId, SecondFactorStage
 /// <param name="UserId">The user.</param>
 /// <param name="TenantId">The user's tenant, or null for a platform user.</param>
 /// <param name="Method">The primary check that was passed.</param>
-/// <param name="Provider">The external provider key, for <see cref="SecondFactorMethod.External"/>.</param>
+/// <param name="Provider">The external provider key for <see cref="SecondFactorMethod.External"/>; the channel label for <see cref="SecondFactorMethod.Custom"/> and for a <see cref="SecondFactorMethod.Otp"/> login made on a channel; otherwise null. Read <paramref name="Method"/> first.</param>
 /// <param name="WasCreated">External login only: the user was provisioned by this login.</param>
 /// <param name="WasLinked">External login only: a link was created by this login.</param>
 /// <param name="SecurityStamp">The user's security stamp when the ticket was issued.</param>
@@ -139,7 +143,7 @@ public readonly record struct SecondFactorCompletionResult
     /// <summary>The primary check the completed login passed; null unless completed.</summary>
     public SecondFactorMethod? Method { get; }
 
-    /// <summary>The external provider key for an external login; otherwise null.</summary>
+    /// <summary>The external provider key for an external login; the channel label for a Custom login and for a one-time-code login made on a channel; otherwise null. Read <see cref="Method"/> first.</summary>
     public string? Provider { get; }
 
     /// <summary>External login only: the user was provisioned by this login.</summary>

@@ -710,3 +710,4 @@ Themia.Modules.Identity.Abstractions.IUserLifecycleHooks.OnBeforeAnonymiseAsync(
 Themia.Modules.Identity.Abstractions.UserMutation.Anonymised = 512 -> Themia.Modules.Identity.Abstractions.UserMutation
 Themia.Modules.Identity.Abstractions.Entities.RefreshToken.SecurityStamp.get -> string?
 Themia.Modules.Identity.Abstractions.Entities.RefreshToken.SecurityStamp.set -> void
+Themia.Modules.Identity.Abstractions.IOtpLoginFlow.VerifyAsync(System.Guid challengeId, string! code, Themia.Modules.Identity.Abstractions.Authentication.SessionRequest! session, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Identity.Abstractions.Authentication.LoginResult>!

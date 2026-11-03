@@ -71,6 +71,29 @@ public sealed class PurposeOptions
     }
 
     /// <summary>
+    /// Whether a successful verify also voids every other live challenge of the same scope (key + purpose
+    /// + tenant). Defaults to <see langword="false"/>, which keeps today's behaviour: with
+    /// <see cref="MaxLiveChallenges"/> above 1 a resent link does not void the earlier one (that is what the
+    /// cap is for), but then an older link stays redeemable after a newer one was used — an old password-reset
+    /// mail can change the password again until it expires. Turn this on for single-use link purposes
+    /// (password reset, invitation, e-mail verification) that keep more than one link live.
+    /// <para>
+    /// Applies to <see cref="IChallengeService.VerifyAsync"/> and <see cref="IChallengeService.VerifyByTokenAsync"/>
+    /// when they succeed, and only then: a peek, a wrong code, and a resend void nothing. The consume and the
+    /// void run in one transaction, so two sibling links redeemed at the same moment yield exactly one
+    /// <see cref="ChallengeVerifyOutcome.Verified"/>; the other answers <see cref="ChallengeVerifyOutcome.Consumed"/>
+    /// (a deadlock between them is reported the same way, fail closed — request a new link).
+    /// </para>
+    /// <para>
+    /// With this on, a <see cref="IChallengeService.VerifyByTokenAsync"/> from a mail scanner or link
+    /// preview also voids the user's newer links; redeem by POST, not by following the link, as the
+    /// scanner-safe pattern. A sibling that expires within the duration of one request can dodge the void,
+    /// so two <see cref="ChallengeVerifyOutcome.Verified"/> are possible at that instant.
+    /// </para>
+    /// </summary>
+    public bool InvalidateSiblingsOnVerify { get; set; }
+
+    /// <summary>
     /// The rate limit on issuance for one scope (key + purpose + tenant): at most <c>Limit</c> secrets
     /// may be issued within <c>Window</c>. Defaults to 3 per 15 minutes. Narrower than
     /// <see cref="ChallengeOptions.PerKeyWindow"/>, which caps the same key across every purpose.

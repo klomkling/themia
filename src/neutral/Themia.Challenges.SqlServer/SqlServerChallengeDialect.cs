@@ -33,6 +33,12 @@ public sealed class SqlServerChallengeDialect : IChallengeDialect
     /// <inheritdoc />
     public DbConnection CreateConnection() => new SqlConnection(connectionString);
 
+    /// <inheritdoc />
+    public bool IsDeadlock(DbException exception) => exception is SqlException { Number: SqlDeadlockVictimNumber };
+
+    /// <summary>SQL Server error 1205: the transaction was chosen as the deadlock victim and rolled back.</summary>
+    private const int SqlDeadlockVictimNumber = 1205;
+
     /// <summary>The engine-appropriate quoting of the reserved <c>key</c> column.</summary>
     private const string KeyColumn = "[key]";
 
