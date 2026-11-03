@@ -27,6 +27,14 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+### Fixed
+
+- **`IUserService.VerifyPasswordAsync`: the access failure counter is now atomic.** Charging a wrong guess, locking at the
+  threshold and clearing the state on success are now compare-and-set updates against the failure state each guess read,
+  instead of a read-modify-write of the whole user row. A right guess is checked against the state it read too, so it is
+  refused when the account locked while it was being judged. A locked or inactive account still answers without hash work,
+  and a successful sign-in now writes the user row once, even when nothing changed. No API, schema or option changes.
+
 ## [0.51.0] - 2026-11-01
 
 ### Added
