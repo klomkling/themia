@@ -465,6 +465,41 @@ public abstract class IdentityStoreConformanceTests
         Assert.Equal(PasswordVerificationResult.Failed, await s.Users.VerifyPasswordAsync("frank", "nope"));
     }
 
+    /// <summary>The one-time-code attempt cap at its real default holds under parallel wrong guesses.</summary>
+    [Fact]
+    public async Task Parallel_wrong_one_time_code_guesses_stop_at_the_attempt_cap()
+    {
+        await ResetAsync();
+        const int guesses = 32;
+        var options = new Themia.Modules.Identity.Abstractions.OtpLoginOptions();   // real defaults
+        Guid challengeId;
+        await using (var setup = NewScope(new TenantId("acme")))
+        {
+            var userId = (await setup.Users.CreateAsync("otp-user", "pw")).UserId!.Value;
+            var service = new Themia.Modules.Identity.Services.OtpChallengeService(setup.OtpRows, setup.Inner.ServiceProvider.GetRequiredService<IUnitOfWork>(), TimeProvider.System, options);
+            challengeId = (await service.IssueAsync("+66811110000", userId)).ChallengeId;
+        }
+
+        using var start = new ManualResetEventSlim(false);
+        var attempts = Enumerable.Range(0, guesses).Select(_ => Task.Run(async () =>
+        {
+            await using var scope = NewScope(new TenantId("acme"));
+            var service = new Themia.Modules.Identity.Services.OtpChallengeService(scope.OtpRows, scope.Inner.ServiceProvider.GetRequiredService<IUnitOfWork>(), TimeProvider.System, options);
+            start.Wait();
+            return (await service.VerifyAsync(challengeId, "abcdef")).Outcome;
+        })).ToArray();
+        start.Set();
+        var outcomes = await Task.WhenAll(attempts);
+
+        await using var check = NewScope(new TenantId("acme"));
+        var charged = (await check.OtpRows.GetByIdAsync(challengeId))!.AttemptCount;
+        var invalid = outcomes.Count(o => o == Themia.Modules.Identity.Abstractions.OtpVerifyOutcome.Invalid);
+        var lockedOut = outcomes.Count(o => o == Themia.Modules.Identity.Abstractions.OtpVerifyOutcome.LockedOut);
+        Assert.True(
+            charged == options.MaxAttempts && invalid <= options.MaxAttempts,
+            $"maxAttempts={options.MaxAttempts} invalid={invalid} lockedOut={lockedOut} charged={charged}");
+    }
+
     [Fact]
     public async Task Lockout_engages_at_threshold_and_releases_after_window()
     {
