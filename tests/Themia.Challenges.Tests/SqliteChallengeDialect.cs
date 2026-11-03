@@ -118,11 +118,11 @@ internal sealed class SqliteChallengeDialect : IChallengeDialect
 
     public string ConsumeSql => """
         UPDATE challenges SET consumed_at = @ConsumedAt
-        WHERE id = @Id AND consumed_at IS NULL AND expires_at > @Now;
+        WHERE id = @Id AND consumed_at IS NULL AND expires_at > @Now AND attempts < @MaxAttempts;
         """;
 
     public string RecordAttemptSql => """
-        UPDATE challenges SET attempts = attempts + 1 WHERE id = @Id AND consumed_at IS NULL;
+        UPDATE challenges SET attempts = attempts + 1 WHERE id = @Id AND consumed_at IS NULL AND attempts < @MaxAttempts;
         """;
 
     public string InvalidateLiveForScopeSql(ChallengeTenancy tenancy) => $"""
