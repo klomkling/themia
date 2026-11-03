@@ -18,3 +18,4 @@ Themia.Challenges.MySql.MySqlChallengeDialect.SelectLiveByTokenHashSql.get -> st
 Themia.Challenges.MySql.MySqlChallengeDialect.SelectMostRecentByScopeSql(Themia.Challenges.ChallengeTenancy tenancy) -> string!
 Themia.Challenges.MySql.ServiceCollectionExtensions
 static Themia.Challenges.MySql.ServiceCollectionExtensions.AddThemiaChallengesMySql(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, string! connectionString) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+Themia.Challenges.MySql.MySqlChallengeDialect.IsDeadlock(System.Data.Common.DbException! exception) -> bool
