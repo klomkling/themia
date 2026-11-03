@@ -216,11 +216,13 @@ public sealed class RefreshTokenService : IRefreshTokenService, ISessionRevoker
         if (allForUser)
         {
             // One set-based UPDATE over the user's active tokens (the spec already filters
-            // RevokedAt == null && ExpiresAt > now), instead of loading-and-stamping each row.
+            // RevokedAt == null && ExpiresAt > now), instead of loading-and-stamping each row. On None, like
+            // RevokeFamilyAsync: the token proved the owner, the revoke is decided, and a client that
+            // disconnects here must not leave the sessions valid.
             var revoked = await tokens.UpdateWhereAsync(
                 new ActiveRefreshTokensByUserSpec(match.UserId, now),
                 set => set.Set(t => t.RevokedAt, now),
-                cancellationToken).ConfigureAwait(false);
+                CancellationToken.None).ConfigureAwait(false);
             logger.LogInformation("Revoked all active refresh tokens for user {UserId} ({Count} tokens).", match.UserId, revoked);
             return revoked;
         }
@@ -273,10 +275,13 @@ public sealed class RefreshTokenService : IRefreshTokenService, ISessionRevoker
             throw new ArgumentException("The session id does not name an active session of the user.", nameof(keepSessionId));
         }
 
+        // Both UPDATEs are on None: the session to keep was validated above, nothing is undecided after that, and an
+        // abort between them would revoke the others but leave the kept session unbound, signing the caller out at
+        // their next refresh.
         var revoked = await tokens.UpdateWhereAsync(
             new ActiveRefreshTokensByUserExceptFamilySpec(user.Id, keepFamilyId, now),
             set => set.Set(t => t.RevokedAt, now),
-            cancellationToken).ConfigureAwait(false);
+            CancellationToken.None).ConfigureAwait(false);
         // The kept session is the caller's own (they just changed the password, say): bind it to the current stamp so it survives
         // the rotation. Call this AFTER the mutation that rotated the stamp; before it, the kept session ends at its next refresh.
         // keepSessionId is the caller's assertion that it is the authenticated session (the `sid` of the principal): the family is
@@ -284,7 +289,7 @@ public sealed class RefreshTokenService : IRefreshTokenService, ISessionRevoker
         await tokens.UpdateWhereAsync(
             new ActiveRefreshTokensByUserAndFamilySpec(user.Id, keepFamilyId, now),
             set => set.Set(t => t.SecurityStamp, user.SecurityStamp),
-            cancellationToken).ConfigureAwait(false);
+            CancellationToken.None).ConfigureAwait(false);
         logger.LogInformation("Revoked {Count} refresh tokens for user {UserId}, keeping one session.", revoked, user.Id);
         return revoked;
     }
@@ -306,10 +311,11 @@ public sealed class RefreshTokenService : IRefreshTokenService, ISessionRevoker
         }
 
         var now = timeProvider.GetUtcNow();
+        // On None: the owner resolved above, so the revoke is decided; a disconnect must not leave sessions valid.
         var revoked = await tokens.UpdateWhereAsync(
             new ActiveRefreshTokensByUserSpec(user.Id, now),
             set => set.Set(t => t.RevokedAt, now),
-            cancellationToken).ConfigureAwait(false);
+            CancellationToken.None).ConfigureAwait(false);
         logger.LogInformation("Revoked all active refresh tokens for user {UserId} ({Count} tokens).", user.Id, revoked);
         return revoked;
     }

@@ -151,16 +151,66 @@ public sealed class AuthenticationFlowAbortedRefreshTests
     }
 
     [Fact]
+    public async Task LoginFailed_RunsTheHookAndRaisesTheEvent_WhenTheClientAbortsBeforeTheHook()
+    {
+        await abort.CancelAsync();
+        hooks.HonourCancellationOnLoginFailed = true;
+        var observer = new TokenProbeObserver();
+        var flow = new AuthenticationFlow(
+            new FakeUserService { VerifyResult = PasswordVerificationResult.Failed, UserToReturn = new User { UserName = "alice" } },
+            factory, new FakeAccessTokenService(), refresh, new FakePasswordHasher(), hooks, [observer], clock,
+            NullLogger<AuthenticationFlow>.Instance);
+
+        var result = await flow.LoginAsync("alice", "bad", abort.Token);
+
+        Assert.False(result.Succeeded);
+        Assert.Contains("login-failed", hooks.Calls);
+        var seen = Assert.Single(observer.Events);
+        Assert.Equal(nameof(IIdentityEventObserver.OnLoginFailedAsync), seen.Name);
+        Assert.False(seen.TokenCancelled);
+    }
+
+    [Fact]
+    public async Task Logout_RunsTheLogoutHook_WhenTheClientAbortsBeforeTheHook()
+    {
+        await abort.CancelAsync();
+        hooks.HonourCancellationOnLogout = true;
+
+        var outcome = await Build(new TokenProbeObserver()).LogoutAsync("token", allSessions: false, abort.Token);
+
+        Assert.Equal(LogoutOutcome.Revoked, outcome);
+        Assert.Contains("logout", hooks.Calls);
+    }
+
+    [Fact]
     public async Task Logout_ReceivesAToken_ThatIsNotCancelledAtTheAbort()
     {
         await abort.CancelAsync();
-        refresh.HonourCancellationOnResolveOwner = false;   // logout's owner lookup lets OCE through on purpose; this pins the raise only
         var observer = new TokenProbeObserver();
 
         await Build(observer).LogoutAsync("token", allSessions: false, abort.Token);
 
         var seen = Assert.Single(observer.Events);
         Assert.Equal(nameof(IIdentityEventObserver.OnLogoutAsync), seen.Name);
+        Assert.False(seen.TokenCancelled);
+    }
+
+    [Fact]
+    public async Task Logout_RevokesAndIsAudited_WhenTheClientAbortsBeforeTheRevoke()
+    {
+        await abort.CancelAsync();
+        var owner = Guid.NewGuid();
+        refresh.OwnerId = owner;
+        refresh.HonourCancellationOnRevoke = true;
+        var observer = new TokenProbeObserver();
+
+        var outcome = await Build(observer).LogoutAsync("token", allSessions: true, abort.Token);
+
+        Assert.Equal(LogoutOutcome.Revoked, outcome);
+        Assert.Equal(1, refresh.RevokeCalls);
+        var seen = Assert.Single(observer.Events);
+        Assert.Equal(nameof(IIdentityEventObserver.OnLogoutAsync), seen.Name);
+        Assert.Equal(owner, seen.UserId);
         Assert.False(seen.TokenCancelled);
     }
 
@@ -218,6 +268,12 @@ internal sealed class TokenProbeObserver : IIdentityEventObserver
 
     public Task OnLogoutAsync(Guid? userId, bool allSessions, CancellationToken cancellationToken = default) =>
         RecordAsync(nameof(OnLogoutAsync), userId, cancellationToken);
+
+    public Task OnLoginDeniedAsync(string userName, string? denialReason, CancellationToken cancellationToken = default) =>
+        RecordAsync(nameof(OnLoginDeniedAsync), null, cancellationToken);
+
+    public Task OnExternalLoginDeniedAsync(string provider, string? denialReason, CancellationToken cancellationToken = default) =>
+        RecordAsync(nameof(OnExternalLoginDeniedAsync), null, cancellationToken);
 
     public Task OnRefreshFailedAsync(Guid? userId, RefreshOutcome outcome, CancellationToken cancellationToken = default) =>
         RecordAsync(nameof(OnRefreshFailedAsync), userId, cancellationToken);

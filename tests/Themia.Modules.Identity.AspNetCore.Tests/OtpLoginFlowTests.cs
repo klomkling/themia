@@ -192,6 +192,27 @@ public sealed class OtpLoginFlowTests : IDisposable
     }
 
     [Fact]
+    public async Task Verify_RunsTheFailedHookAndRaisesTheEvent_WhenTheClientAbortsAfterTheCodeWasJudged()
+    {
+        GivenAccount();
+        challenges.VerifyResult = new OtpVerifyResult(OtpVerifyOutcome.Invalid, null, null);
+        hooks.HonourCancellationOnLoginFailed = true;
+        var probe = new TokenProbeObserver();
+        var aborted = new OtpLoginFlow(users, resolver, challenges, sender, new FormattingOnlyPhoneNumberNormalizer(),
+            principals, access, refresh, hooks, [probe], identityOptions, clock, NullLogger<OtpLoginFlow>.Instance);
+        using var abort = new CancellationTokenSource();
+        await abort.CancelAsync();
+
+        var result = await aborted.VerifyAsync(Guid.NewGuid(), Code, abort.Token);
+
+        Assert.Equal(LoginOutcome.InvalidCredentials, result.Outcome);
+        Assert.Contains("login-failed", hooks.Calls);
+        var seen = Assert.Single(probe.Events);
+        Assert.Equal(nameof(IIdentityEventObserver.OnLoginFailedAsync), seen.Name);
+        Assert.False(seen.TokenCancelled);
+    }
+
+    [Fact]
     public async Task Verify_ReChecksTheAccountAfterTheCode_InactiveGetsNoTokens()
     {
         var user = Eligible();

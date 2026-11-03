@@ -135,8 +135,7 @@ internal sealed class FakeRefreshTokenService : IRefreshTokenService
 
     /// <summary>When set, <see cref="ResolveOwnerAsync"/> throws <see cref="OperationCanceledException"/>
     /// instead — the shape a client disconnect during logout actually takes. Kept distinct from
-    /// <see cref="ThrowOnResolveOwner"/> because <c>AuthenticationFlow.TryResolveOwnerAsync</c>
-    /// deliberately does NOT swallow this exception type (see its own remarks).</summary>
+    /// <see cref="ThrowOnResolveOwner"/> so a test can say which of the two it means.</summary>
     public bool CancelOnResolveOwner { get; set; }
 
     /// <summary>The family id handed out by the last <see cref="IssueAsync"/>.</summary>
@@ -168,6 +167,13 @@ internal sealed class FakeRefreshTokenService : IRefreshTokenService
     /// <summary>When set, <see cref="ResolveOwnerAsync"/> honours its token like the real store does.</summary>
     public bool HonourCancellationOnResolveOwner { get; set; }
 
+    /// <summary>When set, <see cref="RevokeAsync"/> honours its token like the real store does.</summary>
+    public bool HonourCancellationOnRevoke { get; set; }
+
+    /// <summary>How many revokes had already run when <see cref="ResolveOwnerAsync"/> was last called: proves the
+    /// revoke precedes attribution.</summary>
+    public int RevokeCallsWhenOwnerLookedUp { get; private set; }
+
     public Task<RefreshValidationResult> ValidateAndRotateAsync(string rawToken, CancellationToken cancellationToken = default)
     {
         OnRotated?.Invoke();
@@ -189,6 +195,7 @@ internal sealed class FakeRefreshTokenService : IRefreshTokenService
     public async Task<Guid?> ResolveOwnerAsync(string rawToken, CancellationToken cancellationToken = default)
     {
         ResolveOwnerCalls++;
+        RevokeCallsWhenOwnerLookedUp = RevokeCalls;
         if (HangResolveOwner) await Task.Delay(Timeout.Infinite, cancellationToken);
         if (HonourCancellationOnResolveOwner) cancellationToken.ThrowIfCancellationRequested();
         if (CancelOnResolveOwner)
@@ -210,6 +217,7 @@ internal sealed class FakeRefreshTokenService : IRefreshTokenService
         RevokeCalls++;
         LastRevokeAllForUser = allForUser;
         LastRevokeToken = cancellationToken;
+        if (HonourCancellationOnRevoke) cancellationToken.ThrowIfCancellationRequested();
         if (ThrowOnRevoke) throw new InvalidOperationException("revoke failed");
         return Task.FromResult(RevokeResult);
     }
@@ -247,18 +255,36 @@ internal sealed class RecordingHooks : Themia.Modules.Identity.AspNetCore.Authen
         return Task.CompletedTask;
     }
 
+    /// <summary>Runs inside <see cref="OnLoginSucceededAsync"/>: where a real client abort lands during the hooks.</summary>
+    public Action? OnSucceededHook { get; set; }
+
     public override Task OnLoginSucceededAsync(LoginSucceededContext context, CancellationToken cancellationToken = default)
     {
         Calls.Add("login-succeeded");
+        OnSucceededHook?.Invoke();
         if (Refresh is not null) SucceededRanBeforeIssue = Refresh.IssueCalls == 0;
         if (DenyOnSucceeded) context.Deny("gated");
         return Task.CompletedTask;
     }
 
+    /// <summary>When set, <see cref="OnLoginFailedAsync"/> honours its token.</summary>
+    public bool HonourCancellationOnLoginFailed { get; set; }
+
     public override Task OnLoginFailedAsync(LoginFailedContext context, CancellationToken cancellationToken = default)
     {
+        if (HonourCancellationOnLoginFailed) cancellationToken.ThrowIfCancellationRequested();
         Calls.Add("login-failed");
         FailedReason = context.Reason;
+        return Task.CompletedTask;
+    }
+
+    /// <summary>When set, <see cref="OnLogoutAsync"/> honours its token.</summary>
+    public bool HonourCancellationOnLogout { get; set; }
+
+    public override Task OnLogoutAsync(LogoutContext context, CancellationToken cancellationToken = default)
+    {
+        if (HonourCancellationOnLogout) cancellationToken.ThrowIfCancellationRequested();
+        Calls.Add("logout");
         return Task.CompletedTask;
     }
 

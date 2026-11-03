@@ -81,6 +81,44 @@ public sealed class AuthenticationFlowTenantScopeTests : IDisposable
     }
 
     [Fact]
+    public async Task ReuseDetected_RaisesTheEventAsTheTokenOwnersTenant_ThenRestoresTheScope()
+    {
+        refresh.RotateResult = RefreshValidationResult.ReuseDetected();
+        refresh.OwnerId = Guid.NewGuid();
+        refresh.OwnerTenant = Acme;
+        TenantContextAccessor.CurrentTenantId = Beta;
+
+        await Flow().RefreshAsync("token");
+
+        Assert.Equal(Acme, observer.RefreshFailedTenant);
+        Assert.Equal(Beta, TenantContextAccessor.CurrentTenantId);
+    }
+
+    [Fact]
+    public async Task ReuseDetected_FallsBackToTheCallersScopeWhenTheOwnerIsUnknown()
+    {
+        refresh.RotateResult = RefreshValidationResult.ReuseDetected();
+        refresh.OwnerId = null;
+        TenantContextAccessor.CurrentTenantId = Beta;
+
+        await Flow().RefreshAsync("token");
+
+        Assert.Equal(Beta, observer.RefreshFailedTenant);
+    }
+
+    [Fact]
+    public async Task InvalidRefresh_RaisesTheEventInTheCallersScope_WithoutAnOwnerLookup()
+    {
+        refresh.RotateResult = RefreshValidationResult.Invalid();
+        TenantContextAccessor.CurrentTenantId = Beta;
+
+        await Flow().RefreshAsync("token");
+
+        Assert.Equal(Beta, observer.RefreshFailedTenant);
+        Assert.Equal(0, refresh.ResolveOwnerCalls);
+    }
+
+    [Fact]
     public async Task Logout_ReportsRevokedOnlyWhenSomethingWasRevoked()
     {
         refresh.RevokeResult = 2;
@@ -200,6 +238,15 @@ internal sealed class TenantProbeObserver : IIdentityEventObserver
 {
     public List<string> Calls { get; } = [];
     public TenantId? LogoutTenant { get; private set; }
+
+    public TenantId? RefreshFailedTenant { get; private set; }
+
+    public Task OnRefreshFailedAsync(Guid? userId, RefreshOutcome outcome, CancellationToken cancellationToken = default)
+    {
+        Calls.Add(nameof(OnRefreshFailedAsync));
+        RefreshFailedTenant = TenantContextAccessor.CurrentTenantId;
+        return Task.CompletedTask;
+    }
 
     public Task OnLogoutAsync(Guid? userId, bool allSessions, CancellationToken cancellationToken = default)
     {

@@ -36,14 +36,17 @@ namespace Themia.Modules.Identity.Abstractions.Authentication;
 /// <b>Observers of <c>AuthenticationFlow</c> get a grace after a client abort.</b> Once the flow reaches the
 /// point where it raises an event (refresh, login succeeded/denied/failed, logout), the token an observer
 /// receives is signalled up to 10 seconds AFTER the abort, not at it, so an audit write for a replayed refresh
-/// token or a failed login is not lost to a client that disconnects right after sending it. A live request is
-/// unaffected (no timeout of its own), and an observer that ignores its token holds the request until it
-/// finishes, as before. This is not a guarantee that the event is raised: awaits that run BEFORE the raise
-/// still use the caller's token, and an abort there can skip the event. They are the login hooks
-/// (<c>OnLoginFailed</c>, <c>OnLoginSucceeded</c>) and the token issue after them, the logout owner lookup and
-/// logout hook (the logout is revoked but not audited), and, for a refresh, a grace that lapses inside the
-/// principal factory or the refresh hook, or an abort that lands while the rotation commits. Events raised by
-/// other classes (external login, OTP login, user mutations, session issue) receive the caller's token as it is.
+/// token or a failed login is not lost to a client that disconnects right after sending it. The same holds
+/// for the hooks that record a decided failure or logout (the login-failed hook and the logout hook), the
+/// logout revoke itself and the owner lookup behind it, in <c>AuthenticationFlow</c>, <c>OtpLoginFlow</c> and
+/// <c>SecondFactorCompletion</c>. A live request is unaffected (no timeout of its own), and an observer that
+/// ignores its token holds the request until it finishes, as before. This is not a guarantee that the event is
+/// raised: a login that is not yet decided uses the caller's token, so an abort during the login-succeeded hook or the
+/// token issue (no token was delivered, so there is no login to record) skips the event; so does a grace that
+/// lapses inside a hook, the principal factory or the refresh hook, or an abort that lands while the rotation
+/// commits. Events raised by other classes (external login, user mutations, session issue) receive the caller's
+/// token as it is. The lock event raised after a wrong password is the exception in the other direction: once the
+/// attempt is decided it receives <see cref="CancellationToken.None"/>, so it is not bound by the 10 second grace.
 /// </para>
 /// </remarks>
 public interface IIdentityEventObserver

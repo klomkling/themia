@@ -70,4 +70,62 @@ public class RefreshAbortTests
 
         Assert.True(rotation.TryGetSuccess(out _, out _));
     }
+
+    /// <summary>The user's own "sign out everywhere" (or an admin's revoke) is decided by the time the UPDATE
+    /// runs: a client that disconnects at that moment must not leave the sessions valid.</summary>
+    private void HonourCancellationOnTheRevokeUpdates() =>
+        tokenRepo.HonourCancellationFor = spec => spec.GetType().Name.Contains("ActiveRefreshTokensByUser", StringComparison.Ordinal);
+
+    [Fact]
+    public async Task LogoutOfAllSessions_RevokesEverySession_EvenWhenTheClientAbortsTheRequest()
+    {
+        var user = AddUser();
+        var first = await Tokens().IssueAsync(user.Id);
+        await Tokens().IssueAsync(user.Id);
+        HonourCancellationOnTheRevokeUpdates();
+        using var abort = new CancellationTokenSource();
+        await abort.CancelAsync();
+
+        var revoked = await Tokens().RevokeAsync(first.RawToken, allForUser: true, abort.Token);
+
+        Assert.Equal(2, revoked);
+        Assert.All(tokens, t => Assert.NotNull(t.RevokedAt));
+    }
+
+    [Fact]
+    public async Task RevokeAllForUser_RevokesEverySession_EvenWhenTheClientAbortsTheRequest()
+    {
+        var user = AddUser();
+        await Tokens().IssueAsync(user.Id);
+        await Tokens().IssueAsync(user.Id);
+        HonourCancellationOnTheRevokeUpdates();
+        using var abort = new CancellationTokenSource();
+        await abort.CancelAsync();
+
+        var revoked = await Tokens().RevokeAllForUserAsync(user.Id, abort.Token);
+
+        Assert.Equal(2, revoked);
+        Assert.All(tokens, t => Assert.NotNull(t.RevokedAt));
+    }
+
+    [Fact]
+    public async Task RevokeAllForUserExcept_RevokesTheOthersAndRebindsTheKeptSession_EvenWhenTheClientAbortsTheRequest()
+    {
+        var user = AddUser();
+        user.SecurityStamp = "stamp-after-the-change";
+        await Tokens().IssueAsync(user.Id);
+        await Tokens().IssueAsync(user.Id);
+        var keptFamily = tokens[0].FamilyId;
+        HonourCancellationOnTheRevokeUpdates();
+        using var abort = new CancellationTokenSource();
+        await abort.CancelAsync();
+
+        var revoked = await Tokens().RevokeAllForUserExceptAsync(user.Id, keptFamily.ToString(), abort.Token);
+
+        Assert.Equal(1, revoked);
+        var keptRow = tokens.Single(t => t.FamilyId == keptFamily);
+        Assert.Null(keptRow.RevokedAt);
+        Assert.Equal("stamp-after-the-change", keptRow.SecurityStamp);
+        Assert.All(tokens.Where(t => t.FamilyId != keptFamily), t => Assert.NotNull(t.RevokedAt));
+    }
 }

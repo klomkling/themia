@@ -329,7 +329,11 @@ public sealed class OtpLoginFlow : IOtpLoginFlow
             logger.LogWarning("One-time code login failed for {Identifier}: {Reason} ({DenialReason}).", Mask(identifier), reason, denialReason);
         }
 
-        await hooks.OnLoginFailedAsync(new LoginFailedContext(identifier, reason), cancellationToken).ConfigureAwait(false);
+        using (var hookGrace = new AbortGrace(cancellationToken, timeProvider))
+        {
+            await hooks.OnLoginFailedAsync(new LoginFailedContext(identifier, reason), hookGrace.Token).ConfigureAwait(false);
+        }
+
         if (reason == LoginFailureReason.Denied)
         {
             await RaiseAsync((o, ct) => o.OnLoginDeniedAsync(identifier, denialReason, ct), cancellationToken).ConfigureAwait(false);
@@ -348,7 +352,10 @@ public sealed class OtpLoginFlow : IOtpLoginFlow
         {
             try
             {
-                await invoke(observer, cancellationToken).ConfigureAwait(false);
+                // The outcome is decided by now: a client that aborts must not cost the audit row, so each observer gets a
+                // token that follows the caller's only AbortGrace.Duration after an abort (see AuthenticationFlow).
+                using var grace = new AbortGrace(cancellationToken, timeProvider);
+                await invoke(observer, grace.Token).ConfigureAwait(false);
             }
             catch (Exception ex)
             {

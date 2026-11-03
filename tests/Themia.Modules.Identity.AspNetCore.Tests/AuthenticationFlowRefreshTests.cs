@@ -159,12 +159,22 @@ public sealed class AuthenticationFlowRefreshTests
     public async Task Logout_still_revokes_when_owner_resolution_is_cancelled()
     {
         // Cancellation is the most likely failure on a logout: a client that POSTs /logout and
-        // immediately navigates away or backgrounds the app. TryResolveOwnerAsync deliberately does not
-        // swallow OperationCanceledException, so revocation must happen BEFORE attribution is attempted
-        // — otherwise the refresh token stays valid even though the client asked to log out.
+        // immediately navigates away or backgrounds the app. Revocation must happen BEFORE attribution is
+        // attempted — otherwise the refresh token stays valid even though the client asked to log out — and
+        // the revoke is committed by then, so a cancelled owner lookup costs the attribution only: the
+        // logout is still reported and its event still raised, without an owner.
         var refresh = new FakeRefreshTokenService { CancelOnResolveOwner = true };
-        await Assert.ThrowsAsync<OperationCanceledException>(
-            () => Build(refresh, new RecordingHooks()).LogoutAsync("token", allSessions: false));
+        var observer = new TokenProbeObserver();
+        var flow = new AuthenticationFlow(new FakeUserService(), new FakeClaimsPrincipalFactory(), new FakeAccessTokenService(),
+            refresh, new FakePasswordHasher(), new RecordingHooks(), [observer], TimeProvider.System, NullLogger<AuthenticationFlow>.Instance);
+
+        var outcome = await flow.LogoutAsync("token", allSessions: false);
+
+        Assert.Equal(LogoutOutcome.Revoked, outcome);
         Assert.Equal(1, refresh.RevokeCalls);
+        Assert.Equal(1, refresh.RevokeCallsWhenOwnerLookedUp);   // revoke still precedes attribution
+        var seen = Assert.Single(observer.Events);
+        Assert.Equal(nameof(IIdentityEventObserver.OnLogoutAsync), seen.Name);
+        Assert.Null(seen.UserId);
     }
 }

@@ -35,11 +35,19 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
   after the abort (per observer, never on a live request) instead of at it. The reuse owner lookup falls back to no
   owner rather than skipping the event. Family revocation after a detected reuse is no longer cancellable by the
   caller (it has no timeout of its own beyond the provider's), and an abort during the post-rotation ciphertext
-  cleanup no longer turns a committed rotation into an exception. Not guaranteed: awaits that run before the raise
-  still use the caller's token, so an abort during the login hooks and token issue, the logout owner lookup and
-  logout hook (revoked but not audited), a refresh's principal factory or hook past the grace, or the rotation
-  commit can still skip the event. Events raised by other classes (external login, OTP login, user mutations) are
-  unchanged.
+  cleanup no longer turns a committed rotation into an exception. Not guaranteed: an abort during the login-succeeded
+  hook and token issue (no login was decided), a refresh's principal factory or hook past the grace, or the rotation
+  commit can still skip the event. Events raised by other classes (external login, user mutations) are unchanged.
+- **Identity: a client abort no longer skips what records a decided outcome.** `AuthenticationFlow.LogoutAsync` runs the revoke (reads
+  included), the owner lookup, the logout hook and the event on a token that follows the caller's only 10 seconds after an abort, so a
+  disconnect during a logout neither leaves the session valid nor drops the audit row; an owner lookup that fails or is cancelled raises
+  the event without an owner instead of throwing. The login-failed hook and its event, in `AuthenticationFlow`, `OtpLoginFlow` and
+  `SecondFactorCompletion`, get the same grace, and `OtpLoginFlow` and `SecondFactorCompletion` raise their observer events on it.
+  `RefreshTokenService.RevokeAsync` (all sessions), `RevokeAllForUserAsync` and `RevokeAllForUserExceptAsync` no longer take the caller's
+  token for their UPDATEs. The failure state written for a wrong password (`UserService.VerifyPasswordAsync`) or a wrong one-time code, and
+  the lockout event (whose observers then receive `CancellationToken.None`, so no 10 second bound), are no longer cancellable by the caller. A refresh reuse event is raised in the token owner's tenant scope, like the
+  other refresh events. The pinned test `Logout_still_revokes_when_owner_resolution_is_cancelled` now asserts that the logout is still
+  revoked and reported, and the event raised without an owner, instead of an `OperationCanceledException`.
 ### Added
 
 - **`Themia.Modules.Identity`: `IOtpLoginFlow.VerifyAsync(challengeId, code, SessionRequest session, ct)` (coord #0191).** The one-time-code login with every check and hook of the plain overload (the one-time-code login switch, `OnBeforeLogin`, active, lockout, tenant, the confirmed-phone binding on the Themia user, `OnLoginSucceeded`, observers), minted on an app channel like `IAuthTokenIssuer.StartSessionAsync`: `OnSessionIssuedAsync` carries the channel and the access token carries `sid`. An app that checked the code itself with `IOtpChallengeService` and then called the issuer skipped all of those; this overload is the supported way. The session is checked before the code is read (null, a bad channel, or non-empty `AppClaims`, which this overload does not support, throw and spend nothing); `ExpectedTenant` must equal the challenge's tenant, decided before any hook or the policy (a mismatch is `InvalidCredentials`, so a wrong tenant can never earn a ticket). A user who owes a second factor gets a ticket, and `ISecondFactorCompletion.CompleteAsync` finishes it on the same channel (`OnLoginSucceeded` and `OnSessionIssued` once each); `IAuthTokenIssuer.CompleteSessionAsync` refuses and burns that ticket. The new overload takes its `CancellationToken` with a default like the plain one; the optional-parameter analyzers RS0026/RS0027 are suppressed on the two overloads with a comment, since they differ by a required `SessionRequest`.
