@@ -31,6 +31,7 @@ public sealed class OtpLoginFlow : IOtpLoginFlow
     private readonly TimeProvider timeProvider;
     private readonly ILogger<OtpLoginFlow> logger;
     private readonly ISecondFactorPolicy secondFactorPolicy;
+    private readonly ChannelSessionMinter minter;
     private readonly ISecondFactorTicketService? secondFactorTickets;
 
     /// <summary>Creates the flow with the default second-factor policy (nobody owes a second factor).</summary>
@@ -115,6 +116,7 @@ public sealed class OtpLoginFlow : IOtpLoginFlow
         this.identityOptions = identityOptions;
         this.timeProvider = timeProvider;
         this.logger = logger;
+        minter = new ChannelSessionMinter(principalFactory, accessTokens, refreshTokens, this.observers, timeProvider, logger);
     }
 
     /// <inheritdoc />
@@ -164,8 +166,27 @@ public sealed class OtpLoginFlow : IOtpLoginFlow
         return new OtpStartResult(OtpStartOutcome.Issued, issued.ChallengeId, issued.ExpiresAt);
     }
 
+    // Same justification as IOtpLoginFlow: the two overloads differ by a required SessionRequest, so they cannot be ambiguous.
+#pragma warning disable RS0026, RS0027
     /// <inheritdoc />
-    public async Task<LoginResult> VerifyAsync(Guid challengeId, string code, CancellationToken cancellationToken = default)
+    public Task<LoginResult> VerifyAsync(Guid challengeId, string code, CancellationToken cancellationToken = default) =>
+        VerifyCoreAsync(challengeId, code, MintTarget.Legacy, cancellationToken);
+
+    /// <inheritdoc />
+    public Task<LoginResult> VerifyAsync(Guid challengeId, string code, SessionRequest session, CancellationToken cancellationToken = default)
+    {
+        // Everything that can be wrong with the argument is decided before the challenge is read, so a mistake never spends a code.
+        ArgumentNullException.ThrowIfNull(session);
+        ChannelSessionMinter.Validate(session);
+        if (session.AppClaims is { Count: > 0 })
+        {
+            throw new ArgumentException("App claims are not supported on the one-time-code login.", nameof(session));
+        }
+
+        return VerifyCoreAsync(challengeId, code, MintTarget.OnChannel(session), cancellationToken);
+    }
+
+    private async Task<LoginResult> VerifyCoreAsync(Guid challengeId, string code, MintTarget target, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(code);
 
@@ -188,17 +209,26 @@ public sealed class OtpLoginFlow : IOtpLoginFlow
                 cancellationToken).ConfigureAwait(false);
         }
 
+        // A session minted for another tenant than the challenge's is refused here, before any hook and before the policy is asked, so a
+        // wrong ExpectedTenant can never earn a ticket. The code is already spent, as for any wrong-tenant login.
+        if (target.Session is { } requested && !Equals(requested.ExpectedTenant, check.TenantId))
+        {
+            return await FailAsync(identifier, LoginFailureReason.InvalidOtp, LoginResult.InvalidCredentials(), cancellationToken).ConfigureAwait(false);
+        }
+
         // The code is right, and it was proved against a challenge issued in a specific tenant. The request
         // carries no tenant scope under a claims-only strategy, so everything from here runs as the
         // challenge's own tenant, and the user must belong to that tenant.
         using (TenantContextAccessor.BeginScope(check.TenantId))
         {
-            return await CompleteVerifyAsync(check, userId, identifier, challengeId, cancellationToken).ConfigureAwait(false);
+            return await CompleteVerifyAsync(check, userId, identifier, challengeId, target, cancellationToken).ConfigureAwait(false);
         }
     }
 
+#pragma warning restore RS0026, RS0027
+
     private async Task<LoginResult> CompleteVerifyAsync(
-        OtpVerifyResult check, Guid userId, string identifier, Guid challengeId, CancellationToken cancellationToken)
+        OtpVerifyResult check, Guid userId, string identifier, Guid challengeId, MintTarget target, CancellationToken cancellationToken)
     {
         // The password flow's gate, re-evaluated NOW: the account may have been deactivated, locked or lost its
         // confirmed phone since the code was sent.
@@ -249,7 +279,7 @@ public sealed class OtpLoginFlow : IOtpLoginFlow
         // The code was right, so this is not a failed login. A user who owes a second factor gets a ticket
         // instead of tokens; OnLoginSucceeded fires when the login completes.
         var pending = await SecondFactorGate.RequireAsync(
-            secondFactorPolicy, secondFactorTickets, user, SecondFactorMethod.Otp, null, false, false, cancellationToken).ConfigureAwait(false);
+            secondFactorPolicy, secondFactorTickets, user, SecondFactorMethod.Otp, target.Session?.Channel, false, false, cancellationToken).ConfigureAwait(false);
         if (pending is { } owed)
         {
             logger.LogInformation("User {UserId} passed the one-time code check and owes a second factor ({Stage}).", user.Id, owed.Stage);
@@ -263,8 +293,10 @@ public sealed class OtpLoginFlow : IOtpLoginFlow
             return await FailAsync(phone, LoginFailureReason.Denied, LoginResult.Denied(), cancellationToken, succeeded.DenialReason).ConfigureAwait(false);
         }
 
-        var tokens = await AuthTokenIssuer.IssueAsync(
-            principalFactory, accessTokens, refreshTokens, timeProvider, user, AuthenticationType, cancellationToken).ConfigureAwait(false);
+        var tokens = target.Session is { } onChannel
+            ? (await minter.MintAsync(user, onChannel, cancellationToken).ConfigureAwait(false)).Tokens
+            : await AuthTokenIssuer.IssueAsync(
+                principalFactory, accessTokens, refreshTokens, timeProvider, user, AuthenticationType, cancellationToken).ConfigureAwait(false);
         logger.LogInformation("User {UserId} authenticated via one-time phone code (challenge {ChallengeId}).", user.Id, challengeId);
         await RaiseAsync((o, ct) => o.OnLoginSucceededAsync(user.Id, user.UserName, ct), cancellationToken).ConfigureAwait(false);
         return LoginResult.Success(tokens);
@@ -327,4 +359,13 @@ public sealed class OtpLoginFlow : IOtpLoginFlow
 
     private static string Mask(string value) =>
         value.Length <= 4 ? "****" : new string('*', value.Length - 4) + value[^4..];
+
+    /// <summary>How the session is minted: the legacy way (no channel) or on an app channel. Never null, so a missing session can
+    /// not silently select the legacy mint.</summary>
+    private sealed record MintTarget(SessionRequest? Session)
+    {
+        public static MintTarget Legacy { get; } = new((SessionRequest?)null);
+
+        public static MintTarget OnChannel(SessionRequest session) => new(session ?? throw new ArgumentNullException(nameof(session)));
+    }
 }

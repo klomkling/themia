@@ -1,5 +1,3 @@
-using System.Security.Claims;
-using System.Text.RegularExpressions;
 using Microsoft.Extensions.Logging;
 using Themia.Framework.Core.Abstractions.Tenancy;
 using Themia.Modules.Identity.Abstractions;
@@ -15,17 +13,14 @@ namespace Themia.Modules.Identity.AspNetCore.Authentication;
 /// refresh row is revoked again if the access token cannot be issued. A new session asks the <see cref="ISecondFactorPolicy"/>; a
 /// renewal does not, because it must name a live session of the same user, and a session only exists once the factor was passed.
 /// </summary>
-internal sealed partial class GuardedAuthTokenIssuer : IAuthTokenIssuer
+internal sealed class GuardedAuthTokenIssuer : IAuthTokenIssuer
 {
-    private const string AuthenticationType = "Bearer";
-
     private readonly IUserService users;
-    private readonly IClaimsPrincipalFactory principalFactory;
     private readonly IAccessTokenService accessTokens;
     private readonly IRefreshTokenService refreshTokens;
     private readonly ISecondFactorPolicy policy;
     private readonly ISecondFactorTicketService? tickets;
-    private readonly IIdentityEventObserver[] observers;
+    private readonly ChannelSessionMinter minter;
     private readonly IdentityModuleOptions options;
     private readonly TimeProvider timeProvider;
     private readonly ILogger<GuardedAuthTokenIssuer> logger;
@@ -52,23 +47,19 @@ internal sealed partial class GuardedAuthTokenIssuer : IAuthTokenIssuer
         ArgumentNullException.ThrowIfNull(timeProvider);
         ArgumentNullException.ThrowIfNull(logger);
         this.users = users;
-        this.principalFactory = principalFactory;
         this.accessTokens = accessTokens;
         this.refreshTokens = refreshTokens;
         this.policy = policy;
         this.tickets = tickets;
-        this.observers = observers as IIdentityEventObserver[] ?? observers.ToArray();
+        minter = new ChannelSessionMinter(principalFactory, accessTokens, refreshTokens, observers, timeProvider, logger);
         this.options = options;
         this.timeProvider = timeProvider;
         this.logger = logger;
     }
 
-    [GeneratedRegex("^[a-z0-9._-]{1,64}$")]
-    private static partial Regex ChannelPattern();
-
     public async Task<IssueResult> StartSessionAsync(Guid userId, SessionRequest request, CancellationToken cancellationToken = default)
     {
-        Validate(request);
+        ChannelSessionMinter.Validate(request);
         using (TenantContextAccessor.BeginScope(request.ExpectedTenant))
         {
             var (user, refusal) = await LoadAndGuardAsync(userId, request, cancellationToken).ConfigureAwait(false);
@@ -93,7 +84,7 @@ internal sealed partial class GuardedAuthTokenIssuer : IAuthTokenIssuer
         Guid userId, string ticket, SecondFactorStage expectedStage, SessionRequest request, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(ticket);
-        Validate(request);
+        ChannelSessionMinter.Validate(request);
 
         // Burnt first, whatever follows: a ticket is spent by the attempt to use it.
         var data = await (tickets ?? throw new InvalidOperationException("No ISecondFactorTicketService is registered."))
@@ -130,7 +121,7 @@ internal sealed partial class GuardedAuthTokenIssuer : IAuthTokenIssuer
 
     public async Task<IssueResult> RenewSessionAsync(Guid userId, Guid sessionId, SessionRequest request, CancellationToken cancellationToken = default)
     {
-        Validate(request);
+        ChannelSessionMinter.Validate(request);
         using (TenantContextAccessor.BeginScope(request.ExpectedTenant))
         {
             var (user, refusal) = await LoadAndGuardAsync(userId, request, cancellationToken).ConfigureAwait(false);
@@ -147,28 +138,11 @@ internal sealed partial class GuardedAuthTokenIssuer : IAuthTokenIssuer
                 return IssueResult.Refused(IssueOutcome.SessionNotLive);
             }
 
-            var principal = await BuildPrincipalAsync(user, request, cancellationToken).ConfigureAwait(false);
+            var principal = await minter.BuildPrincipalAsync(user, request, cancellationToken).ConfigureAwait(false);
             AuthTokenIssuer.AddSession(principal, sessionId);
             var access = accessTokens.Issue(principal);
             var tokens = new AuthTokens(access.Token, AuthTokenIssuer.ExpiresInSeconds(timeProvider, access.ExpiresAt), string.Empty);
             return IssueResult.Issued(tokens, sessionId);
-        }
-    }
-
-    private static void Validate(SessionRequest request)
-    {
-        ArgumentNullException.ThrowIfNull(request);
-        if (string.IsNullOrEmpty(request.Channel) || !ChannelPattern().IsMatch(request.Channel))
-        {
-            throw new ArgumentException("The channel must be 1 to 64 characters of a-z, 0-9, '.', '_' and '-'.", nameof(request));
-        }
-
-        foreach (var claim in request.AppClaims ?? [])
-        {
-            if (ReservedClaimTypes.IsReserved(claim.Type))
-            {
-                throw new ArgumentException($"The claim type '{claim.Type}' is reserved and cannot be set by the app.", nameof(request));
-            }
         }
     }
 
@@ -201,80 +175,9 @@ internal sealed partial class GuardedAuthTokenIssuer : IAuthTokenIssuer
         return (user, default);
     }
 
-    private async Task<ClaimsPrincipal> BuildPrincipalAsync(User user, SessionRequest request, CancellationToken cancellationToken)
-    {
-        var principal = await principalFactory.CreateAsync(user, AuthenticationType, cancellationToken).ConfigureAwait(false);
-        if (request.AppClaims is { Count: > 0 } appClaims && principal.Identities.FirstOrDefault() is { } identity)
-        {
-            // Replace by type, so a claim the app carries forward (a session start) is never duplicated.
-            foreach (var type in appClaims.Select(c => c.Type).Distinct(StringComparer.Ordinal))
-            {
-                foreach (var stale in identity.FindAll(type).ToList())
-                {
-                    identity.RemoveClaim(stale);
-                }
-            }
-
-            identity.AddClaims(appClaims);
-        }
-
-        return principal;
-    }
-
     private async Task<IssueResult> IssueNewSessionAsync(User user, SessionRequest request, CancellationToken cancellationToken)
     {
-        var principal = await BuildPrincipalAsync(user, request, cancellationToken).ConfigureAwait(false);
-
-        // The refresh family is the session, so it is issued first and its id goes into the access token.
-        var refresh = await refreshTokens.IssueAsync(user.Id, cancellationToken).ConfigureAwait(false);
-        AccessToken access;
-        var issued = false;
-        try
-        {
-            AuthTokenIssuer.AddSession(principal, refresh.FamilyId);
-            access = accessTokens.Issue(principal);
-            issued = true;
-        }
-        finally
-        {
-            if (!issued)
-            {
-                await RevokeUnhandedAsync(refresh.RawToken, user.Id).ConfigureAwait(false);
-            }
-        }
-
-        var tokens = new AuthTokens(access.Token, AuthTokenIssuer.ExpiresInSeconds(timeProvider, access.ExpiresAt), refresh.RawToken);
-        logger.LogInformation("Session {SessionId} issued for user {UserId} on channel {Channel}.", refresh.FamilyId, user.Id, request.Channel);
-        await RaiseAsync((o, ct) => o.OnSessionIssuedAsync(user.Id, request.Channel, refresh.FamilyId, ct), cancellationToken).ConfigureAwait(false);
-        return IssueResult.Issued(tokens, refresh.FamilyId);
-    }
-
-    // Nobody will ever be handed this refresh token: end the session rather than leave a live row behind. Not tied to the
-    // caller's cancellation (a cancelled request must still clean up) and never allowed to mask the original failure.
-    private async Task RevokeUnhandedAsync(string rawRefreshToken, Guid userId)
-    {
-        try
-        {
-            await refreshTokens.RevokeAsync(rawRefreshToken, false, CancellationToken.None).ConfigureAwait(false);
-        }
-        catch (Exception revokeFailure)
-        {
-            logger.LogError(revokeFailure, "Revoking the refresh token of a session whose access token failed to issue also failed (user {UserId}).", userId);
-        }
-    }
-
-    private async Task RaiseAsync(Func<IIdentityEventObserver, CancellationToken, Task> invoke, CancellationToken cancellationToken)
-    {
-        foreach (var observer in observers)
-        {
-            try
-            {
-                await invoke(observer, cancellationToken).ConfigureAwait(false);
-            }
-            catch (Exception ex)
-            {
-                logger.LogError(ex, "Identity event observer {ObserverType} threw and was swallowed.", observer.GetType());
-            }
-        }
+        var session = await minter.MintAsync(user, request, cancellationToken).ConfigureAwait(false);
+        return IssueResult.Issued(session.Tokens, session.SessionId);
     }
 }

@@ -30,6 +30,7 @@ internal sealed class SecondFactorCompletion : ISecondFactorCompletion
     private readonly IdentityModuleOptions options;
     private readonly TimeProvider timeProvider;
     private readonly ILogger<SecondFactorCompletion> logger;
+    private readonly ChannelSessionMinter minter;
 
     public SecondFactorCompletion(
         ISecondFactorTicketService tickets,
@@ -65,6 +66,7 @@ internal sealed class SecondFactorCompletion : ISecondFactorCompletion
         this.options = options;
         this.timeProvider = timeProvider;
         this.logger = logger;
+        minter = new ChannelSessionMinter(principalFactory, accessTokens, refreshTokens, this.observers, timeProvider, logger);
     }
 
     public async Task<SecondFactorCompletionResult> CompleteAsync(
@@ -148,8 +150,12 @@ internal sealed class SecondFactorCompletion : ISecondFactorCompletion
             }
         }
 
-        var tokens = await AuthTokenIssuer.IssueAsync(
-            principalFactory, accessTokens, refreshTokens, timeProvider, user, AuthenticationType, cancellationToken).ConfigureAwait(false);
+        // A one-time-code login made on an app channel (IOtpLoginFlow's channel overload) carries the channel as its provider and is
+        // finished on that channel. External tickets also carry a provider, so the method is part of the test.
+        var tokens = data.Method == SecondFactorMethod.Otp && data.Provider is { } channel
+            ? (await minter.MintAsync(user, new SessionRequest(data.TenantId, channel), cancellationToken).ConfigureAwait(false)).Tokens
+            : await AuthTokenIssuer.IssueAsync(
+                principalFactory, accessTokens, refreshTokens, timeProvider, user, AuthenticationType, cancellationToken).ConfigureAwait(false);
         logger.LogInformation("User {UserId} completed the second factor ({Method}).", user.Id, data.Method);
 
         if (data.Method == SecondFactorMethod.External)
