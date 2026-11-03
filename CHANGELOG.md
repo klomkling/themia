@@ -45,7 +45,7 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
   `SecondFactorCompletion`, get the same grace, and `OtpLoginFlow` and `SecondFactorCompletion` raise their observer events on it.
   `RefreshTokenService.RevokeAsync` (all sessions), `RevokeAllForUserAsync` and `RevokeAllForUserExceptAsync` no longer take the caller's
   token for their UPDATEs. The failure state written for a wrong password (`UserService.VerifyPasswordAsync`) or a wrong one-time code, and
-  the lockout event, are no longer cancellable by the caller. A refresh reuse event is raised in the token owner's tenant scope, like the
+  the lockout event (whose observers then receive no token, so no 10 second bound), are no longer cancellable by the caller. A refresh reuse event is raised in the token owner's tenant scope, like the
   other refresh events. The pinned test `Logout_still_revokes_when_owner_resolution_is_cancelled` now asserts that the logout is still
   revoked and reported, and the event raised without an owner, instead of an `OperationCanceledException`.
 ### Added

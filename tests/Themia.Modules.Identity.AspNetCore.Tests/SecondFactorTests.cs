@@ -383,6 +383,30 @@ public sealed class SecondFactorTests : IDisposable
     }
 
     [Fact]
+    public async Task An_external_denial_is_recorded_when_the_client_aborts_after_the_ticket_was_consumed()
+    {
+        var user = Staff();
+        users.UserToReturn = user;
+        var pending = await ticketService.IssueAsync(new SecondFactorTicketData(
+            user.Id, user.TenantId, SecondFactorMethod.External, "line", WasCreated: false, WasLinked: false, user.SecurityStamp, SecondFactorStage.Verify));
+        externalHooks.Deny = true;
+        externalHooks.HonourCancellationOnFailed = true;
+        var probe = new TokenProbeObserver();
+        var completion = new SecondFactorCompletion(ticketService, users, principals, access, refresh, hooks, [probe], options, clock,
+            NullLogger<SecondFactorCompletion>.Instance, externalHooks);
+        using var abort = new CancellationTokenSource();
+        externalHooks.OnSucceededHook = abort.Cancel;
+
+        var result = await completion.CompleteAsync(pending.Ticket, pending.UserId, pending.Stage, abort.Token);
+
+        Assert.Equal(SecondFactorCompletionOutcome.Denied, result.Outcome);
+        Assert.Equal(1, externalHooks.Failed);
+        var seen = Assert.Single(probe.Events);
+        Assert.Equal(nameof(IIdentityEventObserver.OnExternalLoginDeniedAsync), seen.Name);
+        Assert.False(seen.TokenCancelled);
+    }
+
+    [Fact]
     public async Task An_external_ticket_fires_the_external_hook_and_observer_and_never_the_password_ones()
     {
         var user = Staff();

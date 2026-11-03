@@ -116,6 +116,9 @@ public sealed class OtpChallengeService : IOtpChallengeService
             return Invalid();
         }
 
+        // Nothing is decided in the first round, so its read follows the caller. After a wrong guess lost the race it is
+        // decided, and the next round's read runs on the same token as the charge.
+        var readToken = cancellationToken;
         for (var attempt = 0; attempt < MaxCasRetries; attempt++)
         {
             if (challenge.ClosedAt is not null || challenge.ExpiresAt <= now)
@@ -124,7 +127,7 @@ public sealed class OtpChallengeService : IOtpChallengeService
                 return Invalid();
             }
 
-            var allowed = await AllowedAttemptsAsync(challenge, now, cancellationToken).ConfigureAwait(false);
+            var allowed = await AllowedAttemptsAsync(challenge, now, readToken).ConfigureAwait(false);
             var used = challenge.AttemptCount;
             if (used >= allowed)
             {
@@ -167,6 +170,7 @@ public sealed class OtpChallengeService : IOtpChallengeService
             }
 
             challenge = reloaded;
+            readToken = storeToken;
         }
 
         return Invalid();

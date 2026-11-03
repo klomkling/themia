@@ -171,6 +171,18 @@ public sealed class AuthenticationFlowAbortedRefreshTests
     }
 
     [Fact]
+    public async Task Logout_RunsTheLogoutHook_WhenTheClientAbortsBeforeTheHook()
+    {
+        await abort.CancelAsync();
+        hooks.HonourCancellationOnLogout = true;
+
+        var outcome = await Build(new TokenProbeObserver()).LogoutAsync("token", allSessions: false, abort.Token);
+
+        Assert.Equal(LogoutOutcome.Revoked, outcome);
+        Assert.Contains("logout", hooks.Calls);
+    }
+
+    [Fact]
     public async Task Logout_ReceivesAToken_ThatIsNotCancelledAtTheAbort()
     {
         await abort.CancelAsync();
@@ -259,6 +271,9 @@ internal sealed class TokenProbeObserver : IIdentityEventObserver
 
     public Task OnLoginDeniedAsync(string userName, string? denialReason, CancellationToken cancellationToken = default) =>
         RecordAsync(nameof(OnLoginDeniedAsync), null, cancellationToken);
+
+    public Task OnExternalLoginDeniedAsync(string provider, string? denialReason, CancellationToken cancellationToken = default) =>
+        RecordAsync(nameof(OnExternalLoginDeniedAsync), null, cancellationToken);
 
     public Task OnRefreshFailedAsync(Guid? userId, RefreshOutcome outcome, CancellationToken cancellationToken = default) =>
         RecordAsync(nameof(OnRefreshFailedAsync), userId, cancellationToken);

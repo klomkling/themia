@@ -36,11 +36,21 @@ internal sealed class FakeRepository<T>(List<T> store, Func<T, Guid> idSelector)
     public Task<T?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
         Task.FromResult(store.FirstOrDefault(e => NotDeleted(e) && TenantMatches(e) && idSelector(e) == id));
 
-    public Task<T?> FirstOrDefaultAsync(ISpecification<T> specification, CancellationToken cancellationToken = default) =>
-        Task.FromResult(Query(specification).FirstOrDefault());
+    /// <summary>When set, <see cref="FirstOrDefaultAsync"/> and <see cref="ListAsync"/> honour their token for the
+    /// specifications it returns true for, like a read aborted by the client.</summary>
+    public Func<ISpecification<T>, bool>? HonourCancellationForReads { get; set; }
 
-    public Task<IReadOnlyList<T>> ListAsync(ISpecification<T> specification, CancellationToken cancellationToken = default) =>
-        Task.FromResult<IReadOnlyList<T>>(Query(specification).ToList());
+    public Task<T?> FirstOrDefaultAsync(ISpecification<T> specification, CancellationToken cancellationToken = default)
+    {
+        if (HonourCancellationForReads?.Invoke(specification) == true) cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult(Query(specification).FirstOrDefault());
+    }
+
+    public Task<IReadOnlyList<T>> ListAsync(ISpecification<T> specification, CancellationToken cancellationToken = default)
+    {
+        if (HonourCancellationForReads?.Invoke(specification) == true) cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult<IReadOnlyList<T>>(Query(specification).ToList());
+    }
 
     public Task<long> CountAsync(ISpecification<T> specification, CancellationToken cancellationToken = default) =>
         Task.FromResult<long>(Query(specification).LongCount());
@@ -70,11 +80,15 @@ internal sealed class FakeRepository<T>(List<T> store, Func<T, Guid> idSelector)
     /// for, like a real set-based UPDATE aborted by the client.</summary>
     public Func<ISpecification<T>, bool>? HonourCancellationFor { get; set; }
 
+    /// <summary>Runs before each <see cref="UpdateWhereAsync"/> matches, to replay a parallel writer that got there first.</summary>
+    public Action<ISpecification<T>>? BeforeUpdateWhere { get; set; }
+
     public Task<int> UpdateWhereAsync(
         ISpecification<T> specification,
         Action<IBulkUpdateSetters<T>> set,
         CancellationToken cancellationToken = default)
     {
+        BeforeUpdateWhere?.Invoke(specification);
         // Mirror the real set-based path: target rows by the spec's WHERE (tenant filter + criteria),
         // then write each named property directly on the matched instances.
         if (HonourCancellationFor?.Invoke(specification) == true) cancellationToken.ThrowIfCancellationRequested();

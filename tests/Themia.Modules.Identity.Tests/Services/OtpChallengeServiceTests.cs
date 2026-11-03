@@ -458,6 +458,33 @@ public class OtpChallengeServiceTests
     }
 
     [Fact]
+    public async Task AWrongCode_IsChargedAndAnsweredInvalid_WhenItLosesTheRaceAndTheClientAborts()
+    {
+        var issued = await NewService().IssueAsync(Phone, userId);
+        using var abort = new CancellationTokenSource();
+        var lostOnce = false;
+        var honouring = new FakeRepository<OtpLoginChallenge>(rows, c => c.Id)
+        {
+            // Every read honours its token, so a read left on the caller's token after the abort throws.
+            HonourCancellationForReads = _ => true,
+            // A parallel guess takes the slot just before this guess's gate UPDATE, and the client aborts at that moment.
+            BeforeUpdateWhere = _ =>
+            {
+                if (lostOnce) return;
+                lostOnce = true;
+                rows[0].AttemptCount++;
+                abort.Cancel();
+            },
+        };
+        var service = new OtpChallengeService(honouring, new FakeUnitOfWork(), clock, options);
+
+        var result = await service.VerifyAsync(issued.ChallengeId, WrongCode, abort.Token);
+
+        Assert.Equal(OtpVerifyOutcome.Invalid, result.Outcome);
+        Assert.Equal(2, Assert.Single(rows).AttemptCount);   // the parallel guess and this one, both charged
+    }
+
+    [Fact]
     public async Task ARightCode_IsNotConsumed_WhenTheClientAborts()
     {
         var issued = await NewService().IssueAsync(Phone, userId);

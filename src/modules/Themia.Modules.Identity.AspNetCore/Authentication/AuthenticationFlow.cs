@@ -165,7 +165,7 @@ public sealed class AuthenticationFlow : IAuthenticationFlow
     /// <summary>Finds the owner (and tenant) of a refresh token whose outcome is already decided — a reuse, a
     /// logout — for audit attribution and tenant scope. A failure here must not turn a decided outcome into a
     /// 500 — losing attribution is acceptable, breaking the flow is not — so any exception is logged at
-    /// <c>Error</c> and swallowed to <see langword="null"/>. That includes cancellation: the outcome is
+    /// <c>Error</c> (cancellation at <c>Warning</c>) and swallowed to <see langword="null"/>. That includes cancellation: the outcome is
     /// decided, and a client that aborted must not cost the event (it is raised without an owner instead).
     /// Runs on a token that follows the caller's only <see cref="AbortGrace.Duration"/> after an abort.</summary>
     private async Task<RefreshTokenOwner?> TryFindOwnerAsync(string rawToken, CancellationToken cancellationToken)
@@ -174,6 +174,12 @@ public sealed class AuthenticationFlow : IAuthenticationFlow
         {
             using var grace = new AbortGrace(cancellationToken, timeProvider);
             return await refreshTokens.FindOwnerAsync(rawToken, grace.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException ex)
+        {
+            // Expected when the grace lapses on a hung lookup: attribution is lost, not the event.
+            logger.LogWarning(ex, "Finding the owner of a refresh token for audit attribution was cancelled.");
+            return null;
         }
         catch (Exception ex)
         {

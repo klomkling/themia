@@ -45,7 +45,8 @@ namespace Themia.Modules.Identity.Abstractions.Authentication;
 /// token issue (no token was delivered, so there is no login to record) skips the event; so does a grace that
 /// lapses inside a hook, the principal factory or the refresh hook, or an abort that lands while the rotation
 /// commits. Events raised by other classes (external login, user mutations, session issue) receive the caller's
-/// token as it is.
+/// token as it is. The lock event raised after a wrong password is the exception in the other direction: once the
+/// attempt is decided it receives <see cref="CancellationToken.None"/>, so it is not bound by the 10 second grace.
 /// </para>
 /// </remarks>
 public interface IIdentityEventObserver

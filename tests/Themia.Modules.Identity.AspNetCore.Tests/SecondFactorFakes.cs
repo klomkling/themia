@@ -39,6 +39,7 @@ internal sealed class RecordingExternalHooks : IExternalAuthenticationHooks
     public Task OnExternalLoginSucceededAsync(ExternalLoginSucceededContext context, CancellationToken cancellationToken = default)
     {
         Succeeded++;
+        OnSucceededHook?.Invoke();
         if (Deny)
         {
             context.Deny("gated");
@@ -47,8 +48,15 @@ internal sealed class RecordingExternalHooks : IExternalAuthenticationHooks
         return Task.CompletedTask;
     }
 
+    /// <summary>When set, <see cref="OnExternalLoginFailedAsync"/> honours its token.</summary>
+    public bool HonourCancellationOnFailed { get; set; }
+
+    /// <summary>Runs inside <see cref="OnExternalLoginSucceededAsync"/>, to land a client abort after the ticket is consumed.</summary>
+    public Action? OnSucceededHook { get; set; }
+
     public Task OnExternalLoginFailedAsync(ExternalLoginFailedContext context, CancellationToken cancellationToken = default)
     {
+        if (HonourCancellationOnFailed) cancellationToken.ThrowIfCancellationRequested();
         Failed++;
         return Task.CompletedTask;
     }

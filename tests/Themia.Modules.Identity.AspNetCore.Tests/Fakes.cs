@@ -278,6 +278,16 @@ internal sealed class RecordingHooks : Themia.Modules.Identity.AspNetCore.Authen
         return Task.CompletedTask;
     }
 
+    /// <summary>When set, <see cref="OnLogoutAsync"/> honours its token.</summary>
+    public bool HonourCancellationOnLogout { get; set; }
+
+    public override Task OnLogoutAsync(LogoutContext context, CancellationToken cancellationToken = default)
+    {
+        if (HonourCancellationOnLogout) cancellationToken.ThrowIfCancellationRequested();
+        Calls.Add("logout");
+        return Task.CompletedTask;
+    }
+
     public override Task OnBeforeRefreshAsync(BeforeRefreshContext context, CancellationToken cancellationToken = default)
     {
         Calls.Add("before-refresh");

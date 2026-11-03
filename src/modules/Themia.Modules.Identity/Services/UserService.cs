@@ -513,7 +513,8 @@ public sealed class UserService : IUserService
 
             // A wrong guess is decided once it has been judged: charging it, re-reading after a lost race and raising the
             // lock it triggers run on None, so a client that aborts here cannot turn it into a free, uncharged guess or
-            // cost the lock its event. Nothing external runs in between. A right guess decides nothing until it is accepted,
+            // cost the lock its event. The only external code in between is the lock event's observers, which get None and so no
+            // timeout of their own. A right guess decides nothing until it is accepted,
             // so accepting (and its re-read) stays on the caller's token and the next login redoes it.
             var storeToken = matches ? cancellationToken : CancellationToken.None;
             var charged = matches

@@ -81,6 +81,25 @@ public class AbortedGuessTests
         Assert.False(seen.TokenCancelled);
     }
 
+    [Fact]
+    public async Task AWrongGuess_IsChargedAfterReReadingTheState_WhenItLosesTheRaceAndTheClientAborts()
+    {
+        var user = AddUser();
+        var lostOnce = false;
+        repo.HonourCancellationForReads = _ => true;   // a read left on the caller's token would throw after the abort
+        repo.BeforeUpdateWhere = _ =>
+        {
+            if (lostOnce) return;
+            lostOnce = true;
+            user.AccessFailedCount++;   // a parallel guess is charged just before this guess's gate UPDATE
+        };
+
+        var result = await sut.VerifyPasswordAsync("victim", "wrong", abort.Token);
+
+        Assert.Equal(PasswordVerificationResult.Failed, result);
+        Assert.Equal(2, user.AccessFailedCount);   // the parallel guess and this one, both charged
+    }
+
     [Theory]
     [InlineData(0)]
     [InlineData(2)]
