@@ -465,6 +465,181 @@ public abstract class IdentityStoreConformanceTests
         Assert.Equal(PasswordVerificationResult.Failed, await s.Users.VerifyPasswordAsync("frank", "nope"));
     }
 
+    /// <summary>
+    /// Wrong guesses sent in parallel: every guess that was answered <c>Failed</c> must be charged to the
+    /// account's failure counter. The numbers go into the failure message so the measurement is readable
+    /// without a debugger.
+    /// </summary>
+    [Fact]
+    public async Task Parallel_wrong_guesses_are_each_charged_to_the_failure_counter()
+    {
+        await ResetAsync();
+        const int guesses = 32;
+        await using (var setup = NewScope(new TenantId("acme"), maxFailedAccessAttempts: 1000))
+        {
+            await setup.Users.CreateAsync("victim", "right");
+        }
+
+        using var start = new ManualResetEventSlim(false);
+        var attempts = Enumerable.Range(0, guesses).Select(_ => Task.Run(async () =>
+        {
+            await using var scope = NewScope(new TenantId("acme"), maxFailedAccessAttempts: 1000);
+            start.Wait();
+            try
+            {
+                return (Result: (PasswordVerificationResult?)await scope.Users.VerifyPasswordAsync("victim", "wrong"), Error: (string?)null);
+            }
+            catch (Exception ex)
+            {
+                return (null, ex.GetType().Name);
+            }
+        })).ToArray();
+        start.Set();
+        var outcomes = await Task.WhenAll(attempts);
+
+        var answeredFailed = outcomes.Count(o => o.Result == PasswordVerificationResult.Failed);
+        var errors = string.Join(", ", outcomes.Where(o => o.Error is not null).GroupBy(o => o.Error).Select(g => $"{g.Key}x{g.Count()}"));
+        await using var check = NewScope(new TenantId("acme"), maxFailedAccessAttempts: 1000);
+        var charged = (await check.Users.FindByUserNameAsync("victim"))!.AccessFailedCount;
+
+        Assert.True(
+            charged == answeredFailed,
+            $"guesses={guesses} answeredFailed={answeredFailed} errors=[{errors}] charged={charged}");
+    }
+
+    /// <summary>The bound holds under parallel guesses: exactly the threshold is charged and answered, the rest are refused.</summary>
+    [Fact]
+    public async Task Parallel_wrong_guesses_stop_at_the_threshold_and_lock_once()
+    {
+        await ResetAsync();
+        const int guesses = 32;
+        const int threshold = 5;
+        await using (var setup = NewScope(new TenantId("acme"), maxFailedAccessAttempts: threshold))
+        {
+            await setup.Users.CreateAsync("victim", "right");
+        }
+
+        var locks = new LockCounter();
+        using var start = new ManualResetEventSlim(false);
+        var attempts = Enumerable.Range(0, guesses).Select(_ => Task.Run(async () =>
+        {
+            await using var scope = NewScope(
+                new TenantId("acme"), maxFailedAccessAttempts: threshold,
+                configureServices: services => services.AddSingleton<IIdentityEventObserver>(locks));
+            start.Wait();
+            return await scope.Users.VerifyPasswordAsync("victim", "wrong");
+        })).ToArray();
+        start.Set();
+        var results = await Task.WhenAll(attempts);
+
+        var failed = results.Count(r => r == PasswordVerificationResult.Failed);
+        var lockedOut = results.Count(r => r == PasswordVerificationResult.LockedOut);
+        Assert.True(
+            failed == threshold && lockedOut == guesses - threshold && locks.Count == 1,
+            $"failed={failed} lockedOut={lockedOut} lockEvents={locks.Count}");
+    }
+
+    /// <summary>A right guess judged while the account locks must not be answered Success.</summary>
+    [Fact]
+    public async Task A_right_guess_judged_while_the_account_locks_is_refused()
+    {
+        await ResetAsync();
+        const int threshold = 5;
+        await using (var setup = NewScope(new TenantId("acme"), maxFailedAccessAttempts: threshold))
+        {
+            await setup.Users.CreateAsync("victim", "right");
+        }
+
+        using var judging = new ManualResetEventSlim(false);
+        using var locked = new ManualResetEventSlim(false);
+        var heldHasher = new HoldingHasher(judging, locked);
+        void Configure(IServiceCollection services)
+        {
+            services.RemoveAll<IPasswordHasher>();
+            services.AddSingleton<IPasswordHasher>(heldHasher);
+        }
+
+        var rightGuess = Task.Run(async () =>
+        {
+            await using var scope = NewScope(new TenantId("acme"), maxFailedAccessAttempts: threshold, configureServices: Configure);
+            return await scope.Users.VerifyPasswordAsync("victim", "right");
+        });
+        Assert.True(judging.Wait(TimeSpan.FromSeconds(60)), "the right guess never reached the hasher");   // it has read the account (count 0, no lock) and is inside the hasher
+
+        for (var i = 0; i < threshold; i++)
+        {
+            await using var scope = NewScope(new TenantId("acme"), maxFailedAccessAttempts: threshold, configureServices: Configure);
+            Assert.Equal(PasswordVerificationResult.Failed, await scope.Users.VerifyPasswordAsync("victim", "wrong"));
+        }
+
+        locked.Set();   // the account is locked; let the right guess finish judging
+        Assert.Equal(PasswordVerificationResult.LockedOut, await rightGuess);
+    }
+
+    /// <summary>The gate compares a non-null LockoutEnd read back from the store: an expired lock must not strand the account.</summary>
+    [Fact]
+    public async Task A_wrong_guess_after_an_expired_lock_is_charged_and_a_right_one_clears_it()
+    {
+        await ResetAsync();
+        var clock = new FakeTimeProvider(DateTimeOffset.Parse("2026-11-03T04:00:00Z").AddTicks(1234567));   // sub-second ticks: pins LockoutEnd equality on a value with full precision
+        await using var s = NewScope(new TenantId("acme"), maxFailedAccessAttempts: 2, timeProvider: clock);
+        await s.Users.CreateAsync("grace", "right");
+        Assert.Equal(PasswordVerificationResult.Failed, await s.Users.VerifyPasswordAsync("grace", "wrong"));
+        Assert.Equal(PasswordVerificationResult.Failed, await s.Users.VerifyPasswordAsync("grace", "wrong"));   // locks
+        Assert.Equal(PasswordVerificationResult.LockedOut, await s.Users.VerifyPasswordAsync("grace", "right"));
+
+        clock.Advance(TimeSpan.FromDays(2));   // past any lock length
+
+        Assert.Equal(PasswordVerificationResult.Failed, await s.Users.VerifyPasswordAsync("grace", "wrong"));
+        await using (var check = NewScope(new TenantId("acme"), maxFailedAccessAttempts: 2, timeProvider: clock))
+        {
+            Assert.Equal(1, (await check.Users.FindByUserNameAsync("grace"))!.AccessFailedCount);
+        }
+
+        Assert.Equal(PasswordVerificationResult.Success, await s.Users.VerifyPasswordAsync("grace", "right"));
+        await using (var check = NewScope(new TenantId("acme"), maxFailedAccessAttempts: 2, timeProvider: clock))
+        {
+            var user = (await check.Users.FindByUserNameAsync("grace"))!;
+            Assert.Equal(0, user.AccessFailedCount);
+            Assert.Null(user.LockoutEnd);
+        }
+    }
+
+    private sealed class LockCounter : IIdentityEventObserver
+    {
+        private int count;
+
+        public int Count => Volatile.Read(ref count);
+
+        public Task OnLockedOutAsync(Guid userId, DateTimeOffset lockoutEnd, CancellationToken cancellationToken = default)
+        {
+            Interlocked.Increment(ref count);
+            return Task.CompletedTask;
+        }
+    }
+
+    /// <summary>Real Argon2 verdicts; the guess "right" announces itself and then waits to be released.</summary>
+    private sealed class HoldingHasher(ManualResetEventSlim judging, ManualResetEventSlim release) : IPasswordHasher
+    {
+        private readonly Themia.Modules.Identity.Hashing.Argon2idPasswordHasher inner = new();
+
+        public string Hash(string password) => inner.Hash(password);
+
+        public bool NeedsRehash(string encodedHash) => inner.NeedsRehash(encodedHash);
+
+        public bool Verify(string encodedHash, string password)
+        {
+            var matches = inner.Verify(encodedHash, password);
+            if (matches)
+            {
+                judging.Set();
+                release.Wait(TimeSpan.FromSeconds(60));
+            }
+
+            return matches;
+        }
+    }
+
     [Fact]
     public async Task Lockout_engages_at_threshold_and_releases_after_window()
     {

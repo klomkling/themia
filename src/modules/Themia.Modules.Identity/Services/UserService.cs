@@ -444,7 +444,16 @@ public sealed class UserService : IUserService
         return UserMutationResult.Success();
     }
 
+    /// <summary>Bound on gate retries per guess. Each lost round means another guess was charged, and a lock stops
+    /// the loop, so a real threshold ends it in a few rounds; the bound only has to outlast the widest burst.</summary>
+    private const int MaxFailureGateAttempts = 64;
+
     /// <inheritdoc />
+    /// <remarks>
+    /// The failure state is changed only by compare-and-set updates whose affected-row count is read as "this guess won":
+    /// the store must report MATCHED rows, as PostgreSQL and SQL Server do. A MySQL connection configured to report only
+    /// CHANGED rows (<c>UseAffectedRows=true</c>) would see 0 for an accept that changes nothing.
+    /// </remarks>
     public async Task<PasswordVerificationResult> VerifyPasswordAsync(string userName, string password, CancellationToken cancellationToken = default)
     {
         var user = await FindByUserNameAsync(userName, cancellationToken).ConfigureAwait(false);
@@ -453,63 +462,125 @@ public sealed class UserService : IUserService
             return PasswordVerificationResult.NotFound;
         }
 
+        // A locked or inactive account answers without any hash work, as it always did.
         if (!user.IsActive)
         {
             return PasswordVerificationResult.Inactive;
         }
 
-        var now = timeProvider.GetUtcNow();
-        if (user.IsLockedOut(now))
+        if (user.IsLockedOut(timeProvider.GetUtcNow()))
         {
             return PasswordVerificationResult.LockedOut;
         }
 
-        if (user.PasswordHash is null || !passwordHasher.Verify(user.PasswordHash, password))
-        {
-            if (user.LockoutEnabled)
-            {
-                user.AccessFailedCount++;
-                var justLockedOut = false;
-                if (user.AccessFailedCount >= options.MaxFailedAccessAttempts)
-                {
-                    user.LockoutEnd = now.Add(ComputeLockoutDuration(user.AccessFailedCount));
-                    if (options.LockoutPolicy == LockoutPolicy.ResetCountOnLock)
-                    {
-                        user.AccessFailedCount = 0;
-                    }
-                    justLockedOut = true;
-                }
-                users.Update(user);
-                await IdentityScope.SaveScopedAsync(unitOfWork, filterScope, user.TenantId is null, cancellationToken).ConfigureAwait(false);
+        // The guess is judged once per password hash (Argon2 is the expensive part); every state change below is a
+        // compare-and-set on the failure state read in the same round, so a parallel guess cannot overwrite a charge,
+        // and no guess is answered Success on an account that locked while it was being judged.
+        var judgedAgainst = user.PasswordHash;
+        var matches = judgedAgainst is not null && passwordHasher.Verify(judgedAgainst, password);
+        string? rehashed = null;
 
-                // No notification existed here before: an observer could previously only infer a lockout
-                // from the NEXT login attempt returning LockedOut — a different event at a different time.
-                if (justLockedOut)
-                {
-                    await RaiseAsync((o, ct) => o.OnLockedOutAsync(user.Id, user.LockoutEnd!.Value, ct), cancellationToken).ConfigureAwait(false);
-                }
+        for (var round = 0; round < MaxFailureGateAttempts; round++)
+        {
+            if (user is null)
+            {
+                return PasswordVerificationResult.NotFound;
             }
+
+            if (!user.IsActive)
+            {
+                return PasswordVerificationResult.Inactive;
+            }
+
+            var now = timeProvider.GetUtcNow();
+            if (user.IsLockedOut(now))
+            {
+                return PasswordVerificationResult.LockedOut;
+            }
+
+            if (!string.Equals(user.PasswordHash, judgedAgainst, StringComparison.Ordinal))
+            {
+                // The password changed while the guess was being judged: judge it again against the new hash.
+                judgedAgainst = user.PasswordHash;
+                matches = judgedAgainst is not null && passwordHasher.Verify(judgedAgainst, password);
+                rehashed = null;
+            }
+
+            if (matches && rehashed is null && user.PasswordHash is { } currentHash && passwordHasher.NeedsRehash(currentHash))
+            {
+                rehashed = passwordHasher.Hash(password);   // once per hash, not per round
+            }
+
+            var charged = matches
+                ? await TryAcceptAsync(user, rehashed, cancellationToken).ConfigureAwait(false)
+                : await TryChargeAsync(user, now, cancellationToken).ConfigureAwait(false);
+            if (charged is { } result)
+            {
+                return result;
+            }
+
+            // Lost the slot to a parallel guess: read the account again and decide on its new state.
+            user = await IdentityScope.ResolveUserAnyTenantAsync(users, user.Id, cancellationToken).ConfigureAwait(false);
+        }
+
+        logger.LogWarning("Failure-state gate retries exhausted for user {UserId}; answering LockedOut uncharged.", user?.Id);
+        return PasswordVerificationResult.LockedOut;
+    }
+
+    // A wrong guess: charge it against the failure state the caller read. Null = lost the race, read again.
+    private async Task<PasswordVerificationResult?> TryChargeAsync(User user, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        if (!user.LockoutEnabled)
+        {
             return PasswordVerificationResult.Failed;
         }
 
-        // Success: clear failure state and re-hash if the cost parameters changed.
-        var changed = false;
-        if (user.AccessFailedCount != 0 || user.LockoutEnd is not null)
+        var count = user.AccessFailedCount + 1;
+        DateTimeOffset? lockEnd = null;
+        var storedCount = count;
+        if (count >= options.MaxFailedAccessAttempts)
         {
-            user.AccessFailedCount = 0;
-            user.LockoutEnd = null;
-            changed = true;
+            lockEnd = now.Add(ComputeLockoutDuration(count));
+            storedCount = options.LockoutPolicy == LockoutPolicy.ResetCountOnLock ? 0 : count;
         }
-        if (passwordHasher.NeedsRehash(user.PasswordHash))
+
+        var gate = new UserFailureStateGateSpec(user.Id, user.AccessFailedCount, user.LockoutEnd, null);
+        var updated = lockEnd is { } end
+            ? await users.UpdateWhereAsync(gate, set => set.Set(u => u.AccessFailedCount, storedCount).Set(u => u.LockoutEnd, (DateTimeOffset?)end), cancellationToken).ConfigureAwait(false)
+            : await users.UpdateWhereAsync(gate, set => set.Set(u => u.AccessFailedCount, storedCount), cancellationToken).ConfigureAwait(false);
+        if (updated != 1)
         {
-            // Same password, stronger hash: not a credential event, so the stamp stays and the user's other sessions live.
-            user.PasswordHash = passwordHasher.Hash(password);
-            changed = true;
+            return null;
         }
-        if (changed)
+
+        // No notification existed here before: an observer could previously only infer a lockout
+        // from the NEXT login attempt returning LockedOut — a different event at a different time.
+        if (lockEnd is { } lockedUntil)
         {
-            users.Update(user);
-            await IdentityScope.SaveScopedAsync(unitOfWork, filterScope, user.TenantId is null, cancellationToken).ConfigureAwait(false);
+            await RaiseAsync((o, ct) => o.OnLockedOutAsync(user.Id, lockedUntil, ct), cancellationToken).ConfigureAwait(false);
+        }
+
+        return PasswordVerificationResult.Failed;
+    }
+
+    // A right guess: also passes the gate, so it cannot be answered Success on an account that locked meanwhile. It clears
+    // the failure state and, when the cost parameters changed, re-hashes the same password (not a credential event: the
+    // stamp stays and the user's other sessions live). The stamp is part of the gate so a re-hash can never restore an
+    // old password over a reset that landed meanwhile. Null = lost the race, read again.
+    private async Task<PasswordVerificationResult?> TryAcceptAsync(User user, string? rehashed, CancellationToken cancellationToken)
+    {
+        var gate = new UserFailureStateGateSpec(user.Id, user.AccessFailedCount, user.LockoutEnd, user.SecurityStamp);
+        var evict = user.AccessFailedCount != 0 || user.LockoutEnd is not null || rehashed is not null;
+        var updated = rehashed is null
+            ? await users.UpdateWhereAsync(gate, set => set.Set(u => u.AccessFailedCount, 0).Set(u => u.LockoutEnd, (DateTimeOffset?)null), cancellationToken).ConfigureAwait(false)
+            : await users.UpdateWhereAsync(gate, set => set.Set(u => u.AccessFailedCount, 0).Set(u => u.LockoutEnd, (DateTimeOffset?)null).Set(u => u.PasswordHash, rehashed), cancellationToken).ConfigureAwait(false);
+        if (updated != 1)
+        {
+            return null;
+        }
+
+        if (evict)
+        {
             SecurityStampCache.Evict(stampCache, [user.Id]);
         }
 

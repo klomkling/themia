@@ -351,3 +351,26 @@ internal sealed class UserTokensByUserSpec : Specification<UserToken>
 {
     public UserTokensByUserSpec(Guid userId) => Where(t => t.UserId == userId);
 }
+
+/// <summary>
+/// The failure-counter gate: one user, only while the failure state still reads what the caller read. A
+/// compare-and-set, so parallel guesses cannot overwrite each other's charge. Ignores the tenant filter on
+/// purpose (a platform user is reached from a tenant scope); the id comes from a row already resolved in scope.
+/// </summary>
+internal sealed class UserFailureStateGateSpec : Specification<User>
+{
+    public UserFailureStateGateSpec(Guid id, int expectedCount, DateTimeOffset? expectedLockoutEnd, string? expectedSecurityStamp)
+    {
+        if (expectedSecurityStamp is null)
+        {
+            Where(u => u.Id == id && u.AccessFailedCount == expectedCount && u.LockoutEnd == expectedLockoutEnd);
+        }
+        else
+        {
+            Where(u => u.Id == id && u.AccessFailedCount == expectedCount && u.LockoutEnd == expectedLockoutEnd
+                && u.SecurityStamp == expectedSecurityStamp);
+        }
+
+        WithoutTenantFilter();
+    }
+}
