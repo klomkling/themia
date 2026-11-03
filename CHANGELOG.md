@@ -27,6 +27,14 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+### Added
+
+- **`Themia.Modules.Identity`: `IOtpLoginFlow.VerifyAsync(challengeId, code, SessionRequest session, ct)` (coord #0191).** The one-time-code login with every check and hook of the plain overload (the one-time-code login switch, `OnBeforeLogin`, active, lockout, tenant, the confirmed-phone binding on the Themia user, `OnLoginSucceeded`, observers), minted on an app channel like `IAuthTokenIssuer.StartSessionAsync`: `OnSessionIssuedAsync` carries the channel and the access token carries `sid`. An app that checked the code itself with `IOtpChallengeService` and then called the issuer skipped all of those; this overload is the supported way. The session is checked before the code is read (null, a bad channel, or non-empty `AppClaims`, which this overload does not support, throw and spend nothing); `ExpectedTenant` must equal the challenge's tenant, decided before any hook or the policy (a mismatch is `InvalidCredentials`, so a wrong tenant can never earn a ticket). A user who owes a second factor gets a ticket, and `ISecondFactorCompletion.CompleteAsync` finishes it on the same channel (`OnLoginSucceeded` and `OnSessionIssued` once each); `IAuthTokenIssuer.CompleteSessionAsync` refuses and burns that ticket. The new overload takes its `CancellationToken` with a default like the plain one; the optional-parameter analyzers RS0026/RS0027 are suppressed on the two overloads with a comment, since they differ by a required `SessionRequest`.
+
+### Changed
+
+- **(breaking) `IOtpLoginFlow` has a new member.** Anything that implements the interface (a fake or a wrapper in a test or an app) stops compiling until it adds `VerifyAsync(Guid, string, SessionRequest, CancellationToken)`; `OtpLoginFlow` is the only implementation in Themia. For a one-time-code second-factor ticket made through the channel overload, `SecondFactorContext.Provider` and `SecondFactorCompletionResult.Provider` are now the channel (they were null for `SecondFactorMethod.Otp`); a policy that reads `Provider` must check `Method` too. A ticket in flight when an app rolls back to an older build completes without the channel label (tickets live 5 to 15 minutes); accepted.
+
 ## [0.51.0] - 2026-11-01
 
 ### Added
