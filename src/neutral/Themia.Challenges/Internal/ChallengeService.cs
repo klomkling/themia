@@ -5,7 +5,7 @@ namespace Themia.Challenges.Internal;
 
 /// <summary>
 /// The policy engine: orchestrates <see cref="IChallengeDialect"/>'s twelve statements into
-/// <see cref="IChallengeService"/>'s four operations, enforcing every security requirement the package
+/// <see cref="IChallengeService"/>'s operations, enforcing every security requirement the package
 /// exists for (see <c>docs/superpowers/specs/2026-08-04-themia-challenges-design.md</c>, "Security
 /// requirements — non-negotiable").
 /// </summary>
@@ -237,6 +237,30 @@ internal sealed class ChallengeService : IChallengeService
                 return 0;
             },
             cancellationToken);
+
+    /// <inheritdoc />
+    public async Task<int> InvalidateLiveAsync(ChallengeScope scope, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(scope);
+        _ = options.GetPurpose(scope.Purpose);   // an unconfigured purpose throws, so a typo cannot silently void nothing
+        var now = timeProvider.GetUtcNow();
+
+        await using var connection = dialect.CreateConnection();
+
+        // One autocommit UPDATE. A concurrent sibling redeem holds row locks of its own, so this can be the deadlock
+        // victim: the statement rolled back as a whole, the retry's count is the only count, and the SQL is built inside
+        // the lambda so a dialect that varies it per call is asked again.
+        var voided = await WithDeadlockRetryAsync(
+            scope.Purpose,
+            () => connection.ExecuteAsync(new CommandDefinition(
+                dialect.InvalidateLiveForScopeSql(TenancyOf(scope)),
+                new { scope.TenantId, scope.Key, scope.Purpose, Now = now, ConsumedAt = now },
+                cancellationToken: cancellationToken)),
+            cancellationToken);
+
+        logger.LogInformation("Voided {Count} live challenges for purpose {Purpose}", voided, scope.Purpose);
+        return voided;
+    }
 
     /// <summary>
     /// Runs <paramref name="work"/> again when it fails with an engine deadlock the dialect classifies

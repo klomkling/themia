@@ -106,6 +106,40 @@ public interface IChallengeService
         string token, string purpose, string? tenantId = null, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Voids every live challenge of exactly <paramref name="scope"/> (key, purpose and tenant), numeric and
+    /// opaque-token alike, in one statement, and returns how many it voided.
+    /// </summary>
+    /// <remarks>
+    /// For a caller that must kill outstanding links when something else changes, a password change being the
+    /// usual case: <see cref="PurposeOptions.InvalidateSiblingsOnVerify"/> only voids siblings when one of them is
+    /// redeemed. Nothing changes for other keys, purposes or tenants (a platform scope, with no tenant, is a
+    /// different scope from any tenant's). It is not an attempt and charges no rate-limit window. While the scope has no
+    /// newer link, a voided challenge answers <see cref="ChallengeVerifyOutcome.Consumed"/> through
+    /// <see cref="VerifyAsync"/> and <see cref="PeekAsync"/>; once a newer link has been issued, the old secret matches no
+    /// live challenge and is treated as a wrong guess, charged to the newer link. Through <see cref="VerifyByTokenAsync"/>
+    /// it answers <see cref="ChallengeVerifyOutcome.NotFound"/>. Idempotent: a second call returns 0, so it is safe to retry.
+    /// <para>
+    /// <b>The caller's token cancels the statement, and a failure is the caller's to handle.</b> This is a security
+    /// step that follows a change which is already committed, so a call that is cancelled or fails leaves the old links
+    /// redeemable. Call it from an identity event observer (<c>IIdentityEventObserver</c>) only with
+    /// <see cref="CancellationToken.None"/>: the observer dispatcher swallows every exception, a cancelled request
+    /// token included (it only logs it), so the caller never sees the failure. Isolate each call when voiding several purposes, so a
+    /// throw on the first does not skip the second. Inside an ambient <see cref="System.Transactions.Transaction"/> the
+    /// statement rolls back with the outer transaction, and a deadlock is not retried.
+    /// </para>
+    /// <para>
+    /// <b>What it does not cover.</b> A link whose issuance has not committed when the statement runs may stay live
+    /// (the outcome differs by engine), and a link redeemed just before the call can still complete its own action
+    /// afterwards. A concurrent redeem and this call never both succeed for the same row.
+    /// </para>
+    /// </remarks>
+    /// <param name="scope">The identity of the challenges to void.</param>
+    /// <param name="cancellationToken">Cancels the underlying store operation.</param>
+    /// <returns>The number of live challenges voided; 0 when none were live.</returns>
+    /// <exception cref="InvalidOperationException"><paramref name="scope"/>'s purpose was never configured via <see cref="ChallengeOptions.ConfigurePurpose"/>.</exception>
+    Task<int> InvalidateLiveAsync(ChallengeScope scope, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Returns the rate-limit quota one issuance consumed, for a delivery that is known to have failed
     /// (including <c>NotificationResult.NotConfigured</c>). Decrements both the per-scope and per-key
     /// windows, each floored at zero. A message that was never sent must not consume the victim's

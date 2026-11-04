@@ -18,6 +18,7 @@ internal sealed class FaultInjectingDialect : IChallengeDialect
     private readonly SqliteChallengeDialect inner;
     private int failInsertTimes;
     private int failIncrementTimes;
+    private int failInvalidateTimes;
 
     public FaultInjectingDialect(SqliteChallengeDialect inner) => this.inner = inner;
 
@@ -29,6 +30,9 @@ internal sealed class FaultInjectingDialect : IChallengeDialect
 
     /// <summary>The next <paramref name="times"/> window increments fail.</summary>
     public void FailIncrement(int times) => failIncrementTimes = times;
+
+    /// <summary>The next <paramref name="times"/> scope voids fail.</summary>
+    public void FailInvalidate(int times) => failInvalidateTimes = times;
 
     public DbConnection CreateConnection() => inner.CreateConnection();
 
@@ -48,7 +52,8 @@ internal sealed class FaultInjectingDialect : IChallengeDialect
 
     public string RecordAttemptSql => inner.RecordAttemptSql;
 
-    public string InvalidateLiveForScopeSql(ChallengeTenancy tenancy) => inner.InvalidateLiveForScopeSql(tenancy);
+    public string InvalidateLiveForScopeSql(ChallengeTenancy tenancy) =>
+        TakeFailure(ref failInvalidateTimes) ? "UPDATE deadlock_sim_missing SET x = @ConsumedAt WHERE y = @Key;" : inner.InvalidateLiveForScopeSql(tenancy);
 
     public string PurgeExpiredSql => inner.PurgeExpiredSql;
 

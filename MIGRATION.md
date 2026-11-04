@@ -10,6 +10,18 @@ with the *why* and concrete upgrade steps.
 - Each entry states: **What changed**, **Why**, and **How to upgrade** (before → after).
 - Non-breaking changes are *not* listed here — see the CHANGELOG.
 
+## Unreleased
+
+### `IChallengeService` has a new member (breaking)
+
+**What changed:** `IChallengeService` gained `Task<int> InvalidateLiveAsync(ChallengeScope scope, CancellationToken cancellationToken = default)`, which voids every live challenge of one scope and returns how many. `ChallengeService` is the only implementation in Themia.
+
+**Why:** an app that must kill outstanding links when something else changes (a password change, say) had no call for it short of writing to the challenges table.
+
+**Who is affected:** anything that implements `IChallengeService`: a fake or a wrapper in a test or an app. Callers of the existing members are not affected.
+
+**How to upgrade:** add the member. A wrapper forwards it to the inner service; a test fake voids its own live entries for the scope and returns the count.
+
 ## 0.52.0
 
 ### `IOtpLoginFlow` has a new member (breaking)

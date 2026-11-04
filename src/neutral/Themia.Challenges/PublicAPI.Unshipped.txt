@@ -124,3 +124,4 @@ static Themia.Challenges.ChallengeVerifyResult.RateLimited(Themia.Challenges.Cha
 Themia.Challenges.IChallengeDialect.IsDeadlock(System.Data.Common.DbException! exception) -> bool
 Themia.Challenges.PurposeOptions.InvalidateSiblingsOnVerify.get -> bool
 Themia.Challenges.PurposeOptions.InvalidateSiblingsOnVerify.set -> void
+Themia.Challenges.IChallengeService.InvalidateLiveAsync(Themia.Challenges.ChallengeScope! scope, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<int>!
