@@ -27,6 +27,20 @@ public abstract class ConversationGuestTests(ConversationEngineFixture fixture)
 
         public bool RateLimit { get; set; }
 
+        public Task<int> InvalidateLiveAsync(ChallengeScope scope, CancellationToken cancellationToken = default)
+        {
+            lock (gate)
+            {
+                var secrets = live.Where(e => e.Value == scope).Select(e => e.Key).ToList();
+                foreach (var secret in secrets)
+                {
+                    live.Remove(secret);
+                }
+
+                return Task.FromResult(secrets.Count);
+            }
+        }
+
         public Task<ChallengeIssueResult> IssueAsync(ChallengeScope scope, CancellationToken cancellationToken = default)
         {
             if (RateLimit)

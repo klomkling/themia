@@ -94,7 +94,8 @@ internal sealed class SiblingGateDialect : IChallengeDialect
 
     private static void Gate(Barrier? barrier, string step)
     {
-        if (barrier is not null && !barrier.SignalAndWait(GateTimeout))
+        // Open once both parties have met: a statement that is re-run (a deadlock retry) must not wait for a partner that is gone.
+        if (barrier is not null && barrier.CurrentPhaseNumber == 0 && !barrier.SignalAndWait(GateTimeout))
         {
             throw new InvalidOperationException($"The two racing verifies never both reached {step}; the run would have been sequential.");
         }
