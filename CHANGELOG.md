@@ -27,6 +27,8 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.53.0] - 2026-11-05
+
 ### Added
 
 - **`Themia.Challenges`: `IChallengeService.InvalidateLiveAsync(ChallengeScope, ct)` (coord #0195).** Voids every live challenge of exactly one scope (key, purpose and tenant; a platform scope is a different scope from any tenant's), numeric and opaque-token alike, in one statement, and returns how many it voided (0 when none; a second call returns 0). It is not an attempt and charges no rate-limit window, and it needs no dialect or schema change: it runs the existing `InvalidateLiveForScopeSql`, with the same classified deadlock retry as the other autocommit statements. While the scope has no newer link, a voided challenge answers `Consumed` through `VerifyAsync` and `PeekAsync`; once a newer link has been issued, the old secret is treated as a wrong guess and charged to the newer link. Through `VerifyByTokenAsync` it answers `NotFound`. Use it when something else invalidates outstanding links, a password change being the usual case; `InvalidateSiblingsOnVerify` only voids siblings when one is redeemed. It throws for a purpose that was never configured. The caller's token cancels it, and a failure is the caller's to handle: from an `IIdentityEventObserver` pass `CancellationToken.None`, because the observer dispatcher swallows every exception, a cancelled request token included, so the caller never sees the failure. A link whose issuance has not committed when the statement runs may stay live, and a link redeemed just before the call can still complete its own action.
