@@ -10,6 +10,30 @@ with the *why* and concrete upgrade steps.
 - Each entry states: **What changed**, **Why**, and **How to upgrade** (before → after).
 - Non-breaking changes are *not* listed here — see the CHANGELOG.
 
+## 0.52.0
+
+### `IOtpLoginFlow` has a new member (breaking)
+
+**What changed:** `IOtpLoginFlow` gained `VerifyAsync(Guid challengeId, string code, SessionRequest session, CancellationToken cancellationToken = default)`, which signs in with a one-time code and issues the session on an application channel. `OtpLoginFlow` is the only implementation in Themia.
+
+**Why:** an app that labels its sessions with its own channel had to choose between the one-time-code gate (login-method switch, hooks, phone binding, second-factor policy) and the channel label. The flow now takes the channel, so the gate stays in one place.
+
+**Who is affected:** anything that implements `IOtpLoginFlow`: a fake or a wrapper in a test or an app. Callers of the existing overload are not affected.
+
+**How to upgrade:** add the member. A wrapper forwards it to the inner flow; a test fake returns what its existing overload returns. `session.AppClaims` must be empty (the overload refuses a non-empty set) and `session.ExpectedTenant` is checked against the challenge's tenant.
+
+For a one-time-code second-factor ticket made through the channel overload, `SecondFactorContext.Provider` and `SecondFactorCompletionResult.Provider` are now the channel (they were `null` for `SecondFactorMethod.Otp`). A policy that reads `Provider` must check `Method` too.
+
+### A custom `IChallengeDialect` must enforce the attempt bound (behaviour change)
+
+**What changed:** the `MaxAttempts` bound of `Themia.Challenges` is now enforced by the statements that record an attempt and consume a challenge: `RecordAttemptSql` and `ConsumeSql` carry `attempts < @MaxAttempts` and take a `@MaxAttempts` parameter. The PostgreSQL, MySQL and SQL Server dialects ship with it.
+
+**Why:** the check was done on a value read before the write, so parallel wrong guesses could be recorded beyond the configured budget.
+
+**Who is affected:** apps with their own `IChallengeDialect`. Without the condition a custom dialect keeps the old, unbounded behaviour; nothing fails to compile.
+
+**How to upgrade:** add `attempts < @MaxAttempts` to both statements and accept the `@MaxAttempts` parameter, as the shipped dialects do. A peek is neither charged nor consuming.
+
 ## 0.42.0
 
 ### `AllowedAttachmentContentTypes` replaces the default list (behaviour change)
