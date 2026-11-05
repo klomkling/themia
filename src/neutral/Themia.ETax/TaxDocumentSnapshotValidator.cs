@@ -39,6 +39,8 @@ public static class TaxDocumentSnapshotValidator
             Add(errors, TaxDocumentValidationCode.Malformed, "form");
         else if (s.Form == TaxDocumentForm.Abbreviated && s.Kind != TaxDocumentKind.TaxInvoiceReceipt)
             Add(errors, TaxDocumentValidationCode.NotAllowed, "form");
+        if (s.Form == TaxDocumentForm.Abbreviated && s.Totals is { WithheldSatang: > 0 })
+            Add(errors, TaxDocumentValidationCode.NotAllowed, "totals.withheld_satang");
         if (string.IsNullOrWhiteSpace(s.DocumentNumber))
             Add(errors, TaxDocumentValidationCode.Required, "document_number");
         if (s.IssueDate == default)

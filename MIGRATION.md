@@ -14,7 +14,7 @@ with the *why* and concrete upgrade steps.
 
 ### Themia.ETax: `TaxDocumentSnapshot.Form`, `ITaxDocumentNumberSource.NextNumberForFormAsync`
 
-Nothing to change for an existing app: `Form` defaults to `Full` and is not written, so stored hashes are unchanged, and the new interface method has a default body that calls `NextNumberAsync`. To give abbreviated invoices their own running number, override `NextNumberForFormAsync` in your source. A custom `ITaxDocumentStore` or renderer needs nothing.
+Nothing to change for an existing app: `Form` defaults to `Full` and is not written, so stored hashes are unchanged, and the new interface method has a default body that calls `NextNumberAsync`. To give abbreviated invoices their own running number, override `NextNumberForFormAsync` in your source. An older Themia reads an abbreviated snapshot without its `form` and renders it as a full one, so upgrade every reader before the first abbreviated document is issued. The buyer of an abbreviated snapshot is stored but not printed; it exists so a later credit note can copy it. A custom `ITaxDocumentStore` or renderer needs nothing.
 
 ## 0.53.0
 

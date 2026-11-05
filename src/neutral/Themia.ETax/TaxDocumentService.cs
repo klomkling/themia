@@ -135,7 +135,7 @@ public sealed class TaxDocumentService
         }
 
         // Before the number: a source that fails must not leave a taken number (a hole in a gapless sequence) behind.
-        var logo = TaxDocumentTemplates.PageSizeOf(_templateVersion) is null
+        var logo = draft.Form == TaxDocumentForm.Abbreviated || TaxDocumentTemplates.PageSizeOf(_templateVersion) is null
             ? null
             : await _logos.GetCurrentAsync(request.SellerId, ct).ConfigureAwait(false);
 

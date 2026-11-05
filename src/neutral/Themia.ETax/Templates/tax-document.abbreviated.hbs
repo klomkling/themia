@@ -55,11 +55,11 @@ td.desc { white-space: pre-line; }
 </div>
 <table>
   <thead>
-    <tr><th style="width: 8%">#</th><th>รายการ / Description</th><th class="num" style="width: 22%">มูลค่าก่อนภาษี / Amount ex VAT</th></tr>
+    <tr><th style="width: 8%">#</th><th>รายการ / Description</th><th class="num" style="width: 16%">จำนวน / Qty</th><th class="num" style="width: 22%">มูลค่าก่อนภาษี / Amount ex VAT</th></tr>
   </thead>
   <tbody>
     {{#each lines}}
-    <tr><td>{{number}}</td><td class="desc">{{description}}</td><td class="num">{{amount}}</td></tr>
+    <tr><td>{{number}}</td><td class="desc">{{description}}</td><td class="num">{{quantity}}</td><td class="num">{{amount}}</td></tr>
     {{/each}}
   </tbody>
 </table>

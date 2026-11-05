@@ -100,7 +100,7 @@ internal static class TaxDocumentPagedModel
         difference = kind == TaxDocumentKind.TaxInvoiceReceipt ? null : TaxDocumentRenderModel.Money(l.AmountExVatSatang),
     };
 
-    private static string Quantity(decimal quantity, string? unit)
+    internal static string Quantity(decimal quantity, string? unit)
     {
         var text = quantity.ToString("0.####", CultureInfo.InvariantCulture);
         return string.IsNullOrWhiteSpace(unit) ? text : text + " " + unit;

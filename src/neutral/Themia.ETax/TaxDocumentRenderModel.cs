@@ -30,6 +30,7 @@ internal static class TaxDocumentRenderModel
             {
                 number = (i + 1).ToString(CultureInfo.InvariantCulture),
                 description = l.Description,
+                quantity = l.Quantity is { } q ? TaxDocumentPagedModel.Quantity(q, l.Unit) : null,
                 amount = Money(l.AmountExVatSatang),
             }).ToArray(),
             totals = new
