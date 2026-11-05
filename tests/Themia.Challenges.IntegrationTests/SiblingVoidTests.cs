@@ -86,7 +86,7 @@ public abstract class SiblingVoidTests
             var serviceA = NewService(gated);
             var serviceB = NewService(gated);
 
-            var results = await Task.WhenAll(serviceA.VerifyAsync(scope, codeA), serviceB.VerifyAsync(scope, codeB));
+            var results = await RaceOutcome.WhenAllReportedAsync(serviceA.VerifyAsync(scope, codeA), serviceB.VerifyAsync(scope, codeB));
 
             var outcomes = string.Join(", ", results.Select(r => r.Outcome));
             Assert.True(1 == results.Count(r => r.Outcome == ChallengeVerifyOutcome.Verified), $"round {round}: [{outcomes}]");
@@ -110,7 +110,7 @@ public abstract class SiblingVoidTests
             var serviceA = NewService(gated);
             var serviceB = NewService(gated);
 
-            var results = await Task.WhenAll(
+            var results = await RaceOutcome.WhenAllReportedAsync(
                 serviceA.VerifyByTokenAsync(tokenA, scope.Purpose, scope.TenantId),
                 serviceB.VerifyByTokenAsync(tokenB, scope.Purpose, scope.TenantId));
 
@@ -135,7 +135,7 @@ public abstract class SiblingVoidTests
         var serviceA = NewService(gated);
         var serviceB = NewService(gated);
 
-        var results = await Task.WhenAll(
+        var results = await RaceOutcome.WhenAllReportedAsync(
             serviceA.VerifyByTokenAsync(token, scope.Purpose, scope.TenantId),
             serviceB.VerifyByTokenAsync(token, scope.Purpose, scope.TenantId));
 

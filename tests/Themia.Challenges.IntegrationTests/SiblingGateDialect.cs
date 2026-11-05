@@ -97,7 +97,21 @@ internal sealed class SiblingGateDialect : IChallengeDialect
         // Open once both parties have met: a statement that is re-run (a deadlock retry) must not wait for a partner that is gone.
         if (barrier is not null && barrier.CurrentPhaseNumber == 0 && !barrier.SignalAndWait(GateTimeout))
         {
-            throw new InvalidOperationException($"The two racing verifies never both reached {step}; the run would have been sequential.");
+            throw new InvalidOperationException(Diagnose(barrier, step));
         }
+    }
+
+    /// <summary>
+    /// What a timed-out rendezvous knows: which step, how many parties had not arrived, and whether the thread pool was
+    /// starved (every worker busy and work queued), which is what a blocked gate in async code looks like from outside.
+    /// </summary>
+    internal static string Diagnose(Barrier barrier, string step)
+    {
+        ThreadPool.GetMinThreads(out var minWorkers, out _);
+        ThreadPool.GetMaxThreads(out var maxWorkers, out _);
+        return $"The two racing verifies never both reached {step} within {GateTimeout.TotalSeconds:0} s; the run would have been sequential. "
+            + $"Parties not yet arrived: {barrier.ParticipantsRemaining} of {barrier.ParticipantCount}. "
+            + $"Thread pool: {ThreadPool.ThreadCount} threads (min {minWorkers}, max {maxWorkers}), {ThreadPool.PendingWorkItemCount} queued work items, "
+            + $"{Environment.ProcessorCount} processors.";
     }
 }
