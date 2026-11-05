@@ -27,6 +27,11 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+### Fixed
+
+- **`Themia.Modules.Identity`: erasure now voids live reset/invite links (follow-up to coord #0195).** `IIdentityAnonymiser` nulled the password hash but announced only `UserMutation.Anonymised`, so an observer that voids outstanding links on the password mutation never ran and a reset link stayed redeemable against the erased row for the rest of its TTL. Erasure now announces `UserMutation.Password | UserMutation.Anonymised` to `IUserLifecycleHooks.OnUserMutatedAsync` and to every `IIdentityEventObserver`. A consumer that matches the value exactly (`== UserMutation.Anonymised`, or a `switch` on it) no longer matches; test with `HasFlag`. See MIGRATION.md. Two hardening changes ship with it: `SetPasswordAsync`, `SetActiveAsync`, `SetEmailAsync` and `SetPhoneNumberAsync` now answer `UserNotFound` for an erased user instead of writing onto the tombstone, and `OnUserMutatedAsync` observers now run before the lifecycle hook (a hook that throws after commit used to skip them; observers swallow their own failures, a hook's still propagates).
+  **Known residual (own row, planned):** a mutator that loaded the user before erasure committed and saves after it writes the stale row back, restoring personal data, the active flag or a password hash onto the tombstone, because `User` has no concurrency token. The fix is a schema change and ships separately.
+
 ## [0.54.0] - 2026-11-05
 
 ### Added

@@ -222,7 +222,8 @@ It is idempotent (`AlreadyAnonymised` still removes any stray child rows). A ten
 that tenant's scope and a platform user only from the platform scope; otherwise the outcome is `NotFound`. A background
 job sets the scope with `TenantContextAccessor.BeginScope(tenantId)` first. Register an
 `IUserLifecycleHooks.OnBeforeAnonymiseAsync` to veto (for example under a legal hold); the reason it returns must not
-contain personal data. Afterwards `OnUserMutatedAsync(userId, UserMutation.Anonymised)` fires with the id only.
+contain personal data. Afterwards `OnUserMutatedAsync(userId, UserMutation.Password | UserMutation.Anonymised)` fires with the id only (the
+password flag is there so observers that void reset/invite links run; match with `HasFlag`).
 
 Not covered, so put them in your closure runbook: audit actor columns, notification logs, conversations (they have their
 own erasure) and your own tables; OTP challenges with no user id for a phone the user never held (they expire by TTL).

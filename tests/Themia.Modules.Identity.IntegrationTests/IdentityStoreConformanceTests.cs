@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -637,6 +638,17 @@ public abstract class IdentityStoreConformanceTests
             var user = (await check.Users.FindByUserNameAsync("grace"))!;
             Assert.Equal(0, user.AccessFailedCount);
             Assert.Null(user.LockoutEnd);
+        }
+    }
+
+    private sealed class MutationRecorder : IIdentityEventObserver
+    {
+        public ConcurrentBag<(Guid UserId, UserMutation Mutation)> Mutations { get; } = [];
+
+        public Task OnUserMutatedAsync(Guid userId, UserMutation mutation, CancellationToken cancellationToken = default)
+        {
+            Mutations.Add((userId, mutation));
+            return Task.CompletedTask;
         }
     }
 
@@ -1572,6 +1584,30 @@ public abstract class IdentityStoreConformanceTests
         Assert.Equal(ExternalLoginLinkOutcome.Linked,
             (await s.Linking.LinkAsync(bystander, new ExternalIdentity("LINE", "ln-anon", null, false, null))).Outcome);
         _ = resetToken;
+    }
+
+    [Fact] // erasure must fire the password mutation (observers void reset/invite links on it) and a late redemption must not revive the row
+    public async Task Anonymise_raises_the_password_mutation_and_the_tombstone_refuses_later_writes()
+    {
+        await ResetAsync();
+        var seen = new MutationRecorder();
+        await using var s = NewScope(
+            new TenantId("acme"), configureServices: services => services.AddSingleton<IIdentityEventObserver>(seen));
+        var user = (await s.Users.CreateAsync("erase-me", "pw", "erase@x.com")).UserId!.Value;
+        await s.Users.SetPhoneNumberAsync(user, "+66812345678");
+
+        Assert.Equal(AnonymiseOutcome.Anonymised, (await s.Anonymiser.AnonymiseAsync(user)).Outcome);
+
+        Assert.Contains((user, UserMutation.Password | UserMutation.Anonymised), seen.Mutations);
+        Assert.Equal(UserMutationOutcome.UserNotFound, (await s.Users.SetPasswordAsync(user, "revived")).Outcome);
+        Assert.Equal(UserMutationOutcome.UserNotFound, (await s.Users.SetActiveAsync(user, true)).Outcome);
+        Assert.Equal(UserMutationOutcome.UserNotFound, (await s.Users.SetEmailAsync(user, "back@x.com")).Outcome);
+        Assert.Equal(UserMutationOutcome.UserNotFound, (await s.Users.SetPhoneNumberAsync(user, "+66899999999")).Outcome);
+        var row = await s.Users.FindByIdAsync(user);
+        Assert.Null(row!.PasswordHash);
+        Assert.Null(row.Email);
+        Assert.Null(row.PhoneNumber);
+        Assert.False(row.IsActive);
     }
 
     [Fact] // a platform-scope challenge for the same phone is not the tenant user's: erasure must neither touch it nor fail on it

@@ -10,6 +10,16 @@ with the *why* and concrete upgrade steps.
 - Each entry states: **What changed**, **Why**, and **How to upgrade** (before → after).
 - Non-breaking changes are *not* listed here — see the CHANGELOG.
 
+## Unreleased
+
+### Erasure announces `UserMutation.Password | UserMutation.Anonymised`
+
+**What changed:** `IIdentityAnonymiser.AnonymiseAsync` now passes both flags to `IUserLifecycleHooks.OnUserMutatedAsync` and `IIdentityEventObserver.OnUserMutatedAsync`; it used to pass `Anonymised` alone. `OnUserMutatedAsync` observers also run before the lifecycle hook for every mutation.
+
+**Why:** erasure nulls the password hash, and observers that void reset/invite links key on the password mutation. They never fired on erasure.
+
+**How to upgrade:** replace an exact match (`mutation == UserMutation.Anonymised`, or a `switch` on the value) with `mutation.HasFlag(UserMutation.Anonymised)`, and test the other flags separately. A handler that mails the user on `Password` should skip a mutation that also has `Anonymised`: the address is already cleared.
+
 ## 0.54.0
 
 ### Themia.ETax: `TaxDocumentSnapshot.Form`, `ITaxDocumentNumberSource.NextNumberForFormAsync`
