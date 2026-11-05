@@ -10,6 +10,12 @@ with the *why* and concrete upgrade steps.
 - Each entry states: **What changed**, **Why**, and **How to upgrade** (before → after).
 - Non-breaking changes are *not* listed here — see the CHANGELOG.
 
+## Unreleased
+
+### Themia.ETax: `TaxDocumentSnapshot.Form`, `ITaxDocumentNumberSource.NextNumberForFormAsync`
+
+Nothing to change for an existing app: `Form` defaults to `Full` and is not written, so stored hashes are unchanged, and the new interface method has a default body that calls `NextNumberAsync`. To give abbreviated invoices their own running number, override `NextNumberForFormAsync` in your source. A custom `ITaxDocumentStore` or renderer needs nothing.
+
 ## 0.53.0
 
 ### `IChallengeService` has a new member (breaking)

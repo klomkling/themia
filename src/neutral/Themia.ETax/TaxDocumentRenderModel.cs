@@ -11,7 +11,7 @@ internal static class TaxDocumentRenderModel
 
     public static object Build(TaxDocumentSnapshot s, TaxDocumentMarker marker, string fontCss, ThaiBahtTextEtMode etMode)
     {
-        var (titleTh, titleEn) = Title(s.Kind);
+        var (titleTh, titleEn) = Title(s.Kind, s.Form);
         var (markerTh, markerEn, markerKey) = Mark(marker);
         return new
         {
@@ -86,8 +86,9 @@ internal static class TaxDocumentRenderModel
         correctedValue = n.CorrectedValueSatang is { } c ? Money(c) : null,
     };
 
-    private static (string Th, string En) Title(TaxDocumentKind kind) => kind switch
+    private static (string Th, string En) Title(TaxDocumentKind kind, TaxDocumentForm form) => kind switch
     {
+        TaxDocumentKind.TaxInvoiceReceipt when form == TaxDocumentForm.Abbreviated => ("ใบกำกับภาษีอย่างย่อ", ""),
         TaxDocumentKind.TaxInvoiceReceipt => ("ใบกำกับภาษี/ใบเสร็จรับเงิน", "Tax Invoice / Receipt"),
         TaxDocumentKind.CreditNote => ("ใบลดหนี้", "Credit Note"),
         TaxDocumentKind.DebitNote => ("ใบเพิ่มหนี้", "Debit Note"),

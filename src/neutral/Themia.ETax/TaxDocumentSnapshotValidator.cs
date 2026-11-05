@@ -35,6 +35,10 @@ public static class TaxDocumentSnapshotValidator
             Add(errors, TaxDocumentValidationCode.Malformed, "schema_version");
         if (!Enum.IsDefined(s.Kind))
             Add(errors, TaxDocumentValidationCode.Malformed, "kind");
+        if (!Enum.IsDefined(s.Form))
+            Add(errors, TaxDocumentValidationCode.Malformed, "form");
+        else if (s.Form == TaxDocumentForm.Abbreviated && s.Kind != TaxDocumentKind.TaxInvoiceReceipt)
+            Add(errors, TaxDocumentValidationCode.NotAllowed, "form");
         if (string.IsNullOrWhiteSpace(s.DocumentNumber))
             Add(errors, TaxDocumentValidationCode.Required, "document_number");
         if (s.IssueDate == default)
