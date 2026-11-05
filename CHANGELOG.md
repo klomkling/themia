@@ -27,6 +27,8 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.54.0] - 2026-11-05
+
 ### Added
 
 - **`Themia.ETax`: abbreviated tax invoice as a snapshot form (coord #0196).** `TaxDocumentSnapshot.Form` (`TaxDocumentForm.Full` | `Abbreviated`) on a `TaxInvoiceReceipt`. `Full` is the default and is omitted from the stored JSON, so a full snapshot keeps its bytes and hash; `Abbreviated` is written as `"form":"Abbreviated"` and is refused on a credit or debit note. An abbreviated document renders with a dedicated single-sheet template under whatever template version it records: the title is exactly `ใบกำกับภาษีอย่างย่อ`, the buyer block is not printed (the snapshot still needs a buyer, so a placeholder name keeps a later credit note valid), and there is no payment or withholding row. `ITaxDocumentNumberSource.NextNumberForFormAsync(tx, sellerId, kind, form, issueDate, ct)` is a new default interface method that `TaxDocumentService` now calls; its default delegates to `NextNumberAsync`, so an existing source keeps working and an abbreviated document shares the full series until the source overrides it.
