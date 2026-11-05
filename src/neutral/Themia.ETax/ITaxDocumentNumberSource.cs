@@ -15,4 +15,17 @@ public interface ITaxDocumentNumberSource
     /// <param name="issueDate">The tax point, for a per-period run.</param>
     /// <param name="ct">Cancellation token.</param>
     Task<string> NextNumberAsync(DbTransaction tx, string sellerId, TaxDocumentKind kind, DateOnly issueDate, CancellationToken ct = default);
+
+    /// <summary>
+    /// Allocates the next number for a document of <paramref name="form"/>. The default delegates to the form-less overload, so an abbreviated
+    /// document shares the series of a full one; override it to keep a separate running number.
+    /// </summary>
+    /// <param name="tx">The caller's issue transaction. Never committed or rolled back here.</param>
+    /// <param name="sellerId">The issuing seller.</param>
+    /// <param name="kind">The document kind.</param>
+    /// <param name="form">The document form.</param>
+    /// <param name="issueDate">The tax point, for a per-period run.</param>
+    /// <param name="ct">Cancellation token.</param>
+    Task<string> NextNumberForFormAsync(DbTransaction tx, string sellerId, TaxDocumentKind kind, TaxDocumentForm form, DateOnly issueDate, CancellationToken ct) =>
+        NextNumberAsync(tx, sellerId, kind, issueDate, ct);
 }

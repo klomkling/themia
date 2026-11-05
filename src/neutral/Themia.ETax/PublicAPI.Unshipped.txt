@@ -436,3 +436,9 @@ Themia.ETax.TaxDocumentSnapshot.LogoSha256.get -> string?
 Themia.ETax.TaxDocumentSnapshot.LogoSha256.init -> void
 Themia.ETax.TaxDocumentTemplateOptions.Logo.get -> Themia.ETax.TaxDocumentLogo?
 Themia.ETax.TaxDocumentTemplateOptions.Logo.set -> void
+Themia.ETax.TaxDocumentForm
+Themia.ETax.TaxDocumentForm.Abbreviated = 1 -> Themia.ETax.TaxDocumentForm
+Themia.ETax.TaxDocumentForm.Full = 0 -> Themia.ETax.TaxDocumentForm
+Themia.ETax.TaxDocumentSnapshot.Form.get -> Themia.ETax.TaxDocumentForm
+Themia.ETax.TaxDocumentSnapshot.Form.init -> void
+Themia.ETax.ITaxDocumentNumberSource.NextNumberForFormAsync(System.Data.Common.DbTransaction! tx, string! sellerId, Themia.ETax.TaxDocumentKind kind, Themia.ETax.TaxDocumentForm form, System.DateOnly issueDate, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<string!>!

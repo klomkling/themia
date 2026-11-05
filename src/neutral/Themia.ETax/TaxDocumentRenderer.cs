@@ -121,7 +121,7 @@ public sealed class TaxDocumentRenderer
             throw new TaxDocumentLogoException(recorded);
 
         var html = RenderHtml(snapshot, templateVersion, marker, logo);
-        var options = TaxDocumentTemplates.PageSizeOf(templateVersion) switch
+        var options = (snapshot.Form == TaxDocumentForm.Abbreviated ? null : TaxDocumentTemplates.PageSizeOf(templateVersion)) switch
         {
             TaxDocumentPageSize.A4Portrait => A4PortraitPagedPrintOptions,
             TaxDocumentPageSize.A5Landscape => A5LandscapePrintOptions,
@@ -137,6 +137,12 @@ public sealed class TaxDocumentRenderer
 
     internal string RenderHtml(TaxDocumentSnapshot snapshot, string templateVersion, TaxDocumentMarker marker, TaxDocumentLogo? logo = null)
     {
+        if (snapshot.Form == TaxDocumentForm.Abbreviated)
+        {
+            var abbreviatedModel = TaxDocumentRenderModel.Build(snapshot, marker, FontCss.Value, TaxDocumentTemplates.EtModeOf(templateVersion));
+            return Handlebars.Compile(TaxDocumentTemplates.GetAbbreviated())(abbreviatedModel);
+        }
+
         var model = TaxDocumentTemplates.PageSizeOf(templateVersion) is { } size
             ? TaxDocumentPagedModel.Build(snapshot, marker, FontCss.Value, TaxDocumentTemplates.EtModeOf(templateVersion), logo, size)
             : TaxDocumentRenderModel.Build(snapshot, marker, FontCss.Value, TaxDocumentTemplates.EtModeOf(templateVersion));

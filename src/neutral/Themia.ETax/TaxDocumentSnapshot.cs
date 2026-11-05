@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace Themia.ETax;
 
 /// <summary>
@@ -17,6 +19,13 @@ public sealed record TaxDocumentSnapshot
 
     /// <summary>Document kind.</summary>
     public required TaxDocumentKind Kind { get; init; }
+
+    /// <summary>
+    /// How much a tax invoice/receipt prints. Omitted from the stored JSON when <see cref="TaxDocumentForm.Full"/>, so a full document is byte-identical to one issued
+    /// before forms existed. <see cref="Buyer"/> is still required: an abbreviated document keeps a placeholder buyer so a later credit note can copy it.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public TaxDocumentForm Form { get; init; }
 
     /// <summary>The allocated gapless document number.</summary>
     public required string DocumentNumber { get; init; }

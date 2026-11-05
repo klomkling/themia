@@ -85,6 +85,15 @@ internal sealed class FakeNumberSource : ITaxDocumentNumberSource
     /// <summary>Calls to <see cref="NextNumberAsync"/>, whether or not rolled back.</summary>
     public int Calls { get; private set; }
 
+    /// <summary>The form of every allocation that came through the form-aware overload.</summary>
+    public List<TaxDocumentForm> Forms { get; } = [];
+
+    public Task<string> NextNumberForFormAsync(System.Data.Common.DbTransaction tx, string sellerId, TaxDocumentKind kind, TaxDocumentForm form, DateOnly issueDate, CancellationToken ct)
+    {
+        Forms.Add(form);
+        return NextNumberAsync(tx, sellerId, kind, issueDate, ct);
+    }
+
     public Task<string> NextNumberAsync(System.Data.Common.DbTransaction tx, string sellerId, TaxDocumentKind kind, DateOnly issueDate, CancellationToken ct = default)
     {
         Calls++;

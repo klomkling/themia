@@ -28,6 +28,12 @@ public static class TaxDocumentTemplates
     private static readonly Lazy<string> Version4 = new(() =>
         System.Text.Encoding.UTF8.GetString(TaxDocumentFonts.ReadBytes("Templates.tax-document.v4.hbs")));
 
+    private static readonly Lazy<string> Abbreviated = new(() =>
+        System.Text.Encoding.UTF8.GetString(TaxDocumentFonts.ReadBytes("Templates.tax-document.abbreviated.hbs")));
+
+    /// <summary>The single-sheet template every abbreviated document renders with, whatever version it records: it has no buyer block and no payment or withholding rows.</summary>
+    internal static string GetAbbreviated() => Abbreviated.Value;
+
     /// <summary>The paper of a paged version ("4" A4 portrait, "5" A5 landscape); <see langword="null"/> for the single-sheet versions "1" to "3".</summary>
     internal static TaxDocumentPageSize? PageSizeOf(string templateVersion) => templateVersion switch
     {
