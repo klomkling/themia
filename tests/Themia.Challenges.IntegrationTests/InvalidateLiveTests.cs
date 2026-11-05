@@ -117,7 +117,7 @@ public abstract class InvalidateLiveTests
             var redeem = redeeming.VerifyAsync(scope, codes[0]);
             // On a thread of its own: the call reaches the gate before its first await, and must not hold the test thread.
             var voided = Task.Run(() => voiding.InvalidateLiveAsync(scope));
-            await Task.WhenAll(redeem, voided);
+            await RaceOutcome.WhenAllReportedAsync(redeem, voided);
 
             var outcome = (await redeem).Outcome;
             var count = await voided;
