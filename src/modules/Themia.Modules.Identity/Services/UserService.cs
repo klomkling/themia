@@ -116,13 +116,6 @@ public sealed class UserService : IUserService
     {
     }
 
-    /// <summary>
-    /// Announces a committed mutation to the lifecycle hook and the observers, running as the mutated user's
-    /// own tenant. The caller's scope is whoever is calling (a platform admin, an anonymous reset or confirm
-    /// request); a hook that revokes the user's sessions or writes tenant data must act on the user's tenant,
-    /// not the caller's. The tenant comes from the user row this service just loaded and changed, and the
-    /// caller's scope is restored afterwards even if a hook throws.
-    /// </summary>
     /// <summary>Kills every live password-reset token of the user. It runs before the change is saved, so a failure
     /// leaves the old value and no live link rather than a new value with an old link still redeemable.</summary>
     private async Task VoidResetTokensAsync(Guid userId, CancellationToken cancellationToken)
@@ -139,6 +132,13 @@ public sealed class UserService : IUserService
             cancellationToken).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Announces a committed mutation to the lifecycle hook and the observers, running as the mutated user's
+    /// own tenant. The caller's scope is whoever is calling (a platform admin, an anonymous reset or confirm
+    /// request); a hook that revokes the user's sessions or writes tenant data must act on the user's tenant,
+    /// not the caller's. The tenant comes from the user row this service just loaded and changed, and the
+    /// caller's scope is restored afterwards even if a hook throws.
+    /// </summary>
     private async ValueTask NotifyMutatedAsync(User user, UserMutation mutation, CancellationToken cancellationToken)
     {
         using (TenantContextAccessor.BeginScope(user.TenantId))
