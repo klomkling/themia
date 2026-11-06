@@ -17,9 +17,14 @@ public interface IUserPasswordHashService
     /// eviction and the mutation announcement happen when this call returns, before your commit, so call it as the
     /// last statement before committing: a request on the old stamp can be cached for up to the stamp window after
     /// the commit, as on other instances, and observers see a change that a later rollback would undo.</para>
-    /// <para><b>Any result other than success: roll your transaction back.</b> The reset links are voided before
-    /// the save. Committing after a <c>Conflict</c>, <c>Refused</c> or <c>UserNotFound</c> leaves your store with
-    /// the new hash, Themia with the old one and the reset links spent. Throw on a non-success result.</para>
+    /// <para><b>Have no other pending changes on the unit of work when you call it: save your own writes first.</b>
+    /// A save that loses a race to another writer discards the pending changes of the whole unit of work, not only
+    /// the user row, and the retry then reports success. Your staged write would be gone while the call reports
+    /// success. For a platform user (no tenant) the save also skips tenant write-validation for everything pending.</para>
+    /// <para><b>Any result other than success: roll your transaction back.</b> After <c>Conflict</c> the reset links
+    /// are already voided (the void runs before the save), so committing leaves your store with the new hash,
+    /// Themia with the old one and the links spent. <c>Refused</c> and <c>UserNotFound</c> change nothing, but treat
+    /// them the same way: the two stores now disagree. Throw on a non-success result.</para>
     /// <para><b>Themia never verifies a hash its <see cref="IPasswordHasher"/> cannot parse</b> (for example bcrypt
     /// under the default Argon2id hasher). Logging in through <see cref="IUserService.VerifyPasswordAsync"/> with
     /// such a hash is a wrong guess that counts towards the lockout, so keep login in your own store unless the

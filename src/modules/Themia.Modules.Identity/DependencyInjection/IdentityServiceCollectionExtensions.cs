@@ -118,6 +118,7 @@ public static class IdentityServiceCollectionExtensions
             ?? throw new InvalidOperationException(
                 $"{nameof(IUserPasswordHashService)} is implemented by the default UserService; the registered "
                 + $"{nameof(IUserService)} does not implement it. Register your own {nameof(IUserPasswordHashService)}."));
+
         services.TryAddScoped<IIdentityAnonymiser, IdentityAnonymiser>();
         services.TryAddScoped<IRoleService, RoleService>();
         services.TryAddScoped<IRoleLevelService, RoleLevelService>();
