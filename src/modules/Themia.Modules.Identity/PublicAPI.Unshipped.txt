@@ -113,3 +113,7 @@ Themia.Modules.Identity.Migrations.AddRefreshTokenSecurityStampMigration
 Themia.Modules.Identity.Migrations.AddRefreshTokenSecurityStampMigration.AddRefreshTokenSecurityStampMigration() -> void
 override Themia.Modules.Identity.Migrations.AddRefreshTokenSecurityStampMigration.Down() -> void
 override Themia.Modules.Identity.Migrations.AddRefreshTokenSecurityStampMigration.Up() -> void
+Themia.Modules.Identity.Migrations.UserConcurrencyVersionMigration
+Themia.Modules.Identity.Migrations.UserConcurrencyVersionMigration.UserConcurrencyVersionMigration() -> void
+override Themia.Modules.Identity.Migrations.UserConcurrencyVersionMigration.Down() -> void
+override Themia.Modules.Identity.Migrations.UserConcurrencyVersionMigration.Up() -> void

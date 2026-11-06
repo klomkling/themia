@@ -342,4 +342,29 @@ public class IdentityAnonymiserTests
 
         Assert.False(stampCache.TryGetValue(SecurityStampCache.Key(u.Id), out _));
     }
+
+    [Fact]
+    public async Task Anonymise_survives_four_lost_races_in_a_row_and_asks_the_hook_once()
+    {
+        var u = AddUser(Acme);
+        uow.ConcurrencyFailures = 4;
+
+        var result = await Sut(Acme).AnonymiseAsync(u.Id);
+
+        Assert.Equal(AnonymiseOutcome.Anonymised, result.Outcome);
+        Assert.Equal($"anonymised-{u.Id:N}", Assert.Single(users).UserName);
+        Assert.Single(hooks.Asked, nameof(IUserLifecycleHooks.OnBeforeAnonymiseAsync));
+    }
+
+    [Fact]
+    public async Task Anonymise_surfaces_the_conflict_once_the_retry_budget_is_spent()
+    {
+        var u = AddUser(Acme);
+        uow.ConcurrencyFailures = 5;
+
+        await Assert.ThrowsAsync<Themia.Framework.Data.Abstractions.Exceptions.ConcurrencyException>(
+            () => Sut(Acme).AnonymiseAsync(u.Id));
+
+        Assert.Equal("alice", Assert.Single(users).UserName);
+    }
 }

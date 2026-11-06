@@ -31,6 +31,9 @@ public interface IRepository<T, in TKey> : IReadRepository<T, TKey> where T : cl
     /// your later <c>SaveChangesAsync</c> re-writes that entity's columns from its tracked snapshot — overwriting the
     /// bulk-updated values for that row (last-writer-wins). The Dapper peer has no change tracker and keeps the bulk
     /// value. Avoid mixing a tracked edit with an overlapping bulk update in the same unit of work.
+    /// For an entity implementing <c>IVersionedEntity</c> the bulk update also moves its concurrency counter and does
+    /// not check it, so a pending or later <c>Update</c> of an instance loaded before the write fails with
+    /// <c>ConcurrencyException</c> on both peers instead of overwriting it. Reload after the bulk write.
     /// </remarks>
     /// <returns>The number of rows updated.</returns>
     Task<int> UpdateWhereAsync(

@@ -1,6 +1,7 @@
 using System.Linq.Expressions;
 using global::Dapper;
 using SqlKata;
+using Themia.Framework.Core.Abstractions.Entities;
 using Themia.Framework.Core.Abstractions.Tenancy;
 using Themia.Framework.Data.Abstractions.Filtering;
 using Themia.Framework.Data.Abstractions.Repositories;
@@ -51,6 +52,12 @@ internal sealed class DapperRepository<T, TKey>(
         set(setters);
         if (setters.Values.Count == 0)
             throw new InvalidOperationException("UpdateWhereAsync requires at least one Set(...) call.");
+
+        // A versioned entity's set-based write also moves the counter, so a stale full-row Update loaded before
+        // this write conflicts instead of overwriting it. The write keeps its own predicate and does not check it.
+        if (typeof(IVersionedEntity).IsAssignableFrom(typeof(T))
+            && Map.Columns.TryGetValue(nameof(IVersionedEntity.ConcurrencyVersion), out var versionColumn))
+            setters.Values[versionColumn] = VersionedSql.Increment(versionColumn);
 
         var sql = Compiler.Compile(query.AsUpdate(setters.Values));
         var conn = await Connection.GetOpenConnectionAsync(cancellationToken);

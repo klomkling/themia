@@ -7,7 +7,7 @@ namespace Themia.Modules.Identity.Abstractions.Entities;
 /// A user account. Tenant-scoped when <see cref="ITenantEntity.TenantId"/> is set; a platform
 /// (cross-tenant) super-admin when it is <see langword="null"/>.
 /// </summary>
-public sealed class User : SoftDeletableEntity<Guid>, ITenantEntity
+public sealed class User : SoftDeletableEntity<Guid>, ITenantEntity, IVersionedEntity
 {
     /// <inheritdoc />
     public TenantId? TenantId { get; set; }
@@ -68,6 +68,12 @@ public sealed class User : SoftDeletableEntity<Guid>, ITenantEntity
 
     /// <summary>Whether two-factor authentication is enabled (the 0.5.0 hook; TOTP arrives later).</summary>
     public bool TwoFactorEnabled { get; set; }
+
+    /// <summary>
+    /// Optimistic-concurrency counter, managed by the data layer. A stale save (loaded before an erasure, a
+    /// stamp rotation or a lockout) fails with <c>ConcurrencyException</c> instead of overwriting the newer row.
+    /// </summary>
+    public long ConcurrencyVersion { get; set; }
 
     /// <summary>Assigns the identifier for a new (transient) user.</summary>
     /// <param name="id">A client-generated identifier.</param>

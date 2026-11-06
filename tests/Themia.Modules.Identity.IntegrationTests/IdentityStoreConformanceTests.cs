@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Time.Testing;
 using Themia.Framework.Core.Abstractions.Tenancy;
 using Themia.Framework.Data.Abstractions.Auditing;
+using Themia.Framework.Data.Abstractions.Exceptions;
 using Themia.Framework.Data.Abstractions.Repositories;
 using Themia.Framework.Data.Abstractions.UnitOfWork;
 using Themia.Modules.Identity.Abstractions;
@@ -1816,6 +1817,124 @@ public abstract class IdentityStoreConformanceTests
         // Swapped from the current stamp (not forced): the session opened after the reset follows, the one the reset ended stays ended.
         Assert.Equal(RefreshOutcome.Success, (await check.RefreshTokens.ValidateAndRotateAsync(afterReset.RawToken)).Outcome);
         Assert.Equal(RefreshOutcome.Invalid, (await check.RefreshTokens.ValidateAndRotateAsync(stale.RawToken)).Outcome);
+    }
+
+    private async Task<Guid> SeedUserAsync(string name)
+    {
+        await using var setup = NewScope(new TenantId("acme"));
+        return (await setup.Users.CreateAsync(name, "pw")).UserId!.Value;
+    }
+
+    [Fact] // the residual named in #415: a mutator loaded before an erasure must not restore PII onto the tombstone
+    public async Task A_stale_save_after_an_erasure_conflicts_and_the_tombstone_stays_clean()
+    {
+        await ResetAsync();
+        var user = await SeedUserAsync("stale-erased");
+        await using var stale = NewScope(new TenantId("acme"));
+        var loaded = (await stale.UserRepo.GetByIdAsync(user))!;
+
+        await using (var eraser = NewScope(new TenantId("acme")))
+        {
+            Assert.Equal(AnonymiseOutcome.Anonymised, (await eraser.Anonymiser.AnonymiseAsync(user)).Outcome);
+        }
+
+        loaded.Email = "back@example.com";
+        loaded.PasswordHash = "old-hash";
+        loaded.IsActive = true;
+        stale.UserRepo.Update(loaded);
+        await Assert.ThrowsAsync<ConcurrencyException>(() => stale.UnitOfWork.SaveChangesAsync());
+
+        await using var check = NewScope(new TenantId("acme"));
+        var row = (await check.UserRepo.GetByIdAsync(user))!;
+        Assert.Equal($"anonymised-{user:N}", row.UserName);
+        Assert.Null(row.Email);
+        Assert.Null(row.PasswordHash);
+        Assert.False(row.IsActive);
+    }
+
+    [Fact] // stamp revival: a stale full-row save after a bulk stamp rotation must not write the old stamp back
+    public async Task A_stale_save_after_a_stamp_rotation_conflicts_and_the_new_stamp_stays()
+    {
+        await ResetAsync();
+        var user = await SeedUserAsync("stale-stamp");
+        await using var stale = NewScope(new TenantId("acme"));
+        var loaded = (await stale.UserRepo.GetByIdAsync(user))!;
+        var oldStamp = loaded.SecurityStamp;
+
+        await using (var admin = NewScope(new TenantId("acme")))
+        {
+            await Themia.Modules.Identity.Services.RefreshStampBinding.RotateAndRebindAsync(
+                admin.UserRepo, admin.RefreshRows, new Dictionary<Guid, string> { [user] = oldStamp }, "rotated-stamp", CancellationToken.None);
+        }
+
+        loaded.PhoneNumber = "+66811112222";
+        stale.UserRepo.Update(loaded);
+        await Assert.ThrowsAsync<ConcurrencyException>(() => stale.UnitOfWork.SaveChangesAsync());
+
+        await using var check = NewScope(new TenantId("acme"));
+        Assert.Equal("rotated-stamp", (await check.UserRepo.GetByIdAsync(user))!.SecurityStamp);
+    }
+
+    [Fact] // lock lifted: a stale save after the lockout CAS must not write lockout_end = NULL back
+    public async Task A_stale_save_after_a_lockout_conflicts_and_the_lock_stays()
+    {
+        await ResetAsync();
+        var user = await SeedUserAsync("stale-lock");
+        await using var stale = NewScope(new TenantId("acme"));
+        var loaded = (await stale.UserRepo.GetByIdAsync(user))!;
+
+        var lockedUntil = DateTimeOffset.UtcNow.AddHours(1);
+        await using (var attacker = NewScope(new TenantId("acme")))
+        {
+            var changed = await attacker.UserRepo.UpdateWhereAsync(
+                new WhereSpec<User>(u => u.Id == user), set => set.Set(u => u.LockoutEnd, (DateTimeOffset?)lockedUntil));
+            Assert.Equal(1, changed);
+        }
+
+        loaded.PhoneNumber = "+66811113333";
+        stale.UserRepo.Update(loaded);
+        await Assert.ThrowsAsync<ConcurrencyException>(() => stale.UnitOfWork.SaveChangesAsync());
+
+        await using var check = NewScope(new TenantId("acme"));
+        Assert.NotNull((await check.UserRepo.GetByIdAsync(user))!.LockoutEnd);
+    }
+
+    [Fact] // the contract documented on IVersionedEntity: a bulk write then an Update of an earlier load self-conflicts
+    public async Task A_bulk_write_then_an_update_of_the_same_loaded_user_in_one_scope_conflicts()
+    {
+        await ResetAsync();
+        var user = await SeedUserAsync("self-conflict");
+        await using var s = NewScope(new TenantId("acme"));
+        var loaded = (await s.UserRepo.GetByIdAsync(user))!;
+
+        await s.UserRepo.UpdateWhereAsync(new WhereSpec<User>(u => u.Id == user), set => set.Set(u => u.AccessFailedCount, 3));
+        loaded.PhoneNumber = "+66811114444";
+        s.UserRepo.Update(loaded);
+
+        await Assert.ThrowsAsync<ConcurrencyException>(() => s.UnitOfWork.SaveChangesAsync());
+    }
+
+    [Fact] // the version moves by one per tracked update, starting at 0, and the same instance can be saved repeatedly
+    public async Task Each_tracked_update_moves_the_version_by_one()
+    {
+        await ResetAsync();
+        var user = await SeedUserAsync("version-steps");
+        await using var s = NewScope(new TenantId("acme"));
+        var loaded = (await s.UserRepo.GetByIdAsync(user))!;
+        Assert.Equal(0, loaded.ConcurrencyVersion);
+
+        loaded.PhoneNumber = "+66811115555";
+        s.UserRepo.Update(loaded);
+        await s.UnitOfWork.SaveChangesAsync();
+        Assert.Equal(1, loaded.ConcurrencyVersion);
+
+        loaded.PhoneNumber = "+66811116666";
+        s.UserRepo.Update(loaded);
+        await s.UnitOfWork.SaveChangesAsync();
+        Assert.Equal(2, loaded.ConcurrencyVersion);
+
+        await using var check = NewScope(new TenantId("acme"));
+        Assert.Equal(2, (await check.UserRepo.GetByIdAsync(user))!.ConcurrencyVersion);
     }
 
     [Fact] // without the keep-session call the old session simply ends at its next refresh

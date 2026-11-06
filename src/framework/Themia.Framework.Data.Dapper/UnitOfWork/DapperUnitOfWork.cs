@@ -134,9 +134,23 @@ internal sealed class DapperUnitOfWork(
                 RemoveColumn(values, map, nameof(IAuditableEntity.CreatedAt));
                 RemoveColumn(values, map, nameof(IAuditableEntity.CreatedBy));
                 RemoveColumn(values, map, nameof(ITenantEntity.TenantId));
-                var query = TenantScoped(new Query(map.Table), op.Entity, map).Where(map.KeyColumn, KeyOf(op.Entity, map)).AsUpdate(values);
-                var sql = compiler.Compile(query);
-                return await ExecuteSingleAsync(conn, tx, sql, op, map, "Update", ct);
+                var query = TenantScoped(new Query(map.Table), op.Entity, map).Where(map.KeyColumn, KeyOf(op.Entity, map));
+                var loadedVersion = VersionColumn(op.Entity, map, out var versionColumn)
+                    ? (long)map.GetValue(op.Entity, nameof(IVersionedEntity.ConcurrencyVersion))!
+                    : 0L;
+                if (versionColumn is not null)
+                {
+                    // Optimistic concurrency: only the row still at the loaded version may be overwritten, and the
+                    // same UPDATE moves it to loaded + 1. A stale full-row write matches no row -> ConcurrencyException.
+                    values[versionColumn] = loadedVersion + 1;
+                    query = query.Where(versionColumn, loadedVersion);
+                }
+                var sql = compiler.Compile(query.AsUpdate(values));
+                var affected = await ExecuteSingleAsync(conn, tx, sql, op, map, "Update", ct);
+                // Keep the instance in step so a second Update of it in the same scope does not conflict with itself.
+                if (versionColumn is not null)
+                    map.SetValue(op.Entity, nameof(IVersionedEntity.ConcurrencyVersion), loadedVersion + 1);
+                return affected;
             }
             case PendingKind.Remove:
             {
@@ -149,6 +163,8 @@ internal sealed class DapperUnitOfWork(
                         [map.Column(nameof(ISoftDeletable.DeletedAt))] = now,
                         [map.Column(nameof(ISoftDeletable.DeletedBy))] = userId,
                     };
+                    if (VersionColumn(op.Entity, map, out var removeVersionColumn))
+                        values[removeVersionColumn!] = VersionedSql.Increment(removeVersionColumn!);
                     query = TenantScoped(new Query(map.Table), op.Entity, map).Where(map.KeyColumn, KeyOf(op.Entity, map)).AsUpdate(values);
                 }
                 else
@@ -174,6 +190,13 @@ internal sealed class DapperUnitOfWork(
                 $"{operation} of '{map.Table}' (key '{KeyOf(op.Entity, map)}') affected no rows: the row does not exist, " +
                 "was concurrently deleted, or is outside the current tenant scope.");
         return affected;
+    }
+
+    // True when the entity opts into IVersionedEntity and its mapping carries the counter column.
+    private static bool VersionColumn(object entity, EntityMapping map, out string? column)
+    {
+        column = entity is IVersionedEntity && map.Columns.TryGetValue(nameof(IVersionedEntity.ConcurrencyVersion), out var c) ? c : null;
+        return column is not null;
     }
 
     private static void RemoveColumn(Dictionary<string, object?> values, EntityMapping map, string property)

@@ -20,6 +20,12 @@ public enum UserMutationOutcome
 
     /// <summary>An <see cref="IUserLifecycleHooks"/> implementation refused it. See the reason.</summary>
     Refused,
+
+    /// <summary>
+    /// The user changed after it was loaded (erased, locked, re-stamped or edited by another request), so
+    /// nothing was written. Reload and decide again; the change is not retried for you.
+    /// </summary>
+    Conflict,
 }
 
 /// <summary>The outcome of a mutation on <see cref="IUserService"/>.</summary>
@@ -59,6 +65,9 @@ public readonly record struct UserMutationResult
 
     /// <summary>Another user already holds the value.</summary>
     public static UserMutationResult Duplicate() => new(UserMutationOutcome.Duplicate, null);
+
+    /// <summary>The user changed after it was loaded; nothing was written.</summary>
+    public static UserMutationResult Conflict() => new(UserMutationOutcome.Conflict, null);
 
     /// <summary>A hook refused the change.</summary>
     /// <param name="reason">What to tell whoever attempted it.</param>

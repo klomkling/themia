@@ -20,6 +20,14 @@ with the *why* and concrete upgrade steps.
 
 **How to upgrade:** replace an exact match (`mutation == UserMutation.Anonymised`, or a `switch` on the value) with `mutation.HasFlag(UserMutation.Anonymised)`, and test the other flags separately. A handler that mails the user on `Password` should skip a mutation that also has `Anonymised`: the address is already cleared.
 
+### Themia.Modules.Identity: `users.concurrency_version`, `UserMutationOutcome.Conflict`
+
+Run the new migration `202611060001` (`ALTER TABLE identity.users ADD concurrency_version bigint NOT NULL DEFAULT 0`). It is metadata-only on PostgreSQL 11+; on SQL Server it is online on Enterprise and a size-of-data update under a schema lock on Standard, so run it in a quiet window on a large `identity.users`. Existing rows start at 0; nothing to backfill.
+
+Add a `Conflict` arm to every `switch` on `UserMutationOutcome` (the build breaks where the switch is exhaustive, by design): it means the user changed after it was loaded, nothing was written, and the caller should reload and decide again. Typically map it to HTTP 409.
+
+Code that loads a `User` and later calls `Update` now throws `ConcurrencyException` if the row was written in between, and also if a set-based `UpdateWhereAsync` touched it earlier in the same scope. Reload the user after a bulk write. Anything that writes `identity.users` with raw SQL should add `concurrency_version = concurrency_version + 1`, or stale saves will not be detected.
+
 ## 0.54.0
 
 ### Themia.ETax: `TaxDocumentSnapshot.Form`, `ITaxDocumentNumberSource.NextNumberForFormAsync`

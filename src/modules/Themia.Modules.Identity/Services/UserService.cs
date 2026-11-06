@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using Themia.Framework.Core.Abstractions.Tenancy;
+using Themia.Framework.Data.Abstractions.Exceptions;
 using Themia.Framework.Data.Abstractions.Filtering;
 using Themia.Framework.Data.Abstractions.Repositories;
 using Themia.Framework.Data.Abstractions.UnitOfWork;
@@ -130,6 +131,24 @@ public sealed class UserService : IUserService
             new LiveUserTokensOfPurposeSpec(userId, TokenPurpose.PasswordReset, now),
             set => set.Set(t => t.ConsumedAt, now),
             cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Runs a save and reports whether it landed. A <see cref="ConcurrencyException"/> means the user row changed
+    /// after it was loaded (an erasure, a stamp rotation, a lockout, another mutator), so the caller gets
+    /// <see cref="UserMutationOutcome.Conflict"/> and nothing was written; retrying means reloading the user.
+    /// </summary>
+    private static async Task<bool> TrySaveAsync(Func<Task> save)
+    {
+        try
+        {
+            await save().ConfigureAwait(false);
+            return true;
+        }
+        catch (ConcurrencyException)
+        {
+            return false;
+        }
     }
 
     /// <summary>
@@ -360,7 +379,11 @@ public sealed class UserService : IUserService
         user.EmailConfirmed = false;
 
         users.Update(user);
-        await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        if (!await TrySaveAsync(() => unitOfWork.SaveChangesAsync(cancellationToken)).ConfigureAwait(false))
+        {
+            return UserMutationResult.Conflict();
+        }
+
         await NotifyMutatedAsync(user, UserMutation.Email, cancellationToken).ConfigureAwait(false);
         return UserMutationResult.Success();
     }
@@ -383,7 +406,11 @@ public sealed class UserService : IUserService
 
         user.EmailConfirmed = true;
         users.Update(user);
-        await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        if (!await TrySaveAsync(() => unitOfWork.SaveChangesAsync(cancellationToken)).ConfigureAwait(false))
+        {
+            return UserMutationResult.Conflict();
+        }
+
         await NotifyMutatedAsync(user, UserMutation.EmailConfirmation, cancellationToken).ConfigureAwait(false);
         return UserMutationResult.Success();
     }
@@ -435,7 +462,11 @@ public sealed class UserService : IUserService
         user.PhoneNumberConfirmed = false;
 
         users.Update(user);
-        await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        if (!await TrySaveAsync(() => unitOfWork.SaveChangesAsync(cancellationToken)).ConfigureAwait(false))
+        {
+            return UserMutationResult.Conflict();
+        }
+
         await NotifyMutatedAsync(user, UserMutation.Phone, cancellationToken).ConfigureAwait(false);
         return UserMutationResult.Success();
     }
@@ -458,7 +489,11 @@ public sealed class UserService : IUserService
 
         user.PhoneNumberConfirmed = true;
         users.Update(user);
-        await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        if (!await TrySaveAsync(() => unitOfWork.SaveChangesAsync(cancellationToken)).ConfigureAwait(false))
+        {
+            return UserMutationResult.Conflict();
+        }
+
         await NotifyMutatedAsync(user, UserMutation.PhoneConfirmation, cancellationToken).ConfigureAwait(false);
         return UserMutationResult.Success();
     }
@@ -488,7 +523,11 @@ public sealed class UserService : IUserService
         user.AccessFailedCount = 0;
         user.LockoutEnd = null;
         users.Update(user);
-        await IdentityScope.SaveScopedAsync(unitOfWork, filterScope, user.TenantId is null, cancellationToken).ConfigureAwait(false);
+        if (!await TrySaveAsync(() => IdentityScope.SaveScopedAsync(unitOfWork, filterScope, user.TenantId is null, cancellationToken)).ConfigureAwait(false))
+        {
+            return UserMutationResult.Conflict();
+        }
+
         SecurityStampCache.Evict(stampCache, [user.Id]);
         await NotifyMutatedAsync(user, UserMutation.Password, cancellationToken).ConfigureAwait(false);
         return UserMutationResult.Success();
@@ -676,7 +715,11 @@ public sealed class UserService : IUserService
         user.IsActive = isActive;
         user.SecurityStamp = SecurityStampCache.NewStamp();
         users.Update(user);
-        await IdentityScope.SaveScopedAsync(unitOfWork, filterScope, user.TenantId is null, cancellationToken).ConfigureAwait(false);
+        if (!await TrySaveAsync(() => IdentityScope.SaveScopedAsync(unitOfWork, filterScope, user.TenantId is null, cancellationToken)).ConfigureAwait(false))
+        {
+            return UserMutationResult.Conflict();
+        }
+
         SecurityStampCache.Evict(stampCache, [user.Id]);
         await NotifyMutatedAsync(user, UserMutation.Active, cancellationToken).ConfigureAwait(false);
         return UserMutationResult.Success();
@@ -699,7 +742,11 @@ public sealed class UserService : IUserService
         }
 
         users.Remove(user);
-        await IdentityScope.SaveScopedAsync(unitOfWork, filterScope, user.TenantId is null, cancellationToken).ConfigureAwait(false);
+        if (!await TrySaveAsync(() => IdentityScope.SaveScopedAsync(unitOfWork, filterScope, user.TenantId is null, cancellationToken)).ConfigureAwait(false))
+        {
+            return UserMutationResult.Conflict();
+        }
+
         SecurityStampCache.Evict(stampCache, [user.Id]);
         await NotifyMutatedAsync(user, UserMutation.Deleted, cancellationToken).ConfigureAwait(false);
         return UserMutationResult.Success();

@@ -74,20 +74,31 @@ public sealed class IdentityAnonymiser : IIdentityAnonymiser
         this.stampCache = stampCache;
     }
 
+    /// <summary>
+    /// Passes after the first that a lost race may trigger. Every login attempt on the user bumps its concurrency
+    /// version, so an erasure of an account under a guess burst can lose more than once; each pass reloads and the
+    /// tombstone check makes a re-run idempotent. Past this budget the contention is not a race any more and surfaces.
+    /// </summary>
+    private const int MaxRetries = 4;
+
     /// <inheritdoc />
     public async Task<AnonymiseResult> AnonymiseAsync(Guid userId, CancellationToken cancellationToken = default)
     {
-        try
+        // The veto hook answers on the first pass only; a re-run does not ask again.
+        var askHook = true;
+        for (var attempt = 0; ; attempt++)
         {
-            return await RunAsync(userId, askHook: true, cancellationToken).ConfigureAwait(false);
-        }
-        catch (ConcurrencyException)
-        {
-            // Lost a race with a concurrent erasure of the same user: it deleted rows this call had loaded. The
-            // failed save rolled back and cleared the tracker, so one re-run sees the tombstone and finishes
-            // as AlreadyAnonymised. A second loss is not a race any more and surfaces. The veto hook already answered
-            // on the first pass, so the re-run does not ask again.
-            return await RunAsync(userId, askHook: false, cancellationToken).ConfigureAwait(false);
+            try
+            {
+                return await RunAsync(userId, askHook, cancellationToken).ConfigureAwait(false);
+            }
+            catch (ConcurrencyException) when (attempt < MaxRetries)
+            {
+                // Lost a race: a concurrent erasure deleted rows this pass had loaded, or a login, stamp rotation or
+                // lockout moved the user's version. The failed save rolled back and cleared the tracker, so the next
+                // pass reloads, sees the current row (or the tombstone, finishing as AlreadyAnonymised).
+                askHook = false;
+            }
         }
     }
 

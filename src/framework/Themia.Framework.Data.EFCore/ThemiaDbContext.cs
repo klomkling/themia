@@ -153,6 +153,7 @@ public abstract class ThemiaDbContext : DbContext
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {
         UpdateAuditableEntities();
+        BumpConcurrencyVersions();
         return base.SaveChanges(acceptAllChangesOnSuccess);
     }
 
@@ -160,6 +161,7 @@ public abstract class ThemiaDbContext : DbContext
     public override async Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
     {
         UpdateAuditableEntities();
+        BumpConcurrencyVersions();
         return await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
     }
 
@@ -203,6 +205,27 @@ public abstract class ThemiaDbContext : DbContext
     {
         var entity = await base.FindAsync<TEntity>(keyValues, cancellationToken);
         return ValidateTenantAccess(entity);
+    }
+
+    /// <summary>
+    /// Moves every modified <see cref="IVersionedEntity"/> to <c>original + 1</c>. EF's UPDATE then carries
+    /// <c>WHERE concurrency_version = original</c> (the token), so a stale save fails with
+    /// <see cref="DbUpdateConcurrencyException"/> and the bump lands in the same statement. Bumps from the
+    /// ORIGINAL value, never the current one: a detached entity re-attached via <c>Update</c> keeps the version it
+    /// was loaded with, and a second save of the same instance starts from the value EF accepted after the first.
+    /// </summary>
+    private void BumpConcurrencyVersions()
+    {
+        foreach (var entry in ChangeTracker.Entries<IVersionedEntity>())
+        {
+            if (entry.State is not EntityState.Modified)
+            {
+                continue;
+            }
+
+            var property = entry.Property(nameof(IVersionedEntity.ConcurrencyVersion));
+            property.CurrentValue = (long)property.OriginalValue! + 1;
+        }
     }
 
     /// <summary>
@@ -460,6 +483,7 @@ public abstract class ThemiaDbContext : DbContext
             (nameof(ISoftDeletable.RestoredBy), "restored_by"),
         ]),
         (typeof(IConcurrencyAware), [(nameof(IConcurrencyAware.RowVersion), "row_version")]),
+        (typeof(IVersionedEntity), [(nameof(IVersionedEntity.ConcurrencyVersion), "concurrency_version")]),
     ];
 
     private static void ApplyFrameworkColumnNames(ModelBuilder modelBuilder)
@@ -656,6 +680,14 @@ public abstract class ThemiaDbContext : DbContext
     /// </remarks>
     private static void ApplyConcurrencyTokens(ModelBuilder modelBuilder, bool isNpgsql)
     {
+        // Portable app-incremented counter (all engines, EF and Dapper alike): a plain concurrency token,
+        // bumped in SaveChanges by BumpConcurrencyVersions.
+        foreach (var versioned in modelBuilder.Model.GetEntityTypes()
+                     .Where(t => typeof(IVersionedEntity).IsAssignableFrom(t.ClrType) && !t.IsOwned() && !t.HasSharedClrType))
+        {
+            modelBuilder.Entity(versioned.ClrType).Property(nameof(IVersionedEntity.ConcurrencyVersion)).IsConcurrencyToken();
+        }
+
         foreach (var entityType in modelBuilder.Model.GetEntityTypes())
         {
             if (!typeof(IConcurrencyAware).IsAssignableFrom(entityType.ClrType))
