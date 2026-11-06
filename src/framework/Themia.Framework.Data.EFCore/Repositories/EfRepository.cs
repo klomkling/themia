@@ -1,6 +1,7 @@
 using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Query;
+using Themia.Framework.Core.Abstractions.Entities;
 using Themia.Framework.Core.Abstractions.Tenancy;
 using Themia.Framework.Data.Abstractions.Filtering;
 using Themia.Framework.Data.Abstractions.Repositories;
@@ -56,10 +57,17 @@ public sealed class EfRepository<T, TKey>(ThemiaDbContext context, IDataFilterSc
         // Build the WHERE from the normal read path (criteria + tenant global query filter, with
         // WithoutTenantFilter honoured), then replay the collected setters onto EF's UpdateSettersBuilder.
         // The tenant predicate is thus part of the emitted UPDATE by construction.
+        var bumpVersion = collector.BumpVersion ? VersionBump : null;
         var affected = await CountQuery(specification).ExecuteUpdateAsync(
-            builder => { foreach (var setter in collector.Setters) setter(builder); },
+            builder =>
+            {
+                foreach (var setter in collector.Setters) setter(builder);
+                bumpVersion?.Invoke(builder);
+            },
             cancellationToken).ConfigureAwait(false);
 
+        // A set-based write to a versioned entity moves its counter (see IVersionedEntity), so a pending Modified
+        // entry for the same row no longer wins "last writer": its SaveChanges now throws ConcurrencyException.
         // ExecuteUpdate writes straight to the database and does NOT touch the change tracker, so any
         // T already tracked in this scope still holds its pre-update column values. Detach ONLY the
         // Unchanged entries: a later read in the same scope then re-queries the DB and observes the bulk
@@ -73,6 +81,24 @@ public sealed class EfRepository<T, TKey>(ThemiaDbContext context, IDataFilterSc
         return affected;
     }
 
+    // For an IVersionedEntity: SetProperty(x => x.ConcurrencyVersion, x => x.ConcurrencyVersion + 1), built once
+    // per closed type because the property is not reachable through an interface cast in an EF setter expression.
+    private static readonly Action<UpdateSettersBuilder<T>>? VersionBump = BuildVersionBump();
+
+    private static Action<UpdateSettersBuilder<T>>? BuildVersionBump()
+    {
+        if (!typeof(IVersionedEntity).IsAssignableFrom(typeof(T)))
+        {
+            return null;
+        }
+
+        var parameter = Expression.Parameter(typeof(T), "x");
+        var member = Expression.Property(parameter, nameof(IVersionedEntity.ConcurrencyVersion));
+        var selector = Expression.Lambda<Func<T, long>>(member, parameter);
+        var next = Expression.Lambda<Func<T, long>>(Expression.Add(member, Expression.Constant(1L)), parameter);
+        return builder => builder.SetProperty(selector, next);
+    }
+
     // Collects the caller's setters in a single pass (so the caller's lambda runs exactly once). Each Set
     // validates the expression through the shared helper — a non-member-access setter fails with the same
     // uniform ArgumentException as the Dapper/fake peers — then captures a SetProperty(property, value) call
@@ -81,6 +107,14 @@ public sealed class EfRepository<T, TKey>(ThemiaDbContext context, IDataFilterSc
     private sealed class EfBulkUpdateSetters : IBulkUpdateSetters<T>
     {
         public List<Action<UpdateSettersBuilder<T>>> Setters { get; } = [];
+
+        public bool BumpVersion { get; private set; } = true;
+
+        public IBulkUpdateSetters<T> WithoutVersionBump()
+        {
+            BumpVersion = false;
+            return this;
+        }
 
         public IBulkUpdateSetters<T> Set<TProperty>(Expression<Func<T, TProperty>> property, TProperty value)
         {

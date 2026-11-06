@@ -711,3 +711,7 @@ Themia.Modules.Identity.Abstractions.UserMutation.Anonymised = 512 -> Themia.Mod
 Themia.Modules.Identity.Abstractions.Entities.RefreshToken.SecurityStamp.get -> string?
 Themia.Modules.Identity.Abstractions.Entities.RefreshToken.SecurityStamp.set -> void
 Themia.Modules.Identity.Abstractions.IOtpLoginFlow.VerifyAsync(System.Guid challengeId, string! code, Themia.Modules.Identity.Abstractions.Authentication.SessionRequest! session, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Identity.Abstractions.Authentication.LoginResult>!
+Themia.Modules.Identity.Abstractions.Entities.User.ConcurrencyVersion.get -> long
+Themia.Modules.Identity.Abstractions.Entities.User.ConcurrencyVersion.set -> void
+Themia.Modules.Identity.Abstractions.UserMutationOutcome.Conflict = 4 -> Themia.Modules.Identity.Abstractions.UserMutationOutcome
+static Themia.Modules.Identity.Abstractions.UserMutationResult.Conflict() -> Themia.Modules.Identity.Abstractions.UserMutationResult

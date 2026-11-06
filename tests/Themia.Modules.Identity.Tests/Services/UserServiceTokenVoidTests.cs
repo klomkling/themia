@@ -61,6 +61,20 @@ public class UserServiceTokenVoidTests
     }
 
     [Fact]
+    public async Task A_reset_link_issued_while_the_password_change_loses_a_race_is_voided_by_the_pass_that_lands()
+    {
+        var user = AddUser("alice");
+        UserToken? late = null;
+        uow.ConcurrencyFailures = 1;
+        uow.OnConcurrencyFailure = () => late = AddToken(user, TokenPurpose.PasswordReset);   // issued between the two passes
+
+        Assert.True((await sut.SetPasswordAsync(user.Id, "new-password")).Succeeded);
+
+        Assert.NotNull(late);
+        Assert.NotNull(late!.ConsumedAt);
+    }
+
+    [Fact]
     public async Task A_refused_password_change_voids_nothing()
     {
         var user = AddUser("alice");

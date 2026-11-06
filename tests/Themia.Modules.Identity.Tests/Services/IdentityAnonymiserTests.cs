@@ -342,4 +342,44 @@ public class IdentityAnonymiserTests
 
         Assert.False(stampCache.TryGetValue(SecurityStampCache.Key(u.Id), out _));
     }
+
+    [Fact]
+    public async Task Anonymise_survives_four_lost_races_in_a_row_and_asks_the_hook_on_every_pass()
+    {
+        var u = AddUser(Acme);
+        uow.ConcurrencyFailures = 4;
+
+        var result = await Sut(Acme).AnonymiseAsync(u.Id);
+
+        Assert.Equal(AnonymiseOutcome.Anonymised, result.Outcome);
+        Assert.Equal($"anonymised-{u.Id:N}", Assert.Single(users).UserName);
+        Assert.Equal(5, hooks.Asked.Count(a => a == nameof(IUserLifecycleHooks.OnBeforeAnonymiseAsync)));
+    }
+
+    [Fact]
+    public async Task Anonymise_honours_a_veto_that_appears_between_a_lost_race_and_its_retry()
+    {
+        // A legal hold placed while the first pass was losing its race must stop the retry: the veto is asked on
+        // every pass, not once.
+        var u = AddUser(Acme);
+        uow.ConcurrencyFailures = 1;
+        uow.OnConcurrencyFailure = () => hooks.RefuseAnonymise = "legal hold";
+
+        var result = await Sut(Acme).AnonymiseAsync(u.Id);
+
+        Assert.Equal(AnonymiseOutcome.Refused, result.Outcome);
+        Assert.Equal(u.UserName, Assert.Single(users).UserName);
+    }
+
+    [Fact]
+    public async Task Anonymise_surfaces_the_conflict_once_the_retry_budget_is_spent()
+    {
+        var u = AddUser(Acme);
+        uow.ConcurrencyFailures = 5;
+
+        await Assert.ThrowsAsync<Themia.Framework.Data.Abstractions.Exceptions.ConcurrencyException>(
+            () => Sut(Acme).AnonymiseAsync(u.Id));
+
+        Assert.Equal("alice", Assert.Single(users).UserName);
+    }
 }

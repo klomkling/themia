@@ -9,3 +9,6 @@ static Themia.Framework.Core.Abstractions.Tenancy.TenantId.From(System.Guid valu
 static Themia.Framework.Core.Abstractions.Tenancy.TenantId.TryFrom(string? value, out Themia.Framework.Core.Abstractions.Tenancy.TenantId tenantId) -> bool
 static Themia.Framework.Core.Abstractions.Tenancy.TenantId.From(int value) -> Themia.Framework.Core.Abstractions.Tenancy.TenantId
 static Themia.Framework.Core.Abstractions.Tenancy.TenantId.From(long value) -> Themia.Framework.Core.Abstractions.Tenancy.TenantId
+Themia.Framework.Core.Abstractions.Entities.IVersionedEntity
+Themia.Framework.Core.Abstractions.Entities.IVersionedEntity.ConcurrencyVersion.get -> long
+Themia.Framework.Core.Abstractions.Entities.IVersionedEntity.ConcurrencyVersion.set -> void

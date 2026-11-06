@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using Themia.Framework.Core.Abstractions.Tenancy;
+using Themia.Framework.Data.Abstractions.Exceptions;
 using Themia.Framework.Data.Abstractions.Filtering;
 using Themia.Framework.Data.Abstractions.Repositories;
 using Themia.Framework.Data.Abstractions.UnitOfWork;
@@ -117,7 +118,10 @@ public sealed class UserService : IUserService
     }
 
     /// <summary>Kills every live password-reset token of the user. It runs before the change is saved, so a failure
-    /// leaves the old value and no live link rather than a new value with an old link still redeemable.</summary>
+    /// leaves the old value and no live link rather than a new value with an old link still redeemable. The void is
+    /// its own statement, not part of the save: if the save then loses a race
+    /// (<see cref="UserMutationOutcome.Conflict"/>), the user row is unchanged but the reset links are already spent
+    /// and the user must request a new one.</summary>
     private async Task VoidResetTokensAsync(Guid userId, CancellationToken cancellationToken)
     {
         if (tokens is null)
@@ -130,6 +134,26 @@ public sealed class UserService : IUserService
             new LiveUserTokensOfPurposeSpec(userId, TokenPurpose.PasswordReset, now),
             set => set.Set(t => t.ConsumedAt, now),
             cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Runs a save and reports whether it landed. A <see cref="ConcurrencyException"/> means the user row changed
+    /// after it was loaded (an erasure, a stamp rotation, a lockout, another mutator), so the caller gets
+    /// <see cref="UserMutationOutcome.Conflict"/> and the user row was not written; retrying means reloading the user.
+    /// A password, email or phone change has already voided the user's reset links by then (see
+    /// <c>VoidResetTokensAsync</c>), so the retry must also issue a new link if one is needed.
+    /// </summary>
+    private static async Task<bool> TrySaveAsync(Func<Task> save)
+    {
+        try
+        {
+            await save().ConfigureAwait(false);
+            return true;
+        }
+        catch (ConcurrencyException)
+        {
+            return false;
+        }
     }
 
     /// <summary>
@@ -360,7 +384,11 @@ public sealed class UserService : IUserService
         user.EmailConfirmed = false;
 
         users.Update(user);
-        await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        if (!await TrySaveAsync(() => unitOfWork.SaveChangesAsync(cancellationToken)).ConfigureAwait(false))
+        {
+            return UserMutationResult.Conflict();
+        }
+
         await NotifyMutatedAsync(user, UserMutation.Email, cancellationToken).ConfigureAwait(false);
         return UserMutationResult.Success();
     }
@@ -383,7 +411,11 @@ public sealed class UserService : IUserService
 
         user.EmailConfirmed = true;
         users.Update(user);
-        await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        if (!await TrySaveAsync(() => unitOfWork.SaveChangesAsync(cancellationToken)).ConfigureAwait(false))
+        {
+            return UserMutationResult.Conflict();
+        }
+
         await NotifyMutatedAsync(user, UserMutation.EmailConfirmation, cancellationToken).ConfigureAwait(false);
         return UserMutationResult.Success();
     }
@@ -435,7 +467,11 @@ public sealed class UserService : IUserService
         user.PhoneNumberConfirmed = false;
 
         users.Update(user);
-        await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        if (!await TrySaveAsync(() => unitOfWork.SaveChangesAsync(cancellationToken)).ConfigureAwait(false))
+        {
+            return UserMutationResult.Conflict();
+        }
+
         await NotifyMutatedAsync(user, UserMutation.Phone, cancellationToken).ConfigureAwait(false);
         return UserMutationResult.Success();
     }
@@ -458,15 +494,25 @@ public sealed class UserService : IUserService
 
         user.PhoneNumberConfirmed = true;
         users.Update(user);
-        await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        if (!await TrySaveAsync(() => unitOfWork.SaveChangesAsync(cancellationToken)).ConfigureAwait(false))
+        {
+            return UserMutationResult.Conflict();
+        }
+
         await NotifyMutatedAsync(user, UserMutation.PhoneConfirmation, cancellationToken).ConfigureAwait(false);
         return UserMutationResult.Success();
     }
 
     /// <inheritdoc />
-    public async Task<UserMutationResult> SetPasswordAsync(Guid userId, string password, CancellationToken cancellationToken = default)
+    public Task<UserMutationResult> SetPasswordAsync(Guid userId, string password, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(password);
+        var write = new PasswordWrite();
+        return RetryOnConflictAsync(() => SetPasswordPassAsync(userId, password, write, cancellationToken));
+    }
+
+    private async Task<UserMutationResult> SetPasswordPassAsync(Guid userId, string password, PasswordWrite write, CancellationToken cancellationToken)
+    {
         var user = await IdentityScope.ResolveUserAsync(users, userId, cancellationToken).ConfigureAwait(false);
         if (user is null || IdentityAnonymiser.IsTombstone(user))
         {
@@ -480,18 +526,50 @@ public sealed class UserService : IUserService
             return UserMutationResult.Refused(decision.Reason!, decision.Code);
         }
 
+        // Every pass, not once: it is one conditional UPDATE, and a reset link issued between two passes must not
+        // survive the password change that finally lands.
         await VoidResetTokensAsync(user.Id, cancellationToken).ConfigureAwait(false);
-        user.PasswordHash = passwordHasher.Hash(password);
+        user.PasswordHash = write.Hash ??= passwordHasher.Hash(password);
         user.SecurityStamp = SecurityStampCache.NewStamp();
         // A reset proves ownership, so it also lifts a lock: otherwise a victim whose account was locked by someone
         // else's guesses would wait out the full (possibly progressive) lock after recovering.
         user.AccessFailedCount = 0;
         user.LockoutEnd = null;
         users.Update(user);
-        await IdentityScope.SaveScopedAsync(unitOfWork, filterScope, user.TenantId is null, cancellationToken).ConfigureAwait(false);
+        if (!await TrySaveAsync(() => IdentityScope.SaveScopedAsync(unitOfWork, filterScope, user.TenantId is null, cancellationToken)).ConfigureAwait(false))
+        {
+            return UserMutationResult.Conflict();
+        }
+
         SecurityStampCache.Evict(stampCache, [user.Id]);
         await NotifyMutatedAsync(user, UserMutation.Password, cancellationToken).ConfigureAwait(false);
         return UserMutationResult.Success();
+    }
+
+    /// <summary>Reload-and-retry bound for the mutators that must not be starved by a busy row. Each lost round
+    /// means another writer moved the user between the load and the save; the bound only has to outlast a burst.</summary>
+    private const int MaxConflictRetries = 4;
+
+    // Runs a whole mutator pass again from the reload while it answers Conflict, up to MaxConflictRetries times.
+    // Every pass re-reads the user, re-checks the tombstone and re-asks the hook, so a veto or an erasure that lands
+    // between passes is honoured. Only the last pass's Conflict reaches the caller.
+    private static async Task<UserMutationResult> RetryOnConflictAsync(Func<Task<UserMutationResult>> pass)
+    {
+        for (var retry = 0; ; retry++)
+        {
+            var result = await pass().ConfigureAwait(false);
+            if (result.Outcome != UserMutationOutcome.Conflict || retry >= MaxConflictRetries)
+            {
+                return result;
+            }
+        }
+    }
+
+    // What a SetPasswordAsync call computes once and keeps across its passes: the Argon2 hash, which is expensive and
+    // the widest part of the race window.
+    private sealed class PasswordWrite
+    {
+        public string? Hash { get; set; }
     }
 
     /// <summary>Bound on gate retries per guess. Each lost round means another guess was charged, and a lock stops
@@ -603,7 +681,7 @@ public sealed class UserService : IUserService
         var gate = new UserFailureStateGateSpec(user.Id, user.AccessFailedCount, user.LockoutEnd, null);
         var updated = lockEnd is { } end
             ? await users.UpdateWhereAsync(gate, set => set.Set(u => u.AccessFailedCount, storedCount).Set(u => u.LockoutEnd, (DateTimeOffset?)end), cancellationToken).ConfigureAwait(false)
-            : await users.UpdateWhereAsync(gate, set => set.Set(u => u.AccessFailedCount, storedCount), cancellationToken).ConfigureAwait(false);
+            : await users.UpdateWhereAsync(gate, set => set.Set(u => u.AccessFailedCount, storedCount).WithoutVersionBump(), cancellationToken).ConfigureAwait(false);
         if (updated != 1)
         {
             return null;
@@ -619,6 +697,10 @@ public sealed class UserService : IUserService
         return PasswordVerificationResult.Failed;
     }
 
+    // Login bookkeeping (the failure counter below a lock, and a right guess clearing it) does not move the user's
+    // concurrency version: it is gated on its own predicate, and a stream of logins must not keep an admin's
+    // disable, delete or password reset losing its version check. The write that STARTS a lock still moves it, so a
+    // stale full-row save loaded before the lock cannot lift it.
     // A right guess: also passes the gate, so it cannot be answered Success on an account that locked meanwhile. It clears
     // the failure state and, when the cost parameters changed, re-hashes the same password (not a credential event: the
     // stamp stays and the user's other sessions live). The stamp is part of the gate so a re-hash can never restore an
@@ -628,8 +710,8 @@ public sealed class UserService : IUserService
         var gate = new UserFailureStateGateSpec(user.Id, user.AccessFailedCount, user.LockoutEnd, user.SecurityStamp);
         var evict = user.AccessFailedCount != 0 || user.LockoutEnd is not null || rehashed is not null;
         var updated = rehashed is null
-            ? await users.UpdateWhereAsync(gate, set => set.Set(u => u.AccessFailedCount, 0).Set(u => u.LockoutEnd, (DateTimeOffset?)null), cancellationToken).ConfigureAwait(false)
-            : await users.UpdateWhereAsync(gate, set => set.Set(u => u.AccessFailedCount, 0).Set(u => u.LockoutEnd, (DateTimeOffset?)null).Set(u => u.PasswordHash, rehashed), cancellationToken).ConfigureAwait(false);
+            ? await users.UpdateWhereAsync(gate, set => set.Set(u => u.AccessFailedCount, 0).Set(u => u.LockoutEnd, (DateTimeOffset?)null).WithoutVersionBump(), cancellationToken).ConfigureAwait(false)
+            : await users.UpdateWhereAsync(gate, set => set.Set(u => u.AccessFailedCount, 0).Set(u => u.LockoutEnd, (DateTimeOffset?)null).Set(u => u.PasswordHash, rehashed).WithoutVersionBump(), cancellationToken).ConfigureAwait(false);
         if (updated != 1)
         {
             return null;
@@ -658,7 +740,10 @@ public sealed class UserService : IUserService
     }
 
     /// <inheritdoc />
-    public async Task<UserMutationResult> SetActiveAsync(Guid userId, bool isActive, CancellationToken cancellationToken = default)
+    public Task<UserMutationResult> SetActiveAsync(Guid userId, bool isActive, CancellationToken cancellationToken = default)
+        => RetryOnConflictAsync(() => SetActivePassAsync(userId, isActive, cancellationToken));
+
+    private async Task<UserMutationResult> SetActivePassAsync(Guid userId, bool isActive, CancellationToken cancellationToken)
     {
         var user = await IdentityScope.ResolveUserAsync(users, userId, cancellationToken).ConfigureAwait(false);
         if (user is null || IdentityAnonymiser.IsTombstone(user))
@@ -676,14 +761,21 @@ public sealed class UserService : IUserService
         user.IsActive = isActive;
         user.SecurityStamp = SecurityStampCache.NewStamp();
         users.Update(user);
-        await IdentityScope.SaveScopedAsync(unitOfWork, filterScope, user.TenantId is null, cancellationToken).ConfigureAwait(false);
+        if (!await TrySaveAsync(() => IdentityScope.SaveScopedAsync(unitOfWork, filterScope, user.TenantId is null, cancellationToken)).ConfigureAwait(false))
+        {
+            return UserMutationResult.Conflict();
+        }
+
         SecurityStampCache.Evict(stampCache, [user.Id]);
         await NotifyMutatedAsync(user, UserMutation.Active, cancellationToken).ConfigureAwait(false);
         return UserMutationResult.Success();
     }
 
     /// <inheritdoc />
-    public async Task<UserMutationResult> DeleteAsync(Guid userId, CancellationToken cancellationToken = default)
+    public Task<UserMutationResult> DeleteAsync(Guid userId, CancellationToken cancellationToken = default)
+        => RetryOnConflictAsync(() => DeletePassAsync(userId, cancellationToken));
+
+    private async Task<UserMutationResult> DeletePassAsync(Guid userId, CancellationToken cancellationToken)
     {
         var user = await IdentityScope.ResolveUserAsync(users, userId, cancellationToken).ConfigureAwait(false);
         if (user is null)
@@ -699,7 +791,11 @@ public sealed class UserService : IUserService
         }
 
         users.Remove(user);
-        await IdentityScope.SaveScopedAsync(unitOfWork, filterScope, user.TenantId is null, cancellationToken).ConfigureAwait(false);
+        if (!await TrySaveAsync(() => IdentityScope.SaveScopedAsync(unitOfWork, filterScope, user.TenantId is null, cancellationToken)).ConfigureAwait(false))
+        {
+            return UserMutationResult.Conflict();
+        }
+
         SecurityStampCache.Evict(stampCache, [user.Id]);
         await NotifyMutatedAsync(user, UserMutation.Deleted, cancellationToken).ConfigureAwait(false);
         return UserMutationResult.Success();

@@ -74,24 +74,33 @@ public sealed class IdentityAnonymiser : IIdentityAnonymiser
         this.stampCache = stampCache;
     }
 
+    /// <summary>
+    /// Passes after the first that a lost race may trigger. Every login attempt on the user bumps its concurrency
+    /// version, so an erasure of an account under a guess burst can lose more than once; each pass reloads and the
+    /// tombstone check makes a re-run idempotent. Past this budget the contention is not a race any more and surfaces.
+    /// </summary>
+    private const int MaxRetries = 4;
+
     /// <inheritdoc />
     public async Task<AnonymiseResult> AnonymiseAsync(Guid userId, CancellationToken cancellationToken = default)
     {
-        try
+        for (var attempt = 0; ; attempt++)
         {
-            return await RunAsync(userId, askHook: true, cancellationToken).ConfigureAwait(false);
-        }
-        catch (ConcurrencyException)
-        {
-            // Lost a race with a concurrent erasure of the same user: it deleted rows this call had loaded. The
-            // failed save rolled back and cleared the tracker, so one re-run sees the tombstone and finishes
-            // as AlreadyAnonymised. A second loss is not a race any more and surfaces. The veto hook already answered
-            // on the first pass, so the re-run does not ask again.
-            return await RunAsync(userId, askHook: false, cancellationToken).ConfigureAwait(false);
+            try
+            {
+                return await RunAsync(userId, cancellationToken).ConfigureAwait(false);
+            }
+            catch (ConcurrencyException) when (attempt < MaxRetries)
+            {
+                // Lost a race: a concurrent erasure deleted rows this pass had loaded, or a login, stamp rotation or
+                // lockout moved the user's version. The failed save rolled back and cleared the tracker, so the next
+                // pass reloads, sees the current row (or the tombstone, finishing as AlreadyAnonymised). The veto hook is
+                // asked again on every pass: the row it vetoed or allowed is not the row this pass is about to erase.
+            }
         }
     }
 
-    private async Task<AnonymiseResult> RunAsync(Guid userId, bool askHook, CancellationToken cancellationToken)
+    private async Task<AnonymiseResult> RunAsync(Guid userId, CancellationToken cancellationToken)
     {
         var user = await IdentityScope.ResolveUserAsync(users, userId, cancellationToken).ConfigureAwait(false);
         // ResolveUserAsync falls back to a platform row from a tenant scope; erasure is stricter: the user's
@@ -103,7 +112,7 @@ public sealed class IdentityAnonymiser : IIdentityAnonymiser
 
         var tombstone = TombstoneName(user.Id);
         var already = user.UserName == tombstone && user.Email is null && user.PhoneNumber is null && !user.IsActive && user.PasswordHash is null;
-        if (!already && askHook)
+        if (!already)
         {
             var decision = await hooks.OnBeforeAnonymiseAsync(userId, cancellationToken).ConfigureAwait(false);
             if (!decision.IsAllowed)
