@@ -50,6 +50,7 @@ public abstract class IdentityStoreConformanceTests
     protected sealed record Scope(ServiceProvider Provider, AsyncServiceScope Inner) : IAsyncDisposable
     {
         public IUserService Users => Inner.ServiceProvider.GetRequiredService<IUserService>();
+        public IUserPasswordHashService PasswordHashes => Inner.ServiceProvider.GetRequiredService<IUserPasswordHashService>();
         public IRoleService Roles => Inner.ServiceProvider.GetRequiredService<IRoleService>();
         public IRoleLevelService RoleLevels => Inner.ServiceProvider.GetRequiredService<IRoleLevelService>();
         public IUserLevelReader Levels => Inner.ServiceProvider.GetRequiredService<IUserLevelReader>();
@@ -1621,6 +1622,117 @@ public abstract class IdentityStoreConformanceTests
 
         Assert.Equal(TokenConsumeResult.AlreadyConsumed, await s.Tokens.ConsumeAsync(user, TokenPurpose.PasswordReset, sibling));
         Assert.Equal(TokenConsumeResult.AlreadyConsumed, await s.Tokens.ConsumeAsync(user, TokenPurpose.PasswordReset, presented));
+    }
+
+    private const string AppBcryptHash = "$2a$11$abcdefghijklmnopqrstuuABCDEFGHIJKLMNOPQRSTUVWXYZ01234";
+
+    [Fact] // coord #0202: the app's own hash is stored verbatim, and the same write kills that user's live reset links
+    public async Task SetPasswordHash_stores_the_hash_verbatim_and_voids_live_reset_tokens_of_that_user_only()
+    {
+        await ResetAsync();
+        await using var s = NewScope(new TenantId("acme"));
+        Assert.Same(s.Users, s.PasswordHashes);
+        var user = (await s.Users.CreateAsync("mirror-me", "pw", "mirror@x.com")).UserId!.Value;
+        var other = (await s.Users.CreateAsync("mirror-other", "pw", "mirror-other@x.com")).UserId!.Value;
+        var reset = await s.Tokens.GenerateAsync(user, TokenPurpose.PasswordReset);
+        var confirm = await s.Tokens.GenerateAsync(user, TokenPurpose.EmailConfirm);
+        var theirs = await s.Tokens.GenerateAsync(other, TokenPurpose.PasswordReset);
+        var stamp = (await s.Users.FindByIdAsync(user))!.SecurityStamp;
+
+        Assert.True((await s.PasswordHashes.SetPasswordHashAsync(user, AppBcryptHash)).Succeeded);
+
+        var row = (await s.Users.FindByIdAsync(user))!;
+        Assert.Equal(AppBcryptHash, row.PasswordHash);
+        Assert.NotEqual(stamp, row.SecurityStamp);
+        Assert.Equal(TokenConsumeResult.AlreadyConsumed, await s.Tokens.ConsumeAsync(user, TokenPurpose.PasswordReset, reset));
+        Assert.Equal(TokenConsumeResult.Success, await s.Tokens.ConsumeAsync(user, TokenPurpose.EmailConfirm, confirm));
+        Assert.Equal(TokenConsumeResult.Success, await s.Tokens.ConsumeAsync(other, TokenPurpose.PasswordReset, theirs));
+    }
+
+    [Fact] // coord #0202: a null hash clears the password and still kills the reset links
+    public async Task SetPasswordHash_null_clears_the_password_and_voids_live_reset_tokens()
+    {
+        await ResetAsync();
+        await using var s = NewScope(new TenantId("acme"));
+        var user = (await s.Users.CreateAsync("clear-me", "pw", "clear@x.com")).UserId!.Value;
+        var reset = await s.Tokens.GenerateAsync(user, TokenPurpose.PasswordReset);
+
+        Assert.True((await s.PasswordHashes.SetPasswordHashAsync(user, null)).Succeeded);
+
+        Assert.Null((await s.Users.FindByIdAsync(user))!.PasswordHash);
+        Assert.Equal(TokenConsumeResult.AlreadyConsumed, await s.Tokens.ConsumeAsync(user, TokenPurpose.PasswordReset, reset));
+    }
+
+    [Fact] // coord #0202: inside the caller's transaction a rollback undoes the hash AND the void, so a failed sync loses nothing
+    public async Task SetPasswordHash_rolled_back_with_the_callers_transaction_leaves_hash_and_token_untouched()
+    {
+        await ResetAsync();
+        await using var s = NewScope(new TenantId("acme"));
+        var user = (await s.Users.CreateAsync("rollback-me", "pw", "rollback@x.com")).UserId!.Value;
+        var before = (await s.Users.FindByIdAsync(user))!.PasswordHash;
+        var reset = await s.Tokens.GenerateAsync(user, TokenPurpose.PasswordReset);
+
+        await using (var tx = await s.UnitOfWork.BeginTransactionAsync())
+        {
+            Assert.True((await s.PasswordHashes.SetPasswordHashAsync(user, AppBcryptHash)).Succeeded);
+            await tx.RollbackAsync();
+        }
+
+        await using var fresh = NewScope(new TenantId("acme"));
+        Assert.Equal(before, (await fresh.Users.FindByIdAsync(user))!.PasswordHash);
+        Assert.Equal(TokenConsumeResult.Success, await fresh.Tokens.ConsumeAsync(user, TokenPurpose.PasswordReset, reset));
+    }
+
+    [Fact] // coord #0202 plan review: another writer lands between the load and the save, inside the caller's transaction
+    public async Task SetPasswordHash_inside_a_transaction_never_loses_a_concurrent_writers_column()
+    {
+        await ResetAsync();
+        await using var setup = NewScope(new TenantId("acme"));
+        var user = (await setup.Users.CreateAsync("race-me", "pw", "race@x.com")).UserId!.Value;
+        var hooks = new BumpOnceHooks(async () =>
+        {
+            await using var other = NewScope(new TenantId("acme"));
+            await other.Users.SetPhoneNumberAsync(user, "+66812345678");
+        });
+        await using var s = NewScope(new TenantId("acme"), configureServices: services =>
+        {
+            services.RemoveAll<IUserLifecycleHooks>();
+            services.AddSingleton<IUserLifecycleHooks>(hooks);
+        });
+
+        UserMutationResult result;
+        await using (var tx = await s.UnitOfWork.BeginTransactionAsync())
+        {
+            result = await s.PasswordHashes.SetPasswordHashAsync(user, AppBcryptHash);
+            await tx.CommitAsync();
+        }
+
+        Assert.True(hooks.Passes >= 2, $"passes: {hooks.Passes}");   // the first save lost the race
+        Assert.True(result.Succeeded, result.Outcome.ToString());   // one lost round, then the reload lands it
+        await using var fresh = NewScope(new TenantId("acme"));
+        var row = (await fresh.Users.FindByIdAsync(user))!;
+        Assert.NotNull(row.PhoneNumber);   // the other writer's column survived
+        Assert.Equal(AppBcryptHash, row.PasswordHash);
+    }
+
+    // Runs one side effect inside the first before-password hook, i.e. after the pass loaded the user.
+    private sealed class BumpOnceHooks(Func<Task> bump) : IUserLifecycleHooks
+    {
+        private int fired;
+
+        /// <summary>How many passes asked: more than one proves the stale save was retried.</summary>
+        public int Passes { get; private set; }
+
+        public async ValueTask<UserMutationDecision> OnBeforeSetPasswordAsync(Guid userId, CancellationToken cancellationToken = default)
+        {
+            Passes++;
+            if (Interlocked.Exchange(ref fired, 1) == 0)
+            {
+                await bump();
+            }
+
+            return UserMutationDecision.Allow();
+        }
     }
 
     [Fact] // erasure must fire the password mutation (observers void reset/invite links on it) and a late redemption must not revive the row

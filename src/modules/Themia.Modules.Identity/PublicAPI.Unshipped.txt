@@ -117,3 +117,4 @@ Themia.Modules.Identity.Migrations.UserConcurrencyVersionMigration
 Themia.Modules.Identity.Migrations.UserConcurrencyVersionMigration.UserConcurrencyVersionMigration() -> void
 override Themia.Modules.Identity.Migrations.UserConcurrencyVersionMigration.Down() -> void
 override Themia.Modules.Identity.Migrations.UserConcurrencyVersionMigration.Up() -> void
+Themia.Modules.Identity.Services.UserService.SetPasswordHashAsync(System.Guid userId, string? passwordHash, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Identity.Abstractions.UserMutationResult>!
