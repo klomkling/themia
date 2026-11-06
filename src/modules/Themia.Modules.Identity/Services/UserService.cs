@@ -21,12 +21,17 @@ public sealed class UserService : IUserService
     private readonly IdentityModuleOptions options;
     private readonly IDataFilterScope filterScope;
     private readonly IPhoneNumberNormalizer phoneNormalizer;
+    private readonly IRepository<UserToken, Guid>? tokens;
     private readonly IUserLifecycleHooks hooks;
     private readonly IIdentityEventObserver[] observers;
     private readonly ILogger<UserService> logger;
     private readonly IMemoryCache? stampCache;
 
-    /// <summary>Creates the service.</summary>
+    /// <summary>Creates the service without the token repository, so password, email and phone changes leave
+    /// reset tokens alone. Kept with its optional parameters so the shipped signature stays binary compatible;
+    /// RS0027 wants the overload with optional parameters to be the widest, which would mean adding a parameter
+    /// to this shipped constructor.</summary>
+#pragma warning disable RS0027
     public UserService(
         IRepository<User, Guid> users,
         IUnitOfWork unitOfWork,
@@ -39,7 +44,30 @@ public sealed class UserService : IUserService
         IEnumerable<IIdentityEventObserver> observers,
         ILogger<UserService>? logger = null,
         IMemoryCache? stampCache = null)
+        : this(users, unitOfWork, passwordHasher, timeProvider, options, filterScope, phoneNormalizer, hooks, observers,
+              null, logger, stampCache)
     {
+    }
+#pragma warning restore RS0027
+
+    /// <summary>Creates the service. <paramref name="tokens"/> lets a password, email or phone change void the
+    /// user's live password-reset tokens; the constructor without it leaves them alone, so an instance built by hand
+    /// keeps its old behaviour. DI resolves this one.</summary>
+    public UserService(
+        IRepository<User, Guid> users,
+        IUnitOfWork unitOfWork,
+        IPasswordHasher passwordHasher,
+        TimeProvider timeProvider,
+        IdentityModuleOptions options,
+        IDataFilterScope filterScope,
+        IPhoneNumberNormalizer phoneNormalizer,
+        IUserLifecycleHooks hooks,
+        IEnumerable<IIdentityEventObserver> observers,
+        IRepository<UserToken, Guid>? tokens,
+        ILogger<UserService>? logger,
+        IMemoryCache? stampCache)
+    {
+        this.tokens = tokens;
         ArgumentNullException.ThrowIfNull(users);
         ArgumentNullException.ThrowIfNull(unitOfWork);
         ArgumentNullException.ThrowIfNull(passwordHasher);
@@ -88,6 +116,22 @@ public sealed class UserService : IUserService
     {
     }
 
+    /// <summary>Kills every live password-reset token of the user. It runs before the change is saved, so a failure
+    /// leaves the old value and no live link rather than a new value with an old link still redeemable.</summary>
+    private async Task VoidResetTokensAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        if (tokens is null)
+        {
+            return;
+        }
+
+        var now = timeProvider.GetUtcNow();
+        await tokens.UpdateWhereAsync(
+            new LiveUserTokensOfPurposeSpec(userId, TokenPurpose.PasswordReset, now),
+            set => set.Set(t => t.ConsumedAt, now),
+            cancellationToken).ConfigureAwait(false);
+    }
+
     /// <summary>
     /// Announces a committed mutation to the lifecycle hook and the observers, running as the mutated user's
     /// own tenant. The caller's scope is whoever is calling (a platform admin, an anonymous reset or confirm
@@ -99,8 +143,10 @@ public sealed class UserService : IUserService
     {
         using (TenantContextAccessor.BeginScope(user.TenantId))
         {
-            await hooks.OnUserMutatedAsync(user.Id, mutation, cancellationToken).ConfigureAwait(false);
+            // Observers first: they swallow their own failures, while a throwing hook would skip them, and an
+            // observer may be the only thing voiding links that the committed mutation made stale.
             await RaiseAsync((o, ct) => o.OnUserMutatedAsync(user.Id, mutation, ct), cancellationToken).ConfigureAwait(false);
+            await hooks.OnUserMutatedAsync(user.Id, mutation, cancellationToken).ConfigureAwait(false);
         }
     }
 
@@ -278,7 +324,7 @@ public sealed class UserService : IUserService
     public async Task<UserMutationResult> SetEmailAsync(Guid userId, string? email, CancellationToken cancellationToken = default)
     {
         var user = await IdentityScope.ResolveUserAsync(users, userId, cancellationToken).ConfigureAwait(false);
-        if (user is null)
+        if (user is null || IdentityAnonymiser.IsTombstone(user))
         {
             return UserMutationResult.UserNotFound();
         }
@@ -303,6 +349,8 @@ public sealed class UserService : IUserService
             }
         }
 
+        // A reset link was mailed to the old address; the new one has not proven anything yet.
+        await VoidResetTokensAsync(user.Id, cancellationToken).ConfigureAwait(false);
         user.Email = string.IsNullOrWhiteSpace(email) ? null : email.Trim();
         user.NormalizedEmail = normalized;
 
@@ -344,7 +392,7 @@ public sealed class UserService : IUserService
     public async Task<UserMutationResult> SetPhoneNumberAsync(Guid userId, string? phoneNumber, CancellationToken cancellationToken = default)
     {
         var user = await IdentityScope.ResolveUserAsync(users, userId, cancellationToken).ConfigureAwait(false);
-        if (user is null)
+        if (user is null || IdentityAnonymiser.IsTombstone(user))
         {
             return UserMutationResult.UserNotFound();
         }
@@ -377,6 +425,7 @@ public sealed class UserService : IUserService
             }
         }
 
+        await VoidResetTokensAsync(user.Id, cancellationToken).ConfigureAwait(false);
         user.PhoneNumber = string.IsNullOrWhiteSpace(phoneNumber) ? null : phoneNumber.Trim();
         user.NormalizedPhoneNumber = normalized;
 
@@ -419,7 +468,7 @@ public sealed class UserService : IUserService
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(password);
         var user = await IdentityScope.ResolveUserAsync(users, userId, cancellationToken).ConfigureAwait(false);
-        if (user is null)
+        if (user is null || IdentityAnonymiser.IsTombstone(user))
         {
             return UserMutationResult.UserNotFound();
         }
@@ -431,6 +480,7 @@ public sealed class UserService : IUserService
             return UserMutationResult.Refused(decision.Reason!, decision.Code);
         }
 
+        await VoidResetTokensAsync(user.Id, cancellationToken).ConfigureAwait(false);
         user.PasswordHash = passwordHasher.Hash(password);
         user.SecurityStamp = SecurityStampCache.NewStamp();
         // A reset proves ownership, so it also lifts a lock: otherwise a victim whose account was locked by someone
@@ -611,7 +661,7 @@ public sealed class UserService : IUserService
     public async Task<UserMutationResult> SetActiveAsync(Guid userId, bool isActive, CancellationToken cancellationToken = default)
     {
         var user = await IdentityScope.ResolveUserAsync(users, userId, cancellationToken).ConfigureAwait(false);
-        if (user is null)
+        if (user is null || IdentityAnonymiser.IsTombstone(user))
         {
             return UserMutationResult.UserNotFound();
         }

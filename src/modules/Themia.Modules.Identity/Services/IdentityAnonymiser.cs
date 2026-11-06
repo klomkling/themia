@@ -141,7 +141,13 @@ public sealed class IdentityAnonymiser : IIdentityAnonymiser
         return AnonymiseResult.Anonymised();
     }
 
+    private const UserMutation ErasureMutation = UserMutation.Password | UserMutation.Anonymised;
+
     private static string TombstoneName(Guid id) => $"{TombstonePrefix}{id:N}";
+
+    /// <summary>True for a row this service has erased. Other mutators refuse it: a late reset or invite
+    /// redemption must not write a password, address or active flag back onto an erased user.</summary>
+    internal static bool IsTombstone(User user) => user.UserName == TombstoneName(user.Id);
 
     private static void Scrub(User user, string tombstone)
     {
@@ -192,8 +198,10 @@ public sealed class IdentityAnonymiser : IIdentityAnonymiser
     {
         using (TenantContextAccessor.BeginScope(user.TenantId))
         {
-            await hooks.OnUserMutatedAsync(user.Id, UserMutation.Anonymised, cancellationToken).ConfigureAwait(false);
-            await RaiseAsync((o, ct) => o.OnUserMutatedAsync(user.Id, UserMutation.Anonymised, ct), cancellationToken).ConfigureAwait(false);
+            // Observers first (see UserService.NotifyMutatedAsync). Password is raised with Anonymised because
+            // erasure nulls the hash, and observers that void reset/invite links key on the password mutation.
+            await RaiseAsync((o, ct) => o.OnUserMutatedAsync(user.Id, ErasureMutation, ct), cancellationToken).ConfigureAwait(false);
+            await hooks.OnUserMutatedAsync(user.Id, ErasureMutation, cancellationToken).ConfigureAwait(false);
         }
     }
 
