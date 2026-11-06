@@ -9,6 +9,12 @@ namespace Themia.Framework.Data.EFCore.UnitOfWork;
 /// <summary>EF Core unit of work over <see cref="ThemiaDbContext"/>.</summary>
 public sealed class EfUnitOfWork(ThemiaDbContext context, IDataFilterScope filterScope, ISqlExceptionInterpreter sqlExceptionInterpreter) : IUnitOfWork
 {
+    // Versions of versioned entities as they were before the running ExecuteInTransactionAsync touched them. A save
+    // inside it is accepted (the instance moves to original + 1) before the transaction can still roll back, so
+    // the rollback needs the version from before the transaction to put the instance back in step with the row.
+    private readonly Dictionary<object, long> versionsBeforeTransaction = new(ReferenceEqualityComparer.Instance);
+    private bool inTransaction;
+
     /// <summary>
     /// Back-compatible overload matching the original signature. The tenant-filter bypass state is
     /// process-ambient (a static <see cref="DataFilterScope"/> async-local), so a fresh instance observes the
@@ -37,6 +43,7 @@ public sealed class EfUnitOfWork(ThemiaDbContext context, IDataFilterScope filte
             await context.ValidateTenantWritesAsync(cancellationToken);
         }
 
+        RememberVersionsBeforeTransaction();
         try
         {
             return await context.SaveChangesAsync(cancellationToken);
@@ -48,23 +55,13 @@ public sealed class EfUnitOfWork(ThemiaDbContext context, IDataFilterScope filte
             // conflict again, and the next SaveChanges would commit the unrelated half of the failed unit of work
             // or throw the raw DbUpdateConcurrencyException. Detach everything pending; unchanged entities stay
             // readable and the next load of the losers reads the row as it now is.
+            RestoreLoadedVersions();
             foreach (var entry in context.ChangeTracker.Entries().ToList())
             {
-                if (entry.State is not (EntityState.Added or EntityState.Modified or EntityState.Deleted))
+                if (entry.State is EntityState.Added or EntityState.Modified or EntityState.Deleted)
                 {
-                    continue;
+                    entry.State = EntityState.Detached;
                 }
-
-                if (entry is { State: EntityState.Modified, Entity: IVersionedEntity })
-                {
-                    // The save bumped the instance to original + 1 before the UPDATE ran. Put the loaded version
-                    // back: a caller that re-attaches this same instance with Update would otherwise carry
-                    // original + 1, which is exactly the version a winner just wrote, and overwrite it.
-                    var version = entry.Property(nameof(IVersionedEntity.ConcurrencyVersion));
-                    version.CurrentValue = version.OriginalValue;
-                }
-
-                entry.State = EntityState.Detached;
             }
 
             throw new ConcurrencyException(
@@ -73,8 +70,54 @@ public sealed class EfUnitOfWork(ThemiaDbContext context, IDataFilterScope filte
         }
         catch (DbUpdateException ex) when (sqlExceptionInterpreter.IsUniqueConstraintViolation(ex))
         {
+            RestoreLoadedVersions();
             throw new UniqueConstraintException(
                 "A write violated a unique or primary-key constraint: a row with the same key already exists.", ex);
+        }
+        catch
+        {
+            RestoreLoadedVersions();
+            throw;
+        }
+    }
+
+    // Inside ExecuteInTransactionAsync, remember each versioned entity's version before its first save of the
+    // transaction (the first value wins: a second save would record the already bumped one).
+    private void RememberVersionsBeforeTransaction()
+    {
+        if (!inTransaction)
+        {
+            return;
+        }
+
+        foreach (var entry in context.ChangeTracker.Entries<IVersionedEntity>())
+        {
+            if (entry.State is EntityState.Modified)
+            {
+                versionsBeforeTransaction.TryAdd(
+                    entry.Entity, (long)entry.Property(nameof(IVersionedEntity.ConcurrencyVersion)).OriginalValue!);
+            }
+        }
+    }
+
+    // A failed or rolled-back write leaves versioned instances one ahead of their row (the save bumps the instance to
+    // original + 1 before the UPDATE runs). Put the version the row still has back, so a caller that re-attaches the
+    // same instance with Update carries the version it was loaded with and conflicts with a winner instead of
+    // matching the winner's version and overwriting it. An entity saved earlier in the same rolled-back transaction
+    // was already accepted, so its pre-transaction version comes from the record, not from EF's original value.
+    private void RestoreLoadedVersions()
+    {
+        foreach (var entry in context.ChangeTracker.Entries<IVersionedEntity>().ToList())
+        {
+            var version = entry.Property(nameof(IVersionedEntity.ConcurrencyVersion));
+            if (versionsBeforeTransaction.TryGetValue(entry.Entity, out var beforeTransaction))
+            {
+                version.CurrentValue = beforeTransaction;
+            }
+            else if (entry.State is EntityState.Modified)
+            {
+                version.CurrentValue = version.OriginalValue;
+            }
         }
     }
 
@@ -89,6 +132,8 @@ public sealed class EfUnitOfWork(ThemiaDbContext context, IDataFilterScope filte
         await strategy.ExecuteAsync(async () =>
         {
             await using var tx = await context.Database.BeginTransactionAsync(cancellationToken);
+            versionsBeforeTransaction.Clear();
+            inTransaction = true;
             try
             {
                 await work(cancellationToken);
@@ -101,8 +146,14 @@ public sealed class EfUnitOfWork(ThemiaDbContext context, IDataFilterScope filte
                 // database — but EF still tracks them (Added/Modified). Discard that tracker state so a
                 // caller that retries on the same scoped DbContext (e.g. a concurrency-race retry loop)
                 // does not re-attempt the failed writes against a clean transaction.
+                RestoreLoadedVersions();
                 context.ChangeTracker.Clear();
                 throw;
+            }
+            finally
+            {
+                inTransaction = false;
+                versionsBeforeTransaction.Clear();
             }
         });
     }

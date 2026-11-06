@@ -1962,6 +1962,42 @@ public abstract class IdentityStoreConformanceTests
         Assert.Equal("+66811116666", (await check.UserRepo.GetByIdAsync(user))!.PhoneNumber);
     }
 
+    /// <summary>
+    /// A save inside a unit of work is accepted, a later step fails and the transaction rolls back: the row is
+    /// still at the loaded version, so re-saving the held instance after a winner must conflict, not overwrite.
+    /// The EF peers call this from a [Fact]; the Dapper peer is the residual named in the CHANGELOG.
+    /// </summary>
+    protected async Task Re_saving_a_held_instance_after_a_rolled_back_unit_of_work_conflicts_with_the_winner()
+    {
+        await ResetAsync();
+        var user = await SeedUserAsync("rollback-held");
+        await using var s = NewScope(new TenantId("acme"));
+        var held = (await s.UserRepo.GetByIdAsync(user))!;
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => s.UnitOfWork.ExecuteInTransactionAsync(async ct =>
+        {
+            held.PhoneNumber = "+66811118888";
+            s.UserRepo.Update(held);
+            await s.UnitOfWork.SaveChangesAsync(ct);   // accepted: the instance is now one ahead of the row
+            throw new InvalidOperationException("a later step failed");
+        }));
+
+        await using (var winner = NewScope(new TenantId("acme")))
+        {
+            var won = (await winner.UserRepo.GetByIdAsync(user))!;
+            Assert.Null(won.PhoneNumber);   // the rollback left the row as it was loaded
+            won.PhoneNumber = "+66811119999";
+            winner.UserRepo.Update(won);
+            await winner.UnitOfWork.SaveChangesAsync();
+        }
+
+        s.UserRepo.Update(held);
+        await Assert.ThrowsAsync<ConcurrencyException>(() => s.UnitOfWork.SaveChangesAsync());
+
+        await using var check = NewScope(new TenantId("acme"));
+        Assert.Equal("+66811119999", (await check.UserRepo.GetByIdAsync(user))!.PhoneNumber);
+    }
+
     [Fact] // the contract documented on IVersionedEntity: a bulk write then an Update of an earlier load self-conflicts
     public async Task A_bulk_write_then_an_update_of_the_same_loaded_user_in_one_scope_conflicts()
     {

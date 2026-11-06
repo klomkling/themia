@@ -17,6 +17,10 @@ public sealed class EfPostgresIdentityTests(PostgresIdentityFixture fixture)
     protected override string ConnectionString => fixture.ConnectionString;
     protected override Task ResetAsync() => fixture.ResetAsync();
 
+    [Fact] // EF only: the Dapper unit of work keeps its own instance-version residual (see CHANGELOG)
+    public Task A_rolled_back_unit_of_work_does_not_leave_the_held_instance_ahead_of_its_row()
+        => Re_saving_a_held_instance_after_a_rolled_back_unit_of_work_conflicts_with_the_winner();
+
     protected override void RegisterIdentity(IServiceCollection services, Action<IdentityModuleOptions> configure)
         => services.AddThemiaIdentityEFCore(configure);
 
