@@ -1586,6 +1586,42 @@ public abstract class IdentityStoreConformanceTests
         _ = resetToken;
     }
 
+    [Fact] // coord #0198: a password change kills the user's live reset links, through the DI-built IUserService
+    public async Task Password_change_voids_live_reset_tokens_of_that_user_only()
+    {
+        await ResetAsync();
+        await using var s = NewScope(new TenantId("acme"));
+        var user = (await s.Users.CreateAsync("reset-me", "pw", "reset@x.com")).UserId!.Value;
+        var other = (await s.Users.CreateAsync("reset-other", "pw", "other@x.com")).UserId!.Value;
+        var resetA = await s.Tokens.GenerateAsync(user, TokenPurpose.PasswordReset);
+        var resetB = await s.Tokens.GenerateAsync(user, TokenPurpose.PasswordReset);
+        var confirm = await s.Tokens.GenerateAsync(user, TokenPurpose.EmailConfirm);
+        var theirs = await s.Tokens.GenerateAsync(other, TokenPurpose.PasswordReset);
+
+        Assert.True((await s.Users.SetPasswordAsync(user, "new-pw")).Succeeded);
+
+        Assert.Equal(TokenConsumeResult.AlreadyConsumed, await s.Tokens.ConsumeAsync(user, TokenPurpose.PasswordReset, resetA));
+        Assert.Equal(TokenConsumeResult.AlreadyConsumed, await s.Tokens.ConsumeAsync(user, TokenPurpose.PasswordReset, resetB));
+        Assert.Equal(TokenConsumeResult.Success, await s.Tokens.ConsumeAsync(user, TokenPurpose.EmailConfirm, confirm));
+        Assert.Equal(TokenConsumeResult.Success, await s.Tokens.ConsumeAsync(other, TokenPurpose.PasswordReset, theirs));
+    }
+
+    [Fact] // the reset endpoint consumes the presented link, then sets the password: that order must still work
+    public async Task Consume_then_set_password_succeeds_and_kills_the_sibling_link()
+    {
+        await ResetAsync();
+        await using var s = NewScope(new TenantId("acme"));
+        var user = (await s.Users.CreateAsync("reset-flow", "pw", "flow@x.com")).UserId!.Value;
+        var presented = await s.Tokens.GenerateAsync(user, TokenPurpose.PasswordReset);
+        var sibling = await s.Tokens.GenerateAsync(user, TokenPurpose.PasswordReset);
+
+        Assert.Equal(TokenConsumeResult.Success, await s.Tokens.ConsumeAsync(user, TokenPurpose.PasswordReset, presented));
+        Assert.True((await s.Users.SetPasswordAsync(user, "new-pw")).Succeeded);
+
+        Assert.Equal(TokenConsumeResult.AlreadyConsumed, await s.Tokens.ConsumeAsync(user, TokenPurpose.PasswordReset, sibling));
+        Assert.Equal(TokenConsumeResult.AlreadyConsumed, await s.Tokens.ConsumeAsync(user, TokenPurpose.PasswordReset, presented));
+    }
+
     [Fact] // erasure must fire the password mutation (observers void reset/invite links on it) and a late redemption must not revive the row
     public async Task Anonymise_raises_the_password_mutation_and_the_tombstone_refuses_later_writes()
     {

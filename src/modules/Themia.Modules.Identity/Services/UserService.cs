@@ -21,12 +21,17 @@ public sealed class UserService : IUserService
     private readonly IdentityModuleOptions options;
     private readonly IDataFilterScope filterScope;
     private readonly IPhoneNumberNormalizer phoneNormalizer;
+    private readonly IRepository<UserToken, Guid>? tokens;
     private readonly IUserLifecycleHooks hooks;
     private readonly IIdentityEventObserver[] observers;
     private readonly ILogger<UserService> logger;
     private readonly IMemoryCache? stampCache;
 
-    /// <summary>Creates the service.</summary>
+    /// <summary>Creates the service without the token repository, so password, email and phone changes leave
+    /// reset tokens alone. Kept with its optional parameters so the shipped signature stays binary compatible;
+    /// RS0027 wants the overload with optional parameters to be the widest, which would mean adding a parameter
+    /// to this shipped constructor.</summary>
+#pragma warning disable RS0027
     public UserService(
         IRepository<User, Guid> users,
         IUnitOfWork unitOfWork,
@@ -39,7 +44,30 @@ public sealed class UserService : IUserService
         IEnumerable<IIdentityEventObserver> observers,
         ILogger<UserService>? logger = null,
         IMemoryCache? stampCache = null)
+        : this(users, unitOfWork, passwordHasher, timeProvider, options, filterScope, phoneNormalizer, hooks, observers,
+              null, logger, stampCache)
     {
+    }
+#pragma warning restore RS0027
+
+    /// <summary>Creates the service. <paramref name="tokens"/> lets a password, email or phone change void the
+    /// user's live password-reset tokens; the constructor without it leaves them alone, so an instance built by hand
+    /// keeps its old behaviour. DI resolves this one.</summary>
+    public UserService(
+        IRepository<User, Guid> users,
+        IUnitOfWork unitOfWork,
+        IPasswordHasher passwordHasher,
+        TimeProvider timeProvider,
+        IdentityModuleOptions options,
+        IDataFilterScope filterScope,
+        IPhoneNumberNormalizer phoneNormalizer,
+        IUserLifecycleHooks hooks,
+        IEnumerable<IIdentityEventObserver> observers,
+        IRepository<UserToken, Guid>? tokens,
+        ILogger<UserService>? logger,
+        IMemoryCache? stampCache)
+    {
+        this.tokens = tokens;
         ArgumentNullException.ThrowIfNull(users);
         ArgumentNullException.ThrowIfNull(unitOfWork);
         ArgumentNullException.ThrowIfNull(passwordHasher);
@@ -86,6 +114,22 @@ public sealed class UserService : IUserService
         : this(users, unitOfWork, passwordHasher, timeProvider, options, filterScope, phoneNormalizer, hooks,
               Array.Empty<IIdentityEventObserver>(), Microsoft.Extensions.Logging.Abstractions.NullLogger<UserService>.Instance)
     {
+    }
+
+    /// <summary>Kills every live password-reset token of the user. It runs before the change is saved, so a failure
+    /// leaves the old value and no live link rather than a new value with an old link still redeemable.</summary>
+    private async Task VoidResetTokensAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        if (tokens is null)
+        {
+            return;
+        }
+
+        var now = timeProvider.GetUtcNow();
+        await tokens.UpdateWhereAsync(
+            new LiveUserTokensOfPurposeSpec(userId, TokenPurpose.PasswordReset, now),
+            set => set.Set(t => t.ConsumedAt, now),
+            cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -305,6 +349,8 @@ public sealed class UserService : IUserService
             }
         }
 
+        // A reset link was mailed to the old address; the new one has not proven anything yet.
+        await VoidResetTokensAsync(user.Id, cancellationToken).ConfigureAwait(false);
         user.Email = string.IsNullOrWhiteSpace(email) ? null : email.Trim();
         user.NormalizedEmail = normalized;
 
@@ -379,6 +425,7 @@ public sealed class UserService : IUserService
             }
         }
 
+        await VoidResetTokensAsync(user.Id, cancellationToken).ConfigureAwait(false);
         user.PhoneNumber = string.IsNullOrWhiteSpace(phoneNumber) ? null : phoneNumber.Trim();
         user.NormalizedPhoneNumber = normalized;
 
@@ -433,6 +480,7 @@ public sealed class UserService : IUserService
             return UserMutationResult.Refused(decision.Reason!, decision.Code);
         }
 
+        await VoidResetTokensAsync(user.Id, cancellationToken).ConfigureAwait(false);
         user.PasswordHash = passwordHasher.Hash(password);
         user.SecurityStamp = SecurityStampCache.NewStamp();
         // A reset proves ownership, so it also lifts a lock: otherwise a victim whose account was locked by someone

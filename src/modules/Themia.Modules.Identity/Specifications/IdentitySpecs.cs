@@ -174,6 +174,13 @@ internal sealed class ClaimableUserTokenSpec : Specification<UserToken>
         Where(t => t.Id == tokenId && t.ConsumedAt == null && t.ExpiresAt > now);
 }
 
+/// <summary>A user's tokens of one purpose that are still unconsumed and unexpired: what a credential change voids.</summary>
+internal sealed class LiveUserTokensOfPurposeSpec : Specification<UserToken>
+{
+    public LiveUserTokensOfPurposeSpec(Guid userId, TokenPurpose purpose, DateTimeOffset now) =>
+        Where(t => t.UserId == userId && t.Purpose == purpose && t.ConsumedAt == null && t.ExpiresAt > now);
+}
+
 /// <summary>All roles whose id is in the given set, resolved without the tenant filter but still
 /// guarded to platform (null-tenant) roles or roles of the ambient tenant.</summary>
 internal sealed class RolesByIdsSpec : Specification<Role>
