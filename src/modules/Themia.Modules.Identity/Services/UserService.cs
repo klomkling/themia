@@ -526,12 +526,9 @@ public sealed class UserService : IUserService
             return UserMutationResult.Refused(decision.Reason!, decision.Code);
         }
 
-        if (!write.Voided)
-        {
-            await VoidResetTokensAsync(user.Id, cancellationToken).ConfigureAwait(false);
-            write.Voided = true;
-        }
-
+        // Every pass, not once: it is one conditional UPDATE, and a reset link issued between two passes must not
+        // survive the password change that finally lands.
+        await VoidResetTokensAsync(user.Id, cancellationToken).ConfigureAwait(false);
         user.PasswordHash = write.Hash ??= passwordHasher.Hash(password);
         user.SecurityStamp = SecurityStampCache.NewStamp();
         // A reset proves ownership, so it also lifts a lock: otherwise a victim whose account was locked by someone
@@ -568,13 +565,11 @@ public sealed class UserService : IUserService
         }
     }
 
-    // What a SetPasswordAsync call computes once and keeps across its passes: the Argon2 hash (expensive, and the
-    // widest part of the race window) and whether the reset links were already voided.
+    // What a SetPasswordAsync call computes once and keeps across its passes: the Argon2 hash, which is expensive and
+    // the widest part of the race window.
     private sealed class PasswordWrite
     {
         public string? Hash { get; set; }
-
-        public bool Voided { get; set; }
     }
 
     /// <summary>Bound on gate retries per guess. Each lost round means another guess was charged, and a lock stops
