@@ -55,7 +55,7 @@ internal sealed class DapperRepository<T, TKey>(
 
         // A versioned entity's set-based write also moves the counter, so a stale full-row Update loaded before
         // this write conflicts instead of overwriting it. The write keeps its own predicate and does not check it.
-        if (typeof(IVersionedEntity).IsAssignableFrom(typeof(T))
+        if (setters.BumpVersion && typeof(IVersionedEntity).IsAssignableFrom(typeof(T))
             && Map.Columns.TryGetValue(nameof(IVersionedEntity.ConcurrencyVersion), out var versionColumn))
             setters.Values[versionColumn] = VersionedSql.Increment(versionColumn);
 
@@ -71,6 +71,14 @@ internal sealed class DapperRepository<T, TKey>(
     private sealed class DapperBulkUpdateSetters(EntityMapping map) : IBulkUpdateSetters<T>
     {
         public Dictionary<string, object?> Values { get; } = [];
+
+        public bool BumpVersion { get; private set; } = true;
+
+        public IBulkUpdateSetters<T> WithoutVersionBump()
+        {
+            BumpVersion = false;
+            return this;
+        }
 
         public IBulkUpdateSetters<T> Set<TProperty>(Expression<Func<T, TProperty>> property, TProperty value)
         {

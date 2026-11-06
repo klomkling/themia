@@ -504,9 +504,15 @@ public sealed class UserService : IUserService
     }
 
     /// <inheritdoc />
-    public async Task<UserMutationResult> SetPasswordAsync(Guid userId, string password, CancellationToken cancellationToken = default)
+    public Task<UserMutationResult> SetPasswordAsync(Guid userId, string password, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(password);
+        var write = new PasswordWrite();
+        return RetryOnConflictAsync(() => SetPasswordPassAsync(userId, password, write, cancellationToken));
+    }
+
+    private async Task<UserMutationResult> SetPasswordPassAsync(Guid userId, string password, PasswordWrite write, CancellationToken cancellationToken)
+    {
         var user = await IdentityScope.ResolveUserAsync(users, userId, cancellationToken).ConfigureAwait(false);
         if (user is null || IdentityAnonymiser.IsTombstone(user))
         {
@@ -520,8 +526,13 @@ public sealed class UserService : IUserService
             return UserMutationResult.Refused(decision.Reason!, decision.Code);
         }
 
-        await VoidResetTokensAsync(user.Id, cancellationToken).ConfigureAwait(false);
-        user.PasswordHash = passwordHasher.Hash(password);
+        if (!write.Voided)
+        {
+            await VoidResetTokensAsync(user.Id, cancellationToken).ConfigureAwait(false);
+            write.Voided = true;
+        }
+
+        user.PasswordHash = write.Hash ??= passwordHasher.Hash(password);
         user.SecurityStamp = SecurityStampCache.NewStamp();
         // A reset proves ownership, so it also lifts a lock: otherwise a victim whose account was locked by someone
         // else's guesses would wait out the full (possibly progressive) lock after recovering.
@@ -536,6 +547,34 @@ public sealed class UserService : IUserService
         SecurityStampCache.Evict(stampCache, [user.Id]);
         await NotifyMutatedAsync(user, UserMutation.Password, cancellationToken).ConfigureAwait(false);
         return UserMutationResult.Success();
+    }
+
+    /// <summary>Reload-and-retry bound for the mutators that must not be starved by a busy row. Each lost round
+    /// means another writer moved the user between the load and the save; the bound only has to outlast a burst.</summary>
+    private const int MaxConflictRetries = 4;
+
+    // Runs a whole mutator pass again from the reload while it answers Conflict, up to MaxConflictRetries times.
+    // Every pass re-reads the user, re-checks the tombstone and re-asks the hook, so a veto or an erasure that lands
+    // between passes is honoured. Only the last pass's Conflict reaches the caller.
+    private static async Task<UserMutationResult> RetryOnConflictAsync(Func<Task<UserMutationResult>> pass)
+    {
+        for (var retry = 0; ; retry++)
+        {
+            var result = await pass().ConfigureAwait(false);
+            if (result.Outcome != UserMutationOutcome.Conflict || retry >= MaxConflictRetries)
+            {
+                return result;
+            }
+        }
+    }
+
+    // What a SetPasswordAsync call computes once and keeps across its passes: the Argon2 hash (expensive, and the
+    // widest part of the race window) and whether the reset links were already voided.
+    private sealed class PasswordWrite
+    {
+        public string? Hash { get; set; }
+
+        public bool Voided { get; set; }
     }
 
     /// <summary>Bound on gate retries per guess. Each lost round means another guess was charged, and a lock stops
@@ -647,7 +686,7 @@ public sealed class UserService : IUserService
         var gate = new UserFailureStateGateSpec(user.Id, user.AccessFailedCount, user.LockoutEnd, null);
         var updated = lockEnd is { } end
             ? await users.UpdateWhereAsync(gate, set => set.Set(u => u.AccessFailedCount, storedCount).Set(u => u.LockoutEnd, (DateTimeOffset?)end), cancellationToken).ConfigureAwait(false)
-            : await users.UpdateWhereAsync(gate, set => set.Set(u => u.AccessFailedCount, storedCount), cancellationToken).ConfigureAwait(false);
+            : await users.UpdateWhereAsync(gate, set => set.Set(u => u.AccessFailedCount, storedCount).WithoutVersionBump(), cancellationToken).ConfigureAwait(false);
         if (updated != 1)
         {
             return null;
@@ -663,6 +702,10 @@ public sealed class UserService : IUserService
         return PasswordVerificationResult.Failed;
     }
 
+    // Login bookkeeping (the failure counter below a lock, and a right guess clearing it) does not move the user's
+    // concurrency version: it is gated on its own predicate, and a stream of logins must not keep an admin's
+    // disable, delete or password reset losing its version check. The write that STARTS a lock still moves it, so a
+    // stale full-row save loaded before the lock cannot lift it.
     // A right guess: also passes the gate, so it cannot be answered Success on an account that locked meanwhile. It clears
     // the failure state and, when the cost parameters changed, re-hashes the same password (not a credential event: the
     // stamp stays and the user's other sessions live). The stamp is part of the gate so a re-hash can never restore an
@@ -672,8 +715,8 @@ public sealed class UserService : IUserService
         var gate = new UserFailureStateGateSpec(user.Id, user.AccessFailedCount, user.LockoutEnd, user.SecurityStamp);
         var evict = user.AccessFailedCount != 0 || user.LockoutEnd is not null || rehashed is not null;
         var updated = rehashed is null
-            ? await users.UpdateWhereAsync(gate, set => set.Set(u => u.AccessFailedCount, 0).Set(u => u.LockoutEnd, (DateTimeOffset?)null), cancellationToken).ConfigureAwait(false)
-            : await users.UpdateWhereAsync(gate, set => set.Set(u => u.AccessFailedCount, 0).Set(u => u.LockoutEnd, (DateTimeOffset?)null).Set(u => u.PasswordHash, rehashed), cancellationToken).ConfigureAwait(false);
+            ? await users.UpdateWhereAsync(gate, set => set.Set(u => u.AccessFailedCount, 0).Set(u => u.LockoutEnd, (DateTimeOffset?)null).WithoutVersionBump(), cancellationToken).ConfigureAwait(false)
+            : await users.UpdateWhereAsync(gate, set => set.Set(u => u.AccessFailedCount, 0).Set(u => u.LockoutEnd, (DateTimeOffset?)null).Set(u => u.PasswordHash, rehashed).WithoutVersionBump(), cancellationToken).ConfigureAwait(false);
         if (updated != 1)
         {
             return null;
@@ -702,7 +745,10 @@ public sealed class UserService : IUserService
     }
 
     /// <inheritdoc />
-    public async Task<UserMutationResult> SetActiveAsync(Guid userId, bool isActive, CancellationToken cancellationToken = default)
+    public Task<UserMutationResult> SetActiveAsync(Guid userId, bool isActive, CancellationToken cancellationToken = default)
+        => RetryOnConflictAsync(() => SetActivePassAsync(userId, isActive, cancellationToken));
+
+    private async Task<UserMutationResult> SetActivePassAsync(Guid userId, bool isActive, CancellationToken cancellationToken)
     {
         var user = await IdentityScope.ResolveUserAsync(users, userId, cancellationToken).ConfigureAwait(false);
         if (user is null || IdentityAnonymiser.IsTombstone(user))
@@ -731,7 +777,10 @@ public sealed class UserService : IUserService
     }
 
     /// <inheritdoc />
-    public async Task<UserMutationResult> DeleteAsync(Guid userId, CancellationToken cancellationToken = default)
+    public Task<UserMutationResult> DeleteAsync(Guid userId, CancellationToken cancellationToken = default)
+        => RetryOnConflictAsync(() => DeletePassAsync(userId, cancellationToken));
+
+    private async Task<UserMutationResult> DeletePassAsync(Guid userId, CancellationToken cancellationToken)
     {
         var user = await IdentityScope.ResolveUserAsync(users, userId, cancellationToken).ConfigureAwait(false);
         if (user is null)

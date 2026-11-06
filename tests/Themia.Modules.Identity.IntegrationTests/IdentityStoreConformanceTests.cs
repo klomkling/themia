@@ -2000,6 +2000,29 @@ public abstract class IdentityStoreConformanceTests
         Assert.Equal("+66811119999", (await check.UserRepo.GetByIdAsync(user))!.PhoneNumber);
     }
 
+    [Fact] // login bookkeeping must not keep an admin write losing its version check (incident response)
+    public async Task Logins_do_not_move_the_version_so_a_user_loaded_before_them_still_saves()
+    {
+        await ResetAsync();
+        var user = await SeedUserAsync("login-no-bump");
+        await using var admin = NewScope(new TenantId("acme"));
+        var loaded = (await admin.UserRepo.GetByIdAsync(user))!;
+
+        await using (var login = NewScope(new TenantId("acme")))
+        {
+            Assert.Equal(PasswordVerificationResult.Failed, await login.Users.VerifyPasswordAsync("login-no-bump", "wrong"));
+            Assert.Equal(PasswordVerificationResult.Success, await login.Users.VerifyPasswordAsync("login-no-bump", "pw"));
+            Assert.Equal(PasswordVerificationResult.Success, await login.Users.VerifyPasswordAsync("login-no-bump", "pw"));
+        }
+
+        loaded.PhoneNumber = "+66811110000";
+        admin.UserRepo.Update(loaded);
+        await admin.UnitOfWork.SaveChangesAsync();   // would throw ConcurrencyException if the logins had moved the version
+
+        await using var check = NewScope(new TenantId("acme"));
+        Assert.Equal("+66811110000", (await check.UserRepo.GetByIdAsync(user))!.PhoneNumber);
+    }
+
     [Fact] // the contract documented on IVersionedEntity: a bulk write then an Update of an earlier load self-conflicts
     public async Task A_bulk_write_then_an_update_of_the_same_loaded_user_in_one_scope_conflicts()
     {

@@ -18,6 +18,8 @@ namespace Themia.Framework.Core.Abstractions.Entities;
 /// their own predicates and do not check it), so a stale full-row <c>Update</c> loaded before a bulk write
 /// conflicts instead of overwriting it. Consequently a bulk write followed by an <c>Update</c> of an entity
 /// loaded earlier in the same scope throws <c>ConcurrencyException</c>.
+/// A bulk write that is only bookkeeping (a login clearing its own failure counter) opts out with
+/// <c>WithoutVersionBump()</c> on the setters, so a stream of them cannot keep other writers losing their check.
 /// </para>
 /// <para>
 /// Writes that bypass the repositories (raw SQL) do not bump the version. Do not set the value yourself.

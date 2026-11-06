@@ -57,7 +57,7 @@ public sealed class EfRepository<T, TKey>(ThemiaDbContext context, IDataFilterSc
         // Build the WHERE from the normal read path (criteria + tenant global query filter, with
         // WithoutTenantFilter honoured), then replay the collected setters onto EF's UpdateSettersBuilder.
         // The tenant predicate is thus part of the emitted UPDATE by construction.
-        var bumpVersion = VersionBump;
+        var bumpVersion = collector.BumpVersion ? VersionBump : null;
         var affected = await CountQuery(specification).ExecuteUpdateAsync(
             builder =>
             {
@@ -107,6 +107,14 @@ public sealed class EfRepository<T, TKey>(ThemiaDbContext context, IDataFilterSc
     private sealed class EfBulkUpdateSetters : IBulkUpdateSetters<T>
     {
         public List<Action<UpdateSettersBuilder<T>>> Setters { get; } = [];
+
+        public bool BumpVersion { get; private set; } = true;
+
+        public IBulkUpdateSetters<T> WithoutVersionBump()
+        {
+            BumpVersion = false;
+            return this;
+        }
 
         public IBulkUpdateSetters<T> Set<TProperty>(Expression<Func<T, TProperty>> property, TProperty value)
         {

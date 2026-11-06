@@ -14,6 +14,16 @@ public interface IBulkUpdateSetters<T>
     /// <param name="value">The constant value to write.</param>
     /// <returns>The same instance, so calls can be chained.</returns>
     IBulkUpdateSetters<T> Set<TProperty>(Expression<Func<T, TProperty>> property, TProperty value);
+
+    /// <summary>
+    /// Leaves the concurrency counter of an <c>IVersionedEntity</c> alone for this write. Use it only for
+    /// bookkeeping a stale full-row <c>Update</c> may safely overwrite or race with (a login clearing its own
+    /// failure counter, say), so a stream of such writes cannot keep every other writer of the row losing its
+    /// version check. Do not use it for a write another writer must be able to notice. A default member that
+    /// does nothing, for peers that never bump a counter.
+    /// </summary>
+    /// <returns>The same instance, so calls can be chained.</returns>
+    IBulkUpdateSetters<T> WithoutVersionBump() => this;
 }
 
 /// <summary>

@@ -43,7 +43,8 @@ public class UserServiceConflictTests
         var user = new User { TenantId = new TenantId("acme"), UserName = "alice", NormalizedUserName = "ALICE", Email = "a@example.com", NormalizedEmail = "A@EXAMPLE.COM", PhoneNumber = "+66811111111", NormalizedPhoneNumber = "+66811111111", IsActive = true };
         user.SetId(Guid.NewGuid());
         store.Add(user);
-        uow.ConcurrencyFailures = 1;
+        uow.ConcurrencyFailures = 5;   // SetPassword, SetActive and Delete retry four times (UserServiceConflictRetryTests); five losses still end in Conflict
+        uow.OnConcurrencyFailure = () => user.IsDeleted = false;   // a lost save leaves the row where it was (the fake's Remove soft-deletes it at once)
 
         var result = await mutate(sut, user.Id);
 
