@@ -38,8 +38,10 @@ namespace Themia.Framework.Data.Sequences;
 /// <para>
 /// <b>Transaction isolation:</b> The caller's transaction must use <see cref="System.Data.IsolationLevel.ReadCommitted"/>.
 /// Under <c>RepeatableRead</c> or <c>Serializable</c> on PostgreSQL, queued concurrent callers on the same key will fail
-/// with SQLSTATE 40001 (serialization failure) when the lock holder commits. On MySQL, the default <c>REPEATABLE READ</c>
-/// risks gap-lock deadlocks during first-use seeding.
+/// with SQLSTATE 40001 (serialization failure) when the lock holder commits. On MySQL, first-use seeding commits independently of the caller's
+/// transaction (a side connection cloned from <see cref="DbTransaction.Connection"/>), so a rolled-back first caller leaves the
+/// seed row at 1; call <see cref="ISequenceProvider.EnsureSequenceAsync"/> before the first allocation if the run must
+/// start elsewhere.
 /// </para>
 /// </remarks>
 public interface ITransactionalSequenceAllocator

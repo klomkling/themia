@@ -177,6 +177,26 @@ public abstract class TransactionalSequenceAllocatorTestsBase
     }
 
     [Fact]
+    public async Task SameKeyAllocatedTwiceInOneTransaction_ReturnsConsecutiveValues_WithoutWaitingOnItself()
+    {
+        // One caller transaction may legitimately allocate the same key twice (two documents of one kind, seller
+        // and period). The second call must not queue behind a lock the first call took.
+        var allocator = Allocator();
+        var key = Key("SameKeyTwice");
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+
+        await using var conn = CreateConnection();
+        await conn.OpenAsync(timeout.Token);
+        await using var tx = await conn.BeginTransactionAsync(IsolationLevel.ReadCommitted, timeout.Token);
+
+        var first = await allocator.NextInTransactionAsync(tx, key, timeout.Token);
+        var second = await allocator.NextInTransactionAsync(tx, key, timeout.Token);
+        await tx.CommitAsync(timeout.Token);
+
+        Assert.Equal(new long[] { 1, 2 }, new[] { first, second });
+    }
+
+    [Fact]
     public async Task ConcurrentQueuedCallerRollback_LeavesNoGapsInCommittedValues()
     {
         // Core claim: when concurrent callers queue on the lock, and one or more roll back,

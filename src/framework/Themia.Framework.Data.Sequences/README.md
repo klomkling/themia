@@ -47,7 +47,7 @@ await tx.CommitAsync(ct);
 
 - **`NextInTransactionAsync(tx, key, ct)`**: Tenant-scoped inside the caller's transaction (requires ambient tenant).
 - **`NextHostInTransactionAsync(tx, key, ct)`**: Host-level inside the caller's transaction.
-- **Lazy seeding**: Seeds starting at 1 on first use race-free (unlike `ISequenceProvider`, which throws when an unseeded key is accessed). No prior `EnsureSequenceAsync` call required.
+- **Lazy seeding**: Seeds starting at 1 on first use race-free (unlike `ISequenceProvider`, which throws when an unseeded key is accessed). No prior `EnsureSequenceAsync` call required. On MySQL the seed row commits on its own connection, so a rolled-back first caller leaves it at 1: call `EnsureSequenceAsync(key, startValue)` before the first allocation of a key that continues an existing run.
 - **Pre-seeding existing runs**: Calling `EnsureSequenceAsync(key, startValue)` (or `EnsureHostSequenceAsync`) beforehand is fully supported if you need an initial offset other than 1.
 - **Shared table caution**: Both mechanisms share `themia_sequences`. Never call `ISequenceProvider.Next*` on a key meant for gapless transactional numbering, as its separate transaction will cause skipped numbers.
 - **Database & connection**: The allocator ignores `SequenceOptions.ConnectionString` and runs directly on `tx.Connection`. Ensure `themia_sequences` exists in the caller's database (via `SequencesSchemaMigration`) and `SequenceOptions.Engine` matches the caller's database engine.
