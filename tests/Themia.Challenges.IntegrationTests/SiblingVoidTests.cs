@@ -86,8 +86,9 @@ public abstract class SiblingVoidTests
             var serviceA = NewService(gated);
             var serviceB = NewService(gated);
 
-            var results = await RaceOutcome.WhenAllReportedAsync(serviceA.VerifyAsync(scope, codeA), serviceB.VerifyAsync(scope, codeB));
+            var results = await RaceOutcome.WhenAllReportedAsync(() => serviceA.VerifyAsync(scope, codeA), () => serviceB.VerifyAsync(scope, codeB));
 
+            Assert.True(consumeGate.CurrentPhaseNumber >= 1, $"round {round}: the racers never met at the consume gate");
             var outcomes = string.Join(", ", results.Select(r => r.Outcome));
             Assert.True(1 == results.Count(r => r.Outcome == ChallengeVerifyOutcome.Verified), $"round {round}: [{outcomes}]");
             Assert.True(1 == results.Count(r => r.Outcome == ChallengeVerifyOutcome.Consumed), $"round {round}: [{outcomes}]");
@@ -111,9 +112,10 @@ public abstract class SiblingVoidTests
             var serviceB = NewService(gated);
 
             var results = await RaceOutcome.WhenAllReportedAsync(
-                serviceA.VerifyByTokenAsync(tokenA, scope.Purpose, scope.TenantId),
-                serviceB.VerifyByTokenAsync(tokenB, scope.Purpose, scope.TenantId));
+                () => serviceA.VerifyByTokenAsync(tokenA, scope.Purpose, scope.TenantId),
+                () => serviceB.VerifyByTokenAsync(tokenB, scope.Purpose, scope.TenantId));
 
+            Assert.True(consumeGate.CurrentPhaseNumber >= 1, $"round {round}: the racers never met at the consume gate");
             var outcomes = string.Join(", ", results.Select(r => r.Outcome));
             Assert.True(1 == results.Count(r => r.Outcome == ChallengeVerifyOutcome.Verified), $"round {round}: [{outcomes}]");
             Assert.True(1 == results.Count(r => r.Outcome == ChallengeVerifyOutcome.Consumed), $"round {round}: [{outcomes}]");
@@ -136,9 +138,10 @@ public abstract class SiblingVoidTests
         var serviceB = NewService(gated);
 
         var results = await RaceOutcome.WhenAllReportedAsync(
-            serviceA.VerifyByTokenAsync(token, scope.Purpose, scope.TenantId),
-            serviceB.VerifyByTokenAsync(token, scope.Purpose, scope.TenantId));
+            () => serviceA.VerifyByTokenAsync(token, scope.Purpose, scope.TenantId),
+            () => serviceB.VerifyByTokenAsync(token, scope.Purpose, scope.TenantId));
 
+        Assert.True(consumeGate.CurrentPhaseNumber >= 1, "the racers never met at the consume gate");
         Assert.Equal(1, results.Count(r => r.Outcome == ChallengeVerifyOutcome.Verified));
         Assert.Equal(1, gated.VoidCalls);
     }
