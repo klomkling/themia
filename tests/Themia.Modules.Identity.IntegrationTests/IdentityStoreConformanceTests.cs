@@ -1913,6 +1913,9 @@ public abstract class IdentityStoreConformanceTests
                 new WhereSpec<User>(u => u.Id == user), set => set.Set(u => u.LockoutEnd, (DateTimeOffset?)DateTimeOffset.UtcNow.AddHours(1)));
         }
 
+        var bystander = new User { UserName = "conflict-bystander", NormalizedUserName = "CONFLICT-BYSTANDER", PasswordHash = "x" };
+        bystander.SetId(Guid.CreateVersion7());
+        await s.UserRepo.AddAsync(bystander);   // staged in the same save that loses: it rolled back with it
         loaded.PhoneNumber = "+66811115555";
         s.UserRepo.Update(loaded);
         await Assert.ThrowsAsync<ConcurrencyException>(() => s.UnitOfWork.SaveChangesAsync());
@@ -1929,6 +1932,7 @@ public abstract class IdentityStoreConformanceTests
         var row = (await check.UserRepo.GetByIdAsync(user))!;
         Assert.Equal("+66811115555", row.PhoneNumber);
         Assert.NotNull(row.LockoutEnd);
+        Assert.Null(await check.UserRepo.GetByIdAsync(bystander.Id));   // the failed save's other half did not leak into the retry
     }
 
     [Fact] // the contract documented on IVersionedEntity: a bulk write then an Update of an earlier load self-conflicts

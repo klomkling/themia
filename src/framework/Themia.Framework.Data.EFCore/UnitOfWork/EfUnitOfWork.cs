@@ -42,12 +42,17 @@ public sealed class EfUnitOfWork(ThemiaDbContext context, IDataFilterScope filte
         }
         catch (DbUpdateConcurrencyException ex)
         {
-            // Drop the entries that lost the race. Left tracked and Modified they would make a reload in this
-            // scope return the stale instance, a retry conflict again, and the next SaveChanges throw the raw
-            // DbUpdateConcurrencyException; detached, the next load reads the row as it now is.
-            foreach (var entry in ex.Entries)
+            // The save rolled back as a whole, so every pending change of it is void, not only the entries that
+            // lost the race. Left tracked, a reload in this scope would return the stale instance, a retry would
+            // conflict again, and the next SaveChanges would commit the unrelated half of the failed unit of work
+            // or throw the raw DbUpdateConcurrencyException. Detach everything pending; unchanged entities stay
+            // readable and the next load of the losers reads the row as it now is.
+            foreach (var entry in context.ChangeTracker.Entries().ToList())
             {
-                entry.State = EntityState.Detached;
+                if (entry.State is EntityState.Added or EntityState.Modified or EntityState.Deleted)
+                {
+                    entry.State = EntityState.Detached;
+                }
             }
 
             throw new ConcurrencyException(
