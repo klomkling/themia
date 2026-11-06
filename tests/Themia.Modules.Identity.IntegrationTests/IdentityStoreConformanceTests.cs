@@ -2177,6 +2177,177 @@ public abstract class IdentityStoreConformanceTests
         Assert.Equal(2, (await check.UserRepo.GetByIdAsync(user))!.ConcurrencyVersion);
     }
 
+    [Fact] // a caller-owned transaction that rolls back must leave the held instance at the version its row still has
+    public async Task A_rolled_back_caller_transaction_puts_the_saved_instance_back_to_its_loaded_version()
+    {
+        await ResetAsync();
+        var user = await SeedUserAsync("rollback-version");
+        await using var s = NewScope(new TenantId("acme"));
+        var loaded = (await s.UserRepo.GetByIdAsync(user))!;
+
+        await using (var tx = await s.UnitOfWork.BeginTransactionAsync())
+        {
+            loaded.PhoneNumber = "+66811117777";
+            s.UserRepo.Update(loaded);
+            await s.UnitOfWork.SaveChangesAsync();
+            Assert.Equal(1, loaded.ConcurrencyVersion);
+            await tx.RollbackAsync();
+        }
+
+        Assert.Equal(0, loaded.ConcurrencyVersion);
+        await using var check = NewScope(new TenantId("acme"));
+        Assert.Equal(0, (await check.UserRepo.GetByIdAsync(user))!.ConcurrencyVersion);
+    }
+
+    [Fact] // same, for a scope that is only disposed: the safety-net rollback must restore too
+    public async Task A_caller_transaction_disposed_without_commit_restores_the_version()
+    {
+        await ResetAsync();
+        var user = await SeedUserAsync("dispose-version");
+        await using var s = NewScope(new TenantId("acme"));
+        var loaded = (await s.UserRepo.GetByIdAsync(user))!;
+
+        await using (await s.UnitOfWork.BeginTransactionAsync())
+        {
+            loaded.PhoneNumber = "+66811118888";
+            s.UserRepo.Update(loaded);
+            await s.UnitOfWork.SaveChangesAsync();
+        }
+
+        Assert.Equal(0, loaded.ConcurrencyVersion);
+    }
+
+    [Fact] // plan review: after a rollback a stale holder must conflict with a winner, not match its version and overwrite it
+    public async Task A_stale_instance_from_a_rolled_back_transaction_conflicts_with_a_later_winner()
+    {
+        await ResetAsync();
+        var user = await SeedUserAsync("rollback-stale");
+        await using var s = NewScope(new TenantId("acme"));
+        var loaded = (await s.UserRepo.GetByIdAsync(user))!;
+        await using (var tx = await s.UnitOfWork.BeginTransactionAsync())
+        {
+            loaded.PhoneNumber = "+66811110001";
+            s.UserRepo.Update(loaded);
+            await s.UnitOfWork.SaveChangesAsync();
+            await tx.RollbackAsync();
+        }
+
+        await using (var winner = NewScope(new TenantId("acme")))
+        {
+            Assert.True((await winner.Users.SetPhoneNumberAsync(user, "+66811110002")).Succeeded);   // the row is now at version 1
+        }
+
+        loaded.PhoneNumber = "+66811110003";
+        s.UserRepo.Update(loaded);
+        await Assert.ThrowsAsync<ConcurrencyException>(() => s.UnitOfWork.SaveChangesAsync());
+        await using var check = NewScope(new TenantId("acme"));
+        Assert.Equal("+66811110002", (await check.UserRepo.GetByIdAsync(user))!.PhoneNumber);
+    }
+
+    [Fact] // plan review item 1: a service call after the rollback must not see (or re-write) the rolled-back values
+    public async Task After_a_rolled_back_transaction_the_next_service_call_reloads_the_row_and_succeeds_first_pass()
+    {
+        await ResetAsync();
+        await using var s = NewScope(new TenantId("acme"));
+        var user = (await s.Users.CreateAsync("rollback-reload", "pw", "reload@x.com")).UserId!.Value;
+        var before = (await s.Users.FindByIdAsync(user))!.PasswordHash;
+
+        await using (var tx = await s.UnitOfWork.BeginTransactionAsync())
+        {
+            Assert.True((await s.Users.SetPasswordAsync(user, "rolled-back-pw")).Succeeded);
+            await tx.RollbackAsync();
+        }
+
+        Assert.True((await s.Users.SetActiveAsync(user, false)).Succeeded);
+        await using var check = NewScope(new TenantId("acme"));
+        var row = (await check.Users.FindByIdAsync(user))!;
+        Assert.Equal(before, row.PasswordHash);   // the rolled-back credential did not come back
+        Assert.False(row.IsActive);
+        Assert.Equal(1, row.ConcurrencyVersion);   // exactly one committed write, so no round was burned on a self-conflict
+    }
+
+    [Fact] // plan review item 2: a save that fails inside the caller's transaction must not undo the saves made before it
+    public async Task A_failed_save_in_a_caller_transaction_keeps_the_earlier_saved_instance_in_step_with_its_row()
+    {
+        await ResetAsync();
+        var first = await SeedUserAsync("earlier-save");
+        var second = await SeedUserAsync("later-conflict");
+        await using var s = NewScope(new TenantId("acme"));
+        var a = (await s.UserRepo.GetByIdAsync(first))!;
+        var b = (await s.UserRepo.GetByIdAsync(second))!;
+        await using (var other = NewScope(new TenantId("acme")))
+        {
+            Assert.True((await other.Users.SetPhoneNumberAsync(second, "+66811110004")).Succeeded);   // b is now stale
+        }
+
+        await using (var tx = await s.UnitOfWork.BeginTransactionAsync())
+        {
+            a.PhoneNumber = "+66811110005";
+            s.UserRepo.Update(a);
+            await s.UnitOfWork.SaveChangesAsync();
+            b.PhoneNumber = "+66811110006";
+            s.UserRepo.Update(b);
+            await Assert.ThrowsAsync<ConcurrencyException>(() => s.UnitOfWork.SaveChangesAsync());
+            await tx.CommitAsync();
+        }
+
+        await using var check = NewScope(new TenantId("acme"));
+        var row = (await check.UserRepo.GetByIdAsync(first))!;
+        Assert.Equal("+66811110005", row.PhoneNumber);
+        Assert.Equal(row.ConcurrencyVersion, a.ConcurrencyVersion);
+    }
+
+    [Fact] // the same, with both writes in ONE batch: Dapper has no savepoint, so the first op stays in the transaction
+    public async Task A_batch_whose_second_write_conflicts_leaves_the_first_instance_in_step_with_the_committed_row()
+    {
+        await ResetAsync();
+        var first = await SeedUserAsync("batch-first");
+        var second = await SeedUserAsync("batch-second");
+        await using var s = NewScope(new TenantId("acme"));
+        var a = (await s.UserRepo.GetByIdAsync(first))!;
+        var b = (await s.UserRepo.GetByIdAsync(second))!;
+        await using (var other = NewScope(new TenantId("acme")))
+        {
+            Assert.True((await other.Users.SetPhoneNumberAsync(second, "+66811110007")).Succeeded);
+        }
+
+        await using (var tx = await s.UnitOfWork.BeginTransactionAsync())
+        {
+            a.PhoneNumber = "+66811110008";
+            s.UserRepo.Update(a);
+            b.PhoneNumber = "+66811110009";
+            s.UserRepo.Update(b);
+            await Assert.ThrowsAsync<ConcurrencyException>(() => s.UnitOfWork.SaveChangesAsync());
+            await tx.CommitAsync();
+        }
+
+        await using var check = NewScope(new TenantId("acme"));
+        Assert.Equal((await check.UserRepo.GetByIdAsync(first))!.ConcurrencyVersion, a.ConcurrencyVersion);
+    }
+
+    [Fact] // the commit path is unchanged: the instance stays at the version it was saved to
+    public async Task A_committed_caller_transaction_leaves_the_instance_at_its_new_version()
+    {
+        await ResetAsync();
+        var user = await SeedUserAsync("commit-version");
+        await using var s = NewScope(new TenantId("acme"));
+        var loaded = (await s.UserRepo.GetByIdAsync(user))!;
+
+        await using (var tx = await s.UnitOfWork.BeginTransactionAsync())
+        {
+            loaded.PhoneNumber = "+66811110010";
+            s.UserRepo.Update(loaded);
+            await s.UnitOfWork.SaveChangesAsync();
+            await tx.CommitAsync();
+        }
+
+        Assert.Equal(1, loaded.ConcurrencyVersion);
+        loaded.PhoneNumber = "+66811110011";
+        s.UserRepo.Update(loaded);
+        await s.UnitOfWork.SaveChangesAsync();   // the same instance saves again without conflicting with itself
+        Assert.Equal(2, loaded.ConcurrencyVersion);
+    }
+
     [Fact] // without the keep-session call the old session simply ends at its next refresh
     public async Task Refresh_after_a_password_reset_is_Invalid()
     {

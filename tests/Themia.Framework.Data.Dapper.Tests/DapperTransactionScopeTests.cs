@@ -44,6 +44,82 @@ public sealed class DapperTransactionScopeTests
         Assert.Equal(1, ctx.DisposeTransactionCalls);
     }
 
+    [Fact]
+    public async Task CommitAsync_WhenCommitThrows_PutsRecordedVersionsBack()
+    {
+        var entity = new VersionedStub { ConcurrencyVersion = 4 };   // a save already moved it from 3 to 4
+        var ctx = new FakeConnectionContext(new FakeTx { CommitThrows = true });
+        var uow = NewUnitOfWork(ctx);
+        var scope = await uow.BeginTransactionAsync();
+        uow.RememberVersion(entity, 3);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => scope.CommitAsync());
+
+        Assert.Equal(3, entity.ConcurrencyVersion);   // nobody can say whether it landed: behind the row is the safe side
+        await scope.DisposeAsync();                    // the failed commit disposed the tx, so Dispose cannot restore: it was done above
+    }
+
+    [Fact]
+    public async Task CommitAsync_WhenItSucceeds_LeavesTheNewVersionAndForgetsTheRecord()
+    {
+        var entity = new VersionedStub { ConcurrencyVersion = 4 };
+        var uow = NewUnitOfWork(new FakeConnectionContext(new FakeTx()));
+        var scope = await uow.BeginTransactionAsync();
+        uow.RememberVersion(entity, 3);
+
+        await scope.CommitAsync();
+        await scope.DisposeAsync();
+
+        Assert.Equal(4, entity.ConcurrencyVersion);
+    }
+
+    [Fact]
+    public async Task RollbackAsync_PutsRecordedVersionsBack_AndDisposeAfterwardsDoesNotRestoreAgain()
+    {
+        var entity = new VersionedStub { ConcurrencyVersion = 4 };
+        var uow = NewUnitOfWork(new FakeConnectionContext(new FakeTx()));
+        var scope = await uow.BeginTransactionAsync();
+        uow.RememberVersion(entity, 3);
+
+        await scope.RollbackAsync();
+        entity.ConcurrencyVersion = 9;                 // a later committed write moved it on
+        await scope.DisposeAsync();
+
+        Assert.Equal(9, entity.ConcurrencyVersion);
+    }
+
+    [Fact]
+    public async Task DisposeAsync_WithoutCommit_PutsRecordedVersionsBack()
+    {
+        var entity = new VersionedStub { ConcurrencyVersion = 4 };
+        var uow = NewUnitOfWork(new FakeConnectionContext(new FakeTx()));
+        var scope = await uow.BeginTransactionAsync();
+        uow.RememberVersion(entity, 3);
+
+        await scope.DisposeAsync();
+
+        Assert.Equal(3, entity.ConcurrencyVersion);
+    }
+
+    [Fact]
+    public async Task RememberVersion_FirstValueWins()
+    {
+        var entity = new VersionedStub { ConcurrencyVersion = 5 };   // saved twice: 3 -> 4 -> 5
+        var uow = NewUnitOfWork(new FakeConnectionContext(new FakeTx()));
+        var scope = await uow.BeginTransactionAsync();
+        uow.RememberVersion(entity, 3);
+        uow.RememberVersion(entity, 4);
+
+        await scope.RollbackAsync();
+
+        Assert.Equal(3, entity.ConcurrencyVersion);
+    }
+
+    private sealed class VersionedStub : Themia.Framework.Core.Abstractions.Entities.IVersionedEntity
+    {
+        public long ConcurrencyVersion { get; set; }
+    }
+
     // Only the connection context is exercised on the BeginTransaction -> Commit/Dispose path; the remaining
     // dependencies are null! because they are never touched there. filterScope gets a real instance so the
     // helper stays safe to reuse on a path that reaches TenantScoped.
