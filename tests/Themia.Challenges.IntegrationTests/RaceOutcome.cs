@@ -7,6 +7,24 @@ namespace Themia.Challenges.IntegrationTests;
 /// </summary>
 internal static class RaceOutcome
 {
+    /// <summary>
+    /// Starts every racer on a thread-pool thread of its own, then awaits them as <see cref="WhenAllReportedAsync{T}(Task{T}[])"/>.
+    /// </summary>
+    /// <remarks>
+    /// A racer must never be started inline on the test thread. A gated call can run all the way to its blocking
+    /// rendezvous before its first incomplete await (an async database call that completes synchronously, such as a
+    /// pooled connection answering from a hot buffer, does not yield), and then the caller never gets to start the
+    /// partner: the first racer times out alone, then the second does, and the forced overlap is lost. Running each
+    /// racer from <see cref="Task.Run(Func{Task})"/> also keeps its continuations off the test framework's
+    /// synchronization context, so a blocked racer cannot starve its partner of a worker.
+    /// </remarks>
+    public static Task<T[]> WhenAllReportedAsync<T>(params Func<Task<T>>[] racers) =>
+        WhenAllReportedAsync(racers.Select(racer => Task.Run(racer)).ToArray());
+
+    /// <summary>The non-generic form of <see cref="WhenAllReportedAsync{T}(Func{Task{T}}[])"/>.</summary>
+    public static Task WhenAllReportedAsync(params Func<Task>[] racers) =>
+        WhenAllReportedAsync(racers.Select(racer => Task.Run(racer)).ToArray());
+
     /// <summary>Awaits all <paramref name="racers"/>; throws one exception that names each racer's end state when any failed.</summary>
     public static async Task<T[]> WhenAllReportedAsync<T>(params Task<T>[] racers)
     {

@@ -23,6 +23,14 @@ internal sealed class MySqlSequenceDialect : ISequenceDialect
     public string SelectForUpdateSql =>
         "SELECT next_value FROM themia_sequences WHERE tenant_id = @tenant AND sequence_key = @key FOR UPDATE";
 
+    /// <summary>
+    /// Plain, non-locking existence probe used before first-use seeding. Deliberately not
+    /// <c>FOR UPDATE</c>: under REPEATABLE READ a locking read that finds no row takes a gap lock, and the
+    /// side-connection seed would then wait on the caller's own lock.
+    /// </summary>
+    internal string ExistsSql =>
+        "SELECT 1 FROM themia_sequences WHERE tenant_id = @tenant AND sequence_key = @key";
+
     /// <inheritdoc />
     public string UpdateNextValueSql =>
         "UPDATE themia_sequences SET next_value = @val WHERE tenant_id = @tenant AND sequence_key = @key";
