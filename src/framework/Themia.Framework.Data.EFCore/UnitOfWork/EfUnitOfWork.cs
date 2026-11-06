@@ -119,6 +119,16 @@ public sealed class EfUnitOfWork(ThemiaDbContext context, IDataFilterScope filte
                 version.CurrentValue = version.OriginalValue;
             }
         }
+
+        // An instance saved earlier in the transaction and detached since (UpdateWhereAsync does that) is no longer
+        // tracked, but the caller still holds it at original + 1.
+        foreach (var (entity, beforeTransaction) in versionsBeforeTransaction)
+        {
+            if (entity is IVersionedEntity versioned && context.Entry(entity).State is EntityState.Detached)
+            {
+                versioned.ConcurrencyVersion = beforeTransaction;
+            }
+        }
     }
 
     /// <inheritdoc />

@@ -1979,6 +1979,8 @@ public abstract class IdentityStoreConformanceTests
             held.PhoneNumber = "+66811118888";
             s.UserRepo.Update(held);
             await s.UnitOfWork.SaveChangesAsync(ct);   // accepted: the instance is now one ahead of the row
+            // A set-based write in the same transaction detaches the held instance from the tracker.
+            await s.UserRepo.UpdateWhereAsync(new WhereSpec<User>(u => u.Id == user), set => set.Set(u => u.AccessFailedCount, 3), ct);
             throw new InvalidOperationException("a later step failed");
         }));
 

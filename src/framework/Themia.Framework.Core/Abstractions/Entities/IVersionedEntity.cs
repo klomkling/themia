@@ -22,6 +22,18 @@ namespace Themia.Framework.Core.Abstractions.Entities;
 /// <para>
 /// Writes that bypass the repositories (raw SQL) do not bump the version. Do not set the value yourself.
 /// </para>
+/// <para>
+/// <b>After a failed or rolled-back unit of work, reload the entity; never re-<c>Update</c> a held
+/// instance.</b> The data layer moves the instance to <c>loaded + 1</c> when it writes, before it knows the
+/// transaction will commit. When the write is later rolled back, the row is still at <c>loaded</c> but the
+/// instance may keep <c>loaded + 1</c>, which is exactly the version a concurrent winner writes: saving that
+/// same instance again could then overwrite the winner. A lost race (<c>ConcurrencyException</c>), the common
+/// failures and a rolled-back <c>ExecuteInTransactionAsync</c> are put back in step, but these known paths are
+/// not: a Dapper unit of work with several operations where an earlier one succeeded and a later one failed,
+/// and an EF transaction opened with <c>BeginTransactionAsync</c> and rolled back by hand. Without a winner the stale
+/// instance fails closed (a spurious <c>ConcurrencyException</c>), so the exposure is a caller that holds
+/// an instance across the failure and a writer that lands in between. Reload by id instead.
+/// </para>
 /// </remarks>
 public interface IVersionedEntity
 {
