@@ -84,25 +84,23 @@ public sealed class IdentityAnonymiser : IIdentityAnonymiser
     /// <inheritdoc />
     public async Task<AnonymiseResult> AnonymiseAsync(Guid userId, CancellationToken cancellationToken = default)
     {
-        // The veto hook answers on the first pass only; a re-run does not ask again.
-        var askHook = true;
         for (var attempt = 0; ; attempt++)
         {
             try
             {
-                return await RunAsync(userId, askHook, cancellationToken).ConfigureAwait(false);
+                return await RunAsync(userId, cancellationToken).ConfigureAwait(false);
             }
             catch (ConcurrencyException) when (attempt < MaxRetries)
             {
                 // Lost a race: a concurrent erasure deleted rows this pass had loaded, or a login, stamp rotation or
                 // lockout moved the user's version. The failed save rolled back and cleared the tracker, so the next
-                // pass reloads, sees the current row (or the tombstone, finishing as AlreadyAnonymised).
-                askHook = false;
+                // pass reloads, sees the current row (or the tombstone, finishing as AlreadyAnonymised). The veto hook is
+                // asked again on every pass: the row it vetoed or allowed is not the row this pass is about to erase.
             }
         }
     }
 
-    private async Task<AnonymiseResult> RunAsync(Guid userId, bool askHook, CancellationToken cancellationToken)
+    private async Task<AnonymiseResult> RunAsync(Guid userId, CancellationToken cancellationToken)
     {
         var user = await IdentityScope.ResolveUserAsync(users, userId, cancellationToken).ConfigureAwait(false);
         // ResolveUserAsync falls back to a platform row from a tenant scope; erasure is stricter: the user's
@@ -114,7 +112,7 @@ public sealed class IdentityAnonymiser : IIdentityAnonymiser
 
         var tombstone = TombstoneName(user.Id);
         var already = user.UserName == tombstone && user.Email is null && user.PhoneNumber is null && !user.IsActive && user.PasswordHash is null;
-        if (!already && askHook)
+        if (!already)
         {
             var decision = await hooks.OnBeforeAnonymiseAsync(userId, cancellationToken).ConfigureAwait(false);
             if (!decision.IsAllowed)

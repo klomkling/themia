@@ -14,6 +14,9 @@ internal sealed class FakeUnitOfWork : IUnitOfWork
     /// <summary>How many saves (or transactions) still fail with a ConcurrencyException before one succeeds.</summary>
     public int ConcurrencyFailures { get; set; }
 
+    /// <summary>Runs each time a save loses the race, to change the world between two passes of a retry.</summary>
+    public Action? OnConcurrencyFailure { get; set; }
+
     public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
         if (ThrowOnSave)
@@ -40,6 +43,7 @@ internal sealed class FakeUnitOfWork : IUnitOfWork
         if (ConcurrencyFailures > 0)
         {
             ConcurrencyFailures--;
+            OnConcurrencyFailure?.Invoke();
             throw new ConcurrencyException("The row changed after it was loaded.");
         }
     }

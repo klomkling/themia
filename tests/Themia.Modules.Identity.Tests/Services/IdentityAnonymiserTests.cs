@@ -344,7 +344,7 @@ public class IdentityAnonymiserTests
     }
 
     [Fact]
-    public async Task Anonymise_survives_four_lost_races_in_a_row_and_asks_the_hook_once()
+    public async Task Anonymise_survives_four_lost_races_in_a_row_and_asks_the_hook_on_every_pass()
     {
         var u = AddUser(Acme);
         uow.ConcurrencyFailures = 4;
@@ -353,7 +353,22 @@ public class IdentityAnonymiserTests
 
         Assert.Equal(AnonymiseOutcome.Anonymised, result.Outcome);
         Assert.Equal($"anonymised-{u.Id:N}", Assert.Single(users).UserName);
-        Assert.Single(hooks.Asked, nameof(IUserLifecycleHooks.OnBeforeAnonymiseAsync));
+        Assert.Equal(5, hooks.Asked.Count(a => a == nameof(IUserLifecycleHooks.OnBeforeAnonymiseAsync)));
+    }
+
+    [Fact]
+    public async Task Anonymise_honours_a_veto_that_appears_between_a_lost_race_and_its_retry()
+    {
+        // A legal hold placed while the first pass was losing its race must stop the retry: the veto is asked on
+        // every pass, not once.
+        var u = AddUser(Acme);
+        uow.ConcurrencyFailures = 1;
+        uow.OnConcurrencyFailure = () => hooks.RefuseAnonymise = "legal hold";
+
+        var result = await Sut(Acme).AnonymiseAsync(u.Id);
+
+        Assert.Equal(AnonymiseOutcome.Refused, result.Outcome);
+        Assert.Equal(u.UserName, Assert.Single(users).UserName);
     }
 
     [Fact]
