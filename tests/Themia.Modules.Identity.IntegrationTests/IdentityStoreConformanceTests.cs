@@ -1667,7 +1667,9 @@ public abstract class IdentityStoreConformanceTests
     public async Task SetPasswordHash_rolled_back_with_the_callers_transaction_leaves_hash_and_token_untouched()
     {
         await ResetAsync();
-        await using var s = NewScope(new TenantId("acme"));
+        var seen = new MutationRecorder();
+        await using var s = NewScope(
+            new TenantId("acme"), configureServices: services => services.AddSingleton<IIdentityEventObserver>(seen));
         var user = (await s.Users.CreateAsync("rollback-me", "pw", "rollback@x.com")).UserId!.Value;
         var before = (await s.Users.FindByIdAsync(user))!.PasswordHash;
         var reset = await s.Tokens.GenerateAsync(user, TokenPurpose.PasswordReset);
@@ -1678,6 +1680,8 @@ public abstract class IdentityStoreConformanceTests
             await tx.RollbackAsync();
         }
 
+        // Pinned, not endorsed: observers are told when the call returns, before the caller's commit (see the XML doc).
+        Assert.Contains((user, UserMutation.Password), seen.Mutations);
         await using var fresh = NewScope(new TenantId("acme"));
         Assert.Equal(before, (await fresh.Users.FindByIdAsync(user))!.PasswordHash);
         Assert.Equal(TokenConsumeResult.Success, await fresh.Tokens.ConsumeAsync(user, TokenPurpose.PasswordReset, reset));
