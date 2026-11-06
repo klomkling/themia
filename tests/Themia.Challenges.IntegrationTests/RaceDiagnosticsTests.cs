@@ -11,6 +11,24 @@ namespace Themia.Challenges.IntegrationTests;
 public sealed class RaceDiagnosticsTests
 {
     [Fact]
+    public async Task WhenAllReported_ShouldMeetBothRacersAtAGate_WhenEachBlocksBeforeItsFirstAwait()
+    {
+        // A racer that reaches its blocking rendezvous synchronously (no incomplete await first) must not hold the
+        // caller: started inline it would wait for a partner that is never started, and time out alone.
+        using var gate = new Barrier(2);
+
+        var results = await RaceOutcome.WhenAllReportedAsync(() => Rendezvous(gate, 1), () => Rendezvous(gate, 2));
+
+        Assert.Equal([1, 2], results);
+        Assert.Equal(1, gate.CurrentPhaseNumber);
+    }
+
+    private static Task<int> Rendezvous(Barrier gate, int result) =>
+        gate.SignalAndWait(TimeSpan.FromSeconds(10))
+            ? Task.FromResult(result)
+            : throw new InvalidOperationException("the partner racer never arrived");
+
+    [Fact]
     public async Task WhenAllReported_ShouldReturnEveryResult_WhenNoRacerFails()
     {
         var results = await RaceOutcome.WhenAllReportedAsync(Task.FromResult(1), Task.FromResult(2));
