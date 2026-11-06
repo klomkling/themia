@@ -2,6 +2,8 @@ using System.Data.Common;
 
 using Dapper;
 
+using MySqlConnector;
+
 using Themia.Framework.Core.Abstractions.Tenancy;
 using Themia.Framework.Data.Sequences.Dialects;
 
@@ -13,6 +15,7 @@ namespace Themia.Framework.Data.Sequences;
 internal sealed class TransactionalSequenceAllocator : ITransactionalSequenceAllocator
 {
     private const string HostTenant = "";
+    private const int SideSeedAttempts = 3;
 
     private readonly ITenantContext tenantContext;
     private readonly ISequenceDialect dialect;
@@ -50,10 +53,7 @@ internal sealed class TransactionalSequenceAllocator : ITransactionalSequenceAll
             ?? throw new InvalidOperationException(
                 $"Cannot allocate sequence '{sequenceKey}': the provided transaction has no associated connection.");
 
-        // Lazy seeding inside the caller's transaction: ensures row exists race-free without requiring a separate pre-seed step.
-        await connection.ExecuteAsync(new CommandDefinition(
-            dialect.InsertIfMissingSql, new { tenant, key = sequenceKey, val = 1L }, tx, cancellationToken: ct))
-            .ConfigureAwait(false);
+        await SeedIfMissingAsync(tx, connection, tenant, sequenceKey, ct).ConfigureAwait(false);
 
         var current = await connection.QuerySingleOrDefaultAsync<long?>(new CommandDefinition(
             dialect.SelectForUpdateSql, new { tenant, key = sequenceKey }, tx, cancellationToken: ct))
@@ -85,6 +85,72 @@ internal sealed class TransactionalSequenceAllocator : ITransactionalSequenceAll
             .ConfigureAwait(false);
 
         return valueToReturn;
+    }
+
+    /// <summary>
+    /// Lazy seeding: makes sure the row exists without requiring a separate pre-seed step.
+    /// </summary>
+    /// <remarks>
+    /// On MySQL the seed commits independently of the caller's transaction. An uncommitted seed insert
+    /// that later rolls back makes every queued seeder of the same new key wake at once, and InnoDB
+    /// deadlocks them (error 1213); the victim loses its whole caller transaction, so the statement cannot be
+    /// retried in place. The seed row is always <c>next_value = 1</c>, so a caller rollback leaves exactly the
+    /// value an unseeded key would start at: gap-freeness still comes only from the in-transaction
+    /// <c>FOR UPDATE</c> and <c>UPDATE</c>. A connection that is not a <see cref="MySqlConnection"/> keeps the
+    /// in-transaction seed.
+    /// </remarks>
+    private async Task SeedIfMissingAsync(
+        DbTransaction tx, DbConnection connection, string tenant, string sequenceKey, CancellationToken ct)
+    {
+        if (dialect is not MySqlSequenceDialect mySql || connection is not MySqlConnection mySqlConnection)
+        {
+            await connection.ExecuteAsync(new CommandDefinition(
+                dialect.InsertIfMissingSql, new { tenant, key = sequenceKey, val = 1L }, tx, cancellationToken: ct))
+                .ConfigureAwait(false);
+            return;
+        }
+
+        // Only the first use of a key pays for a side connection. A second allocation of the same key inside one
+        // caller transaction must not reach the side seed: ON DUPLICATE KEY UPDATE takes an X lock on the row the
+        // caller already holds, and the caller would wait on its own lock until innodb_lock_wait_timeout.
+        var exists = await connection.QuerySingleOrDefaultAsync<int?>(new CommandDefinition(
+            mySql.ExistsSql, new { tenant, key = sequenceKey }, tx, cancellationToken: ct))
+            .ConfigureAwait(false);
+        if (exists is not null)
+        {
+            return;
+        }
+
+        await SeedOnSideConnectionAsync(mySql, mySqlConnection, tenant, sequenceKey, ct).ConfigureAwait(false);
+    }
+
+    private static async Task SeedOnSideConnectionAsync(
+        MySqlSequenceDialect mySql, MySqlConnection callerConnection, string tenant, string sequenceKey,
+        CancellationToken ct)
+    {
+        // The caller built its connection, so AutoEnlist is whatever they left it (default true). Set it off
+        // explicitly: joining an ambient System.Transactions scope would let their rollback take the seed back.
+        // A different connection string also means a separate pool, so the caller's pool cannot be starved.
+        var sideString = new MySqlConnectionStringBuilder(callerConnection.ConnectionString) { AutoEnlist = false }
+            .ConnectionString;
+
+        for (var attempt = 1; ; attempt++)
+        {
+            try
+            {
+                await using var side = callerConnection.CloneWith(sideString);
+                await side.OpenAsync(ct).ConfigureAwait(false);
+                await side.ExecuteAsync(new CommandDefinition(
+                    mySql.InsertIfMissingSql, new { tenant, key = sequenceKey, val = 1L }, cancellationToken: ct))
+                    .ConfigureAwait(false);
+                return;
+            }
+            catch (MySqlException ex) when (attempt < SideSeedAttempts
+                && ex.ErrorCode is MySqlErrorCode.LockDeadlock or MySqlErrorCode.LockWaitTimeout)
+            {
+                // Autocommit on a side connection: a deadlock victim loses only the seed, so retrying is safe.
+            }
+        }
     }
 
     private string RequireTenant(string sequenceKey)
