@@ -192,6 +192,7 @@ return result.Outcome switch
     UserMutationOutcome.Refused      => Conflict(result.Reason),
     UserMutationOutcome.Duplicate    => Conflict("That number is already in use."),
     UserMutationOutcome.UserNotFound => NotFound(),
+    UserMutationOutcome.Conflict     => Conflict("The user changed while you were editing it; reload and try again."),
     _ => throw new UnreachableException(),
 };
 ```

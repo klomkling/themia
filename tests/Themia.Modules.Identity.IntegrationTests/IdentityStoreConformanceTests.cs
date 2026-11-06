@@ -1935,6 +1935,33 @@ public abstract class IdentityStoreConformanceTests
         Assert.Null(await check.UserRepo.GetByIdAsync(bystander.Id));   // the failed save's other half did not leak into the retry
     }
 
+    [Fact] // re-saving the SAME stale instance after a Conflict must conflict again, never overwrite the winner
+    public async Task Re_saving_the_same_stale_instance_after_a_conflict_conflicts_again_and_the_winner_stays()
+    {
+        await ResetAsync();
+        var user = await SeedUserAsync("conflict-same-instance");
+        await using var s = NewScope(new TenantId("acme"));
+        var loaded = (await s.UserRepo.GetByIdAsync(user))!;
+
+        await using (var winner = NewScope(new TenantId("acme")))
+        {
+            var won = (await winner.UserRepo.GetByIdAsync(user))!;
+            won.PhoneNumber = "+66811116666";
+            winner.UserRepo.Update(won);
+            await winner.UnitOfWork.SaveChangesAsync();   // moves the row from the loaded version to loaded + 1
+        }
+
+        loaded.PhoneNumber = "+66811117777";
+        s.UserRepo.Update(loaded);
+        await Assert.ThrowsAsync<ConcurrencyException>(() => s.UnitOfWork.SaveChangesAsync());
+
+        s.UserRepo.Update(loaded);   // the caller retries with the instance it still holds
+        await Assert.ThrowsAsync<ConcurrencyException>(() => s.UnitOfWork.SaveChangesAsync());
+
+        await using var check = NewScope(new TenantId("acme"));
+        Assert.Equal("+66811116666", (await check.UserRepo.GetByIdAsync(user))!.PhoneNumber);
+    }
+
     [Fact] // the contract documented on IVersionedEntity: a bulk write then an Update of an earlier load self-conflicts
     public async Task A_bulk_write_then_an_update_of_the_same_loaded_user_in_one_scope_conflicts()
     {

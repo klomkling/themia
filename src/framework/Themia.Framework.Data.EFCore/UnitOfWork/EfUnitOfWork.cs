@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Themia.Framework.Core.Abstractions.Entities;
 using Themia.Framework.Data.Abstractions.Exceptions;
 using Themia.Framework.Data.Abstractions.Filtering;
 using Themia.Framework.Data.Abstractions.UnitOfWork;
@@ -49,10 +50,21 @@ public sealed class EfUnitOfWork(ThemiaDbContext context, IDataFilterScope filte
             // readable and the next load of the losers reads the row as it now is.
             foreach (var entry in context.ChangeTracker.Entries().ToList())
             {
-                if (entry.State is EntityState.Added or EntityState.Modified or EntityState.Deleted)
+                if (entry.State is not (EntityState.Added or EntityState.Modified or EntityState.Deleted))
                 {
-                    entry.State = EntityState.Detached;
+                    continue;
                 }
+
+                if (entry is { State: EntityState.Modified, Entity: IVersionedEntity })
+                {
+                    // The save bumped the instance to original + 1 before the UPDATE ran. Put the loaded version
+                    // back: a caller that re-attaches this same instance with Update would otherwise carry
+                    // original + 1, which is exactly the version a winner just wrote, and overwrite it.
+                    var version = entry.Property(nameof(IVersionedEntity.ConcurrencyVersion));
+                    version.CurrentValue = version.OriginalValue;
+                }
+
+                entry.State = EntityState.Detached;
             }
 
             throw new ConcurrencyException(
