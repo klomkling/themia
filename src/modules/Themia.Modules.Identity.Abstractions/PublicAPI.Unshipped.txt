@@ -715,3 +715,5 @@ Themia.Modules.Identity.Abstractions.Entities.User.ConcurrencyVersion.get -> lon
 Themia.Modules.Identity.Abstractions.Entities.User.ConcurrencyVersion.set -> void
 Themia.Modules.Identity.Abstractions.UserMutationOutcome.Conflict = 4 -> Themia.Modules.Identity.Abstractions.UserMutationOutcome
 static Themia.Modules.Identity.Abstractions.UserMutationResult.Conflict() -> Themia.Modules.Identity.Abstractions.UserMutationResult
+Themia.Modules.Identity.Abstractions.IUserPasswordHashService
+Themia.Modules.Identity.Abstractions.IUserPasswordHashService.SetPasswordHashAsync(System.Guid userId, string? passwordHash, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Identity.Abstractions.UserMutationResult>!

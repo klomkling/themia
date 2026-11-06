@@ -13,7 +13,7 @@ using Themia.Modules.Identity.Specifications;
 namespace Themia.Modules.Identity.Services;
 
 /// <summary>Default <see cref="IUserService"/> over the Themia data abstractions.</summary>
-public sealed class UserService : IUserService
+public sealed class UserService : IUserService, IUserPasswordHashService
 {
     private readonly IRepository<User, Guid> users;
     private readonly IUnitOfWork unitOfWork;
@@ -511,7 +511,23 @@ public sealed class UserService : IUserService
         return RetryOnConflictAsync(() => SetPasswordPassAsync(userId, password, write, cancellationToken));
     }
 
-    private async Task<UserMutationResult> SetPasswordPassAsync(Guid userId, string password, PasswordWrite write, CancellationToken cancellationToken)
+    /// <summary>Column width of <c>password_hash</c> (see IdentitySchemaMigration).</summary>
+    private const int MaxPasswordHashLength = 1024;
+
+    /// <inheritdoc />
+    public Task<UserMutationResult> SetPasswordHashAsync(Guid userId, string? passwordHash, CancellationToken cancellationToken = default)
+    {
+        if (passwordHash is not null)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(passwordHash);
+            ArgumentOutOfRangeException.ThrowIfGreaterThan(passwordHash.Length, MaxPasswordHashLength);
+        }
+
+        var write = new PasswordWrite { Hash = passwordHash, IsHashed = true };
+        return RetryOnConflictAsync(() => SetPasswordPassAsync(userId, null, write, cancellationToken));
+    }
+
+    private async Task<UserMutationResult> SetPasswordPassAsync(Guid userId, string? password, PasswordWrite write, CancellationToken cancellationToken)
     {
         var user = await IdentityScope.ResolveUserAsync(users, userId, cancellationToken).ConfigureAwait(false);
         if (user is null || IdentityAnonymiser.IsTombstone(user))
@@ -529,7 +545,13 @@ public sealed class UserService : IUserService
         // Every pass, not once: it is one conditional UPDATE, and a reset link issued between two passes must not
         // survive the password change that finally lands.
         await VoidResetTokensAsync(user.Id, cancellationToken).ConfigureAwait(false);
-        user.PasswordHash = write.Hash ??= passwordHasher.Hash(password);
+        if (!write.IsHashed)
+        {
+            write.Hash = passwordHasher.Hash(password!);
+            write.IsHashed = true;
+        }
+
+        user.PasswordHash = write.Hash;
         user.SecurityStamp = SecurityStampCache.NewStamp();
         // A reset proves ownership, so it also lifts a lock: otherwise a victim whose account was locked by someone
         // else's guesses would wait out the full (possibly progressive) lock after recovering.
@@ -565,11 +587,14 @@ public sealed class UserService : IUserService
         }
     }
 
-    // What a SetPasswordAsync call computes once and keeps across its passes: the Argon2 hash, which is expensive and
-    // the widest part of the race window.
+    // What a password write computes once and keeps across its passes: the Argon2 hash, which is expensive and
+    // the widest part of the race window. IsHashed is separate from Hash because a caller-supplied null is a
+    // decision (clear the password), not "not computed yet".
     private sealed class PasswordWrite
     {
         public string? Hash { get; set; }
+
+        public bool IsHashed { get; set; }
     }
 
     /// <summary>Bound on gate retries per guess. Each lost round means another guess was charged, and a lock stops

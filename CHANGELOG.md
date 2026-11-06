@@ -27,6 +27,10 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+### Added
+
+- **Identity: `IUserPasswordHashService.SetPasswordHashAsync` (coord #0202).** Writes a password hash the caller already computed (`null` clears it), through the same pass as `SetPasswordAsync`: it rotates the security stamp, voids the user's live password-reset links, lifts a lock and announces `UserMutation.Password`. For an app that keeps its own hash and mirrors it into Themia, where `SetPasswordAsync` would hash the plaintext again. A separate interface, resolved as the same scoped instance as `IUserService` (a replaced `IUserService` that does not implement it fails at resolve time), so existing `IUserService` implementers do not break. Inside the caller's transaction, save your own writes first so nothing else is pending (a lost race discards the whole unit of work's pending changes and the retry still reports success), call it last before committing, and roll back on any non-success result: the stamp-cache eviction and the announcement happen before the commit. A hash the configured `IPasswordHasher` cannot parse (bcrypt under Argon2id) never verifies and counts as a failed login attempt.
+
 ## [0.56.0] - 2026-11-06
 
 ### Fixed

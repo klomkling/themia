@@ -110,6 +110,15 @@ public static class IdentityServiceCollectionExtensions
         services.TryAddScoped<IUserLifecycleHooks, NoOpUserLifecycleHooks>();
 
         services.TryAddScoped<IUserService, UserService>();
+
+        // The same instance as IUserService, so a call through either sees one unit of work. An adopter who
+        // replaced IUserService with a service that does not implement this gets a clear error at resolve time.
+        services.TryAddScoped<IUserPasswordHashService>(static sp =>
+            sp.GetRequiredService<IUserService>() as IUserPasswordHashService
+            ?? throw new InvalidOperationException(
+                $"{nameof(IUserPasswordHashService)} is implemented by the default UserService; the registered "
+                + $"{nameof(IUserService)} does not implement it. Register your own {nameof(IUserPasswordHashService)}."));
+
         services.TryAddScoped<IIdentityAnonymiser, IdentityAnonymiser>();
         services.TryAddScoped<IRoleService, RoleService>();
         services.TryAddScoped<IRoleLevelService, RoleLevelService>();
