@@ -118,7 +118,10 @@ public sealed class UserService : IUserService
     }
 
     /// <summary>Kills every live password-reset token of the user. It runs before the change is saved, so a failure
-    /// leaves the old value and no live link rather than a new value with an old link still redeemable.</summary>
+    /// leaves the old value and no live link rather than a new value with an old link still redeemable. The void is
+    /// its own statement, not part of the save: if the save then loses a race
+    /// (<see cref="UserMutationOutcome.Conflict"/>), the user row is unchanged but the reset links are already spent
+    /// and the user must request a new one.</summary>
     private async Task VoidResetTokensAsync(Guid userId, CancellationToken cancellationToken)
     {
         if (tokens is null)
@@ -136,7 +139,9 @@ public sealed class UserService : IUserService
     /// <summary>
     /// Runs a save and reports whether it landed. A <see cref="ConcurrencyException"/> means the user row changed
     /// after it was loaded (an erasure, a stamp rotation, a lockout, another mutator), so the caller gets
-    /// <see cref="UserMutationOutcome.Conflict"/> and nothing was written; retrying means reloading the user.
+    /// <see cref="UserMutationOutcome.Conflict"/> and the user row was not written; retrying means reloading the user.
+    /// A password, email or phone change has already voided the user's reset links by then (see
+    /// <c>VoidResetTokensAsync</c>), so the retry must also issue a new link if one is needed.
     /// </summary>
     private static async Task<bool> TrySaveAsync(Func<Task> save)
     {

@@ -1899,6 +1899,38 @@ public abstract class IdentityStoreConformanceTests
         Assert.NotNull((await check.UserRepo.GetByIdAsync(user))!.LockoutEnd);
     }
 
+    [Fact] // after a Conflict the same scope can reload the user, see the current row and save the retry
+    public async Task After_a_conflict_the_same_scope_reloads_the_current_row_and_the_retry_saves()
+    {
+        await ResetAsync();
+        var user = await SeedUserAsync("conflict-reload");
+        await using var s = NewScope(new TenantId("acme"));
+        var loaded = (await s.UserRepo.GetByIdAsync(user))!;
+
+        await using (var other = NewScope(new TenantId("acme")))
+        {
+            await other.UserRepo.UpdateWhereAsync(
+                new WhereSpec<User>(u => u.Id == user), set => set.Set(u => u.LockoutEnd, (DateTimeOffset?)DateTimeOffset.UtcNow.AddHours(1)));
+        }
+
+        loaded.PhoneNumber = "+66811115555";
+        s.UserRepo.Update(loaded);
+        await Assert.ThrowsAsync<ConcurrencyException>(() => s.UnitOfWork.SaveChangesAsync());
+
+        var reloaded = (await s.UserRepo.GetByIdAsync(user))!;
+        Assert.NotNull(reloaded.LockoutEnd);
+        Assert.NotSame(loaded, reloaded);
+
+        reloaded.PhoneNumber = "+66811115555";
+        s.UserRepo.Update(reloaded);
+        await s.UnitOfWork.SaveChangesAsync();
+
+        await using var check = NewScope(new TenantId("acme"));
+        var row = (await check.UserRepo.GetByIdAsync(user))!;
+        Assert.Equal("+66811115555", row.PhoneNumber);
+        Assert.NotNull(row.LockoutEnd);
+    }
+
     [Fact] // the contract documented on IVersionedEntity: a bulk write then an Update of an earlier load self-conflicts
     public async Task A_bulk_write_then_an_update_of_the_same_loaded_user_in_one_scope_conflicts()
     {

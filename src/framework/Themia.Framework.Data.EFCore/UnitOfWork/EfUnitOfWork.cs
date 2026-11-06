@@ -42,6 +42,14 @@ public sealed class EfUnitOfWork(ThemiaDbContext context, IDataFilterScope filte
         }
         catch (DbUpdateConcurrencyException ex)
         {
+            // Drop the entries that lost the race. Left tracked and Modified they would make a reload in this
+            // scope return the stale instance, a retry conflict again, and the next SaveChanges throw the raw
+            // DbUpdateConcurrencyException; detached, the next load reads the row as it now is.
+            foreach (var entry in ex.Entries)
+            {
+                entry.State = EntityState.Detached;
+            }
+
             throw new ConcurrencyException(
                 "A tracked update or delete affected no rows: the row does not exist, was concurrently deleted, " +
                 "or is outside the current tenant scope.", ex);
