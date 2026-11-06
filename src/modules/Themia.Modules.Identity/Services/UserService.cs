@@ -99,8 +99,10 @@ public sealed class UserService : IUserService
     {
         using (TenantContextAccessor.BeginScope(user.TenantId))
         {
-            await hooks.OnUserMutatedAsync(user.Id, mutation, cancellationToken).ConfigureAwait(false);
+            // Observers first: they swallow their own failures, while a throwing hook would skip them, and an
+            // observer may be the only thing voiding links that the committed mutation made stale.
             await RaiseAsync((o, ct) => o.OnUserMutatedAsync(user.Id, mutation, ct), cancellationToken).ConfigureAwait(false);
+            await hooks.OnUserMutatedAsync(user.Id, mutation, cancellationToken).ConfigureAwait(false);
         }
     }
 
@@ -278,7 +280,7 @@ public sealed class UserService : IUserService
     public async Task<UserMutationResult> SetEmailAsync(Guid userId, string? email, CancellationToken cancellationToken = default)
     {
         var user = await IdentityScope.ResolveUserAsync(users, userId, cancellationToken).ConfigureAwait(false);
-        if (user is null)
+        if (user is null || IdentityAnonymiser.IsTombstone(user))
         {
             return UserMutationResult.UserNotFound();
         }
@@ -344,7 +346,7 @@ public sealed class UserService : IUserService
     public async Task<UserMutationResult> SetPhoneNumberAsync(Guid userId, string? phoneNumber, CancellationToken cancellationToken = default)
     {
         var user = await IdentityScope.ResolveUserAsync(users, userId, cancellationToken).ConfigureAwait(false);
-        if (user is null)
+        if (user is null || IdentityAnonymiser.IsTombstone(user))
         {
             return UserMutationResult.UserNotFound();
         }
@@ -419,7 +421,7 @@ public sealed class UserService : IUserService
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(password);
         var user = await IdentityScope.ResolveUserAsync(users, userId, cancellationToken).ConfigureAwait(false);
-        if (user is null)
+        if (user is null || IdentityAnonymiser.IsTombstone(user))
         {
             return UserMutationResult.UserNotFound();
         }
@@ -611,7 +613,7 @@ public sealed class UserService : IUserService
     public async Task<UserMutationResult> SetActiveAsync(Guid userId, bool isActive, CancellationToken cancellationToken = default)
     {
         var user = await IdentityScope.ResolveUserAsync(users, userId, cancellationToken).ConfigureAwait(false);
-        if (user is null)
+        if (user is null || IdentityAnonymiser.IsTombstone(user))
         {
             return UserMutationResult.UserNotFound();
         }

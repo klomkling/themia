@@ -343,6 +343,37 @@ public class UserServiceTests
         Assert.False(Assert.Single(store).IsActive);
     }
 
+    public static TheoryData<string, Func<UserService, Guid, Task<UserMutationResult>>> TombstoneMutators => new()
+    {
+        { "SetPassword", (s, id) => s.SetPasswordAsync(id, "new-password") },
+        { "SetActive", (s, id) => s.SetActiveAsync(id, true) },
+        { "SetEmail", (s, id) => s.SetEmailAsync(id, "back@example.com") },
+        { "ConfirmEmail", (s, id) => s.ConfirmEmailAsync(id) },
+        { "SetPhone", (s, id) => s.SetPhoneNumberAsync(id, "+66812345678") },
+        { "ConfirmPhone", (s, id) => s.ConfirmPhoneNumberAsync(id) },
+    };
+
+    [Theory]
+    [MemberData(nameof(TombstoneMutators))]
+    public async Task Mutators_treat_an_anonymised_user_as_not_found_and_write_nothing(
+        string mutator, Func<UserService, Guid, Task<UserMutationResult>> mutate)
+    {
+        var tombstone = new User { UserName = "x", NormalizedUserName = "X", IsActive = false, TenantId = new TenantId("acme") };
+        tombstone.SetId(Guid.NewGuid());
+        tombstone.UserName = $"anonymised-{tombstone.Id:N}";
+        store.Add(tombstone);
+        var saves = uow.SaveCount;
+
+        var result = await mutate(sut, tombstone.Id);
+
+        Assert.True(UserMutationOutcome.UserNotFound == result.Outcome, mutator);
+        Assert.Equal(saves, uow.SaveCount);
+        Assert.Null(tombstone.PasswordHash);
+        Assert.Null(tombstone.Email);
+        Assert.False(tombstone.IsActive);
+        Assert.Empty(hooks.Observed);
+    }
+
     /// <summary>Minimal hasher to drive the rehash path deterministically.</summary>
     private sealed class StubPasswordHasher : IPasswordHasher
     {

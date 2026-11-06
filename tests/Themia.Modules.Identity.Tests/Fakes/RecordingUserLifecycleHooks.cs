@@ -24,6 +24,9 @@ internal sealed class RecordingUserLifecycleHooks : IUserLifecycleHooks
     /// <summary>The machine code every refusal carries; null refuses with a reason only.</summary>
     public string? RefusalCode { get; set; }
 
+    /// <summary>Makes <see cref="IUserLifecycleHooks.OnUserMutatedAsync"/> throw after recording the call.</summary>
+    public bool ThrowOnMutated { get; set; }
+
     /// <summary>The mutations announced through <see cref="IUserLifecycleHooks.OnUserMutatedAsync"/>.</summary>
     public List<UserMutation> Observed { get; } = [];
 
@@ -102,6 +105,11 @@ internal sealed class RecordingUserLifecycleHooks : IUserLifecycleHooks
         Guid userId, UserMutation mutation, CancellationToken cancellationToken = default)
     {
         Observed.Add(mutation);
+        if (ThrowOnMutated)
+        {
+            throw new InvalidOperationException("hook failed after commit");
+        }
+
         return ValueTask.CompletedTask;
     }
 

@@ -300,8 +300,36 @@ public class IdentityAnonymiserTests
 
         await Sut(Acme).AnonymiseAsync(u.Id);
 
-        Assert.Equal(UserMutation.Anonymised, Assert.Single(hooks.Observed));
-        Assert.Equal((u.Id, UserMutation.Anonymised), Assert.Single(observer.Mutations));
+        // Password is raised too: erasure nulls the hash, and observers that void reset/invite links key on it.
+        const UserMutation expected = UserMutation.Password | UserMutation.Anonymised;
+        Assert.Equal(expected, Assert.Single(hooks.Observed));
+        Assert.Equal((u.Id, expected), Assert.Single(observer.Mutations));
+    }
+
+    [Fact]
+    public async Task Anonymise_runs_observers_even_when_the_hook_throws()
+    {
+        var u = AddUser(Acme);
+        hooks.ThrowOnMutated = true;
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => Sut(Acme).AnonymiseAsync(u.Id));
+
+        Assert.Equal(u.Id, Assert.Single(observer.Mutations).UserId);
+    }
+
+    [Fact]
+    public async Task Anonymise_of_an_already_anonymised_user_announces_nothing()
+    {
+        var u = AddUser(Acme);
+        await Sut(Acme).AnonymiseAsync(u.Id);
+        hooks.Observed.Clear();
+        observer.Mutations.Clear();
+
+        var again = await Sut(Acme).AnonymiseAsync(u.Id);
+
+        Assert.Equal(AnonymiseOutcome.AlreadyAnonymised, again.Outcome);
+        Assert.Empty(hooks.Observed);
+        Assert.Empty(observer.Mutations);
     }
 
     [Fact]
