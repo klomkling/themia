@@ -1,0 +1,231 @@
+#nullable enable
+const Themia.SecondFactor.AmrClaims.EmailOtp = "email_otp" -> string!
+const Themia.SecondFactor.AmrClaims.HardwareKey = "hwk" -> string!
+const Themia.SecondFactor.AmrClaims.Mfa = "mfa" -> string!
+const Themia.SecondFactor.AmrClaims.Otp = "otp" -> string!
+const Themia.SecondFactor.AmrClaims.Password = "pwd" -> string!
+const Themia.SecondFactor.AmrClaims.Sms = "sms" -> string!
+const Themia.SecondFactor.AmrClaims.SoftwareKey = "swk" -> string!
+const Themia.SecondFactor.RecoveryCodeGenerator.DefaultCount = 10 -> int
+const Themia.SecondFactor.RecoveryCodeHasher.Scheme = "hmac-sha256-v1" -> string!
+static readonly Themia.SecondFactor.MfaRule.DefaultSpareGrace -> System.TimeSpan
+static Themia.SecondFactor.AmrClaims.ForRecoveryCode() -> System.Collections.Generic.IReadOnlyList<string!>!
+static Themia.SecondFactor.AmrClaims.ForSecondFactor(Themia.SecondFactor.MfaMethodKind kind) -> System.Collections.Generic.IReadOnlyList<string!>!
+static Themia.SecondFactor.DependencyInjection.SecondFactorServiceCollectionExtensions.AddThemiaSecondFactor(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, byte[]! recoveryCodeKey, System.Action<Themia.SecondFactor.MfaPolicyOptions!>? configure = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static Themia.SecondFactor.FederatedMfaOutcomeExtensions.Succeeded(this Themia.SecondFactor.FederatedMfaOutcome outcome) -> bool
+static Themia.SecondFactor.FederatedMfaVerifier.Satisfies(Themia.SecondFactor.FederatedAssertion! assertion, System.Collections.Generic.IReadOnlyCollection<string!>! trustedIssuers, System.TimeSpan maxAge, System.DateTimeOffset now) -> Themia.SecondFactor.FederatedMfaOutcome
+static Themia.SecondFactor.MfaMethodKindExtensions.Strength(this Themia.SecondFactor.MfaMethodKind kind) -> Themia.SecondFactor.MfaStrength
+static Themia.SecondFactor.MfaRule.Mandatory(int minimumEnrolled = 1, System.Collections.Generic.IEnumerable<Themia.SecondFactor.MfaMethodKind>? offered = null, System.TimeSpan? spareGrace = null) -> Themia.SecondFactor.MfaRule!
+static Themia.SecondFactor.MfaRule.Optional() -> Themia.SecondFactor.MfaRule!
+static Themia.SecondFactor.RecoveryCodeGenerator.Generate(int count = 10) -> System.Collections.Generic.IReadOnlyList<string!>!
+Themia.SecondFactor.AmrClaims
+Themia.SecondFactor.DependencyInjection.SecondFactorServiceCollectionExtensions
+Themia.SecondFactor.FederatedAssertion
+Themia.SecondFactor.FederatedAssertion.Amr.get -> System.Collections.Generic.IReadOnlyCollection<string!>!
+Themia.SecondFactor.FederatedAssertion.Amr.init -> void
+Themia.SecondFactor.FederatedAssertion.AuthTime.get -> System.DateTimeOffset?
+Themia.SecondFactor.FederatedAssertion.AuthTime.init -> void
+Themia.SecondFactor.FederatedAssertion.FederatedAssertion(string! Issuer, System.Collections.Generic.IReadOnlyCollection<string!>! Amr, System.DateTimeOffset? AuthTime) -> void
+Themia.SecondFactor.FederatedAssertion.Issuer.get -> string!
+Themia.SecondFactor.FederatedAssertion.Issuer.init -> void
+Themia.SecondFactor.FederatedMfaOutcome
+Themia.SecondFactor.FederatedMfaOutcome.MissingAuthTime = 4 -> Themia.SecondFactor.FederatedMfaOutcome
+Themia.SecondFactor.FederatedMfaOutcome.MissingMfa = 2 -> Themia.SecondFactor.FederatedMfaOutcome
+Themia.SecondFactor.FederatedMfaOutcome.NoStrongMethod = 3 -> Themia.SecondFactor.FederatedMfaOutcome
+Themia.SecondFactor.FederatedMfaOutcome.Satisfied = 0 -> Themia.SecondFactor.FederatedMfaOutcome
+Themia.SecondFactor.FederatedMfaOutcome.StaleAuthTime = 5 -> Themia.SecondFactor.FederatedMfaOutcome
+Themia.SecondFactor.FederatedMfaOutcome.UntrustedIssuer = 1 -> Themia.SecondFactor.FederatedMfaOutcome
+Themia.SecondFactor.FederatedMfaOutcomeExtensions
+Themia.SecondFactor.FederatedMfaVerifier
+Themia.SecondFactor.IMfaAuditLog
+Themia.SecondFactor.IMfaAuditLog.AppendAsync(Themia.SecondFactor.MfaAuditEntry! entry, System.DateTimeOffset now, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.SecondFactor.IMfaCeremonyStore
+Themia.SecondFactor.IMfaCeremonyStore.StoreAsync(string! challengeId, string! optionsJson, string? tenantId, string? userId, Themia.SecondFactor.MfaCeremonyPurpose purpose, System.TimeSpan ttl, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.SecondFactor.IMfaCeremonyStore.TryConsumeAsync(string! challengeId, string? userId, Themia.SecondFactor.MfaCeremonyPurpose purpose, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.SecondFactor.MfaCeremony?>!
+Themia.SecondFactor.IMfaMethodStore
+Themia.SecondFactor.IMfaMethodStore.AddAsync(Themia.SecondFactor.NewMfaMethod! method, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.SecondFactor.MfaEnrolOutcome>!
+Themia.SecondFactor.IMfaMethodStore.FindPasskeyAsync(byte[]! credentialId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.SecondFactor.StoredPasskey?>!
+Themia.SecondFactor.IMfaMethodStore.FindTotpAsync(string? tenantId, string! userId, System.Guid methodId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.SecondFactor.StoredTotp?>!
+Themia.SecondFactor.IMfaMethodStore.ListAsync(string? tenantId, string! userId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Themia.SecondFactor.MfaMethod!>!>!
+Themia.SecondFactor.IMfaMethodStore.ListPasskeyCredentialIdsAsync(string? tenantId, string! userId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<byte[]!>!>!
+Themia.SecondFactor.IMfaMethodStore.RemoveAsync(string? tenantId, string! userId, System.Guid methodId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!
+Themia.SecondFactor.IMfaMethodStore.TryAdvanceTotpStepAsync(string? tenantId, string! userId, System.Guid methodId, long step, System.DateTimeOffset now, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!
+Themia.SecondFactor.IMfaMethodStore.TryUpdateSignCountAsync(string? tenantId, string! userId, System.Guid methodId, long newSignCount, System.DateTimeOffset now, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!
+Themia.SecondFactor.IMfaPolicy
+Themia.SecondFactor.IMfaPolicy.Evaluate(Themia.SecondFactor.MfaSubject! subject, Themia.SecondFactor.MfaPrimary! primary, System.Collections.Generic.IReadOnlyCollection<Themia.SecondFactor.MfaMethod!>! methods, System.DateTimeOffset? spareNagStartedAt, System.DateTimeOffset now) -> Themia.SecondFactor.MfaRequirement!
+Themia.SecondFactor.IMfaRecoveryCodeStore
+Themia.SecondFactor.IMfaRecoveryCodeStore.CountUnusedAsync(string? tenantId, string! userId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<int>!
+Themia.SecondFactor.IMfaRecoveryCodeStore.ReplaceAsync(string? tenantId, string! userId, System.Collections.Generic.IReadOnlyCollection<string!>! codeHashes, string! hashScheme, System.DateTimeOffset now, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.SecondFactor.IMfaRecoveryCodeStore.TryConsumeAsync(string? tenantId, string! userId, string! codeHash, System.DateTimeOffset now, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!
+Themia.SecondFactor.IMfaUserStateStore
+Themia.SecondFactor.IMfaUserStateStore.GetLockStateAsync(string? tenantId, string! userId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.SecondFactor.MfaLockState!>!
+Themia.SecondFactor.IMfaUserStateStore.GetSpareNagStartedAtAsync(string? tenantId, string! userId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.DateTimeOffset?>!
+Themia.SecondFactor.IMfaUserStateStore.RecordFailureAsync(string? tenantId, string! userId, int maxFailures, System.TimeSpan lockFor, System.DateTimeOffset now, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.SecondFactor.MfaLockState!>!
+Themia.SecondFactor.IMfaUserStateStore.ResetFailuresAsync(string? tenantId, string! userId, System.DateTimeOffset now, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.SecondFactor.IMfaUserStateStore.StartSpareNagAsync(string? tenantId, string! userId, System.DateTimeOffset now, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.SecondFactor.MfaAuditEntry
+Themia.SecondFactor.MfaAuditEntry.Action.get -> string!
+Themia.SecondFactor.MfaAuditEntry.Action.init -> void
+Themia.SecondFactor.MfaAuditEntry.Actor.get -> string!
+Themia.SecondFactor.MfaAuditEntry.Actor.init -> void
+Themia.SecondFactor.MfaAuditEntry.MethodKind.get -> Themia.SecondFactor.MfaMethodKind?
+Themia.SecondFactor.MfaAuditEntry.MethodKind.init -> void
+Themia.SecondFactor.MfaAuditEntry.MfaAuditEntry(string? TenantId, string! TargetUserId, string! Actor, string! Action, Themia.SecondFactor.MfaMethodKind? MethodKind, string? Reason) -> void
+Themia.SecondFactor.MfaAuditEntry.Reason.get -> string?
+Themia.SecondFactor.MfaAuditEntry.Reason.init -> void
+Themia.SecondFactor.MfaAuditEntry.TargetUserId.get -> string!
+Themia.SecondFactor.MfaAuditEntry.TargetUserId.init -> void
+Themia.SecondFactor.MfaAuditEntry.TenantId.get -> string?
+Themia.SecondFactor.MfaAuditEntry.TenantId.init -> void
+Themia.SecondFactor.MfaCeremony
+Themia.SecondFactor.MfaCeremony.MfaCeremony(string! OptionsJson, string? UserId) -> void
+Themia.SecondFactor.MfaCeremony.OptionsJson.get -> string!
+Themia.SecondFactor.MfaCeremony.OptionsJson.init -> void
+Themia.SecondFactor.MfaCeremony.UserId.get -> string?
+Themia.SecondFactor.MfaCeremony.UserId.init -> void
+Themia.SecondFactor.MfaCeremonyPurpose
+Themia.SecondFactor.MfaCeremonyPurpose.Authenticate = 1 -> Themia.SecondFactor.MfaCeremonyPurpose
+Themia.SecondFactor.MfaCeremonyPurpose.Register = 0 -> Themia.SecondFactor.MfaCeremonyPurpose
+Themia.SecondFactor.MfaEnrolOutcome
+Themia.SecondFactor.MfaEnrolOutcome.Added = 0 -> Themia.SecondFactor.MfaEnrolOutcome
+Themia.SecondFactor.MfaEnrolOutcome.DuplicateCredential = 1 -> Themia.SecondFactor.MfaEnrolOutcome
+Themia.SecondFactor.MfaLockState
+Themia.SecondFactor.MfaLockState.FailedAttempts.get -> int
+Themia.SecondFactor.MfaLockState.FailedAttempts.init -> void
+Themia.SecondFactor.MfaLockState.IsLocked(System.DateTimeOffset now) -> bool
+Themia.SecondFactor.MfaLockState.LockedUntil.get -> System.DateTimeOffset?
+Themia.SecondFactor.MfaLockState.LockedUntil.init -> void
+Themia.SecondFactor.MfaLockState.MfaLockState(int FailedAttempts, System.DateTimeOffset? LockedUntil) -> void
+Themia.SecondFactor.MfaMethod
+Themia.SecondFactor.MfaMethod.DisabledAt.get -> System.DateTimeOffset?
+Themia.SecondFactor.MfaMethod.DisabledAt.init -> void
+Themia.SecondFactor.MfaMethod.EnrolledAt.get -> System.DateTimeOffset
+Themia.SecondFactor.MfaMethod.EnrolledAt.init -> void
+Themia.SecondFactor.MfaMethod.Id.get -> System.Guid
+Themia.SecondFactor.MfaMethod.Id.init -> void
+Themia.SecondFactor.MfaMethod.IsUsable.get -> bool
+Themia.SecondFactor.MfaMethod.Kind.get -> Themia.SecondFactor.MfaMethodKind
+Themia.SecondFactor.MfaMethod.Kind.init -> void
+Themia.SecondFactor.MfaMethod.Label.get -> string!
+Themia.SecondFactor.MfaMethod.Label.init -> void
+Themia.SecondFactor.MfaMethod.MfaMethod(System.Guid Id, Themia.SecondFactor.MfaMethodKind Kind, string! Label, System.DateTimeOffset EnrolledAt, System.DateTimeOffset? DisabledAt) -> void
+Themia.SecondFactor.MfaMethodKind
+Themia.SecondFactor.MfaMethodKind.EmailOtp = 2 -> Themia.SecondFactor.MfaMethodKind
+Themia.SecondFactor.MfaMethodKind.Passkey = 0 -> Themia.SecondFactor.MfaMethodKind
+Themia.SecondFactor.MfaMethodKind.SmsOtp = 3 -> Themia.SecondFactor.MfaMethodKind
+Themia.SecondFactor.MfaMethodKind.Totp = 1 -> Themia.SecondFactor.MfaMethodKind
+Themia.SecondFactor.MfaMethodKindExtensions
+Themia.SecondFactor.MfaPolicy
+Themia.SecondFactor.MfaPolicy.Evaluate(Themia.SecondFactor.MfaSubject! subject, Themia.SecondFactor.MfaPrimary! primary, System.Collections.Generic.IReadOnlyCollection<Themia.SecondFactor.MfaMethod!>! methods, System.DateTimeOffset? spareNagStartedAt, System.DateTimeOffset now) -> Themia.SecondFactor.MfaRequirement!
+Themia.SecondFactor.MfaPolicy.MfaPolicy(Themia.SecondFactor.MfaPolicyOptions! options) -> void
+Themia.SecondFactor.MfaPolicyOptions
+Themia.SecondFactor.MfaPolicyOptions.Default.get -> Themia.SecondFactor.MfaRule!
+Themia.SecondFactor.MfaPolicyOptions.Default.set -> void
+Themia.SecondFactor.MfaPolicyOptions.MfaPolicyOptions() -> void
+Themia.SecondFactor.MfaPolicyOptions.Roles.get -> System.Collections.Generic.Dictionary<string!, Themia.SecondFactor.MfaRule!>!
+Themia.SecondFactor.MfaPrimary
+Themia.SecondFactor.MfaPrimary.Kind.get -> Themia.SecondFactor.MfaPrimaryKind
+Themia.SecondFactor.MfaPrimary.Kind.init -> void
+Themia.SecondFactor.MfaPrimary.MfaPrimary(Themia.SecondFactor.MfaPrimaryKind Kind, string? Provider = null) -> void
+Themia.SecondFactor.MfaPrimary.Provider.get -> string?
+Themia.SecondFactor.MfaPrimary.Provider.init -> void
+Themia.SecondFactor.MfaPrimaryKind
+Themia.SecondFactor.MfaPrimaryKind.EmailLink = 1 -> Themia.SecondFactor.MfaPrimaryKind
+Themia.SecondFactor.MfaPrimaryKind.External = 2 -> Themia.SecondFactor.MfaPrimaryKind
+Themia.SecondFactor.MfaPrimaryKind.Password = 0 -> Themia.SecondFactor.MfaPrimaryKind
+Themia.SecondFactor.MfaRequirement
+Themia.SecondFactor.MfaRequirement.EnrolKinds.get -> System.Collections.Generic.IReadOnlyCollection<Themia.SecondFactor.MfaMethodKind>!
+Themia.SecondFactor.MfaRequirement.EnrolKinds.init -> void
+Themia.SecondFactor.MfaRequirement.Level.get -> Themia.SecondFactor.MfaRequirementLevel
+Themia.SecondFactor.MfaRequirement.Level.init -> void
+Themia.SecondFactor.MfaRequirement.SpareMandatory.get -> bool
+Themia.SecondFactor.MfaRequirement.SpareMandatory.init -> void
+Themia.SecondFactor.MfaRequirement.SpareNagShouldStart.get -> bool
+Themia.SecondFactor.MfaRequirement.SpareNagShouldStart.init -> void
+Themia.SecondFactor.MfaRequirement.SpareNeeded.get -> bool
+Themia.SecondFactor.MfaRequirement.SpareNeeded.init -> void
+Themia.SecondFactor.MfaRequirement.UsableMethods.get -> System.Collections.Generic.IReadOnlyCollection<Themia.SecondFactor.MfaMethod!>!
+Themia.SecondFactor.MfaRequirement.UsableMethods.init -> void
+Themia.SecondFactor.MfaRequirementLevel
+Themia.SecondFactor.MfaRequirementLevel.Enrol = 2 -> Themia.SecondFactor.MfaRequirementLevel
+Themia.SecondFactor.MfaRequirementLevel.NotRequired = 0 -> Themia.SecondFactor.MfaRequirementLevel
+Themia.SecondFactor.MfaRequirementLevel.Verify = 1 -> Themia.SecondFactor.MfaRequirementLevel
+Themia.SecondFactor.MfaRule
+Themia.SecondFactor.MfaRule.MfaRule() -> void
+Themia.SecondFactor.MfaRule.MinimumEnrolled.get -> int
+Themia.SecondFactor.MfaRule.MinimumEnrolled.init -> void
+Themia.SecondFactor.MfaRule.OfferedKinds.get -> System.Collections.Generic.IReadOnlySet<Themia.SecondFactor.MfaMethodKind>!
+Themia.SecondFactor.MfaRule.OfferedKinds.init -> void
+Themia.SecondFactor.MfaRule.Required.get -> bool
+Themia.SecondFactor.MfaRule.Required.init -> void
+Themia.SecondFactor.MfaRule.SpareGrace.get -> System.TimeSpan
+Themia.SecondFactor.MfaRule.SpareGrace.init -> void
+Themia.SecondFactor.MfaStrength
+Themia.SecondFactor.MfaStrength.Strong = 1 -> Themia.SecondFactor.MfaStrength
+Themia.SecondFactor.MfaStrength.Weak = 0 -> Themia.SecondFactor.MfaStrength
+Themia.SecondFactor.MfaSubject
+Themia.SecondFactor.MfaSubject.MfaSubject(string! UserId, string? TenantId, System.Collections.Generic.IReadOnlySet<string!>! Roles) -> void
+Themia.SecondFactor.MfaSubject.Roles.get -> System.Collections.Generic.IReadOnlySet<string!>!
+Themia.SecondFactor.MfaSubject.Roles.init -> void
+Themia.SecondFactor.MfaSubject.TenantId.get -> string?
+Themia.SecondFactor.MfaSubject.TenantId.init -> void
+Themia.SecondFactor.MfaSubject.UserId.get -> string!
+Themia.SecondFactor.MfaSubject.UserId.init -> void
+Themia.SecondFactor.NewMfaMethod
+Themia.SecondFactor.NewMfaMethod.CredentialId.get -> byte[]?
+Themia.SecondFactor.NewMfaMethod.CredentialId.init -> void
+Themia.SecondFactor.NewMfaMethod.EnrolledAt.get -> System.DateTimeOffset
+Themia.SecondFactor.NewMfaMethod.EnrolledAt.init -> void
+Themia.SecondFactor.NewMfaMethod.Kind.get -> Themia.SecondFactor.MfaMethodKind
+Themia.SecondFactor.NewMfaMethod.Kind.init -> void
+Themia.SecondFactor.NewMfaMethod.Label.get -> string!
+Themia.SecondFactor.NewMfaMethod.Label.init -> void
+Themia.SecondFactor.NewMfaMethod.LastUsedStep.get -> long
+Themia.SecondFactor.NewMfaMethod.LastUsedStep.init -> void
+Themia.SecondFactor.NewMfaMethod.ProtectionScheme.get -> string?
+Themia.SecondFactor.NewMfaMethod.ProtectionScheme.init -> void
+Themia.SecondFactor.NewMfaMethod.PublicKey.get -> byte[]?
+Themia.SecondFactor.NewMfaMethod.PublicKey.init -> void
+Themia.SecondFactor.NewMfaMethod.SecretProtected.get -> string?
+Themia.SecondFactor.NewMfaMethod.SecretProtected.init -> void
+Themia.SecondFactor.NewMfaMethod.SignCount.get -> long
+Themia.SecondFactor.NewMfaMethod.SignCount.init -> void
+Themia.SecondFactor.NewMfaMethod.TenantId.get -> string?
+Themia.SecondFactor.NewMfaMethod.TenantId.init -> void
+Themia.SecondFactor.NewMfaMethod.UserHandle.get -> byte[]?
+Themia.SecondFactor.NewMfaMethod.UserHandle.init -> void
+Themia.SecondFactor.NewMfaMethod.UserId.get -> string!
+Themia.SecondFactor.NewMfaMethod.UserId.init -> void
+Themia.SecondFactor.RecoveryCodeGenerator
+Themia.SecondFactor.RecoveryCodeHasher
+Themia.SecondFactor.RecoveryCodeHasher.Hash(string! userId, string! code) -> string!
+Themia.SecondFactor.RecoveryCodeHasher.RecoveryCodeHasher(byte[]! key) -> void
+Themia.SecondFactor.StoredPasskey
+Themia.SecondFactor.StoredPasskey.CredentialId.get -> byte[]!
+Themia.SecondFactor.StoredPasskey.CredentialId.init -> void
+Themia.SecondFactor.StoredPasskey.MethodId.get -> System.Guid
+Themia.SecondFactor.StoredPasskey.MethodId.init -> void
+Themia.SecondFactor.StoredPasskey.PublicKey.get -> byte[]!
+Themia.SecondFactor.StoredPasskey.PublicKey.init -> void
+Themia.SecondFactor.StoredPasskey.SignCount.get -> long
+Themia.SecondFactor.StoredPasskey.SignCount.init -> void
+Themia.SecondFactor.StoredPasskey.StoredPasskey(System.Guid MethodId, string? TenantId, string! UserId, byte[]! CredentialId, byte[]! PublicKey, byte[]! UserHandle, long SignCount) -> void
+Themia.SecondFactor.StoredPasskey.TenantId.get -> string?
+Themia.SecondFactor.StoredPasskey.TenantId.init -> void
+Themia.SecondFactor.StoredPasskey.UserHandle.get -> byte[]!
+Themia.SecondFactor.StoredPasskey.UserHandle.init -> void
+Themia.SecondFactor.StoredPasskey.UserId.get -> string!
+Themia.SecondFactor.StoredPasskey.UserId.init -> void
+Themia.SecondFactor.StoredTotp
+Themia.SecondFactor.StoredTotp.LastUsedStep.get -> long
+Themia.SecondFactor.StoredTotp.LastUsedStep.init -> void
+Themia.SecondFactor.StoredTotp.MethodId.get -> System.Guid
+Themia.SecondFactor.StoredTotp.MethodId.init -> void
+Themia.SecondFactor.StoredTotp.ProtectionScheme.get -> string!
+Themia.SecondFactor.StoredTotp.ProtectionScheme.init -> void
+Themia.SecondFactor.StoredTotp.SecretProtected.get -> string!
+Themia.SecondFactor.StoredTotp.SecretProtected.init -> void
+Themia.SecondFactor.StoredTotp.StoredTotp(System.Guid MethodId, string! SecretProtected, string! ProtectionScheme, long LastUsedStep) -> void
+Themia.SecondFactor.MfaRequirementLevel.Denied = 3 -> Themia.SecondFactor.MfaRequirementLevel
+Themia.SecondFactor.MfaRequirement.UpgradeMandatory.get -> bool
+Themia.SecondFactor.MfaRequirement.UpgradeMandatory.init -> void
