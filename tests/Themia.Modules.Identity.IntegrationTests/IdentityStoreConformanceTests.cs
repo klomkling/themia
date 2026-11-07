@@ -2199,6 +2199,24 @@ public abstract class IdentityStoreConformanceTests
         Assert.Equal(0, (await check.UserRepo.GetByIdAsync(user))!.ConcurrencyVersion);
     }
 
+    [Fact] // quality-security: a soft delete is bumped inside SaveChanges (Deleted becomes Modified); its rollback must restore too
+    public async Task A_rolled_back_soft_delete_puts_the_instance_back_to_its_loaded_version()
+    {
+        await ResetAsync();
+        var user = await SeedUserAsync("rollback-soft-delete");
+        await using var s = NewScope(new TenantId("acme"));
+        var loaded = (await s.UserRepo.GetByIdAsync(user))!;
+
+        await using (var tx = await s.UnitOfWork.BeginTransactionAsync())
+        {
+            s.UserRepo.Remove(loaded);
+            await s.UnitOfWork.SaveChangesAsync();
+            await tx.RollbackAsync();
+        }
+
+        Assert.Equal(0, loaded.ConcurrencyVersion);
+    }
+
     [Fact] // same, for a scope that is only disposed: the safety-net rollback must restore too
     public async Task A_caller_transaction_disposed_without_commit_restores_the_version()
     {

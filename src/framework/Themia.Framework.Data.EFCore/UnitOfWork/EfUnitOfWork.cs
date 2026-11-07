@@ -93,7 +93,8 @@ public sealed class EfUnitOfWork(ThemiaDbContext context, IDataFilterScope filte
 
         foreach (var entry in context.ChangeTracker.Entries<IVersionedEntity>())
         {
-            if (entry.State is EntityState.Modified)
+            // Deleted too: a soft delete is converted to Modified and bumped inside SaveChanges, after this record.
+            if (entry.State is EntityState.Modified or EntityState.Deleted)
             {
                 versionsBeforeTransaction.TryAdd(
                     entry.Entity, (long)entry.Property(nameof(IVersionedEntity.ConcurrencyVersion)).OriginalValue!);
