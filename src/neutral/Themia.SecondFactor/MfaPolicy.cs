@@ -1,0 +1,99 @@
+namespace Themia.SecondFactor;
+
+/// <summary>Pure policy: decides what a sign-in must do for a second factor. No I/O.</summary>
+public interface IMfaPolicy
+{
+    /// <summary>Evaluates the requirement for one sign-in.</summary>
+    /// <param name="subject">The user.</param>
+    /// <param name="primary">How the user already authenticated.</param>
+    /// <param name="methods">The user's enrolled methods (disabled ones are ignored).</param>
+    /// <param name="spareNagStartedAt">When the spare-method prompt first appeared, or <see langword="null"/>.</param>
+    /// <param name="now">The current time.</param>
+    MfaRequirement Evaluate(
+        MfaSubject subject,
+        MfaPrimary primary,
+        IReadOnlyCollection<MfaMethod> methods,
+        DateTimeOffset? spareNagStartedAt,
+        DateTimeOffset now);
+}
+
+/// <summary>Default <see cref="IMfaPolicy"/> driven by <see cref="MfaPolicyOptions"/>.</summary>
+public sealed class MfaPolicy : IMfaPolicy
+{
+    private static readonly MfaMethodKind[] AllKinds = Enum.GetValues<MfaMethodKind>();
+
+    private readonly MfaPolicyOptions options;
+
+    /// <summary>Creates the policy.</summary>
+    public MfaPolicy(MfaPolicyOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        this.options = options;
+    }
+
+    /// <inheritdoc />
+    public MfaRequirement Evaluate(
+        MfaSubject subject,
+        MfaPrimary primary,
+        IReadOnlyCollection<MfaMethod> methods,
+        DateTimeOffset? spareNagStartedAt,
+        DateTimeOffset now)
+    {
+        ArgumentNullException.ThrowIfNull(subject);
+        ArgumentNullException.ThrowIfNull(primary);
+        ArgumentNullException.ThrowIfNull(methods);
+
+        var rule = ResolveRule(subject);
+        var allowed = AllKinds.Where(kind => rule.OfferedKinds.Contains(kind) && PrimaryAllows(primary, kind)).ToArray();
+        var usable = methods.Where(method => method.IsUsable && allowed.Contains(method.Kind)).ToArray();
+
+        // Enrol only at zero usable methods: with one method already present, an Enrol answer would let
+        // someone holding just the password add their own factor and complete the sign-in unproven.
+        if (usable.Length == 0)
+        {
+            return new MfaRequirement
+            {
+                Level = rule.Required ? MfaRequirementLevel.Enrol : MfaRequirementLevel.NotRequired,
+                EnrolKinds = allowed,
+                UsableMethods = usable,
+            };
+        }
+
+        var spareNeeded = rule.Required && usable.Length < rule.MinimumEnrolled;
+        var graceOver = spareNagStartedAt is { } started && now - started >= rule.SpareGrace;
+        return new MfaRequirement
+        {
+            Level = MfaRequirementLevel.Verify,
+            EnrolKinds = allowed,
+            UsableMethods = usable,
+            SpareNeeded = spareNeeded,
+            SpareMandatory = spareNeeded && (rule.SpareGrace <= TimeSpan.Zero || graceOver),
+            SpareNagShouldStart = spareNeeded && rule.SpareGrace > TimeSpan.Zero && spareNagStartedAt is null,
+        };
+    }
+
+    // Strictest across the default and every matching role: required if any says so, highest minimum,
+    // shortest grace, intersection of offered kinds.
+    private MfaRule ResolveRule(MfaSubject subject)
+    {
+        var rules = new List<MfaRule> { options.Default };
+        rules.AddRange(subject.Roles.Where(options.Roles.ContainsKey).Select(role => options.Roles[role]));
+
+        return new MfaRule
+        {
+            Required = rules.Any(rule => rule.Required),
+            MinimumEnrolled = rules.Max(rule => rule.MinimumEnrolled),
+            SpareGrace = rules.Min(rule => rule.SpareGrace),
+            OfferedKinds = rules.Select(rule => rule.OfferedKinds).Aggregate((a, b) => a.Intersect(b).ToHashSet()),
+        };
+    }
+
+    // An external primary (LINE) is the same account as any delivery channel, so only strong kinds count;
+    // an emailed link makes an emailed code the same channel.
+    private static bool PrimaryAllows(MfaPrimary primary, MfaMethodKind kind) => primary.Kind switch
+    {
+        MfaPrimaryKind.External => kind.Strength() == MfaStrength.Strong,
+        MfaPrimaryKind.EmailLink => kind != MfaMethodKind.EmailOtp,
+        _ => true,
+    };
+}

@@ -1,0 +1,7 @@
+#nullable enable
+override Themia.SecondFactor.PostgreSql.Migrations.SecondFactorSchemaMigration.Down() -> void
+override Themia.SecondFactor.PostgreSql.Migrations.SecondFactorSchemaMigration.Up() -> void
+static Themia.SecondFactor.PostgreSql.ServiceCollectionExtensions.AddThemiaSecondFactorPostgres(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, string! connectionString) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+Themia.SecondFactor.PostgreSql.Migrations.SecondFactorSchemaMigration
+Themia.SecondFactor.PostgreSql.Migrations.SecondFactorSchemaMigration.SecondFactorSchemaMigration() -> void
+Themia.SecondFactor.PostgreSql.ServiceCollectionExtensions
