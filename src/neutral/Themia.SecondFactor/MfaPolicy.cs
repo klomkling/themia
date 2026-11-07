@@ -83,8 +83,8 @@ public sealed class MfaPolicy : IMfaPolicy
 
     private static MfaRequirement FallbackToHeldMethods(MfaPrimary primary, MfaMethod[] held, MfaMethodKind[] allowed)
     {
-        // A method on the primary's own channel (an emailed code after an emailed link) proves nothing new.
-        var provable = held.Where(method => !SharesChannel(primary, method.Kind)).ToArray();
+        // A method the primary cannot rely on (same channel as the primary, or weak under an external primary) proves nothing new.
+        var provable = held.Where(method => PrimaryAllows(primary, method.Kind)).ToArray();
         return new MfaRequirement
         {
             Level = provable.Length == 0 ? MfaRequirementLevel.Denied : MfaRequirementLevel.Verify,
@@ -93,9 +93,6 @@ public sealed class MfaPolicy : IMfaPolicy
             UpgradeMandatory = provable.Length > 0,
         };
     }
-
-    private static bool SharesChannel(MfaPrimary primary, MfaMethodKind kind) =>
-        primary.Kind == MfaPrimaryKind.EmailLink && kind == MfaMethodKind.EmailOtp;
 
     // Strictest across the default and every matching role: required if any says so, highest minimum,
     // shortest grace, intersection of offered kinds.
@@ -113,12 +110,13 @@ public sealed class MfaPolicy : IMfaPolicy
         };
     }
 
+    // One predicate for both the offered path and the held-methods fallback, so they cannot drift apart.
     // An external primary (LINE) is the same account as any delivery channel, so only strong kinds count;
     // an emailed link makes an emailed code the same channel.
     private static bool PrimaryAllows(MfaPrimary primary, MfaMethodKind kind) => primary.Kind switch
     {
         MfaPrimaryKind.External => kind.Strength() == MfaStrength.Strong,
-        MfaPrimaryKind.EmailLink => !SharesChannel(primary, kind),
+        MfaPrimaryKind.EmailLink => kind != MfaMethodKind.EmailOtp,
         _ => true,
     };
 }

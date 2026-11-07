@@ -71,18 +71,29 @@ public sealed class MfaPolicyTests
     }
 
     [Fact]
-    public void Evaluate_ShouldVerifyHeldWeakMethodThenUpgrade_WhenPrimaryIsExternal()
+    public void Evaluate_ShouldDeny_WhenPrimaryIsExternalAndOnlyWeakMethodsHeld()
     {
-        // Enrol here would let someone holding only the LINE account add their own TOTP and skip the SMS factor.
+        // Enrol would let someone holding only the LINE account add their own TOTP; verifying a weak method is not
+        // an accepted proof under an external primary either (strong only, #0203). Sign in another way.
         var policy = Policy(o => o.Default = MfaRule.Mandatory());
 
         var result = policy.Evaluate(Staff, Line, [Method(MfaMethodKind.SmsOtp)], null, Now);
 
-        Assert.Equal(MfaRequirementLevel.Verify, result.Level);
-        Assert.True(result.UpgradeMandatory);
-        Assert.Single(result.UsableMethods);
+        Assert.Equal(MfaRequirementLevel.Denied, result.Level);
+        Assert.Empty(result.UsableMethods);
         Assert.DoesNotContain(MfaMethodKind.SmsOtp, result.EnrolKinds);
-        Assert.DoesNotContain(MfaMethodKind.EmailOtp, result.EnrolKinds);
+    }
+
+    [Fact]
+    public void Evaluate_ShouldVerifyOnlyTheStrongHeldMethod_WhenExternalPrimaryAndMixedMethodsHeld()
+    {
+        var policy = Policy(o => o.Default = MfaRule.Mandatory(offered: [MfaMethodKind.Passkey]));
+
+        var result = policy.Evaluate(Staff, Line, [Method(MfaMethodKind.SmsOtp), Method(MfaMethodKind.Totp)], null, Now);
+
+        Assert.Equal(MfaRequirementLevel.Verify, result.Level);
+        Assert.Equal(MfaMethodKind.Totp, result.UsableMethods.Single().Kind);
+        Assert.True(result.UpgradeMandatory);
     }
 
     [Fact]

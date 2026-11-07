@@ -49,7 +49,7 @@ public enum MfaRequirementLevel
     Enrol,
 
     /// <summary>The user holds methods, but none can prove anything new for this primary (an emailed code after an
-    /// emailed link). Sign-in must be refused or retried with another primary; it must never fall through to Enrol.</summary>
+    /// emailed link, or only weak methods under an external primary such as LINE). Sign-in must be refused or retried with another primary; it must never fall through to Enrol.</summary>
     Denied,
 }
 
