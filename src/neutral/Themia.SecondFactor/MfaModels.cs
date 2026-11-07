@@ -47,6 +47,10 @@ public enum MfaRequirementLevel
 
     /// <summary>The user has no usable method and must enrol the first one.</summary>
     Enrol,
+
+    /// <summary>The user holds methods, but none can prove anything new for this primary (an emailed code after an
+    /// emailed link). Sign-in must be refused or retried with another primary; it must never fall through to Enrol.</summary>
+    Denied,
 }
 
 /// <summary>The policy's answer for one sign-in.</summary>
@@ -63,6 +67,10 @@ public sealed record MfaRequirement
 
     /// <summary>The user holds fewer usable methods than the rule's minimum.</summary>
     public bool SpareNeeded { get; init; }
+
+    /// <summary>The user verified with a method this rule or primary no longer offers: after verifying they must
+    /// enrol one of <see cref="EnrolKinds"/> before continuing.</summary>
+    public bool UpgradeMandatory { get; init; }
 
     /// <summary>The caller should record the first-prompt time so the grace period starts counting.</summary>
     public bool SpareNagShouldStart { get; init; }

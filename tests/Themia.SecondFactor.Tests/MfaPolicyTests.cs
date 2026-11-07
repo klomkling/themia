@@ -71,15 +71,29 @@ public sealed class MfaPolicyTests
     }
 
     [Fact]
-    public void Evaluate_ShouldCountWeakOnlyAsZero_WhenPrimaryIsExternal()
+    public void Evaluate_ShouldVerifyHeldWeakMethodThenUpgrade_WhenPrimaryIsExternal()
     {
+        // Enrol here would let someone holding only the LINE account add their own TOTP and skip the SMS factor.
         var policy = Policy(o => o.Default = MfaRule.Mandatory());
 
         var result = policy.Evaluate(Staff, Line, [Method(MfaMethodKind.SmsOtp)], null, Now);
 
-        Assert.Equal(MfaRequirementLevel.Enrol, result.Level);
+        Assert.Equal(MfaRequirementLevel.Verify, result.Level);
+        Assert.True(result.UpgradeMandatory);
+        Assert.Single(result.UsableMethods);
         Assert.DoesNotContain(MfaMethodKind.SmsOtp, result.EnrolKinds);
         Assert.DoesNotContain(MfaMethodKind.EmailOtp, result.EnrolKinds);
+    }
+
+    [Fact]
+    public void Evaluate_ShouldEnrolOnlyStrongKinds_WhenPrimaryIsExternalAndNothingHeld()
+    {
+        var policy = Policy(o => o.Default = MfaRule.Mandatory());
+
+        var result = policy.Evaluate(Staff, Line, [], null, Now);
+
+        Assert.Equal(MfaRequirementLevel.Enrol, result.Level);
+        Assert.All(result.EnrolKinds, kind => Assert.Equal(MfaStrength.Strong, kind.Strength()));
     }
 
     [Fact]
@@ -94,14 +108,47 @@ public sealed class MfaPolicyTests
     }
 
     [Fact]
-    public void Evaluate_ShouldOnlyOfferConfiguredKinds()
+    public void Evaluate_ShouldOnlyOfferConfiguredKindsForEnrolment()
+    {
+        var policy = Policy(o => o.Default = MfaRule.Mandatory(offered: [MfaMethodKind.Passkey, MfaMethodKind.Totp]));
+
+        var result = policy.Evaluate(Staff, Password, [], null, Now);
+
+        Assert.Equal(MfaRequirementLevel.Enrol, result.Level);
+        Assert.Equal([MfaMethodKind.Passkey, MfaMethodKind.Totp], result.EnrolKinds.OrderBy(k => k));
+    }
+
+    [Fact]
+    public void Evaluate_ShouldVerifyThenUpgrade_WhenHeldMethodIsNoLongerOffered()
     {
         var policy = Policy(o => o.Default = MfaRule.Mandatory(offered: [MfaMethodKind.Passkey, MfaMethodKind.Totp]));
 
         var result = policy.Evaluate(Staff, Password, [Method(MfaMethodKind.SmsOtp)], null, Now);
 
-        Assert.Equal(MfaRequirementLevel.Enrol, result.Level);
-        Assert.Equal([MfaMethodKind.Passkey, MfaMethodKind.Totp], result.EnrolKinds.OrderBy(k => k));
+        Assert.Equal(MfaRequirementLevel.Verify, result.Level);
+        Assert.True(result.UpgradeMandatory);
+        Assert.Equal(MfaMethodKind.SmsOtp, result.UsableMethods.Single().Kind);
+    }
+
+    [Fact]
+    public void Evaluate_ShouldStillVerify_WhenRuleIsOptionalButUserHoldsAnUnofferedMethod()
+    {
+        var narrowed = Policy(o => o.Default = new MfaRule { OfferedKinds = new HashSet<MfaMethodKind> { MfaMethodKind.Passkey } });
+
+        var result = narrowed.Evaluate(Staff, Password, [Method(MfaMethodKind.Totp)], null, Now);
+
+        Assert.Equal(MfaRequirementLevel.Verify, result.Level);
+    }
+
+    [Fact]
+    public void Evaluate_ShouldDeny_WhenOnlyHeldMethodSharesTheEmailPrimaryChannel()
+    {
+        var policy = Policy(o => o.Default = MfaRule.Mandatory());
+
+        var result = policy.Evaluate(Staff, new MfaPrimary(MfaPrimaryKind.EmailLink), [Method(MfaMethodKind.EmailOtp)], null, Now);
+
+        Assert.Equal(MfaRequirementLevel.Denied, result.Level);
+        Assert.Empty(result.UsableMethods);
     }
 
     [Fact]

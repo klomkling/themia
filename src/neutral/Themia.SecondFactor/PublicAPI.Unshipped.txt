@@ -226,3 +226,6 @@ Themia.SecondFactor.StoredTotp.ProtectionScheme.init -> void
 Themia.SecondFactor.StoredTotp.SecretProtected.get -> string!
 Themia.SecondFactor.StoredTotp.SecretProtected.init -> void
 Themia.SecondFactor.StoredTotp.StoredTotp(System.Guid MethodId, string! SecretProtected, string! ProtectionScheme, long LastUsedStep) -> void
+Themia.SecondFactor.MfaRequirementLevel.Denied = 3 -> Themia.SecondFactor.MfaRequirementLevel
+Themia.SecondFactor.MfaRequirement.UpgradeMandatory.get -> bool
+Themia.SecondFactor.MfaRequirement.UpgradeMandatory.init -> void

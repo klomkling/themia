@@ -45,9 +45,18 @@ public sealed class MfaPolicy : IMfaPolicy
 
         var rule = ResolveRule(subject);
         var allowed = AllKinds.Where(kind => rule.OfferedKinds.Contains(kind) && PrimaryAllows(primary, kind)).ToArray();
-        var usable = methods.Where(method => method.IsUsable && allowed.Contains(method.Kind)).ToArray();
+        var held = methods.Where(method => method.IsUsable).ToArray();
+        var usable = held.Where(method => allowed.Contains(method.Kind)).ToArray();
 
-        // Enrol only at zero usable methods: with one method already present, an Enrol answer would let
+        // A user who holds usable methods must never be treated as having none: that would answer Enrol (letting
+        // someone with only the primary add their own factor) or NotRequired (silently dropping protection the user
+        // opted into). Methods the rule or primary no longer offers are still verified, then replaced.
+        if (usable.Length == 0 && held.Length > 0)
+        {
+            return FallbackToHeldMethods(primary, held, allowed);
+        }
+
+        // Enrol only at zero held methods: with one method already present, an Enrol answer would let
         // someone holding just the password add their own factor and complete the sign-in unproven.
         if (usable.Length == 0)
         {
@@ -72,6 +81,22 @@ public sealed class MfaPolicy : IMfaPolicy
         };
     }
 
+    private static MfaRequirement FallbackToHeldMethods(MfaPrimary primary, MfaMethod[] held, MfaMethodKind[] allowed)
+    {
+        // A method on the primary's own channel (an emailed code after an emailed link) proves nothing new.
+        var provable = held.Where(method => !SharesChannel(primary, method.Kind)).ToArray();
+        return new MfaRequirement
+        {
+            Level = provable.Length == 0 ? MfaRequirementLevel.Denied : MfaRequirementLevel.Verify,
+            EnrolKinds = allowed,
+            UsableMethods = provable,
+            UpgradeMandatory = provable.Length > 0,
+        };
+    }
+
+    private static bool SharesChannel(MfaPrimary primary, MfaMethodKind kind) =>
+        primary.Kind == MfaPrimaryKind.EmailLink && kind == MfaMethodKind.EmailOtp;
+
     // Strictest across the default and every matching role: required if any says so, highest minimum,
     // shortest grace, intersection of offered kinds.
     private MfaRule ResolveRule(MfaSubject subject)
@@ -93,7 +118,7 @@ public sealed class MfaPolicy : IMfaPolicy
     private static bool PrimaryAllows(MfaPrimary primary, MfaMethodKind kind) => primary.Kind switch
     {
         MfaPrimaryKind.External => kind.Strength() == MfaStrength.Strong,
-        MfaPrimaryKind.EmailLink => kind != MfaMethodKind.EmailOtp,
+        MfaPrimaryKind.EmailLink => !SharesChannel(primary, kind),
         _ => true,
     };
 }
