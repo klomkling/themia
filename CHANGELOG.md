@@ -27,6 +27,10 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Data layer: a versioned instance (`IVersionedEntity`, e.g. `User`) goes back to its pre-transaction version when a transaction the caller opened with `BeginTransactionAsync` ends without a commit.** The save moves the instance to `loaded + 1` before the commit, so a rollback, a dispose without commit or a commit that threw left it one ahead of its row: re-saving that instance after a concurrent writer landed matched the winner's version and overwrote it. EF and Dapper now record each instance's version before its first save in any transaction and restore it when the transaction does not commit; an EF scope that rolls back also clears the change tracker (as `ExecuteInTransactionAsync` already did), so the next load reads the row and a service call such as `SetActiveAsync` cannot re-write rolled-back values from the tracked instance. A save that fails inside a transaction the caller still commits restores only its own entries (the earlier saves are committed). A Dapper `SaveChangesAsync` that opens its own transaction and fails midway now restores the instances of the operations that ran. The bump stays in the same `UPDATE` as the write (a post-commit bump would reopen a lost-update window). Not covered: an instance after a bulk `UpdateWhereAsync` stays behind its row (fails closed), and observers notified inside a caller transaction that later rolls back still hear about the write.
+
 ## [0.57.0] - 2026-11-07
 
 ### Added

@@ -24,13 +24,24 @@ internal sealed class DapperUnitOfWork(
 {
     private readonly List<PendingOperation> pending = [];
 
+    // Versions of versioned entities as they were before the open transaction (the one SaveChangesAsync opens, or a
+    // scope from BeginTransactionAsync) first saved them. A save moves the instance to loaded + 1 before the
+    // transaction can still roll back, so a rollback needs these to put each instance back in step with its row.
+    private readonly Dictionary<IVersionedEntity, long> versionsBeforeTransaction = new(ReferenceEqualityComparer.Instance);
+    private bool recordingVersions;
+
     public void Enqueue(PendingOperation operation) => pending.Add(operation);
 
     public async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
         if (pending.Count == 0) return 0;
         var ownsTransaction = connection.CurrentTransaction is null;
-        if (ownsTransaction) await connection.BeginTransactionAsync(cancellationToken);
+        if (ownsTransaction)
+        {
+            await connection.BeginTransactionAsync(cancellationToken);
+            BeginVersionRecord();
+        }
+
         var conn = await connection.GetOpenConnectionAsync(cancellationToken);
         var tx = connection.CurrentTransaction;
         try
@@ -40,12 +51,16 @@ internal sealed class DapperUnitOfWork(
                 affected += await ExecuteAsync(conn, tx, op, cancellationToken);
             if (ownsTransaction && tx is not null)
                 await tx.CommitAsync(cancellationToken);
+            if (ownsTransaction) EndVersionRecord();
             pending.Clear();
             return affected;
         }
         catch (Exception ex)
         {
             pending.Clear();
+            // Only a transaction this save opened is void as a whole. In the caller's, an earlier op of this batch
+            // stays in it at loaded + 1 (there is no savepoint), and the caller's own rollback restores it.
+            if (ownsTransaction) RestoreRecordedVersions();
             if (ownsTransaction && tx is not null)
             {
                 // Roll back with CancellationToken.None so a cancelled token can't abort the cleanup,
@@ -71,7 +86,37 @@ internal sealed class DapperUnitOfWork(
     public async Task<ITransactionScope> BeginTransactionAsync(CancellationToken cancellationToken = default)
     {
         await connection.BeginTransactionAsync(cancellationToken);
-        return new TransactionScope(connection);
+        // After Begin: a nested Begin throws, and must not touch the outer transaction's record.
+        BeginVersionRecord();
+        return new TransactionScope(connection, this);
+    }
+
+    internal void BeginVersionRecord()
+    {
+        versionsBeforeTransaction.Clear();
+        recordingVersions = true;
+    }
+
+    internal void EndVersionRecord()
+    {
+        recordingVersions = false;
+        versionsBeforeTransaction.Clear();
+    }
+
+    // First value wins: a second save of the same instance would record the version the first one already bumped.
+    internal void RememberVersion(IVersionedEntity entity, long loadedVersion)
+    {
+        if (recordingVersions) versionsBeforeTransaction.TryAdd(entity, loadedVersion);
+    }
+
+    // The transaction ended without a commit (rolled back, disposed, or a commit that threw, after which nobody can
+    // say whether it landed: an instance behind its row only costs a spurious Conflict, one ahead of it loses an
+    // update), so every save it made is void.
+    internal void RestoreRecordedVersions()
+    {
+        foreach (var (entity, loadedVersion) in versionsBeforeTransaction)
+            entity.ConcurrencyVersion = loadedVersion;
+        EndVersionRecord();
     }
 
     public async Task ExecuteInTransactionAsync(Func<CancellationToken, Task> work, CancellationToken cancellationToken = default)
@@ -140,6 +185,7 @@ internal sealed class DapperUnitOfWork(
                     : 0L;
                 if (versionColumn is not null)
                 {
+                    RememberVersion((IVersionedEntity)op.Entity, loadedVersion);
                     // Optimistic concurrency: only the row still at the loaded version may be overwritten, and the
                     // same UPDATE moves it to loaded + 1. A stale full-row write matches no row -> ConcurrencyException.
                     values[versionColumn] = loadedVersion + 1;
@@ -263,13 +309,35 @@ internal sealed class DapperUnitOfWork(
         _ => false
     };
 
-    private sealed class TransactionScope(IDapperConnectionContext connection) : ITransactionScope
+    private sealed class TransactionScope(IDapperConnectionContext connection, DapperUnitOfWork owner) : ITransactionScope
     {
-        public Task CommitAsync(CancellationToken cancellationToken = default) =>
-            CompleteAsync(tx => tx.CommitAsync(cancellationToken));
+        public async Task CommitAsync(CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                await CompleteAsync(tx => tx.CommitAsync(cancellationToken));
+            }
+            catch
+            {
+                // CompleteAsync disposed the transaction, so DisposeAsync below would no-op: restore here.
+                owner.RestoreRecordedVersions();
+                throw;
+            }
 
-        public Task RollbackAsync(CancellationToken cancellationToken = default) =>
-            CompleteAsync(tx => tx.RollbackAsync(cancellationToken));
+            owner.EndVersionRecord();
+        }
+
+        public async Task RollbackAsync(CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                await CompleteAsync(tx => tx.RollbackAsync(cancellationToken));
+            }
+            finally
+            {
+                owner.RestoreRecordedVersions();
+            }
+        }
 
         // Always dispose the ambient transaction, even when commit/rollback throws, so a failed
         // commit leaves nothing for DisposeAsync to roll back (which would mask the original error).
@@ -288,7 +356,11 @@ internal sealed class DapperUnitOfWork(
             if (connection.CurrentTransaction is not { } tx) return;
             try { await tx.RollbackAsync(); }
             catch { /* best-effort cleanup; an in-flight exception takes precedence */ }
-            finally { await connection.DisposeTransactionAsync(); }
+            finally
+            {
+                await connection.DisposeTransactionAsync();
+                owner.RestoreRecordedVersions();
+            }
         }
     }
 }
