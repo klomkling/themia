@@ -1,30 +1,48 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
+
+using Themia.Totp;
+using Themia.WebAuthn;
 
 namespace Themia.SecondFactor.DependencyInjection;
 
-/// <summary>DI entry point for the engine-neutral second-factor pieces (policy, recovery-code hasher).</summary>
+/// <summary>DI entry point for the engine-neutral second-factor layer.</summary>
 public static class SecondFactorServiceCollectionExtensions
 {
     /// <summary>
-    /// Registers <see cref="IMfaPolicy"/> over the rules in <paramref name="configure"/> and the keyed
-    /// <see cref="RecoveryCodeHasher"/>. The store comes from the engine package (for example
-    /// <c>AddThemiaSecondFactorPostgres</c>).
+    /// Registers <see cref="ISecondFactorService"/>, <see cref="IMfaPolicy"/> over <see cref="SecondFactorOptions.Policy"/>,
+    /// the keyed <see cref="RecoveryCodeHasher"/>, and the TOTP and WebAuthn services wired to this layer's stores. The
+    /// store comes from the engine package (for example <c>AddThemiaSecondFactorPostgres</c>). The adopter also registers
+    /// <see cref="ISecondFactorSecretProtector"/>, <see cref="ISecondFactorContactResolver"/>, one
+    /// <see cref="IOtpDelivery"/> per channel it offers, and <c>AddThemiaChallenges*</c> with the
+    /// <see cref="SecondFactorOptions.EmailOtpPurpose"/> / <see cref="SecondFactorOptions.SmsOtpPurpose"/> purposes.
     /// </summary>
     /// <param name="services">The service collection.</param>
     /// <param name="recoveryCodeKey">A server-side secret of at least 32 bytes, from configuration or a secret manager.</param>
-    /// <param name="configure">Per-app and per-role rules; omitted means second factor is optional for everyone.</param>
+    /// <param name="configure">Issuer, limits and the per-app/per-role policy.</param>
+    /// <param name="configureWebAuthn">Relying-party identity: domain, name and origins have no sensible default.</param>
     public static IServiceCollection AddThemiaSecondFactor(
-        this IServiceCollection services, byte[] recoveryCodeKey, Action<MfaPolicyOptions>? configure = null)
+        this IServiceCollection services,
+        byte[] recoveryCodeKey,
+        Action<SecondFactorOptions> configure,
+        Action<WebAuthnOptions> configureWebAuthn)
     {
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(recoveryCodeKey);
+        ArgumentNullException.ThrowIfNull(configure);
+        ArgumentNullException.ThrowIfNull(configureWebAuthn);
 
-        var options = new MfaPolicyOptions();
-        configure?.Invoke(options);
+        services.AddOptions<SecondFactorOptions>().Configure(configure).ValidateOnStart();
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IValidateOptions<SecondFactorOptions>, SecondFactorOptionsValidator>());
 
-        services.TryAddSingleton<IMfaPolicy>(new MfaPolicy(options));
+        services.TryAddSingleton(TimeProvider.System);
         services.TryAddSingleton(new RecoveryCodeHasher(recoveryCodeKey));
+        services.TryAddSingleton<IMfaPolicy>(sp => new MfaPolicy(sp.GetRequiredService<IOptions<SecondFactorOptions>>().Value.Policy));
+
+        services.AddThemiaTotp<MfaTotpReplayStore>();
+        services.AddThemiaWebAuthn<CeremonyBackedWebAuthnStore>(configureWebAuthn);
+        services.TryAddScoped<ISecondFactorService, SecondFactorService>();
         return services;
     }
 }

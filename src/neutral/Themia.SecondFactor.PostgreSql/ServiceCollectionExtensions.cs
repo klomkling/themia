@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Hosting;
 
 using Npgsql;
 
@@ -36,12 +37,13 @@ public static class ServiceCollectionExtensions
         MigrationEngineRegistry.Add(PostgresMigrationEngine.Adapter);
         ThemiaMigrations.Run(PostgresMigrationEngine.Adapter, connectionString, typeof(SecondFactorSchemaMigration).Assembly);
 
-        services.TryAddSingleton(_ => NpgsqlDataSource.Create(connectionString));
+        services.TryAddSingleton(new SecondFactorDataSource(connectionString));
         services.TryAddSingleton<IMfaMethodStore, PostgresMfaMethodStore>();
         services.TryAddSingleton<IMfaRecoveryCodeStore, PostgresMfaRecoveryCodeStore>();
         services.TryAddSingleton<IMfaUserStateStore, PostgresMfaUserStateStore>();
         services.TryAddSingleton<IMfaCeremonyStore, PostgresMfaCeremonyStore>();
         services.TryAddSingleton<IMfaAuditLog, PostgresMfaAuditLog>();
+        services.AddHostedService<CeremonyPurgeService>();
 
         services.AddPostgresSchemaProbe(
             "Themia.SecondFactor",

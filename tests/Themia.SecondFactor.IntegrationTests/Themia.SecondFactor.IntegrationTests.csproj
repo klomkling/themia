@@ -20,10 +20,13 @@
     <PackageReference Include="Dapper" />
     <PackageReference Include="Npgsql" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" />
+    <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/neutral/Themia.SecondFactor/Themia.SecondFactor.csproj" />
     <ProjectReference Include="../../src/neutral/Themia.SecondFactor.PostgreSql/Themia.SecondFactor.PostgreSql.csproj" />
+    <ProjectReference Include="../../src/neutral/Themia.Challenges.PostgreSql/Themia.Challenges.PostgreSql.csproj" />
     <ProjectReference Include="../../src/neutral/Themia.Data.Migrations.PostgreSql/Themia.Data.Migrations.PostgreSql.csproj" />
   </ItemGroup>
 </Project>

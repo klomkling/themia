@@ -1,14 +1,12 @@
 using Dapper;
 
-using Npgsql;
-
 namespace Themia.SecondFactor.PostgreSql;
 
-internal sealed class PostgresMfaUserStateStore(NpgsqlDataSource dataSource) : IMfaUserStateStore
+internal sealed class PostgresMfaUserStateStore(SecondFactorDataSource source) : IMfaUserStateStore
 {
     public async Task<MfaLockState> GetLockStateAsync(string? tenantId, string userId, CancellationToken cancellationToken = default)
     {
-        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
+        await using var connection = await source.DataSource.OpenConnectionAsync(cancellationToken);
         var row = await connection.QuerySingleOrDefaultAsync<LockRow>(new CommandDefinition(
             """
             SELECT failed_attempts AS FailedAttempts, locked_until AS LockedUntil
@@ -25,7 +23,7 @@ internal sealed class PostgresMfaUserStateStore(NpgsqlDataSource dataSource) : I
     public async Task<MfaLockState> RecordFailureAsync(
         string? tenantId, string userId, int maxFailures, TimeSpan lockFor, DateTimeOffset now, CancellationToken cancellationToken = default)
     {
-        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
+        await using var connection = await source.DataSource.OpenConnectionAsync(cancellationToken);
         var row = await connection.QuerySingleAsync<LockRow>(new CommandDefinition(
             """
             INSERT INTO second_factor_user_state (tenant_id, user_id, failed_attempts, locked_until, updated_at)
@@ -52,7 +50,7 @@ internal sealed class PostgresMfaUserStateStore(NpgsqlDataSource dataSource) : I
 
     public async Task ResetFailuresAsync(string? tenantId, string userId, DateTimeOffset now, CancellationToken cancellationToken = default)
     {
-        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
+        await using var connection = await source.DataSource.OpenConnectionAsync(cancellationToken);
         await connection.ExecuteAsync(new CommandDefinition(
             """
             UPDATE second_factor_user_state SET failed_attempts = 0, locked_until = NULL, updated_at = @Now
@@ -64,7 +62,7 @@ internal sealed class PostgresMfaUserStateStore(NpgsqlDataSource dataSource) : I
 
     public async Task<DateTimeOffset?> GetSpareNagStartedAtAsync(string? tenantId, string userId, CancellationToken cancellationToken = default)
     {
-        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
+        await using var connection = await source.DataSource.OpenConnectionAsync(cancellationToken);
         var started = await connection.ExecuteScalarAsync<DateTime?>(new CommandDefinition(
             """
             SELECT spare_nag_started_at FROM second_factor_user_state
@@ -77,7 +75,7 @@ internal sealed class PostgresMfaUserStateStore(NpgsqlDataSource dataSource) : I
 
     public async Task StartSpareNagAsync(string? tenantId, string userId, DateTimeOffset now, CancellationToken cancellationToken = default)
     {
-        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
+        await using var connection = await source.DataSource.OpenConnectionAsync(cancellationToken);
         await connection.ExecuteAsync(new CommandDefinition(
             """
             INSERT INTO second_factor_user_state (tenant_id, user_id, spare_nag_started_at, updated_at)

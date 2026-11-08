@@ -88,6 +88,12 @@ public interface IMfaMethodStore
     Task<bool> TryAdvanceTotpStepAsync(string? tenantId, string userId, Guid methodId, long step, DateTimeOffset now, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Atomically advances the TOTP step by method id alone, for the replay store the TOTP service calls. The id must come
+    /// from a tenant-scoped <see cref="FindTotpAsync"/> lookup.
+    /// </summary>
+    Task<bool> TryAdvanceTotpStepByMethodAsync(Guid methodId, long step, DateTimeOffset now, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Atomically records a new sign counter. Accepts a strictly higher counter, and 0 after 0 (synced passkeys
     /// report 0 on purpose); <see langword="false"/> means a regression or a lost race.
     /// </summary>

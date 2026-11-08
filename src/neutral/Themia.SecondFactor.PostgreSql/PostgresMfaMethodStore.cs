@@ -4,7 +4,7 @@ using Npgsql;
 
 namespace Themia.SecondFactor.PostgreSql;
 
-internal sealed class PostgresMfaMethodStore(NpgsqlDataSource dataSource) : IMfaMethodStore
+internal sealed class PostgresMfaMethodStore(SecondFactorDataSource source) : IMfaMethodStore
 {
     private const string UniqueViolation = "23505";
 
@@ -13,7 +13,7 @@ internal sealed class PostgresMfaMethodStore(NpgsqlDataSource dataSource) : IMfa
 
     public async Task<IReadOnlyList<MfaMethod>> ListAsync(string? tenantId, string userId, CancellationToken cancellationToken = default)
     {
-        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
+        await using var connection = await source.DataSource.OpenConnectionAsync(cancellationToken);
         var rows = await connection.QueryAsync<MethodRow>(new CommandDefinition(
             $"SELECT id, kind, label, enrolled_at AS EnrolledAt, disabled_at AS DisabledAt FROM second_factor_methods WHERE {UserScope} ORDER BY enrolled_at, id",
             new { UserId = userId, TenantId = tenantId },
@@ -24,7 +24,7 @@ internal sealed class PostgresMfaMethodStore(NpgsqlDataSource dataSource) : IMfa
     public async Task<MfaEnrolOutcome> AddAsync(NewMfaMethod method, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(method);
-        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
+        await using var connection = await source.DataSource.OpenConnectionAsync(cancellationToken);
         try
         {
             await connection.ExecuteAsync(new CommandDefinition(
@@ -63,7 +63,7 @@ internal sealed class PostgresMfaMethodStore(NpgsqlDataSource dataSource) : IMfa
 
     public async Task<bool> RemoveAsync(string? tenantId, string userId, Guid methodId, CancellationToken cancellationToken = default)
     {
-        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
+        await using var connection = await source.DataSource.OpenConnectionAsync(cancellationToken);
         var affected = await connection.ExecuteAsync(new CommandDefinition(
             $"DELETE FROM second_factor_methods WHERE id = @MethodId AND {UserScope}",
             new { MethodId = methodId, UserId = userId, TenantId = tenantId },
@@ -74,7 +74,7 @@ internal sealed class PostgresMfaMethodStore(NpgsqlDataSource dataSource) : IMfa
     public async Task<StoredPasskey?> FindPasskeyAsync(byte[] credentialId, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(credentialId);
-        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
+        await using var connection = await source.DataSource.OpenConnectionAsync(cancellationToken);
         var row = await connection.QuerySingleOrDefaultAsync<PasskeyRow>(new CommandDefinition(
             """
             SELECT id, tenant_id AS TenantId, user_id AS UserId, credential_id AS CredentialId,
@@ -89,7 +89,7 @@ internal sealed class PostgresMfaMethodStore(NpgsqlDataSource dataSource) : IMfa
 
     public async Task<IReadOnlyList<byte[]>> ListPasskeyCredentialIdsAsync(string? tenantId, string userId, CancellationToken cancellationToken = default)
     {
-        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
+        await using var connection = await source.DataSource.OpenConnectionAsync(cancellationToken);
         var ids = await connection.QueryAsync<byte[]>(new CommandDefinition(
             $"SELECT credential_id FROM second_factor_methods WHERE kind = 'Passkey' AND disabled_at IS NULL AND {UserScope}",
             new { UserId = userId, TenantId = tenantId },
@@ -99,7 +99,7 @@ internal sealed class PostgresMfaMethodStore(NpgsqlDataSource dataSource) : IMfa
 
     public async Task<StoredTotp?> FindTotpAsync(string? tenantId, string userId, Guid methodId, CancellationToken cancellationToken = default)
     {
-        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
+        await using var connection = await source.DataSource.OpenConnectionAsync(cancellationToken);
         var row = await connection.QuerySingleOrDefaultAsync<TotpRow>(new CommandDefinition(
             $"""
             SELECT id, secret_protected AS SecretProtected, protection_scheme AS ProtectionScheme, last_used_step AS LastUsedStep
@@ -113,7 +113,7 @@ internal sealed class PostgresMfaMethodStore(NpgsqlDataSource dataSource) : IMfa
 
     public async Task<bool> TryAdvanceTotpStepAsync(string? tenantId, string userId, Guid methodId, long step, DateTimeOffset now, CancellationToken cancellationToken = default)
     {
-        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
+        await using var connection = await source.DataSource.OpenConnectionAsync(cancellationToken);
         var affected = await connection.ExecuteAsync(new CommandDefinition(
             $"""
             UPDATE second_factor_methods
@@ -125,9 +125,23 @@ internal sealed class PostgresMfaMethodStore(NpgsqlDataSource dataSource) : IMfa
         return affected == 1;
     }
 
+    public async Task<bool> TryAdvanceTotpStepByMethodAsync(Guid methodId, long step, DateTimeOffset now, CancellationToken cancellationToken = default)
+    {
+        await using var connection = await source.DataSource.OpenConnectionAsync(cancellationToken);
+        var affected = await connection.ExecuteAsync(new CommandDefinition(
+            """
+            UPDATE second_factor_methods
+            SET last_used_step = @Step, last_used_at = @Now, updated_at = @Now
+            WHERE id = @MethodId AND kind = 'Totp' AND disabled_at IS NULL AND last_used_step < @Step
+            """,
+            new { MethodId = methodId, Step = step, Now = now.ToUniversalTime() },
+            cancellationToken: cancellationToken));
+        return affected == 1;
+    }
+
     public async Task<bool> TryUpdateSignCountAsync(string? tenantId, string userId, Guid methodId, long newSignCount, DateTimeOffset now, CancellationToken cancellationToken = default)
     {
-        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
+        await using var connection = await source.DataSource.OpenConnectionAsync(cancellationToken);
         var affected = await connection.ExecuteAsync(new CommandDefinition(
             $"""
             UPDATE second_factor_methods
