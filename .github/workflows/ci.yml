@@ -61,7 +61,8 @@ jobs:
       - name: Setup reviewdog
         uses: reviewdog/action-setup@v1
         with:
-          reviewdog_version: latest
+          # Pinned: "latest" makes the action look the tag up through the GitHub API and fails the job on a 504.
+          reviewdog_version: v0.21.2
 
       - name: Build (compile gate + inline diagnostics on the PR)
         env:
