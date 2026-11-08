@@ -48,6 +48,14 @@ Never log snapshot contents: they hold names and tax ids. Errors from this packa
   browsers, multiple pages, images and concurrency. An app that points `ThemiaPdfOptions.ExecutablePath` at its own
   Chromium runs a build CI does not cover; `RendererVersion` records which one rendered.
 
+## Previewing the buyer block
+
+`TaxDocumentBuyerBlock.Lines(buyer, templateVersion)` returns the buyer lines exactly as the PDF prints them (after the browser's white-space
+rules), so a preview cannot drift from the document. Use `Lines(buyer, options)` with the `TaxDocumentTemplateOptions` the service is
+registered with, so the preview follows the configured version, and `Lines(buyer, record.TemplateVersion)` for an issued document. Full form
+only: an abbreviated document prints no buyer block. Hash `templateVersion + Lines` when the buyer confirms, recompute at issue and refuse on a
+mismatch, so a configuration change in between forces a re-confirm.
+
 ## Issuing and sending
 
 Apps own their tables, migrations and the persistence port; Themia owns the rules.

@@ -442,3 +442,6 @@ Themia.ETax.TaxDocumentForm.Full = 0 -> Themia.ETax.TaxDocumentForm
 Themia.ETax.TaxDocumentSnapshot.Form.get -> Themia.ETax.TaxDocumentForm
 Themia.ETax.TaxDocumentSnapshot.Form.init -> void
 Themia.ETax.ITaxDocumentNumberSource.NextNumberForFormAsync(System.Data.Common.DbTransaction! tx, string! sellerId, Themia.ETax.TaxDocumentKind kind, Themia.ETax.TaxDocumentForm form, System.DateOnly issueDate, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<string!>!
+Themia.ETax.TaxDocumentBuyerBlock
+static Themia.ETax.TaxDocumentBuyerBlock.Lines(Themia.ETax.TaxParty! buyer, string! templateVersion) -> System.Collections.Generic.IReadOnlyList<string!>!
+static Themia.ETax.TaxDocumentBuyerBlock.Lines(Themia.ETax.TaxParty! buyer, Themia.ETax.TaxDocumentTemplateOptions! options) -> System.Collections.Generic.IReadOnlyList<string!>!

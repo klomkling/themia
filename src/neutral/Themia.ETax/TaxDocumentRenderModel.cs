@@ -6,7 +6,6 @@ namespace Themia.ETax;
 /// <summary>Turns a snapshot into the plain, pre-formatted values the template prints. Pure: no clock, no culture.</summary>
 internal static class TaxDocumentRenderModel
 {
-    private const string HeadOfficeBranch = "00000";
     private const int BuddhistEraOffset = 543;
 
     public static object Build(TaxDocumentSnapshot s, TaxDocumentMarker marker, string fontCss, ThaiBahtTextEtMode etMode)
@@ -72,7 +71,7 @@ internal static class TaxDocumentRenderModel
         name = p.Name,
         address = p.Address,
         taxId = p.TaxId,
-        branch = p.Branch is null ? null : p.Branch == HeadOfficeBranch ? "สำนักงานใหญ่ / Head office" : $"สาขา / Branch {p.Branch}",
+        branch = TaxPartyText.FlatBranch(p.Branch),
     };
 
     private static object Note(TaxDocumentKind kind, TaxNoteReference n) => new
