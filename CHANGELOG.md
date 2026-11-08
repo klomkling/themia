@@ -27,6 +27,8 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.57.2] - 2026-11-08
+
 ### Added
 
 - **`Themia.ETax`: `TaxDocumentBuyerBlock.Lines(buyer, templateVersion)` and `Lines(buyer, options)` return the buyer block exactly as the PDF prints it** (coord #0204), so an app preview, tick or hash cannot drift from the printed document. The lines follow the browser's white-space rules per template family (the address keeps its line breaks on templates 1 to 3 and joins on one line on 4 to 7) and the tax id and branch wording the template prints. Full form only: an abbreviated document prints no buyer block. Apps hash `templateVersion + Lines` at confirmation, recompute at issue and refuse on a mismatch. The branch and tax-id wording moved into one internal helper shared by both render models; rendered output is unchanged and no template was edited.
