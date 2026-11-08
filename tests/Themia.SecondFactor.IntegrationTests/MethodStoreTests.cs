@@ -149,11 +149,11 @@ public sealed class MethodStoreTests(PostgresFixture fixture)
         var id = await AddAndGetIdAsync(Totp(user, null));
 
         Assert.Empty(await Store.ListAsync("other-tenant", user));
-        Assert.False(await Store.RemoveAsync("other-tenant", user, id));
-        Assert.False(await Store.RemoveAsync(null, NewUser(), id));
+        Assert.False(await Store.RemoveAsync("other-tenant", user, id, 0));
+        Assert.False(await Store.RemoveAsync(null, NewUser(), id, 0));
         Assert.Null(await Store.FindTotpAsync("other-tenant", user, id));
         Assert.Single(await Store.ListAsync(null, user));
-        Assert.True(await Store.RemoveAsync(null, user, id));
+        Assert.True(await Store.RemoveAsync(null, user, id, 0));
     }
 
     [Fact]
@@ -162,5 +162,19 @@ public sealed class MethodStoreTests(PostgresFixture fixture)
         var bad = Totp(NewUser(), null) with { SecretProtected = null };
 
         await Assert.ThrowsAnyAsync<Exception>(() => Store.AddAsync(bad));
+    }
+
+    [Fact]
+    public async Task Remove_ShouldLeaveOneMethod_WhenTwoAreRemovedInParallel()
+    {
+        var user = NewUser();
+        await Store.AddAsync(Totp(user, "t1"));
+        await Store.AddAsync(Totp(user, "t1"));
+        var ids = (await Store.ListAsync("t1", user)).Select(m => m.Id).ToArray();
+
+        var results = await Task.WhenAll(ids.Select(id => Store.RemoveAsync("t1", user, id, 1)));
+
+        Assert.Equal(1, results.Count(removed => removed));
+        Assert.Single(await Store.ListAsync("t1", user));
     }
 }

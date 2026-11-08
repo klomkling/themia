@@ -117,10 +117,10 @@ public sealed class SupportStoreTests(PostgresFixture fixture)
         var id = Guid.NewGuid().ToString("N");
         await store.StoreAsync(id, "{}", null, user, MfaCeremonyPurpose.Register, TimeSpan.FromMinutes(5));
 
-        Assert.Null(await store.TryConsumeAsync(id, user, MfaCeremonyPurpose.Authenticate));
-        Assert.Null(await store.TryConsumeAsync(id, NewUser(), MfaCeremonyPurpose.Register));
-        Assert.NotNull(await store.TryConsumeAsync(id, user, MfaCeremonyPurpose.Register));
-        Assert.Null(await store.TryConsumeAsync(id, user, MfaCeremonyPurpose.Register));
+        Assert.Null(await store.TryConsumeAsync(id, null, user, MfaCeremonyPurpose.Authenticate));
+        Assert.Null(await store.TryConsumeAsync(id, null, NewUser(), MfaCeremonyPurpose.Register));
+        Assert.NotNull(await store.TryConsumeAsync(id, null, user, MfaCeremonyPurpose.Register));
+        Assert.Null(await store.TryConsumeAsync(id, null, user, MfaCeremonyPurpose.Register));
     }
 
     [Fact]
@@ -132,7 +132,7 @@ public sealed class SupportStoreTests(PostgresFixture fixture)
         await store.StoreAsync(id, "{}", null, user, MfaCeremonyPurpose.Authenticate, TimeSpan.FromMinutes(5));
 
         var results = await Task.WhenAll(Enumerable.Range(0, Parallelism)
-            .Select(_ => store.TryConsumeAsync(id, user, MfaCeremonyPurpose.Authenticate)));
+            .Select(_ => store.TryConsumeAsync(id, null, user, MfaCeremonyPurpose.Authenticate)));
 
         Assert.Equal(1, results.Count(r => r is not null));
     }
@@ -144,7 +144,7 @@ public sealed class SupportStoreTests(PostgresFixture fixture)
         var id = Guid.NewGuid().ToString("N");
         await store.StoreAsync(id, "{}", null, null, MfaCeremonyPurpose.Authenticate, TimeSpan.FromSeconds(-1));
 
-        Assert.Null(await store.TryConsumeAsync(id, null, MfaCeremonyPurpose.Authenticate));
+        Assert.Null(await store.TryConsumeAsync(id, null, null, MfaCeremonyPurpose.Authenticate));
     }
 
     [Fact]
@@ -156,5 +156,56 @@ public sealed class SupportStoreTests(PostgresFixture fixture)
         await Assert.ThrowsAsync<PostgresException>(() => fixture.ExecuteAsync("UPDATE second_factor_audit SET actor = 'x'"));
         await Assert.ThrowsAsync<PostgresException>(() => fixture.ExecuteAsync("DELETE FROM second_factor_audit"));
         await Assert.ThrowsAsync<PostgresException>(() => fixture.ExecuteAsync("TRUNCATE second_factor_audit"));
+    }
+
+    [Fact]
+    public async Task Ceremony_ShouldBeBoundToTheTenantItWasOpenedFor()
+    {
+        var store = fixture.Get<IMfaCeremonyStore>();
+        var user = NewUser();
+        var id = Guid.NewGuid().ToString("N");
+        await store.StoreAsync(id, "{}", "tenant-a", user, MfaCeremonyPurpose.Register, TimeSpan.FromMinutes(5));
+
+        Assert.Null(await store.TryConsumeAsync(id, "tenant-b", user, MfaCeremonyPurpose.Register));
+        Assert.Null(await store.TryConsumeAsync(id, null, user, MfaCeremonyPurpose.Register));
+        Assert.NotNull(await store.TryConsumeAsync(id, "tenant-a", user, MfaCeremonyPurpose.Register));
+    }
+
+    [Theory]
+    [InlineData(MfaCeremonyPurpose.Register)]
+    [InlineData(MfaCeremonyPurpose.EnrolTotp)]
+    public async Task Ceremony_ShouldRefuseToStoreAUserlessRegisterOrEnrol(MfaCeremonyPurpose purpose)
+    {
+        var store = fixture.Get<IMfaCeremonyStore>();
+
+        await Assert.ThrowsAsync<ArgumentException>(
+            () => store.StoreAsync(Guid.NewGuid().ToString("N"), "{}", null, null, purpose, TimeSpan.FromMinutes(5)));
+    }
+
+    [Fact]
+    public async Task Ceremony_ShouldPurgeOnlyExpiredRows()
+    {
+        var store = fixture.Get<IMfaCeremonyStore>();
+        var live = Guid.NewGuid().ToString("N");
+        var dead = Guid.NewGuid().ToString("N");
+        await store.StoreAsync(live, "{}", null, null, MfaCeremonyPurpose.Authenticate, TimeSpan.FromMinutes(5));
+        await store.StoreAsync(dead, "{}", null, null, MfaCeremonyPurpose.Authenticate, TimeSpan.FromSeconds(-1));
+
+        var purged = await store.PurgeExpiredAsync();
+
+        Assert.True(purged >= 1);
+        Assert.NotNull(await store.TryConsumeAsync(live, null, null, MfaCeremonyPurpose.Authenticate));
+    }
+
+    [Fact]
+    public async Task RecoveryCode_ShouldLeaveOneBatch_WhenRegeneratedConcurrently()
+    {
+        var store = fixture.Get<IMfaRecoveryCodeStore>();
+        var user = NewUser();
+
+        await Task.WhenAll(Enumerable.Range(0, 8).Select(i =>
+            store.ReplaceAsync("t1", user, [$"B{i}-1", $"B{i}-2", $"B{i}-3"], RecoveryCodeHasher.Scheme, Now)));
+
+        Assert.Equal(3, await store.CountUnusedAsync("t1", user));
     }
 }

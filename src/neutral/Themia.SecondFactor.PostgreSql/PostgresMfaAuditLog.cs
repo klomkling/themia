@@ -1,15 +1,13 @@
 using Dapper;
 
-using Npgsql;
-
 namespace Themia.SecondFactor.PostgreSql;
 
-internal sealed class PostgresMfaAuditLog(NpgsqlDataSource dataSource) : IMfaAuditLog
+internal sealed class PostgresMfaAuditLog(SecondFactorDataSource source) : IMfaAuditLog
 {
     public async Task AppendAsync(MfaAuditEntry entry, DateTimeOffset now, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(entry);
-        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
+        await using var connection = await source.DataSource.OpenConnectionAsync(cancellationToken);
         await connection.ExecuteAsync(new CommandDefinition(
             """
             INSERT INTO second_factor_audit (at, tenant_id, target_user_id, actor, action, method_kind, reason)

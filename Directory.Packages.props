@@ -135,6 +135,8 @@
          4.0.1 is the latest STABLE; 5.0.0 is preview only and a neutral package two consumers adopt
          should not pin a preview. It ships net8.0 assets only, which net10 consumes. -->
     <PackageVersion Include="Fido2" Version="4.0.1" />
+    <!-- SecondFactor: server-side TOTP enrol QR (SVG string, no network); netstandard2.0, MIT -->
+    <PackageVersion Include="QRCoder" Version="1.6.0" />
     <!-- Integration tests: real PostgreSQL via Testcontainers -->
     <PackageVersion Include="Testcontainers.PostgreSql" Version="4.13.0" />
     <!-- Exceptional dialects (0.3.0): MySQL + SqlServer drivers + FluentMigrator runners -->

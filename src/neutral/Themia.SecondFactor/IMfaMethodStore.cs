@@ -72,8 +72,12 @@ public interface IMfaMethodStore
     /// <summary>Stores a method. A passkey credential id is unique across all accounts.</summary>
     Task<MfaEnrolOutcome> AddAsync(NewMfaMethod method, CancellationToken cancellationToken = default);
 
-    /// <summary>Removes one of the user's methods. Returns <see langword="false"/> when it is not theirs.</summary>
-    Task<bool> RemoveAsync(string? tenantId, string userId, Guid methodId, CancellationToken cancellationToken = default);
+    /// <summary>
+    /// Removes one of the user's methods. Returns <see langword="false"/> when it is not theirs, or when fewer than
+    /// <paramref name="minimumRemainingUsable"/> other usable methods would remain. The count and the delete run under a
+    /// per-user lock, so two parallel removals cannot both pass the check and leave the user with none.
+    /// </summary>
+    Task<bool> RemoveAsync(string? tenantId, string userId, Guid methodId, int minimumRemainingUsable, CancellationToken cancellationToken = default);
 
     /// <summary>Loads a passkey by credential id alone (discoverable sign-in). The caller must check the returned user handle.</summary>
     Task<StoredPasskey?> FindPasskeyAsync(byte[] credentialId, CancellationToken cancellationToken = default);
@@ -86,6 +90,12 @@ public interface IMfaMethodStore
 
     /// <summary>Atomically advances the TOTP step; <see langword="false"/> when <paramref name="step"/> is not newer (replay).</summary>
     Task<bool> TryAdvanceTotpStepAsync(string? tenantId, string userId, Guid methodId, long step, DateTimeOffset now, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Atomically advances the TOTP step by method id alone, for the replay store the TOTP service calls. The id must come
+    /// from a tenant-scoped <see cref="FindTotpAsync"/> lookup.
+    /// </summary>
+    Task<bool> TryAdvanceTotpStepByMethodAsync(Guid methodId, long step, DateTimeOffset now, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Atomically records a new sign counter. Accepts a strictly higher counter, and 0 after 0 (synced passkeys

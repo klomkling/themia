@@ -44,8 +44,11 @@ public interface IMfaUserStateStore
 /// <summary>Why a WebAuthn ceremony was opened.</summary>
 public enum MfaCeremonyPurpose
 {
-    /// <summary>Registering a passkey.</summary>
+    /// <summary>Registering a passkey. Always bound to a user.</summary>
     Register,
+
+    /// <summary>Confirming a pending TOTP enrolment. Always bound to a user.</summary>
+    EnrolTotp,
 
     /// <summary>Signing in with a passkey.</summary>
     Authenticate,
@@ -59,14 +62,17 @@ public sealed record MfaCeremony(string OptionsJson, string? UserId);
 /// <summary>Single-use WebAuthn ceremony state, bound to user and purpose.</summary>
 public interface IMfaCeremonyStore
 {
-    /// <summary>Stores ceremony options for <paramref name="ttl"/>.</summary>
+    /// <summary>Stores ceremony options for <paramref name="ttl"/>. Register and EnrolTotp require a user.</summary>
     Task StoreAsync(string challengeId, string optionsJson, string? tenantId, string? userId, MfaCeremonyPurpose purpose, TimeSpan ttl, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Atomically consumes the ceremony. <see langword="null"/> when unknown, expired, already consumed, opened for a
-    /// different user, or opened for a different purpose.
+    /// different tenant or user, or opened for a different purpose.
     /// </summary>
-    Task<MfaCeremony?> TryConsumeAsync(string challengeId, string? userId, MfaCeremonyPurpose purpose, CancellationToken cancellationToken = default);
+    Task<MfaCeremony?> TryConsumeAsync(string challengeId, string? tenantId, string? userId, MfaCeremonyPurpose purpose, CancellationToken cancellationToken = default);
+
+    /// <summary>Deletes expired ceremonies (unauthenticated begin calls would otherwise grow the table). Returns the count.</summary>
+    Task<int> PurgeExpiredAsync(CancellationToken cancellationToken = default);
 }
 
 /// <summary>One audit entry. Never carries secrets or contact details.</summary>
