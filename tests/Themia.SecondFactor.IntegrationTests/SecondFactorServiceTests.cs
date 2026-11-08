@@ -45,7 +45,7 @@ public sealed class SecondFactorServiceTests : IAsyncLifetime
         var totp = scope.ServiceProvider.GetRequiredService<ITotpService>();
         var begin = await service.BeginTotpEnrolAsync(subject, Password, null);
         Assert.True(begin.Succeeded);
-        var confirm = await service.ConfirmTotpEnrolAsync(subject, begin.Value!.EnrolmentId, totp.GenerateCode(begin.Value.Secret), "Authenticator");
+        var confirm = await service.ConfirmTotpEnrolAsync(subject, begin.Value!.EnrolmentId, totp.GenerateCode(begin.Value.Secret), "Authenticator", null);
         Assert.True(confirm.Succeeded);
         var methodId = (await service.ListMethodsAsync(subject)).Single().Id;
         return (methodId, begin.Value.Secret);
@@ -111,8 +111,8 @@ public sealed class SecondFactorServiceTests : IAsyncLifetime
         var totp = scope.ServiceProvider.GetRequiredService<ITotpService>();
         var begin = await service.BeginTotpEnrolAsync(subject, Password, null);
 
-        var typo = await service.ConfirmTotpEnrolAsync(subject, begin.Value!.EnrolmentId, "000000", "Authenticator");
-        var retry = await service.ConfirmTotpEnrolAsync(subject, begin.Value.EnrolmentId, totp.GenerateCode(begin.Value.Secret), "Authenticator");
+        var typo = await service.ConfirmTotpEnrolAsync(subject, begin.Value!.EnrolmentId, "000000", "Authenticator", null);
+        var retry = await service.ConfirmTotpEnrolAsync(subject, begin.Value.EnrolmentId, totp.GenerateCode(begin.Value.Secret), "Authenticator", null);
 
         Assert.Equal(SecondFactorOutcome.Incorrect, typo.Outcome);
         Assert.True(retry.Succeeded);
@@ -128,7 +128,7 @@ public sealed class SecondFactorServiceTests : IAsyncLifetime
         var totp = scope.ServiceProvider.GetRequiredService<ITotpService>();
         var begin = await service.BeginTotpEnrolAsync(owner, Password, null);
 
-        var stolen = await service.ConfirmTotpEnrolAsync(other, begin.Value!.EnrolmentId, totp.GenerateCode(begin.Value.Secret), "Mine");
+        var stolen = await service.ConfirmTotpEnrolAsync(other, begin.Value!.EnrolmentId, totp.GenerateCode(begin.Value.Secret), "Mine", null);
 
         Assert.Equal(SecondFactorOutcome.CeremonyExpired, stolen.Outcome);
         Assert.Empty(await service.ListMethodsAsync(other));
@@ -151,6 +151,26 @@ public sealed class SecondFactorServiceTests : IAsyncLifetime
         Assert.Equal(SecondFactorOutcome.StepUpRequired, weak.Outcome);
         Assert.Equal(SecondFactorOutcome.StepUpRequired, stale.Outcome);
         Assert.True(fresh.Succeeded);
+    }
+
+    [Fact]
+    public async Task ConfirmTotpEnrol_ShouldNeedProof_WhenTheUserEnrolledSomethingSinceBegin()
+    {
+        var subject = NewSubject();
+        using var scope = harness.CreateScope();
+        var service = scope.ServiceProvider.GetRequiredService<ISecondFactorService>();
+        var totp = scope.ServiceProvider.GetRequiredService<ITotpService>();
+        var pending = await service.BeginTotpEnrolAsync(subject, Password, null);
+        Assert.True((await service.EnrolOtpAsync(subject, Password, MfaMethodKind.SmsOtp, null)).Succeeded);
+        var code = totp.GenerateCode(pending.Value!.Secret);
+
+        var replayedPending = await service.ConfirmTotpEnrolAsync(subject, pending.Value.EnrolmentId, code, "Attacker", null);
+        var withProof = await service.ConfirmTotpEnrolAsync(
+            subject, pending.Value.EnrolmentId, code, "Mine", new MfaProof(MfaStrength.Weak, harness.Clock.GetUtcNow()));
+
+        Assert.Equal(SecondFactorOutcome.StepUpRequired, replayedPending.Outcome);
+        Assert.True(withProof.Succeeded);
+        Assert.Equal(2, (await service.ListMethodsAsync(subject)).Count);
     }
 
     [Fact]

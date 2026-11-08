@@ -41,7 +41,7 @@ internal sealed partial class SecondFactorService
     }
 
     public async Task<SecondFactorResult> ConfirmTotpEnrolAsync(
-        MfaSubject subject, string enrolmentId, string code, string label, CancellationToken cancellationToken = default)
+        MfaSubject subject, string enrolmentId, string code, string label, MfaProof? proof, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(enrolmentId);
         ArgumentException.ThrowIfNullOrWhiteSpace(code);
@@ -51,6 +51,14 @@ internal sealed partial class SecondFactorService
         if (attempt.IsLocked(time.GetUtcNow()))
         {
             return SecondFactorResult.Failed(SecondFactorOutcome.Locked, attempt.LockedUntil);
+        }
+
+        // Begin may have run with no proof because the user held nothing; if they have enrolled something since, a
+        // primary-only caller must not be able to spend that old pending enrolment to add a second factor unproven.
+        var heldNow = await methods.ListAsync(subject.TenantId, subject.UserId, cancellationToken).ConfigureAwait(false);
+        if (!MayAdd(heldNow, MfaMethodKind.Totp, proof))
+        {
+            return SecondFactorResult.Failed(SecondFactorOutcome.StepUpRequired);
         }
 
         var ceremony = await ceremonies.TryConsumeAsync(enrolmentId, subject.TenantId, subject.UserId, MfaCeremonyPurpose.EnrolTotp, cancellationToken).ConfigureAwait(false);
@@ -115,10 +123,16 @@ internal sealed partial class SecondFactorService
     }
 
     public async Task<SecondFactorResult> CompletePasskeyEnrolAsync(
-        MfaSubject subject, AuthenticatorAttestationRawResponse response, string label, CancellationToken cancellationToken = default)
+        MfaSubject subject, AuthenticatorAttestationRawResponse response, string label, MfaProof? proof, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(response);
         ArgumentException.ThrowIfNullOrWhiteSpace(label);
+
+        var heldNow = await methods.ListAsync(subject.TenantId, subject.UserId, cancellationToken).ConfigureAwait(false);
+        if (!MayAdd(heldNow, MfaMethodKind.Passkey, proof))
+        {
+            return SecondFactorResult.Failed(SecondFactorOutcome.StepUpRequired);
+        }
 
         using var ceremony = PasskeyCeremonyContext.Begin(subject.TenantId, subject.UserId, MfaCeremonyPurpose.Register);
         var registration = await webAuthn.CompleteRegistrationAsync(

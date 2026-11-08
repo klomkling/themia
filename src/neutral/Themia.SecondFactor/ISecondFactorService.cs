@@ -47,14 +47,17 @@ public interface ISecondFactorService
     /// <summary>Starts a TOTP enrolment: a fresh secret, its otpauth URI (labelled with the email/username) and a QR SVG.</summary>
     Task<SecondFactorValue<TotpEnrolment>> BeginTotpEnrolAsync(MfaSubject subject, MfaPrimary primary, MfaProof? proof, CancellationToken cancellationToken = default);
 
-    /// <summary>Confirms a TOTP enrolment with a code from the app. The confirming code is spent and cannot sign in.</summary>
-    Task<SecondFactorResult> ConfirmTotpEnrolAsync(MfaSubject subject, string enrolmentId, string code, string label, CancellationToken cancellationToken = default);
+    /// <summary>
+    /// Confirms a TOTP enrolment with a code from the app. The confirming code is spent and cannot sign in. The add rules are
+    /// checked again here: the user's methods may have changed since begin, and a pending enrolment is not authority.
+    /// </summary>
+    Task<SecondFactorResult> ConfirmTotpEnrolAsync(MfaSubject subject, string enrolmentId, string code, string label, MfaProof? proof, CancellationToken cancellationToken = default);
 
     /// <summary>Starts a passkey registration.</summary>
     Task<SecondFactorValue<PasskeyCeremony>> BeginPasskeyEnrolAsync(MfaSubject subject, MfaPrimary primary, MfaProof? proof, CancellationToken cancellationToken = default);
 
-    /// <summary>Completes a passkey registration.</summary>
-    Task<SecondFactorResult> CompletePasskeyEnrolAsync(MfaSubject subject, AuthenticatorAttestationRawResponse response, string label, CancellationToken cancellationToken = default);
+    /// <summary>Completes a passkey registration. The add rules are checked again here, as for TOTP.</summary>
+    Task<SecondFactorResult> CompletePasskeyEnrolAsync(MfaSubject subject, AuthenticatorAttestationRawResponse response, string label, MfaProof? proof, CancellationToken cancellationToken = default);
 
     /// <summary>Enrols the user's verified email or phone as a one-time-code method.</summary>
     Task<SecondFactorResult> EnrolOtpAsync(MfaSubject subject, MfaPrimary primary, MfaMethodKind kind, MfaProof? proof, CancellationToken cancellationToken = default);
