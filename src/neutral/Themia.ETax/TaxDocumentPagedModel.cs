@@ -5,8 +5,6 @@ namespace Themia.ETax;
 /// <summary>The data the paged template (versions "4" A4 portrait and "5" A5 landscape) prints: one entry per page, split by <see cref="TaxDocumentPageLayout"/>.</summary>
 internal static class TaxDocumentPagedModel
 {
-    private const string HeadOfficeBranch = "00000";
-    private static readonly int[] TaxIdGroups = [1, 4, 5, 2, 1];
 
     public static object Build(
         TaxDocumentSnapshot s, TaxDocumentMarker marker, string fontCss, ThaiBahtTextEtMode etMode, TaxDocumentLogo? logo, TaxDocumentPageSize size)
@@ -143,27 +141,10 @@ internal static class TaxDocumentPagedModel
     {
         name = p.Name,
         address = p.Address,
-        taxId = p.TaxId is null ? null : TaxId(p.TaxId),
-        branchTh = p.Branch is null ? null : p.Branch == HeadOfficeBranch ? "สำนักงานใหญ่" : "สาขาที่ " + p.Branch,
-        branchEn = p.Branch is null ? null : p.Branch == HeadOfficeBranch ? "Head office" : "Branch " + p.Branch,
+        taxId = p.TaxId is null ? null : TaxPartyText.GroupedTaxId(p.TaxId),
+        branchTh = TaxPartyText.PagedBranchTh(p.Branch),
+        branchEn = TaxPartyText.PagedBranchEn(p.Branch),
     };
-
-    // A 13-digit id prints grouped the way the Revenue Department writes it (1 4 5 2 1); anything else prints as given.
-    private static string TaxId(string id)
-    {
-        if (id.Length != 13 || !id.All(char.IsAsciiDigit))
-            return id;
-
-        var parts = new List<string>(TaxIdGroups.Length);
-        var at = 0;
-        foreach (var size in TaxIdGroups)
-        {
-            parts.Add(id.Substring(at, size));
-            at += size;
-        }
-
-        return string.Join(' ', parts);
-    }
 
     private static (string Th, string En) Title(TaxDocumentKind kind) => kind switch
     {
