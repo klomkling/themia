@@ -404,4 +404,33 @@ public sealed class SecondFactorServiceTests : IAsyncLifetime
         Assert.Contains("Issuer", result.FailureMessage, StringComparison.Ordinal);
         Assert.Contains("OfferedKinds", result.FailureMessage, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public async Task Remove_ShouldRefuseTheOnlyStrongMethod_WhenThePrimaryIsExternal()
+    {
+        var subject = NewSubject();
+        var (totpId, _) = await EnrolFirstTotpAsync(subject);
+        using var scope = harness.CreateScope();
+        var service = scope.ServiceProvider.GetRequiredService<ISecondFactorService>();
+        Assert.True((await service.EnrolOtpAsync(subject, Password, MfaMethodKind.SmsOtp, StrongNow())).Succeeded);
+
+        // Under LINE only strong methods count, so removing the TOTP would leave nothing that can prove: Denied.
+        var removed = await service.RemoveMethodAsync(subject, Line, totpId, StrongNow());
+
+        Assert.Equal(SecondFactorOutcome.NotAllowed, removed.Outcome);
+    }
+
+    [Fact]
+    public async Task EnrolOtp_ShouldRefuseASecondMethodOfTheSameKind()
+    {
+        var subject = NewSubject();
+        using var scope = harness.CreateScope();
+        var service = scope.ServiceProvider.GetRequiredService<ISecondFactorService>();
+        await service.EnrolOtpAsync(subject, Password, MfaMethodKind.EmailOtp, null);
+
+        var again = await service.EnrolOtpAsync(subject, Password, MfaMethodKind.EmailOtp, StrongNow());
+
+        Assert.Equal(SecondFactorOutcome.NotAllowed, again.Outcome);
+        Assert.Single(await service.ListMethodsAsync(subject));
+    }
 }

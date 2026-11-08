@@ -190,7 +190,7 @@ internal sealed partial class SecondFactorService
             return SecondFactorResult.Failed(SecondFactorOutcome.NotAllowed);
         }
 
-        await methods.AddAsync(
+        var added = await methods.AddAsync(
             new NewMfaMethod
             {
                 TenantId = subject.TenantId,
@@ -200,6 +200,11 @@ internal sealed partial class SecondFactorService
                 EnrolledAt = time.GetUtcNow(),
             },
             cancellationToken).ConfigureAwait(false);
+        if (added != MfaEnrolOutcome.Added)
+        {
+            return SecondFactorResult.Failed(SecondFactorOutcome.NotAllowed);
+        }
+
         await AuditAsync(subject, "method.added", kind, cancellationToken).ConfigureAwait(false);
         return Success(kind);
     }
@@ -225,12 +230,15 @@ internal sealed partial class SecondFactorService
         var now = time.GetUtcNow();
         var before = policy.Evaluate(subject, primary, held, nagStartedAt, now);
         var after = policy.Evaluate(subject, primary, [.. held.Where(method => method.Id != methodId)], nagStartedAt, now);
-        if (after.Level == MfaRequirementLevel.Enrol || (after.SpareNeeded && !before.SpareNeeded))
+        // Denied is a lockout too: under an external (LINE) primary, removing the only strong method leaves nothing that can prove.
+        if (after.Level is MfaRequirementLevel.Enrol or MfaRequirementLevel.Denied || (after.SpareNeeded && !before.SpareNeeded))
         {
             return SecondFactorResult.Failed(SecondFactorOutcome.NotAllowed);
         }
 
-        if (!await methods.RemoveAsync(subject.TenantId, subject.UserId, methodId, cancellationToken).ConfigureAwait(false))
+        // A required user keeps at least one usable method; the store re-checks that under a lock against parallel removals.
+        var mustKeepOne = policy.Evaluate(subject, primary, [], null, now).Level == MfaRequirementLevel.Enrol;
+        if (!await methods.RemoveAsync(subject.TenantId, subject.UserId, methodId, mustKeepOne ? 1 : 0, cancellationToken).ConfigureAwait(false))
         {
             return SecondFactorResult.Failed(SecondFactorOutcome.NotAvailable);
         }

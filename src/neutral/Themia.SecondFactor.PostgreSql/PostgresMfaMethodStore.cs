@@ -61,13 +61,29 @@ internal sealed class PostgresMfaMethodStore(SecondFactorDataSource source) : IM
         }
     }
 
-    public async Task<bool> RemoveAsync(string? tenantId, string userId, Guid methodId, CancellationToken cancellationToken = default)
+    public async Task<bool> RemoveAsync(string? tenantId, string userId, Guid methodId, int minimumRemainingUsable, CancellationToken cancellationToken = default)
     {
         await using var connection = await source.DataSource.OpenConnectionAsync(cancellationToken);
-        var affected = await connection.ExecuteAsync(new CommandDefinition(
-            $"DELETE FROM second_factor_methods WHERE id = @MethodId AND {UserScope}",
-            new { MethodId = methodId, UserId = userId, TenantId = tenantId },
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+
+        // The remaining-count check and the delete must see each other: the per-user lock serialises parallel removals.
+        await connection.ExecuteAsync(new CommandDefinition(
+            "SELECT pg_advisory_xact_lock(hashtextextended(@Key, 0))",
+            new { Key = $"second-factor-methods:{tenantId}\n{userId}" },
+            transaction,
             cancellationToken: cancellationToken));
+
+        var affected = await connection.ExecuteAsync(new CommandDefinition(
+            $"""
+            DELETE FROM second_factor_methods
+            WHERE id = @MethodId AND {UserScope}
+              AND (SELECT count(*) FROM second_factor_methods
+                   WHERE {UserScope} AND disabled_at IS NULL AND id <> @MethodId) >= @MinimumRemaining
+            """,
+            new { MethodId = methodId, UserId = userId, TenantId = tenantId, MinimumRemaining = minimumRemainingUsable },
+            transaction,
+            cancellationToken: cancellationToken));
+        await transaction.CommitAsync(cancellationToken);
         return affected == 1;
     }
 
