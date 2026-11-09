@@ -25,6 +25,10 @@ internal sealed class PostgresMfaMethodStore(SecondFactorDataSource source) : IM
     {
         ArgumentNullException.ThrowIfNull(method);
         await using var connection = await source.DataSource.OpenConnectionAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+
+        // The same per-user lock a removal and an admin reset take, so an enrolment cannot commit between a reset's delete and its audit row.
+        await LockUserAsync(connection, transaction, method.TenantId, method.UserId, cancellationToken);
         try
         {
             await connection.ExecuteAsync(new CommandDefinition(
@@ -52,7 +56,9 @@ internal sealed class PostgresMfaMethodStore(SecondFactorDataSource source) : IM
                     method.LastUsedStep,
                     EnrolledAt = method.EnrolledAt.ToUniversalTime(),
                 },
+                transaction,
                 cancellationToken: cancellationToken));
+            await transaction.CommitAsync(cancellationToken);
             return MfaEnrolOutcome.Added;
         }
         catch (PostgresException ex) when (ex.SqlState == UniqueViolation)
@@ -61,17 +67,20 @@ internal sealed class PostgresMfaMethodStore(SecondFactorDataSource source) : IM
         }
     }
 
+    private static Task LockUserAsync(NpgsqlConnection connection, NpgsqlTransaction transaction, string? tenantId, string userId, CancellationToken cancellationToken) =>
+        connection.ExecuteAsync(new CommandDefinition(
+            "SELECT pg_advisory_xact_lock(hashtextextended(@Key, 0))",
+            new { Key = $"second-factor-methods:{tenantId}\n{userId}" },
+            transaction,
+            cancellationToken: cancellationToken));
+
     public async Task<bool> RemoveAsync(string? tenantId, string userId, Guid methodId, int minimumRemainingUsable, CancellationToken cancellationToken = default)
     {
         await using var connection = await source.DataSource.OpenConnectionAsync(cancellationToken);
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
 
         // The remaining-count check and the delete must see each other: the per-user lock serialises parallel removals.
-        await connection.ExecuteAsync(new CommandDefinition(
-            "SELECT pg_advisory_xact_lock(hashtextextended(@Key, 0))",
-            new { Key = $"second-factor-methods:{tenantId}\n{userId}" },
-            transaction,
-            cancellationToken: cancellationToken));
+        await LockUserAsync(connection, transaction, tenantId, userId, cancellationToken);
 
         var affected = await connection.ExecuteAsync(new CommandDefinition(
             $"""

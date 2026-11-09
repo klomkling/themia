@@ -46,4 +46,21 @@ public static class SecondFactorServiceCollectionExtensions
         services.TryAddScoped<ISecondFactorService, SecondFactorService>();
         return services;
     }
+
+    /// <summary>
+    /// Turns on the admin reset of another user's second factor (<see cref="ISecondFactorAdminService"/>). The host registers an
+    /// <see cref="IMfaActOnPolicy"/> (there is no default that allows) and, to end the target's sessions, one or more
+    /// <see cref="ISecondFactorResetObserver"/>; host start fails without the policy. Needs a store that implements
+    /// <see cref="IMfaResetStore"/> (the PostgreSQL package registers one).
+    /// </summary>
+    /// <param name="services">The service collection.</param>
+    public static IServiceCollection AddThemiaSecondFactorAdmin(this IServiceCollection services)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+
+        services.AddSingleton<IValidateOptions<SecondFactorOptions>>(new AdminPolicyValidator(services));
+        services.TryAddSingleton(TimeProvider.System);
+        services.TryAddScoped<ISecondFactorAdminService, SecondFactorAdminService>();
+        return services;
+    }
 }

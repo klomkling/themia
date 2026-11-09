@@ -43,6 +43,7 @@ public static class ServiceCollectionExtensions
         services.TryAddSingleton<IMfaUserStateStore, PostgresMfaUserStateStore>();
         services.TryAddSingleton<IMfaCeremonyStore, PostgresMfaCeremonyStore>();
         services.TryAddSingleton<IMfaAuditLog, PostgresMfaAuditLog>();
+        services.TryAddSingleton<IMfaResetStore, PostgresMfaResetStore>();
         services.AddHostedService<CeremonyPurgeService>();
 
         services.AddPostgresSchemaProbe(

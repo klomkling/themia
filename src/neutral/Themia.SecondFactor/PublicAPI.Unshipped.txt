@@ -352,3 +352,18 @@ Themia.SecondFactor.TotpEnrolment.Secret.get -> string!
 Themia.SecondFactor.TotpEnrolment.Secret.init -> void
 Themia.SecondFactor.TotpEnrolment.TotpEnrolment(string! EnrolmentId, string! Secret, System.Uri! OtpAuthUri, string! QrSvg) -> void
 Themia.SecondFactor.SecondFactorResult.ToProof() -> Themia.SecondFactor.MfaProof!
+Themia.SecondFactor.IMfaResetStore
+Themia.SecondFactor.IMfaResetStore.ResetAsync(string? tenantId, string! userId, string! actor, string! action, string! reason, System.DateTimeOffset now, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<int>!
+Themia.SecondFactor.IMfaActOnPolicy
+Themia.SecondFactor.IMfaActOnPolicy.CanActOnAsync(Themia.SecondFactor.MfaSubject! actor, string! targetUserId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!
+Themia.SecondFactor.ISecondFactorAdminService
+Themia.SecondFactor.ISecondFactorAdminService.ResetAsync(Themia.SecondFactor.MfaSubject! actor, Themia.SecondFactor.MfaProof? actorProof, string! targetUserId, string! reason, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.SecondFactor.MfaAdminResetOutcome>!
+Themia.SecondFactor.ISecondFactorResetObserver
+Themia.SecondFactor.ISecondFactorResetObserver.OnResetAsync(string? tenantId, string! targetUserId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.SecondFactor.MfaAdminResetOutcome
+Themia.SecondFactor.MfaAdminResetOutcome.InvalidRequest = 3 -> Themia.SecondFactor.MfaAdminResetOutcome
+Themia.SecondFactor.MfaAdminResetOutcome.NotAllowed = 2 -> Themia.SecondFactor.MfaAdminResetOutcome
+Themia.SecondFactor.MfaAdminResetOutcome.SessionsNotRevoked = 4 -> Themia.SecondFactor.MfaAdminResetOutcome
+Themia.SecondFactor.MfaAdminResetOutcome.StepUpRequired = 1 -> Themia.SecondFactor.MfaAdminResetOutcome
+Themia.SecondFactor.MfaAdminResetOutcome.Succeeded = 0 -> Themia.SecondFactor.MfaAdminResetOutcome
+static Themia.SecondFactor.DependencyInjection.SecondFactorServiceCollectionExtensions.AddThemiaSecondFactorAdmin(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!

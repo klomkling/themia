@@ -80,16 +80,7 @@ internal sealed partial class SecondFactorService : ISecondFactorService
 
     // The proof must be strong and recent; the session it came from is the caller's to vouch for. A session opened with a
     // recovery code is not enough: whoever holds only a leaked code must not be able to remove methods or mint new codes.
-    private bool IsFreshStrong(MfaProof? proof)
-    {
-        if (proof is not { Strength: MfaStrength.Strong, RecoveryCodeOnly: false } strong)
-        {
-            return false;
-        }
-
-        var age = time.GetUtcNow() - strong.AuthenticatedAt;
-        return age <= options.StrongAuthMaxAge && age >= -ClockSkew;
-    }
+    private bool IsFreshStrong(MfaProof? proof) => ProofFreshness.IsFreshStrong(proof, time.GetUtcNow(), options.StrongAuthMaxAge);
 
     private bool IsFresh(MfaProof? proof)
     {
@@ -99,10 +90,8 @@ internal sealed partial class SecondFactorService : ISecondFactorService
         }
 
         var age = time.GetUtcNow() - proof.AuthenticatedAt;
-        return age <= options.StrongAuthMaxAge && age >= -ClockSkew;
+        return age <= options.StrongAuthMaxAge && age >= -ProofFreshness.ClockSkew;
     }
-
-    private static readonly TimeSpan ClockSkew = TimeSpan.FromMinutes(2);
 
     // Who may add a method. The first method needs no proof (the caller is in the Enrol stage, with only the primary);
     // later ones need a fresh strong verification; a user who only holds weak methods may add a strong one after a fresh
