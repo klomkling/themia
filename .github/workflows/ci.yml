@@ -58,13 +58,36 @@ jobs:
         # A PackageVersion referenced by none of those manifests is silently never updated.
         run: bash .github/dependabot-nuget/verify-coverage.sh
 
+      # A runner that already has reviewdog v0.21.2 skips the download; the download is the only step that
+      # depends on GitHub releases being reachable.
+      - name: Detect reviewdog
+        id: rd_present
+        run: |
+          if [ "$(reviewdog -version 2>/dev/null)" = "0.21.2" ]; then echo "present=true" >> "$GITHUB_OUTPUT"; else echo "present=false" >> "$GITHUB_OUTPUT"; fi
+
+      # continue-on-error on THIS step only: reviewdog is advisory, the compile gate below stays mandatory.
       - name: Setup reviewdog
+        id: rd_setup
+        if: steps.rd_present.outputs.present != 'true'
+        continue-on-error: true
         uses: reviewdog/action-setup@v1
         with:
           # Pinned: "latest" makes the action look the tag up through the GitHub API and fails the job on a 504.
           reviewdog_version: v0.21.2
 
+      - name: Record reviewdog status
+        id: rd_status
+        run: |
+          if [ "$(reviewdog -version 2>/dev/null)" = "0.21.2" ]; then
+            echo "reviewdog=ran" >> "$GITHUB_OUTPUT"
+          else
+            echo "reviewdog=not-run" >> "$GITHUB_OUTPUT"
+            echo "reviewdog: not run" >> "$GITHUB_STEP_SUMMARY"
+            echo "::warning title=reviewdog not run::reviewdog: not run (setup failed); no inline comments were posted"
+          fi
+
       - name: Build (compile gate + inline diagnostics on the PR)
+        if: steps.rd_status.outputs.reviewdog == 'ran'
         env:
           REVIEWDOG_GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         # The definitive "does the whole solution compile" gate — covers projects no test references —
@@ -83,6 +106,11 @@ jobs:
                 -filter-mode=diff_context \
                 -level=warning \
                 -fail-on-error=true
+
+      # reviewdog could not be set up: the same build without the pipe, so the compile gate (TreatWarningsAsErrors) still runs.
+      - name: Build (compile gate, reviewdog not run)
+        if: steps.rd_status.outputs.reviewdog == 'not-run'
+        run: dotnet build --configuration Release --no-restore
 
   test:
     name: Test (shard ${{ matrix.shard }}/3)
