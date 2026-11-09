@@ -10,6 +10,25 @@ with the *why* and concrete upgrade steps.
 - Each entry states: **What changed**, **Why**, and **How to upgrade** (before → after).
 - Non-breaking changes are *not* listed here — see the CHANGELOG.
 
+## 0.58.0
+
+### Second-factor and session APIs (breaking)
+
+**What changed:** (1) `ISecondFactorTicketService` gained `Task<SecondFactorTicketData?> PeekAsync(string ticket, CancellationToken cancellationToken = default)`, which reads a ticket without burning it. (2) `MfaProof` is now `MfaProof(MfaStrength Strength, DateTimeOffset AuthenticatedAt, bool RecoveryCodeOnly)`. (3) `IssueOutcome` gained `SecondFactorDenied`, returned by `IAuthTokenIssuer.StartSessionAsync` when the second-factor policy denies the user. (4) `amr` and `auth_time` are reserved claim types. (5) `SessionRequest` gained an optional `Proof` parameter, which `IAuthTokenIssuer` refuses; `AddThemiaSecondFactor` now fails options validation when another `ITotpReplayStore` or `IWebAuthnChallengeStore` is registered.
+
+**Why:** the second-factor proof now lives on the session instead of in token claims, and a recovery-code session must be told apart from a full one.
+
+**Who is affected:** (1) anything that implements `ISecondFactorTicketService`; `SecondFactorTicketService` is the only implementation in Themia. (2) code that builds an `MfaProof` by hand or reads one from a store. (3) an exhaustive `switch` on `IssueOutcome`. (4) an app that passes `amr` or `auth_time` in `SessionRequest.AppClaims`. (5) a prebuilt consumer of `SessionRequest` (binary only; source is unchanged), and an app that replaced the TOTP replay or WebAuthn challenge store.
+
+**How to upgrade:**
+- Add `PeekAsync`; a wrapper forwards it to the inner service, a test fake returns the ticket without removing it.
+- Pass `RecoveryCodeOnly` (`false` for a proof from a normal verification), or build the proof with `SecondFactorResult.ToProof()`.
+- Add a `SecondFactorDenied` arm to every `switch` on `IssueOutcome`; map it like `Inactive` (refuse the sign-in), since the user may not sign in under the current second-factor policy.
+- Drop `amr` and `auth_time` from `AppClaims`; Themia sets them from the session's proof.
+- Rebuild against 0.58.0. Register your own replay or challenge store only through the second-factor layer, not beside it.
+
+The new package `Themia.Modules.Identity.SecondFactor` and its `session_second_factor` migration are additive; keep the bridge off until PR C ships (see the CHANGELOG).
+
 ## 0.56.0
 
 ### Themia.Modules.Identity: `users.concurrency_version`, `UserMutationOutcome.Conflict`
