@@ -56,6 +56,9 @@ public sealed class ExternalAuthenticationFlowTests
             return Task.FromResult(new PendingSecondFactor(data.UserId, data.Stage, "ticket-1", DateTimeOffset.UtcNow.AddMinutes(5)));
         }
 
+        public Task<SecondFactorTicketData?> PeekAsync(string ticket, CancellationToken cancellationToken = default) =>
+            Task.FromResult<SecondFactorTicketData?>(null);
+
         public Task<SecondFactorTicketData?> ConsumeAsync(string ticket, CancellationToken cancellationToken = default) =>
             Task.FromResult<SecondFactorTicketData?>(null);
     }
@@ -93,6 +96,30 @@ public sealed class ExternalAuthenticationFlowTests
         Assert.True(ticket.WasCreated && ticket.WasLinked);
         Assert.Equal(user.SecurityStamp, ticket.SecurityStamp);
         Assert.Equal(new SecondFactorContext(user.Id, user.TenantId, SecondFactorMethod.External, Provider), Assert.Single(policy.Contexts));
+    }
+
+    [Fact]
+    public async Task External_login_the_policy_denies_fails_through_the_normal_failure_path_and_issues_nothing()
+    {
+        var provider = new FakeExternalAuthProvider { Result = ExternalAuthResult.Success(Identity()) };
+        var refresh = new FakeRefreshTokenService();
+        var hooks = new RecordingExternalHooks { Refresh = refresh };
+        var tickets = new RecordingTickets();
+        var flow = new ExternalAuthenticationFlow(
+            new FakeProviderRegistry(provider), new FakeExternalLoginService { Result = new ExternalLoginResult(NewUser(), true, true) },
+            new FakeClaimsPrincipalFactory(), new FakeAccessTokenService(TimeProvider.System), refresh, hooks, [], new IdentityModuleOptions(),
+            TimeProvider.System, NullLogger<ExternalAuthenticationFlow>.Instance,
+            new FixedSecondFactorPolicy(SecondFactorRequirement.Denied), tickets);
+
+        var result = await flow.AuthenticateAsync(Provider, Request());
+
+        Assert.Equal(ExternalLoginOutcome.Denied, result.Outcome);
+        Assert.Null(result.Tokens);
+        Assert.Null(result.SecondFactor);
+        Assert.Equal(0, refresh.IssueCalls);
+        Assert.Empty(tickets.Issued);
+        Assert.Equal(ExternalLoginOutcome.Denied, hooks.FailedReason);
+        Assert.DoesNotContain("succeeded", hooks.Calls);
     }
 
     [Fact]

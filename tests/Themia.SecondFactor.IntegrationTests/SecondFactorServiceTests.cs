@@ -36,7 +36,7 @@ public sealed class SecondFactorServiceTests : IAsyncLifetime
         return subject;
     }
 
-    private MfaProof StrongNow() => new(MfaStrength.Strong, harness.Clock.GetUtcNow());
+    private MfaProof StrongNow() => new(MfaStrength.Strong, harness.Clock.GetUtcNow(), RecoveryCodeOnly: false);
 
     private async Task<(Guid MethodId, string Secret)> EnrolFirstTotpAsync(MfaSubject subject)
     {
@@ -143,8 +143,8 @@ public sealed class SecondFactorServiceTests : IAsyncLifetime
         var service = scope.ServiceProvider.GetRequiredService<ISecondFactorService>();
 
         var none = await service.BeginTotpEnrolAsync(subject, Password, null);
-        var weak = await service.BeginTotpEnrolAsync(subject, Password, new MfaProof(MfaStrength.Weak, harness.Clock.GetUtcNow()));
-        var stale = await service.BeginTotpEnrolAsync(subject, Password, new MfaProof(MfaStrength.Strong, harness.Clock.GetUtcNow().AddMinutes(-6)));
+        var weak = await service.BeginTotpEnrolAsync(subject, Password, new MfaProof(MfaStrength.Weak, harness.Clock.GetUtcNow(), RecoveryCodeOnly: false));
+        var stale = await service.BeginTotpEnrolAsync(subject, Password, new MfaProof(MfaStrength.Strong, harness.Clock.GetUtcNow().AddMinutes(-6), RecoveryCodeOnly: false));
         var fresh = await service.BeginTotpEnrolAsync(subject, Password, StrongNow());
 
         Assert.Equal(SecondFactorOutcome.StepUpRequired, none.Outcome);
@@ -166,7 +166,7 @@ public sealed class SecondFactorServiceTests : IAsyncLifetime
 
         var replayedPending = await service.ConfirmTotpEnrolAsync(subject, pending.Value.EnrolmentId, code, "Attacker", null);
         var withProof = await service.ConfirmTotpEnrolAsync(
-            subject, pending.Value.EnrolmentId, code, "Mine", new MfaProof(MfaStrength.Weak, harness.Clock.GetUtcNow()));
+            subject, pending.Value.EnrolmentId, code, "Mine", new MfaProof(MfaStrength.Weak, harness.Clock.GetUtcNow(), RecoveryCodeOnly: false));
 
         Assert.Equal(SecondFactorOutcome.StepUpRequired, replayedPending.Outcome);
         Assert.True(withProof.Succeeded);
@@ -181,8 +181,8 @@ public sealed class SecondFactorServiceTests : IAsyncLifetime
         var service = scope.ServiceProvider.GetRequiredService<ISecondFactorService>();
         Assert.True((await service.EnrolOtpAsync(subject, Password, MfaMethodKind.SmsOtp, null)).Succeeded);
 
-        var upgrade = await service.BeginTotpEnrolAsync(subject, Password, new MfaProof(MfaStrength.Weak, harness.Clock.GetUtcNow()));
-        var secondWeak = await service.EnrolOtpAsync(subject, Password, MfaMethodKind.EmailOtp, new MfaProof(MfaStrength.Weak, harness.Clock.GetUtcNow()));
+        var upgrade = await service.BeginTotpEnrolAsync(subject, Password, new MfaProof(MfaStrength.Weak, harness.Clock.GetUtcNow(), RecoveryCodeOnly: false));
+        var secondWeak = await service.EnrolOtpAsync(subject, Password, MfaMethodKind.EmailOtp, new MfaProof(MfaStrength.Weak, harness.Clock.GetUtcNow(), RecoveryCodeOnly: false));
 
         Assert.True(upgrade.Succeeded);
         Assert.Equal(SecondFactorOutcome.StepUpRequired, secondWeak.Outcome);
@@ -237,6 +237,40 @@ public sealed class SecondFactorServiceTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task ARecoveryCodeSession_ShouldEnrolAStrongMethod_ButNotRemoveOrMintRecoveryCodes()
+    {
+        var subject = NewSubject();
+        var (methodId, _) = await EnrolFirstTotpAsync(subject);
+        using var scope = harness.CreateScope();
+        var service = scope.ServiceProvider.GetRequiredService<ISecondFactorService>();
+        Assert.True((await service.EnrolOtpAsync(subject, Password, MfaMethodKind.SmsOtp, StrongNow())).Succeeded);
+        var recovery = new MfaProof(MfaStrength.Strong, harness.Clock.GetUtcNow(), RecoveryCodeOnly: true);
+
+        var remove = await service.RemoveMethodAsync(subject, Password, methodId, recovery);
+        var mint = await service.GenerateRecoveryCodesAsync(subject, recovery);
+        var weakEnrol = await service.EnrolOtpAsync(subject, Password, MfaMethodKind.EmailOtp, recovery);
+        var strongEnrol = await service.BeginTotpEnrolAsync(subject, Password, recovery);
+
+        Assert.Equal(SecondFactorOutcome.StepUpRequired, remove.Outcome);
+        Assert.Equal(SecondFactorOutcome.StepUpRequired, mint.Outcome);
+        Assert.Equal(SecondFactorOutcome.StepUpRequired, weakEnrol.Outcome);
+        Assert.True(strongEnrol.Succeeded);
+        Assert.Equal(2, (await service.ListMethodsAsync(subject)).Count);
+    }
+
+    [Fact]
+    public async Task AStaleRecoveryCodeSession_ShouldNotEnrol()
+    {
+        var subject = NewSubject();
+        await EnrolFirstTotpAsync(subject);
+        using var scope = harness.CreateScope();
+        var service = scope.ServiceProvider.GetRequiredService<ISecondFactorService>();
+        var stale = new MfaProof(MfaStrength.Strong, harness.Clock.GetUtcNow().AddMinutes(-6), RecoveryCodeOnly: true);
+
+        Assert.Equal(SecondFactorOutcome.StepUpRequired, (await service.BeginTotpEnrolAsync(subject, Password, stale)).Outcome);
+    }
+
+    [Fact]
     public async Task RecoveryCodes_ShouldNeedStrongProof_AndBeSingleUse()
     {
         var subject = NewSubject();
@@ -255,6 +289,25 @@ public sealed class SecondFactorServiceTests : IAsyncLifetime
         Assert.True(first.UsedRecoveryCode);
         Assert.Contains(AmrClaims.Mfa, first.Amr);
         Assert.Equal(SecondFactorOutcome.Incorrect, again.Outcome);
+    }
+
+    [Fact]
+    public async Task AProofFromARealRecoveryCodeVerify_ShouldBeRecoveryOnly_AndNotRemoveMethods()
+    {
+        var subject = NewSubject();
+        var (methodId, _) = await EnrolFirstTotpAsync(subject);
+        using var scope = harness.CreateScope();
+        var service = scope.ServiceProvider.GetRequiredService<ISecondFactorService>();
+        Assert.True((await service.EnrolOtpAsync(subject, Password, MfaMethodKind.SmsOtp, StrongNow())).Succeeded);
+        var minted = await service.GenerateRecoveryCodesAsync(subject, StrongNow());
+        var verified = await service.VerifyRecoveryCodeAsync(subject, Password, minted.Codes[0]);
+
+        var proof = verified.ToProof();
+        var remove = await service.RemoveMethodAsync(subject, Password, methodId, proof);
+
+        Assert.True(proof.RecoveryCodeOnly);
+        Assert.Equal(SecondFactorOutcome.StepUpRequired, remove.Outcome);
+        Assert.False(StrongNow().RecoveryCodeOnly);
     }
 
     [Fact]

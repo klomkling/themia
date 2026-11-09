@@ -278,9 +278,14 @@ public sealed class OtpLoginFlow : IOtpLoginFlow
 
         // The code was right, so this is not a failed login. A user who owes a second factor gets a ticket
         // instead of tokens; OnLoginSucceeded fires when the login completes.
-        var pending = await SecondFactorGate.RequireAsync(
+        var gate = await SecondFactorGate.RequireAsync(
             secondFactorPolicy, secondFactorTickets, user, SecondFactorMethod.Otp, target.Session?.Channel, false, false, cancellationToken).ConfigureAwait(false);
-        if (pending is { } owed)
+        if (gate.Decision == SecondFactorGateDecision.Denied)
+        {
+            return await FailAsync(phone, LoginFailureReason.Denied, LoginResult.Denied(), cancellationToken, "second factor denied by policy").ConfigureAwait(false);
+        }
+
+        if (gate.Pending is { } owed)
         {
             logger.LogInformation("User {UserId} passed the one-time code check and owes a second factor ({Stage}).", user.Id, owed.Stage);
             return LoginResult.RequiresSecondFactor(owed);

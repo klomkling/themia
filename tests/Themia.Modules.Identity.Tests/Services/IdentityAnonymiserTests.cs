@@ -25,6 +25,7 @@ public class IdentityAnonymiserTests
     private readonly FakeUnitOfWork uow = new();
     private readonly RecordingUserLifecycleHooks hooks = new();
     private readonly RecordingIdentityEventObserver observer = new();
+    private readonly List<SessionSecondFactor> sessionProofs = [];
     private readonly MemoryCache stampCache = new(new MemoryCacheOptions());
 
     private IdentityAnonymiser Sut(TenantId? ambient) => new(
@@ -34,6 +35,7 @@ public class IdentityAnonymiserTests
         new FakeRepository<UserClaim>(claims, c => c.Id),
         new FakeRepository<ExternalLoginLink>(links, l => l.Id) { AmbientTenant = ambient },
         new FakeRepository<OtpLoginChallenge>(otp, c => c.Id) { AmbientTenant = ambient },
+        new FakeRepository<SessionSecondFactor>(sessionProofs, p => p.Id),
         uow, new DataFilterScope(), new TenantContext(ambient), hooks, [observer],
         NullLogger<IdentityAnonymiser>.Instance, stampCache);
 

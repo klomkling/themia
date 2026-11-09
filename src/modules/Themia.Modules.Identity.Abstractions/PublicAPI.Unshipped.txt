@@ -570,6 +570,7 @@ Themia.Modules.Identity.Abstractions.Authentication.SecondFactorRequirement
 Themia.Modules.Identity.Abstractions.Authentication.SecondFactorRequirement.NotRequired = 0 -> Themia.Modules.Identity.Abstractions.Authentication.SecondFactorRequirement
 Themia.Modules.Identity.Abstractions.Authentication.SecondFactorRequirement.Verify = 1 -> Themia.Modules.Identity.Abstractions.Authentication.SecondFactorRequirement
 Themia.Modules.Identity.Abstractions.Authentication.SecondFactorRequirement.Enrol = 2 -> Themia.Modules.Identity.Abstractions.Authentication.SecondFactorRequirement
+Themia.Modules.Identity.Abstractions.Authentication.SecondFactorRequirement.Denied = 3 -> Themia.Modules.Identity.Abstractions.Authentication.SecondFactorRequirement
 Themia.Modules.Identity.Abstractions.Authentication.SecondFactorStage
 Themia.Modules.Identity.Abstractions.Authentication.SecondFactorStage.Verify = 0 -> Themia.Modules.Identity.Abstractions.Authentication.SecondFactorStage
 Themia.Modules.Identity.Abstractions.Authentication.SecondFactorStage.Enrol = 1 -> Themia.Modules.Identity.Abstractions.Authentication.SecondFactorStage
@@ -656,6 +657,7 @@ Themia.Modules.Identity.Abstractions.Authentication.IssueOutcome.TenantMismatch 
 Themia.Modules.Identity.Abstractions.Authentication.IssueOutcome.SecondFactorRequired = 4 -> Themia.Modules.Identity.Abstractions.Authentication.IssueOutcome
 Themia.Modules.Identity.Abstractions.Authentication.IssueOutcome.SessionNotLive = 5 -> Themia.Modules.Identity.Abstractions.Authentication.IssueOutcome
 Themia.Modules.Identity.Abstractions.Authentication.IssueOutcome.TicketInvalid = 6 -> Themia.Modules.Identity.Abstractions.Authentication.IssueOutcome
+Themia.Modules.Identity.Abstractions.Authentication.IssueOutcome.SecondFactorDenied = 7 -> Themia.Modules.Identity.Abstractions.Authentication.IssueOutcome
 Themia.Modules.Identity.Abstractions.Authentication.IssueResult
 Themia.Modules.Identity.Abstractions.Authentication.IssueResult.IssueResult() -> void
 Themia.Modules.Identity.Abstractions.Authentication.IssueResult.Outcome.get -> Themia.Modules.Identity.Abstractions.Authentication.IssueOutcome
@@ -667,13 +669,29 @@ static Themia.Modules.Identity.Abstractions.Authentication.IssueResult.Issued(Th
 static Themia.Modules.Identity.Abstractions.Authentication.IssueResult.Refused(Themia.Modules.Identity.Abstractions.Authentication.IssueOutcome outcome) -> Themia.Modules.Identity.Abstractions.Authentication.IssueResult
 static Themia.Modules.Identity.Abstractions.Authentication.IssueResult.RequiresSecondFactor(Themia.Modules.Identity.Abstractions.Authentication.PendingSecondFactor pending) -> Themia.Modules.Identity.Abstractions.Authentication.IssueResult
 Themia.Modules.Identity.Abstractions.Authentication.SessionRequest
-Themia.Modules.Identity.Abstractions.Authentication.SessionRequest.SessionRequest(Themia.Framework.Core.Abstractions.Tenancy.TenantId? ExpectedTenant, string! Channel, System.Collections.Generic.IReadOnlyCollection<System.Security.Claims.Claim!>? AppClaims = null) -> void
+Themia.Modules.Identity.Abstractions.Authentication.SessionRequest.SessionRequest(Themia.Framework.Core.Abstractions.Tenancy.TenantId? ExpectedTenant, string! Channel, System.Collections.Generic.IReadOnlyCollection<System.Security.Claims.Claim!>? AppClaims = null, Themia.Modules.Identity.Abstractions.Authentication.SessionProofSnapshot? Proof = null) -> void
 Themia.Modules.Identity.Abstractions.Authentication.SessionRequest.ExpectedTenant.get -> Themia.Framework.Core.Abstractions.Tenancy.TenantId?
 Themia.Modules.Identity.Abstractions.Authentication.SessionRequest.ExpectedTenant.init -> void
 Themia.Modules.Identity.Abstractions.Authentication.SessionRequest.Channel.get -> string!
 Themia.Modules.Identity.Abstractions.Authentication.SessionRequest.Channel.init -> void
 Themia.Modules.Identity.Abstractions.Authentication.SessionRequest.AppClaims.get -> System.Collections.Generic.IReadOnlyCollection<System.Security.Claims.Claim!>?
 Themia.Modules.Identity.Abstractions.Authentication.SessionRequest.AppClaims.init -> void
+Themia.Modules.Identity.Abstractions.Authentication.SessionRequest.Proof.get -> Themia.Modules.Identity.Abstractions.Authentication.SessionProofSnapshot?
+Themia.Modules.Identity.Abstractions.Authentication.SessionRequest.Proof.init -> void
+Themia.Modules.Identity.Abstractions.Authentication.SessionProofSnapshot
+Themia.Modules.Identity.Abstractions.Authentication.SessionProofSnapshot.SessionProofSnapshot(string! Amr, Themia.Modules.Identity.Abstractions.Entities.SessionProofStrength Strength, System.DateTimeOffset AuthenticatedAt, Themia.Modules.Identity.Abstractions.Entities.SessionRestriction Restriction = Themia.Modules.Identity.Abstractions.Entities.SessionRestriction.None) -> void
+Themia.Modules.Identity.Abstractions.Authentication.SessionProofSnapshot.Amr.get -> string!
+Themia.Modules.Identity.Abstractions.Authentication.SessionProofSnapshot.Amr.init -> void
+Themia.Modules.Identity.Abstractions.Authentication.SessionProofSnapshot.Strength.get -> Themia.Modules.Identity.Abstractions.Entities.SessionProofStrength
+Themia.Modules.Identity.Abstractions.Authentication.SessionProofSnapshot.Strength.init -> void
+Themia.Modules.Identity.Abstractions.Authentication.SessionProofSnapshot.AuthenticatedAt.get -> System.DateTimeOffset
+Themia.Modules.Identity.Abstractions.Authentication.SessionProofSnapshot.AuthenticatedAt.init -> void
+Themia.Modules.Identity.Abstractions.Authentication.SessionProofSnapshot.Restriction.get -> Themia.Modules.Identity.Abstractions.Entities.SessionRestriction
+Themia.Modules.Identity.Abstractions.Authentication.SessionProofSnapshot.Restriction.init -> void
+Themia.Modules.Identity.Abstractions.Authentication.ISessionProofStore
+Themia.Modules.Identity.Abstractions.Authentication.ISessionProofStore.GetAsync(System.Guid userId, System.Guid sessionId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Identity.Abstractions.Authentication.SessionProofSnapshot?>!
+Themia.Modules.Identity.Abstractions.Authentication.ISessionProofStore.SaveAsync(System.Guid userId, System.Guid sessionId, Themia.Modules.Identity.Abstractions.Authentication.SessionProofSnapshot! proof, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!
+Themia.Modules.Identity.Abstractions.Authentication.ISessionProofStore.LiftRestrictionAsync(System.Guid userId, System.Guid sessionId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!
 Themia.Modules.Identity.Abstractions.Authentication.IAuthTokenIssuer
 Themia.Modules.Identity.Abstractions.Authentication.IAuthTokenIssuer.StartSessionAsync(System.Guid userId, Themia.Modules.Identity.Abstractions.Authentication.SessionRequest! request, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Identity.Abstractions.Authentication.IssueResult>!
 Themia.Modules.Identity.Abstractions.Authentication.IAuthTokenIssuer.CompleteSessionAsync(System.Guid userId, string! ticket, Themia.Modules.Identity.Abstractions.Authentication.SecondFactorStage expectedStage, Themia.Modules.Identity.Abstractions.Authentication.SessionRequest! request, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Identity.Abstractions.Authentication.IssueResult>!
@@ -717,3 +735,31 @@ Themia.Modules.Identity.Abstractions.UserMutationOutcome.Conflict = 4 -> Themia.
 static Themia.Modules.Identity.Abstractions.UserMutationResult.Conflict() -> Themia.Modules.Identity.Abstractions.UserMutationResult
 Themia.Modules.Identity.Abstractions.IUserPasswordHashService
 Themia.Modules.Identity.Abstractions.IUserPasswordHashService.SetPasswordHashAsync(System.Guid userId, string? passwordHash, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Identity.Abstractions.UserMutationResult>!
+Themia.Modules.Identity.Abstractions.Entities.SessionProofStrength
+Themia.Modules.Identity.Abstractions.Entities.SessionProofStrength.Strong = 1 -> Themia.Modules.Identity.Abstractions.Entities.SessionProofStrength
+Themia.Modules.Identity.Abstractions.Entities.SessionProofStrength.Weak = 0 -> Themia.Modules.Identity.Abstractions.Entities.SessionProofStrength
+Themia.Modules.Identity.Abstractions.Entities.SessionRestriction
+Themia.Modules.Identity.Abstractions.Entities.SessionRestriction.None = 0 -> Themia.Modules.Identity.Abstractions.Entities.SessionRestriction
+Themia.Modules.Identity.Abstractions.Entities.SessionRestriction.RecoveryOnly = 1 -> Themia.Modules.Identity.Abstractions.Entities.SessionRestriction
+Themia.Modules.Identity.Abstractions.Entities.SessionRestriction.UpgradeDue = 2 -> Themia.Modules.Identity.Abstractions.Entities.SessionRestriction
+Themia.Modules.Identity.Abstractions.Entities.SessionSecondFactor
+Themia.Modules.Identity.Abstractions.Entities.SessionSecondFactor.Amr.get -> string!
+Themia.Modules.Identity.Abstractions.Entities.SessionSecondFactor.Amr.set -> void
+Themia.Modules.Identity.Abstractions.Entities.SessionSecondFactor.AuthenticatedAt.get -> System.DateTimeOffset
+Themia.Modules.Identity.Abstractions.Entities.SessionSecondFactor.AuthenticatedAt.set -> void
+Themia.Modules.Identity.Abstractions.Entities.SessionSecondFactor.CreatedAt.get -> System.DateTimeOffset
+Themia.Modules.Identity.Abstractions.Entities.SessionSecondFactor.CreatedAt.set -> void
+Themia.Modules.Identity.Abstractions.Entities.SessionSecondFactor.Id.get -> System.Guid
+Themia.Modules.Identity.Abstractions.Entities.SessionSecondFactor.Id.set -> void
+Themia.Modules.Identity.Abstractions.Entities.SessionSecondFactor.Restriction.get -> Themia.Modules.Identity.Abstractions.Entities.SessionRestriction
+Themia.Modules.Identity.Abstractions.Entities.SessionSecondFactor.Restriction.set -> void
+Themia.Modules.Identity.Abstractions.Entities.SessionSecondFactor.Strength.get -> Themia.Modules.Identity.Abstractions.Entities.SessionProofStrength
+Themia.Modules.Identity.Abstractions.Entities.SessionSecondFactor.Strength.set -> void
+Themia.Modules.Identity.Abstractions.Entities.SessionSecondFactor.UpdatedAt.get -> System.DateTimeOffset
+Themia.Modules.Identity.Abstractions.Entities.SessionSecondFactor.UpdatedAt.set -> void
+Themia.Modules.Identity.Abstractions.Entities.SessionSecondFactor.UserId.get -> System.Guid
+Themia.Modules.Identity.Abstractions.Entities.SessionSecondFactor.UserId.set -> void
+Themia.Modules.Identity.Abstractions.Entities.SessionSecondFactor.SessionSecondFactor() -> void
+Themia.Modules.Identity.Abstractions.Authentication.ISecondFactorProofCompletion
+Themia.Modules.Identity.Abstractions.Authentication.ISecondFactorProofCompletion.CompleteAsync(string! ticket, System.Guid expectedUserId, Themia.Modules.Identity.Abstractions.Authentication.SecondFactorStage expectedStage, Themia.Modules.Identity.Abstractions.Authentication.SessionProofSnapshot! proof, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Identity.Abstractions.Authentication.SecondFactorCompletionResult>!
+Themia.Modules.Identity.Abstractions.Authentication.ISecondFactorTicketService.PeekAsync(string! ticket, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Identity.Abstractions.Authentication.SecondFactorTicketData?>!

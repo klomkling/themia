@@ -152,6 +152,21 @@ public sealed class GuardedAuthTokenIssuerTests : IDisposable
     }
 
     [Fact]
+    public async Task Start_returns_second_factor_denied_when_the_policy_denies_and_issues_nothing()
+    {
+        var user = Member();
+        users.UserToReturn = user;
+        policy.Requirement = SecondFactorRequirement.Denied;
+
+        var result = await Issuer().StartSessionAsync(user.Id, Request());
+
+        Assert.Equal(IssueOutcome.SecondFactorDenied, result.Outcome);
+        Assert.Null(result.SecondFactor);
+        Assert.Null(result.Tokens);
+        AssertNothingIssued();
+    }
+
+    [Fact]
     public async Task A_policy_that_throws_stops_the_start_with_nothing_issued()
     {
         var user = Member();

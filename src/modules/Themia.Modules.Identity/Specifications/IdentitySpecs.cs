@@ -347,6 +347,12 @@ internal sealed class TokenByPurposeAndHashSpec : Specification<UserToken>
         Where(t => t.Purpose == purpose && t.TokenHash == tokenHash);
 }
 
+/// <summary>Every session second-factor proof row of a user (erasure deletes them with the sessions).</summary>
+internal sealed class SessionSecondFactorsByUserSpec : Specification<SessionSecondFactor>
+{
+    public SessionSecondFactorsByUserSpec(Guid userId) => Where(s => s.UserId == userId);
+}
+
 /// <summary>Every refresh token row of a user, live or not (erasure deletes the hashes too).</summary>
 internal sealed class RefreshTokensByUserSpec : Specification<RefreshToken>
 {
@@ -380,4 +386,18 @@ internal sealed class UserFailureStateGateSpec : Specification<User>
 
         WithoutTenantFilter();
     }
+}
+
+/// <summary>The proof row of one session, bound to its owner so another user's session id never matches.</summary>
+internal sealed class SessionSecondFactorOfSpec : Specification<SessionSecondFactor>
+{
+    public SessionSecondFactorOfSpec(Guid userId, Guid sessionId) =>
+        Where(s => s.Id == sessionId && s.UserId == userId);
+}
+
+/// <summary>Like <see cref="SessionSecondFactorOfSpec"/> but only while the session is still restricted, so a lift touches nothing twice.</summary>
+internal sealed class RestrictedSessionSecondFactorOfSpec : Specification<SessionSecondFactor>
+{
+    public RestrictedSessionSecondFactorOfSpec(Guid userId, Guid sessionId) =>
+        Where(s => s.Id == sessionId && s.UserId == userId && s.Restriction != SessionRestriction.None);
 }

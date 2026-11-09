@@ -208,6 +208,7 @@ public sealed class EnabledLoginMethodsTests : IDisposable
         services.AddSingleton<IClaimsPrincipalFactory, FakeClaimsPrincipalFactory>();
         services.AddSingleton<IAccessTokenService>(new FakeAccessTokenService(clock));
         services.AddSingleton<IRefreshTokenService, FakeRefreshTokenService>();
+        services.AddSingleton<ISessionProofStore, InMemorySessionProofStore>();   // the data layer is not part of this harness
         services.AddSingleton<IPasswordHasher, FakePasswordHasher>();
         services.AddThemiaIdentityCore(o => o.EnabledLoginMethods = LoginMethods.Otp);
         services.AddThemiaIdentityAspNetCore(o =>

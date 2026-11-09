@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <PackageId>Themia.Modules.Identity.SecondFactor</PackageId>
+    <Description>Bridge between Themia.SecondFactor and Themia Identity — the second-factor policy over the multi-method service, verify-then-complete for pending logins, per-session proof reads and the restriction lift after a strong enrolment.</Description>
+    <PackageTags>themia;identity;mfa;second-factor;passkey;totp</PackageTags>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Themia.Modules.Identity.Abstractions/Themia.Modules.Identity.Abstractions.csproj" />
+    <ProjectReference Include="../../neutral/Themia.SecondFactor/Themia.SecondFactor.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+    <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+  <ItemGroup>
+    <AdditionalFiles Include="PublicAPI.Shipped.txt" />
+    <AdditionalFiles Include="PublicAPI.Unshipped.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Themia.Modules.Identity.SecondFactor.Tests" />
+  </ItemGroup>
+</Project>
