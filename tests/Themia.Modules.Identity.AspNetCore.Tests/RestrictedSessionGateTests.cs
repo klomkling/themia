@@ -160,6 +160,17 @@ public sealed class RestrictedSessionGateTests
     }
 
     [Fact]
+    public async Task Request_ShouldStillBeRefused_WhenACustomHandlerIsRegisteredAfterTheGateAndTheGateIsAddedAgain()
+    {
+        proofs.Rows[(UserId, SessionId)] = Row(SessionRestriction.RecoveryOnly);
+
+        using var response = await Send("/plain", "RecoveryOnly", customHandlerBetween: true);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.Contains("second_factor_restricted", await response.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
     public async Task Request_ShouldNotBeGated_OnAnEndpointWithoutAuthorization()
     {
         using var response = await Send("/open", "RecoveryOnly");
@@ -168,7 +179,7 @@ public sealed class RestrictedSessionGateTests
     }
 
     private async Task<HttpResponseMessage> Send(
-        string path, string? restriction, string? flaw = null, bool withFallback = false, string role = "admin", bool customHandler = false, bool callTwice = false)
+        string path, string? restriction, string? flaw = null, bool withFallback = false, string role = "admin", bool customHandler = false, bool callTwice = false, bool customHandlerBetween = false)
     {
         var builder = WebApplication.CreateBuilder();
         builder.WebHost.UseTestServer();
@@ -192,6 +203,12 @@ public sealed class RestrictedSessionGateTests
         builder.Services.AddThemiaRestrictedSessionGate();
         if (callTwice)
         {
+            builder.Services.AddThemiaRestrictedSessionGate();
+        }
+
+        if (customHandlerBetween)
+        {
+            builder.Services.AddSingleton<IAuthorizationMiddlewareResultHandler, CustomHandler>();
             builder.Services.AddThemiaRestrictedSessionGate();
         }
 

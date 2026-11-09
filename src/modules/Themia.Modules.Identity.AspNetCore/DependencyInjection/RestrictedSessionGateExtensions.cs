@@ -21,16 +21,20 @@ public static class RestrictedSessionGateExtensions
     {
         ArgumentNullException.ThrowIfNull(services);
 
-        // The gate is registered as a factory, so the descriptor cannot be recognised by type: a marker makes a second call a no-op.
-        if (services.Any(descriptor => descriptor.ServiceType == typeof(RestrictedSessionGateMarker)))
+        // The gate is a factory registration, so it cannot be recognised by type. A repeat call is a no-op only while the
+        // gate's own descriptor is still the last handler: if a custom handler was registered after it, the gate is out of
+        // the chain and must wrap that handler again, never be skipped.
+        var last = services.LastOrDefault(descriptor => descriptor.ServiceType == typeof(IAuthorizationMiddlewareResultHandler));
+        var marker = services.Select(descriptor => descriptor.ImplementationInstance).OfType<RestrictedSessionGateMarker>().LastOrDefault();
+        if (marker is not null && ReferenceEquals(marker.Gate, last))
         {
             return services;
         }
 
-        services.AddSingleton<RestrictedSessionGateMarker>();
-        var previous = services.LastOrDefault(descriptor => descriptor.ServiceType == typeof(IAuthorizationMiddlewareResultHandler));
-        services.Add(ServiceDescriptor.Singleton<IAuthorizationMiddlewareResultHandler>(provider =>
-            new RestrictedSessionGate(Inner(provider, previous), provider.GetRequiredService<ILogger<RestrictedSessionGate>>())));
+        var gate = ServiceDescriptor.Singleton<IAuthorizationMiddlewareResultHandler>(provider =>
+            new RestrictedSessionGate(Inner(provider, last), provider.GetRequiredService<ILogger<RestrictedSessionGate>>()));
+        services.AddSingleton(new RestrictedSessionGateMarker(gate));
+        services.Add(gate);
         return services;
     }
 
@@ -54,5 +58,5 @@ public static class RestrictedSessionGateExtensions
         return (IAuthorizationMiddlewareResultHandler)ActivatorUtilities.CreateInstance(provider, previous.ImplementationType!);
     }
 
-    private sealed class RestrictedSessionGateMarker;
+    private sealed record RestrictedSessionGateMarker(ServiceDescriptor Gate);
 }
