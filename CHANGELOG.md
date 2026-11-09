@@ -36,6 +36,7 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ### Changed
 
+- **(breaking) Second-factor and session APIs from 0.57.x changed shape.** Each is checked against the v0.57.2 source; see [MIGRATION.md](MIGRATION.md#0580). (1) `ISecondFactorTicketService` has a new member `PeekAsync`: anything that implements it (a fake, a wrapper) stops compiling until it adds it. (2) `MfaProof` has a new required constructor parameter `RecoveryCodeOnly` (`new MfaProof(strength, at)` no longer compiles; `SecondFactorResult.ToProof()` builds one from a result). (3) `IssueOutcome` has a new member `SecondFactorDenied`, returned by `IAuthTokenIssuer.StartSessionAsync` when the second-factor policy denies the user: an exhaustive `switch` stops compiling and a non-exhaustive one silently misses it. (4) `amr` and `auth_time` are reserved claim types: a `SessionRequest.AppClaims` entry of either type now throws `ArgumentException` (it did not before). (5) `SessionRequest` gained an optional `Proof` parameter (source-compatible, binary-incompatible for a prebuilt consumer) and `IAuthTokenIssuer` refuses a request that carries one; `AddThemiaSecondFactor` fails options validation when another `ITotpReplayStore` or `IWebAuthnChallengeStore` is registered in place of the second-factor layer's.
 - **CI: the build gate keeps running when reviewdog cannot be installed**, and reviewdog is pinned to v0.21.2 instead of latest.
 
 ## [0.57.2] - 2026-11-08
