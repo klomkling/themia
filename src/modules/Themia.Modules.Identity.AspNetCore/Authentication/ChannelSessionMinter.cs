@@ -65,6 +65,12 @@ internal sealed partial class ChannelSessionMinter
             throw new ArgumentException("The channel must be 1 to 64 characters of a-z, 0-9, '.', '_' and '-'.", nameof(request));
         }
 
+        // Only the second-factor completion may set a proof, and it reaches the minter directly; a proof here would be unverified.
+        if (request.Proof is not null)
+        {
+            throw new ArgumentException("A session request from an app cannot carry a second-factor proof; it is set only by the second-factor completion.", nameof(request));
+        }
+
         foreach (var claim in request.AppClaims ?? [])
         {
             if (ReservedClaimTypes.IsReserved(claim.Type))

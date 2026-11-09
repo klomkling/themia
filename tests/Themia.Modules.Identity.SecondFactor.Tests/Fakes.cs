@@ -1,4 +1,5 @@
 using Fido2NetLib;
+using Themia.Framework.Core.Abstractions.Tenancy;
 using Themia.Modules.Identity.Abstractions;
 using Themia.Modules.Identity.Abstractions.Authentication;
 using Themia.SecondFactor;
@@ -13,8 +14,9 @@ internal static class Samples
 
     public static MfaSubject Subject => new(UserId.ToString("D"), null, new HashSet<string>());
 
-    public static SecondFactorTicketData Ticket(SecondFactorStage stage, SecondFactorMethod method = SecondFactorMethod.Password, string? provider = null) =>
-        new(UserId, null, method, provider, false, false, "stamp", stage);
+    public static SecondFactorTicketData Ticket(
+        SecondFactorStage stage, SecondFactorMethod method = SecondFactorMethod.Password, string? provider = null, TenantId? tenant = null) =>
+        new(UserId, tenant, method, provider, false, false, "stamp", stage);
 
     public static PendingSecondFactor Pending(SecondFactorStage stage) =>
         new(UserId, stage, "ticket", Now.AddMinutes(5));
@@ -40,9 +42,20 @@ internal static class Samples
 
 internal sealed class FakeSubjects(MfaSubject? subject, string? stamp = "stamp") : ISecondFactorSubjectResolver
 {
-    public Task<string?> GetSecurityStampAsync(Guid userId, CancellationToken cancellationToken = default) => Task.FromResult(stamp);
+    /// <summary>The ambient tenant seen by each call, so a test can tell whether the bridge ran as the ticket's tenant.</summary>
+    public List<TenantId?> TenantsSeen { get; } = [];
 
-    public Task<MfaSubject?> ResolveAsync(Guid userId, CancellationToken cancellationToken = default) => Task.FromResult(subject);
+    public Task<string?> GetSecurityStampAsync(Guid userId, CancellationToken cancellationToken = default)
+    {
+        TenantsSeen.Add(TenantContextAccessor.CurrentTenantId);
+        return Task.FromResult(stamp);
+    }
+
+    public Task<MfaSubject?> ResolveAsync(Guid userId, CancellationToken cancellationToken = default)
+    {
+        TenantsSeen.Add(TenantContextAccessor.CurrentTenantId);
+        return Task.FromResult(subject);
+    }
 }
 
 internal sealed class FakeTickets(SecondFactorTicketData? data) : ISecondFactorTicketService

@@ -1,4 +1,5 @@
 using Fido2NetLib;
+using Themia.Framework.Core.Abstractions.Tenancy;
 using Themia.Modules.Identity.Abstractions;
 using Themia.Modules.Identity.Abstractions.Authentication;
 using Themia.Modules.Identity.Abstractions.Entities;
@@ -12,8 +13,10 @@ public sealed class BridgeTests
     private readonly FakeService _service = new();
     private readonly FakeCompletion _completion = new();
 
-    private SecondFactorBridge Bridge(SecondFactorTicketData? ticket, MfaSubject? subject = null) =>
-        new(_service, new FakeSubjects(subject ?? Samples.Subject), new FakeTickets(ticket), _completion);
+    private SecondFactorBridge Bridge(SecondFactorTicketData? ticket, MfaSubject? subject = null) => Bridge(ticket, new FakeSubjects(subject ?? Samples.Subject));
+
+    private SecondFactorBridge Bridge(SecondFactorTicketData? ticket, FakeSubjects subjects) =>
+        new(_service, subjects, new FakeTickets(ticket), _completion);
 
     [Fact]
     public async Task VerifyTotp_ShouldCompleteWithTheProof_WhenTheCodeIsRight()
@@ -99,7 +102,7 @@ public sealed class BridgeTests
     [Fact]
     public async Task VerifyRecoveryCode_ShouldOpenARecoveryOnlySession()
     {
-        _service.Result = Samples.Verified(MfaStrength.Weak, recovery: true);
+        _service.Result = Samples.Verified(MfaStrength.Strong, recovery: true);
 
         await Bridge(Samples.Ticket(SecondFactorStage.Verify)).VerifyRecoveryCodeAsync(Samples.Pending(SecondFactorStage.Verify), "abcd-efgh");
 
@@ -137,5 +140,43 @@ public sealed class BridgeTests
         Assert.DoesNotContain(names, n => n.Contains("EnrolOtp", StringComparison.Ordinal));
         Assert.Equal(0, _service.EnrolOtpCalls);
         await Task.CompletedTask;
+    }
+
+    [Fact]
+    public async Task VerifyRecoveryCode_ShouldStoreAWeakProof_WhenTheServiceReportsTheCodeAsStrong()
+    {
+        // The real service reports a recovery code as Strong (SecondFactorService); the stored proof must not be.
+        _service.Result = Samples.Verified(MfaStrength.Strong, recovery: true);
+
+        await Bridge(Samples.Ticket(SecondFactorStage.Verify)).VerifyRecoveryCodeAsync(Samples.Pending(SecondFactorStage.Verify), "abcd-efgh");
+
+        var proof = Assert.Single(_completion.Completed);
+        Assert.Equal(SessionProofStrength.Weak, proof.Strength);
+        Assert.Equal(SessionRestriction.RecoveryOnly, proof.Restriction);
+    }
+
+    [Fact]
+    public async Task VerifyTotp_ShouldBeRefusedBeforeAnyProofRuns_WhenTheTicketIsForAnAppChannel()
+    {
+        var result = await Bridge(Samples.Ticket(SecondFactorStage.Verify, SecondFactorMethod.Custom, "line"))
+            .VerifyTotpAsync(Samples.Pending(SecondFactorStage.Verify), Guid.NewGuid(), "123456");
+
+        Assert.False(result.Succeeded);
+        Assert.Null(result.Verification);
+        Assert.Null(_service.SeenPrimary);
+        Assert.Empty(_completion.Completed);
+    }
+
+    [Fact]
+    public async Task VerifyTotp_ShouldRunAsTheTicketsTenant()
+    {
+        var subjects = new FakeSubjects(Samples.Subject);
+        var tenant = TenantId.From("t1");
+
+        await Bridge(Samples.Ticket(SecondFactorStage.Verify, tenant: tenant), subjects)
+            .VerifyTotpAsync(Samples.Pending(SecondFactorStage.Verify), Guid.NewGuid(), "123456");
+
+        Assert.NotEmpty(subjects.TenantsSeen);
+        Assert.All(subjects.TenantsSeen, seen => Assert.Equal(tenant, seen));
     }
 }

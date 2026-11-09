@@ -56,22 +56,54 @@ public sealed class SessionProofClaimsTests : IDisposable
         return replay ? RefreshValidationResult.ReplayedWithinGrace(user, successor) : RefreshValidationResult.Success(user, successor);
     }
 
-    [Fact]
-    public async Task Start_stores_the_proof_under_the_new_session_and_puts_it_in_the_first_token()
-    {
-        var result = await Issuer(store).StartSessionAsync(user.Id, Request(Proof()));
+    private ChannelSessionMinter Minter(ISessionProofStore? proofs) =>
+        new(new FakeClaimsPrincipalFactory(), access, refresh, [new RecordingObserver()], clock, NullLogger<GuardedAuthTokenIssuer>.Instance, proofs);
 
-        Assert.True(result.Succeeded);
+    [Fact]
+    public async Task Mint_stores_the_proof_under_the_new_session_and_puts_it_in_the_first_token()
+    {
+        await Minter(store).MintAsync(user, Request(Proof()), CancellationToken.None);
+
         Assert.Equal(Proof(), store.Rows[(user.Id, refresh.LastFamilyId)]);
         AssertProofClaims(access.LastPrincipal!);
     }
 
     [Fact]
-    public async Task Start_with_a_proof_but_no_store_issues_nothing()
+    public async Task Mint_with_a_proof_but_no_store_issues_nothing()
     {
-        await Assert.ThrowsAsync<InvalidOperationException>(() => Issuer(null).StartSessionAsync(user.Id, Request(Proof())));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => Minter(null).MintAsync(user, Request(Proof()), CancellationToken.None));
 
         Assert.Equal(0, refresh.IssueCalls);
+    }
+
+    [Fact]
+    public async Task Start_refuses_a_request_that_carries_a_proof_because_only_the_second_factor_completion_may_set_one()
+    {
+        await Assert.ThrowsAsync<ArgumentException>(() => Issuer(store).StartSessionAsync(user.Id, Request(Proof())));
+
+        Assert.Equal(0, refresh.IssueCalls);
+        Assert.Empty(store.Rows);
+    }
+
+    [Fact]
+    public async Task Complete_refuses_a_request_that_carries_a_proof_before_the_ticket_is_spent()
+    {
+        var tickets = new CountingTickets();
+
+        var issuer = new GuardedAuthTokenIssuer(users, new FakeClaimsPrincipalFactory(), access, refresh, new ScriptedSecondFactorPolicy(), [new RecordingObserver()],
+            new IdentityModuleOptions(), clock, NullLogger<GuardedAuthTokenIssuer>.Instance, tickets, store);
+        await Assert.ThrowsAsync<ArgumentException>(() => issuer.CompleteSessionAsync(user.Id, "ticket", SecondFactorStage.Verify, Request(Proof())));
+
+        Assert.Equal(0, tickets.Consumed);
+    }
+
+    [Fact]
+    public async Task Renew_refuses_a_request_that_carries_a_proof()
+    {
+        var session = Guid.NewGuid();
+        refresh.LiveSessions.Add((user.Id, session));
+
+        await Assert.ThrowsAsync<ArgumentException>(() => Issuer(store).RenewSessionAsync(user.Id, session, Request(Proof())));
     }
 
     [Fact]
@@ -155,4 +187,19 @@ internal sealed class InMemorySessionProofStore : ISessionProofStore
 
     public Task<bool> LiftRestrictionAsync(Guid userId, Guid sessionId, CancellationToken cancellationToken = default) =>
         Task.FromResult(false);
+}
+
+internal sealed class CountingTickets : ISecondFactorTicketService
+{
+    public int Consumed { get; private set; }
+
+    public Task<PendingSecondFactor> IssueAsync(SecondFactorTicketData data, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+    public Task<SecondFactorTicketData?> PeekAsync(string ticket, CancellationToken cancellationToken = default) => Task.FromResult<SecondFactorTicketData?>(null);
+
+    public Task<SecondFactorTicketData?> ConsumeAsync(string ticket, CancellationToken cancellationToken = default)
+    {
+        Consumed++;
+        return Task.FromResult<SecondFactorTicketData?>(null);
+    }
 }

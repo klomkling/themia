@@ -31,8 +31,8 @@ public static class TenantContextAccessor
     /// that returns its own fixed value is not switched.
     /// </para>
     /// <para>
-    /// It is internal and used across assemblies through <c>InternalsVisibleTo</c> (Themia.Modules.Identity and
-    /// Themia.Modules.Identity.AspNetCore), so those packages and Themia.Framework.Core must be installed at the
+    /// It is internal and used across assemblies through <c>InternalsVisibleTo</c> (Themia.Modules.Identity,
+    /// Themia.Modules.Identity.AspNetCore and Themia.Modules.Identity.SecondFactor), so those packages and Themia.Framework.Core must be installed at the
     /// same version. All Themia packages share one version, so this holds unless versions are mixed by hand.
     /// </para>
     /// </remarks>

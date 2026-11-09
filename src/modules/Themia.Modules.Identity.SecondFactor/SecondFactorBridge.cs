@@ -1,4 +1,5 @@
 using Fido2NetLib;
+using Themia.Framework.Core.Abstractions.Tenancy;
 using Themia.Modules.Identity.Abstractions.Authentication;
 using Themia.Modules.Identity.Abstractions.Entities;
 using Themia.SecondFactor;
@@ -82,6 +83,22 @@ internal sealed class SecondFactorBridge(
             return Refused();
         }
 
+        // An app-channel ticket has no strong factor of its own to prove, and the completion refuses it only after the proof ran.
+        if (data.Method == SecondFactorMethod.Custom)
+        {
+            return Refused();
+        }
+
+        // The request completing a ticket has no tenant scope under a claims-only strategy: run as the ticket's tenant.
+        using (TenantContextAccessor.BeginScope(data.TenantId))
+        {
+            return await RunScopedAsync(pending, stage, data, prove, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    private async Task<SecondFactorBridgeResult> RunScopedAsync(
+        PendingSecondFactor pending, SecondFactorStage stage, SecondFactorTicketData data, Prove prove, CancellationToken cancellationToken)
+    {
         // The completion re-checks the stamp, but only after the proof ran; refuse a stale ticket before it can enrol anything.
         var stamp = await subjects.GetSecurityStampAsync(data.UserId, cancellationToken).ConfigureAwait(false);
         if (!string.Equals(stamp, data.SecurityStamp, StringComparison.Ordinal))
