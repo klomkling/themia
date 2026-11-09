@@ -145,6 +145,17 @@ internal static class BeamMapping
         return new PaymentFailure(reason, failureCode, message);
     }
 
+    /// <summary>
+    /// Names the method behind Beam's <c>paymentMethod.paymentMethodType</c>, or <see langword="null"/> for a type this adapter does not map.
+    /// </summary>
+    public static PaymentMethod? ToPaidMethod(string? paymentMethodType) => paymentMethodType switch
+    {
+        "CARD" or "CARD_INSTALLMENTS" => PaymentMethod.Card,
+        "QR_PROMPT_PAY" => PaymentMethod.QrPromptPay,
+        "ALIPAY" or "WECHAT_PAY" => PaymentMethod.Wallet,
+        _ => null,
+    };
+
     /// <summary>Reads a required non-empty string property, without throwing on a missing or malformed one.</summary>
     public static bool TryGetNonEmptyString(JsonElement root, string propertyName, out string value)
     {
