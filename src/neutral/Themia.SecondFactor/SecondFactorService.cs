@@ -78,10 +78,11 @@ internal sealed partial class SecondFactorService : ISecondFactorService
         return requirement;
     }
 
-    // The proof must be strong and recent; the session it came from is the caller's to vouch for.
+    // The proof must be strong and recent; the session it came from is the caller's to vouch for. A session opened with a
+    // recovery code is not enough: whoever holds only a leaked code must not be able to remove methods or mint new codes.
     private bool IsFreshStrong(MfaProof? proof)
     {
-        if (proof is not { Strength: MfaStrength.Strong } strong)
+        if (proof is not { Strength: MfaStrength.Strong, RecoveryCodeOnly: false } strong)
         {
             return false;
         }
@@ -112,6 +113,12 @@ internal sealed partial class SecondFactorService : ISecondFactorService
         if (usable.Length == 0 || IsFreshStrong(proof))
         {
             return true;
+        }
+
+        // A recovery-code session is for getting back in: it may enrol a strong method (a lost device is replaced) and nothing else.
+        if (proof is { RecoveryCodeOnly: true })
+        {
+            return IsFresh(proof) && kindToAdd.Strength() == MfaStrength.Strong;
         }
 
         var holdsStrong = usable.Any(method => method.Kind.Strength() == MfaStrength.Strong);

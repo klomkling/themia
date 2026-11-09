@@ -20,5 +20,10 @@
     <!-- Shared conformance base, fixtures, TestIdentityDbContext. -->
     <ProjectReference Include="../Themia.Modules.Identity.IntegrationTests/Themia.Modules.Identity.IntegrationTests.csproj" />
     <ProjectReference Include="../../src/framework/Themia.Framework.Data.Dapper.SqlServer/Themia.Framework.Data.Dapper.SqlServer.csproj" />
+    <ProjectReference Include="../../src/modules/Themia.Modules.Identity.EFCore/Themia.Modules.Identity.EFCore.csproj" />
+    <ProjectReference Include="../../src/framework/Themia.Framework.Data.EFCore.SqlServer/Themia.Framework.Data.EFCore.SqlServer.csproj" />
+    <!-- The shared cross-layer base lives in the EF Core test project, which also holds the PostgreSQL Dapper engine; link the file rather
+         than reference the assembly so this process only ever registers the SQL Server Dapper engine. -->
+    <Compile Include="../Themia.Modules.Identity.EFCore.IntegrationTests/SessionSecondFactorCrossLayerTests.cs" Link="SessionSecondFactorCrossLayerTests.cs" />
   </ItemGroup>
 </Project>

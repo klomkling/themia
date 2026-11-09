@@ -24,6 +24,7 @@ internal sealed class GuardedAuthTokenIssuer : IAuthTokenIssuer
     private readonly IdentityModuleOptions options;
     private readonly TimeProvider timeProvider;
     private readonly ILogger<GuardedAuthTokenIssuer> logger;
+    private readonly ISessionProofStore? proofs;
 
     public GuardedAuthTokenIssuer(
         IUserService users,
@@ -35,7 +36,8 @@ internal sealed class GuardedAuthTokenIssuer : IAuthTokenIssuer
         IdentityModuleOptions options,
         TimeProvider timeProvider,
         ILogger<GuardedAuthTokenIssuer> logger,
-        ISecondFactorTicketService? tickets = null)
+        ISecondFactorTicketService? tickets = null,
+        ISessionProofStore? proofs = null)
     {
         ArgumentNullException.ThrowIfNull(users);
         ArgumentNullException.ThrowIfNull(principalFactory);
@@ -51,7 +53,8 @@ internal sealed class GuardedAuthTokenIssuer : IAuthTokenIssuer
         this.refreshTokens = refreshTokens;
         this.policy = policy;
         this.tickets = tickets;
-        minter = new ChannelSessionMinter(principalFactory, accessTokens, refreshTokens, observers, timeProvider, logger);
+        minter = new ChannelSessionMinter(principalFactory, accessTokens, refreshTokens, observers, timeProvider, logger, proofs);
+        this.proofs = proofs;
         this.options = options;
         this.timeProvider = timeProvider;
         this.logger = logger;
@@ -68,9 +71,15 @@ internal sealed class GuardedAuthTokenIssuer : IAuthTokenIssuer
                 return refusal;
             }
 
-            var pending = await SecondFactorGate.RequireAsync(
+            var gate = await SecondFactorGate.RequireAsync(
                 policy, tickets, user, SecondFactorMethod.Custom, request.Channel, false, false, cancellationToken).ConfigureAwait(false);
-            if (pending is { } owed)
+            if (gate.Decision == SecondFactorGateDecision.Denied)
+            {
+                logger.LogWarning("The second-factor policy denied user {UserId} on channel {Channel}.", user.Id, request.Channel);
+                return IssueResult.Refused(IssueOutcome.SecondFactorDenied);
+            }
+
+            if (gate.Pending is { } owed)
             {
                 logger.LogInformation("User {UserId} owes a second factor on channel {Channel} ({Stage}).", user.Id, request.Channel, owed.Stage);
                 return IssueResult.RequiresSecondFactor(owed);
@@ -139,6 +148,8 @@ internal sealed class GuardedAuthTokenIssuer : IAuthTokenIssuer
             }
 
             var principal = await minter.BuildPrincipalAsync(user, request, cancellationToken).ConfigureAwait(false);
+            // Same proof, same auth_time: the renewal reads what the session stored and never re-derives it.
+            SessionProofClaims.Apply(principal, proofs is null ? null : await proofs.GetAsync(user.Id, sessionId, cancellationToken).ConfigureAwait(false));
             AuthTokenIssuer.AddSession(principal, sessionId);
             var access = accessTokens.Issue(principal);
             var tokens = new AuthTokens(access.Token, AuthTokenIssuer.ExpiresInSeconds(timeProvider, access.ExpiresAt), string.Empty);

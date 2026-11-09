@@ -127,6 +127,7 @@ public static class IdentityServiceCollectionExtensions
         services.TryAddScoped<IUserTokenService, UserTokenService>();
         services.TryAddScoped<IUserTokenValidator, UserTokenService>();
         services.TryAddScoped<IRefreshTokenService, RefreshTokenService>();
+        services.TryAddScoped<ISessionProofStore, SessionProofStore>();
         services.AddMemoryCache();
         services.TryAddScoped<ISecurityStampValidator, SecurityStampValidator>();
         services.TryAddScoped<ISessionRevoker, RefreshTokenService>();

@@ -63,21 +63,19 @@ internal sealed class SecondFactorTicketService : ISecondFactorTicketService
         return new PendingSecondFactor(data.UserId, data.Stage, ticket, expiresAt);
     }
 
+    public Task<SecondFactorTicketData?> PeekAsync(string ticket, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(ticket);
+        var payload = ReadPayload(ticket);
+        return Task.FromResult(payload is null ? null : ToData(payload));
+    }
+
     public async Task<SecondFactorTicketData?> ConsumeAsync(string ticket, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(ticket);
 
-        Payload? payload;
-        try
-        {
-            payload = JsonSerializer.Deserialize<Payload>(protector.Unprotect(ticket));
-        }
-        catch (Exception ex) when (ex is CryptographicException or JsonException)
-        {
-            return null;
-        }
-
-        if (payload is null || string.IsNullOrEmpty(payload.Nonce) || payload.ExpiresAtUnix < timeProvider.GetUtcNow().ToUnixTimeSeconds())
+        var payload = ReadPayload(ticket);
+        if (payload is null)
         {
             return null;
         }
@@ -89,10 +87,29 @@ internal sealed class SecondFactorTicketService : ISecondFactorTicketService
             consumed = await services.GetRequiredService<IUserTokenService>().ConsumeAsync(payload.UserId, TokenPurpose.SecondFactorTicket, payload.Nonce, cancellationToken).ConfigureAwait(false);
         }
 
-        return consumed == TokenConsumeResult.Success
-            ? new SecondFactorTicketData(payload.UserId, tenant, payload.Method, payload.Provider, payload.WasCreated, payload.WasLinked, payload.Stamp, payload.Stage)
-            : null;
+        return consumed == TokenConsumeResult.Success ? ToData(payload) : null;
     }
+
+    // Signature and expiry only: whether the ticket is still unused is known only to ConsumeAsync.
+    private Payload? ReadPayload(string ticket)
+    {
+        Payload? payload;
+        try
+        {
+            payload = JsonSerializer.Deserialize<Payload>(protector.Unprotect(ticket));
+        }
+        catch (Exception ex) when (ex is CryptographicException or JsonException)
+        {
+            return null;
+        }
+
+        return payload is null || string.IsNullOrEmpty(payload.Nonce) || payload.ExpiresAtUnix < timeProvider.GetUtcNow().ToUnixTimeSeconds()
+            ? null
+            : payload;
+    }
+
+    private static SecondFactorTicketData ToData(Payload payload) =>
+        new(payload.UserId, TenantId.From(payload.Tenant), payload.Method, payload.Provider, payload.WasCreated, payload.WasLinked, payload.Stamp, payload.Stage);
 
     private sealed record Payload(
         Guid UserId,

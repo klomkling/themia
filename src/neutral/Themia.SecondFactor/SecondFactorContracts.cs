@@ -42,7 +42,9 @@ public interface IOtpDelivery
 /// <summary>Proof the caller already holds from this session, read from the server-side session and never from a client claim.</summary>
 /// <param name="Strength">The strongest method verified.</param>
 /// <param name="AuthenticatedAt">When it was verified.</param>
-public sealed record MfaProof(MfaStrength Strength, DateTimeOffset AuthenticatedAt);
+/// <param name="RecoveryCodeOnly">The session was opened with a recovery code. It may enrol a strong method, but never counts as a
+/// fresh strong verification: removing a method and minting recovery codes are refused until a strong method is enrolled.</param>
+public sealed record MfaProof(MfaStrength Strength, DateTimeOffset AuthenticatedAt, bool RecoveryCodeOnly);
 
 /// <summary>What happened to a verify, enrol or remove request.</summary>
 public enum SecondFactorOutcome
@@ -107,6 +109,14 @@ public sealed record SecondFactorResult
 
     /// <summary>Whether the request succeeded.</summary>
     public bool Succeeded => Outcome == SecondFactorOutcome.Succeeded;
+
+    /// <summary>The proof this result stands for, carrying whether a recovery code was the method. Prefer this to building an
+    /// <see cref="MfaProof"/> by hand.</summary>
+    /// <exception cref="InvalidOperationException">The result is not <see cref="SecondFactorOutcome.Succeeded"/>.</exception>
+    public MfaProof ToProof() =>
+        Succeeded && AuthenticatedAt is { } at
+            ? new MfaProof(Strength, at, UsedRecoveryCode)
+            : throw new InvalidOperationException("Only a succeeded second-factor result carries a proof.");
 
     internal static SecondFactorResult Failed(SecondFactorOutcome outcome, DateTimeOffset? lockedUntil = null) =>
         new() { Outcome = outcome, LockedUntil = lockedUntil };

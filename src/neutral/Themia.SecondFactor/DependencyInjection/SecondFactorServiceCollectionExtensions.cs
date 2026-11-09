@@ -35,6 +35,7 @@ public static class SecondFactorServiceCollectionExtensions
 
         services.AddOptions<SecondFactorOptions>().Configure(configure).ValidateOnStart();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IValidateOptions<SecondFactorOptions>, SecondFactorOptionsValidator>());
+        services.AddSingleton<IValidateOptions<SecondFactorOptions>>(new StoreOwnershipValidator(services));
 
         services.TryAddSingleton(TimeProvider.System);
         services.TryAddSingleton(new RecoveryCodeHasher(recoveryCodeKey));

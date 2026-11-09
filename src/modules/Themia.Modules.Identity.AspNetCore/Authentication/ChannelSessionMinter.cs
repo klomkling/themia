@@ -27,6 +27,7 @@ internal sealed partial class ChannelSessionMinter
     private readonly IIdentityEventObserver[] observers;
     private readonly TimeProvider timeProvider;
     private readonly ILogger logger;
+    private readonly ISessionProofStore? proofs;
 
     public ChannelSessionMinter(
         IClaimsPrincipalFactory principalFactory,
@@ -34,7 +35,8 @@ internal sealed partial class ChannelSessionMinter
         IRefreshTokenService refreshTokens,
         IEnumerable<IIdentityEventObserver> observers,
         TimeProvider timeProvider,
-        ILogger logger)
+        ILogger logger,
+        ISessionProofStore? proofs = null)
     {
         ArgumentNullException.ThrowIfNull(principalFactory);
         ArgumentNullException.ThrowIfNull(accessTokens);
@@ -48,6 +50,7 @@ internal sealed partial class ChannelSessionMinter
         this.observers = observers as IIdentityEventObserver[] ?? observers.ToArray();
         this.timeProvider = timeProvider;
         this.logger = logger;
+        this.proofs = proofs;
     }
 
     [GeneratedRegex("^[a-z0-9._-]{1,64}$")]
@@ -94,6 +97,12 @@ internal sealed partial class ChannelSessionMinter
     /// <summary>Mints a new session for <paramref name="user"/> on <paramref name="request"/>'s channel. The caller has already run every gate.</summary>
     public async Task<MintedSession> MintAsync(User user, SessionRequest request, CancellationToken cancellationToken)
     {
+        // A token must never claim a proof the server did not store: without a store there is nowhere to keep it, so nothing is issued.
+        if (request.Proof is not null && proofs is null)
+        {
+            throw new InvalidOperationException("The session request carries a second-factor proof but no ISessionProofStore is registered.");
+        }
+
         var principal = await BuildPrincipalAsync(user, request, cancellationToken).ConfigureAwait(false);
 
         // The refresh family is the session, so it is issued first and its id goes into the access token.
@@ -102,6 +111,13 @@ internal sealed partial class ChannelSessionMinter
         var issued = false;
         try
         {
+            if (request.Proof is not null
+                && !await proofs!.SaveAsync(user.Id, refresh.FamilyId, request.Proof, cancellationToken).ConfigureAwait(false))
+            {
+                throw new InvalidOperationException("The second-factor proof could not be stored for the new session.");
+            }
+
+            SessionProofClaims.Apply(principal, request.Proof);
             AuthTokenIssuer.AddSession(principal, refresh.FamilyId);
             access = accessTokens.Issue(principal);
             issued = true;

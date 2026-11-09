@@ -20,6 +20,7 @@ public sealed class IdentityAnonymiser : IIdentityAnonymiser
 
     private readonly IRepository<User, Guid> users;
     private readonly IRepository<RefreshToken, Guid> refreshTokens;
+    private readonly IRepository<SessionSecondFactor, Guid> sessionProofs;
     private readonly IRepository<UserToken, Guid> userTokens;
     private readonly IRepository<UserClaim, Guid> claims;
     private readonly IRepository<ExternalLoginLink, Guid> links;
@@ -40,6 +41,7 @@ public sealed class IdentityAnonymiser : IIdentityAnonymiser
         IRepository<UserClaim, Guid> claims,
         IRepository<ExternalLoginLink, Guid> links,
         IRepository<OtpLoginChallenge, Guid> challenges,
+        IRepository<SessionSecondFactor, Guid> sessionProofs,
         IUnitOfWork unitOfWork,
         IDataFilterScope filterScope,
         ITenantContext tenantContext,
@@ -61,6 +63,7 @@ public sealed class IdentityAnonymiser : IIdentityAnonymiser
         ArgumentNullException.ThrowIfNull(observers);
         this.users = users;
         this.refreshTokens = refreshTokens;
+        this.sessionProofs = sessionProofs;
         this.userTokens = userTokens;
         this.claims = claims;
         this.links = links;
@@ -180,6 +183,11 @@ public sealed class IdentityAnonymiser : IIdentityAnonymiser
         foreach (var token in await refreshTokens.ListAsync(new RefreshTokensByUserSpec(userId), ct).ConfigureAwait(false))
         {
             refreshTokens.Remove(token);
+        }
+
+        foreach (var proof in await sessionProofs.ListAsync(new SessionSecondFactorsByUserSpec(userId), ct).ConfigureAwait(false))
+        {
+            sessionProofs.Remove(proof);
         }
 
         foreach (var token in await userTokens.ListAsync(new UserTokensByUserSpec(userId), ct).ConfigureAwait(false))

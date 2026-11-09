@@ -27,6 +27,7 @@ public sealed class AuthenticationFlow : IAuthenticationFlow
     private readonly ILogger<AuthenticationFlow> logger;
     private readonly ISecondFactorPolicy secondFactorPolicy;
     private readonly ISecondFactorTicketService? secondFactorTickets;
+    private readonly ISessionProofStore? sessionProofs;
 
     /// <summary>Creates the flow with the default second-factor policy (nobody owes a second factor).</summary>
     public AuthenticationFlow(
@@ -58,6 +59,7 @@ public sealed class AuthenticationFlow : IAuthenticationFlow
     /// <param name="logger">The logger.</param>
     /// <param name="secondFactorPolicy">Decides whether a user who passed the password check owes a second factor.</param>
     /// <param name="secondFactorTickets">Issues the ticket of a login waiting for its second factor; required only when the policy asks for one.</param>
+    /// <param name="sessionProofs">Reads the stored second-factor proof of a session, so a refreshed access token carries the same <c>amr</c> and <c>auth_time</c>; null for none.</param>
     public AuthenticationFlow(
         IUserService users,
         IClaimsPrincipalFactory principalFactory,
@@ -70,11 +72,13 @@ public sealed class AuthenticationFlow : IAuthenticationFlow
         TimeProvider timeProvider,
         ILogger<AuthenticationFlow> logger,
         ISecondFactorPolicy secondFactorPolicy,
-        ISecondFactorTicketService? secondFactorTickets = null)
+        ISecondFactorTicketService? secondFactorTickets = null,
+        ISessionProofStore? sessionProofs = null)
     {
         ArgumentNullException.ThrowIfNull(secondFactorPolicy);
         this.secondFactorPolicy = secondFactorPolicy;
         this.secondFactorTickets = secondFactorTickets;
+        this.sessionProofs = sessionProofs;
         ArgumentNullException.ThrowIfNull(users);
         ArgumentNullException.ThrowIfNull(principalFactory);
         ArgumentNullException.ThrowIfNull(accessTokens);
@@ -243,9 +247,14 @@ public sealed class AuthenticationFlow : IAuthenticationFlow
 
         // The password was right, so this is not a failed login: no failure hook, no lockout count. A user who
         // owes a second factor gets a ticket instead of tokens, and OnLoginSucceeded fires when the login completes.
-        var pending = await SecondFactorGate.RequireAsync(
+        var gate = await SecondFactorGate.RequireAsync(
             secondFactorPolicy, secondFactorTickets, resolved, SecondFactorMethod.Password, null, false, false, cancellationToken).ConfigureAwait(false);
-        if (pending is { } owed)
+        if (gate.Decision == SecondFactorGateDecision.Denied)
+        {
+            return await FailAsync(identifier, LoginFailureReason.Denied, LoginResult.Denied(), cancellationToken, "second factor denied by policy").ConfigureAwait(false);
+        }
+
+        if (gate.Pending is { } owed)
         {
             logger.LogInformation("User {UserId} passed the password check and owes a second factor ({Stage}).", resolved.Id, owed.Stage);
             return LoginResult.RequiresSecondFactor(owed);
@@ -400,6 +409,8 @@ public sealed class AuthenticationFlow : IAuthenticationFlow
         // AbortGrace.Duration after the abort.
         using var decided = new AbortGrace(cancellationToken, timeProvider);
         var principal = await principalFactory.CreateAsync(user, AuthenticationType, decided.Token).ConfigureAwait(false);
+        // Rotation, a lost-race replay and a channel renewal all read the proof the session stored, so amr and auth_time never change.
+        SessionProofClaims.Apply(principal, sessionProofs is null ? null : await sessionProofs.GetAsync(user.Id, replacement.FamilyId, decided.Token).ConfigureAwait(false));
         AuthTokenIssuer.AddSession(principal, replacement.FamilyId);   // rotation keeps the family, so the session id is stable
         var access = accessTokens.Issue(principal);
         var tokens = new AuthTokens(access.Token, AuthTokenIssuer.ExpiresInSeconds(timeProvider, access.ExpiresAt), replacement.RawToken);

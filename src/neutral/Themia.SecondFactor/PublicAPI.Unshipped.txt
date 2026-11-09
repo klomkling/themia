@@ -174,7 +174,9 @@ Themia.SecondFactor.MfaPrimaryKind.Password = 0 -> Themia.SecondFactor.MfaPrimar
 Themia.SecondFactor.MfaProof
 Themia.SecondFactor.MfaProof.AuthenticatedAt.get -> System.DateTimeOffset
 Themia.SecondFactor.MfaProof.AuthenticatedAt.init -> void
-Themia.SecondFactor.MfaProof.MfaProof(Themia.SecondFactor.MfaStrength Strength, System.DateTimeOffset AuthenticatedAt) -> void
+Themia.SecondFactor.MfaProof.MfaProof(Themia.SecondFactor.MfaStrength Strength, System.DateTimeOffset AuthenticatedAt, bool RecoveryCodeOnly) -> void
+Themia.SecondFactor.MfaProof.RecoveryCodeOnly.get -> bool
+Themia.SecondFactor.MfaProof.RecoveryCodeOnly.init -> void
 Themia.SecondFactor.MfaProof.Strength.get -> Themia.SecondFactor.MfaStrength
 Themia.SecondFactor.MfaProof.Strength.init -> void
 Themia.SecondFactor.MfaRequirement
@@ -349,3 +351,4 @@ Themia.SecondFactor.TotpEnrolment.QrSvg.init -> void
 Themia.SecondFactor.TotpEnrolment.Secret.get -> string!
 Themia.SecondFactor.TotpEnrolment.Secret.init -> void
 Themia.SecondFactor.TotpEnrolment.TotpEnrolment(string! EnrolmentId, string! Secret, System.Uri! OtpAuthUri, string! QrSvg) -> void
+Themia.SecondFactor.SecondFactorResult.ToProof() -> Themia.SecondFactor.MfaProof!

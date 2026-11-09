@@ -58,6 +58,7 @@ public abstract class IdentityStoreConformanceTests
         public IUserTokenValidator TokenValidator => Inner.ServiceProvider.GetRequiredService<IUserTokenValidator>();
         public IUserTokenService Tokens => Inner.ServiceProvider.GetRequiredService<IUserTokenService>();
         public ISessionRevoker Sessions => Inner.ServiceProvider.GetRequiredService<ISessionRevoker>();
+        public ISessionProofStore SessionProofs => Inner.ServiceProvider.GetRequiredService<ISessionProofStore>();
         public IRefreshTokenService RefreshTokens => Inner.ServiceProvider.GetRequiredService<IRefreshTokenService>();
         public IExternalLoginService ExternalLogins => Inner.ServiceProvider.GetRequiredService<IExternalLoginService>();
         public IExternalLoginLinkService Linking => Inner.ServiceProvider.GetRequiredService<IExternalLoginLinkService>();
@@ -66,6 +67,7 @@ public abstract class IdentityStoreConformanceTests
         public IRepository<UserRole, Guid> Memberships => Inner.ServiceProvider.GetRequiredService<IRepository<UserRole, Guid>>();
         public IIdentityAnonymiser Anonymiser => Inner.ServiceProvider.GetRequiredService<IIdentityAnonymiser>();
         public IRepository<RefreshToken, Guid> RefreshRows => Inner.ServiceProvider.GetRequiredService<IRepository<RefreshToken, Guid>>();
+        public IRepository<SessionSecondFactor, Guid> SessionProofRows => Inner.ServiceProvider.GetRequiredService<IRepository<SessionSecondFactor, Guid>>();
         public IRepository<OtpLoginChallenge, Guid> OtpRows => Inner.ServiceProvider.GetRequiredService<IRepository<OtpLoginChallenge, Guid>>();
         public IRepository<UserClaim, Guid> ClaimRows => Inner.ServiceProvider.GetRequiredService<IRepository<UserClaim, Guid>>();
         public IUnitOfWork UnitOfWork => Inner.ServiceProvider.GetRequiredService<IUnitOfWork>();
@@ -1094,6 +1096,63 @@ public abstract class IdentityStoreConformanceTests
     }
 
     [Fact]
+    public async Task A_session_proof_is_kept_per_live_session_of_its_own_user_and_survives_rotation()
+    {
+        await ResetAsync();
+        var verifiedAt = DateTimeOffset.Parse("2026-06-14T09:00:00Z");
+        await using var s = NewScope(new TenantId("acme"));
+        var ann = (await s.Users.CreateAsync("proof-ann", "pw")).UserId!.Value;
+        var bob = (await s.Users.CreateAsync("proof-bob", "pw")).UserId!.Value;
+        var session = await s.RefreshTokens.IssueAsync(ann);
+        var proof = new SessionProofSnapshot("otp mfa", SessionProofStrength.Strong, verifiedAt);
+
+        Assert.Null(await s.SessionProofs.GetAsync(ann, session.FamilyId));                              // no row means no second factor
+        Assert.True(await s.SessionProofs.SaveAsync(ann, session.FamilyId, proof));
+        Assert.Equal(proof, await s.SessionProofs.GetAsync(ann, session.FamilyId));
+        Assert.Null(await s.SessionProofs.GetAsync(bob, session.FamilyId));                              // another user's session
+        Assert.False(await s.SessionProofs.SaveAsync(bob, session.FamilyId, proof));
+        Assert.False(await s.SessionProofs.SaveAsync(ann, Guid.NewGuid(), proof));                       // not a session
+
+        Assert.True((await s.RefreshTokens.ValidateAndRotateAsync(session.RawToken)).TryGetSuccess(out _, out _));
+        Assert.Equal(proof, await s.SessionProofs.GetAsync(ann, session.FamilyId));                      // same family, same proof
+
+        var replaced = proof with { Amr = "swk mfa", AuthenticatedAt = verifiedAt.AddMinutes(5) };
+        Assert.True(await s.SessionProofs.SaveAsync(ann, session.FamilyId, replaced));
+        Assert.Equal(replaced, await s.SessionProofs.GetAsync(ann, session.FamilyId));
+
+        await s.RefreshTokens.RevokeAllForUserAsync(ann);
+        Assert.Null(await s.SessionProofs.GetAsync(ann, session.FamilyId));                              // a dead session proves nothing
+    }
+
+    [Fact]
+    public async Task Lifting_a_restriction_changes_only_that_live_session_of_that_user()
+    {
+        await ResetAsync();
+        var at = DateTimeOffset.Parse("2026-06-14T09:00:00Z");
+        await using var s = NewScope(new TenantId("acme"));
+        var ann = (await s.Users.CreateAsync("lift-ann", "pw")).UserId!.Value;
+        var bob = (await s.Users.CreateAsync("lift-bob", "pw")).UserId!.Value;
+        var restricted = await s.RefreshTokens.IssueAsync(ann);
+        var sibling = await s.RefreshTokens.IssueAsync(ann);
+        var free = await s.RefreshTokens.IssueAsync(bob);
+        var recovery = new SessionProofSnapshot("otp mfa", SessionProofStrength.Strong, at, SessionRestriction.RecoveryOnly);
+        await s.SessionProofs.SaveAsync(ann, restricted.FamilyId, recovery);
+        await s.SessionProofs.SaveAsync(ann, sibling.FamilyId, recovery);
+        await s.SessionProofs.SaveAsync(bob, free.FamilyId, recovery with { Restriction = SessionRestriction.None });
+
+        Assert.False(await s.SessionProofs.LiftRestrictionAsync(bob, restricted.FamilyId));              // not bob's session
+        Assert.Equal(SessionRestriction.RecoveryOnly, (await s.SessionProofs.GetAsync(ann, restricted.FamilyId))!.Restriction);
+        Assert.True(await s.SessionProofs.LiftRestrictionAsync(ann, restricted.FamilyId));
+        Assert.False(await s.SessionProofs.LiftRestrictionAsync(ann, restricted.FamilyId));              // nothing left to lift
+        Assert.False(await s.SessionProofs.LiftRestrictionAsync(bob, free.FamilyId));
+
+        var lifted = (await s.SessionProofs.GetAsync(ann, restricted.FamilyId))!;
+        Assert.Equal(SessionRestriction.None, lifted.Restriction);
+        Assert.Equal(recovery with { Restriction = SessionRestriction.None }, lifted);                    // amr and auth time untouched
+        Assert.Equal(SessionRestriction.RecoveryOnly, (await s.SessionProofs.GetAsync(ann, sibling.FamilyId))!.Restriction);
+    }
+
+    [Fact]
     public async Task A_session_is_live_for_its_own_user_across_a_rotation_and_not_after_revocation_reuse_expiry_or_for_a_stranger()
     {
         await ResetAsync();
@@ -1565,6 +1624,15 @@ public abstract class IdentityStoreConformanceTests
         var second = (await s.RefreshTokens.ValidateAndRotateAsync(first.RawToken)).TryGetSuccess(out _, out var r2) ? r2 : throw new InvalidOperationException();
         Assert.True((await s.RefreshTokens.ValidateAndRotateAsync(second.RawToken)).TryGetSuccess(out _, out _));
         var theirs = await s.RefreshTokens.IssueAsync(bystander);
+        var now = DateTimeOffset.UtcNow;
+        SessionSecondFactor Proof(Guid owner) => new()
+        {
+            Id = Guid.NewGuid(), UserId = owner, Amr = "otp mfa", Strength = SessionProofStrength.Strong,
+            AuthenticatedAt = now, Restriction = SessionRestriction.None, CreatedAt = now, UpdatedAt = now,
+        };
+        await s.SessionProofRows.AddAsync(Proof(user));
+        await s.SessionProofRows.AddAsync(Proof(bystander));
+        await s.UnitOfWork.SaveChangesAsync();
 
         var result = await s.Anonymiser.AnonymiseAsync(user);
 
@@ -1578,6 +1646,8 @@ public abstract class IdentityStoreConformanceTests
         Assert.False(row.IsActive);
         Assert.False(row.IsDeleted);
         Assert.Empty(await s.RefreshRows.ListAsync(new WhereSpec<RefreshToken>(t => t.UserId == user)));
+        Assert.Empty(await s.SessionProofRows.ListAsync(new WhereSpec<SessionSecondFactor>(p => p.UserId == user)));
+        Assert.Single(await s.SessionProofRows.ListAsync(new WhereSpec<SessionSecondFactor>(p => p.UserId == bystander)));
         Assert.Empty(await s.ClaimRows.ListAsync(new WhereSpec<UserClaim>(c => c.UserId == user)));
         Assert.Empty(await s.Linking.GetLoginsAsync(user));
         Assert.NotEqual(RefreshOutcome.Success, (await s.RefreshTokens.ValidateAndRotateAsync(second.RawToken)).Outcome);

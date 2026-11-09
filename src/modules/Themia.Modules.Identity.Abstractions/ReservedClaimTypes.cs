@@ -18,6 +18,8 @@ public static class ReservedClaimTypes
     private static readonly HashSet<string> Reserved = new(StringComparer.OrdinalIgnoreCase)
     {
         "sid",
+        "amr",        // the second-factor proof is read from the server session and put on the token by Themia only
+        "auth_time",
         "tenant_id",   // the claims tenant-resolution strategy reads this by default (MultiTenancyOptions.ClaimType)
         ClaimTypes.NameIdentifier,
         ClaimTypes.Name,

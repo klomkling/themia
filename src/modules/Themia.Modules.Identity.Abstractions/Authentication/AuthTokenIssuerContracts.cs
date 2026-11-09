@@ -27,6 +27,9 @@ public enum IssueOutcome
 
     /// <summary>The second-factor ticket is unknown, expired, used, not for this user and channel, or the user changed since it was issued.</summary>
     TicketInvalid,
+
+    /// <summary>The app's <see cref="ISecondFactorPolicy"/> answered <see cref="SecondFactorRequirement.Denied"/>: nothing was issued and no ticket exists.</summary>
+    SecondFactorDenied,
 }
 
 /// <summary>The result of <see cref="IAuthTokenIssuer"/>.</summary>
@@ -74,7 +77,10 @@ public readonly record struct IssueResult
 /// <param name="AppClaims">Extra claims for the principal, replacing any claim of the same type already on it (so a session-start claim
 /// can be carried forward). A reserved claim type (<see cref="ReservedClaimTypes"/>) is refused with <see cref="ArgumentException"/>
 /// before anything is issued.</param>
-public sealed record SessionRequest(TenantId? ExpectedTenant, string Channel, IReadOnlyCollection<Claim>? AppClaims = null);
+/// <param name="Proof">The second-factor proof of the new session, written with it and put in the first access token as <c>amr</c> and
+/// <c>auth_time</c>. Set only by the second-factor bridge, after the factor verified; null for a session with no second factor.</param>
+public sealed record SessionRequest(TenantId? ExpectedTenant, string Channel, IReadOnlyCollection<Claim>? AppClaims = null,
+    SessionProofSnapshot? Proof = null);
 
 /// <summary>The one guarded way for an app to mint a session outside the Themia login flows. It reloads the user, checks active, lockout
 /// and tenant, asks the <see cref="ISecondFactorPolicy"/>, sets the <c>sid</c> claim, issues the refresh token first and revokes it if

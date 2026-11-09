@@ -23,6 +23,7 @@ public static class ModelBuilderExtensions
         modelBuilder.ApplyConfiguration(new RoleClaimConfiguration());
         modelBuilder.ApplyConfiguration(new UserTokenConfiguration());
         modelBuilder.ApplyConfiguration(new RefreshTokenConfiguration());
+        modelBuilder.ApplyConfiguration(new SessionSecondFactorConfiguration());
         modelBuilder.ApplyConfiguration(new ExternalLoginLinkConfiguration());
         modelBuilder.ApplyConfiguration(new OtpLoginChallengeConfiguration());
         return modelBuilder;
@@ -137,6 +138,23 @@ public static class ModelBuilderExtensions
             b.Property(t => t.SuccessorCiphertext).HasColumnName("successor_ciphertext").HasMaxLength(256);
             b.Property(t => t.SecurityStamp).HasColumnName("security_stamp").HasMaxLength(128);
             b.Property(t => t.CreatedAt).HasColumnName("created_at");
+        }
+    }
+
+    private sealed class SessionSecondFactorConfiguration : IEntityTypeConfiguration<SessionSecondFactor>
+    {
+        public void Configure(EntityTypeBuilder<SessionSecondFactor> b)
+        {
+            b.ToTable("session_second_factor", Schema);
+            b.HasKey(s => s.Id);
+            b.Property(s => s.Id).HasColumnName("id").ValueGeneratedNever();
+            b.Property(s => s.UserId).HasColumnName("user_id");
+            b.Property(s => s.Amr).HasColumnName("amr").HasMaxLength(128).IsRequired();
+            b.Property(s => s.Strength).HasColumnName("strength");              // enum → int by convention
+            b.Property(s => s.AuthenticatedAt).HasColumnName("authenticated_at");
+            b.Property(s => s.Restriction).HasColumnName("restriction");        // enum → int by convention
+            b.Property(s => s.CreatedAt).HasColumnName("created_at");
+            b.Property(s => s.UpdatedAt).HasColumnName("updated_at");
         }
     }
 

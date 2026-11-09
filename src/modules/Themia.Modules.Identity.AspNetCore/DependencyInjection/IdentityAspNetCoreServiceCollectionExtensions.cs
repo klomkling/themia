@@ -63,7 +63,9 @@ public static class IdentityAspNetCoreServiceCollectionExtensions
         services.AddDataProtection();
         services.TryAddSingleton<ISecondFactorPolicy>(NotRequiredSecondFactorPolicy.Instance);
         services.TryAddScoped<ISecondFactorTicketService, SecondFactorTicketService>();
-        services.TryAddScoped<ISecondFactorCompletion, SecondFactorCompletion>();
+        services.TryAddScoped<SecondFactorCompletion>();
+        services.TryAddScoped<ISecondFactorCompletion>(sp => sp.GetRequiredService<SecondFactorCompletion>());
+        services.TryAddScoped<ISecondFactorProofCompletion>(sp => sp.GetRequiredService<SecondFactorCompletion>());
         services.TryAddScoped<IAuthTokenIssuer, GuardedAuthTokenIssuer>();
 
         services.TryAddScoped<IAuthenticationFlow, AuthenticationFlow>();

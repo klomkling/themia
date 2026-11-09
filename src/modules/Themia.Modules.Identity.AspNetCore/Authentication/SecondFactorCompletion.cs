@@ -15,7 +15,7 @@ namespace Themia.Modules.Identity.AspNetCore.Authentication;
 /// exactly as they would have, and the session is issued through the same issuer as every other login (so
 /// <c>sid</c> and the claims are identical).
 /// </summary>
-internal sealed class SecondFactorCompletion : ISecondFactorCompletion
+internal sealed class SecondFactorCompletion : ISecondFactorProofCompletion
 {
     private const string AuthenticationType = "Bearer";
 
@@ -30,6 +30,7 @@ internal sealed class SecondFactorCompletion : ISecondFactorCompletion
     private readonly IdentityModuleOptions options;
     private readonly TimeProvider timeProvider;
     private readonly ILogger<SecondFactorCompletion> logger;
+    private readonly ISessionProofStore? proofs;
     private readonly ChannelSessionMinter minter;
 
     public SecondFactorCompletion(
@@ -43,7 +44,8 @@ internal sealed class SecondFactorCompletion : ISecondFactorCompletion
         IdentityModuleOptions options,
         TimeProvider timeProvider,
         ILogger<SecondFactorCompletion> logger,
-        IExternalAuthenticationHooks? externalHooks = null)
+        IExternalAuthenticationHooks? externalHooks = null,
+        ISessionProofStore? proofs = null)
     {
         ArgumentNullException.ThrowIfNull(tickets);
         ArgumentNullException.ThrowIfNull(users);
@@ -62,17 +64,35 @@ internal sealed class SecondFactorCompletion : ISecondFactorCompletion
         this.refreshTokens = refreshTokens;
         this.hooks = hooks;
         this.externalHooks = externalHooks;
+        this.proofs = proofs;
         this.observers = observers as IIdentityEventObserver[] ?? observers.ToArray();
         this.options = options;
         this.timeProvider = timeProvider;
         this.logger = logger;
-        minter = new ChannelSessionMinter(principalFactory, accessTokens, refreshTokens, this.observers, timeProvider, logger);
+        minter = new ChannelSessionMinter(principalFactory, accessTokens, refreshTokens, this.observers, timeProvider, logger, proofs);
     }
 
-    public async Task<SecondFactorCompletionResult> CompleteAsync(
-        string ticket, Guid expectedUserId, SecondFactorStage expectedStage, CancellationToken cancellationToken = default)
+    public Task<SecondFactorCompletionResult> CompleteAsync(
+        string ticket, Guid expectedUserId, SecondFactorStage expectedStage, CancellationToken cancellationToken = default) =>
+        CompleteCoreAsync(ticket, expectedUserId, expectedStage, proof: null, cancellationToken);
+
+    public Task<SecondFactorCompletionResult> CompleteAsync(
+        string ticket, Guid expectedUserId, SecondFactorStage expectedStage, SessionProofSnapshot proof, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(proof);
+        return CompleteCoreAsync(ticket, expectedUserId, expectedStage, proof, cancellationToken);
+    }
+
+    private async Task<SecondFactorCompletionResult> CompleteCoreAsync(
+        string ticket, Guid expectedUserId, SecondFactorStage expectedStage, SessionProofSnapshot? proof, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(ticket);
+
+        // A proof the server cannot store must not be promised: check before the ticket is burnt, so the caller can retry.
+        if (proof is not null && proofs is null)
+        {
+            throw new InvalidOperationException("A second-factor proof was supplied but no ISessionProofStore is registered.");
+        }
 
         var data = await tickets.ConsumeAsync(ticket, cancellationToken).ConfigureAwait(false);
         if (data is null)
@@ -99,7 +119,7 @@ internal sealed class SecondFactorCompletion : ISecondFactorCompletion
         // The completing request has no tenant scope under a claims-only strategy: run as the ticket's tenant.
         using (TenantContextAccessor.BeginScope(data.TenantId))
         {
-            return await CompleteScopedAsync(data, cancellationToken).ConfigureAwait(false);
+            return await CompleteScopedAsync(data, proof, cancellationToken).ConfigureAwait(false);
         }
     }
 
@@ -109,7 +129,8 @@ internal sealed class SecondFactorCompletion : ISecondFactorCompletion
         return tickets.ConsumeAsync(ticket, cancellationToken);
     }
 
-    private async Task<SecondFactorCompletionResult> CompleteScopedAsync(SecondFactorTicketData data, CancellationToken cancellationToken)
+    private async Task<SecondFactorCompletionResult> CompleteScopedAsync(
+        SecondFactorTicketData data, SessionProofSnapshot? proof, CancellationToken cancellationToken)
     {
         if (!options.EnabledLoginMethods.HasFlag(ToFlag(data.Method)))
         {
@@ -153,9 +174,8 @@ internal sealed class SecondFactorCompletion : ISecondFactorCompletion
         // A one-time-code login made on an app channel (IOtpLoginFlow's channel overload) carries the channel as its provider and is
         // finished on that channel. External tickets also carry a provider, so the method is part of the test.
         var tokens = data.Method == SecondFactorMethod.Otp && data.Provider is { } channel
-            ? (await minter.MintAsync(user, new SessionRequest(data.TenantId, channel), cancellationToken).ConfigureAwait(false)).Tokens
-            : await AuthTokenIssuer.IssueAsync(
-                principalFactory, accessTokens, refreshTokens, timeProvider, user, AuthenticationType, cancellationToken).ConfigureAwait(false);
+            ? (await minter.MintAsync(user, new SessionRequest(data.TenantId, channel, Proof: proof), cancellationToken).ConfigureAwait(false)).Tokens
+            : await IssueSessionAsync(user, proof, cancellationToken).ConfigureAwait(false);
         logger.LogInformation("User {UserId} completed the second factor ({Method}).", user.Id, data.Method);
 
         if (data.Method == SecondFactorMethod.External)
@@ -168,6 +188,49 @@ internal sealed class SecondFactorCompletion : ISecondFactorCompletion
         }
 
         return SecondFactorCompletionResult.Completed(tokens, data.Method, data.Provider, data.WasCreated, data.WasLinked);
+    }
+
+    private async Task<AuthTokens> IssueSessionAsync(User user, SessionProofSnapshot? proof, CancellationToken cancellationToken)
+    {
+        if (proof is null)
+        {
+            return await AuthTokenIssuer.IssueAsync(
+                principalFactory, accessTokens, refreshTokens, timeProvider, user, AuthenticationType, cancellationToken).ConfigureAwait(false);
+        }
+
+        // Same sequence as AuthTokenIssuer.IssueAsync, with the proof stored before the access token exists: a token must never
+        // claim a proof the server did not keep. If anything fails after the refresh token is issued, nobody is handed it, so end it.
+        var principal = await principalFactory.CreateAsync(user, AuthenticationType, cancellationToken).ConfigureAwait(false);
+        var refresh = await refreshTokens.IssueAsync(user.Id, cancellationToken).ConfigureAwait(false);
+        try
+        {
+            if (!await proofs!.SaveAsync(user.Id, refresh.FamilyId, proof, cancellationToken).ConfigureAwait(false))
+            {
+                throw new InvalidOperationException("The second-factor proof could not be stored for the new session.");
+            }
+
+            SessionProofClaims.Apply(principal, proof);
+            AuthTokenIssuer.AddSession(principal, refresh.FamilyId);
+            var access = accessTokens.Issue(principal);
+            return new AuthTokens(access.Token, AuthTokenIssuer.ExpiresInSeconds(timeProvider, access.ExpiresAt), refresh.RawToken);
+        }
+        catch
+        {
+            await RevokeUnhandedAsync(refresh.RawToken, user.Id).ConfigureAwait(false);
+            throw;
+        }
+    }
+
+    private async Task RevokeUnhandedAsync(string rawRefreshToken, Guid userId)
+    {
+        try
+        {
+            await refreshTokens.RevokeAsync(rawRefreshToken, false, CancellationToken.None).ConfigureAwait(false);
+        }
+        catch (Exception revokeFailure)
+        {
+            logger.LogError(revokeFailure, "Revoking the refresh token of a session whose proof or access token failed to issue also failed (user {UserId}).", userId);
+        }
     }
 
     private bool StillMayLogIn(User user, SecondFactorTicketData data)

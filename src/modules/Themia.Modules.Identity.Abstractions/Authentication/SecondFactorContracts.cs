@@ -30,6 +30,10 @@ public enum SecondFactorRequirement
 
     /// <summary>The user must have a second factor and has none yet: enrol one, then prove it.</summary>
     Enrol,
+
+    /// <summary>The login may not proceed at all, for example because no second factor the policy accepts exists for this primary check.
+    /// Nothing is issued and no ticket is created: the flow fails through its normal failure path (failure hook, observer and audit).</summary>
+    Denied,
 }
 
 /// <summary>The stage a pending login is waiting at.</summary>
@@ -104,6 +108,13 @@ public interface ISecondFactorTicketService
     /// <param name="cancellationToken">A cancellation token.</param>
     /// <returns>The pending login, carrying the ticket.</returns>
     Task<PendingSecondFactor> IssueAsync(SecondFactorTicketData data, CancellationToken cancellationToken = default);
+
+    /// <summary>Reads what a ticket stands for without using it up. Only the signature and expiry are checked: the ticket may already
+    /// be used, so this is for choosing which second factors to offer and never proof that a login may complete.</summary>
+    /// <param name="ticket">The ticket from <see cref="PendingSecondFactor.Ticket"/>.</param>
+    /// <param name="cancellationToken">A cancellation token.</param>
+    /// <returns>The ticket's data, or null when it is unknown, expired or tampered with.</returns>
+    Task<SecondFactorTicketData?> PeekAsync(string ticket, CancellationToken cancellationToken = default);
 
     /// <summary>Consumes a ticket: it is valid once, until it expires.</summary>
     /// <param name="ticket">The ticket from <see cref="PendingSecondFactor.Ticket"/>.</param>
@@ -186,4 +197,26 @@ public interface ISecondFactorCompletion
     /// <param name="ticket">The ticket to burn.</param>
     /// <param name="cancellationToken">A cancellation token.</param>
     Task RejectAsync(string ticket, CancellationToken cancellationToken = default);
+}
+
+/// <summary>
+/// An <see cref="ISecondFactorCompletion"/> that can also store the second-factor proof on the session it issues, so the
+/// session's <c>amr</c> and <c>auth_time</c> survive refresh. Meant for the second-factor bridge, which calls it only after
+/// the factor was verified; an app that has not verified a factor itself must use the proof-less overload.
+/// </summary>
+public interface ISecondFactorProofCompletion : ISecondFactorCompletion
+{
+    /// <summary>
+    /// Completes the ticket exactly as <see cref="ISecondFactorCompletion.CompleteAsync"/> does, and stores
+    /// <paramref name="proof"/> on the new session before any token is issued. When no <see cref="ISessionProofStore"/> is
+    /// registered, or the proof cannot be stored, nothing is issued and the call throws.
+    /// </summary>
+    /// <param name="ticket">The ticket from the primary step.</param>
+    /// <param name="expectedUserId">The user the caller just verified.</param>
+    /// <param name="expectedStage">The stage the caller just handled.</param>
+    /// <param name="proof">What the verified factor proved.</param>
+    /// <param name="cancellationToken">Cancels the call.</param>
+    /// <returns>The same result as the proof-less overload.</returns>
+    Task<SecondFactorCompletionResult> CompleteAsync(
+        string ticket, Guid expectedUserId, SecondFactorStage expectedStage, SessionProofSnapshot proof, CancellationToken cancellationToken = default);
 }

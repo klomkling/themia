@@ -104,6 +104,46 @@ public sealed class SecondFactorTests : IDisposable
     }
 
     [Fact]
+    public async Task Password_login_the_policy_denies_fails_through_the_normal_failure_path_and_issues_nothing()
+    {
+        users.UserToReturn = Staff();
+        policy.Requirement = SecondFactorRequirement.Denied;
+
+        var result = await PasswordFlow().LoginAsync("staff", "pw");
+
+        Assert.Equal(LoginOutcome.Denied, result.Outcome);
+        Assert.False(result.Succeeded);
+        Assert.Null(result.Tokens);
+        Assert.Null(result.SecondFactor);
+        Assert.Equal(0, refresh.IssueCalls);
+        Assert.Equal(LoginFailureReason.Denied, hooks.FailedReason);
+        Assert.Contains("login-failed", hooks.Calls);
+        Assert.DoesNotContain("login-succeeded", hooks.Calls);
+    }
+
+    [Fact]
+    public async Task One_time_code_login_the_policy_denies_fails_through_the_normal_failure_path_and_issues_nothing()
+    {
+        var user = Staff();
+        users.UserToReturn = user;
+        policy.Requirement = SecondFactorRequirement.Denied;
+        var challenges = new FakeOtpChallengeService
+        {
+            VerifyResult = new OtpVerifyResult(OtpVerifyOutcome.Verified, user.Id, NormalizedPhone) { TenantId = user.TenantId },
+        };
+        var flow = new OtpLoginFlow(users, new FakeOtpRecipientResolver(), challenges, new FakeOtpCodeSender(), new FormattingOnlyPhoneNumberNormalizer(),
+            principals, access, refresh, hooks, [observer], options, clock, NullLogger<OtpLoginFlow>.Instance, policy, ticketService);
+
+        var result = await flow.VerifyAsync(Guid.NewGuid(), "123456");
+
+        Assert.Equal(LoginOutcome.Denied, result.Outcome);
+        Assert.Null(result.Tokens);
+        Assert.Equal(0, refresh.IssueCalls);
+        Assert.Equal(LoginFailureReason.Denied, hooks.FailedReason);
+        Assert.DoesNotContain("login-succeeded", hooks.Calls);
+    }
+
+    [Fact]
     public async Task A_wrong_password_never_reaches_the_policy()
     {
         users.UserToReturn = Staff();
@@ -325,6 +365,89 @@ public sealed class SecondFactorTests : IDisposable
         var seen = Assert.Single(probe.Events);
         Assert.Equal(nameof(IIdentityEventObserver.OnLoginDeniedAsync), seen.Name);
         Assert.False(seen.TokenCancelled);
+    }
+
+    [Fact]
+    public async Task Peeking_a_ticket_reads_what_it_stands_for_and_leaves_it_usable()
+    {
+        var pending = await PendingPasswordLoginAsync();
+
+        var peeked = await ticketService.PeekAsync(pending.Ticket);
+        var peekedAgain = await ticketService.PeekAsync(pending.Ticket);
+
+        Assert.Equal(SecondFactorMethod.Password, peeked!.Method);
+        Assert.Equal(pending.UserId, peeked.UserId);
+        Assert.NotNull(peekedAgain);
+        Assert.True((await Completion().CompleteAsync(pending.Ticket, pending.UserId, pending.Stage)).Succeeded);
+    }
+
+    [Fact]
+    public async Task Peeking_a_tampered_ticket_returns_nothing()
+    {
+        var pending = await PendingPasswordLoginAsync();
+
+        Assert.Null(await ticketService.PeekAsync(pending.Ticket[..^2] + "xx"));
+    }
+
+    private static readonly SessionProofSnapshot StrongProof =
+        new("swk mfa", SessionProofStrength.Strong, DateTimeOffset.Parse("2026-06-14T09:00:00Z"));
+
+    private SecondFactorCompletion CompletionWith(InMemorySessionProofStore? store) =>
+        new(ticketService, users, principals, access, refresh, hooks, [observer], options, clock,
+            NullLogger<SecondFactorCompletion>.Instance, externalHooks, store);
+
+    [Fact]
+    public async Task Completing_with_a_proof_stores_it_on_the_new_session_and_puts_it_on_the_first_token()
+    {
+        var pending = await PendingPasswordLoginAsync();
+        var store = new InMemorySessionProofStore();
+
+        var result = await CompletionWith(store).CompleteAsync(pending.Ticket, pending.UserId, pending.Stage, StrongProof);
+
+        Assert.True(result.Succeeded);
+        Assert.Equal(StrongProof, store.Rows[(pending.UserId, refresh.LastFamilyId)]);
+        var claims = access.LastPrincipal!.Claims.ToList();
+        Assert.Equal(["swk", "mfa"], claims.Where(c => c.Type == "amr").Select(c => c.Value));
+        Assert.Equal(StrongProof.AuthenticatedAt.ToUnixTimeSeconds().ToString(System.Globalization.CultureInfo.InvariantCulture),
+            claims.Single(c => c.Type == "auth_time").Value);
+    }
+
+    [Fact]
+    public async Task Completing_without_a_proof_stores_nothing_and_adds_no_proof_claims()
+    {
+        var pending = await PendingPasswordLoginAsync();
+        var store = new InMemorySessionProofStore();
+
+        var result = await CompletionWith(store).CompleteAsync(pending.Ticket, pending.UserId, pending.Stage);
+
+        Assert.True(result.Succeeded);
+        Assert.Empty(store.Rows);
+        Assert.DoesNotContain(access.LastPrincipal!.Claims, c => c.Type is "amr" or "auth_time");
+    }
+
+    [Fact]
+    public async Task A_proof_with_no_store_registered_throws_before_the_ticket_is_burnt_and_issues_nothing()
+    {
+        var pending = await PendingPasswordLoginAsync();
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => CompletionWith(null).CompleteAsync(pending.Ticket, pending.UserId, pending.Stage, StrongProof));
+
+        Assert.Equal(0, refresh.IssueCalls);
+        Assert.True((await CompletionWith(null).CompleteAsync(pending.Ticket, pending.UserId, pending.Stage)).Succeeded);   // ticket still good
+    }
+
+    [Fact]
+    public async Task A_proof_that_cannot_be_stored_ends_the_new_session_and_issues_no_token()
+    {
+        var pending = await PendingPasswordLoginAsync();
+        var store = new InMemorySessionProofStore { SaveResult = false };
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => CompletionWith(store).CompleteAsync(pending.Ticket, pending.UserId, pending.Stage, StrongProof));
+
+        Assert.Equal(0, access.IssueCalls);
+        Assert.Equal(1, refresh.RevokeCalls);
     }
 
     [Fact]

@@ -194,6 +194,11 @@ internal sealed class ExternalAuthenticationFlow : IExternalAuthenticationFlow
         // gets a ticket instead of tokens; the success hook and observer fire when the login completes.
         var requirement = await secondFactorPolicy.EvaluateAsync(
             new SecondFactorContext(resolution.User.Id, resolution.User.TenantId, SecondFactorMethod.External, provider), cancellationToken).ConfigureAwait(false);
+        if (requirement == SecondFactorRequirement.Denied)
+        {
+            return await FailAsync(provider, ExternalLoginOutcome.Denied, ExternalLoginFlowResult.Denied(), cancellationToken, "second factor denied by policy").ConfigureAwait(false);
+        }
+
         if (requirement != SecondFactorRequirement.NotRequired)
         {
             var stage = requirement switch
