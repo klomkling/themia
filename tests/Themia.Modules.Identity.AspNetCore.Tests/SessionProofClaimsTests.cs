@@ -172,8 +172,15 @@ internal sealed class InMemorySessionProofStore : ISessionProofStore
     /// <summary>What <see cref="SaveAsync"/> reports; false stores nothing, as for a session that is not live.</summary>
     public bool SaveResult { get; set; } = true;
 
-    public Task<SessionProofSnapshot?> GetAsync(Guid userId, Guid sessionId, CancellationToken cancellationToken = default) =>
-        Task.FromResult(Rows.GetValueOrDefault((userId, sessionId)));
+    public int Reads { get; private set; }
+
+    public Exception? Throw { get; set; }
+
+    public Task<SessionProofSnapshot?> GetAsync(Guid userId, Guid sessionId, CancellationToken cancellationToken = default)
+    {
+        Reads++;
+        return Throw is null ? Task.FromResult(Rows.GetValueOrDefault((userId, sessionId))) : Task.FromException<SessionProofSnapshot?>(Throw);
+    }
 
     public Task<bool> SaveAsync(Guid userId, Guid sessionId, SessionProofSnapshot proof, CancellationToken cancellationToken = default)
     {

@@ -20,6 +20,7 @@ public static class ReservedClaimTypes
         "sid",
         "amr",        // the second-factor proof is read from the server session and put on the token by Themia only
         "auth_time",
+        "sf_restr",   // the restricted-session marker the gate reads; only Themia sets it, from the server session row
         "tenant_id",   // the claims tenant-resolution strategy reads this by default (MultiTenancyOptions.ClaimType)
         ClaimTypes.NameIdentifier,
         ClaimTypes.Name,
