@@ -73,7 +73,7 @@ jobs:
         uses: reviewdog/action-setup@v1
         with:
           # Pinned: "latest" makes the action look the tag up through the GitHub API and fails the job on a 504.
-          reviewdog_version: v0.21.2
+          reviewdog_version: v0.0.0-temp-bad
 
       - name: Record reviewdog status
         id: rd_status
