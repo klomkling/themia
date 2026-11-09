@@ -28,6 +28,7 @@ public sealed class SecondFactorAdminServiceTests
     [Fact]
     public async Task ResetAsync_ShouldResetAndAudit_WhenEveryCheckPasses()
     {
+        observers.Add(new FakeObserver(null));
         var outcome = await Service().ResetAsync(Actor, Fresh, "target", "lost phone");
 
         Assert.Equal(MfaAdminResetOutcome.Succeeded, outcome);
@@ -156,9 +157,49 @@ public sealed class SecondFactorAdminServiceTests
     [Fact]
     public void Validate_ShouldSucceed_WhenAnActOnPolicyIsRegistered()
     {
-        var services = new ServiceCollection().AddSingleton<IMfaActOnPolicy>(actOn);
+        var services = new ServiceCollection().AddSingleton<IMfaActOnPolicy>(actOn).AddSingleton<ISecondFactorResetObserver>(new FakeObserver(null));
 
         Assert.True(new AdminPolicyValidator(services).Validate(null, new SecondFactorOptions()).Succeeded);
+    }
+
+    [Fact]
+    public void Validate_ShouldFail_WhenNoObserverIsRegistered()
+    {
+        var services = new ServiceCollection().AddSingleton<IMfaActOnPolicy>(actOn);
+
+        Assert.True(new AdminPolicyValidator(services).Validate(null, new SecondFactorOptions()).Failed);
+    }
+
+    [Fact]
+    public async Task ResetAsync_ShouldReportSessionsNotRevoked_WhenNoObserverRan()
+    {
+        Assert.Equal(MfaAdminResetOutcome.SessionsNotRevoked, await Service().ResetAsync(Actor, Fresh, "target", "lost phone"));
+        Assert.Single(store.Calls);
+    }
+
+    [Fact]
+    public async Task ResetAsync_ShouldStillRevoke_WhenTheCallerCancelsAfterTheReset()
+    {
+        using var cts = new CancellationTokenSource();
+        store.AfterReset = cts.Cancel;
+        var observer = new FakeObserver(null);
+        observers.Add(observer);
+
+        var outcome = await Service().ResetAsync(Actor, Fresh, "target", "lost phone", cts.Token);
+
+        Assert.Equal(MfaAdminResetOutcome.Succeeded, outcome);
+        Assert.Equal(1, observer.Calls);
+    }
+
+    [Fact]
+    public async Task ResetAsync_ShouldTreatAnObserverCancellationAsNotRevoked_AndRunTheRest()
+    {
+        observers.Add(new FakeObserver(new OperationCanceledException()));
+        var later = new FakeObserver(null);
+        observers.Add(later);
+
+        Assert.Equal(MfaAdminResetOutcome.SessionsNotRevoked, await Service().ResetAsync(Actor, Fresh, "target", "lost phone"));
+        Assert.Equal(1, later.Calls);
     }
 
     private sealed class FakeResetStore : IMfaResetStore
@@ -166,6 +207,8 @@ public sealed class SecondFactorAdminServiceTests
         public List<(string? Tenant, string User, string Actor, string Action, string Reason)> Calls { get; } = [];
 
         public Exception? Throw { get; set; }
+
+        public Action? AfterReset { get; set; }
 
         public Task<int> ResetAsync(string? tenantId, string userId, string actor, string action, string reason, DateTimeOffset now, CancellationToken cancellationToken = default)
         {
@@ -175,6 +218,7 @@ public sealed class SecondFactorAdminServiceTests
             }
 
             Calls.Add((tenantId, userId, actor, action, reason));
+            AfterReset?.Invoke();
             return Task.FromResult(1);
         }
     }

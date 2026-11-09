@@ -13,6 +13,7 @@ internal sealed class SecondFactorAdminService(
 {
     internal const string ResetAction = "admin.reset";
     internal const int MaxReasonLength = 500;
+    private static readonly TimeSpan RevocationTimeout = TimeSpan.FromSeconds(30);
 
     public async Task<MfaAdminResetOutcome> ResetAsync(
         MfaSubject actor, MfaProof? actorProof, string targetUserId, string reason, CancellationToken cancellationToken = default)
@@ -41,7 +42,7 @@ internal sealed class SecondFactorAdminService(
         }
 
         await resets.ResetAsync(actor.TenantId, targetUserId, actor.UserId, ResetAction, reason, now, cancellationToken).ConfigureAwait(false);
-        return await RevokeSessionsAsync(actor.TenantId, targetUserId, cancellationToken).ConfigureAwait(false);
+        return await RevokeSessionsAsync(actor.TenantId, targetUserId).ConfigureAwait(false);
     }
 
     // A policy that throws is a refusal: an admin reset must never be allowed because a check could not run.
@@ -58,22 +59,27 @@ internal sealed class SecondFactorAdminService(
         }
     }
 
-    private async Task<MfaAdminResetOutcome> RevokeSessionsAsync(string? tenantId, string targetUserId, CancellationToken cancellationToken)
+    // The reset is already committed, so revocation must not be cut short by the caller going away: it runs on its own bounded token,
+    // and every observer runs even if an earlier one failed. No observer at all counts as not revoked (fail closed).
+    private async Task<MfaAdminResetOutcome> RevokeSessionsAsync(string? tenantId, string targetUserId)
     {
+        using var timeout = new CancellationTokenSource(RevocationTimeout);
+        var ran = 0;
         var allRevoked = true;
         foreach (var observer in observers)
         {
+            ran++;
             try
             {
-                await observer.OnResetAsync(tenantId, targetUserId, cancellationToken).ConfigureAwait(false);
+                await observer.OnResetAsync(tenantId, targetUserId, timeout.Token).ConfigureAwait(false);
             }
-            catch (Exception ex) when (ex is not OperationCanceledException)
+            catch (Exception ex)
             {
                 allRevoked = false;
                 logger.LogError(ex, "A second-factor reset was applied but a session observer failed; the target's sessions may still be live. Repeat the reset.");
             }
         }
 
-        return allRevoked ? MfaAdminResetOutcome.Succeeded : MfaAdminResetOutcome.SessionsNotRevoked;
+        return ran > 0 && allRevoked ? MfaAdminResetOutcome.Succeeded : MfaAdminResetOutcome.SessionsNotRevoked;
     }
 }
