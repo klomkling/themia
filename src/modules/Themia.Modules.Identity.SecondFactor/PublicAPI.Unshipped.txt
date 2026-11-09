@@ -23,3 +23,4 @@ Themia.Modules.Identity.SecondFactor.SecondFactorBridgeResult.Succeeded.get -> b
 Themia.Modules.Identity.SecondFactor.SecondFactorBridgeResult.Verification.get -> Themia.SecondFactor.SecondFactorResult?
 Themia.Modules.Identity.SecondFactor.SecondFactorBridgeResult.Verification.init -> void
 Themia.Modules.Identity.SecondFactor.ISecondFactorSubjectResolver.GetSecurityStampAsync(System.Guid userId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<string?>!
+static Themia.Modules.Identity.SecondFactor.DependencyInjection.IdentitySecondFactorServiceCollectionExtensions.AddThemiaIdentitySecondFactorAdmin(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
