@@ -27,6 +27,17 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.58.0] - 2026-11-09
+
+### Added
+
+- **New package `Themia.Modules.Identity.SecondFactor`: bridges Identity to the multi-method `Themia.SecondFactor` layer, with the proof kept per session (coord #0203 PR B2). Do not turn it on in any app until the framework gate (PR C) ships.** The bridge (`ISecondFactorBridge`, `AddThemiaIdentitySecondFactor()`) verifies or enrols a factor against a pending second-factor ticket and completes the ticket with a proof stored on the session (`identity.session_second_factor`, keyed by the session id `sid`; migration `SessionSecondFactorMigration`, EF and Dapper both). The proof is carried through mint, rotation and renew and reaches the access token as `amr` and `auth_time` (now reserved claim types). A session with no row reads as no second factor (fail closed): sessions open at upgrade must sign in again before acting on second-factor-protected operations. A recovery code opens a `RecoveryOnly` session and a mandatory upgrade or spare opens an `UpgradeDue` one; both can enrol a strong method while fresh and nothing else, and a recovery-code proof is always stored Weak so it never passes the fresh-strong gate. **Nothing in the framework refuses a restricted session on other endpoints yet:** that gate (an authorization policy or filter refusing `RecoveryOnly` and `UpgradeDue` everywhere except enrol) is PR C, and until it ships no app may turn the bridge on, or a restricted session would reach every endpoint an ordinary session can. Also new: `MfaSecondFactorPolicy`, `ISessionProofReader`, `ISessionSecondFactorEnrolment`, `ISessionProofStore`, `ISecondFactorProofCompletion`, `ISecondFactorTicketService.PeekAsync` (an existing implementer of the interface must add it) and `MfaProof.RecoveryCodeOnly` as a required parameter. `IAuthTokenIssuer` refuses a `SessionRequest` that carries a `Proof` (`ArgumentException`): only the second-factor completion sets one. `AddThemiaSecondFactor` now fails options validation when another `ITotpReplayStore` or `IWebAuthnChallengeStore` is registered in place of the second-factor layer's. `IdentityAnonymiser` gained a repository constructor parameter. `Themia.Framework.Core` now lets `Themia.Modules.Identity.SecondFactor` use the internal `TenantContextAccessor.BeginScope` (same version required, as for the other Identity packages).
+- **`Themia.Payments`: `PaymentEvent.PaidMethod` and `PaymentEvent.SourceId`, filled for Beam charge webhooks** (coord #0201). `BeamMapping.ToPaidMethod` maps the Beam payment method conservatively; a method string it does not recognise leaves `PaidMethod` null.
+
+### Changed
+
+- **CI: the build gate keeps running when reviewdog cannot be installed**, and reviewdog is pinned to v0.21.2 instead of latest.
+
 ## [0.57.2] - 2026-11-08
 
 ### Added
