@@ -254,6 +254,50 @@ public sealed class ResetStoreTests(PostgresFixture fixture)
         Assert.Equal("42501", error.SqlState);
     }
 
+    // The grants the runbook tells a DBA to give the operator role. Keep this list and the runbook in step.
+    private const string RunbookGrants = """
+        GRANT USAGE ON SCHEMA public TO {0};
+        GRANT EXECUTE ON FUNCTION second_factor_break_glass_reset(text, text, text) TO {0};
+        GRANT EXECUTE ON FUNCTION second_factor_reset_user(text, text, text, text, text, timestamptz) TO {0};
+        GRANT SELECT, DELETE ON second_factor_methods, second_factor_recovery_codes, second_factor_webauthn_ceremonies, second_factor_user_state TO {0};
+        GRANT INSERT ON second_factor_audit TO {0};
+        """;
+
+    [Fact]
+    public async Task BreakGlass_ShouldReset_ForARoleGrantedExactlyAsTheRunbookSays()
+    {
+        var user = NewUser();
+        await SeedAsync(null, user);
+        var role = "sf_ops_" + Guid.NewGuid().ToString("N")[..8];
+        await fixture.ExecuteAsync($"CREATE ROLE {role}; " + string.Format(RunbookGrants, role));
+        await using var connection = new NpgsqlConnection(fixture.ConnectionString);
+        await connection.OpenAsync();
+        await connection.ExecuteAsync($"SET ROLE {role}");
+
+        var removed = await connection.ExecuteScalarAsync<int>(
+            "SELECT second_factor_break_glass_reset(NULL, @user, 'ticket 1')", new { user });
+
+        Assert.Equal(2, removed);
+        Assert.Equal(1, await AuditAsync(user, "break_glass.reset"));
+    }
+
+    [Fact]
+    public async Task BreakGlass_ShouldBeRefused_ForARoleGrantedOnlyTheBreakGlassFunction()
+    {
+        var role = "sf_half_" + Guid.NewGuid().ToString("N")[..8];
+        await fixture.ExecuteAsync(
+            $"CREATE ROLE {role}; GRANT USAGE ON SCHEMA public TO {role}; " +
+            $"GRANT EXECUTE ON FUNCTION second_factor_break_glass_reset(text, text, text) TO {role};");
+        await using var connection = new NpgsqlConnection(fixture.ConnectionString);
+        await connection.OpenAsync();
+        await connection.ExecuteAsync($"SET ROLE {role}");
+
+        var error = await Assert.ThrowsAsync<PostgresException>(() =>
+            connection.ExecuteScalarAsync<int>("SELECT second_factor_break_glass_reset(NULL, 'u', 'ticket 1')"));
+
+        Assert.Equal("42501", error.SqlState);
+    }
+
     private async Task<LockHolder> HoldAsync(string key)
     {
         var connection = new NpgsqlConnection(fixture.ConnectionString);
