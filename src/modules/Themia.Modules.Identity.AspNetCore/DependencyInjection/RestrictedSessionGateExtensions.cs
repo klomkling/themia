@@ -21,12 +21,14 @@ public static class RestrictedSessionGateExtensions
     {
         ArgumentNullException.ThrowIfNull(services);
 
-        var previous = services.LastOrDefault(descriptor => descriptor.ServiceType == typeof(IAuthorizationMiddlewareResultHandler));
-        if (previous?.ImplementationType == typeof(RestrictedSessionGate))
+        // The gate is registered as a factory, so the descriptor cannot be recognised by type: a marker makes a second call a no-op.
+        if (services.Any(descriptor => descriptor.ServiceType == typeof(RestrictedSessionGateMarker)))
         {
             return services;
         }
 
+        services.AddSingleton<RestrictedSessionGateMarker>();
+        var previous = services.LastOrDefault(descriptor => descriptor.ServiceType == typeof(IAuthorizationMiddlewareResultHandler));
         services.Add(ServiceDescriptor.Singleton<IAuthorizationMiddlewareResultHandler>(provider =>
             new RestrictedSessionGate(Inner(provider, previous), provider.GetRequiredService<ILogger<RestrictedSessionGate>>())));
         return services;
@@ -51,4 +53,6 @@ public static class RestrictedSessionGateExtensions
 
         return (IAuthorizationMiddlewareResultHandler)ActivatorUtilities.CreateInstance(provider, previous.ImplementationType!);
     }
+
+    private sealed class RestrictedSessionGateMarker;
 }

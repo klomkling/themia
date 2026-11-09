@@ -149,6 +149,17 @@ public sealed class RestrictedSessionGateTests
     }
 
     [Fact]
+    public async Task Request_ShouldReadTheStoreOnce_WhenTheGateIsRegisteredTwice()
+    {
+        proofs.Rows[(UserId, SessionId)] = Row(SessionRestriction.None);
+
+        using var response = await Send("/plain", "RecoveryOnly", callTwice: true);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(1, proofs.Reads);
+    }
+
+    [Fact]
     public async Task Request_ShouldNotBeGated_OnAnEndpointWithoutAuthorization()
     {
         using var response = await Send("/open", "RecoveryOnly");
@@ -157,7 +168,7 @@ public sealed class RestrictedSessionGateTests
     }
 
     private async Task<HttpResponseMessage> Send(
-        string path, string? restriction, string? flaw = null, bool withFallback = false, string role = "admin", bool customHandler = false)
+        string path, string? restriction, string? flaw = null, bool withFallback = false, string role = "admin", bool customHandler = false, bool callTwice = false)
     {
         var builder = WebApplication.CreateBuilder();
         builder.WebHost.UseTestServer();
@@ -179,6 +190,10 @@ public sealed class RestrictedSessionGateTests
         }
 
         builder.Services.AddThemiaRestrictedSessionGate();
+        if (callTwice)
+        {
+            builder.Services.AddThemiaRestrictedSessionGate();
+        }
 
         await using var app = builder.Build();
         app.UseAuthentication();
