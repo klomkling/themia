@@ -5,3 +5,7 @@ static Themia.SecondFactor.PostgreSql.ServiceCollectionExtensions.AddThemiaSecon
 Themia.SecondFactor.PostgreSql.Migrations.SecondFactorSchemaMigration
 Themia.SecondFactor.PostgreSql.Migrations.SecondFactorSchemaMigration.SecondFactorSchemaMigration() -> void
 Themia.SecondFactor.PostgreSql.ServiceCollectionExtensions
+override Themia.SecondFactor.PostgreSql.Migrations.SecondFactorResetMigration.Down() -> void
+override Themia.SecondFactor.PostgreSql.Migrations.SecondFactorResetMigration.Up() -> void
+Themia.SecondFactor.PostgreSql.Migrations.SecondFactorResetMigration
+Themia.SecondFactor.PostgreSql.Migrations.SecondFactorResetMigration.SecondFactorResetMigration() -> void

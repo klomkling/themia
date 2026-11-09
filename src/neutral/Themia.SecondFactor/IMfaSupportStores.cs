@@ -90,3 +90,23 @@ public interface IMfaAuditLog
     /// <summary>Appends one entry.</summary>
     Task AppendAsync(MfaAuditEntry entry, DateTimeOffset now, CancellationToken cancellationToken = default);
 }
+
+/// <summary>Wipes every second-factor credential and pending enrolment of one user, and audits it, atomically.</summary>
+public interface IMfaResetStore
+{
+    /// <summary>
+    /// In one transaction, under the same per-user locks the method and recovery-code stores take: deletes the user's methods, unused
+    /// recovery codes, WebAuthn and pending-TOTP ceremonies and failure counters, and appends one audit row. The audit row is part of
+    /// the transaction, so a reset that cannot be audited is not applied.
+    /// </summary>
+    /// <param name="tenantId">The target's tenant, or <see langword="null"/> for a platform user.</param>
+    /// <param name="userId">The target user.</param>
+    /// <param name="actor">The acting user id.</param>
+    /// <param name="action">The audit action name.</param>
+    /// <param name="reason">A free-text reason. Required, and never logged: do not put personal data in it.</param>
+    /// <param name="now">The audit timestamp.</param>
+    /// <param name="cancellationToken">Cancellation.</param>
+    /// <returns>How many methods were removed.</returns>
+    /// <exception cref="ArgumentException"><paramref name="reason"/>, <paramref name="userId"/> or <paramref name="actor"/> is blank.</exception>
+    Task<int> ResetAsync(string? tenantId, string userId, string actor, string action, string reason, DateTimeOffset now, CancellationToken cancellationToken = default);
+}
