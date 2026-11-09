@@ -42,6 +42,44 @@ public class BeamWebhookVerifierTests
     }
 
     [Fact]
+    public void The_published_vector_carries_the_paid_method_and_source_id()
+    {
+        var result = Verifier().Verify(Vector(), Headers(Signature));
+
+        Assert.Equal(PaymentMethod.Card, result.Event!.PaidMethod);
+        Assert.Equal("57Iot6c11o", result.Event.SourceId);
+    }
+
+    [Theory]
+    [InlineData("QR_PROMPT_PAY", PaymentMethod.QrPromptPay)]
+    [InlineData("CARD_INSTALLMENTS", PaymentMethod.Card)]
+    [InlineData("ALIPAY", PaymentMethod.Wallet)]
+    public void A_failed_charge_event_maps_the_method_too(string methodType, PaymentMethod expected)
+    {
+        var (body, signature) = Sign(
+            $$"""{"chargeId":"c","referenceId":"r","status":"FAILED","currency":"THB","amount":100,"sourceId":"plink_x","paymentMethod":{"paymentMethodType":"{{methodType}}"},"transactionTime":"2025-07-23T10:16:12Z"}""");
+
+        var result = Verifier().Verify(body, Headers(signature, "charge.failed"));
+
+        Assert.Equal(WebhookOutcome.Verified, result.Outcome);
+        Assert.Equal(expected, result.Event!.PaidMethod);
+        Assert.Equal("plink_x", result.Event.SourceId);
+    }
+
+    [Fact]
+    public void An_unmapped_method_and_a_missing_source_leave_both_null()
+    {
+        var (body, signature) = Sign(
+            """{"chargeId":"c","referenceId":"r","status":"SUCCEEDED","currency":"THB","amount":100,"paymentMethod":{"paymentMethodType":"SOMETHING_NEW"},"transactionTime":"2025-07-23T10:16:12Z"}""");
+
+        var result = Verifier().Verify(body, Headers(signature));
+
+        Assert.Equal(WebhookOutcome.Verified, result.Outcome);
+        Assert.Null(result.Event!.PaidMethod);
+        Assert.Null(result.Event.SourceId);
+    }
+
+    [Fact]
     public void One_changed_byte_in_the_body_fails()
     {
         var tampered = Vector();
