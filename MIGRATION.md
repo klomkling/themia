@@ -12,6 +12,8 @@ with the *why* and concrete upgrade steps.
 
 ## Unreleased
 
+## 0.60.0
+
 ### `IClaimService.ReplaceRoleClaimsAsync` (breaking for implementers)
 
 **What changed:** `IClaimService` gained `Task ReplaceRoleClaimsAsync(Guid roleId, IReadOnlyCollection<string> claimTypes, IReadOnlyCollection<(string Type, string Value)> desired, CancellationToken cancellationToken = default)`.
