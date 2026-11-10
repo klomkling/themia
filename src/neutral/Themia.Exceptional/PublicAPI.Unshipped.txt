@@ -156,3 +156,5 @@ Themia.Exceptional.Serilog.HttpContextEnricher.Enrich(Serilog.Events.LogEvent! l
 Themia.Exceptional.Serilog.HttpContextEnricher.HttpContextEnricher(Microsoft.AspNetCore.Http.IHttpContextAccessor! accessor, Themia.Exceptional.ExceptionalOptions! options) -> void
 Themia.Exceptional.ServiceCollectionExtensions
 Themia.Exceptional.StringTruncateExtensions
+Themia.Exceptional.ExceptionalOptions.MaskCredentialValues.get -> bool
+Themia.Exceptional.ExceptionalOptions.MaskCredentialValues.set -> void

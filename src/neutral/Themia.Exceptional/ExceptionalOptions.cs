@@ -1,3 +1,4 @@
+using Themia.Exceptional.Masking;
 using System.Text.RegularExpressions;
 
 namespace Themia.Exceptional;
@@ -42,16 +43,24 @@ public sealed class ExceptionalOptions
     /// </summary>
     public RequestContextRedactor? Redactor { get; set; } = DefaultRedactor;
 
+    /// <summary>
+    /// Mask credential-shaped values (JWT, Bearer/Basic, <c>key=secret</c>) in the stored message, detail, URL
+    /// and request body. On by default; turning it off stores them verbatim. It does not affect
+    /// <see cref="DefaultRedactor"/>'s value masking, and a custom <see cref="Redactor"/> replaces that masking entirely.
+    /// </summary>
+    public bool MaskCredentialValues { get; set; } = true;
+
     private static readonly Regex SecretKey = new(
-        "authorization|^cookie$|^set-cookie$|password|secret|token|api[-_]?key|session|\\.aspnetcore",
+        "authorization|^cookie$|^set-cookie$|password|passwd|^pwd$|secret|token|api[-_]?key|access[-_]?key|credential|session|\\.aspnetcore",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     /// <summary>Default redactor: masks values whose key names a categorical secret
     /// (Authorization/Cookie/Set-Cookie, contains password/secret/token/api[-_]?key/session, or is an
     /// ASP.NET Core auth/session cookie such as <c>.AspNetCore.Cookies</c>) to <c>"***"</c>; returns all
-    /// other values unchanged.</summary>
+    /// other values with credential-shaped content (JWT, Bearer/Basic, <c>key=secret</c>, Authorization) masked
+    /// in place.</summary>
     public static string? DefaultRedactor(string key, string value)
-        => SecretKey.IsMatch(key) ? "***" : value;
+        => SecretKey.IsMatch(key) ? "***" : CredentialShapeMasker.Mask(value)!;
 
     /// <summary>Validates the options. Throws <see cref="InvalidOperationException"/> on invalid configuration.</summary>
     public void Validate()

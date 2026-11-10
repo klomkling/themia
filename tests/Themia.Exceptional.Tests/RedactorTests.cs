@@ -37,4 +37,46 @@ public sealed class RedactorTests
         Assert.NotNull(o.Redactor);
         Assert.Equal("***", o.Redactor!("Authorization", "Bearer x"));
     }
+
+    private const string Jwt = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhZG1pbiJ9.c2lnbmF0dXJl";
+
+    [Theory]
+    [InlineData("jwt")]
+    [InlineData("sid")]
+    [InlineData("X-Forwarded-Auth")]
+    [InlineData("next")]
+    [InlineData("anything")]
+    public void DefaultRedactor_MasksAJwtUnderAnyKey(string key)
+        => Assert.Equal("***", ExceptionalOptions.DefaultRedactor(key, Jwt));
+
+    [Fact]
+    public void DefaultRedactor_MasksAJwtInsideLongerText()
+        => Assert.Equal("redirect=/x?t=*** done", ExceptionalOptions.DefaultRedactor("note", $"redirect=/x?t={Jwt} done"));
+
+    [Theory]
+    [InlineData("X-Custom", "Bearer abcdefgh12345", "***")]
+    [InlineData("X-Custom", "Authorization: Digest username=a, nonce=b", "***")]
+    [InlineData("note", "failed with password=hunter2 for user", "failed with *** for user")]
+    public void DefaultRedactor_MasksCredentialShapesUnderUnlistedKeys(string key, string value, string expected)
+        => Assert.Equal(expected, ExceptionalOptions.DefaultRedactor(key, value));
+
+    [Theory]
+    [InlineData("Client-Credential")]
+    [InlineData("aws_credentials")]
+    [InlineData("X-Credential")]
+    [InlineData("db_passwd")]
+    [InlineData("pwd")]
+    [InlineData("access-key")]
+    public void DefaultRedactor_MasksCredentialKeys(string key)
+        => Assert.Equal("***", ExceptionalOptions.DefaultRedactor(key, "abc123def"));
+
+    [Theory]
+    [InlineData("id", "3f2b8c1e-4d5a-4b6c-8d7e-9f0a1b2c3d4e")]
+    [InlineData("order", "202611100042")]
+    [InlineData("hash", "da39a3ee5e6b4b0d3255bfef95601890afd80709")]
+    [InlineData("when", "2026-11-10T09:30:00Z")]
+    [InlineData("name", "Jane Doe")]
+    [InlineData("mail", "jane@example.com")]
+    public void DefaultRedactor_KeepsOrdinaryValuesReadable(string key, string value)
+        => Assert.Equal(value, ExceptionalOptions.DefaultRedactor(key, value));
 }

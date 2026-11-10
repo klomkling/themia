@@ -45,6 +45,10 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 - **`ISessionSecondFactorEnrolment` refuses a session that is not live (F2 of the second-factor reset work).** `ConfirmTotpEnrolAsync` / `CompletePasskeyEnrolAsync` did not check that the `sid` session was still live, so a stale access token (session revoked by an admin or break-glass reset, expired, or not the caller's) could still enrol a new factor. They now ask `IRefreshTokenService.IsSessionLiveAsync` and return `NotAvailable` without calling the service or lifting any restriction; a live session with no proof row (a sign-in that needed no second factor) still enrols with no proof. This must be in place before an app enables `AddThemiaIdentitySecondFactorAdmin`.
 
+### Changed
+
+- **Themia.Exceptional stored data is now masked by credential shape (coord #0208).** Behaviour change of stored data and of `DefaultRedactor` output. A JWT, `Bearer`/`Basic` value, `Authorization` header value or `key=secret` pair (keys matched by suffix: token, secret, password, passwd, pwd, api key, access key, credential) is replaced by `***` in `Message`, every `Detail` field (message, stack trace, inner exceptions, `Data` entries), `Url` and `RequestBody`, and under any key in `DefaultRedactor`. `DefaultRedactor` also masks keys containing `passwd`, `pwd`, `access-key` or `credential`. `ErrorHash` is computed from the masked message, so message-only groups (no stack trace) re-hash once on upgrade. Opt out of the stored-text masking with `ExceptionalOptions.MaskCredentialValues = false`; that flag does not change `DefaultRedactor`, and a custom `Redactor` replaces `DefaultRedactor` entirely. Over-masks by design: `auth:`/`token:` followed by a value masks it (`https://auth:8080` becomes `https://***`) and "Basic validation" becomes "***". Known residual: an opaque random string in free text with no key or JWT shape is not detected, and a host-supplied `RequestContext` log property is stored as given.
+
 ## [0.58.0] - 2026-11-09
 
 ### Added

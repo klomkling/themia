@@ -34,4 +34,38 @@ public sealed class ExceptionalSerilogSinkContextTests
 
         Assert.Equal("{\"headers\":{\"A\":\"1\"}}", store.Last!.RequestContext);
     }
+
+    private const string Jwt = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhZG1pbiJ9.c2lnbmF0dXJl";
+
+    private static ExceptionEntry Log(ExceptionalOptions options, CapturingStore store)
+    {
+        var logger = new LoggerConfiguration()
+            .Enrich.WithProperty("Url", $"/cb?code=1&id_token={Jwt}")
+            .Enrich.WithProperty("RequestBody", $"{{\"note\":\"x\"}} Bearer {Jwt}")
+            .WriteTo.Sink(new ExceptionalSerilogSink(store, options))
+            .CreateLogger();
+        logger.Error(new InvalidOperationException($"bad {Jwt}"), "err");
+        return store.Last!;
+    }
+
+    [Fact]
+    public void Emit_MasksCredentialShapesInMessageUrlAndRequestBody()
+    {
+        var entry = Log(new ExceptionalOptions { ApplicationName = "t" }, new CapturingStore());
+
+        Assert.DoesNotContain("eyJ", entry.Message);
+        Assert.DoesNotContain("eyJ", entry.Url);
+        Assert.DoesNotContain("eyJ", entry.RequestBody);
+        Assert.DoesNotContain("eyJ", entry.Detail);
+    }
+
+    [Fact]
+    public void Emit_WithMaskingOff_StoresVerbatim()
+    {
+        var entry = Log(new ExceptionalOptions { ApplicationName = "t", MaskCredentialValues = false }, new CapturingStore());
+
+        Assert.Contains(Jwt, entry.Message);
+        Assert.Contains(Jwt, entry.Url);
+        Assert.Contains(Jwt, entry.RequestBody);
+    }
 }
