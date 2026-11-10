@@ -27,6 +27,10 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+### Added
+
+- **(breaking) `IClaimService.ReplaceRoleClaimsAsync(roleId, claimTypes, desired)` replaces a role's claims of the given types atomically** (coord #0209). One transaction deletes the stored rows of those types that are not desired, inserts the missing ones and collapses duplicate rows of a kept pair; claims of other types are untouched. Every holder's security stamp rotates once, and only when something changed. The first statement updates the role row (`LastModifiedAt`), so two concurrent replaces of one role are serialized and the result is exactly one caller's set, never a union. `claimTypes` must not be empty; an empty `desired` revokes every claim of those types; a reserved type, a null value, or a desired type outside `claimTypes` throws. **Breaking for implementers:** anything that implements `IClaimService` (a test fake) must add the member; see [MIGRATION.md](MIGRATION.md#unreleased). Known limit: `role_claims` has no unique index, so rows added by other paths can still duplicate; a replace collapses them. On SQL Server and MySQL the default collation is case-insensitive, so a replace of `"perm"` also matches and removes rows typed `"Perm"`; PostgreSQL does not.
+
 ## [0.59.0] - 2026-11-10
 
 ### Added

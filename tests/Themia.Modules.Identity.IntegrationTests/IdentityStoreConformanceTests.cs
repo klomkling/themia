@@ -69,6 +69,7 @@ public abstract class IdentityStoreConformanceTests
         public IRepository<RefreshToken, Guid> RefreshRows => Inner.ServiceProvider.GetRequiredService<IRepository<RefreshToken, Guid>>();
         public IRepository<SessionSecondFactor, Guid> SessionProofRows => Inner.ServiceProvider.GetRequiredService<IRepository<SessionSecondFactor, Guid>>();
         public IRepository<OtpLoginChallenge, Guid> OtpRows => Inner.ServiceProvider.GetRequiredService<IRepository<OtpLoginChallenge, Guid>>();
+        public IRepository<RoleClaim, Guid> RoleClaimRows => Inner.ServiceProvider.GetRequiredService<IRepository<RoleClaim, Guid>>();
         public IRepository<UserClaim, Guid> ClaimRows => Inner.ServiceProvider.GetRequiredService<IRepository<UserClaim, Guid>>();
         public IUnitOfWork UnitOfWork => Inner.ServiceProvider.GetRequiredService<IUnitOfWork>();
 
@@ -231,6 +232,125 @@ public abstract class IdentityStoreConformanceTests
             var raw = await tenant.Tokens.GenerateAsync(rootId, TokenPurpose.PasswordReset);
             Assert.Equal(TokenConsumeResult.Success, await tenant.Tokens.ConsumeAsync(rootId, TokenPurpose.PasswordReset, raw));
         }
+    }
+
+    [Fact]
+    public async Task ReplaceRoleClaims_swaps_the_set_rotates_each_holder_once_and_leaves_other_types()
+    {
+        await ResetAsync();
+        await using var s = NewScope(new TenantId("acme"));
+        var holderId = (await s.Users.CreateAsync("rep-holder", "pw")).UserId!.Value;
+        var bystanderId = (await s.Users.CreateAsync("rep-bystander", "pw")).UserId!.Value;
+        var roleId = (await s.Roles.CreateAsync("Replaceable"))!.Value;
+        Assert.True(await s.Roles.AssignRoleAsync(holderId, roleId));
+        await s.Claims.AddRoleClaimAsync(roleId, "perm", "a");
+        await s.Claims.AddRoleClaimAsync(roleId, "other", "keep");
+        var holderBefore = (await s.Users.FindByIdAsync(holderId))!.SecurityStamp;
+        var bystanderBefore = (await s.Users.FindByIdAsync(bystanderId))!.SecurityStamp;
+
+        await s.Claims.ReplaceRoleClaimsAsync(roleId, ["perm", "perm.level"], [("perm", "b"), ("perm.level", "1")]);
+
+        Assert.Equal(
+            [("other", "keep"), ("perm", "b"), ("perm.level", "1")],
+            await RoleClaimPairsAsync(s, roleId));
+        var holderAfter = (await s.Users.FindByIdAsync(holderId))!.SecurityStamp;
+        Assert.NotEqual(holderBefore, holderAfter);
+        Assert.Equal(bystanderBefore, (await s.Users.FindByIdAsync(bystanderId))!.SecurityStamp);
+
+        await s.Claims.ReplaceRoleClaimsAsync(roleId, ["perm", "perm.level"], [("perm", "b"), ("perm.level", "1")]);
+        Assert.Equal(holderAfter, (await s.Users.FindByIdAsync(holderId))!.SecurityStamp);      // equal set: no rotation
+
+        await s.Claims.ReplaceRoleClaimsAsync(roleId, ["perm", "perm.level"], []);
+        Assert.Equal([("other", "keep")], await RoleClaimPairsAsync(s, roleId));
+        Assert.NotEqual(holderAfter, (await s.Users.FindByIdAsync(holderId))!.SecurityStamp);
+    }
+
+    [Fact]
+    public async Task ReplaceRoleClaims_replaces_a_platform_roles_claims_from_a_tenant_scope_and_rotates_its_holders()
+    {
+        await ResetAsync();
+        Guid roleId;
+        await using (var platform = NewScope(null))
+        {
+            roleId = (await platform.Roles.CreateAsync("PlatformEditor"))!.Value;
+        }
+
+        await using var s = NewScope(new TenantId("acme"));
+        var holderId = (await s.Users.CreateAsync("platform-holder", "pw")).UserId!.Value;
+        Assert.True(await s.Roles.AssignRoleAsync(holderId, roleId));
+        await s.Claims.AddRoleClaimAsync(roleId, "perm", "a");
+        var before = (await s.Users.FindByIdAsync(holderId))!.SecurityStamp;
+
+        await s.Claims.ReplaceRoleClaimsAsync(roleId, ["perm"], [("perm", "b")]);
+
+        Assert.Equal([("perm", "b")], await RoleClaimPairsAsync(s, roleId));
+        Assert.NotEqual(before, (await s.Users.FindByIdAsync(holderId))!.SecurityStamp);
+    }
+
+    [Fact]
+    public async Task Concurrent_ReplaceRoleClaims_of_one_role_end_with_exactly_one_callers_set()
+    {
+        await ResetAsync();
+        await using var setup = NewScope(new TenantId("acme"));
+        var roleId = (await setup.Roles.CreateAsync("Raced"))!.Value;
+        await setup.Claims.AddRoleClaimAsync(roleId, "perm", "a");
+
+        // The first replace is parked right after its role-row touch and before its claim writes are saved, still holding the lock.
+        var reachedSave = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        await using var first = NewScope(new TenantId("acme"), configureServices: services => GateSave(services, reachedSave, release));
+        await using var second = NewScope(new TenantId("acme"));
+
+        var firstRun = Task.Run(() => first.Claims.ReplaceRoleClaimsAsync(roleId, ["perm"], [("perm", "b")]));
+        await reachedSave.Task.WaitAsync(TimeSpan.FromSeconds(30));
+        var secondRun = Task.Run(() => second.Claims.ReplaceRoleClaimsAsync(roleId, ["perm"], [("perm", "c")]));
+        await Task.Delay(TimeSpan.FromSeconds(1));      // the second one is blocked on the role row, or (without the touch) has already run
+        release.SetResult();
+        await Task.WhenAll(firstRun, secondRun);
+
+        var final = await RoleClaimPairsAsync(setup, roleId);
+        Assert.True(
+            final.SequenceEqual([("perm", "b")]) || final.SequenceEqual([("perm", "c")]),
+            $"expected exactly one caller's set, got: {string.Join(", ", final)}");
+    }
+
+    private static async Task<List<(string Type, string Value)>> RoleClaimPairsAsync(Scope s, Guid roleId)
+    {
+        var rows = await s.RoleClaimRows.ListAsync(new WhereSpec<RoleClaim>(c => c.RoleId == roleId));
+        return rows.Select(c => (Type: c.ClaimType, Value: c.ClaimValue)).OrderBy(c => c.Type, StringComparer.Ordinal).ThenBy(c => c.Value, StringComparer.Ordinal).ToList();
+    }
+
+    private static void GateSave(IServiceCollection services, TaskCompletionSource reachedSave, TaskCompletionSource release)
+    {
+        var original = services.Last(d => d.ServiceType == typeof(IUnitOfWork));
+        services.Remove(original);
+        services.Add(ServiceDescriptor.Describe(typeof(IUnitOfWork), sp =>
+        {
+            var inner = original.ImplementationFactory is { } factory
+                ? (IUnitOfWork)factory(sp)
+                : (IUnitOfWork)ActivatorUtilities.CreateInstance(sp, original.ImplementationType!);
+            return new GatedSaveUnitOfWork(inner, reachedSave, release);
+        }, original.Lifetime));
+    }
+
+    private sealed class GatedSaveUnitOfWork(IUnitOfWork inner, TaskCompletionSource reachedSave, TaskCompletionSource release) : IUnitOfWork
+    {
+        private int gated;
+
+        public async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+        {
+            if (Interlocked.Exchange(ref gated, 1) == 0)
+            {
+                reachedSave.TrySetResult();
+                await release.Task.ConfigureAwait(false);
+            }
+
+            return await inner.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        public Task<ITransactionScope> BeginTransactionAsync(CancellationToken cancellationToken = default) => inner.BeginTransactionAsync(cancellationToken);
+
+        public Task ExecuteInTransactionAsync(Func<CancellationToken, Task> work, CancellationToken cancellationToken = default) => inner.ExecuteInTransactionAsync(work, cancellationToken);
     }
 
     [Fact]

@@ -37,6 +37,21 @@ public interface IClaimService
     /// <returns><see langword="true"/> when a claim was removed.</returns>
     Task<bool> RemoveRoleClaimAsync(Guid roleId, string claimType, string claimValue, CancellationToken cancellationToken = default);
 
+    /// <summary>Replaces a role's claims of the given types with <paramref name="desired"/> in one transaction: stored rows
+    /// of those types that are not desired are deleted, desired pairs that are missing are inserted, and duplicate rows of a
+    /// kept pair collapse to one. Claims of other types are untouched. Every holder's security stamp rotates once, only when
+    /// something changed. Concurrent replaces of the same role are serialized, so the result is exactly one caller's set.</summary>
+    /// <param name="roleId">The role; it must resolve in the ambient tenant or be a platform role.</param>
+    /// <param name="claimTypes">The claim types this call owns; must not be empty.</param>
+    /// <param name="desired">The complete set of claims of those types the role should end with; may be empty to revoke them all.
+    /// Every <c>Type</c> must be listed in <paramref name="claimTypes"/>.</param>
+    /// <param name="cancellationToken">A cancellation token.</param>
+    Task ReplaceRoleClaimsAsync(
+        Guid roleId,
+        IReadOnlyCollection<string> claimTypes,
+        IReadOnlyCollection<(string Type, string Value)> desired,
+        CancellationToken cancellationToken = default);
+
     /// <summary>Computes the union of a user's direct claims and the claims of every role assigned to the user.</summary>
     /// <param name="userId">The user id.</param>
     /// <param name="cancellationToken">A cancellation token.</param>
