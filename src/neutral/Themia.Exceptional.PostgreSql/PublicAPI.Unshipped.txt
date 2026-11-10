@@ -19,3 +19,14 @@ Themia.Exceptional.PostgreSql.PostgresExceptionalDialect.RollupSql.get -> string
 Themia.Exceptional.PostgreSql.PostgresExceptionalDialect.SoftDeleteSql.get -> string!
 Themia.Exceptional.PostgreSql.ServiceCollectionExtensions
 Themia.Exceptional.PostgreSql.PostgresExceptionalDialect.PurgeBatchSql.get -> string!
+Themia.Exceptional.PostgreSql.PostgresExceptionalDialect.CandidatesSql.get -> string!
+Themia.Exceptional.PostgreSql.PostgresExceptionalDialect.ClaimSql.get -> string!
+Themia.Exceptional.PostgreSql.PostgresExceptionalDialect.ClaimedRowsSql.get -> string!
+Themia.Exceptional.PostgreSql.PostgresExceptionalDialect.CleanupSql.get -> string!
+Themia.Exceptional.PostgreSql.PostgresExceptionalDialect.FailExhaustedSql.get -> string!
+Themia.Exceptional.PostgreSql.PostgresExceptionalDialect.IsDuplicateClaim(System.Exception! exception) -> bool
+Themia.Exceptional.PostgreSql.PostgresExceptionalDialect.MarkFailedSql.get -> string!
+Themia.Exceptional.PostgreSql.PostgresExceptionalDialect.MarkSentSql.get -> string!
+Themia.Exceptional.PostgreSql.PostgresExceptionalDialect.ReclaimSql.get -> string!
+Themia.Exceptional.PostgreSql.PostgresExceptionalDialect.SentBatchesLastHourSql.get -> string!
+Themia.Exceptional.PostgreSql.PostgresExceptionalDialect.StaleBatchSql.get -> string!

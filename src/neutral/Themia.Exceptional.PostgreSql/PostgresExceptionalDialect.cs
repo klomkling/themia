@@ -3,16 +3,52 @@ using System.Data.Common;
 using Dapper;
 using Npgsql;
 using Themia.Exceptional;
+using Themia.Exceptional.Alerts;
 
 namespace Themia.Exceptional.PostgreSql;
 
 /// <summary>PostgreSQL implementation of <see cref="IExceptionalSqlDialect"/> (Npgsql).</summary>
-public sealed class PostgresExceptionalDialect : IExceptionalSqlDialect, Themia.Exceptional.Retention.IExceptionRetentionSqlDialect
+public sealed class PostgresExceptionalDialect : IExceptionalSqlDialect, Themia.Exceptional.Retention.IExceptionRetentionSqlDialect, IExceptionAlertSqlDialect
 {
     private readonly string connectionString;
 
     /// <summary>Creates the dialect over <paramref name="connectionString"/>.</summary>
     public PostgresExceptionalDialect(string connectionString) => this.connectionString = connectionString;
+
+    private static readonly AlertSqlBuilder AlertSql = new(AlertSqlFlavor.PostgreSql);
+
+    /// <inheritdoc />
+    public bool IsDuplicateClaim(Exception exception) => exception is PostgresException { SqlState: "23505" };
+
+    /// <inheritdoc />
+    public string CandidatesSql => AlertSql.Candidates;
+
+    /// <inheritdoc />
+    public string ClaimSql => AlertSql.Claim;
+
+    /// <inheritdoc />
+    public string ClaimedRowsSql => AlertSql.ClaimedRows;
+
+    /// <inheritdoc />
+    public string StaleBatchSql => AlertSql.StaleBatch;
+
+    /// <inheritdoc />
+    public string ReclaimSql => AlertSql.Reclaim;
+
+    /// <inheritdoc />
+    public string FailExhaustedSql => AlertSql.FailExhausted;
+
+    /// <inheritdoc />
+    public string MarkSentSql => AlertSql.MarkSent;
+
+    /// <inheritdoc />
+    public string MarkFailedSql => AlertSql.MarkFailed;
+
+    /// <inheritdoc />
+    public string SentBatchesLastHourSql => AlertSql.SentBatchesLastHour;
+
+    /// <inheritdoc />
+    public string CleanupSql => AlertSql.Cleanup;
 
     /// <inheritdoc />
     public DbConnection CreateConnection() => new NpgsqlConnection(connectionString);

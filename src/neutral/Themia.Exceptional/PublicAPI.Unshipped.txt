@@ -176,3 +176,102 @@ Themia.Exceptional.Retention.IExceptionRetentionSqlDialect
 Themia.Exceptional.Retention.IExceptionRetentionSqlDialect.PurgeBatchSql.get -> string!
 const Themia.Exceptional.Retention.ExceptionRetentionOptions.MaxDays = 36500 -> int
 static readonly Themia.Exceptional.Retention.ExceptionRetentionOptions.MaxSweepInterval -> System.TimeSpan
+Themia.Exceptional.Alerts.AlertDigest
+Themia.Exceptional.Alerts.AlertDigest.AlertDigest(string! text, int includedCount) -> void
+Themia.Exceptional.Alerts.AlertDigest.IncludedCount.get -> int
+Themia.Exceptional.Alerts.AlertDigest.Text.get -> string!
+Themia.Exceptional.Alerts.AlertSendOutcome
+Themia.Exceptional.Alerts.AlertSendOutcome.Permanent = 3 -> Themia.Exceptional.Alerts.AlertSendOutcome
+Themia.Exceptional.Alerts.AlertSendOutcome.Sent = 1 -> Themia.Exceptional.Alerts.AlertSendOutcome
+Themia.Exceptional.Alerts.AlertSendOutcome.Transient = 2 -> Themia.Exceptional.Alerts.AlertSendOutcome
+Themia.Exceptional.Alerts.AlertServiceCollectionExtensions
+Themia.Exceptional.Alerts.ExceptionAlertCandidate
+Themia.Exceptional.Alerts.ExceptionAlertCandidate.ApplicationName.get -> string!
+Themia.Exceptional.Alerts.ExceptionAlertCandidate.ApplicationName.init -> void
+Themia.Exceptional.Alerts.ExceptionAlertCandidate.DuplicateCount.get -> int
+Themia.Exceptional.Alerts.ExceptionAlertCandidate.DuplicateCount.init -> void
+Themia.Exceptional.Alerts.ExceptionAlertCandidate.ErrorHash.get -> string!
+Themia.Exceptional.Alerts.ExceptionAlertCandidate.ErrorHash.init -> void
+Themia.Exceptional.Alerts.ExceptionAlertCandidate.ExceptionAlertCandidate() -> void
+Themia.Exceptional.Alerts.ExceptionAlertCandidate.ExceptionId.get -> long
+Themia.Exceptional.Alerts.ExceptionAlertCandidate.ExceptionId.init -> void
+Themia.Exceptional.Alerts.ExceptionAlertCandidate.FirstSeenUtc.get -> System.DateTime
+Themia.Exceptional.Alerts.ExceptionAlertCandidate.FirstSeenUtc.init -> void
+Themia.Exceptional.Alerts.ExceptionAlertCandidate.Guid.get -> System.Guid
+Themia.Exceptional.Alerts.ExceptionAlertCandidate.Guid.init -> void
+Themia.Exceptional.Alerts.ExceptionAlertCandidate.LastSeenUtc.get -> System.DateTime
+Themia.Exceptional.Alerts.ExceptionAlertCandidate.LastSeenUtc.init -> void
+Themia.Exceptional.Alerts.ExceptionAlertCandidate.Message.get -> string!
+Themia.Exceptional.Alerts.ExceptionAlertCandidate.Message.init -> void
+Themia.Exceptional.Alerts.ExceptionAlertCandidate.Trigger.get -> Themia.Exceptional.Alerts.ExceptionAlertTrigger
+Themia.Exceptional.Alerts.ExceptionAlertCandidate.Trigger.init -> void
+Themia.Exceptional.Alerts.ExceptionAlertCandidate.Type.get -> string!
+Themia.Exceptional.Alerts.ExceptionAlertCandidate.Type.init -> void
+Themia.Exceptional.Alerts.ExceptionAlertOptions
+Themia.Exceptional.Alerts.ExceptionAlertOptions.AdminUrlTemplate.get -> string!
+Themia.Exceptional.Alerts.ExceptionAlertOptions.AdminUrlTemplate.set -> void
+Themia.Exceptional.Alerts.ExceptionAlertOptions.BotToken.get -> string!
+Themia.Exceptional.Alerts.ExceptionAlertOptions.BotToken.set -> void
+Themia.Exceptional.Alerts.ExceptionAlertOptions.ChatId.get -> string!
+Themia.Exceptional.Alerts.ExceptionAlertOptions.ChatId.set -> void
+Themia.Exceptional.Alerts.ExceptionAlertOptions.CountThreshold.get -> int
+Themia.Exceptional.Alerts.ExceptionAlertOptions.CountThreshold.set -> void
+Themia.Exceptional.Alerts.ExceptionAlertOptions.Enabled.get -> bool
+Themia.Exceptional.Alerts.ExceptionAlertOptions.Enabled.set -> void
+Themia.Exceptional.Alerts.ExceptionAlertOptions.EnvironmentName.get -> string?
+Themia.Exceptional.Alerts.ExceptionAlertOptions.EnvironmentName.set -> void
+Themia.Exceptional.Alerts.ExceptionAlertOptions.ExceptionAlertOptions() -> void
+Themia.Exceptional.Alerts.ExceptionAlertOptions.Interval.get -> System.TimeSpan
+Themia.Exceptional.Alerts.ExceptionAlertOptions.Interval.set -> void
+Themia.Exceptional.Alerts.ExceptionAlertOptions.Lease.get -> System.TimeSpan
+Themia.Exceptional.Alerts.ExceptionAlertOptions.Lease.set -> void
+Themia.Exceptional.Alerts.ExceptionAlertOptions.Lookback.get -> System.TimeSpan
+Themia.Exceptional.Alerts.ExceptionAlertOptions.Lookback.set -> void
+Themia.Exceptional.Alerts.ExceptionAlertOptions.MaxAttempts.get -> int
+Themia.Exceptional.Alerts.ExceptionAlertOptions.MaxAttempts.set -> void
+Themia.Exceptional.Alerts.ExceptionAlertOptions.MaxGroupsPerMessage.get -> int
+Themia.Exceptional.Alerts.ExceptionAlertOptions.MaxGroupsPerMessage.set -> void
+Themia.Exceptional.Alerts.ExceptionAlertOptions.MaxMessagesPerHour.get -> int
+Themia.Exceptional.Alerts.ExceptionAlertOptions.MaxMessagesPerHour.set -> void
+Themia.Exceptional.Alerts.ExceptionAlertOptions.MaxRetryAfter.get -> System.TimeSpan
+Themia.Exceptional.Alerts.ExceptionAlertOptions.MaxRetryAfter.set -> void
+Themia.Exceptional.Alerts.ExceptionAlertOptions.MaxSendRetries.get -> int
+Themia.Exceptional.Alerts.ExceptionAlertOptions.MaxSendRetries.set -> void
+Themia.Exceptional.Alerts.ExceptionAlertOptions.QuietPeriod.get -> System.TimeSpan
+Themia.Exceptional.Alerts.ExceptionAlertOptions.QuietPeriod.set -> void
+Themia.Exceptional.Alerts.ExceptionAlertOptions.RetryBaseDelay.get -> System.TimeSpan
+Themia.Exceptional.Alerts.ExceptionAlertOptions.RetryBaseDelay.set -> void
+Themia.Exceptional.Alerts.ExceptionAlertOptions.SendTimeout.get -> System.TimeSpan
+Themia.Exceptional.Alerts.ExceptionAlertOptions.SendTimeout.set -> void
+Themia.Exceptional.Alerts.ExceptionAlertOptions.TopicId.get -> int?
+Themia.Exceptional.Alerts.ExceptionAlertOptions.TopicId.set -> void
+Themia.Exceptional.Alerts.ExceptionAlertOptions.Validate() -> void
+Themia.Exceptional.Alerts.ExceptionAlertService
+Themia.Exceptional.Alerts.ExceptionAlertTrigger
+Themia.Exceptional.Alerts.ExceptionAlertTrigger.New = 1 -> Themia.Exceptional.Alerts.ExceptionAlertTrigger
+Themia.Exceptional.Alerts.ExceptionAlertTrigger.Reappeared = 2 -> Themia.Exceptional.Alerts.ExceptionAlertTrigger
+Themia.Exceptional.Alerts.ExceptionAlertTrigger.Threshold = 3 -> Themia.Exceptional.Alerts.ExceptionAlertTrigger
+Themia.Exceptional.Alerts.IAlertChannel
+Themia.Exceptional.Alerts.IAlertChannel.SendAsync(Themia.Exceptional.Alerts.AlertDigest! digest, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<Themia.Exceptional.Alerts.AlertSendOutcome>!
+Themia.Exceptional.Alerts.IExceptionAlertSqlDialect
+Themia.Exceptional.Alerts.IExceptionAlertSqlDialect.CandidatesSql.get -> string!
+Themia.Exceptional.Alerts.IExceptionAlertSqlDialect.ClaimSql.get -> string!
+Themia.Exceptional.Alerts.IExceptionAlertSqlDialect.ClaimedRowsSql.get -> string!
+Themia.Exceptional.Alerts.IExceptionAlertSqlDialect.CleanupSql.get -> string!
+Themia.Exceptional.Alerts.IExceptionAlertSqlDialect.CreateConnection() -> System.Data.Common.DbConnection!
+Themia.Exceptional.Alerts.IExceptionAlertSqlDialect.FailExhaustedSql.get -> string!
+Themia.Exceptional.Alerts.IExceptionAlertSqlDialect.IsDuplicateClaim(System.Exception! exception) -> bool
+Themia.Exceptional.Alerts.IExceptionAlertSqlDialect.MarkFailedSql.get -> string!
+Themia.Exceptional.Alerts.IExceptionAlertSqlDialect.MarkSentSql.get -> string!
+Themia.Exceptional.Alerts.IExceptionAlertSqlDialect.ReclaimSql.get -> string!
+Themia.Exceptional.Alerts.IExceptionAlertSqlDialect.SentBatchesLastHourSql.get -> string!
+Themia.Exceptional.Alerts.IExceptionAlertSqlDialect.StaleBatchSql.get -> string!
+Themia.Exceptional.Alerts.TelegramAlertChannel
+Themia.Exceptional.Alerts.TelegramAlertChannel.SendAsync(Themia.Exceptional.Alerts.AlertDigest! digest, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<Themia.Exceptional.Alerts.AlertSendOutcome>!
+Themia.Exceptional.Alerts.TelegramAlertChannel.TelegramAlertChannel(System.Net.Http.IHttpClientFactory! httpClientFactory, Themia.Exceptional.Alerts.ExceptionAlertOptions! options, Microsoft.Extensions.Logging.ILogger<Themia.Exceptional.Alerts.TelegramAlertChannel!>! logger) -> void
+Themia.Exceptional.Migrations.AddExceptionAlertState
+Themia.Exceptional.Migrations.AddExceptionAlertState.AddExceptionAlertState() -> void
+const Themia.Exceptional.Alerts.TelegramAlertChannel.HttpClientName = "Themia.Exceptional.Telegram" -> string!
+override Themia.Exceptional.Migrations.AddExceptionAlertState.Down() -> void
+override Themia.Exceptional.Migrations.AddExceptionAlertState.Up() -> void
+static Themia.Exceptional.Alerts.AlertServiceCollectionExtensions.AddThemiaExceptionalAlerts(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Themia.Exceptional.Alerts.ExceptionAlertOptions!>! configure) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!

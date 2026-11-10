@@ -32,6 +32,16 @@ public sealed class MySqlExceptionalFixture : IAsyncLifetime
     /// <inheritdoc />
     public async Task DisposeAsync() => await container.DisposeAsync();
 
+    /// <summary>Sets the server's default session time zone (needs the container's root user, which the test login lacks).</summary>
+    public async Task SetGlobalTimeZoneAsync(string offset)
+    {
+        var result = await container.ExecAsync(
+            ["mysql", "-uroot", "-pmysql", "-e", $"SET GLOBAL time_zone = '{offset}';"]);
+        if (result.ExitCode != 0)
+            throw new InvalidOperationException($"Could not set the time zone: {result.Stderr}");
+        await MySqlConnector.MySqlConnection.ClearAllPoolsAsync();
+    }
+
     /// <summary>Deletes every row from <c>Exceptions</c> so the next test starts from an empty table —
     /// replaces the isolation a fresh-per-test container used to provide.</summary>
     public async Task ResetAsync()

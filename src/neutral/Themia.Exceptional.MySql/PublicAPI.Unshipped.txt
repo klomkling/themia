@@ -19,3 +19,14 @@ Themia.Exceptional.MySql.MySqlExceptionalDialect.RollupSql.get -> string!
 Themia.Exceptional.MySql.MySqlExceptionalDialect.SoftDeleteSql.get -> string!
 Themia.Exceptional.MySql.ServiceCollectionExtensions
 Themia.Exceptional.MySql.MySqlExceptionalDialect.PurgeBatchSql.get -> string!
+Themia.Exceptional.MySql.MySqlExceptionalDialect.CandidatesSql.get -> string!
+Themia.Exceptional.MySql.MySqlExceptionalDialect.ClaimSql.get -> string!
+Themia.Exceptional.MySql.MySqlExceptionalDialect.ClaimedRowsSql.get -> string!
+Themia.Exceptional.MySql.MySqlExceptionalDialect.CleanupSql.get -> string!
+Themia.Exceptional.MySql.MySqlExceptionalDialect.FailExhaustedSql.get -> string!
+Themia.Exceptional.MySql.MySqlExceptionalDialect.IsDuplicateClaim(System.Exception! exception) -> bool
+Themia.Exceptional.MySql.MySqlExceptionalDialect.MarkFailedSql.get -> string!
+Themia.Exceptional.MySql.MySqlExceptionalDialect.MarkSentSql.get -> string!
+Themia.Exceptional.MySql.MySqlExceptionalDialect.ReclaimSql.get -> string!
+Themia.Exceptional.MySql.MySqlExceptionalDialect.SentBatchesLastHourSql.get -> string!
+Themia.Exceptional.MySql.MySqlExceptionalDialect.StaleBatchSql.get -> string!
