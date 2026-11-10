@@ -13,6 +13,8 @@ public class SqlServerExceptionStoreTests(SqlServerExceptionalFixture fixture) :
 
     protected override IExceptionStore Store => Engine;
 
+    protected override IExceptionalSqlDialect Dialect => new SqlServerExceptionalDialect(fixture.ConnectionString);
+
     protected override Task ResetStoreAsync() => fixture.ResetAsync();
 
     // Engine-specific: datetime2 preserves sub-millisecond ticks — unique to SQL Server.

@@ -18,3 +18,4 @@ Themia.Exceptional.SqlServer.SqlServerExceptionalDialect.ProtectSql.get -> strin
 Themia.Exceptional.SqlServer.SqlServerExceptionalDialect.PurgeSql.get -> string!
 Themia.Exceptional.SqlServer.SqlServerExceptionalDialect.RollupSql.get -> string!
 Themia.Exceptional.SqlServer.SqlServerExceptionalDialect.SoftDeleteSql.get -> string!
+Themia.Exceptional.SqlServer.SqlServerExceptionalDialect.PurgeBatchSql.get -> string!

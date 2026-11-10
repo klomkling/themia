@@ -18,3 +18,4 @@ Themia.Exceptional.PostgreSql.PostgresExceptionalDialect.PurgeSql.get -> string!
 Themia.Exceptional.PostgreSql.PostgresExceptionalDialect.RollupSql.get -> string!
 Themia.Exceptional.PostgreSql.PostgresExceptionalDialect.SoftDeleteSql.get -> string!
 Themia.Exceptional.PostgreSql.ServiceCollectionExtensions
+Themia.Exceptional.PostgreSql.PostgresExceptionalDialect.PurgeBatchSql.get -> string!

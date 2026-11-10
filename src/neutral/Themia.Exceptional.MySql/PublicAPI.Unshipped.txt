@@ -18,3 +18,4 @@ Themia.Exceptional.MySql.MySqlExceptionalDialect.PurgeSql.get -> string!
 Themia.Exceptional.MySql.MySqlExceptionalDialect.RollupSql.get -> string!
 Themia.Exceptional.MySql.MySqlExceptionalDialect.SoftDeleteSql.get -> string!
 Themia.Exceptional.MySql.ServiceCollectionExtensions
+Themia.Exceptional.MySql.MySqlExceptionalDialect.PurgeBatchSql.get -> string!

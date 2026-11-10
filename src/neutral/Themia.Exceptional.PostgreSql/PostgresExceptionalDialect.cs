@@ -7,7 +7,7 @@ using Themia.Exceptional;
 namespace Themia.Exceptional.PostgreSql;
 
 /// <summary>PostgreSQL implementation of <see cref="IExceptionalSqlDialect"/> (Npgsql).</summary>
-public sealed class PostgresExceptionalDialect : IExceptionalSqlDialect
+public sealed class PostgresExceptionalDialect : IExceptionalSqlDialect, Themia.Exceptional.Retention.IExceptionRetentionSqlDialect
 {
     private readonly string connectionString;
 
@@ -79,6 +79,9 @@ public sealed class PostgresExceptionalDialect : IExceptionalSqlDialect
 
     /// <inheritdoc />
     public string PurgeSql => """DELETE FROM "Exceptions" WHERE "IsProtected" = FALSE AND "CreationDate" < @OlderThan;""";
+
+    /// <inheritdoc />
+    public string PurgeBatchSql => """DELETE FROM "Exceptions" WHERE "Id" IN (SELECT "Id" FROM "Exceptions" WHERE "IsProtected" = FALSE AND "CreationDate" < @OlderThan ORDER BY "CreationDate" LIMIT @BatchSize);""";
 
     /// <inheritdoc />
     public DynamicParameters BuildInsertParameters(ExceptionEntry entry)

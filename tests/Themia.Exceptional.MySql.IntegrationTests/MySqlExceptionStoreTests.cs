@@ -14,5 +14,7 @@ public class MySqlExceptionStoreTests(MySqlExceptionalFixture fixture) : Excepti
 
     protected override IExceptionStore Store => Engine;
 
+    protected override IExceptionalSqlDialect Dialect => new MySqlExceptionalDialect(fixture.ConnectionString);
+
     protected override Task ResetStoreAsync() => fixture.ResetAsync();
 }
