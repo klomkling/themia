@@ -1,3 +1,4 @@
+using System.Reflection;
 using Fido2NetLib;
 using Themia.Framework.Core.Abstractions.Tenancy;
 using Themia.Modules.Identity.Abstractions;
@@ -112,6 +113,8 @@ internal sealed class FakeService : ISecondFactorService
 
     public int EnrolOtpCalls { get; private set; }
 
+    public int EnrolConfirmCalls { get; private set; }
+
     public Task<MfaRequirement> EvaluateAsync(MfaSubject subject, MfaPrimary primary, CancellationToken cancellationToken = default)
     {
         SeenPrimary = primary;
@@ -133,12 +136,14 @@ internal sealed class FakeService : ISecondFactorService
     public Task<SecondFactorResult> ConfirmTotpEnrolAsync(MfaSubject subject, string enrolmentId, string code, string label, MfaProof? proof, CancellationToken cancellationToken = default)
     {
         SeenProof = proof;
+        EnrolConfirmCalls++;
         return Task.FromResult(Result);
     }
 
     public Task<SecondFactorResult> CompletePasskeyEnrolAsync(MfaSubject subject, AuthenticatorAttestationRawResponse response, string label, MfaProof? proof, CancellationToken cancellationToken = default)
     {
         SeenProof = proof;
+        EnrolConfirmCalls++;
         return Task.FromResult(Result);
     }
 
@@ -161,4 +166,21 @@ internal sealed class FakeService : ISecondFactorService
     public Task<SecondFactorResult> RemoveMethodAsync(MfaSubject subject, MfaPrimary primary, Guid methodId, MfaProof? proof, CancellationToken cancellationToken = default) => throw new NotSupportedException();
 
     public Task<RecoveryCodesResult> GenerateRecoveryCodesAsync(MfaSubject subject, MfaProof? proof, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+}
+
+/// <summary>An <see cref="IRefreshTokenService"/> that only answers <c>IsSessionLiveAsync</c>; any other call fails the test.</summary>
+internal class FakeSessionLiveness : DispatchProxy
+{
+    public bool Live { get; set; } = true;
+
+    public static (IRefreshTokenService Service, FakeSessionLiveness Control) Create()
+    {
+        var service = Create<IRefreshTokenService, FakeSessionLiveness>();
+        return (service, (FakeSessionLiveness)(object)service);
+    }
+
+    protected override object? Invoke(MethodInfo? targetMethod, object?[]? args) =>
+        targetMethod!.Name == nameof(IRefreshTokenService.IsSessionLiveAsync)
+            ? Task.FromResult(Live)
+            : throw new NotSupportedException(targetMethod.Name);
 }

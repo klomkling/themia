@@ -41,6 +41,10 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 - **`Themia.Payments.Beam`: `GetChargeAsync` now sets `Charge.PaidMethod` (coord #0205).** A charge read back by id, by reference or through its payment link carries the method it was paid with once it is `Succeeded` (`CARD`/`CARD_INSTALLMENTS` → `Card`, `QR_PROMPT_PAY` → `QrPromptPay`, `ALIPAY`/`WECHAT_PAY` → `Wallet`), the same mapping the webhook already used. It stays `null` while unpaid, failed, or for a type the adapter does not map. Additive: `Charge.PaidMethod` already existed.
 
+### Fixed
+
+- **`ISessionSecondFactorEnrolment` refuses a session that is not live (F2 of the second-factor reset work).** `ConfirmTotpEnrolAsync` / `CompletePasskeyEnrolAsync` did not check that the `sid` session was still live, so a stale access token (session revoked by an admin or break-glass reset, expired, or not the caller's) could still enrol a new factor. They now ask `IRefreshTokenService.IsSessionLiveAsync` and return `NotAvailable` without calling the service or lifting any restriction; a live session with no proof row (a sign-in that needed no second factor) still enrols with no proof. This must be in place before an app enables `AddThemiaIdentitySecondFactorAdmin`.
+
 ## [0.58.0] - 2026-11-09
 
 ### Added
