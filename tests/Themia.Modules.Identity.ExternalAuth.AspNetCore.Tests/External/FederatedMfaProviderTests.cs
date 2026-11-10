@@ -16,7 +16,7 @@ public sealed class FederatedMfaProviderTests
 
     private static OidcProviderConfig Config(bool trusts) => new()
     {
-        Name = "ezyassets",
+        Name = "partner-idp",
         TokenEndpoint = new Uri("https://idp.test/token"),
         ClientId = ClientId,
         ClientSecret = "secret",
