@@ -344,7 +344,9 @@ internal sealed class OidcExternalAuthProvider : IExternalAuthProvider
     {
         var amr = ReadAmr(token);
         var authTime = ReadAuthTime(token);
-        var assertion = new FederatedAssertion(config.Issuer, amr, authTime);
+        // The issuer the token actually names, checked against the one issuer this provider trusts, so the verifier is a real second check
+        // on top of the handler's ValidIssuer rather than comparing the configuration with itself.
+        var assertion = new FederatedAssertion(token.Issuer ?? string.Empty, amr, authTime);
         var outcome = FederatedMfaVerifier.Satisfies(assertion, [config.Issuer], config.FederatedMfaMaxAge, timeProvider.GetUtcNow());
         if (!outcome.Succeeded() || authTime is not { } verifiedAt)
         {

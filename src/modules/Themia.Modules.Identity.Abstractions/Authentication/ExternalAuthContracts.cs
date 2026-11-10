@@ -21,7 +21,10 @@ public readonly record struct ExternalIdentity(
 {
     /// <summary>The second factor the provider proved, set only by a provider that was configured to trust the identity provider's
     /// multi-factor claims and only after those claims passed verification (trusted issuer, <c>mfa</c> plus a strong method, fresh
-    /// <c>auth_time</c>). Null means the provider proved no second factor, which is the case for every provider by default.</summary>
+    /// <c>auth_time</c>). Null means the provider proved no second factor, which is the case for every provider by default.
+    /// A custom <see cref="IExternalAuthProvider"/> must set it only after verifying those claims itself (for example with
+    /// <c>FederatedMfaVerifier</c> reporting <c>Satisfied</c>): the login flow trusts a non-null value as a strong, fresh proof and skips the
+    /// local second factor.</summary>
     public ExternalSecondFactorProof? VerifiedSecondFactor { get; init; }
 }
 

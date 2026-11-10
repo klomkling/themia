@@ -303,6 +303,8 @@ public sealed class ExternalAuthenticationFlowTests
     {
         public List<(Guid UserId, SessionProofSnapshot Proof)> Saved { get; } = [];
         public int RefreshIssuedWhenSaved { get; private set; } = -1;
+        public bool SaveResult { get; set; } = true;
+        public bool ThrowOnSave { get; set; }
 
         public Task<SessionProofSnapshot?> GetAsync(Guid userId, Guid sessionId, CancellationToken cancellationToken = default) =>
             Task.FromResult<SessionProofSnapshot?>(null);
@@ -310,8 +312,13 @@ public sealed class ExternalAuthenticationFlowTests
         public Task<bool> SaveAsync(Guid userId, Guid sessionId, SessionProofSnapshot proof, CancellationToken cancellationToken = default)
         {
             RefreshIssuedWhenSaved = refresh.IssueCalls;
+            if (ThrowOnSave)
+            {
+                throw new TimeoutException("store down");
+            }
+
             Saved.Add((userId, proof));
-            return Task.FromResult(true);
+            return Task.FromResult(SaveResult);
         }
 
         public Task<bool> LiftRestrictionAsync(Guid userId, Guid sessionId, CancellationToken cancellationToken = default) => Task.FromResult(false);
@@ -358,6 +365,22 @@ public sealed class ExternalAuthenticationFlowTests
         Assert.Equal(1, proofs.RefreshIssuedWhenSaved);
         Assert.Equal(1, refresh.IssueCalls);
         Assert.Contains("succeeded", hooks.Calls);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Federated_login_whose_proof_cannot_be_stored_revokes_the_refresh_token_and_returns_no_tokens(bool storeThrows)
+    {
+        var (flow, refresh, _, proofs, _) = BuildFederated(SecondFactorRequirement.Verify, FederatedIdentity());
+        proofs.SaveResult = false;
+        proofs.ThrowOnSave = storeThrows;
+
+        await Assert.ThrowsAnyAsync<Exception>(() => flow.AuthenticateAsync(Provider, Request()));
+
+        Assert.Equal(1, refresh.IssueCalls);
+        Assert.Equal(1, refresh.RevokeCalls);
+        Assert.False(refresh.LastRevokeAllForUser);
     }
 
     [Fact]
