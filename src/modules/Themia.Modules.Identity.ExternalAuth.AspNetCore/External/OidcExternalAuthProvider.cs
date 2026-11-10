@@ -134,7 +134,7 @@ internal sealed class OidcExternalAuthProvider : IExternalAuthProvider
             return ExternalAuthResult.Failed("nonce_mismatch");
         }
 
-        return MapIdentity(validated);
+        return MapIdentity(validated, !string.IsNullOrEmpty(request.Nonce));
     }
 
     private static bool NonceSatisfied(JsonWebToken token, string? expected)
@@ -316,7 +316,8 @@ internal sealed class OidcExternalAuthProvider : IExternalAuthProvider
         return now - ClockSkew <= exp;
     }
 
-    private ExternalAuthResult MapIdentity(JsonWebToken token)
+    // nonceBound: the client sent a nonce and the token carried the same one (NonceSatisfied already rejected any mismatch).
+    private ExternalAuthResult MapIdentity(JsonWebToken token, bool nonceBound)
     {
         var subject = GetClaim(token, config.SubjectClaim);
         if (string.IsNullOrEmpty(subject))
@@ -335,8 +336,21 @@ internal sealed class OidcExternalAuthProvider : IExternalAuthProvider
             emailVerified,
             string.IsNullOrEmpty(displayName) ? null : displayName)
         {
-            VerifiedSecondFactor = config.TrustsFederatedMfa ? ReadVerifiedSecondFactor(token) : null,
+            VerifiedSecondFactor = config.TrustsFederatedMfa ? ReadBoundSecondFactor(token, nonceBound) : null,
         });
+    }
+
+    // Without a nonce the id_token is not bound to this sign-in attempt, so a replayed or injected one could carry a proof. Drop only
+    // the proof: sign-in still works and the app's own second-factor policy applies.
+    private ExternalSecondFactorProof? ReadBoundSecondFactor(JsonWebToken token, bool nonceBound)
+    {
+        if (nonceBound)
+        {
+            return ReadVerifiedSecondFactor(token);
+        }
+
+        logger.LogWarning("External provider {Provider} trusts federated MFA but the sign-in carried no nonce, so its MFA claims were ignored. Send a fresh random nonce per attempt.", config.Name);
+        return null;
     }
 
     // Fail closed: anything unreadable, unknown or unverified yields null, which leaves the app's second-factor policy in charge.

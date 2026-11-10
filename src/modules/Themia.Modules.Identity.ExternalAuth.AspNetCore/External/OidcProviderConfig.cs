@@ -60,7 +60,9 @@ public sealed class OidcProviderConfig
     /// <summary>When <see langword="true"/>, the id_token <c>amr</c> and <c>auth_time</c> claims of this provider are taken as proof of a
     /// second factor, provided they pass <c>FederatedMfaVerifier</c> (this provider as the only trusted issuer, <c>mfa</c> plus a strong
     /// method, <c>auth_time</c> within <see cref="FederatedMfaMaxAge"/>). Defaults to <see langword="false"/>: turn it on only for an
-    /// identity provider that really runs MFA (another Themia app, for example), never for a social login.</summary>
+    /// identity provider that really runs MFA (another Themia app, for example), never for a social login. The claims count only when the sign-in is nonce-bound: the client must send a fresh random nonce per
+    /// attempt (never a constant) and pass it in <c>ExternalAuthRequest.Nonce</c>; without one the proof is dropped and the app's own second-factor
+    /// policy applies.</summary>
     public bool TrustsFederatedMfa { get; init; }
 
     /// <summary>How old the provider's <c>auth_time</c> may be for its MFA to count. Defaults to 15 minutes.</summary>
