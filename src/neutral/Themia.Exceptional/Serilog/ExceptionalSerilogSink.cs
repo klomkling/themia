@@ -1,3 +1,4 @@
+using Themia.Exceptional.Masking;
 using Microsoft.AspNetCore.Http;
 using Serilog.Core;
 using Serilog.Debugging;
@@ -53,9 +54,10 @@ public sealed class ExceptionalSerilogSink : ILogEventSink
 
         try
         {
-            var entry = ExceptionEntryFactory.FromException(logEvent.Exception, options.ApplicationName);
+            var entry = ExceptionEntryFactory.FromException(logEvent.Exception, options.ApplicationName, null, options.MaskCredentialValues);
             ApplyContext(entry, logEvent);
             ApplyRequest(entry);
+            MaskStoredText(entry);
             store.LogAsync(entry).GetAwaiter().GetResult();
         }
         catch (Exception ex)
@@ -65,6 +67,15 @@ public sealed class ExceptionalSerilogSink : ILogEventSink
             // destabilize the logging pipeline. All failures are isolated to SelfLog.
             SelfLog.WriteLine("ExceptionalSerilogSink failed to store an exception: {0}", ex);
         }
+    }
+
+    // Url, RequestBody and a host-supplied RequestContext bypass the Redactor, so mask their credential shapes here.
+    private void MaskStoredText(ExceptionEntry entry)
+    {
+        if (!options.MaskCredentialValues)
+            return;
+        entry.Url = CredentialShapeMasker.Mask(entry.Url);
+        entry.RequestBody = CredentialShapeMasker.Mask(entry.RequestBody);
     }
 
     private static void ApplyContext(ExceptionEntry entry, LogEvent logEvent)
