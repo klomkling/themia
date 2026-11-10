@@ -27,6 +27,8 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.59.0] - 2026-11-10
+
 ### Added
 
 - **Themia.Exceptional retention sweep (coord #0207).** `ExceptionalOptions.Retention` (`Enabled` default off, `Days` 30, `SweepInterval` 1 day, `BatchSize` 1000 up to 4000, `MaxBatchesPerSweep` 100) registers a hosted service that deletes stored exceptions whose `CreationDate` is older than `Days`, in batches, never touching protected rows. No lease and no schema change: each batch is a plain delete, so several instances only delete rows the other already removed. `Days` must be longer than `RollupPeriod` and is validated on start. Bind it in the options callback: `config.GetSection("Exceptional:Retention").Bind(o.Retention)` (env `Exceptional__Retention__Enabled`, `__Days`, `__SweepInterval`). The sweep logs counts at Information and, on failure, only the exception type name at Warning. The three engine dialects implement the new `IExceptionRetentionSqlDialect` (`PurgeBatchSql`); a custom dialect must implement it too before `Retention.Enabled` is turned on, otherwise start fails with a clear message.
@@ -42,8 +44,6 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 ### Fixed
 
 - **`Themia.Payments.Beam`: `GetChargeAsync` now sets `Charge.PaidMethod` (coord #0205).** A charge read back by id, by reference or through its payment link carries the method it was paid with once it is `Succeeded` (`CARD`/`CARD_INSTALLMENTS` → `Card`, `QR_PROMPT_PAY` → `QrPromptPay`, `ALIPAY`/`WECHAT_PAY` → `Wallet`), the same mapping the webhook already used. It stays `null` while unpaid, failed, or for a type the adapter does not map. Additive: `Charge.PaidMethod` already existed.
-
-### Fixed
 
 - **`ISessionSecondFactorEnrolment` refuses a session that is not live (F2 of the second-factor reset work).** `ConfirmTotpEnrolAsync` / `CompletePasskeyEnrolAsync` did not check that the `sid` session was still live, so a stale access token (session revoked by an admin or break-glass reset, expired, or not the caller's) could still enrol a new factor. They now ask `IRefreshTokenService.IsSessionLiveAsync` and return `NotAvailable` without calling the service or lifting any restriction; a live session with no proof row (a sign-in that needed no second factor) still enrols with no proof. This must be in place before an app enables `AddThemiaIdentitySecondFactorAdmin`.
 
