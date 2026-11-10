@@ -160,7 +160,7 @@ public sealed class BeamWebhookVerifier : IPaymentWebhookVerifier
                 occurredAt,
                 Encoding.UTF8.GetString(rawBody))
             {
-                PaidMethod = IsChargeEvent(type) ? ReadPaidMethod(root) : null,
+                PaidMethod = IsChargeEvent(type) ? BeamMapping.ReadPaidMethod(root) : null,
                 SourceId = IsChargeEvent(type) && BeamMapping.TryGetNonEmptyString(root, "sourceId", out var sourceId) ? sourceId : null,
             };
 
@@ -170,12 +170,6 @@ public sealed class BeamWebhookVerifier : IPaymentWebhookVerifier
 
     private static bool IsChargeEvent(PaymentEventType type) =>
         type is PaymentEventType.ChargeSucceeded or PaymentEventType.ChargeFailed;
-
-    private static PaymentMethod? ReadPaidMethod(JsonElement root) =>
-        root.TryGetProperty("paymentMethod", out var method) &&
-        BeamMapping.TryGetNonEmptyString(method, "paymentMethodType", out var methodType)
-            ? BeamMapping.ToPaidMethod(methodType)
-            : null;
 
     private static bool IsModelled(PaymentEventType type) => type is
         PaymentEventType.ChargeSucceeded or PaymentEventType.ChargeFailed or
