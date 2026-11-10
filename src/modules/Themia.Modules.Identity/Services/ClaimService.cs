@@ -193,6 +193,94 @@ public sealed class ClaimService : IClaimService
         return true;
     }
 
+    /// <inheritdoc />
+    public async Task ReplaceRoleClaimsAsync(
+        Guid roleId,
+        IReadOnlyCollection<string> claimTypes,
+        IReadOnlyCollection<(string Type, string Value)> desired,
+        CancellationToken cancellationToken = default)
+    {
+        var (types, wanted) = ValidateReplacement(claimTypes, desired);
+
+        // The parent must resolve in the ambient tenant or as a platform role; cross-tenant is refused.
+        if (!await IdentityScope.RoleExistsAsync(roles, roleId, cancellationToken).ConfigureAwait(false))
+        {
+            throw new InvalidOperationException($"Role '{roleId}' was not found in the current tenant scope.");
+        }
+
+        var changed = false;
+        await ChangeAsync(
+            async ct =>
+            {
+                // First statement: an UPDATE of the role row holds its row lock until commit, so a concurrent replace of the
+                // same role waits here and then reads the committed claims; without it two replaces could both insert and
+                // leave a union of both sets. A bulk update because a platform role cannot be saved through the tracker here.
+                var touched = DateTimeOffset.UtcNow;
+                await roles.UpdateWhereAsync(
+                    new RoleByIdAnyTenantSpec(roleId), set => set.Set(r => r.LastModifiedAt, touched), ct).ConfigureAwait(false);
+
+                var current = await roleClaims.ListAsync(new RoleClaimsByRoleAndTypesSpec(roleId, types), ct).ConfigureAwait(false);
+                var kept = new HashSet<(string Type, string Value)>();
+                foreach (var row in current)
+                {
+                    if (wanted.Contains((row.ClaimType, row.ClaimValue)) && kept.Add((row.ClaimType, row.ClaimValue)))
+                    {
+                        continue;
+                    }
+
+                    roleClaims.Remove(row);
+                    changed = true;
+                }
+
+                foreach (var (type, value) in wanted.Where(w => !kept.Contains(w)))
+                {
+                    var claim = new RoleClaim { RoleId = roleId, ClaimType = type, ClaimValue = value };
+                    claim.SetId(Guid.CreateVersion7());
+                    await roleClaims.AddAsync(claim, ct).ConfigureAwait(false);
+                    changed = true;
+                }
+
+                await unitOfWork.SaveChangesAsync(ct).ConfigureAwait(false);
+            },
+            ct => changed ? HolderIdsAsync(roleId, ct) : Task.FromResult<IReadOnlyCollection<Guid>>([]),
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    private static (string[] Types, HashSet<(string Type, string Value)> Wanted) ValidateReplacement(
+        IReadOnlyCollection<string> claimTypes, IReadOnlyCollection<(string Type, string Value)> desired)
+    {
+        ArgumentNullException.ThrowIfNull(claimTypes);
+        ArgumentNullException.ThrowIfNull(desired);
+        if (claimTypes.Count == 0)
+        {
+            throw new ArgumentException("At least one claim type to replace is required.", nameof(claimTypes));
+        }
+
+        var types = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var type in claimTypes)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(type);
+            ThrowIfReserved(type);
+            types.Add(type);
+        }
+
+        var wanted = new HashSet<(string Type, string Value)>();
+        foreach (var (type, value) in desired)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(type);
+            ThrowIfReserved(type);
+            ArgumentNullException.ThrowIfNull(value);
+            if (!types.Contains(type))
+            {
+                throw new ArgumentException($"Claim type '{type}' is not among the types being replaced.", nameof(desired));
+            }
+
+            wanted.Add((type, value));
+        }
+
+        return ([.. types], wanted);
+    }
+
     private async Task<IReadOnlyCollection<Guid>> HolderIdsAsync(Guid roleId, CancellationToken cancellationToken) =>
         (await memberships.ListAsync(new UserRolesByRoleSpec(roleId), cancellationToken).ConfigureAwait(false))
             .Select(m => m.UserId)

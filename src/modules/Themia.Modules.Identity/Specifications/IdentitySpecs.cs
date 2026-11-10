@@ -151,6 +151,24 @@ internal sealed class RoleClaimMatchSpec : Specification<RoleClaim>
         Where(c => c.RoleId == roleId && c.ClaimType == claimType && c.ClaimValue == claimValue);
 }
 
+/// <summary>The claims of one role that have any of the given types.</summary>
+internal sealed class RoleClaimsByRoleAndTypesSpec : Specification<RoleClaim>
+{
+    public RoleClaimsByRoleAndTypesSpec(Guid roleId, IReadOnlyCollection<string> claimTypes) =>
+        Where(c => c.RoleId == roleId && claimTypes.Contains(c.ClaimType));
+}
+
+/// <summary>One role in any tenant, for the row-lock write of <c>ReplaceRoleClaimsAsync</c>; the caller has already resolved
+/// the role in its scope.</summary>
+internal sealed class RoleByIdAnyTenantSpec : Specification<Role>
+{
+    public RoleByIdAnyTenantSpec(Guid id)
+    {
+        Where(r => r.Id == id);
+        WithoutTenantFilter();
+    }
+}
+
 /// <summary>All claims belonging to any of the given roles.</summary>
 internal sealed class RoleClaimsByRoleIdsSpec : Specification<RoleClaim>
 {

@@ -10,6 +10,18 @@ with the *why* and concrete upgrade steps.
 - Each entry states: **What changed**, **Why**, and **How to upgrade** (before → after).
 - Non-breaking changes are *not* listed here — see the CHANGELOG.
 
+## Unreleased
+
+### `IClaimService.ReplaceRoleClaimsAsync` (breaking for implementers)
+
+**What changed:** `IClaimService` gained `Task ReplaceRoleClaimsAsync(Guid roleId, IReadOnlyCollection<string> claimTypes, IReadOnlyCollection<(string Type, string Value)> desired, CancellationToken cancellationToken = default)`.
+
+**Why:** an app that keeps several claim types per role could not replace them atomically: `AddRoleClaimAsync` and `RemoveRoleClaimAsync` each run their own transaction, and a nested one is refused by the Dapper unit of work.
+
+**Who is affected:** anything that implements `IClaimService`. `ClaimService` is the only implementation in Themia; a test fake or a decorator fails to compile with CS0535.
+
+**How to upgrade:** add the member. A decorator forwards it to the inner service; a test fake can replace the role's claims of those types in its own list.
+
 ## 0.58.0
 
 ### Second-factor and session APIs (breaking)
