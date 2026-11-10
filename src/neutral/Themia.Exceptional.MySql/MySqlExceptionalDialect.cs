@@ -3,11 +3,12 @@ using System.Data.Common;
 using Dapper;
 using MySqlConnector;
 using Themia.Exceptional;
+using Themia.Exceptional.Alerts;
 
 namespace Themia.Exceptional.MySql;
 
 /// <summary>MySQL implementation of <see cref="IExceptionalSqlDialect"/> (MySqlConnector).</summary>
-public sealed class MySqlExceptionalDialect : IExceptionalSqlDialect, Themia.Exceptional.Retention.IExceptionRetentionSqlDialect
+public sealed class MySqlExceptionalDialect : IExceptionalSqlDialect, Themia.Exceptional.Retention.IExceptionRetentionSqlDialect, IExceptionAlertSqlDialect
 {
     private readonly string connectionString;
 
@@ -28,6 +29,41 @@ public sealed class MySqlExceptionalDialect : IExceptionalSqlDialect, Themia.Exc
         };
         this.connectionString = builder.ConnectionString;
     }
+
+    private static readonly AlertSqlBuilder AlertSql = new(AlertSqlFlavor.MySql);
+
+    /// <inheritdoc />
+    public bool IsDuplicateClaim(Exception exception) => exception is MySqlException { ErrorCode: MySqlErrorCode.DuplicateKeyEntry };
+
+    /// <inheritdoc />
+    public string CandidatesSql => AlertSql.Candidates;
+
+    /// <inheritdoc />
+    public string ClaimSql => AlertSql.Claim;
+
+    /// <inheritdoc />
+    public string ClaimedRowsSql => AlertSql.ClaimedRows;
+
+    /// <inheritdoc />
+    public string StaleBatchSql => AlertSql.StaleBatch;
+
+    /// <inheritdoc />
+    public string ReclaimSql => AlertSql.Reclaim;
+
+    /// <inheritdoc />
+    public string FailExhaustedSql => AlertSql.FailExhausted;
+
+    /// <inheritdoc />
+    public string MarkSentSql => AlertSql.MarkSent;
+
+    /// <inheritdoc />
+    public string MarkFailedSql => AlertSql.MarkFailed;
+
+    /// <inheritdoc />
+    public string SentBatchesLastHourSql => AlertSql.SentBatchesLastHour;
+
+    /// <inheritdoc />
+    public string CleanupSql => AlertSql.Cleanup;
 
     /// <inheritdoc />
     public DbConnection CreateConnection() => new MySqlConnection(connectionString);

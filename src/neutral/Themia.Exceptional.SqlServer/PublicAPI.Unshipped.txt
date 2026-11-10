@@ -19,3 +19,14 @@ Themia.Exceptional.SqlServer.SqlServerExceptionalDialect.PurgeSql.get -> string!
 Themia.Exceptional.SqlServer.SqlServerExceptionalDialect.RollupSql.get -> string!
 Themia.Exceptional.SqlServer.SqlServerExceptionalDialect.SoftDeleteSql.get -> string!
 Themia.Exceptional.SqlServer.SqlServerExceptionalDialect.PurgeBatchSql.get -> string!
+Themia.Exceptional.SqlServer.SqlServerExceptionalDialect.CandidatesSql.get -> string!
+Themia.Exceptional.SqlServer.SqlServerExceptionalDialect.ClaimSql.get -> string!
+Themia.Exceptional.SqlServer.SqlServerExceptionalDialect.ClaimedRowsSql.get -> string!
+Themia.Exceptional.SqlServer.SqlServerExceptionalDialect.CleanupSql.get -> string!
+Themia.Exceptional.SqlServer.SqlServerExceptionalDialect.FailExhaustedSql.get -> string!
+Themia.Exceptional.SqlServer.SqlServerExceptionalDialect.IsDuplicateClaim(System.Exception! exception) -> bool
+Themia.Exceptional.SqlServer.SqlServerExceptionalDialect.MarkFailedSql.get -> string!
+Themia.Exceptional.SqlServer.SqlServerExceptionalDialect.MarkSentSql.get -> string!
+Themia.Exceptional.SqlServer.SqlServerExceptionalDialect.ReclaimSql.get -> string!
+Themia.Exceptional.SqlServer.SqlServerExceptionalDialect.SentBatchesLastHourSql.get -> string!
+Themia.Exceptional.SqlServer.SqlServerExceptionalDialect.StaleBatchSql.get -> string!
