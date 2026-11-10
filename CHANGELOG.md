@@ -27,6 +27,10 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Second-factor reset no longer reads a revoke of nothing as success, and a refresh no longer mints a token for a session that just ended.** `RevokeSessionsResetObserver` throws when `RevokeAllForUserAsync` revoked nothing and the target is not visible in the tenant scope (a user with no active sessions is still fine). `AuthenticationFlow.RefreshAsync` refuses the rotation when the session has no proof row and is no longer live, so a token without the restricted-session claim is not issued for a session revoked between rotation and the proof read. The break-glass runbook now says to keep the role `NOLOGIN` and the gate's coverage limits.
+
 ## [0.60.0] - 2026-11-10
 
 ### Added

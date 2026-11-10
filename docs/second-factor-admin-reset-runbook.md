@@ -14,7 +14,7 @@ Call `ISecondFactorAdminService.ResetAsync(actor, actorProof, targetUserId, reas
 
 ## 2. Break-glass (SQL)
 
-Run as a named operator role, never as the application role.
+Run as a named operator role, never as the application role. Create that role `NOLOGIN` and grant it to a named operator only for the duration of an incident, then revoke it: the table grants below let a holder delete second-factor rows directly, without the audit row the function writes (the audit table itself is INSERT-only for it).
 
 ```sql
 -- once, by a DBA: the operator role needs EXECUTE on BOTH functions (the wrapper calls the inner one,
@@ -46,5 +46,7 @@ WHERE user_id = '<user-id>' AND revoked_at IS NULL;
 Check the table and column names against your deployed schema before running it.
 
 ## Limits
+
+The restricted-session gate (`AddThemiaRestrictedSessionGate`) only guards endpoints that carry authorization metadata. An endpoint with none, or with `[AllowAnonymous]`, is not gated, and every `[AllowRestrictedSession]` endpoint is open to a restricted session, so keep that attribute to the enrolment endpoints. Check both in each app's review. A custom `IAuthorizationMiddlewareResultHandler` registered after the gate call replaces it.
 
 Access tokens already issued stay valid until they expire (the configured access-token lifetime); only renewal is cut. Keep that lifetime short where it matters.

@@ -148,12 +148,25 @@ public sealed class SessionProofClaimsTests : IDisposable
     [Fact]
     public async Task Rotation_of_a_session_with_no_stored_proof_carries_no_second_factor()
     {
-        refresh.RotateResult = Rotated(Guid.NewGuid(), replay: false);
+        var family = Guid.NewGuid();
+        refresh.LiveSessions.Add((user.Id, family));
+        refresh.RotateResult = Rotated(family, replay: false);
 
         await Flow().RefreshAsync("token");
 
         Assert.Empty(access.LastPrincipal!.FindAll("amr"));
         Assert.Null(access.LastPrincipal.FindFirst("auth_time"));
+    }
+
+    [Fact]
+    public async Task Rotation_is_refused_when_the_session_ended_before_its_proof_was_read()
+    {
+        refresh.RotateResult = Rotated(Guid.NewGuid(), replay: false);
+
+        var result = await Flow().RefreshAsync("token");
+
+        Assert.False(result.Succeeded);
+        Assert.Null(access.LastPrincipal);
     }
 
     [Theory]
