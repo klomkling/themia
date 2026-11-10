@@ -26,6 +26,72 @@ public class BeamGetChargeTests
         Assert.Equal(Money.Thb(199), charge.Amount);
     }
 
+    [Theory]
+    [InlineData("CARD", PaymentMethod.Card)]
+    [InlineData("CARD_INSTALLMENTS", PaymentMethod.Card)]
+    [InlineData("QR_PROMPT_PAY", PaymentMethod.QrPromptPay)]
+    [InlineData("ALIPAY", PaymentMethod.Wallet)]
+    [InlineData("SOMETHING_NEW", null)]
+    public async Task A_succeeded_charge_names_the_method_it_was_paid_with(string methodType, PaymentMethod? expected)
+    {
+        var (gateway, _) = Build($$"""
+        { "chargeId": "ch_1", "referenceId": "order-1", "status": "SUCCEEDED", "currency": "THB", "amount": 199,
+          "paymentMethod": { "paymentMethodType": "{{methodType}}" } }
+        """);
+
+        var charge = await gateway.GetChargeAsync(new ChargeRef("ch_1", "order-1"));
+
+        Assert.Equal(expected, charge.PaidMethod);
+    }
+
+    [Fact]
+    public async Task A_succeeded_charge_without_a_payment_method_has_no_paid_method()
+    {
+        var (gateway, _) = Build("""
+        { "chargeId": "ch_1", "referenceId": "order-1", "status": "SUCCEEDED", "currency": "THB", "amount": 199 }
+        """);
+
+        var charge = await gateway.GetChargeAsync(new ChargeRef("ch_1", "order-1"));
+
+        Assert.Null(charge.PaidMethod);
+    }
+
+    [Theory]
+    [InlineData("FAILED")]
+    [InlineData("PENDING")]
+    public async Task A_charge_that_did_not_succeed_has_no_paid_method(string status)
+    {
+        var (gateway, _) = Build($$"""
+        { "chargeId": "ch_1", "referenceId": "order-1", "status": "{{status}}", "currency": "THB", "amount": 199,
+          "paymentMethod": { "paymentMethodType": "CARD" } }
+        """);
+
+        var charge = await gateway.GetChargeAsync(new ChargeRef("ch_1", "order-1"));
+
+        Assert.Null(charge.PaidMethod);
+    }
+
+    [Fact]
+    public async Task A_charge_found_through_its_payment_link_names_the_paid_method()
+    {
+        var handler = new StubHandler()
+            .Enqueue(HttpStatusCode.NotFound, """{ "error": { "errorCode": "NOT_FOUND_ERROR" } }""")
+            .Enqueue(HttpStatusCode.OK, """
+            { "paymentLinkId": "rGtqz6DafS", "status": "PAID",
+              "order": { "netAmount": 199, "currency": "THB", "referenceId": "order-1" } }
+            """)
+            .Enqueue(HttpStatusCode.OK, """
+            { "data": [
+                { "chargeId": "ch_9", "referenceId": "order-1", "status": "SUCCEEDED", "currency": "THB", "amount": 199,
+                  "sourceId": "rGtqz6DafS", "paymentMethod": { "paymentMethodType": "CARD" } } ] }
+            """);
+        var gateway = BuildWith(handler);
+
+        var charge = await gateway.GetChargeAsync(new ChargeRef("rGtqz6DafS", "order-1"));
+
+        Assert.Equal(PaymentMethod.Card, charge.PaidMethod);
+    }
+
     [Fact]
     public async Task Without_a_provider_id_the_charge_is_found_by_reference_preferring_the_one_that_succeeded()
     {

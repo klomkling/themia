@@ -36,6 +36,10 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
   - `IMfaMethodStore.AddAsync` in the PostgreSQL store now takes the per-user advisory lock, so an enrolment cannot commit between a reset's delete and its audit row.
 - **Known limit.** A reset revokes refresh tokens, not access tokens already issued: they live until they expire. Tighten `AccessTokenLifetime` if that window matters; rotating the security stamp on reset is a candidate follow-up.
 
+### Fixed
+
+- **`Themia.Payments.Beam`: `GetChargeAsync` now sets `Charge.PaidMethod` (coord #0205).** A charge read back by id, by reference or through its payment link carries the method it was paid with once it is `Succeeded` (`CARD`/`CARD_INSTALLMENTS` → `Card`, `QR_PROMPT_PAY` → `QrPromptPay`, `ALIPAY`/`WECHAT_PAY` → `Wallet`), the same mapping the webhook already used. It stays `null` while unpaid, failed, or for a type the adapter does not map. Additive: `Charge.PaidMethod` already existed.
+
 ## [0.58.0] - 2026-11-09
 
 ### Added

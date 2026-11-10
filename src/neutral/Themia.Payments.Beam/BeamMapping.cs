@@ -156,6 +156,17 @@ internal static class BeamMapping
         _ => null,
     };
 
+    /// <summary>
+    /// Names the method behind <c>paymentMethod.paymentMethodType</c> of a Beam charge or charge-webhook body, or <see langword="null"/>
+    /// when the object is absent or the type is not mapped.
+    /// </summary>
+    public static PaymentMethod? ReadPaidMethod(JsonElement chargeBody) =>
+        chargeBody.ValueKind == JsonValueKind.Object &&
+        chargeBody.TryGetProperty("paymentMethod", out var method) &&
+        TryGetNonEmptyString(method, "paymentMethodType", out var methodType)
+            ? ToPaidMethod(methodType)
+            : null;
+
     /// <summary>Reads a required non-empty string property, without throwing on a missing or malformed one.</summary>
     public static bool TryGetNonEmptyString(JsonElement root, string propertyName, out string value)
     {

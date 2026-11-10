@@ -247,6 +247,9 @@ internal static class BeamCharges
             amount,
             status,
             BeamMapping.ToFailure(failureCode, null),
-            completedAt);
+            completedAt)
+        {
+            PaidMethod = status == PaymentStatus.Succeeded ? BeamMapping.ReadPaidMethod(chargeElement) : null,
+        };
     }
 }
