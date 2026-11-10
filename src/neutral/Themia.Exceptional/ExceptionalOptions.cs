@@ -1,5 +1,6 @@
 using Themia.Exceptional.Masking;
 using System.Text.RegularExpressions;
+using Themia.Exceptional.Retention;
 
 namespace Themia.Exceptional;
 
@@ -15,6 +16,12 @@ public sealed class ExceptionalOptions
 
     /// <summary>Window within which a repeat of the same error is rolled up instead of inserted. Default 10 minutes.</summary>
     public TimeSpan RollupPeriod { get; set; } = TimeSpan.FromMinutes(10);
+
+    /// <summary>
+    /// Age-based cleanup of stored exceptions (off by default). Bind from configuration in the options callback, e.g.
+    /// <c>config.GetSection("Exceptional:Retention").Bind(o.Retention)</c>.
+    /// </summary>
+    public ExceptionRetentionOptions Retention { get; } = new();
 
     /// <summary>Enable the request-body logging middleware. Off by default (PII/secret risk).</summary>
     public bool CaptureRequestBody { get; set; }
@@ -71,5 +78,6 @@ public sealed class ExceptionalOptions
             throw new InvalidOperationException("ExceptionalOptions.RollupPeriod must not be negative.");
         if (MaxBodyBytes <= 0)
             throw new InvalidOperationException("ExceptionalOptions.MaxBodyBytes must be positive.");
+        Retention.Validate(RollupPeriod);
     }
 }

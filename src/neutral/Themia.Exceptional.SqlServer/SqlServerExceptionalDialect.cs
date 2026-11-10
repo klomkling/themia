@@ -7,7 +7,7 @@ using Themia.Exceptional;
 namespace Themia.Exceptional.SqlServer;
 
 /// <summary>SQL Server implementation of <see cref="IExceptionalSqlDialect"/> (Microsoft.Data.SqlClient).</summary>
-public sealed class SqlServerExceptionalDialect : IExceptionalSqlDialect
+public sealed class SqlServerExceptionalDialect : IExceptionalSqlDialect, Themia.Exceptional.Retention.IExceptionRetentionSqlDialect
 {
     private readonly string connectionString;
 
@@ -79,6 +79,9 @@ public sealed class SqlServerExceptionalDialect : IExceptionalSqlDialect
 
     /// <inheritdoc />
     public string PurgeSql => "DELETE FROM [Exceptions] WHERE [IsProtected] = 0 AND [CreationDate] < @OlderThan;";
+
+    /// <inheritdoc />
+    public string PurgeBatchSql => "DELETE TOP (@BatchSize) FROM [Exceptions] WHERE [IsProtected] = 0 AND [CreationDate] < @OlderThan;";
 
     /// <inheritdoc />
     public DynamicParameters BuildInsertParameters(ExceptionEntry entry)

@@ -158,3 +158,21 @@ Themia.Exceptional.ServiceCollectionExtensions
 Themia.Exceptional.StringTruncateExtensions
 Themia.Exceptional.ExceptionalOptions.MaskCredentialValues.get -> bool
 Themia.Exceptional.ExceptionalOptions.MaskCredentialValues.set -> void
+Themia.Exceptional.ExceptionalOptions.Retention.get -> Themia.Exceptional.Retention.ExceptionRetentionOptions!
+const Themia.Exceptional.Retention.ExceptionRetentionOptions.MaxBatchSize = 4000 -> int
+Themia.Exceptional.Retention.ExceptionRetentionOptions
+Themia.Exceptional.Retention.ExceptionRetentionOptions.BatchSize.get -> int
+Themia.Exceptional.Retention.ExceptionRetentionOptions.BatchSize.set -> void
+Themia.Exceptional.Retention.ExceptionRetentionOptions.Days.get -> int
+Themia.Exceptional.Retention.ExceptionRetentionOptions.Days.set -> void
+Themia.Exceptional.Retention.ExceptionRetentionOptions.Enabled.get -> bool
+Themia.Exceptional.Retention.ExceptionRetentionOptions.Enabled.set -> void
+Themia.Exceptional.Retention.ExceptionRetentionOptions.ExceptionRetentionOptions() -> void
+Themia.Exceptional.Retention.ExceptionRetentionOptions.MaxBatchesPerSweep.get -> int
+Themia.Exceptional.Retention.ExceptionRetentionOptions.MaxBatchesPerSweep.set -> void
+Themia.Exceptional.Retention.ExceptionRetentionOptions.SweepInterval.get -> System.TimeSpan
+Themia.Exceptional.Retention.ExceptionRetentionOptions.SweepInterval.set -> void
+Themia.Exceptional.Retention.IExceptionRetentionSqlDialect
+Themia.Exceptional.Retention.IExceptionRetentionSqlDialect.PurgeBatchSql.get -> string!
+const Themia.Exceptional.Retention.ExceptionRetentionOptions.MaxDays = 36500 -> int
+static readonly Themia.Exceptional.Retention.ExceptionRetentionOptions.MaxSweepInterval -> System.TimeSpan

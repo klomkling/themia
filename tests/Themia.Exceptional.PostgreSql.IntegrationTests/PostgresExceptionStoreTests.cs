@@ -12,5 +12,7 @@ public class PostgresExceptionStoreTests(PostgresExceptionalFixture fixture) : E
 
     protected override IExceptionStore Store => Engine;
 
+    protected override IExceptionalSqlDialect Dialect => new PostgresExceptionalDialect(fixture.ConnectionString);
+
     protected override Task ResetStoreAsync() => fixture.ResetAsync();
 }

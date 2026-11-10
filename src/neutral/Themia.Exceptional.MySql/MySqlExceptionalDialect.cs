@@ -7,7 +7,7 @@ using Themia.Exceptional;
 namespace Themia.Exceptional.MySql;
 
 /// <summary>MySQL implementation of <see cref="IExceptionalSqlDialect"/> (MySqlConnector).</summary>
-public sealed class MySqlExceptionalDialect : IExceptionalSqlDialect
+public sealed class MySqlExceptionalDialect : IExceptionalSqlDialect, Themia.Exceptional.Retention.IExceptionRetentionSqlDialect
 {
     private readonly string connectionString;
 
@@ -96,6 +96,9 @@ public sealed class MySqlExceptionalDialect : IExceptionalSqlDialect
 
     /// <inheritdoc />
     public string PurgeSql => "DELETE FROM `Exceptions` WHERE `IsProtected` = FALSE AND `CreationDate` < @OlderThan;";
+
+    /// <inheritdoc />
+    public string PurgeBatchSql => "DELETE FROM `Exceptions` WHERE `IsProtected` = FALSE AND `CreationDate` < @OlderThan ORDER BY `CreationDate` LIMIT @BatchSize;";
 
     /// <inheritdoc />
     public DynamicParameters BuildInsertParameters(ExceptionEntry entry)

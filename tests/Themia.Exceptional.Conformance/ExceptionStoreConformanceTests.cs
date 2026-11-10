@@ -1,4 +1,5 @@
 using Themia.Exceptional;
+using Themia.Exceptional.Retention;
 using Xunit;
 
 namespace Themia.Exceptional.Conformance;
@@ -20,6 +21,9 @@ public abstract class ExceptionStoreConformanceTests : IAsyncLifetime
     /// come for free from a brand-new database per test.
     /// </summary>
     protected abstract Task ResetStoreAsync();
+
+    /// <summary>The engine's dialect, used to exercise the batched retention purge against the live database.</summary>
+    protected abstract IExceptionalSqlDialect Dialect { get; }
 
     /// <inheritdoc />
     public Task InitializeAsync() => ResetStoreAsync();
@@ -259,5 +263,50 @@ public abstract class ExceptionStoreConformanceTests : IAsyncLifetime
         duplicate.Guid = first.Guid;
 
         await Assert.ThrowsAnyAsync<System.Data.Common.DbException>(() => store.LogAsync(duplicate));
+    }
+
+    private async Task<ExceptionEntry> LogAgedAsync(string hash, int ageDays)
+    {
+        var entry = NewEntry(hash);
+        entry.CreationDate = DateTime.UtcNow.AddDays(-ageDays);
+        await Store.LogAsync(entry);
+        return entry;
+    }
+
+    [Fact]
+    [Trait("Category", "Integration")]
+    public async Task RetentionPurgeBatch_DeletesAtMostBatchSizePerCall_ThenZero()
+    {
+        for (var i = 0; i < 5; i++)
+            await LogAgedAsync($"old{i}", 40);
+        var purger = new DapperRetentionPurger(Dialect);
+        var cutoff = DateTime.UtcNow.AddDays(-30);
+
+        var counts = new[]
+        {
+            await purger.PurgeBatchAsync(cutoff, 2, default), await purger.PurgeBatchAsync(cutoff, 2, default),
+            await purger.PurgeBatchAsync(cutoff, 2, default), await purger.PurgeBatchAsync(cutoff, 2, default),
+        };
+
+        Assert.Equal(new[] { 2, 2, 1, 0 }, counts);
+    }
+
+    [Fact]
+    [Trait("Category", "Integration")]
+    public async Task RetentionPurgeBatch_KeepsRecentAndProtectedRows_DeletesSoftDeletedOldRows()
+    {
+        var recent = await LogAgedAsync("recent", 1);
+        var protectedOld = await LogAgedAsync("prot", 40);
+        await Store.ProtectAsync(protectedOld.Guid);
+        var softDeleted = await LogAgedAsync("soft", 40);
+        await Store.DeleteAsync(softDeleted.Guid);
+        var old = await LogAgedAsync("old", 40);
+
+        var removed = await new DapperRetentionPurger(Dialect).PurgeBatchAsync(DateTime.UtcNow.AddDays(-30), 100, default);
+
+        Assert.Equal(2, removed);
+        Assert.NotNull(await Store.GetAsync(recent.Guid));
+        Assert.NotNull(await Store.GetAsync(protectedOld.Guid));
+        Assert.Null(await Store.GetAsync(old.Guid));
     }
 }

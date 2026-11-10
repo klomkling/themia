@@ -1,8 +1,11 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Themia.Data.Migrations;
 using Themia.Exceptional.Migrations;
+using Themia.Exceptional.Retention;
 using Themia.Exceptional.Serilog;
 
 namespace Themia.Exceptional;
@@ -25,6 +28,13 @@ public static class ServiceCollectionExtensions
 
         services.TryAddSingleton<IExceptionStore>(sp =>
             new ExceptionStoreEngine(sp.GetRequiredService<IExceptionalSqlDialect>(), options));
+
+        if (options.Retention.Enabled)
+        {
+            services.TryAddSingleton(TimeProvider.System);
+            services.TryAddSingleton<IRetentionPurger>(sp => new DapperRetentionPurger(sp.GetRequiredService<IExceptionalSqlDialect>()));
+            services.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService, ExceptionRetentionService>());
+        }
 
         return services;
     }
