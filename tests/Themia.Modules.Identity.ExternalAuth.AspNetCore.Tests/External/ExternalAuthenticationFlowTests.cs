@@ -299,6 +299,117 @@ public sealed class ExternalAuthenticationFlowTests
         Assert.Equal(900, result.Tokens!.Value.ExpiresInSeconds); // 15 min = 900 s
     }
 
+    private sealed class RecordingProofStore(FakeRefreshTokenService refresh) : ISessionProofStore
+    {
+        public List<(Guid UserId, SessionProofSnapshot Proof)> Saved { get; } = [];
+        public int RefreshIssuedWhenSaved { get; private set; } = -1;
+
+        public Task<SessionProofSnapshot?> GetAsync(Guid userId, Guid sessionId, CancellationToken cancellationToken = default) =>
+            Task.FromResult<SessionProofSnapshot?>(null);
+
+        public Task<bool> SaveAsync(Guid userId, Guid sessionId, SessionProofSnapshot proof, CancellationToken cancellationToken = default)
+        {
+            RefreshIssuedWhenSaved = refresh.IssueCalls;
+            Saved.Add((userId, proof));
+            return Task.FromResult(true);
+        }
+
+        public Task<bool> LiftRestrictionAsync(Guid userId, Guid sessionId, CancellationToken cancellationToken = default) => Task.FromResult(false);
+    }
+
+    private static readonly DateTimeOffset FederatedAuthTime = DateTimeOffset.Parse("2026-06-15T00:00:00Z");
+
+    private static ExternalIdentity FederatedIdentity() => Identity() with
+    {
+        VerifiedSecondFactor = new ExternalSecondFactorProof(["otp", "mfa"], FederatedAuthTime),
+    };
+
+    private static (ExternalAuthenticationFlow Flow, FakeRefreshTokenService Refresh, RecordingTickets Tickets, RecordingProofStore Proofs, RecordingExternalHooks Hooks)
+        BuildFederated(SecondFactorRequirement requirement, ExternalIdentity identity, bool withStore = true)
+    {
+        var provider = new FakeExternalAuthProvider { Result = ExternalAuthResult.Success(identity) };
+        var refresh = new FakeRefreshTokenService();
+        var hooks = new RecordingExternalHooks { Refresh = refresh };
+        var tickets = new RecordingTickets();
+        var proofs = new RecordingProofStore(refresh);
+        var flow = new ExternalAuthenticationFlow(
+            new FakeProviderRegistry(provider), new FakeExternalLoginService { Result = new ExternalLoginResult(NewUser(), true, true) },
+            new FakeClaimsPrincipalFactory(), new FakeAccessTokenService(TimeProvider.System), refresh, hooks, [], new IdentityModuleOptions(),
+            TimeProvider.System, NullLogger<ExternalAuthenticationFlow>.Instance, new FixedSecondFactorPolicy(requirement), tickets,
+            withStore ? proofs : null);
+        return (flow, refresh, tickets, proofs, hooks);
+    }
+
+    [Theory]
+    [InlineData(SecondFactorRequirement.Verify)]
+    [InlineData(SecondFactorRequirement.Enrol)]
+    public async Task Verified_federated_mfa_skips_the_ticket_and_stores_the_proof_before_the_token(SecondFactorRequirement requirement)
+    {
+        var (flow, refresh, tickets, proofs, hooks) = BuildFederated(requirement, FederatedIdentity());
+
+        var result = await flow.AuthenticateAsync(Provider, Request());
+
+        Assert.True(result.Succeeded);
+        Assert.Empty(tickets.Issued);
+        var saved = Assert.Single(proofs.Saved);
+        Assert.Equal("otp mfa", saved.Proof.Amr);
+        Assert.Equal(SessionProofStrength.Strong, saved.Proof.Strength);
+        Assert.Equal(FederatedAuthTime, saved.Proof.AuthenticatedAt);
+        Assert.Equal(1, proofs.RefreshIssuedWhenSaved);
+        Assert.Equal(1, refresh.IssueCalls);
+        Assert.Contains("succeeded", hooks.Calls);
+    }
+
+    [Fact]
+    public async Task Policy_denied_wins_over_verified_federated_mfa()
+    {
+        var (flow, refresh, tickets, proofs, _) = BuildFederated(SecondFactorRequirement.Denied, FederatedIdentity());
+
+        var result = await flow.AuthenticateAsync(Provider, Request());
+
+        Assert.Equal(ExternalLoginOutcome.Denied, result.Outcome);
+        Assert.Empty(proofs.Saved);
+        Assert.Empty(tickets.Issued);
+        Assert.Equal(0, refresh.IssueCalls);
+    }
+
+    [Fact]
+    public async Task Identity_without_a_verified_proof_still_gets_a_ticket()
+    {
+        var (flow, refresh, tickets, proofs, _) = BuildFederated(SecondFactorRequirement.Verify, Identity());
+
+        var result = await flow.AuthenticateAsync(Provider, Request());
+
+        Assert.Equal(ExternalLoginOutcome.SecondFactorRequired, result.Outcome);
+        Assert.Single(tickets.Issued);
+        Assert.Empty(proofs.Saved);
+        Assert.Equal(0, refresh.IssueCalls);
+    }
+
+    [Fact]
+    public async Task Verified_proof_without_a_proof_store_falls_back_to_the_policy()
+    {
+        var (flow, refresh, tickets, _, _) = BuildFederated(SecondFactorRequirement.Verify, FederatedIdentity(), withStore: false);
+
+        var result = await flow.AuthenticateAsync(Provider, Request());
+
+        Assert.Equal(ExternalLoginOutcome.SecondFactorRequired, result.Outcome);
+        Assert.Single(tickets.Issued);
+        Assert.Equal(0, refresh.IssueCalls);
+    }
+
+    [Fact]
+    public async Task Verified_proof_with_nothing_owed_still_records_the_proof()
+    {
+        var (flow, _, tickets, proofs, _) = BuildFederated(SecondFactorRequirement.NotRequired, FederatedIdentity());
+
+        var result = await flow.AuthenticateAsync(Provider, Request());
+
+        Assert.True(result.Succeeded);
+        Assert.Empty(tickets.Issued);
+        Assert.Single(proofs.Saved);
+    }
+
     private static ExternalIdentity Identity() =>
         new(Provider, "subject-123", "alice@acme.test", EmailVerified: true, "Alice");
 }

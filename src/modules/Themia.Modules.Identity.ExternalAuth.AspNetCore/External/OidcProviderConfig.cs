@@ -56,4 +56,13 @@ public sealed class OidcProviderConfig
     /// <summary>When <see langword="true"/>, the resulting email is always treated as verified,
     /// regardless of any <see cref="EmailVerifiedClaim"/> (providers like LINE never emit one).</summary>
     public bool EmailAlwaysVerified { get; init; }
+
+    /// <summary>When <see langword="true"/>, the id_token <c>amr</c> and <c>auth_time</c> claims of this provider are taken as proof of a
+    /// second factor, provided they pass <c>FederatedMfaVerifier</c> (this provider as the only trusted issuer, <c>mfa</c> plus a strong
+    /// method, <c>auth_time</c> within <see cref="FederatedMfaMaxAge"/>). Defaults to <see langword="false"/>: turn it on only for an
+    /// identity provider that really runs MFA (another Themia app, for example), never for a social login.</summary>
+    public bool TrustsFederatedMfa { get; init; }
+
+    /// <summary>How old the provider's <c>auth_time</c> may be for its MFA to count. Defaults to 15 minutes.</summary>
+    public TimeSpan FederatedMfaMaxAge { get; init; } = TimeSpan.FromMinutes(15);
 }

@@ -3,6 +3,7 @@ using Themia.Modules.Identity.Abstractions;
 using Themia.Modules.Identity.Abstractions.Authentication;
 using Themia.Modules.Identity.Abstractions.Entities;
 using Themia.Modules.Identity.AspNetCore.Authentication;
+using Themia.Modules.Identity.Tokens.AspNetCore.Authentication;
 using Xunit;
 
 namespace Themia.Modules.Identity.AspNetCore.Tests;

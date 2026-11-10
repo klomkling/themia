@@ -28,6 +28,7 @@ internal sealed class ExternalAuthenticationFlow : IExternalAuthenticationFlow
     private readonly ILogger<ExternalAuthenticationFlow> logger;
     private readonly ISecondFactorPolicy secondFactorPolicy;
     private readonly ISecondFactorTicketService? secondFactorTickets;
+    private readonly ISessionProofStore? sessionProofs;
 
     /// <summary>Creates the flow with the default second-factor policy (nobody owes a second factor).</summary>
     public ExternalAuthenticationFlow(
@@ -59,11 +60,13 @@ internal sealed class ExternalAuthenticationFlow : IExternalAuthenticationFlow
         TimeProvider timeProvider,
         ILogger<ExternalAuthenticationFlow> logger,
         ISecondFactorPolicy secondFactorPolicy,
-        ISecondFactorTicketService? secondFactorTickets = null)
+        ISecondFactorTicketService? secondFactorTickets = null,
+        ISessionProofStore? sessionProofs = null)
     {
         ArgumentNullException.ThrowIfNull(secondFactorPolicy);
         this.secondFactorPolicy = secondFactorPolicy;
         this.secondFactorTickets = secondFactorTickets;
+        this.sessionProofs = sessionProofs;
         ArgumentNullException.ThrowIfNull(registry);
         ArgumentNullException.ThrowIfNull(externalLogins);
         ArgumentNullException.ThrowIfNull(principalFactory);
@@ -199,6 +202,16 @@ internal sealed class ExternalAuthenticationFlow : IExternalAuthenticationFlow
             return await FailAsync(provider, ExternalLoginOutcome.Denied, ExternalLoginFlowResult.Denied(), cancellationToken, "second factor denied by policy").ConfigureAwait(false);
         }
 
+        // A provider that proved MFA (verified in the provider, never copied from a claim here) satisfies a Verify/Enrol requirement, so
+        // the user is not challenged twice. Denied was handled above and always wins. Without a proof store the proof cannot be kept,
+        // so it is ignored and the policy decides as if the provider had proved nothing.
+        var federated = sessionProofs is not null ? identity.VerifiedSecondFactor : null;
+        if (federated is not null && requirement != SecondFactorRequirement.NotRequired)
+        {
+            logger.LogInformation("User {UserId} satisfied the second factor through {Provider}.", resolution.User.Id, provider);
+            requirement = SecondFactorRequirement.NotRequired;
+        }
+
         if (requirement != SecondFactorRequirement.NotRequired)
         {
             var stage = requirement switch
@@ -231,9 +244,15 @@ internal sealed class ExternalAuthenticationFlow : IExternalAuthenticationFlow
         // committed by ResolveOrProvisionAsync, so a transient failure here returns a 500 but leaves a
         // resolvable link: the next attempt finds it and issues tokens without re-provisioning. The
         // success hook above means "authentication authorized" (it may still deny), not "session created".
-        var tokens = await AuthTokenIssuer
-            .IssueAsync(principalFactory, accessTokens, refreshTokens, timeProvider, resolution.User, AuthenticationType, cancellationToken)
-            .ConfigureAwait(false);
+        var tokens = federated is null
+            ? await AuthTokenIssuer
+                .IssueAsync(principalFactory, accessTokens, refreshTokens, timeProvider, resolution.User, AuthenticationType, cancellationToken)
+                .ConfigureAwait(false)
+            : await AuthTokenIssuer
+                .IssueWithProofAsync(
+                    principalFactory, accessTokens, refreshTokens, sessionProofs!, timeProvider, logger, resolution.User, AuthenticationType,
+                    new SessionProofSnapshot(string.Join(' ', federated.Amr), SessionProofStrength.Strong, federated.AuthenticatedAt), cancellationToken)
+                .ConfigureAwait(false);
         logger.LogInformation("User {UserId} authenticated via external provider {Provider}.", resolution.User.Id, provider);
         await RaiseAsync(
             (o, ct) => o.OnExternalLoginSucceededAsync(resolution.User.Id, provider, resolution.WasCreated, resolution.WasLinked, ct),

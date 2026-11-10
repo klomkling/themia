@@ -27,6 +27,10 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+### Added
+
+- **A federated login that proved MFA at the identity provider is no longer challenged again** (coord #0203). Set `OidcProviderConfig.TrustsFederatedMfa` (off by default, so nothing changes until you opt in) and `OidcExternalAuthProvider` checks the verified id_token's `amr` and `auth_time` with `FederatedMfaVerifier` (issuer is the provider's own; max age `FederatedMfaMaxAge`, default 15 minutes) and exposes only the verified result as `ExternalIdentity.VerifiedSecondFactor`. `ExternalAuthenticationFlow` then treats a Verify/Enrol requirement as met, issues no ticket, and stores the proof (known `amr` values, strong, the IdP `auth_time`) under the new session before the access token is minted, so the token and a later refresh both carry it. A policy `Denied` still wins; without an `ISessionProofStore` registered the proof is ignored and the policy decides as before. `AmrClaims.IsKnown` is new. Internal: `SessionProofClaims` moved to `Themia.Modules.Identity.Tokens.AspNetCore` and the proof-first issue sequence is shared as `AuthTokenIssuer.IssueWithProofAsync`.
+
 ## [0.60.0] - 2026-11-10
 
 ### Added

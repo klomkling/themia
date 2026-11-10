@@ -26,6 +26,12 @@ public static class AmrClaims
 
     internal static readonly string[] StrongMethods = [Otp, SoftwareKey, HardwareKey];
 
+    private static readonly string[] SecondFactorValues = [Mfa, Otp, SoftwareKey, HardwareKey, Sms, EmailOtp];
+
+    /// <summary>Whether <paramref name="value"/> is one of the second-factor values this class names. A verifier stores only these, so an
+    /// arbitrary string from a federated assertion never reaches a stored proof.</summary>
+    public static bool IsKnown(string value) => SecondFactorValues.Contains(value, StringComparer.Ordinal);
+
     /// <summary>The amr values to emit after <paramref name="kind"/> passed as the second factor.
     /// <c>mfa</c> is emitted only for a strong method, so a weak-only result can never claim MFA.</summary>
     public static IReadOnlyList<string> ForSecondFactor(MfaMethodKind kind) => kind switch

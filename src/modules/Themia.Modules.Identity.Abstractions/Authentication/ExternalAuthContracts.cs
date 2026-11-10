@@ -17,7 +17,18 @@ public readonly record struct ExternalAuthRequest(
 /// <param name="EmailVerified">Whether the provider asserts the email is verified.</param>
 /// <param name="DisplayName">An optional display name.</param>
 public readonly record struct ExternalIdentity(
-    string Provider, string Subject, string? Email, bool EmailVerified, string? DisplayName);
+    string Provider, string Subject, string? Email, bool EmailVerified, string? DisplayName)
+{
+    /// <summary>The second factor the provider proved, set only by a provider that was configured to trust the identity provider's
+    /// multi-factor claims and only after those claims passed verification (trusted issuer, <c>mfa</c> plus a strong method, fresh
+    /// <c>auth_time</c>). Null means the provider proved no second factor, which is the case for every provider by default.</summary>
+    public ExternalSecondFactorProof? VerifiedSecondFactor { get; init; }
+}
+
+/// <summary>A second factor an external identity provider proved and Themia verified.</summary>
+/// <param name="Amr">The known authentication-method references that were verified (for example <c>otp</c>, <c>mfa</c>).</param>
+/// <param name="AuthenticatedAt">When the user authenticated at the provider (the id_token <c>auth_time</c>).</param>
+public sealed record ExternalSecondFactorProof(IReadOnlyList<string> Amr, DateTimeOffset AuthenticatedAt);
 
 /// <summary>The outcome of a provider exchange. Expected failures are typed (not exceptions);
 /// genuine faults (network/5xx) throw.</summary>
