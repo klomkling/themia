@@ -201,6 +201,8 @@ Themia.Payments.PaymentEvent.PaidMethod.get -> Themia.Payments.PaymentMethod?
 Themia.Payments.PaymentEvent.PaidMethod.init -> void
 Themia.Payments.PaymentEvent.SourceId.get -> string?
 Themia.Payments.PaymentEvent.SourceId.init -> void
+Themia.Payments.PaymentEvent.RefundId.get -> string?
+Themia.Payments.PaymentEvent.RefundId.init -> void
 Themia.Payments.WebhookVerification
 Themia.Payments.WebhookVerification.WebhookVerification(Themia.Payments.WebhookOutcome Outcome, Themia.Payments.PaymentEvent? Event) -> void
 Themia.Payments.WebhookVerification.Outcome.get -> Themia.Payments.WebhookOutcome

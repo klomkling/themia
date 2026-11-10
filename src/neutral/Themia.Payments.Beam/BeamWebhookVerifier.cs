@@ -162,6 +162,7 @@ public sealed class BeamWebhookVerifier : IPaymentWebhookVerifier
             {
                 PaidMethod = IsChargeEvent(type) ? BeamMapping.ReadPaidMethod(root) : null,
                 SourceId = IsChargeEvent(type) && BeamMapping.TryGetNonEmptyString(root, "sourceId", out var sourceId) ? sourceId : null,
+                RefundId = IsRefundEvent(type) && BeamMapping.TryGetNonEmptyString(root, "refundId", out var refundId) ? refundId : null,
             };
 
             return new WebhookVerification(WebhookOutcome.Verified, paymentEvent);
@@ -170,6 +171,9 @@ public sealed class BeamWebhookVerifier : IPaymentWebhookVerifier
 
     private static bool IsChargeEvent(PaymentEventType type) =>
         type is PaymentEventType.ChargeSucceeded or PaymentEventType.ChargeFailed;
+
+    private static bool IsRefundEvent(PaymentEventType type) =>
+        type is PaymentEventType.RefundSucceeded or PaymentEventType.RefundFailed;
 
     private static bool IsModelled(PaymentEventType type) => type is
         PaymentEventType.ChargeSucceeded or PaymentEventType.ChargeFailed or
