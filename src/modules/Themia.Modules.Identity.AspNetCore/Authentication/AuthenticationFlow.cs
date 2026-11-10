@@ -410,7 +410,18 @@ public sealed class AuthenticationFlow : IAuthenticationFlow
         using var decided = new AbortGrace(cancellationToken, timeProvider);
         var principal = await principalFactory.CreateAsync(user, AuthenticationType, decided.Token).ConfigureAwait(false);
         // Rotation, a lost-race replay and a channel renewal all read the proof the session stored, so amr and auth_time never change.
-        SessionProofClaims.Apply(principal, sessionProofs is null ? null : await sessionProofs.GetAsync(user.Id, replacement.FamilyId, decided.Token).ConfigureAwait(false));
+        var proof = sessionProofs is null ? null : await sessionProofs.GetAsync(user.Id, replacement.FamilyId, decided.Token).ConfigureAwait(false);
+        // A null proof is also what a session revoked after the rotation reads as, and that token would carry no restriction. A session with
+        // no proof row at all is live, so only a session that is no longer live is refused here.
+        if (proof is null && sessionProofs is not null
+            && !await refreshTokens.IsSessionLiveAsync(user.Id, replacement.FamilyId, decided.Token).ConfigureAwait(false))
+        {
+            logger.LogWarning("Refresh rejected for user {UserId}: the session ended while the token was rotated.", user.Id);
+            await RaiseAsync((o, ct) => o.OnRefreshFailedAsync(user.Id, RefreshOutcome.Invalid, ct), cancellationToken).ConfigureAwait(false);
+            return RefreshRotationResult.Invalid();
+        }
+
+        SessionProofClaims.Apply(principal, proof);
         AuthTokenIssuer.AddSession(principal, replacement.FamilyId);   // rotation keeps the family, so the session id is stable
         var access = accessTokens.Issue(principal);
         var tokens = new AuthTokens(access.Token, AuthTokenIssuer.ExpiresInSeconds(timeProvider, access.ExpiresAt), replacement.RawToken);
