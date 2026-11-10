@@ -6,8 +6,9 @@ namespace Themia.Modules.Identity.SecondFactor;
 
 /// <summary>
 /// Enrols a strong second factor from an already signed-in session and lifts that session's restriction once it succeeded. The
-/// session is the one named by the <c>sid</c> claim; the proof is read from the server, never from claims. A failed or weak
-/// enrolment leaves the restriction in place.
+/// session is the one named by the <c>sid</c> claim; the proof is read from the server, never from claims. A session that is not
+/// live (revoked, expired, not this user's) is refused with <see cref="SecondFactorOutcome.NotAvailable"/>. A live session with no
+/// proof row (a sign-in that needed no second factor) enrols with no proof. A failed or weak enrolment leaves the restriction in place.
 /// </summary>
 public interface ISessionSecondFactorEnrolment
 {
@@ -22,7 +23,8 @@ internal sealed class SessionSecondFactorEnrolment(
     ISecondFactorService service,
     ISecondFactorSubjectResolver subjects,
     ISessionProofReader proofs,
-    ISessionProofStore store) : ISessionSecondFactorEnrolment
+    ISessionProofStore store,
+    IRefreshTokenService refreshTokens) : ISessionSecondFactorEnrolment
 {
     public Task<SecondFactorResult> ConfirmTotpEnrolAsync(Guid userId, Guid sessionId, string enrolmentId, string code, string label, CancellationToken cancellationToken = default) =>
         EnrolAsync(userId, sessionId, (subject, proof) => service.ConfirmTotpEnrolAsync(subject, enrolmentId, code, label, proof, cancellationToken), cancellationToken);
@@ -35,6 +37,13 @@ internal sealed class SessionSecondFactorEnrolment(
     {
         var subject = await subjects.ResolveAsync(userId, cancellationToken).ConfigureAwait(false);
         if (subject is null)
+        {
+            return new SecondFactorResult { Outcome = SecondFactorOutcome.NotAvailable };
+        }
+
+        // A null proof also reads for a live session that never needed a second factor, so liveness is asked directly: a token whose
+        // session was revoked (e.g. by a reset) must not enrol a factor.
+        if (!await refreshTokens.IsSessionLiveAsync(userId, sessionId, cancellationToken).ConfigureAwait(false))
         {
             return new SecondFactorResult { Outcome = SecondFactorOutcome.NotAvailable };
         }
