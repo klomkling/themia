@@ -21,17 +21,19 @@ public class ReplaceRoleClaimsTests
     private readonly List<User> users = [];
     private readonly List<Role> roles = [];
     private readonly ClaimService claims;
+    private readonly FakeRepository<Role> roleRepo;
     private int stampWrites;
 
     public ReplaceRoleClaimsTests()
     {
         var userRepo = new FakeRepository<User>(users, u => u.Id) { AmbientTenant = Tenant, BeforeUpdateWhere = _ => stampWrites++ };
+        roleRepo = new FakeRepository<Role>(roles, r => r.Id) { AmbientTenant = Tenant };
         claims = new ClaimService(
             new FakeRepository<UserClaim>([], c => c.Id) { AmbientTenant = Tenant },
             new FakeRepository<RoleClaim>(roleClaims, c => c.Id) { AmbientTenant = Tenant },
             new FakeRepository<UserRole>(memberships, m => m.Id) { AmbientTenant = Tenant },
             userRepo,
-            new FakeRepository<Role>(roles, r => r.Id) { AmbientTenant = Tenant },
+            roleRepo,
             new FakeUnitOfWork(),
             new MemoryCache(new MemoryCacheOptions()));
     }
@@ -214,5 +216,20 @@ public class ReplaceRoleClaimsTests
         await claims.ReplaceRoleClaimsAsync(role.Id, [Legacy], [(Legacy, "a")]);
 
         Assert.NotNull(role.LastModifiedAt);
+    }
+
+    [Fact]
+    public async Task ReplaceRoleClaimsAsync_ShouldThrowAndWriteNothing_WhenTheRoleRowCannotBeLocked()
+    {
+        var holder = SeedUser();
+        var role = SeedRole(holder);
+        SeedClaim(role, Legacy, "a");
+        var before = holder.SecurityStamp;
+        roleRepo.BeforeUpdateWhere = _ => roles.Clear();     // the role is soft-deleted between the scope check and the lock
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => claims.ReplaceRoleClaimsAsync(role.Id, [Legacy], [(Legacy, "b")]));
+
+        Assert.Equal([(Legacy, "a")], Current(role));
+        Assert.Equal(before, holder.SecurityStamp);
     }
 }

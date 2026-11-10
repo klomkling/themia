@@ -216,8 +216,13 @@ public sealed class ClaimService : IClaimService
                 // same role waits here and then reads the committed claims; without it two replaces could both insert and
                 // leave a union of both sets. A bulk update because a platform role cannot be saved through the tracker here.
                 var touched = DateTimeOffset.UtcNow;
-                await roles.UpdateWhereAsync(
+                var touchedRows = await roles.UpdateWhereAsync(
                     new RoleByIdAnyTenantSpec(roleId), set => set.Set(r => r.LastModifiedAt, touched), ct).ConfigureAwait(false);
+                if (touchedRows != 1)
+                {
+                    // No row locked means no serialization with a concurrent replace: fail closed instead of writing.
+                    throw new InvalidOperationException($"Role '{roleId}' could not be locked for the claim replacement.");
+                }
 
                 var current = await roleClaims.ListAsync(new RoleClaimsByRoleAndTypesSpec(roleId, types), ct).ConfigureAwait(false);
                 var kept = new HashSet<(string Type, string Value)>();

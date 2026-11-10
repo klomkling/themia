@@ -266,6 +266,28 @@ public abstract class IdentityStoreConformanceTests
     }
 
     [Fact]
+    public async Task ReplaceRoleClaims_replaces_a_platform_roles_claims_from_a_tenant_scope_and_rotates_its_holders()
+    {
+        await ResetAsync();
+        Guid roleId;
+        await using (var platform = NewScope(null))
+        {
+            roleId = (await platform.Roles.CreateAsync("PlatformEditor"))!.Value;
+        }
+
+        await using var s = NewScope(new TenantId("acme"));
+        var holderId = (await s.Users.CreateAsync("platform-holder", "pw")).UserId!.Value;
+        Assert.True(await s.Roles.AssignRoleAsync(holderId, roleId));
+        await s.Claims.AddRoleClaimAsync(roleId, "perm", "a");
+        var before = (await s.Users.FindByIdAsync(holderId))!.SecurityStamp;
+
+        await s.Claims.ReplaceRoleClaimsAsync(roleId, ["perm"], [("perm", "b")]);
+
+        Assert.Equal([("perm", "b")], await RoleClaimPairsAsync(s, roleId));
+        Assert.NotEqual(before, (await s.Users.FindByIdAsync(holderId))!.SecurityStamp);
+    }
+
+    [Fact]
     public async Task Concurrent_ReplaceRoleClaims_of_one_role_end_with_exactly_one_callers_set()
     {
         await ResetAsync();
