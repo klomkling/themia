@@ -35,6 +35,7 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
   - **Break-glass.** Migration `SecondFactorResetMigration` adds the SQL functions `second_factor_reset_user` and `second_factor_break_glass_reset` (`REVOKE`d from `PUBLIC`; audit actor `db:<session_user>`). Runbook: [docs/second-factor-admin-reset-runbook.md](docs/second-factor-admin-reset-runbook.md).
   - `IMfaMethodStore.AddAsync` in the PostgreSQL store now takes the per-user advisory lock, so an enrolment cannot commit between a reset's delete and its audit row.
 - **Known limit.** A reset revokes refresh tokens, not access tokens already issued: they live until they expire. Tighten `AccessTokenLifetime` if that window matters; rotating the security stamp on reset is a candidate follow-up.
+- **`PaymentEvent.RefundId` (coord #0206).** A Beam `refund.succeeded` / `refund.failed` webhook now carries the provider's refund id from the signed body, so an app matches the event to its refund row without parsing `RawJson`; `null` for every other event. `PaymentEvent.Amount` is already the refunded amount for a refund event. Optional init member, non-breaking.
 
 ### Fixed
 

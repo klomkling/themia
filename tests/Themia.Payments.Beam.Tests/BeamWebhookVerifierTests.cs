@@ -200,6 +200,29 @@ public class BeamWebhookVerifierTests
         Assert.Equal(PaymentEventType.RefundSucceeded, result.Event!.Type);
     }
 
+    [Theory]
+    [InlineData("refund.succeeded", "SUCCEEDED", PaymentEventType.RefundSucceeded)]
+    [InlineData("refund.failed", "FAILED", PaymentEventType.RefundFailed)]
+    public void A_refund_event_carries_the_refund_id_and_the_refunded_amount(string eventName, string status, PaymentEventType type)
+    {
+        var (body, signature) = Sign(
+            $$"""{"chargeId":"ch_1","refundId":"rf_1","status":"{{status}}","amount":100,"currency":"THB","createdAt":"2025-01-01T00:00:00Z"}""");
+
+        var result = Verifier().Verify(body, Headers(signature, eventName));
+
+        Assert.Equal(type, result.Event!.Type);
+        Assert.Equal("rf_1", result.Event.RefundId);
+        Assert.Equal(Money.Thb(100), result.Event.Amount);
+    }
+
+    [Fact]
+    public void A_charge_event_has_no_refund_id()
+    {
+        var result = Verifier().Verify(Vector(), Headers(Signature, "charge.succeeded"));
+
+        Assert.Null(result.Event!.RefundId);
+    }
+
     [Fact]
     public void The_golden_vector_stays_verified_as_charge_succeeded()
     {

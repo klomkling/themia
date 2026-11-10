@@ -38,4 +38,11 @@ public sealed record PaymentEvent(
     /// it stored without parsing <see cref="RawJson"/>.
     /// </summary>
     public string? SourceId { get; init; }
+
+    /// <summary>
+    /// The provider's id of the refund a <see cref="PaymentEventType.RefundSucceeded"/> or <see cref="PaymentEventType.RefundFailed"/> event
+    /// is about (Beam <c>refundId</c>), or <see langword="null"/> for any other event. Match it to the refund row the app stored from
+    /// <see cref="RefundCreation.RefundId"/>; for a refund event <see cref="Amount"/> is the refunded amount.
+    /// </summary>
+    public string? RefundId { get; init; }
 }
