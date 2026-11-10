@@ -96,9 +96,30 @@ public sealed class AdminPolicyTests
             return Task.FromResult(3);
         });
 
-        await new RevokeSessionsResetObserver(tokens).OnResetAsync("t1", TargetId.ToString("D"));
+        await new RevokeSessionsResetObserver(tokens, UsersProxy()).OnResetAsync("t1", TargetId.ToString("D"));
 
         Assert.Equal(TargetId, revoked);
+    }
+
+    private IUserService UsersProxy() => Proxy<IUserService>.Create((name, args) => name == nameof(IUserService.FindByIdAsync)
+        ? Task.FromResult(users.GetValueOrDefault((Guid)args[0]!))
+        : throw new NotSupportedException(name));
+
+    private static IRefreshTokenService TokensRevoking(int count) => Proxy<IRefreshTokenService>.Create((_, _) => Task.FromResult(count));
+
+    [Fact]
+    public async Task OnResetAsync_ShouldNotThrow_WhenTheTargetHasNoActiveSessionsButIsInScope()
+    {
+        Given("t1", RoleLevel.Level1, RoleLevel.Level4);
+
+        await new RevokeSessionsResetObserver(TokensRevoking(0), UsersProxy()).OnResetAsync("t1", TargetId.ToString("D"));
+    }
+
+    [Fact]
+    public async Task OnResetAsync_ShouldThrow_WhenNothingWasRevokedAndTheTargetIsNotVisibleInScope()
+    {
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => new RevokeSessionsResetObserver(TokensRevoking(0), UsersProxy()).OnResetAsync("t1", TargetId.ToString("D")));
     }
 
     [Fact]
@@ -106,7 +127,7 @@ public sealed class AdminPolicyTests
     {
         var tokens = Proxy<IRefreshTokenService>.Create((name, _) => throw new NotSupportedException(name));
 
-        await Assert.ThrowsAsync<ArgumentException>(() => new RevokeSessionsResetObserver(tokens).OnResetAsync("t1", "nope"));
+        await Assert.ThrowsAsync<ArgumentException>(() => new RevokeSessionsResetObserver(tokens, UsersProxy()).OnResetAsync("t1", "nope"));
     }
 
     // Only the members a test touches are answered; any other call fails the test.

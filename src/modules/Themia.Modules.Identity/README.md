@@ -474,7 +474,7 @@ var renewed = await issuer.RenewSessionAsync(userId, sessionId, request, ct);   
 - **`AppClaims` are the app's to compute on the server** from its own data, never copied from a request: Themia only refuses the reserved
   types, it cannot tell a legitimate app claim from a forged one.
 - Not covered: principals that are not `User` rows (a service or bot token) stay in the app.
-- A custom `IRefreshTokenService` must implement `IsSessionLiveAsync` for `RenewSessionAsync` to work; the default answers false (fail closed).
+- A custom `IRefreshTokenService` must implement `IsSessionLiveAsync` for `RenewSessionAsync` to work, and for a refresh of a session that has no stored second-factor proof (the refresh is refused when the session is not live); the default answers false (fail closed).
 ## Sessions follow the security stamp
 
 A refresh session is bound to the user's security stamp at the moment it was issued (`identity.refresh_tokens.security_stamp`,
