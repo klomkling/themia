@@ -31,6 +31,26 @@ public abstract class ConversationServiceTests(ConversationEngineFixture fixture
             ValueTask.FromResult(action == ConversationAction.Open && target.ConversationId is null && target.Subject?.SubjectId == "B-1");
     }
 
+    /// <summary>
+    /// Allows a post the first time it is asked, then denies it, and probes from another connection whether the conversation row is locked at each ask.
+    /// It stands for a caller whose standing changed after the first check and before the post took its counter lock.
+    /// </summary>
+    private sealed class FlipAfterFirstPostCheckPolicy(ConversationEngineFixture fixture) : IConversationAccessPolicy
+    {
+        public List<bool> RowLockedAtPostCheck { get; } = [];
+
+        public async ValueTask<bool> CanAsync(ConversationActor actor, ConversationTarget target, ConversationAction action, CancellationToken cancellationToken = default)
+        {
+            if (action != ConversationAction.Post)
+            {
+                return true;
+            }
+
+            RowLockedAtPostCheck.Add(await fixture.IsConversationRowLockedAsync(target.ConversationId!.Value));
+            return RowLockedAtPostCheck.Count == 1;
+        }
+    }
+
     private sealed class ThrowingSink : IConversationEventSink
     {
         public Task RaiseAsync(DbConnection connection, DbTransaction transaction, ConversationEvent conversationEvent, CancellationToken cancellationToken = default) =>
@@ -400,6 +420,25 @@ public abstract class ConversationServiceTests(ConversationEngineFixture fixture
     }
 
     [Fact]
+    public async Task Post_ShouldBeRefusedAndRolledBack_WhenThePolicyDeniesAgainUnderTheCounterLock()
+    {
+        var allow = Service();
+        var (tenant, conversation) = await OpenAsync(allow);
+        await JoinAsync(allow, tenant, conversation, "a");
+        var policy = new FlipAfterFirstPostCheckPolicy(fixture);
+
+        var result = await Service(policy: policy).PostAsync(Member("a"), tenant, conversation, new PostMessage("m-1", "hi"));
+
+        // The first check runs before the transaction (nothing locked); the second must run while the post holds the row, not before it.
+        Assert.Equal([false, true], policy.RowLockedAtPostCheck);
+        Assert.Equal(PostOutcome.Refused, result.Outcome);
+        Assert.Equal(0, await fixture.ScalarAsync<long>("SELECT last_seq FROM conversations WHERE id = @Id;", new { Id = conversation }));
+        Assert.Equal(0, await fixture.ScalarAsync<int>("SELECT COUNT(*) FROM conversation_messages WHERE conversation_id = @Id;", new { Id = conversation }));
+        var next = await allow.PostAsync(Member("a"), tenant, conversation, new PostMessage("m-2", "hi"));
+        Assert.Equal(1, next.Seq);
+    }
+
+    [Fact]
     public async Task EveryMethod_ShouldAskThePolicyForItsOwnAction()
     {
         var policy = new RecordingPolicy();
@@ -412,7 +451,7 @@ public abstract class ConversationServiceTests(ConversationEngineFixture fixture
         await service.CloseAsync(Member("a"), tenant, conversation);
 
         Assert.Equal(
-            [ConversationAction.Open, ConversationAction.Join, ConversationAction.Post, ConversationAction.Read, ConversationAction.MarkRead, ConversationAction.Close],
+            [ConversationAction.Open, ConversationAction.Join, ConversationAction.Post, ConversationAction.Post, ConversationAction.Read, ConversationAction.MarkRead, ConversationAction.Close],
             policy.Seen);
     }
 
