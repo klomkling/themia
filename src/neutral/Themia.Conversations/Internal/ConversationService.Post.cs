@@ -76,6 +76,14 @@ internal sealed partial class ConversationService
             return new PostResult(PostOutcome.Refused, null, null);
         }
 
+        // The caller's standing was checked before this transaction. An app that changes it in a transaction that also locks this row (a reassignment) is
+        // ordered with this post by the lock, so ask the policy again now that it is held: a post that lost that race must not land after the change.
+        if (!await AllowedAsync(actor, tenantId, conversationId, ConversationAction.Post, cancellationToken))
+        {
+            await transaction.RollbackAsync(CancellationToken.None); // the counter bump goes with it, so the sequence stays dense
+            return new PostResult(PostOutcome.Refused, null, null);
+        }
+
         var messageId = Guid.NewGuid();
         try
         {
