@@ -134,7 +134,7 @@ internal sealed class OidcExternalAuthProvider : IExternalAuthProvider
             return ExternalAuthResult.Failed("nonce_mismatch");
         }
 
-        return MapIdentity(validated, !string.IsNullOrEmpty(request.Nonce));
+        return MapIdentity(validated, request);
     }
 
     private static bool NonceSatisfied(JsonWebToken token, string? expected)
@@ -316,8 +316,8 @@ internal sealed class OidcExternalAuthProvider : IExternalAuthProvider
         return now - ClockSkew <= exp;
     }
 
-    // nonceBound: the client sent a nonce and the token carried the same one (NonceSatisfied already rejected any mismatch).
-    private ExternalAuthResult MapIdentity(JsonWebToken token, bool nonceBound)
+    // A proof is read only when the client sent a nonce (NonceSatisfied already rejected a mismatch with the token) and a code_verifier.
+    private ExternalAuthResult MapIdentity(JsonWebToken token, ExternalAuthRequest request)
     {
         var subject = GetClaim(token, config.SubjectClaim);
         if (string.IsNullOrEmpty(subject))
@@ -336,20 +336,26 @@ internal sealed class OidcExternalAuthProvider : IExternalAuthProvider
             emailVerified,
             string.IsNullOrEmpty(displayName) ? null : displayName)
         {
-            VerifiedSecondFactor = config.TrustsFederatedMfa ? ReadBoundSecondFactor(token, nonceBound) : null,
+            VerifiedSecondFactor = config.TrustsFederatedMfa ? ReadBoundSecondFactor(token, request) : null,
         });
     }
 
-    // Without a nonce the id_token is not bound to this sign-in attempt, so a replayed or injected one could carry a proof. Drop only
-    // the proof: sign-in still works and the app's own second-factor policy applies.
-    private ExternalSecondFactorProof? ReadBoundSecondFactor(JsonWebToken token, bool nonceBound)
+    // The proof counts only when the sign-in is bound to this attempt on two client-held values. Without a nonce a replayed id_token could carry a proof;
+    // without a code_verifier an injected authorization code could (nonce and code travel the same front channel, a S256 verifier does not). Drop only the
+    // proof: sign-in still works and the app's own second-factor policy applies. "Has a verifier" is exactly what is sent to the token endpoint.
+    private ExternalSecondFactorProof? ReadBoundSecondFactor(JsonWebToken token, ExternalAuthRequest request)
     {
-        if (nonceBound)
+        var noNonce = string.IsNullOrEmpty(request.Nonce);
+        var noVerifier = string.IsNullOrEmpty(request.CodeVerifier);
+        if (!noNonce && !noVerifier)
         {
             return ReadVerifiedSecondFactor(token);
         }
 
-        logger.LogWarning("External provider {Provider} trusts federated MFA but the sign-in carried no nonce, so its MFA claims were ignored. Send a fresh random nonce per attempt.", config.Name);
+        logger.LogWarning(
+            "External provider {Provider} trusts federated MFA but the sign-in carried no {Missing}, so its MFA claims were ignored. Send a fresh random nonce and a PKCE (S256) code_verifier per attempt, both kept in the client's own session.",
+            config.Name,
+            noNonce && noVerifier ? "nonce and code_verifier" : noNonce ? "nonce" : "code_verifier");
         return null;
     }
 

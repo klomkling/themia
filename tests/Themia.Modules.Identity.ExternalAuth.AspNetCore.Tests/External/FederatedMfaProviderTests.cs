@@ -27,7 +27,7 @@ public sealed class FederatedMfaProviderTests
         TrustsFederatedMfa = trusts,
     };
 
-    private static async Task<ExternalIdentity> ExchangeAsync(bool trusts, IDictionary<string, object> extraClaims, bool withNonce = true)
+    private static async Task<ExternalIdentity> ExchangeAsync(bool trusts, IDictionary<string, object> extraClaims, bool withNonce = true, string? verifier = "v")
     {
         var claims = new Dictionary<string, object> { ["sub"] = "u1", ["email"] = "a@b.test" };
         if (withNonce)
@@ -45,7 +45,7 @@ public sealed class FederatedMfaProviderTests
         var provider = new OidcExternalAuthProvider(
             Config(trusts), new SingleClientFactory(new HttpClient(StubHttpMessageHandler.Json(HttpStatusCode.OK, body))),
             new FakeTimeProvider(Now), Microsoft.Extensions.Logging.Abstractions.NullLoggerFactory.Instance);
-        var result = await provider.ExchangeAsync(new ExternalAuthRequest("code", "https://app.test/cb", "v", withNonce ? Nonce : null));
+        var result = await provider.ExchangeAsync(new ExternalAuthRequest("code", "https://app.test/cb", verifier, withNonce ? Nonce : null));
         Assert.True(result.Succeeded);
         return result.Identity!.Value;
     }
@@ -132,6 +132,25 @@ public sealed class FederatedMfaProviderTests
         var identity = await ExchangeAsync(false, Claims(new[] { "otp", "mfa" }, null), withNonce: false);
 
         Assert.Equal("u1", identity.Subject);
+        Assert.Null(identity.VerifiedSecondFactor);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    public async Task Federated_mfa_proof_is_dropped_when_the_sign_in_carries_no_code_verifier(string? verifier)
+    {
+        var identity = await ExchangeAsync(true, Claims(new[] { "otp", "mfa" }, null), verifier: verifier);
+
+        Assert.Equal("u1", identity.Subject);
+        Assert.Null(identity.VerifiedSecondFactor);
+    }
+
+    [Fact]
+    public async Task Provider_that_does_not_opt_in_still_signs_in_without_a_code_verifier()
+    {
+        var identity = await ExchangeAsync(false, Claims(new[] { "otp", "mfa" }, null), verifier: null);
+
         Assert.Null(identity.VerifiedSecondFactor);
     }
 }
