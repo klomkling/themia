@@ -764,3 +764,11 @@ Themia.Modules.Identity.Abstractions.Authentication.ISecondFactorProofCompletion
 Themia.Modules.Identity.Abstractions.Authentication.ISecondFactorProofCompletion.CompleteAsync(string! ticket, System.Guid expectedUserId, Themia.Modules.Identity.Abstractions.Authentication.SecondFactorStage expectedStage, Themia.Modules.Identity.Abstractions.Authentication.SessionProofSnapshot! proof, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Identity.Abstractions.Authentication.SecondFactorCompletionResult>!
 Themia.Modules.Identity.Abstractions.Authentication.ISecondFactorTicketService.PeekAsync(string! ticket, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Identity.Abstractions.Authentication.SecondFactorTicketData?>!
 Themia.Modules.Identity.Abstractions.IClaimService.ReplaceRoleClaimsAsync(System.Guid roleId, System.Collections.Generic.IReadOnlyCollection<string!>! claimTypes, System.Collections.Generic.IReadOnlyCollection<(string! Type, string! Value)>! desired, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Modules.Identity.Abstractions.Authentication.ExternalIdentity.VerifiedSecondFactor.get -> Themia.Modules.Identity.Abstractions.Authentication.ExternalSecondFactorProof?
+Themia.Modules.Identity.Abstractions.Authentication.ExternalIdentity.VerifiedSecondFactor.init -> void
+Themia.Modules.Identity.Abstractions.Authentication.ExternalSecondFactorProof
+Themia.Modules.Identity.Abstractions.Authentication.ExternalSecondFactorProof.ExternalSecondFactorProof(System.Collections.Generic.IReadOnlyList<string!>! Amr, System.DateTimeOffset AuthenticatedAt) -> void
+Themia.Modules.Identity.Abstractions.Authentication.ExternalSecondFactorProof.Amr.get -> System.Collections.Generic.IReadOnlyList<string!>!
+Themia.Modules.Identity.Abstractions.Authentication.ExternalSecondFactorProof.Amr.init -> void
+Themia.Modules.Identity.Abstractions.Authentication.ExternalSecondFactorProof.AuthenticatedAt.get -> System.DateTimeOffset
+Themia.Modules.Identity.Abstractions.Authentication.ExternalSecondFactorProof.AuthenticatedAt.init -> void

@@ -3,7 +3,7 @@ using System.Security.Claims;
 using Themia.Modules.Identity.Abstractions.Authentication;
 using Themia.Modules.Identity.Abstractions.Entities;
 
-namespace Themia.Modules.Identity.AspNetCore.Authentication;
+namespace Themia.Modules.Identity.Tokens.AspNetCore.Authentication;
 
 /// <summary>Puts the stored second-factor proof of a session on a principal as <c>amr</c> and <c>auth_time</c>. The one place that
 /// writes either claim, so a token can only carry what the server session holds.</summary>
