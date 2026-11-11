@@ -1,5 +1,9 @@
+using System.Data.Common;
 using Dapper;
+using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.DependencyInjection;
+using MySqlConnector;
+using Npgsql;
 using Testcontainers.MsSql;
 using Testcontainers.MySql;
 using Testcontainers.PostgreSql;
@@ -52,6 +56,32 @@ public abstract class ConversationEngineFixture : IAsyncLifetime
 
     /// <summary>Whether a foreign key named <paramref name="name"/> exists, read from the engine's catalog.</summary>
     public abstract Task<bool> ForeignKeyExistsAsync(string name);
+
+    /// <summary>The statement that takes a row lock on one conversation and fails at once, instead of waiting, when another transaction holds it.</summary>
+    protected abstract string TryLockConversationSql { get; }
+
+    /// <summary>Whether <paramref name="exception"/> is this engine's "lock not available" answer to <see cref="TryLockConversationSql"/>.</summary>
+    protected abstract bool IsLockNotAvailable(DbException exception);
+
+    /// <summary>
+    /// Whether another transaction holds the row lock of conversation <paramref name="conversationId"/>, probed from a separate connection with no wait.
+    /// Any other failure propagates, so a broken probe cannot read as "locked".
+    /// </summary>
+    public async Task<bool> IsConversationRowLockedAsync(Guid conversationId)
+    {
+        await using var connection = Dialect.CreateConnection();
+        await connection.OpenAsync();
+        await using var transaction = await connection.BeginTransactionAsync();
+        try
+        {
+            await connection.ExecuteScalarAsync<int?>(TryLockConversationSql, new { Id = conversationId }, transaction);
+            return false;
+        }
+        catch (DbException ex) when (IsLockNotAvailable(ex))
+        {
+            return true;
+        }
+    }
 
     /// <inheritdoc />
     public async Task InitializeAsync()
@@ -112,6 +142,12 @@ public sealed class PostgresConversationFixture : ConversationEngineFixture
         services.AddThemiaConversationsPostgres(connectionString);
 
     /// <inheritdoc />
+    protected override string TryLockConversationSql => "SELECT 1 FROM conversations WHERE id = @Id FOR UPDATE NOWAIT;";
+
+    /// <inheritdoc />
+    protected override bool IsLockNotAvailable(DbException exception) => exception is PostgresException { SqlState: PostgresErrorCodes.LockNotAvailable };
+
+    /// <inheritdoc />
     public override Task<bool> TableExistsAsync(string name) =>
         ScalarAsync<bool>("SELECT EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = @Name);", new { Name = name });
 
@@ -153,6 +189,12 @@ public sealed class MySqlConversationFixture : ConversationEngineFixture
     /// <inheritdoc />
     protected override void RegisterEngine(IServiceCollection services, string connectionString) =>
         services.AddThemiaConversationsMySql(connectionString);
+
+    /// <inheritdoc />
+    protected override string TryLockConversationSql => "SELECT 1 FROM conversations WHERE id = @Id FOR UPDATE NOWAIT;";
+
+    /// <inheritdoc />
+    protected override bool IsLockNotAvailable(DbException exception) => exception is MySqlException { Number: 3572 }; // ER_LOCK_NOWAIT
 
     /// <inheritdoc />
     public override Task<bool> TableExistsAsync(string name) =>
@@ -198,6 +240,12 @@ public sealed class SqlServerConversationFixture : ConversationEngineFixture
     /// <inheritdoc />
     protected override void RegisterEngine(IServiceCollection services, string connectionString) =>
         services.AddThemiaConversationsSqlServer(connectionString);
+
+    /// <inheritdoc />
+    protected override string TryLockConversationSql => "SET LOCK_TIMEOUT 0; SELECT 1 FROM conversations WITH (UPDLOCK, ROWLOCK) WHERE id = @Id;";
+
+    /// <inheritdoc />
+    protected override bool IsLockNotAvailable(DbException exception) => exception is SqlException { Number: 1222 }; // lock request time out
 
     /// <inheritdoc />
     public override Task<bool> TableExistsAsync(string name) =>
