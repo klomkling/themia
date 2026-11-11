@@ -7,6 +7,7 @@ using Microsoft.IdentityModel.Protocols;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using Microsoft.IdentityModel.Tokens;
 using Themia.Modules.Identity.Abstractions.Authentication;
+using Themia.SecondFactor;
 
 namespace Themia.Modules.Identity.ExternalAuth.AspNetCore.External;
 
@@ -24,6 +25,9 @@ internal sealed class OidcExternalAuthProvider : IExternalAuthProvider
 {
     /// <summary>The named-<see cref="HttpClient"/> prefix; the suffix is the provider name.</summary>
     internal const string HttpClientPrefix = "Themia.Identity.ExternalAuth:";
+
+    // Year 9999: DateTimeOffset.FromUnixTimeSeconds would throw beyond this.
+    private const double MaxNumericDateSeconds = 253402300799;
 
     private static readonly JsonWebTokenHandler Handler = new();
 
@@ -130,7 +134,7 @@ internal sealed class OidcExternalAuthProvider : IExternalAuthProvider
             return ExternalAuthResult.Failed("nonce_mismatch");
         }
 
-        return MapIdentity(validated);
+        return MapIdentity(validated, !string.IsNullOrEmpty(request.Nonce));
     }
 
     private static bool NonceSatisfied(JsonWebToken token, string? expected)
@@ -312,7 +316,8 @@ internal sealed class OidcExternalAuthProvider : IExternalAuthProvider
         return now - ClockSkew <= exp;
     }
 
-    private ExternalAuthResult MapIdentity(JsonWebToken token)
+    // nonceBound: the client sent a nonce and the token carried the same one (NonceSatisfied already rejected any mismatch).
+    private ExternalAuthResult MapIdentity(JsonWebToken token, bool nonceBound)
     {
         var subject = GetClaim(token, config.SubjectClaim);
         if (string.IsNullOrEmpty(subject))
@@ -329,7 +334,64 @@ internal sealed class OidcExternalAuthProvider : IExternalAuthProvider
             subject,
             string.IsNullOrEmpty(email) ? null : email,
             emailVerified,
-            string.IsNullOrEmpty(displayName) ? null : displayName));
+            string.IsNullOrEmpty(displayName) ? null : displayName)
+        {
+            VerifiedSecondFactor = config.TrustsFederatedMfa ? ReadBoundSecondFactor(token, nonceBound) : null,
+        });
+    }
+
+    // Without a nonce the id_token is not bound to this sign-in attempt, so a replayed or injected one could carry a proof. Drop only
+    // the proof: sign-in still works and the app's own second-factor policy applies.
+    private ExternalSecondFactorProof? ReadBoundSecondFactor(JsonWebToken token, bool nonceBound)
+    {
+        if (nonceBound)
+        {
+            return ReadVerifiedSecondFactor(token);
+        }
+
+        logger.LogWarning("External provider {Provider} trusts federated MFA but the sign-in carried no nonce, so its MFA claims were ignored. Send a fresh random nonce per attempt.", config.Name);
+        return null;
+    }
+
+    // Fail closed: anything unreadable, unknown or unverified yields null, which leaves the app's second-factor policy in charge.
+    private ExternalSecondFactorProof? ReadVerifiedSecondFactor(JsonWebToken token)
+    {
+        var amr = ReadAmr(token);
+        var authTime = ReadAuthTime(token);
+        // The issuer the token actually names, checked against the one issuer this provider trusts, so the verifier is a real second check
+        // on top of the handler's ValidIssuer rather than comparing the configuration with itself.
+        var assertion = new FederatedAssertion(token.Issuer ?? string.Empty, amr, authTime);
+        var outcome = FederatedMfaVerifier.Satisfies(assertion, [config.Issuer], config.FederatedMfaMaxAge, timeProvider.GetUtcNow());
+        if (!outcome.Succeeded() || authTime is not { } verifiedAt)
+        {
+            logger.LogInformation("External provider {Provider} asserted no usable second factor ({Outcome}).", config.Name, outcome);
+            return null;
+        }
+
+        var known = amr.Where(value => AmrClaims.IsKnown(value)).Distinct(StringComparer.Ordinal).ToArray();
+        return new ExternalSecondFactorProof(known, verifiedAt);
+    }
+
+    private static string[] ReadAmr(JsonWebToken token)
+    {
+        if (token.TryGetPayloadValue<IList<string>>("amr", out var values) && values is not null)
+        {
+            return values.Where(value => !string.IsNullOrWhiteSpace(value)).ToArray();
+        }
+
+        return token.TryGetPayloadValue<string>("amr", out var single) && !string.IsNullOrWhiteSpace(single) ? [single] : [];
+    }
+
+    // NumericDate (RFC 7519): seconds since the epoch, an integer or a number. Anything else counts as absent.
+    private static DateTimeOffset? ReadAuthTime(JsonWebToken token)
+    {
+        if (!token.TryGetPayloadValue<double>("auth_time", out var seconds)
+            || double.IsNaN(seconds) || double.IsInfinity(seconds) || seconds < 0 || seconds > MaxNumericDateSeconds)
+        {
+            return null;
+        }
+
+        return DateTimeOffset.FromUnixTimeSeconds((long)seconds);
     }
 
     private static string? GetClaim(JsonWebToken token, string name) =>

@@ -81,3 +81,7 @@ static Themia.Modules.Identity.ExternalAuth.AspNetCore.Endpoints.IdentityExterna
 virtual Themia.Modules.Identity.ExternalAuth.AspNetCore.External.ExternalAuthenticationHooksBase.OnBeforeExternalLoginAsync(Themia.Modules.Identity.Abstractions.Authentication.BeforeExternalLoginContext! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
 virtual Themia.Modules.Identity.ExternalAuth.AspNetCore.External.ExternalAuthenticationHooksBase.OnExternalLoginFailedAsync(Themia.Modules.Identity.Abstractions.Authentication.ExternalLoginFailedContext! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
 virtual Themia.Modules.Identity.ExternalAuth.AspNetCore.External.ExternalAuthenticationHooksBase.OnExternalLoginSucceededAsync(Themia.Modules.Identity.Abstractions.Authentication.ExternalLoginSucceededContext! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Modules.Identity.ExternalAuth.AspNetCore.External.OidcProviderConfig.TrustsFederatedMfa.get -> bool
+Themia.Modules.Identity.ExternalAuth.AspNetCore.External.OidcProviderConfig.TrustsFederatedMfa.init -> void
+Themia.Modules.Identity.ExternalAuth.AspNetCore.External.OidcProviderConfig.FederatedMfaMaxAge.get -> System.TimeSpan
+Themia.Modules.Identity.ExternalAuth.AspNetCore.External.OidcProviderConfig.FederatedMfaMaxAge.init -> void

@@ -198,39 +198,8 @@ internal sealed class SecondFactorCompletion : ISecondFactorProofCompletion
                 principalFactory, accessTokens, refreshTokens, timeProvider, user, AuthenticationType, cancellationToken).ConfigureAwait(false);
         }
 
-        // Same sequence as AuthTokenIssuer.IssueAsync, with the proof stored before the access token exists: a token must never
-        // claim a proof the server did not keep. If anything fails after the refresh token is issued, nobody is handed it, so end it.
-        var principal = await principalFactory.CreateAsync(user, AuthenticationType, cancellationToken).ConfigureAwait(false);
-        var refresh = await refreshTokens.IssueAsync(user.Id, cancellationToken).ConfigureAwait(false);
-        try
-        {
-            if (!await proofs!.SaveAsync(user.Id, refresh.FamilyId, proof, cancellationToken).ConfigureAwait(false))
-            {
-                throw new InvalidOperationException("The second-factor proof could not be stored for the new session.");
-            }
-
-            SessionProofClaims.Apply(principal, proof);
-            AuthTokenIssuer.AddSession(principal, refresh.FamilyId);
-            var access = accessTokens.Issue(principal);
-            return new AuthTokens(access.Token, AuthTokenIssuer.ExpiresInSeconds(timeProvider, access.ExpiresAt), refresh.RawToken);
-        }
-        catch
-        {
-            await RevokeUnhandedAsync(refresh.RawToken, user.Id).ConfigureAwait(false);
-            throw;
-        }
-    }
-
-    private async Task RevokeUnhandedAsync(string rawRefreshToken, Guid userId)
-    {
-        try
-        {
-            await refreshTokens.RevokeAsync(rawRefreshToken, false, CancellationToken.None).ConfigureAwait(false);
-        }
-        catch (Exception revokeFailure)
-        {
-            logger.LogError(revokeFailure, "Revoking the refresh token of a session whose proof or access token failed to issue also failed (user {UserId}).", userId);
-        }
+        return await AuthTokenIssuer.IssueWithProofAsync(
+            principalFactory, accessTokens, refreshTokens, proofs!, timeProvider, logger, user, AuthenticationType, proof, cancellationToken).ConfigureAwait(false);
     }
 
     private bool StillMayLogIn(User user, SecondFactorTicketData data)
