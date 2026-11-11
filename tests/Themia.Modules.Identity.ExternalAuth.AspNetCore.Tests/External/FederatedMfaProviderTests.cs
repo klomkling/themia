@@ -12,6 +12,7 @@ public sealed class FederatedMfaProviderTests
     private const string Secret = "this-is-a-32-byte-minimum-secret!!";
     private const string Issuer = "https://idp.test";
     private const string ClientId = "client-123";
+    private const string Nonce = "fresh-random-nonce";
     private static readonly DateTimeOffset Now = DateTimeOffset.Parse("2026-06-15T00:00:00Z");
 
     private static OidcProviderConfig Config(bool trusts) => new()
@@ -26,9 +27,14 @@ public sealed class FederatedMfaProviderTests
         TrustsFederatedMfa = trusts,
     };
 
-    private static async Task<ExternalIdentity> ExchangeAsync(bool trusts, IDictionary<string, object> extraClaims)
+    private static async Task<ExternalIdentity> ExchangeAsync(bool trusts, IDictionary<string, object> extraClaims, bool withNonce = true)
     {
         var claims = new Dictionary<string, object> { ["sub"] = "u1", ["email"] = "a@b.test" };
+        if (withNonce)
+        {
+            claims["nonce"] = Nonce;
+        }
+
         foreach (var pair in extraClaims)
         {
             claims[pair.Key] = pair.Value;
@@ -39,7 +45,7 @@ public sealed class FederatedMfaProviderTests
         var provider = new OidcExternalAuthProvider(
             Config(trusts), new SingleClientFactory(new HttpClient(StubHttpMessageHandler.Json(HttpStatusCode.OK, body))),
             new FakeTimeProvider(Now), Microsoft.Extensions.Logging.Abstractions.NullLoggerFactory.Instance);
-        var result = await provider.ExchangeAsync(new ExternalAuthRequest("code", "https://app.test/cb", "v"));
+        var result = await provider.ExchangeAsync(new ExternalAuthRequest("code", "https://app.test/cb", "v", withNonce ? Nonce : null));
         Assert.True(result.Succeeded);
         return result.Identity!.Value;
     }
@@ -108,6 +114,24 @@ public sealed class FederatedMfaProviderTests
     {
         var identity = await ExchangeAsync(true, Claims(42, null));
 
+        Assert.Null(identity.VerifiedSecondFactor);
+    }
+
+    [Fact]
+    public async Task Opted_in_provider_yields_no_proof_when_the_sign_in_carries_no_nonce_but_still_signs_in()
+    {
+        var identity = await ExchangeAsync(true, Claims(new[] { "otp", "mfa" }, null), withNonce: false);
+
+        Assert.Equal("u1", identity.Subject);
+        Assert.Null(identity.VerifiedSecondFactor);
+    }
+
+    [Fact]
+    public async Task Provider_that_does_not_opt_in_still_signs_in_without_a_nonce()
+    {
+        var identity = await ExchangeAsync(false, Claims(new[] { "otp", "mfa" }, null), withNonce: false);
+
+        Assert.Equal("u1", identity.Subject);
         Assert.Null(identity.VerifiedSecondFactor);
     }
 }
