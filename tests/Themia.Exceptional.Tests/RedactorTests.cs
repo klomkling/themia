@@ -49,6 +49,19 @@ public sealed class RedactorTests
     public void DefaultRedactor_MasksAJwtUnderAnyKey(string key)
         => Assert.Equal("***", ExceptionalOptions.DefaultRedactor(key, Jwt));
 
+    private const string UnsignedJwt = "eyJhbGciOiJub25lIn0.eyJzdWIiOiJhZG1pbiJ9.";
+
+    [Theory]
+    [InlineData("jwt")]
+    [InlineData("next")]
+    [InlineData("anything")]
+    public void DefaultRedactor_MasksAnUnsignedJwtWithAnEmptySignatureUnderAnyKey(string key)
+        => Assert.Equal("***", ExceptionalOptions.DefaultRedactor(key, UnsignedJwt));
+
+    [Fact]
+    public void DefaultRedactor_MasksAnUnsignedJwtInsideLongerText()
+        => Assert.Equal("redirect=/x?t=*** done", ExceptionalOptions.DefaultRedactor("note", $"redirect=/x?t={UnsignedJwt} done"));
+
     [Fact]
     public void DefaultRedactor_MasksAJwtInsideLongerText()
         => Assert.Equal("redirect=/x?t=*** done", ExceptionalOptions.DefaultRedactor("note", $"redirect=/x?t={Jwt} done"));
