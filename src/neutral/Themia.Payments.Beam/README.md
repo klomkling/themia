@@ -22,6 +22,17 @@ services.AddThemiaPaymentsBeam(o =>
 registers the named `HttpClient`, and calls `AddThemiaPayments()` itself — a host does not need to call
 both. Register only one payment adapter per container (see the `Themia.Payments` README).
 
+### Pointing the client at a fake Beam server (test stacks only)
+
+Set `BeamOptions.BaseAddress` (config key `Payments:Beam:BaseAddress`) to make the client call your own server instead of
+Beam. It wins over the address derived from `Environment`, and is checked on start:
+
+- `Environment` must be `Playground`; any override with `Production` is refused.
+- It must be a bare origin (no user info, path, query or fragment).
+- `http` is accepted only for a loopback host (`localhost`, `127.0.0.0/8`, `::1`); any other host needs `https`.
+
+The merchant id and API key are sent to that address, so use it only for an environment you control.
+
 **`WebhookHmacKey` is optional, but when set it must be the base64 of at least 16 bytes** — the key
 Lighthouse gives you is 32. An empty, blank, non-base64 or short key fails startup validation (the key
 itself is never echoed in the message), and `BeamWebhookVerifier` fails closed on any unusable key with

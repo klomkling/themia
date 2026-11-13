@@ -421,6 +421,9 @@ services.AddSingleton<ISecondFactorPolicy, StaffMfaPolicy>();   // after AddThem
   the factor; Themia cannot tell. The ticket proves the primary check passed, not that the second factor did.
 - **Enrol is only as strong as the primary check.** Return `Enrol` only for accounts that have no factor yet, and notify the user
   (and any existing devices) when a factor is enrolled, otherwise whoever holds a stolen password can enrol their own.
+- **A federated MFA proof meets Enrol too.** With `OidcProviderConfig.TrustsFederatedMfa` on and a sign-in bound by nonce and PKCE `code_verifier`, a
+  verified proof from the identity provider satisfies a `Verify` or an `Enrol` requirement alike, so the user is not asked to enrol a second factor the
+  provider already enforced. Keep the nonce and code_verifier in the client's own session, use PKCE `S256`, and make the provider require PKCE for that client.
 - Tickets are protected with ASP.NET Core data protection plus a single-use user token (`TokenPurpose.SecondFactorTicket`); persist and protect
   the data-protection keys in production (a key store that is not encrypted at rest is a risk for every ticket and cookie). Losing them only invalidates tickets in flight. The ticket and the password are never logged.
 - **The seam covers only the three Themia flows.** Code that mints sessions with the public building blocks

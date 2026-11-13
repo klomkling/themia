@@ -16,6 +16,16 @@ public sealed class BeamOptions
     public BeamEnvironment Environment { get; set; } = BeamEnvironment.Playground;
 
     /// <summary>
+    /// Overrides the address derived from <see cref="Environment"/>, so a test stack can point the client at a fake
+    /// Beam server. Optional; leave unset for real traffic. Refused at startup unless <see cref="Environment"/> is
+    /// <see cref="BeamEnvironment.Playground"/>, so a production configuration can never be repointed. It must be an
+    /// absolute origin (no user info, query, fragment or path); <c>http</c> is allowed only for a loopback host
+    /// (<c>localhost</c>, <c>127.0.0.0/8</c>, <c>::1</c>), any other host needs <c>https</c>. The merchant id and API
+    /// key are sent to this address, so only set it for an environment you control.
+    /// </summary>
+    public Uri? BaseAddress { get; set; }
+
+    /// <summary>
     /// The base64 HMAC key from Lighthouse, used to verify webhooks. Never logged. Optional, but when set it
     /// must decode to at least 16 bytes — validated at startup.
     /// </summary>

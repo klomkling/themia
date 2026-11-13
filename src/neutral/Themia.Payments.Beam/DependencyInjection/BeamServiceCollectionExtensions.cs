@@ -36,10 +36,12 @@ public static class BeamServiceCollectionExtensions
                 $"BeamOptions.WebhookHmacKey, when set, must be the base64 of at least {BeamWebhookKey.MinimumBytes} bytes.")
             .ValidateOnStart();
 
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IValidateOptions<BeamOptions>, BeamBaseAddressValidator>());
+
         services.AddHttpClient(BeamPaymentGateway.HttpClientName, (sp, client) =>
         {
             var options = sp.GetRequiredService<IOptions<BeamOptions>>().Value;
-            client.BaseAddress = BeamOptions.BaseAddressFor(options.Environment);
+            client.BaseAddress = BeamBaseAddress.Resolve(options);
             client.Timeout = options.Timeout;
         });
 
