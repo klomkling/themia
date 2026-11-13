@@ -16,6 +16,105 @@ public class BeamOptionsTests
         Assert.Equal(new Uri("https://api.beamcheckout.com"), BeamOptions.BaseAddressFor(BeamEnvironment.Production));
     }
 
+    private static ServiceProvider Provider(Action<BeamOptions> configure)
+    {
+        var services = new ServiceCollection();
+        services.AddThemiaPaymentsBeam(o =>
+        {
+            o.MerchantId = "m";
+            o.ApiKey = "k";
+            configure(o);
+        });
+        return services.BuildServiceProvider();
+    }
+
+    private static string[] Failures(Action<BeamOptions> configure)
+    {
+        using var provider = Provider(configure);
+        var ex = Assert.Throws<OptionsValidationException>(
+            () => { _ = provider.GetRequiredService<IOptions<BeamOptions>>().Value; });
+        return [.. ex.Failures];
+    }
+
+    [Theory]
+    [InlineData("http://localhost:8099")]
+    [InlineData("http://127.0.0.1:8099")]
+    [InlineData("http://127.0.0.2:8099")]
+    [InlineData("http://[::1]:8099")]
+    [InlineData("https://fake-beam.example.test")]
+    public void A_playground_override_is_used_instead_of_the_environment_address(string address)
+    {
+        using var provider = Provider(o => { o.Environment = BeamEnvironment.Playground; o.BaseAddress = new Uri(address); });
+
+        var options = provider.GetRequiredService<IOptions<BeamOptions>>().Value;
+        var client = provider.GetRequiredService<IHttpClientFactory>().CreateClient(BeamPaymentGateway.HttpClientName);
+
+        Assert.Equal(new Uri(address), options.BaseAddress);
+        Assert.Equal(new Uri(address), client.BaseAddress);
+    }
+
+    [Fact]
+    public void Without_an_override_the_environment_address_is_used()
+    {
+        using var provider = Provider(o => o.Environment = BeamEnvironment.Production);
+
+        var client = provider.GetRequiredService<IHttpClientFactory>().CreateClient(BeamPaymentGateway.HttpClientName);
+
+        Assert.Equal(BeamOptions.BaseAddressFor(BeamEnvironment.Production), client.BaseAddress);
+    }
+
+    [Theory]
+    [InlineData("http://localhost:8099")]
+    [InlineData("https://fake-beam.example.test")]
+    public void A_production_override_is_refused_at_startup(string address)
+    {
+        var failures = string.Join(" ", Failures(o => { o.Environment = BeamEnvironment.Production; o.BaseAddress = new Uri(address); }));
+
+        Assert.Contains("BaseAddress", failures, StringComparison.Ordinal);
+        Assert.Contains("Production", failures, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("http://fake-beam.example.test")]
+    [InlineData("http://10.0.0.5:8099")]
+    [InlineData("http://localhost.evil.test")]
+    public void A_plain_http_override_is_refused_unless_the_host_is_loopback(string address)
+    {
+        var failures = string.Join(" ", Failures(o => { o.Environment = BeamEnvironment.Playground; o.BaseAddress = new Uri(address); }));
+
+        Assert.Contains("BaseAddress", failures, StringComparison.Ordinal);
+        Assert.Contains("loopback", failures, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("https://user:pass@fake-beam.example.test")]
+    [InlineData("https://fake-beam.example.test/?x=1")]
+    [InlineData("https://fake-beam.example.test/#frag")]
+    [InlineData("https://fake-beam.example.test/v1")]
+    [InlineData("ftp://fake-beam.example.test")]
+    public void An_override_with_credentials_query_path_or_another_scheme_is_refused(string address)
+    {
+        var failures = Failures(o => { o.Environment = BeamEnvironment.Playground; o.BaseAddress = new Uri(address); });
+
+        Assert.Contains(failures, f => f.Contains("BaseAddress", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void A_relative_override_is_refused()
+    {
+        var failures = Failures(o => o.BaseAddress = new Uri("/beam", UriKind.Relative));
+
+        Assert.Contains(failures, f => f.Contains("BaseAddress", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void A_refused_override_does_not_echo_the_address_credentials()
+    {
+        var failures = string.Join(" ", Failures(o => o.BaseAddress = new Uri("https://user:s3cret@fake-beam.example.test")));
+
+        Assert.DoesNotContain("s3cret", failures, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void A_missing_merchant_id_fails_validation_at_startup()
     {
