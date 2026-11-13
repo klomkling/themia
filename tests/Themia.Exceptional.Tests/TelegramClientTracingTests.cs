@@ -79,8 +79,9 @@ public class TelegramClientTracingTests
 
         using var provider = Provider();
         using var invoker = new HttpClient(provider.GetRequiredService<IHttpMessageHandlerFactory>().CreateHandler(TelegramAlertChannel.HttpClientName));
+        using var timeout = new CancellationTokenSource(RequestTimeout);
         using var response = await invoker.GetAsync(
-            $"http://127.0.0.1:{port}/bot123456:secret-token-value/sendMessage", new CancellationTokenSource(RequestTimeout).Token);
+            $"http://127.0.0.1:{port}/bot123456:secret-token-value/sendMessage", timeout.Token);
         await serving;
 
         Assert.Equal(0, recorded);
