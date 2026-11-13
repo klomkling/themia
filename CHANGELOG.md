@@ -27,6 +27,8 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.60.1] - 2026-11-14
+
 ### Added
 
 - **`Themia.Payments.Beam`: `BeamOptions.BaseAddress` points the client at a fake Beam server for end-to-end stacks.** Nullable and off by default, so nothing changes until it is set; when set it wins over the address for `Environment`. Validated on start: only with `Environment = Playground` (an override with Production is refused), a bare origin with no user info, path, query or fragment, and `http` only for a loopback host (`localhost`, `127.0.0.0/8`, `::1`), `https` otherwise. The failure message never echoes the address. The merchant id and API key are sent to the override, so set it only for an environment you control. Requested in coord #0214.
