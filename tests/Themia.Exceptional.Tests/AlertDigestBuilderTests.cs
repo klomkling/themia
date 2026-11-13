@@ -42,21 +42,32 @@ public class AlertDigestBuilderTests
         Assert.Contains("App", digest.Text);
         Assert.Contains("Production", digest.Text);
         Assert.Contains("System.InvalidOperationException", digest.Text);
-        Assert.Contains("boom", digest.Text);
+        Assert.DoesNotContain("boom", digest.Text);
         Assert.Contains("3", digest.Text);
         Assert.Contains("2026-11-10 05:00", digest.Text);
         Assert.Contains($"https://admin.example.test/exceptions/{c.Guid}", digest.Text);
     }
 
     [Fact]
-    public void Build_MasksPersonalDataInMessageAndCollapsesNewlines()
+    public void Build_NeverIncludesTheExceptionMessage()
     {
-        var c = Candidate(1, message: "user a@b.example failed\nFAKE LINE phone 081 234 5678");
+        var c = Candidate(1, message: "user a@b.example failed, token FAKE-SECRET-0123");
+        var text = AlertDigestBuilder.Build([c], "App", Options()).Text;
+
+        Assert.DoesNotContain("a@b.example", text);
+        Assert.DoesNotContain("failed", text);
+        Assert.DoesNotContain("FAKE-SECRET-0123", text);
+    }
+
+    [Fact]
+    public void Build_MasksPersonalDataInTypeAndCollapsesNewlines()
+    {
+        var c = Candidate(1, type: "My.Ex a@b.example\nFAKE LINE phone 081 234 5678");
         var text = AlertDigestBuilder.Build([c], "App", Options()).Text;
 
         Assert.DoesNotContain("a@b.example", text);
         Assert.DoesNotContain("081 234 5678", text);
-        Assert.DoesNotContain("failed\nFAKE", text);
+        Assert.DoesNotContain("example\nFAKE", text);
     }
 
     [Fact]
@@ -64,7 +75,9 @@ public class AlertDigestBuilderTests
     {
         var group = Enumerable.Range(1, 10)
             .Select(n => Candidate(n, Words("Type"), Words("msg"))).ToList();
-        var digest = AlertDigestBuilder.Build(group, "App", Options());
+        var options = Options();
+        options.AdminUrlTemplate = "https://admin.example.test/" + new string('p', 300) + "/{guid}";
+        var digest = AlertDigestBuilder.Build(group, "App", options);
 
         Assert.True(digest.Text.Length <= AlertDigestBuilder.MaxMessageLength, $"length {digest.Text.Length}");
         Assert.InRange(digest.IncludedCount, 1, 9);

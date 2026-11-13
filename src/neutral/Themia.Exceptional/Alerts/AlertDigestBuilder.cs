@@ -9,7 +9,6 @@ internal static class AlertDigestBuilder
     // Telegram rejects text over 4096 characters; stay clear of the edge so counting differences never matter.
     internal const int MaxMessageLength = 4000;
     private const int MaxTypeLength = 120;
-    private const int MaxMessageTextLength = 200;
     private const string DateFormat = "yyyy-MM-dd HH:mm'Z'";
 
     public static AlertDigest Build(
@@ -40,13 +39,12 @@ internal static class AlertDigestBuilder
     private static string RenderGroup(int index, ExceptionAlertCandidate c, ExceptionAlertOptions options)
     {
         var type = Clean(c.Type, MaxTypeLength);
-        var message = Clean(c.Message, MaxMessageTextLength);
         var link = options.AdminUrlTemplate.Replace("{guid}", c.Guid.ToString("D"), StringComparison.Ordinal);
         return string.Create(CultureInfo.InvariantCulture,
-            $"\n{index}) {c.Trigger.ToString().ToUpperInvariant()} {type}\n{message}\ncount {c.DuplicateCount}, first {c.FirstSeenUtc.ToString(DateFormat, CultureInfo.InvariantCulture)}, last {c.LastSeenUtc.ToString(DateFormat, CultureInfo.InvariantCulture)}\n{link}\n");
+            $"\n{index}) {c.Trigger.ToString().ToUpperInvariant()} {type}\ncount {c.DuplicateCount}, first {c.FirstSeenUtc.ToString(DateFormat, CultureInfo.InvariantCulture)}, last {c.LastSeenUtc.ToString(DateFormat, CultureInfo.InvariantCulture)}\n{link}\n");
     }
 
-    // Masks personal data and tokens, then flattens whitespace so exception text cannot fake extra lines.
+    // The exception message is never rendered (it can carry personal data). The type name is still masked and flattened so it cannot fake extra lines.
     private static string Clean(string value, int maxLength)
     {
         var masked = AlertMessageMasker.Mask(value);
