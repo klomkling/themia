@@ -12,6 +12,8 @@ with the *why* and concrete upgrade steps.
 
 ## Unreleased
 
+## 0.61.0
+
 ### A custom `IRefreshTokenService` must implement `IsSessionLiveAsync` for refresh
 
 **What changed:** when an `ISessionProofStore` is registered, a refresh of a session that has no stored second-factor proof is now refused unless `IRefreshTokenService.IsSessionLiveAsync(userId, familyId)` is true. The refresh path did not ask it before (`RenewSessionAsync`, the restricted-session gate and the proof store already did).
