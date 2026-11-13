@@ -42,8 +42,8 @@ Environment-variable form (standard .NET binding): `Exceptional__Alerts__BotToke
   A threshold alert for one hash is sent at most once per `QuietPeriod`.
 - **Retention.** Host-side purge should keep rows longer than `QuietPeriod`; otherwise an old hash is labelled "new" instead of "reappeared".
 - **Shared database.** Candidates are limited to this app's `ApplicationName` and to rows that are not soft-deleted.
-- **Privacy.** The message never includes stack trace, request body or context, query string, IP address or tenant.
-  The exception message is truncated and e-mail-like text, digit runs of 8 or more and token-like runs are masked. The
-  text still leaves your network for Telegram; review your data-protection position before enabling.
+- **Privacy.** The digest carries only application, environment, exception type, count, first/last seen and the admin link. It never
+  includes the exception message, stack trace, request body or context, query string, IP address or tenant: open the link to read
+  the detail inside your own network. The type name is still masked (e-mail-like text, long digit runs, token-like runs) and flattened.
 - **Custom dialects.** A custom `IExceptionalSqlDialect` must also implement `IExceptionAlertSqlDialect`; otherwise startup fails with a clear message.
 - **Migration.** `AddExceptionAlertState` is additive and forward-only; it creates `ExceptionAlertState` and `IX_Exceptions_App_LastLog`.
