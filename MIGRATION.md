@@ -12,6 +12,16 @@ with the *why* and concrete upgrade steps.
 
 ## Unreleased
 
+### A custom `IRefreshTokenService` must implement `IsSessionLiveAsync` for refresh
+
+**What changed:** when an `ISessionProofStore` is registered, a refresh of a session that has no stored second-factor proof is now refused unless `IRefreshTokenService.IsSessionLiveAsync(userId, familyId)` is true. The refresh path did not ask it before (`RenewSessionAsync`, the restricted-session gate and the proof store already did).
+
+**Why:** a session that ended (revoked family, changed security stamp) could otherwise still mint a new access token through a refresh when no proof row existed to check.
+
+**Who is affected:** only an app that replaced `IRefreshTokenService` with its own implementation. The default implementation is unchanged.
+
+**How to upgrade:** implement `IsSessionLiveAsync` to answer true only for a family that exists, is not revoked and has not expired (and, if you bind sessions to the security stamp, whose stamp still matches). The default interface implementation returns false (fail closed), so an implementation that does not override it now refuses every such refresh.
+
 ## 0.60.0
 
 ### `IClaimService.ReplaceRoleClaimsAsync` (breaking for implementers)
