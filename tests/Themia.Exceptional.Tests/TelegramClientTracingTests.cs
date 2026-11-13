@@ -20,6 +20,7 @@ public class TelegramClientTracingTests
 {
     private const string HttpDiagnosticListenerName = "HttpHandlerDiagnosticListener";
     private const string HttpActivitySourceName = "System.Net.Http";
+    private static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(10);
 
     private static ServiceProvider Provider()
     {
@@ -49,6 +50,7 @@ public class TelegramClientTracingTests
 
         var primary = Assert.IsType<SocketsHttpHandler>(PrimaryHandler(provider));
         Assert.Null(primary.ActivityHeadersPropagator);
+        Assert.False(primary.UseCookies);
     }
 
     [Fact]
@@ -60,7 +62,7 @@ public class TelegramClientTracingTests
         server.Start();
         var serving = Task.Run(async () =>
         {
-            var context = await server.GetContextAsync();
+            var context = await server.GetContextAsync().WaitAsync(RequestTimeout);
             context.Response.StatusCode = 200;
             context.Response.Close();
         });
@@ -77,7 +79,8 @@ public class TelegramClientTracingTests
 
         using var provider = Provider();
         using var invoker = new HttpClient(provider.GetRequiredService<IHttpMessageHandlerFactory>().CreateHandler(TelegramAlertChannel.HttpClientName));
-        using var response = await invoker.GetAsync($"http://127.0.0.1:{port}/bot123456:secret-token-value/sendMessage");
+        using var response = await invoker.GetAsync(
+            $"http://127.0.0.1:{port}/bot123456:secret-token-value/sendMessage", new CancellationTokenSource(RequestTimeout).Token);
         await serving;
 
         Assert.Equal(0, recorded);

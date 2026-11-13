@@ -34,7 +34,7 @@ public static class AlertServiceCollectionExtensions
         // instrumentation reads) carry the URL too, and a null ActivityHeadersPropagator keeps them off this client.
         services.AddHttpClient(TelegramAlertChannel.HttpClientName)
             .RemoveAllLoggers()
-            .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { ActivityHeadersPropagator = null });
+            .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { ActivityHeadersPropagator = null, UseCookies = false });
         services.TryAddSingleton<IAlertChannel, TelegramAlertChannel>();
         services.AddHostedService(sp =>
         {
