@@ -41,6 +41,8 @@ public class BeamOptionsTests
     [InlineData("http://127.0.0.1:8099")]
     [InlineData("http://127.0.0.2:8099")]
     [InlineData("http://[::1]:8099")]
+    [InlineData("HTTP://LOCALHOST:8099")]
+    [InlineData("http://[::ffff:127.0.0.1]:8099")]
     [InlineData("https://fake-beam.example.test")]
     public void A_playground_override_is_used_instead_of_the_environment_address(string address)
     {
@@ -78,12 +80,33 @@ public class BeamOptionsTests
     [InlineData("http://fake-beam.example.test")]
     [InlineData("http://10.0.0.5:8099")]
     [InlineData("http://localhost.evil.test")]
+    [InlineData("http://localhost.:8099")]
+    [InlineData("http://0.0.0.0:8099")]
+    [InlineData("http://[::ffff:10.0.0.5]:8099")]
     public void A_plain_http_override_is_refused_unless_the_host_is_loopback(string address)
     {
         var failures = string.Join(" ", Failures(o => { o.Environment = BeamEnvironment.Playground; o.BaseAddress = new Uri(address); }));
 
         Assert.Contains("BaseAddress", failures, StringComparison.Ordinal);
         Assert.Contains("loopback", failures, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void An_undefined_environment_with_an_override_is_refused()
+    {
+        var failures = string.Join(" ", Failures(o => { o.Environment = (BeamEnvironment)99; o.BaseAddress = new Uri("http://localhost:8099"); }));
+
+        Assert.Contains("Playground", failures, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void An_override_set_after_validation_is_refused_when_the_client_is_created()
+    {
+        using var provider = Provider(o => o.Environment = BeamEnvironment.Playground);
+        provider.GetRequiredService<IOptions<BeamOptions>>().Value.BaseAddress = new Uri("http://fake-beam.example.test");
+
+        Assert.Throws<InvalidOperationException>(
+            () => provider.GetRequiredService<IHttpClientFactory>().CreateClient(BeamPaymentGateway.HttpClientName));
     }
 
     [Theory]

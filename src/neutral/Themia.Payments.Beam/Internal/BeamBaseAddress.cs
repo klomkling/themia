@@ -6,7 +6,11 @@ namespace Themia.Payments.Beam.Internal;
 /// <summary>Resolves and validates <see cref="BeamOptions.BaseAddress"/>, the test-stack override of the Beam address.</summary>
 internal static class BeamBaseAddress
 {
-    public static Uri Resolve(BeamOptions options) => options.BaseAddress ?? BeamOptions.BaseAddressFor(options.Environment);
+    /// <summary>Returns the address to call. Validates again because <see cref="BeamOptions.BaseAddress"/> is settable after startup validation.</summary>
+    public static Uri Resolve(BeamOptions options) =>
+        Validate(options) is { } reason
+            ? throw new InvalidOperationException(reason)
+            : options.BaseAddress ?? BeamOptions.BaseAddressFor(options.Environment);
 
     /// <summary>Returns why the override is unusable, or <see langword="null"/> when it is absent or acceptable. Never echoes the address.</summary>
     public static string? Validate(BeamOptions options)
