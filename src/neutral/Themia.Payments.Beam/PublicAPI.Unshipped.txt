@@ -7,6 +7,8 @@ Themia.Payments.Beam.BeamEnvironment.Playground = 0 -> Themia.Payments.Beam.Beam
 Themia.Payments.Beam.BeamEnvironment.Production = 1 -> Themia.Payments.Beam.BeamEnvironment
 Themia.Payments.Beam.BeamOptions
 Themia.Payments.Beam.BeamOptions.BeamOptions() -> void
+Themia.Payments.Beam.BeamOptions.BaseAddress.get -> System.Uri?
+Themia.Payments.Beam.BeamOptions.BaseAddress.set -> void
 Themia.Payments.Beam.BeamOptions.MerchantId.get -> string!
 Themia.Payments.Beam.BeamOptions.MerchantId.set -> void
 Themia.Payments.Beam.BeamOptions.ApiKey.get -> string!
