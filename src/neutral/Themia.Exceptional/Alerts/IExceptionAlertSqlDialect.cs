@@ -28,7 +28,7 @@ public interface IExceptionAlertSqlDialect
     /// Alertable rows not yet claimed, one result row per (row, trigger), ordered by trigger then recency.
     /// Params: @ApplicationName, @LookbackSeconds, @QuietSeconds, @Threshold, @Limit. A row that is both New and
     /// Threshold appears under both triggers; the caller keeps the lowest.
-    /// Columns: ExceptionId, Guid, ApplicationName, ErrorHash, AlertTrigger, Type, Message, DuplicateCount, FirstSeenUtc, LastSeenUtc.
+    /// Columns: ExceptionId, Guid, ApplicationName, ErrorHash, AlertTrigger, Type, DuplicateCount, FirstSeenUtc, LastSeenUtc.
     /// </summary>
     string CandidatesSql { get; }
 

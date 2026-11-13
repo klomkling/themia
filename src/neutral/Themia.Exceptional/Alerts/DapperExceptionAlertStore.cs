@@ -115,7 +115,6 @@ internal sealed class DapperExceptionAlertStore : IExceptionAlertStore
         public string ErrorHash { get; set; } = string.Empty;
         public int AlertTrigger { get; set; }
         public string Type { get; set; } = string.Empty;
-        public string Message { get; set; } = string.Empty;
         public int DuplicateCount { get; set; }
         public DateTime FirstSeenUtc { get; set; }
         public DateTime LastSeenUtc { get; set; }
@@ -128,7 +127,6 @@ internal sealed class DapperExceptionAlertStore : IExceptionAlertStore
             ErrorHash = ErrorHash,
             Trigger = (ExceptionAlertTrigger)AlertTrigger,
             Type = Type,
-            Message = Message,
             DuplicateCount = DuplicateCount,
             FirstSeenUtc = DateTime.SpecifyKind(FirstSeenUtc, DateTimeKind.Utc),
             LastSeenUtc = DateTime.SpecifyKind(LastSeenUtc, DateTimeKind.Utc),

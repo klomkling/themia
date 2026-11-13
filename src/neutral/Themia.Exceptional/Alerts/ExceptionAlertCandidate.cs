@@ -21,7 +21,7 @@ public sealed class ExceptionAlertCandidate
     /// <summary>Exception type name.</summary>
     public string Type { get; init; } = string.Empty;
 
-    /// <summary>Exception message (untrusted text; masked and truncated before it is sent).</summary>
+    /// <summary>Always empty: the store no longer reads the exception message and the digest never carries it.</summary>
     public string Message { get; init; } = string.Empty;
 
     /// <summary>How many times the error was rolled up into this row.</summary>

@@ -57,7 +57,7 @@ internal sealed class AlertSqlBuilder
 
     public string ClaimedRows => $"""
         SELECT {Q("E")}.{Q("Id")} AS {Q("ExceptionId")}, {Q("E")}.{Q("Guid")}, {Q("E")}.{Q("ApplicationName")},
-               {Q("E")}.{Q("ErrorHash")}, {Q("S")}.{Q("AlertTrigger")}, {Q("E")}.{Q("Type")}, {Q("E")}.{Q("Message")},
+               {Q("E")}.{Q("ErrorHash")}, {Q("S")}.{Q("AlertTrigger")}, {Q("E")}.{Q("Type")},
                {Q("E")}.{Q("DuplicateCount")}, {Q("E")}.{Q("CreationDate")} AS {Q("FirstSeenUtc")},
                {Q("E")}.{Q("LastLogDate")} AS {Q("LastSeenUtc")}
         FROM {State} {Q("S")} JOIN {Exceptions} {Q("E")} ON {Q("E")}.{Q("Id")} = {Q("S")}.{Q("ExceptionId")}
@@ -139,7 +139,7 @@ internal sealed class AlertSqlBuilder
 
     private string CandidateBranch(ExceptionAlertTrigger trigger, string extraFilter) => $"""
         SELECT {Q("E")}.{Q("Id")} AS {Q("ExceptionId")}, {Q("E")}.{Q("Guid")}, {Q("E")}.{Q("ApplicationName")},
-               {Q("E")}.{Q("ErrorHash")}, {(int)trigger} AS {Q("AlertTrigger")}, {Q("E")}.{Q("Type")}, {Q("E")}.{Q("Message")},
+               {Q("E")}.{Q("ErrorHash")}, {(int)trigger} AS {Q("AlertTrigger")}, {Q("E")}.{Q("Type")},
                {Q("E")}.{Q("DuplicateCount")}, {Q("E")}.{Q("CreationDate")} AS {Q("FirstSeenUtc")},
                {Q("E")}.{Q("LastLogDate")} AS {Q("LastSeenUtc")}
         FROM {Exceptions} {Q("E")}

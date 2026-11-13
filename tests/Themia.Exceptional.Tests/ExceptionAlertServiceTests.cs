@@ -89,13 +89,14 @@ public class ExceptionAlertServiceTests
     [Fact]
     public async Task RunOnce_OnlyClaimsGroupsThatFitInTheMessage()
     {
-        var words = string.Join(' ', Enumerable.Repeat("word", 250));
-        var candidates = Enumerable.Range(1, 15).Select(i => Candidate(i, message: words)).ToList();
+        var options = Options();
+        options.AdminUrlTemplate = "https://admin.example.test/" + new string('p', 400) + "/{guid}";
+        var candidates = Enumerable.Range(1, 15).Select(i => Candidate(i)).ToList();
         var store = new FakeStore();
         store.Candidates.AddRange(candidates);
         var channel = new FakeChannel();
 
-        await Service(store, channel).RunOnceAsync(default);
+        await Service(store, channel, options).RunOnceAsync(default);
 
         Assert.InRange(channel.Sent[0].Text.Length, 1, AlertDigestBuilder.MaxMessageLength);
         Assert.Equal(channel.Sent[0].IncludedCount, store.Claims.Count);
@@ -190,7 +191,7 @@ public class ExceptionAlertServiceTests
     }
 
     [Fact]
-    public async Task RunOnce_MasksPersonalDataInTheMessageAndOmitsEverythingElse()
+    public async Task RunOnce_OmitsTheExceptionMessageAndEverythingElse()
     {
         var store = new FakeStore();
         store.Candidates.Add(Candidate(1, message: "user jane.doe@example.test phone 0812345678 failed"));
@@ -201,7 +202,7 @@ public class ExceptionAlertServiceTests
         var text = Assert.Single(channel.Sent).Text;
         Assert.DoesNotContain("jane.doe@example.test", text);
         Assert.DoesNotContain("0812345678", text);
-        Assert.Contains("failed", text);
+        Assert.DoesNotContain("failed", text);
     }
 
     private sealed class ListLogger : Microsoft.Extensions.Logging.ILogger<ExceptionAlertService>
