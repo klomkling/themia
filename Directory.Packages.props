@@ -30,6 +30,9 @@
          EnvelopedCms). Targets net8.0 use 8.0.2, net10.0 use 10.0.13. -->
     <PackageVersion Include="System.Security.Cryptography.Pkcs" Version="8.0.2" Condition="'$(TargetFramework)' == 'net8.0' or '$(TargetFramework)' == ''" />
     <PackageVersion Include="System.Security.Cryptography.Pkcs" Version="10.0.13" Condition="'$(TargetFramework)' == 'net10.0'" />
+    <!-- Transitive pin (via Fido2 4.0.1): force System.Formats.Cbor to 9.0.24 to clear advisory
+         GHSA-vmv3-wvjp-wqpj (patched in 9.0.24). Remove once Fido2 depends on a patched version. -->
+    <PackageVersion Include="System.Formats.Cbor" Version="9.0.24" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.6.0" />
     <PackageVersion Include="xunit" Version="2.9.3" />
     <PackageVersion Include="xunit.assert" Version="2.9.3" />
