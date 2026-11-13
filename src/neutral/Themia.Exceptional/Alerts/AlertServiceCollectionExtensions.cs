@@ -29,8 +29,12 @@ public static class AlertServiceCollectionExtensions
         services.TryAddSingleton<IExceptionAlertStore>(sp => new DapperExceptionAlertStore(ResolveAlertDialect(sp)));
 
         // The bot token is part of the request URL. IHttpClientFactory logs the full URI at Information
-        // by default, so every built-in logger is removed from this client.
-        services.AddHttpClient(TelegramAlertChannel.HttpClientName).RemoveAllLoggers();
+        // by default, so every built-in logger is removed from this client. HttpClient diagnostics (the
+        // System.Net.Http activity and the HttpHandlerDiagnosticListener events that OpenTelemetry's HttpClient
+        // instrumentation reads) carry the URL too, and a null ActivityHeadersPropagator keeps them off this client.
+        services.AddHttpClient(TelegramAlertChannel.HttpClientName)
+            .RemoveAllLoggers()
+            .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { ActivityHeadersPropagator = null, UseCookies = false });
         services.TryAddSingleton<IAlertChannel, TelegramAlertChannel>();
         services.AddHostedService(sp =>
         {
