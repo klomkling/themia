@@ -20,7 +20,7 @@ with the *why* and concrete upgrade steps.
 
 **Why:** a caller that must not mark a refund Succeeded on an answer it cannot reconcile needs the amount the provider echoed. `null` means none was echoed (or it could not be read), never zero.
 
-**Who is affected:** code that deconstructs a `RefundCreation` into two variables (source break), and any assembly compiled against 0.61.x that calls the old two-output `Deconstruct` or the old constructor signature (binary break: recompile). Code that compares two creations that differ only in `Amount` now sees them unequal.
+**Who is affected:** code that deconstructs a `RefundCreation` into two variables (source break), and any assembly compiled against 0.61.x that calls the old two-output `Deconstruct` (binary break: recompile). Code that compares two creations that differ only in `Amount` now sees them unequal.
 
 **How to upgrade:**
 
