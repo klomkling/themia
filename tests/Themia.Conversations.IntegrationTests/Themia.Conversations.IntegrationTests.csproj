@@ -20,6 +20,7 @@
     <PackageReference Include="Testcontainers.MySql" />
     <PackageReference Include="Testcontainers.MsSql" />
     <PackageReference Include="Dapper" />
+    <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
     <PackageReference Include="Npgsql" />
     <PackageReference Include="MySqlConnector" />
     <PackageReference Include="Microsoft.Data.SqlClient" />

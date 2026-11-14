@@ -8,3 +8,5 @@ Themia.Conversations.MySql.MySqlConversationDialect.LimitClause.get -> string!
 Themia.Conversations.MySql.MySqlConversationDialect.MySqlConversationDialect(string! connectionString) -> void
 Themia.Conversations.MySql.ServiceCollectionExtensions
 static Themia.Conversations.MySql.ServiceCollectionExtensions.AddThemiaConversationsMySql(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, string! connectionString) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+Themia.Conversations.MySql.MySqlConversationDialect.CursorClaimRowLockClause.get -> string!
+Themia.Conversations.MySql.MySqlConversationDialect.CursorClaimTableHint.get -> string!

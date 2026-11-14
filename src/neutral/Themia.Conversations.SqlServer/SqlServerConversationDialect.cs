@@ -34,6 +34,12 @@ public sealed class SqlServerConversationDialect : IConversationDialect
         exception is SqlException { Number: DeadlockVictim or LockTimeout };
 
     /// <inheritdoc />
+    public string CursorClaimTableHint => "WITH (UPDLOCK, READPAST, ROWLOCK)";
+
+    /// <inheritdoc />
+    public string CursorClaimRowLockClause => "";
+
+    /// <inheritdoc />
     public string LimitClause => "OFFSET 0 ROWS FETCH NEXT @Limit ROWS ONLY";
 
     /// <inheritdoc />

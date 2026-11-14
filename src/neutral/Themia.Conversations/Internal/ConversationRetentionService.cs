@@ -221,7 +221,7 @@ internal sealed class ConversationRetentionService(
             cancellationToken: cancellationToken));
 
         // Children first (their foreign keys point at participants and messages), then the conversation row, which frees the subject key.
-        foreach (var table in new[] { "conversation_attachments", "conversation_guest_sessions", "conversation_messages", "conversation_participants", "conversation_events" })
+        foreach (var table in new[] { "conversation_attachments", "conversation_guest_sessions", "conversation_messages", "conversation_notify_cursors", "conversation_participants", "conversation_events" })
         {
             await connection.ExecuteAsync(new CommandDefinition(
                 $"DELETE FROM {table} WHERE tenant_id = @TenantId AND conversation_id = @ConversationId;", scope, transaction, cancellationToken: cancellationToken));

@@ -39,6 +39,12 @@ public sealed class MySqlConversationDialect : IConversationDialect
         exception is MySqlException { ErrorCode: MySqlErrorCode.LockDeadlock or MySqlErrorCode.LockWaitTimeout };
 
     /// <inheritdoc />
+    public string CursorClaimTableHint => "";
+
+    /// <inheritdoc />
+    public string CursorClaimRowLockClause => "FOR UPDATE OF n SKIP LOCKED";
+
+    /// <inheritdoc />
     public string LimitClause => "LIMIT @Limit";
 
     /// <inheritdoc />

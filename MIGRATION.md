@@ -12,6 +12,14 @@ with the *why* and concrete upgrade steps.
 
 ## Unreleased
 
+### `Themia.Conversations` gains the table `conversation_notify_cursors` (not breaking)
+
+**What changed:** migration `202611140001` creates `conversation_notify_cursors`, the per-recipient state of the notification drain. Its foreign key to `conversation_participants` has no cascade. The purge deletes cursor rows before the participants, in code.
+
+**Who is affected:** an app that rolls back to a version without this migration, or runs old and new nodes together while a purge can run. An old node's purge does not know the table and its participant delete fails on the foreign key.
+
+**How to upgrade:** nothing for a forward upgrade. For a rollback of the application, run `DROP TABLE conversation_notify_cursors` first (the table holds only notification progress, so dropping it loses no messages; recipients may be notified once more when it is recreated). During a rolling upgrade keep `IConversationNotifications.DrainAsync` and the retention purge off until every node runs the new version.
+
 ## 0.62.0
 
 ### `RefundCreation` gains `Amount`: `Deconstruct` has three outputs and equality includes it (breaking)

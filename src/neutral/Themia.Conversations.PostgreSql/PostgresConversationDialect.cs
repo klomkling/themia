@@ -29,6 +29,12 @@ public sealed class PostgresConversationDialect : IConversationDialect
         exception is PostgresException { SqlState: PostgresErrorCodes.DeadlockDetected or PostgresErrorCodes.SerializationFailure };
 
     /// <inheritdoc />
+    public string CursorClaimTableHint => "";
+
+    /// <inheritdoc />
+    public string CursorClaimRowLockClause => "FOR UPDATE OF n SKIP LOCKED";
+
+    /// <inheritdoc />
     public string LimitClause => "LIMIT @Limit";
 
     /// <inheritdoc />

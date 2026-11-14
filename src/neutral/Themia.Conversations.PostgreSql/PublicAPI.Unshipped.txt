@@ -8,3 +8,5 @@ Themia.Conversations.PostgreSql.PostgresConversationDialect.LimitClause.get -> s
 Themia.Conversations.PostgreSql.PostgresConversationDialect.PostgresConversationDialect(string! connectionString) -> void
 Themia.Conversations.PostgreSql.ServiceCollectionExtensions
 static Themia.Conversations.PostgreSql.ServiceCollectionExtensions.AddThemiaConversationsPostgres(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, string! connectionString) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+Themia.Conversations.PostgreSql.PostgresConversationDialect.CursorClaimRowLockClause.get -> string!
+Themia.Conversations.PostgreSql.PostgresConversationDialect.CursorClaimTableHint.get -> string!

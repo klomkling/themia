@@ -27,6 +27,10 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+### Added
+
+- **`Themia.Conversations`: `IConversationNotifications.DrainAsync` batches unread messages into one debounced notification per recipient** (coord #0182). New `IConversationNotificationSubscriber` port (ids and counts only, at-least-once, `BatchId` for dedupe), per-recipient cursor and lease in the new `conversation_notify_cursors` table (migration `202611140001`, applied by the existing migration run), `ConversationOptions.NotifyDebounce` (2 min) and `NotifyLeaseDuration` (5 min). Locks only the cursor row (`SKIP LOCKED` on PostgreSQL and MySQL 8, `UPDLOCK, READPAST` on SQL Server); `MarkRead` and posts are not blocked. Marks `conversation_events.delivered_at` once every recipient is covered. The purge deletes cursor rows with the conversation. The three dialects gain `CursorClaimTableHint` and `CursorClaimRowLockClause` (default-throwing on `IConversationDialect`, so a custom dialect compiles and fails only if the drain runs).
+
 ## [0.62.0] - 2026-11-14
 
 ### Added

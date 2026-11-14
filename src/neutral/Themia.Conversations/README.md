@@ -110,6 +110,18 @@ var erased = await dataSubject.ErasePersonAsync(dsrActor, tenantId, PersonRef.Fo
 - **A post re-checks its participant** under the counter lock, so a person erased (or gone) while their post waited leaves no message behind; the post answers `Refused`.
 - **Your policy must handle the new actions explicitly.** `ConversationAction.Hold`, `ReleaseHold` and `Erase` are new; the default policy denies them like everything else, but a policy that allows by exhaustive `switch` or by "any staff actor" needs a deliberate case. `Erase` is tenant-wide: its target has `ConversationId = null`, so decide it on the actor and tenant alone. `Hold` and `ReleaseHold` name the conversation.
 
+## Notification drain
+
+`IConversationNotifications.DrainAsync(DrainOptions? options, ct)` batches unread messages into one notification per recipient and hands each to your `IConversationNotificationSubscriber`; the package sends nothing itself. Schedule the call from your own job (for example on `Themia.Scheduling`); several nodes may run it at once.
+
+- **Debounce.** A recipient is notified once their oldest unread message is older than `ConversationOptions.NotifyDebounce` (default 2 minutes, a fixed window, not reset by later posts). 20 posts in the window become one notification with `UnreadCount` and `LastSeq`.
+- **State** is the new `conversation_notify_cursors` table (migration `202611140001`, composite key, no id column). A recipient who read everything, left, or was erased gets nothing; redacted messages are not counted.
+- **At-least-once.** The subscriber is called outside any transaction, then the cursor moves. A throw leaves the recipient due, is logged at Warning and counted in `DrainResult.Failed`; the next drain retries it. A drain that outlives `NotifyLeaseDuration` (default 5 minutes) loses its lease: counted in `LeaseLost`, the other drain owns the recipient. Dedupe on `ConversationNotification.BatchId` (stable for conversation, recipient and `LastSeq`) for at least the lease plus the debounce. Do not throw for a permanent failure.
+- **No subscriber registered:** `DrainOutcome.SubscriberMissing`, nothing claimed.
+- **Needs the default `IConversationEventSink`.** An app that replaces it writes no events, so the drain finds nothing.
+- Notifications carry ids and counts only, never message text or contact data; the app resolves the contact and channel from `ParticipantId`.
+- `BatchSize` is 1 to 1000 per call; call again to continue. Lock hints are per engine (`SKIP LOCKED` on PostgreSQL and MySQL 8, `UPDLOCK, READPAST` on SQL Server) on the cursor row only, so `MarkRead` and posts are never blocked.
+
 ## Staff oversight read
 
 `IConversationOversight.ReadAsync(actor, tenantId, conversationId, afterSeq, limit)` lets staff read a room they are not a participant of. It does not join the reader and does not move any read marker.

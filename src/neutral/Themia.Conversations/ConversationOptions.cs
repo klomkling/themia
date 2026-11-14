@@ -39,6 +39,18 @@ public sealed class ConversationOptions
     /// <summary>Retention per <c>SubjectType</c> (matched exactly, case-sensitive); a subject type not listed uses <see cref="DefaultRetention"/>.</summary>
     public IDictionary<string, TimeSpan> RetentionBySubjectType { get; } = new Dictionary<string, TimeSpan>(StringComparer.Ordinal);
 
+    /// <summary>
+    /// How long an unread message waits before <see cref="IConversationNotifications.DrainAsync"/> reports it, so a busy thread gives one batched notification instead of one per post.
+    /// The window is fixed from the oldest unread message and is not reset by later posts. Default 2 minutes.
+    /// </summary>
+    public TimeSpan NotifyDebounce { get; set; } = TimeSpan.FromMinutes(2);
+
+    /// <summary>
+    /// How long one drain holds a recipient before another drain may take it over. It must exceed the slowest subscriber call and the clock skew between nodes by a wide margin;
+    /// a drain that outlives it can cause a duplicate notification (never a lost one). Default 5 minutes.
+    /// </summary>
+    public TimeSpan NotifyLeaseDuration { get; set; } = TimeSpan.FromMinutes(5);
+
     /// <summary>The retention that applies to <paramref name="subjectType"/>.</summary>
     /// <param name="subjectType">The subject type of a conversation.</param>
     public TimeSpan RetentionFor(string subjectType) =>
@@ -46,6 +58,8 @@ public sealed class ConversationOptions
 
     internal void Validate()
     {
+        Require(NotifyDebounce > TimeSpan.Zero, nameof(NotifyDebounce), "must be positive");
+        Require(NotifyLeaseDuration > TimeSpan.Zero, nameof(NotifyLeaseDuration), "must be positive");
         Require(MaxBodyLength is > 0 and <= BodyColumnWidth, nameof(MaxBodyLength), $"must be between 1 and {BodyColumnWidth}, the width of the body column");
         Require(MaxDisplayNameLength is > 0 and <= DisplayNameColumnWidth, nameof(MaxDisplayNameLength), $"must be between 1 and {DisplayNameColumnWidth}, the width of the column");
         Require(MaxAttachmentsPerMessage > 0, nameof(MaxAttachmentsPerMessage), "must be positive");
