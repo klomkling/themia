@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text.Json;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.TestHost;
@@ -77,6 +78,8 @@ public sealed class BrowserAccessTests
         public required CapturingProvider Logs { get; init; }
         public HashSet<string> Allowed { get; } = [Staff];
         public bool ThrowOnAuthorizeUser { get; set; }
+        public int MintUserCalls { get; set; }
+        public required IServiceProvider Services { get; init; }
     }
 
     private static async Task<Rig> StartAsync(bool browserAccess = true, SameSiteMode sameSite = SameSiteMode.Strict)
@@ -98,6 +101,7 @@ public sealed class BrowserAccessTests
                     s.AddSingleton<IExceptionStore>(new FakeExceptionStore());
                     s.AddSingleton(new ChallengeOptions().AddExceptionalDashboardPurpose());
                     s.AddSingleton<IChallengeService>(challenges);
+                    s.AddSingleton(new ExceptionalOptions { ApplicationName = "app-a" });
                 });
                 web.Configure(app =>
                 {
@@ -110,7 +114,11 @@ public sealed class BrowserAccessTests
                         o.BrowserAccess = new ExceptionalBrowserAccessOptions
                         {
                             SameSite = sameSite,
-                            MintUser = ctx => Task.FromResult<string?>(ctx.Request.Headers["X-User"].FirstOrDefault()),
+                            MintUser = ctx =>
+                            {
+                                rig!.MintUserCalls++;
+                                return Task.FromResult<string?>(ctx.Request.Headers["X-User"].FirstOrDefault());
+                            },
                             AuthorizeUser = (_, user) => rig!.ThrowOnAuthorizeUser
                                 ? throw new InvalidOperationException(SecretLogMarker)
                                 : Task.FromResult(rig.Allowed.Contains(user)),
@@ -119,7 +127,7 @@ public sealed class BrowserAccessTests
                 });
             })
             .StartAsync();
-        rig = new Rig { Client = host.GetTestServer().CreateClient(), Clock = clock, Challenges = challenges, Logs = logs };
+        rig = new Rig { Services = host.Services, Client = host.GetTestServer().CreateClient(), Clock = clock, Challenges = challenges, Logs = logs };
         return rig;
     }
 
@@ -322,6 +330,7 @@ public sealed class BrowserAccessTests
     [InlineData("/exceptionsX/other")]
     [InlineData("/other")]
     [InlineData("")]
+    [InlineData("/exceptions/é")]
     public async Task Redeem_ShouldFallBackToThePrefix_WhenTheReturnPathIsNotUnderIt(string ret)
     {
         var rig = await StartAsync();
@@ -421,6 +430,115 @@ public sealed class BrowserAccessTests
         var res = await rig.Client.SendAsync(req);
 
         Assert.Equal(HttpStatusCode.OK, res.StatusCode);
+    }
+
+    [Fact]
+    public async Task Mint_ShouldReturn404AndNotAskMintUser_WhenTheBearerGateDenies()
+    {
+        var rig = await StartAsync();
+        var req = new HttpRequestMessage(HttpMethod.Post, "/exceptions/ticket");
+        req.Headers.Add("Authorization", "Bearer wrong");
+        req.Headers.Add("X-User", Staff);
+
+        var res = await rig.Client.SendAsync(req);
+
+        Assert.Equal(HttpStatusCode.NotFound, res.StatusCode);
+        Assert.Equal(0, rig.MintUserCalls);
+    }
+
+    [Fact]
+    public async Task Redeem_ShouldRefuseCrossSiteAndKeepTheTicket_WhenSameSiteIsStrict()
+    {
+        var rig = await StartAsync();
+        var url = await MintUrlAsync(rig);
+        var cross = new HttpRequestMessage(HttpMethod.Get, url);
+        cross.Headers.Add("Sec-Fetch-Site", "cross-site");
+
+        var refused = await rig.Client.SendAsync(cross);
+        var sameSite = new HttpRequestMessage(HttpMethod.Get, url);
+        sameSite.Headers.Add("Sec-Fetch-Site", "same-site");
+        var accepted = await rig.Client.SendAsync(sameSite);
+
+        Assert.Equal(HttpStatusCode.NotFound, refused.StatusCode);
+        Assert.False(refused.Headers.Contains("Set-Cookie"));
+        Assert.Equal(HttpStatusCode.SeeOther, accepted.StatusCode);
+    }
+
+    [Fact]
+    public async Task Redeem_ShouldAcceptCrossSite_WhenSameSiteIsLax()
+    {
+        var rig = await StartAsync(sameSite: SameSiteMode.Lax);
+        var req = new HttpRequestMessage(HttpMethod.Get, await MintUrlAsync(rig));
+        req.Headers.Add("Sec-Fetch-Site", "cross-site");
+
+        var res = await rig.Client.SendAsync(req);
+
+        Assert.Equal(HttpStatusCode.SeeOther, res.StatusCode);
+    }
+
+    [Fact]
+    public async Task Redeem_ShouldReturn404_WhenTheTicketBelongsToAnotherPurpose()
+    {
+        var rig = await StartAsync();
+        var issued = await rig.Challenges.IssueAsync(new ChallengeScope(ExceptionalBrowserAccess.KeyPrefix + Staff, "other-purpose"));
+
+        var res = await rig.Client.GetAsync("/exceptions/session?ticket=" + issued.Secret);
+
+        Assert.Equal(HttpStatusCode.NotFound, res.StatusCode);
+    }
+
+    [Theory]
+    [InlineData("app-a", "/exceptions", HttpStatusCode.OK)]
+    [InlineData("app-b", "/exceptions", HttpStatusCode.NotFound)]
+    [InlineData("app-a", "/other", HttpStatusCode.NotFound)]
+    [InlineData("", "/exceptions", HttpStatusCode.NotFound)]
+    public async Task Cookie_ShouldOnlyOpenTheDashboard_WhenBoundToThisApplicationAndMount(string app, string mount, HttpStatusCode expected)
+    {
+        var rig = await StartAsync();
+        var protector = rig.Services.GetRequiredService<Microsoft.AspNetCore.DataProtection.IDataProtectionProvider>()
+            .CreateProtector(ExceptionalBrowserAccess.ProtectorPurpose(app, mount));
+        var payload = JsonSerializer.Serialize(new { UserId = Staff, ExpiresAtUnix = rig.Clock.Now.AddMinutes(5).ToUnixTimeSeconds() });
+
+        var res = await rig.Client.SendAsync(WithCookie("/exceptions", $"{ExceptionalBrowserAccess.CookieName}={protector.Protect(payload)}"));
+
+        Assert.Equal(expected, res.StatusCode);
+    }
+
+    [Fact]
+    public async Task Cookie_ShouldBeRejected_WhenProtectedForAnotherPurpose()
+    {
+        var rig = await StartAsync();
+        var protector = rig.Services.GetRequiredService<Microsoft.AspNetCore.DataProtection.IDataProtectionProvider>().CreateProtector("something-else");
+        var payload = JsonSerializer.Serialize(new { UserId = Staff, ExpiresAtUnix = rig.Clock.Now.AddMinutes(5).ToUnixTimeSeconds() });
+
+        var res = await rig.Client.SendAsync(WithCookie("/exceptions", $"{ExceptionalBrowserAccess.CookieName}={protector.Protect(payload)}"));
+
+        Assert.Equal(HttpStatusCode.NotFound, res.StatusCode);
+    }
+
+    [Fact]
+    public async Task Dashboard_ShouldForbidFraming()
+    {
+        var rig = await StartAsync();
+        var req = new HttpRequestMessage(HttpMethod.Get, "/exceptions");
+        req.Headers.Add("Authorization", "Bearer staff");
+
+        var res = await rig.Client.SendAsync(req);
+
+        Assert.Equal("DENY", res.Headers.GetValues("X-Frame-Options").Single());
+        Assert.Equal("frame-ancestors 'none'", res.Headers.GetValues("Content-Security-Policy").Single());
+    }
+
+    [Fact]
+    public void Startup_ShouldFail_WhenNoChallengeEngineIsRegistered()
+    {
+        var services = new ServiceCollection().AddDataProtection().Services
+            .AddSingleton(new ChallengeOptions().AddExceptionalDashboardPurpose()).BuildServiceProvider();
+        var access = new ExceptionalBrowserAccessOptions { MintUser = _ => Task.FromResult<string?>(null), AuthorizeUser = (_, _) => Task.FromResult(true) };
+
+        var ex = Assert.Throws<InvalidOperationException>(() => ExceptionalBrowserAccess.ValidateStartup(access, services));
+
+        Assert.Contains("IChallengeService", ex.Message);
     }
 
     [Fact]

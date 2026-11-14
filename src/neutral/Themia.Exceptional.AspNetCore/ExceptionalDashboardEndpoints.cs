@@ -45,6 +45,7 @@ public static class ExceptionalDashboardEndpoints
         if (options.BrowserAccess is { } browserAccess)
         {
             ExceptionalBrowserAccess.ValidateStartup(browserAccess, endpoints.ServiceProvider);
+            browserAccess.MountPath = path;
         }
 
         var group = endpoints.MapGroup(path);
@@ -292,6 +293,13 @@ public static class ExceptionalDashboardEndpoints
     {
         ctx.Response.ContentType = "text/html; charset=utf-8";
         PreventCaching(ctx.Response);
+        // The pages carry state-changing buttons: forbid framing. A host CSP already set is not overwritten.
+        ctx.Response.Headers["X-Frame-Options"] = "DENY";
+        if (!ctx.Response.Headers.ContainsKey("Content-Security-Policy"))
+        {
+            ctx.Response.Headers["Content-Security-Policy"] = "frame-ancestors 'none'";
+        }
+
         return ctx.Response.WriteAsync(html, Encoding.UTF8, ct);
     }
 }

@@ -43,10 +43,18 @@ Point `ExceptionAlertOptions.AdminUrlTemplate` at the **web** host that serves t
   record the query on `{prefix}/session`. Themia adds `ticket` to the exception redactor and logs only exception types.
 - `MintUser` must authenticate with the Bearer token (never a cookie).
 
-## Known residual: ticket handed to another browser
+## Known residual: ticket handed to another browser (Lax only)
 
-The redeem GET is not bound to the browser that minted the ticket. Someone holding their own valid ticket could lure a
-victim's browser to their redeem URL, leaving the victim with the attacker's dashboard session (the attacker gains no
-access they lack; the victim's dashboard actions would run as the attacker). Bounded by the 60 s single-use ticket and the
-15 min cookie. A `Sec-Fetch-Site` check cannot close it without breaking the cross-site (Lax) deployment, so it is left for
-api-review to decide.
+The redeem GET is not bound to the browser that minted the ticket. With `SameSite = Strict` the redeem refuses
+`Sec-Fetch-Site: cross-site`, which closes this. With `Lax` (web and API on different registrable domains) a holder of
+their own valid ticket could lure a victim's browser to their redeem URL, leaving the victim with the attacker's dashboard
+session (the attacker gains no access they lack; the victim's dashboard actions would run as the attacker). Bounded by
+the 60 s single-use ticket and the 15 min cookie; accepted by api-review security (themia #472).
+
+## Hardening notes
+
+- The cookie is bound to `ExceptionalOptions.ApplicationName` and the mount (`PathBase` + prefix). Give each app a unique
+  `ApplicationName` (and `SetApplicationName` for Data Protection) when apps share a key ring.
+- `ticket` mint also requires the Bearer `Authorize` predicate to pass before `MintUser` runs.
+- Dashboard HTML sends `X-Frame-Options: DENY` and, unless the host already set one, `Content-Security-Policy: frame-ancestors 'none'`.
+- Startup fails when no `IChallengeService` is registered.

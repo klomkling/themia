@@ -57,6 +57,13 @@ public static class ExceptionalBrowserAccess
             "ExceptionalDashboardOptions.BrowserAccess needs Themia.Challenges: call AddThemiaChallenges(...) with an engine package.");
         _ = challenges.GetPurpose(Purpose); // throws, naming the fix, when AddExceptionalDashboardPurpose() was not called
 
+        // Scoped service: ask the container whether it is registered rather than resolving it from the root provider.
+        if (services.GetService<IServiceProviderIsService>()?.IsService(typeof(IChallengeService)) is not true)
+        {
+            throw new InvalidOperationException(
+                "ExceptionalDashboardOptions.BrowserAccess needs an IChallengeService: add a Themia.Challenges engine package (AddThemiaChallenges(...).Use<Engine>()).");
+        }
+
         if (services.GetService<IDataProtectionProvider>() is null)
         {
             throw new InvalidOperationException(
@@ -64,10 +71,21 @@ public static class ExceptionalBrowserAccess
         }
     }
 
+    // Cookie protector purpose: bound to the application and the dashboard mount, so a cookie from another app
+    // (sharing a key ring) or another mount does not unprotect here.
+    internal static string ProtectorPurpose(string applicationName, string mount) => $"{CookieName}|{applicationName}|{mount}";
+
+    private static IDataProtector? Protector(HttpContext ctx, ExceptionalBrowserAccessOptions access)
+    {
+        var applicationName = ctx.RequestServices.GetService<ExceptionalOptions>()?.ApplicationName ?? string.Empty;
+        return ctx.RequestServices.GetService<IDataProtectionProvider>()
+            ?.CreateProtector(ProtectorPurpose(applicationName, ctx.Request.PathBase + access.MountPath));
+    }
+
     // Only a path under the dashboard prefix, never an absolute URL, a protocol-relative one or a traversal.
     internal static string SafeReturn(string? requested, string prefix)
     {
-        if (string.IsNullOrEmpty(requested) || requested.Length > MaxReturnLength || requested.Any(char.IsControl))
+        if (string.IsNullOrEmpty(requested) || requested.Length > MaxReturnLength || requested.Any(c => char.IsControl(c) || c > 127))
         {
             return prefix;
         }
@@ -87,6 +105,13 @@ public static class ExceptionalBrowserAccess
         var access = options.BrowserAccess!;
         Prevent(ctx.Response);
         if (!ctx.Request.Headers.ContainsKey("Authorization"))
+        {
+            ctx.Response.StatusCode = StatusCodes.Status404NotFound;
+            return;
+        }
+
+        // Defence in depth: the Bearer gate must pass before the app's MintUser is even asked.
+        if (options.Authorize is null || !await GuardAsync(ctx, () => options.Authorize(ctx)).ConfigureAwait(false))
         {
             ctx.Response.StatusCode = StatusCodes.Status404NotFound;
             return;
@@ -124,6 +149,13 @@ public static class ExceptionalBrowserAccess
         ctx.Response.Headers["Referrer-Policy"] = "no-referrer";
         try
         {
+            // Strict means web and API are same-site, so a cross-site navigation here is never the real flow.
+            if (access.SameSite == SameSiteMode.Strict && ctx.Request.Headers["Sec-Fetch-Site"] == "cross-site")
+            {
+                ctx.Response.StatusCode = StatusCodes.Status404NotFound;
+                return;
+            }
+
             var ticket = ctx.Request.Query["ticket"].ToString();
             if (ticket.Length is 0 or > MaxTicketLength)
             {
@@ -147,9 +179,10 @@ public static class ExceptionalBrowserAccess
                 return;
             }
 
-            AppendCookie(ctx, access, prefix, userId);
-            ctx.Response.StatusCode = StatusCodes.Status303SeeOther;
+            // Cookie last: if anything above throws, no session cookie rides on the 404.
             ctx.Response.Headers.Location = ctx.Request.PathBase + SafeReturn(ctx.Request.Query["return"], prefix);
+            ctx.Response.StatusCode = StatusCodes.Status303SeeOther;
+            AppendCookie(ctx, access, prefix, userId);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -159,6 +192,7 @@ public static class ExceptionalBrowserAccess
             if (!ctx.Response.HasStarted)
             {
                 ctx.Response.Headers.Remove("Location");
+                ctx.Response.Headers.Remove("Set-Cookie");
                 ctx.Response.StatusCode = StatusCodes.Status404NotFound;
             }
         }
@@ -168,7 +202,7 @@ public static class ExceptionalBrowserAccess
     internal static async Task<bool> CookieAuthorizedAsync(HttpContext ctx, ExceptionalBrowserAccessOptions access)
     {
         var value = ctx.Request.Cookies[CookieName];
-        var protector = ctx.RequestServices.GetService<IDataProtectionProvider>()?.CreateProtector(CookieName);
+        var protector = Protector(ctx, access);
         if (string.IsNullOrEmpty(value) || protector is null)
         {
             return false;
@@ -197,7 +231,7 @@ public static class ExceptionalBrowserAccess
     {
         var now = (ctx.RequestServices.GetService<TimeProvider>() ?? TimeProvider.System).GetUtcNow();
         var expires = now + access.CookieLifetime;
-        var protector = ctx.RequestServices.GetRequiredService<IDataProtectionProvider>().CreateProtector(CookieName);
+        var protector = Protector(ctx, access) ?? throw new InvalidOperationException("Data Protection is not registered.");
         var value = protector.Protect(JsonSerializer.Serialize(new CookiePayload(userId, expires.ToUnixTimeSeconds())));
         ctx.Response.Cookies.Append(CookieName, value, new CookieOptions
         {
