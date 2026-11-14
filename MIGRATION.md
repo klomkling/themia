@@ -12,6 +12,14 @@ with the *why* and concrete upgrade steps.
 
 ## Unreleased
 
+### A custom `IRefreshTokenService` may override `IsSessionLiveForRotationAsync` (not breaking)
+
+**What changed:** `IRefreshTokenService` gains `IsSessionLiveForRotationAsync(userId, familyId)`, with a default implementation that calls `IsSessionLiveAsync`. The refresh flow asks it, instead of `IsSessionLiveAsync`, right after it rotated a token. The default `RefreshTokenService` overrides it to resolve the owner in any tenant, because a refresh with no JWT runs in a scope with no tenant, where `IsSessionLiveAsync` cannot see a tenant user (0.61.0 refused such a refresh).
+
+**Who is affected:** only an app that replaced `IRefreshTokenService`. With no change it keeps today's behaviour, which still refuses a tenant user's refresh from a scope with no tenant.
+
+**How to upgrade:** override `IsSessionLiveForRotationAsync` with the same rules as `IsSessionLiveAsync` (family exists, not revoked, not expired, stamp still matches) but resolve the owner in any tenant. Call it only from the refresh flow after a token-hash match, never with a user id the caller supplied.
+
 ## 0.61.0
 
 ### A custom `IRefreshTokenService` must implement `IsSessionLiveAsync` for refresh
@@ -20,7 +28,7 @@ with the *why* and concrete upgrade steps.
 
 **Why:** a session that ended (revoked family, changed security stamp) could otherwise still mint a new access token through a refresh when no proof row existed to check.
 
-**Who is affected:** only an app that replaced `IRefreshTokenService` with its own implementation. The default implementation is unchanged.
+**Who is affected:** an app that replaced `IRefreshTokenService` with its own implementation. *Correction (0.61.1):* the default implementation was also affected when a refresh ran in a scope with no tenant (a refresh that carries no JWT): its liveness check resolved the owner in the ambient tenant only, so a tenant user read as not live and the refresh returned `Invalid`. 0.61.1 fixes the default; see [0.61.1](#0611).
 
 **How to upgrade:** implement `IsSessionLiveAsync` to answer true only for a family that exists, is not revoked and has not expired (and, if you bind sessions to the security stamp, whose stamp still matches). The default interface implementation returns false (fail closed), so an implementation that does not override it now refuses every such refresh.
 

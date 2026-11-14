@@ -143,6 +143,23 @@ public interface IRefreshTokenService
     Task<bool> IsSessionLiveAsync(Guid userId, Guid familyId, CancellationToken cancellationToken = default) =>
         Task.FromResult(false);
 
+    /// <summary>Whether <paramref name="familyId"/> is still a live session of <paramref name="userId"/> right after
+    /// <see cref="ValidateAndRotateAsync"/> rotated it, resolving the owner in ANY tenant: a refresh that carries no JWT runs in a scope with
+    /// no tenant, where the ambient-only <see cref="IsSessionLiveAsync"/> cannot see a tenant user.</summary>
+    /// <param name="userId">The owner the rotation resolved from the refresh-token hash match, never a caller-supplied id.</param>
+    /// <param name="familyId">The family the rotation just continued.</param>
+    /// <param name="cancellationToken">A cancellation token.</param>
+    /// <returns><see langword="true"/> only for a live session of that user (not revoked, not expired, bound to the user's current
+    /// security stamp, user not deleted); a bool and nothing else, so it reveals nothing about a user beyond that.</returns>
+    /// <remarks>
+    /// <para>For the authentication flow after a refresh-hash match ONLY. It skips the tenant filter, so it must never be called with a user id
+    /// the caller supplied (a request body, a claim, a route value); use <see cref="IsSessionLiveAsync"/> for those.</para>
+    /// <para>Default implementation calls <see cref="IsSessionLiveAsync"/>, so an existing custom <see cref="IRefreshTokenService"/> keeps
+    /// compiling and behaves as before (ambient scope); override it to resolve the owner in any tenant.</para>
+    /// </remarks>
+    Task<bool> IsSessionLiveForRotationAsync(Guid userId, Guid familyId, CancellationToken cancellationToken = default) =>
+        IsSessionLiveAsync(userId, familyId, cancellationToken);
+
     /// <summary>Resolves the id of the user who owns a presented raw token, without consuming, rotating,
     /// or revoking it. Used to attribute an audit event (e.g. logout) to a user before the token is
     /// acted upon.</summary>

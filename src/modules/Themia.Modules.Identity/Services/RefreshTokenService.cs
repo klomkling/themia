@@ -236,6 +236,20 @@ public sealed class RefreshTokenService : IRefreshTokenService, ISessionRevoker
         // The user must resolve in scope, like every user-id operation here: a foreign tenant's user, or one this scope cannot see,
         // owns no live session as far as the caller can tell.
         var user = await IdentityScope.ResolveUserAsync(users, userId, cancellationToken).ConfigureAwait(false);
+        return await IsLiveAsync(user, familyId, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> IsSessionLiveForRotationAsync(Guid userId, Guid familyId, CancellationToken cancellationToken = default)
+    {
+        // The rotation resolved this owner from the token hash in any tenant (a refresh with no JWT has no ambient tenant), so the check
+        // that follows it must resolve the owner the same way; the liveness rules themselves are the shared ones below.
+        var user = await IdentityScope.ResolveUserAnyTenantAsync(users, userId, cancellationToken).ConfigureAwait(false);
+        return await IsLiveAsync(user, familyId, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task<bool> IsLiveAsync(User? user, Guid familyId, CancellationToken cancellationToken)
+    {
         if (user is null)
         {
             return false;
