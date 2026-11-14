@@ -23,7 +23,7 @@ once, under the protection scheme it has today, and let the protector read that 
 
 Limits to check before running the import:
 
-- **Secret length:** Themia refuses a secret that decodes to fewer than 16 bytes (RFC 4226 §4, 128 bits). Older systems often issued 80-bit
+- **Secret length:** Themia.Totp rejects a secret that decodes to fewer than 16 bytes (RFC 4226 §4, 128 bits) by throwing when it is used. Older systems often issued 80-bit
   secrets (16 base32 characters); those cannot be imported as they are, and those users must re-enrol.
   The import does not check the length: a short secret is stored, then **throws at sign-in** (not a clean refusal). Screen every secret's decoded
   length before importing and leave the short ones to re-enrol.
