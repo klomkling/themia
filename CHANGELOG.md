@@ -27,6 +27,10 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+### Fixed
+
+- **The first value masked after a process start is no longer replaced by `***` when it did not need masking.** The compiled masking regexes in `Themia.Exceptional` are JIT-compiled on their first match, and that time counted against the 100 ms match timeout, so on a cold start the first call could time out and the whole value was dropped (fail closed, no leak). Each masker now runs its patterns once when it is first used. A value that really defeats a pattern is still replaced whole; a test now pins that.
+
 ## [0.61.0] - 2026-11-14
 
 ### Added

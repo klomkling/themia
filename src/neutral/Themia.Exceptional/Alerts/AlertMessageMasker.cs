@@ -24,10 +24,14 @@ internal static class AlertMessageMasker
         new(@"\d(?:[ -]?\d){7,}", RegexOptions.Compiled | RegexOptions.CultureInvariant, MatchTimeout),
     ];
 
-    public static string Mask(string value)
+    static AlertMessageMasker() => RegexWarmUp.Run(Patterns);
+
+    public static string Mask(string value) => Mask(value, Patterns);
+
+    internal static string Mask(string value, Regex[] patterns)
     {
         value = CredentialShapeMasker.Mask(value)!;
-        foreach (var pattern in Patterns)
+        foreach (var pattern in patterns)
         {
             try
             {
