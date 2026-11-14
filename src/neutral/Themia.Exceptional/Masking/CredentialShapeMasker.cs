@@ -21,13 +21,17 @@ internal static class CredentialShapeMasker
         new(@"eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]*", RegexOptions.Compiled | RegexOptions.CultureInvariant, MatchTimeout),
     ];
 
+    static CredentialShapeMasker() => RegexWarmUp.Run(Patterns);
+
     /// <summary>Masks <paramref name="value"/>; a value that defeats the masker (match timeout) becomes <c>***</c> as a whole.</summary>
-    public static string? Mask(string? value)
+    public static string? Mask(string? value) => Mask(value, Patterns);
+
+    internal static string? Mask(string? value, Regex[] patterns)
     {
         if (value is null)
             return null;
 
-        foreach (var pattern in Patterns)
+        foreach (var pattern in patterns)
         {
             try
             {
