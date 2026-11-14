@@ -12,6 +12,20 @@ with the *why* and concrete upgrade steps.
 
 ## Unreleased
 
+## 0.63.1
+
+### `Themia.Exceptional.AspNetCore`: browser access hardening (not breaking)
+
+Apps on 0.63.0 should move straight to 0.63.1; apps adopting `BrowserAccess` start at 0.63.1.
+
+- **One-time cookie invalidation.** The dashboard cookie is now bound to `ExceptionalOptions.ApplicationName` and the
+  dashboard mount, so cookies issued by 0.63.0 stop working; users simply open the alert link again (15 min lifetime).
+  Give each app a unique `ApplicationName` (and `SetApplicationName` for Data Protection) when apps share a key ring.
+- **Frame headers.** Dashboard HTML now sends `X-Frame-Options: DENY` and, unless the host already set a
+  `Content-Security-Policy`, `frame-ancestors 'none'`. An app that embeds the dashboard in a frame must allow it itself.
+- `{prefix}/ticket` now requires the `Authorize` predicate to pass before `MintUser`; with `SameSite` Strict,
+  `{prefix}/session` refuses cross-site navigations; startup fails when no `IChallengeService` is registered.
+
 ## 0.63.0
 
 ### `Themia.Exceptional.AspNetCore`: opt-in browser access (not breaking)
