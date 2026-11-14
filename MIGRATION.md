@@ -12,6 +12,16 @@ with the *why* and concrete upgrade steps.
 
 ## Unreleased
 
+## 0.63.0
+
+### `Themia.Exceptional.AspNetCore`: opt-in browser access (not breaking)
+
+Nothing changes unless `ExceptionalDashboardOptions.BrowserAccess` is set. To make Telegram alert links open in a
+browser, set it and register the purpose with `AddThemiaChallenges(o => o.AddExceptionalDashboardPurpose())`
+(startup fails if Challenges or the purpose is missing). `Themia.Exceptional.AspNetCore` now references
+`Themia.Challenges`. `SameSite` defaults to Strict; an app whose web page and API are on different registrable
+domains must set `SameSite = SameSiteMode.Lax` (startup does not guess). Full guide: `docs/exceptional-browser-access.md`.
+
 ## 0.62.1
 
 ### `Themia.Conversations` gains the table `conversation_notify_cursors` (not breaking)
