@@ -27,6 +27,18 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+### Added
+
+- **`Themia.Payments`: `RefundCreation.Amount`, the refund amount as the provider answered it** (coord #0211). A trailing
+  optional `Money? Amount = null`; null means the provider echoed none (or one that could not be read) and is "not
+  confirmed", never zero. A caller that must not mark a refund Succeeded on an answer it cannot reconcile compares
+  `Amount` with what it asked for only when it is set. `Themia.Payments.Beam` fills it from the `amount`/`currency`
+  of the refund answer when both are present and valid, and never throws on a malformed echo (the refund is already
+  made, a refusal would invite a retry). `Themia.Payments.TwoCTwoP` leaves it null: the Payment Process refund
+  answer carries no amount. The two-argument constructor is kept, so existing `new RefundCreation(id, status)` calls
+  and gateways built against it bind unchanged. Additive, a PATCH per the pre-1.0 policy. The echo field names are
+  not yet confirmed against Beam's sandbox; until then expect null.
+
 ## [0.61.1] - 2026-11-14
 
 ### Added
