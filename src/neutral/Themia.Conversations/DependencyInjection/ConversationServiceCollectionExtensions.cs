@@ -55,6 +55,12 @@ public static class ConversationServiceCollectionExtensions
             sp.GetRequiredService<TimeProvider>(),
             sp.GetRequiredService<ILogger<ConversationRetentionService>>()));
         services.TryAddSingleton<IConversationRetention>(sp => sp.GetRequiredService<ConversationRetentionService>());
+        services.TryAddSingleton<IConversationNotifications>(sp => new ConversationNotificationService(
+            sp.GetRequiredService<IConversationDialect>(),
+            sp.GetRequiredService<ConversationOptions>(),
+            sp.GetService<IConversationNotificationSubscriber>(),
+            sp.GetRequiredService<TimeProvider>(),
+            sp.GetRequiredService<ILogger<ConversationNotificationService>>()));
         services.TryAddSingleton<IConversationDataSubject>(sp => new ConversationDataSubjectService(
             sp.GetRequiredService<IConversationDialect>(),
             sp.GetRequiredService<IConversationAccessPolicy>(),

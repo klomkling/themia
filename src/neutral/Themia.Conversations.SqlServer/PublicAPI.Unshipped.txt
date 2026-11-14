@@ -8,3 +8,5 @@ Themia.Conversations.SqlServer.SqlServerConversationDialect.IsDuplicateKey(Syste
 Themia.Conversations.SqlServer.SqlServerConversationDialect.LimitClause.get -> string!
 Themia.Conversations.SqlServer.SqlServerConversationDialect.SqlServerConversationDialect(string! connectionString) -> void
 static Themia.Conversations.SqlServer.ServiceCollectionExtensions.AddThemiaConversationsSqlServer(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, string! connectionString) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+Themia.Conversations.SqlServer.SqlServerConversationDialect.CursorClaimRowLockClause.get -> string!
+Themia.Conversations.SqlServer.SqlServerConversationDialect.CursorClaimTableHint.get -> string!

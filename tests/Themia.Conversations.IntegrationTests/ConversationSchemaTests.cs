@@ -45,6 +45,13 @@ public abstract class ConversationSchemaTests(ConversationEngineFixture fixture)
     private Task<DbException> RefusedAsync(Func<Task> statement) => Assert.ThrowsAnyAsync<DbException>(statement);
 
     [Fact]
+    public async Task Migration_ShouldCreateTheNotifyCursorsTable_WithItsParticipantForeignKey()
+    {
+        Assert.True(await fixture.TableExistsAsync("conversation_notify_cursors"));
+        Assert.True(await fixture.ForeignKeyExistsAsync("fk_conversation_notify_cursors_participant"));
+    }
+
+    [Fact]
     public async Task Migration_ShouldCreateAllSevenTables()
     {
         foreach (var table in new[] { "conversations", "conversation_participants", "conversation_messages", "conversation_attachments", "conversation_guest_sessions", "conversation_events", "conversation_tombstones" })

@@ -36,7 +36,7 @@ public static class ServiceCollectionExtensions
                 connection.Open();
                 return connection;
             },
-            ["conversations", "conversation_participants", "conversation_messages", "conversation_attachments", "conversation_guest_sessions", "conversation_events", "conversation_tombstones"]);
+            ["conversations", "conversation_participants", "conversation_messages", "conversation_attachments", "conversation_guest_sessions", "conversation_events", "conversation_tombstones", "conversation_notify_cursors"]);
 
         return services;
     }

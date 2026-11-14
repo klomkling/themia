@@ -401,3 +401,51 @@ Themia.Conversations.IConversationOversight
 Themia.Conversations.IConversationOversight.ReadAsync(Themia.Conversations.ConversationActor! actor, string! tenantId, System.Guid conversationId, long afterSeq, int limit, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Conversations.OversightPage!>!
 Themia.Conversations.IConversationReadAudit
 Themia.Conversations.IConversationReadAudit.RecordAsync(System.Data.Common.DbConnection! connection, System.Data.Common.DbTransaction! transaction, Themia.Conversations.OversightRead! entry, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Conversations.ConversationNotification
+Themia.Conversations.ConversationNotification.BatchId.get -> System.Guid
+Themia.Conversations.ConversationNotification.BatchId.init -> void
+Themia.Conversations.ConversationNotification.ConversationId.get -> System.Guid
+Themia.Conversations.ConversationNotification.ConversationId.init -> void
+Themia.Conversations.ConversationNotification.ConversationNotification(System.Guid BatchId, string! TenantId, System.Guid ConversationId, System.Guid ParticipantId, int UnreadCount, long LastSeq) -> void
+Themia.Conversations.ConversationNotification.LastSeq.get -> long
+Themia.Conversations.ConversationNotification.LastSeq.init -> void
+Themia.Conversations.ConversationNotification.ParticipantId.get -> System.Guid
+Themia.Conversations.ConversationNotification.ParticipantId.init -> void
+Themia.Conversations.ConversationNotification.TenantId.get -> string!
+Themia.Conversations.ConversationNotification.TenantId.init -> void
+Themia.Conversations.ConversationNotification.UnreadCount.get -> int
+Themia.Conversations.ConversationNotification.UnreadCount.init -> void
+Themia.Conversations.ConversationOptions.NotifyDebounce.get -> System.TimeSpan
+Themia.Conversations.ConversationOptions.NotifyDebounce.set -> void
+Themia.Conversations.ConversationOptions.NotifyLeaseDuration.get -> System.TimeSpan
+Themia.Conversations.ConversationOptions.NotifyLeaseDuration.set -> void
+Themia.Conversations.DrainOptions
+Themia.Conversations.DrainOptions.BatchSize.get -> int
+Themia.Conversations.DrainOptions.BatchSize.init -> void
+Themia.Conversations.DrainOptions.DrainOptions(int BatchSize = 100) -> void
+Themia.Conversations.DrainOutcome
+Themia.Conversations.DrainOutcome.Completed = 0 -> Themia.Conversations.DrainOutcome
+Themia.Conversations.DrainOutcome.SubscriberMissing = 1 -> Themia.Conversations.DrainOutcome
+Themia.Conversations.DrainResult
+Themia.Conversations.DrainResult.Completed.get -> bool
+Themia.Conversations.DrainResult.Delivered.get -> int
+Themia.Conversations.DrainResult.Delivered.init -> void
+Themia.Conversations.DrainResult.DrainResult(Themia.Conversations.DrainOutcome Outcome, int Delivered, int Skipped, int Failed, int LeaseLost) -> void
+Themia.Conversations.DrainResult.Failed.get -> int
+Themia.Conversations.DrainResult.Failed.init -> void
+Themia.Conversations.DrainResult.LeaseLost.get -> int
+Themia.Conversations.DrainResult.LeaseLost.init -> void
+Themia.Conversations.DrainResult.Outcome.get -> Themia.Conversations.DrainOutcome
+Themia.Conversations.DrainResult.Outcome.init -> void
+Themia.Conversations.DrainResult.Skipped.get -> int
+Themia.Conversations.DrainResult.Skipped.init -> void
+Themia.Conversations.IConversationDialect.CursorClaimRowLockClause.get -> string!
+Themia.Conversations.IConversationDialect.CursorClaimTableHint.get -> string!
+Themia.Conversations.IConversationNotifications
+Themia.Conversations.IConversationNotifications.DrainAsync(Themia.Conversations.DrainOptions? options = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Conversations.DrainResult!>!
+Themia.Conversations.IConversationNotificationSubscriber
+Themia.Conversations.IConversationNotificationSubscriber.NotifyAsync(Themia.Conversations.ConversationNotification! notification, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Themia.Conversations.Migrations.ConversationNotifyCursorsMigration
+Themia.Conversations.Migrations.ConversationNotifyCursorsMigration.ConversationNotifyCursorsMigration() -> void
+override Themia.Conversations.Migrations.ConversationNotifyCursorsMigration.Down() -> void
+override Themia.Conversations.Migrations.ConversationNotifyCursorsMigration.Up() -> void

@@ -177,6 +177,25 @@ public abstract class ConversationRetentionTests(ConversationEngineFixture fixtu
     }
 
     [Fact]
+    public async Task Sweep_ShouldPurgeAConversation_ThatHasANotificationCursor()
+    {
+        var tenant = NewTenant();
+        var service = Conversations();
+        var id = (await service.OpenAsync(Member("a"), tenant, new ConversationSubject("booking", "B-1"))).ConversationId!.Value;
+        var joined = await service.JoinAsync(Member("a"), tenant, id, "Somchai");
+        await fixture.ExecuteAsync(
+            "INSERT INTO conversation_notify_cursors (tenant_id, conversation_id, participant_id, notified_seq, created_at, updated_at) VALUES (@Tenant, @Id, @Participant, 0, @Now, @Now);",
+            new { Tenant = tenant, Id = id, Participant = joined.ParticipantId, Now = DateTime.UtcNow });
+        await service.CloseAsync(Member("a"), tenant, id);
+        await fixture.ExecuteAsync("UPDATE conversations SET retention_until = @Until WHERE id = @Id;", new { Id = id, Until = DateTime.UtcNow.AddDays(-1) });
+
+        var result = await Retention(new FakeHoldPort()).SweepAsync(tenant);
+
+        Assert.Equal(1, result.Purged);
+        Assert.Equal(0, await CountAsync("conversation_notify_cursors", id));
+    }
+
+    [Fact]
     public async Task Sweep_ShouldReportHoldPortMissing_MarkExpired_AndPurgeNothing()
     {
         var tenant = NewTenant();

@@ -32,4 +32,16 @@ public interface IConversationDialect
     /// <param name="conversationId">The conversation.</param>
     /// <param name="cancellationToken">Cancels the call.</param>
     Task<long?> IncrementLastSeqAsync(DbConnection connection, DbTransaction transaction, string tenantId, Guid conversationId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// The table hint that follows the <c>conversation_notify_cursors n</c> alias in the notification claim select: <c>WITH (UPDLOCK, READPAST, ROWLOCK)</c> on SQL Server, empty where
+    /// <see cref="CursorClaimRowLockClause"/> does the work. The default throws, so a custom dialect that never implemented it fails loudly instead of claiming without a lock.
+    /// </summary>
+    string CursorClaimTableHint => throw new NotSupportedException($"{GetType().Name} does not implement {nameof(CursorClaimTableHint)}, which the notification drain needs.");
+
+    /// <summary>
+    /// The row-lock clause that ends the notification claim select, locking only the cursor alias <c>n</c> and skipping rows another drain holds
+    /// (<c>FOR UPDATE OF n SKIP LOCKED</c> on PostgreSQL and MySQL 8.0.1+), empty on SQL Server. The default throws.
+    /// </summary>
+    string CursorClaimRowLockClause => throw new NotSupportedException($"{GetType().Name} does not implement {nameof(CursorClaimRowLockClause)}, which the notification drain needs.");
 }
