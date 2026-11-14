@@ -54,7 +54,7 @@ Left, erased and redacted therefore never keep an event undelivered or a convers
 4. **Failure isolation.** A subscriber exception leaves only that recipient's cursor, so A is never pushed again because B threw, and B retries on the next drain with its own `BatchId`.
    `Failed` counts them; each is logged at Warning with conversation id and participant id, never text or contact.
 5. **Claim unit = the cursor row (must-fix 2), lease with an owner (must-fix 3).** Every due predicate sits inside the locked select, which locks only the cursor row (`FOR UPDATE OF <cursor> SKIP LOCKED`; the due test is an `EXISTS`, not a `GROUP BY`, which a row lock cannot combine with) (PostgreSQL and MySQL 8.0.1+ `FOR UPDATE SKIP LOCKED`,
-   SQL Server `UPDLOCK, READPAST`, MySQL at READ COMMITTED as in `MySqlMessagingDialect`), then `UPDATE ... SET lease_owner, lease_expires_at WHERE id IN (...)`, the shape of the
+   SQL Server `UPDLOCK, READPAST`, MySQL at READ COMMITTED as in `MySqlMessagingDialect`), then `UPDATE ... SET lease_owner, lease_expires_at` addressed by the **composite key** `(tenant_id, conversation_id, participant_id)` of the claimed rows (the table has no id; on SQL Server, join the update on the claimed keys), the shape of the
    Messaging outbox claim; no outer filter on a locked subquery. A cursor row is created on first use by insert-if-absent as **its own committed statement before the claim** (a unique-key conflict is a no-op), so a recipient with no row yet is claimable and the claim never inserts under its own lock.
    The mark is `WHERE lease_owner = @me`: zero rows means the lease was lost (an expired lease was reclaimed), logged and **not** counted as `Delivered`.
    One claim takes at most `BatchSize` recipients; a drain that runs longer than the lease logs a Warning.
@@ -75,6 +75,9 @@ Left, erased and redacted therefore never keep an event undelivered or a convers
 - recipient reads everything, then a new post: nothing is sent until the window after the new post; a left participant, a revoked guest and an erased person get nothing; a guest gets one;
 - A claims and blocks inside the subscriber, a new post arrives, B drains: nothing for that recipient; A finishes and marks;
 - A's lease expires, B reclaims, A's mark updates 0 rows and A's result does not count it;
+- a recipient who leaves or is erased, or whose message is redacted, between posts: the event gets `delivered_at` (covered), so it is not rescanned;
+- `MarkReadAsync` is not blocked by a drain claim (PostgreSQL and MySQL): the claim locks only the cursor row;
+- two drains with no cursor rows yet deliver each recipient once (insert-if-absent, then claim);
 - two concurrent drains deliver each recipient once; no subscriber: `SubscriberMissing`, rows untouched; a purge between claim and mark leaves no cursor row;
 - `BatchSize` 0 and 1001 throw; the notification and the drain log carry no text or contact (`NoPiiInLogs` style).
 
