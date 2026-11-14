@@ -27,6 +27,10 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+### Added
+
+- **`Themia.ETax.Withholding`: `WithholdingFilingCsv.Build` writes the monthly PND3 / PND53 CSV an accounting office keys a return from** (coord #0164). One file per form per month, one line per income row (payee tax id, name, address, date paid, income type, amount, rate, tax withheld), with row count and total paid / withheld as control figures. It is not the Revenue Department's e-filing layout: apps do not file themselves. Only Issued certificates count (a cancelled one and its replacement are never both in the file), every snapshot is checked against its stored hash, text cells that start like a formula are defused, and `ToUtf8Bytes()` adds a byte order mark so a spreadsheet reads the Thai text.
+
 ## [0.61.1] - 2026-11-14
 
 ### Added
