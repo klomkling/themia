@@ -27,6 +27,8 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.63.0] - 2026-11-14
+
 ### Added
 
 - **`Themia.Exceptional.AspNetCore`: opt-in browser access to the dashboard** (coord #0216). `ExceptionalDashboardOptions.BrowserAccess` adds `POST {prefix}/ticket` (60 s single-use `Themia.Challenges` ticket) and `GET {prefix}/session` (redeems it for a 15 min `__Secure-themia_dash` cookie, `AuthorizeUser` re-checked on every request). Fixes Telegram alert links answering 404 in a browser. `SameSite` defaults to Strict; set Lax when web and API are on different registrable domains. Requires `AddExceptionalDashboardPurpose()` on `ChallengeOptions`. `Themia.Exceptional.AspNetCore` now references `Themia.Challenges`. Unset = no change. See `docs/exceptional-browser-access.md`.
