@@ -12,6 +12,28 @@ with the *why* and concrete upgrade steps.
 
 ## Unreleased
 
+## 0.62.0
+
+### `RefundCreation` gains `Amount`: `Deconstruct` has three outputs and equality includes it (breaking)
+
+**What changed:** `Themia.Payments.RefundCreation` is now `RefundCreation(string? RefundId, PaymentStatus Status, Money? Amount = null)` (coord #0211). The positional record's compiler-generated `Deconstruct` has three outputs instead of two, its constructor has a third parameter, and `Equals`/`GetHashCode` include `Amount`. The two-argument constructor is kept, so `new RefundCreation(id, status)` still compiles.
+
+**Why:** a caller that must not mark a refund Succeeded on an answer it cannot reconcile needs the amount the provider echoed. `null` means none was echoed (or it could not be read), never zero.
+
+**Who is affected:** code that deconstructs a `RefundCreation` into two variables (source break), and any assembly compiled against 0.61.x that calls the old two-output `Deconstruct` or the old constructor signature (binary break: recompile). Code that compares two creations that differ only in `Amount` now sees them unequal.
+
+**How to upgrade:**
+
+```csharp
+// before
+var (id, status) = creation;
+
+// after
+var (id, status, _) = creation;    // or read creation.RefundId / creation.Status
+```
+
+Recompile every project that references `Themia.Payments` 0.61.x. A gateway that builds `new RefundCreation(id, status)` needs no change; fill `Amount` when the provider echoes one.
+
 ## 0.61.1
 
 ### A custom `IRefreshTokenService` may override `IsSessionLiveForRotationAsync` (not breaking)
