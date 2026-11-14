@@ -12,6 +12,8 @@ with the *why* and concrete upgrade steps.
 
 ## Unreleased
 
+## 0.62.1
+
 ### `Themia.Conversations` gains the table `conversation_notify_cursors` (not breaking)
 
 **What changed:** migration `202611140001` creates `conversation_notify_cursors`, the per-recipient state of the notification drain. Its foreign key to `conversation_participants` has no cascade. The purge deletes cursor rows before the participants, in code.
