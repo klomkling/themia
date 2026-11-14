@@ -15,7 +15,7 @@ public static class WithholdingFilingCsv
     private const string LineEnd = "\r\n";
     private const int SatangPerBaht = 100;
     private const int BasisPointsPerPercent = 100;
-    private static readonly char[] FormulaPrefixes = ['=', '+', '-', '@', '\t', '\r'];
+    private static readonly char[] FormulaPrefixes = ['=', '+', '-', '@', '\t', '\r', '\n'];
 
     /// <summary>Builds the CSV of <paramref name="form"/> for the month of <paramref name="year"/>/<paramref name="month"/>, by the date each row was paid.</summary>
     /// <param name="certificates">The payer's stored certificates; the caller has already scoped them to one payer.</param>

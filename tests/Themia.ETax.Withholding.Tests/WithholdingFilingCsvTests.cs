@@ -153,6 +153,7 @@ public class WithholdingFilingCsvTests
     [InlineData("+66812345678")]
     [InlineData("-1+1")]
     [InlineData("@SUM(A1)")]
+    [InlineData("\n=1+1")]
     public void A_text_cell_that_a_spreadsheet_would_run_as_a_formula_is_defused_with_a_leading_quote(string name)
     {
         var payee = new TaxParty { Name = name, TaxId = Samples.ValidPayeeTaxId, Address = "x" };
