@@ -30,18 +30,23 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 ### Added
 
 - **`Themia.Conversations`: `IConversationNotifications.DrainAsync` batches unread messages into one debounced notification per recipient** (coord #0182). New `IConversationNotificationSubscriber` port (ids and counts only, at-least-once, `BatchId` for dedupe), per-recipient cursor and lease in the new `conversation_notify_cursors` table (migration `202611140001`, applied by the existing migration run), `ConversationOptions.NotifyDebounce` (2 min) and `NotifyLeaseDuration` (5 min). Locks only the cursor row (`SKIP LOCKED` on PostgreSQL and MySQL 8, `UPDLOCK, READPAST` on SQL Server); `MarkRead` and posts are not blocked. Marks `conversation_events.delivered_at` once every recipient is covered. The purge deletes cursor rows with the conversation. The three dialects gain `CursorClaimTableHint` and `CursorClaimRowLockClause` (default-throwing on `IConversationDialect`, so a custom dialect compiles and fails only if the drain runs).
-- **`Themia.SecondFactor`: README with the recipe for importing existing TOTP secrets without re-enrolling, and an integration test that runs it** (coord #0203). `IMfaMethodStore.AddAsync` with the stored secret, its protection scheme and `LastUsedStep` plus a protector that still reads the old scheme; documented limits: Themia refuses secrets under 16 bytes (80-bit legacy secrets must re-enrol), and one `TotpOptions` applies to all users. No code change in the package.
+
+## [0.62.0] - 2026-11-14
+
+### Added
+
+- **`Themia.SecondFactor`: README with the recipe for importing existing TOTP secrets without re-enrolling, and an integration test that runs it** (coord #0203). `IMfaMethodStore.AddAsync` with the stored secret, its protection scheme and `LastUsedStep` plus a protector that still reads the old scheme; documented limits: the import does not check length and a secret under 16 bytes throws when used at sign-in, so screen lengths first (80-bit legacy secrets must re-enrol), and one `TotpOptions` applies to all users. No code change in the package.
 - **`Themia.ETax.Withholding`: `WithholdingFilingCsv.Build` writes the monthly PND3 / PND53 CSV an accounting office keys a return from** (coord #0164). One file per form per month, one line per income row (payee tax id, name, address, date paid, income type, amount, rate, tax withheld), with row count and total paid / withheld as control figures. It is not the Revenue Department's e-filing layout: apps do not file themselves. Only Issued certificates count (a cancelled one and its replacement are never both in the file), every snapshot is checked against its stored hash, text cells that start like a formula are defused, and `ToUtf8Bytes()` adds a byte order mark so a spreadsheet reads the Thai text. A digit-only payee tax id or certificate number is written as the text formula `="0105556123456"` so a spreadsheet keeps its leading zero (PND53 ids start with 0).
-- **`Themia.Payments`: `RefundCreation.Amount`, the refund amount as the provider answered it** (coord #0211). A trailing
+- **(breaking) `Themia.Payments`: `RefundCreation.Amount`, the refund amount as the provider answered it** (coord #0211). A trailing
   optional `Money? Amount = null`; null means the provider echoed none (or one that could not be read) and is "not
   confirmed", never zero. A caller that must not mark a refund Succeeded on an answer it cannot reconcile compares
   `Amount` with what it asked for only when it is set. `Themia.Payments.Beam` fills it from the `amount`/`currency`
   of the refund answer when both are present and valid, and never throws on a malformed echo (the refund is already
   made, a refusal would invite a retry). `Themia.Payments.TwoCTwoP` leaves it null: the Payment Process refund
   answer carries no amount. The two-argument constructor is kept, so existing `new RefundCreation(id, status)` calls
-  and gateways built against it bind unchanged. Additive, a PATCH per the pre-1.0 policy. The echo field names are
+  and gateways built against it bind unchanged. The echo field names are
   not yet confirmed against Beam's sandbox; until then expect null.
-  Two source-visible effects for consumers: `Deconstruct` on `RefundCreation` now has three outputs instead of two (a
+  A source and binary break, see [MIGRATION.md](MIGRATION.md#0620): `Deconstruct` on `RefundCreation` now has three outputs instead of two (a
   `var (id, status) = creation;` must become `var (id, status, _) = creation;`), and record equality now includes
   `Amount`, so two creations that differ only in `Amount` are no longer equal.
 
