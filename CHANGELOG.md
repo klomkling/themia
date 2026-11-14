@@ -27,6 +27,8 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.61.1] - 2026-11-14
+
 ### Added
 
 - **`IRefreshTokenService.IsSessionLiveForRotationAsync`** adds a member with a default (it calls `IsSessionLiveAsync`), so a custom implementation keeps compiling and behaving as before. The default `RefreshTokenService` overrides it to resolve the owner in any tenant. For the refresh flow after a token-hash match only: it must never be called with a caller-supplied user id.

@@ -12,6 +12,8 @@ with the *why* and concrete upgrade steps.
 
 ## Unreleased
 
+## 0.61.1
+
 ### A custom `IRefreshTokenService` may override `IsSessionLiveForRotationAsync` (not breaking)
 
 **What changed:** `IRefreshTokenService` gains `IsSessionLiveForRotationAsync(userId, familyId)`, with a default implementation that calls `IsSessionLiveAsync`. The refresh flow asks it, instead of `IsSessionLiveAsync`, right after it rotated a token. The default `RefreshTokenService` overrides it to resolve the owner in any tenant, because a refresh carries no JWT, and where the ambient tenant stays empty (`PerTenantModel`, a fixed/custom `ITenantContext`), `IsSessionLiveAsync` cannot see a tenant user (0.61.0 refused such a refresh).
