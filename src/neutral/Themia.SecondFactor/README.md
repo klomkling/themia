@@ -25,6 +25,8 @@ Limits to check before running the import:
 
 - **Secret length:** Themia refuses a secret that decodes to fewer than 16 bytes (RFC 4226 §4, 128 bits). Older systems often issued 80-bit
   secrets (16 base32 characters); those cannot be imported as they are, and those users must re-enrol.
+  The import does not check the length: a short secret is stored, then **throws at sign-in** (not a clean refusal). Screen every secret's decoded
+  length before importing and leave the short ones to re-enrol.
 - **Digits, period and algorithm:** one `TotpOptions` applies to every user (defaults: 6 digits, 30-second step, SHA-1, what authenticator apps use).
   Set them to match the old system before importing; secrets issued with different parameters cannot be mixed.
 - **The method id is new.** The replay record is keyed on the new method id, so import before the first sign-in, not during it.
