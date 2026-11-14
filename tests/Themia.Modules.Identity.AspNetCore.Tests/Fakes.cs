@@ -153,6 +153,13 @@ internal sealed class FakeRefreshTokenService : IRefreshTokenService
     public Task<bool> IsSessionLiveAsync(Guid userId, Guid familyId, CancellationToken cancellationToken = default) =>
         Task.FromResult(LiveSessions.Contains((userId, familyId)));
 
+    /// <summary>(user, family) pairs that only <see cref="IsSessionLiveForRotationAsync"/> reports as live: the owner a rotation
+    /// resolved in any tenant, which the ambient-only <see cref="IsSessionLiveAsync"/> cannot see.</summary>
+    public HashSet<(Guid UserId, Guid FamilyId)> RotationLiveSessions { get; } = [];
+
+    public Task<bool> IsSessionLiveForRotationAsync(Guid userId, Guid familyId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(LiveSessions.Contains((userId, familyId)) || RotationLiveSessions.Contains((userId, familyId)));
+
     public Task<RefreshIssue> IssueAsync(Guid userId, CancellationToken cancellationToken = default)
     {
         IssueCalls++;

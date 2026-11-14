@@ -414,7 +414,7 @@ public sealed class AuthenticationFlow : IAuthenticationFlow
         // A null proof is also what a session revoked after the rotation reads as, and that token would carry no restriction. A session with
         // no proof row at all is live, so only a session that is no longer live is refused here.
         if (proof is null && sessionProofs is not null
-            && !await refreshTokens.IsSessionLiveAsync(user.Id, replacement.FamilyId, decided.Token).ConfigureAwait(false))
+            && !await refreshTokens.IsSessionLiveForRotationAsync(user.Id, replacement.FamilyId, decided.Token).ConfigureAwait(false))
         {
             logger.LogWarning("Refresh rejected for user {UserId}: the session ended while the token was rotated.", user.Id);
             await RaiseAsync((o, ct) => o.OnRefreshFailedAsync(user.Id, RefreshOutcome.Invalid, ct), cancellationToken).ConfigureAwait(false);

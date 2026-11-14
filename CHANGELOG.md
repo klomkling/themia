@@ -27,12 +27,19 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+### Added
+
+- **`IRefreshTokenService.IsSessionLiveForRotationAsync`** adds a member with a default (it calls `IsSessionLiveAsync`), so a custom implementation keeps compiling and behaving as before. The default `RefreshTokenService` overrides it to resolve the owner in any tenant. For the refresh flow after a token-hash match only: it must never be called with a caller-supplied user id.
+
 ### Deprecated
 
 - **`ExceptionAlertCandidate.Message` is obsolete.** It has been always empty since the alert digest stopped carrying the exception message, and nothing reads it. It will be removed in the next MINOR release; a custom `IExceptionAlertStore` that sets it can stop, and one that reads it was already getting an empty string. Setting or reading it now raises CS0618, which fails a build that treats warnings as errors.
+
 ### Fixed
 
 - **The first value masked after a process start is no longer replaced by `***` when it did not need masking.** The compiled masking regexes in `Themia.Exceptional` are JIT-compiled on their first match, and that time counted against the 100 ms match timeout, so on a cold start the first call could time out and the whole value was dropped (fail closed, no leak). Each masker now runs its patterns once when it is first used. A value that really defeats a pattern is still replaced whole; a test now pins that.
+
+- **A refresh of a tenant user is no longer refused when the refresh scope has no ambient tenant (0.61.0 regression).** A refresh carries no JWT. With the default `RuntimeTenantAccess` the flow runs the rest of the refresh inside `BeginScope(user.TenantId)`, so that setup was not affected; with `PerTenantModel` or a fixed/custom `ITenantContext` the ambient tenant stays empty, 0.61.0's post-rotation liveness check resolved the owner in the ambient tenant only, a live, just-rotated tenant session read as dead and the refresh returned `Invalid`. The flow now asks `IsSessionLiveForRotationAsync`. A revoked, expired or stamp-changed session is still refused. The 0.61.0 MIGRATION note missed this case and is corrected.
 
 ## [0.61.0] - 2026-11-14
 

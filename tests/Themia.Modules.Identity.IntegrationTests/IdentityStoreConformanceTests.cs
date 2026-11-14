@@ -1273,6 +1273,27 @@ public abstract class IdentityStoreConformanceTests
     }
 
     [Fact]
+    public async Task A_tenant_users_session_is_live_for_the_rotation_check_from_a_scope_with_no_tenant_until_it_is_revoked()
+    {
+        await ResetAsync();
+        Guid ann;
+        RefreshIssue issued;
+        await using (var tenant = NewScope(new TenantId("acme")))
+        {
+            ann = (await tenant.Users.CreateAsync("rotation-ann", "pw")).UserId!.Value;
+            issued = await tenant.RefreshTokens.IssueAsync(ann);
+        }
+
+        await using var noTenant = NewScope(tenant: null);   // a refresh with no JWT: the rotation resolves the owner by hash match
+        Assert.True((await noTenant.RefreshTokens.ValidateAndRotateAsync(issued.RawToken)).TryGetSuccess(out _, out var next));
+        Assert.True(await noTenant.RefreshTokens.IsSessionLiveForRotationAsync(ann, issued.FamilyId));
+        Assert.False(await noTenant.RefreshTokens.IsSessionLiveAsync(ann, issued.FamilyId));   // the caller-facing check stays ambient-only
+
+        await noTenant.RefreshTokens.RevokeAsync(next.RawToken, allForUser: false);
+        Assert.False(await noTenant.RefreshTokens.IsSessionLiveForRotationAsync(ann, issued.FamilyId));
+    }
+
+    [Fact]
     public async Task A_session_is_live_for_its_own_user_across_a_rotation_and_not_after_revocation_reuse_expiry_or_for_a_stranger()
     {
         await ResetAsync();
