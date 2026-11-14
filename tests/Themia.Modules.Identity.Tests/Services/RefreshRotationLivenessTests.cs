@@ -30,9 +30,9 @@ public class RefreshRotationLivenessTests
     private RefreshTokenService Tokens() =>
         new(userRepo, tokenRepo, new FakeUnitOfWork(), clock, new IdentityModuleOptions(), NullLogger<RefreshTokenService>.Instance);
 
-    private User AddTenantUser()
+    private User AddTenantUser(string name = "alice", TenantId? tenant = null)
     {
-        var u = new User { UserName = "alice", NormalizedUserName = "ALICE", TenantId = Acme };
+        var u = new User { UserName = name, NormalizedUserName = name.ToUpperInvariant(), TenantId = tenant ?? Acme };
         u.SetId(Guid.NewGuid());
         users.Add(u);
         return u;
@@ -84,11 +84,27 @@ public class RefreshRotationLivenessTests
     }
 
     [Fact]
-    public async Task IsSessionLiveForRotation_is_false_for_a_family_that_belongs_to_another_user()
+    public async Task IsSessionLiveForRotation_is_false_for_a_family_that_belongs_to_another_user_in_the_same_tenant()
     {
         var (_, issued, _) = await IssueThenRotateWithNoTenant();
+        var bob = AddTenantUser("bob");
+        userRepo.AmbientTenant = Acme;
+        await Tokens().IssueAsync(bob.Id);
+        LeaveTenantScope();
 
-        Assert.False(await Tokens().IsSessionLiveForRotationAsync(Guid.NewGuid(), issued.FamilyId));
+        Assert.False(await Tokens().IsSessionLiveForRotationAsync(bob.Id, issued.FamilyId));
+    }
+
+    [Fact]
+    public async Task IsSessionLiveForRotation_is_false_for_a_family_that_belongs_to_a_user_in_another_tenant()
+    {
+        var (_, issued, _) = await IssueThenRotateWithNoTenant();
+        var carol = AddTenantUser("carol", new TenantId("globex"));
+        userRepo.AmbientTenant = carol.TenantId;
+        await Tokens().IssueAsync(carol.Id);
+        LeaveTenantScope();
+
+        Assert.False(await Tokens().IsSessionLiveForRotationAsync(carol.Id, issued.FamilyId));
     }
 
     [Fact]

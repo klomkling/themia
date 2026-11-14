@@ -28,7 +28,7 @@ with the *why* and concrete upgrade steps.
 
 **Why:** a session that ended (revoked family, changed security stamp) could otherwise still mint a new access token through a refresh when no proof row existed to check.
 
-**Who is affected:** an app that replaced `IRefreshTokenService` with its own implementation. *Correction (0.61.1):* the default implementation was also affected when a refresh ran in a scope with no tenant (a refresh that carries no JWT): its liveness check resolved the owner in the ambient tenant only, so a tenant user read as not live and the refresh returned `Invalid`. 0.61.1 fixes the default; see [0.61.1](#0611).
+**Who is affected:** an app that replaced `IRefreshTokenService` with its own implementation. *Correction (0.62.0):* the default implementation was also affected when a refresh ran in a scope with no tenant (a refresh that carries no JWT): its liveness check resolved the owner in the ambient tenant only, so a tenant user read as not live and the refresh returned `Invalid`. 0.62.0 fixes the default; see [0.62.0](#0620).
 
 **How to upgrade:** implement `IsSessionLiveAsync` to answer true only for a family that exists, is not revoked and has not expired (and, if you bind sessions to the security stamp, whose stamp still matches). The default interface implementation returns false (fail closed), so an implementation that does not override it now refuses every such refresh.
 
