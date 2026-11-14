@@ -19,7 +19,8 @@ internal sealed class ServiceHarness : IAsyncDisposable
 
     private readonly ServiceProvider root;
 
-    public ServiceHarness(string connectionString, Action<SecondFactorOptions>? configure = null)
+    public ServiceHarness(
+        string connectionString, Action<SecondFactorOptions>? configure = null, Action<IServiceCollection>? configureServices = null)
     {
         Clock = new FakeTimeProvider(DateTimeOffset.UtcNow);
         Contacts = new FakeContacts();
@@ -30,6 +31,7 @@ internal sealed class ServiceHarness : IAsyncDisposable
         services.AddSingleton<TimeProvider>(Clock);
         services.AddSingleton<ISecondFactorSecretProtector, Base64Protector>();
         services.AddSingleton<ISecondFactorContactResolver>(Contacts);
+        configureServices?.Invoke(services);
         services.AddSingleton<IOtpDelivery>(Email);
         services.AddSingleton<IOtpDelivery>(Sms);
         services.AddThemiaChallenges(options =>
