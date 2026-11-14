@@ -99,6 +99,41 @@ public class BeamRefundTests
         Assert.False(sent.RootElement.TryGetProperty("amount", out _));
         Assert.Equal("re_1", refund.RefundId);
         Assert.Equal(PaymentStatus.Pending, refund.Status);
+        Assert.Null(refund.Amount);
+    }
+
+    [Fact]
+    public async Task A_refund_answer_that_echoes_amount_and_currency_carries_them_as_the_accepted_amount()
+    {
+        var handler = new StubHandler()
+            .Enqueue(HttpStatusCode.OK, CardCharge)
+            .Enqueue(HttpStatusCode.OK, CardCharge)
+            .Enqueue(HttpStatusCode.OK, """{ "refundId": "re_3", "amount": 4000, "currency": "THB" }""");
+        var gateway = BuildWith(handler);
+
+        var refund = await gateway.RefundAsync(new RefundRequest(new ChargeRef("ch_1", "order-1"), Money.Thb(5000), null, null));
+
+        Assert.Equal(Money.Thb(4000), refund.Amount);
+    }
+
+    [Theory]
+    [InlineData("""{ "refundId": "re_4", "amount": 4000 }""")]
+    [InlineData("""{ "refundId": "re_4", "amount": "4000", "currency": "THB" }""")]
+    [InlineData("""{ "refundId": "re_4", "amount": -1, "currency": "THB" }""")]
+    [InlineData("""{ "refundId": "re_4", "amount": 4000, "currency": "baht" }""")]
+    public async Task A_refund_answer_with_an_unusable_amount_still_returns_the_refund_with_no_amount(string body)
+    {
+        // The refund is already made; refusing the answer would invite a retry. "No amount" means "not confirmed".
+        var handler = new StubHandler()
+            .Enqueue(HttpStatusCode.OK, CardCharge)
+            .Enqueue(HttpStatusCode.OK, CardCharge)
+            .Enqueue(HttpStatusCode.OK, body);
+        var gateway = BuildWith(handler);
+
+        var refund = await gateway.RefundAsync(new RefundRequest(new ChargeRef("ch_1", "order-1"), Money.Thb(5000), null, null));
+
+        Assert.Equal("re_4", refund.RefundId);
+        Assert.Null(refund.Amount);
     }
 
     [Fact]

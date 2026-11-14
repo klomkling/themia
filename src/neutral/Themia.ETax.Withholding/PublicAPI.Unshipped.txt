@@ -286,3 +286,11 @@ Themia.ETax.Withholding.WithholdingSignatureFailure.NotIssuedWithOne = 2 -> Them
 Themia.ETax.Withholding.WithholdingSignatureException
 Themia.ETax.Withholding.WithholdingSignatureException.Failure.get -> Themia.ETax.Withholding.WithholdingSignatureFailure
 Themia.ETax.Withholding.WithholdingSignatureException.WithholdingSignatureException(Themia.ETax.Withholding.WithholdingSignatureFailure failure) -> void
+Themia.ETax.Withholding.WithholdingFilingCsv
+Themia.ETax.Withholding.WithholdingFilingCsvResult
+Themia.ETax.Withholding.WithholdingFilingCsvResult.Csv.get -> string!
+Themia.ETax.Withholding.WithholdingFilingCsvResult.PaidSatang.get -> long
+Themia.ETax.Withholding.WithholdingFilingCsvResult.RowCount.get -> int
+Themia.ETax.Withholding.WithholdingFilingCsvResult.ToUtf8Bytes() -> byte[]!
+Themia.ETax.Withholding.WithholdingFilingCsvResult.WithheldSatang.get -> long
+static Themia.ETax.Withholding.WithholdingFilingCsv.Build(System.Collections.Generic.IEnumerable<Themia.ETax.Withholding.WithholdingCertificateRecord!>! certificates, Themia.ETax.Withholding.WithholdingFilingForm form, int year, int month) -> Themia.ETax.Withholding.WithholdingFilingCsvResult!
