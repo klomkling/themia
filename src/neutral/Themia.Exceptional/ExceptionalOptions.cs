@@ -58,7 +58,7 @@ public sealed class ExceptionalOptions
     public bool MaskCredentialValues { get; set; } = true;
 
     private static readonly Regex SecretKey = new(
-        "authorization|^cookie$|^set-cookie$|password|passwd|^pwd$|secret|token|api[-_]?key|access[-_]?key|credential|session|\\.aspnetcore",
+        "authorization|^cookie$|^set-cookie$|password|passwd|^pwd$|secret|token|ticket|api[-_]?key|access[-_]?key|credential|session|themia_dash|\\.aspnetcore",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     /// <summary>Default redactor: masks values whose key names a categorical secret

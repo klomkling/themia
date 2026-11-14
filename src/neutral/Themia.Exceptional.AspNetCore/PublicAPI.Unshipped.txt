@@ -29,3 +29,19 @@ Themia.Exceptional.AspNetCore.ExceptionalDashboardOptions.Heading.get -> string!
 Themia.Exceptional.AspNetCore.ExceptionalDashboardOptions.Heading.set -> void
 Themia.Exceptional.AspNetCore.ExceptionalDashboardOptions.OnDenied.get -> System.Func<Microsoft.AspNetCore.Http.HttpContext!, System.Threading.Tasks.Task!>?
 Themia.Exceptional.AspNetCore.ExceptionalDashboardOptions.OnDenied.set -> void
+const Themia.Exceptional.AspNetCore.ExceptionalBrowserAccess.Purpose = "exceptional-dashboard" -> string!
+static Themia.Exceptional.AspNetCore.ExceptionalBrowserAccess.AddExceptionalDashboardPurpose(this Themia.Challenges.ChallengeOptions! options) -> Themia.Challenges.ChallengeOptions!
+static readonly Themia.Exceptional.AspNetCore.ExceptionalBrowserAccess.TicketLifetime -> System.TimeSpan
+Themia.Exceptional.AspNetCore.ExceptionalBrowserAccess
+Themia.Exceptional.AspNetCore.ExceptionalBrowserAccessOptions
+Themia.Exceptional.AspNetCore.ExceptionalBrowserAccessOptions.AuthorizeUser.get -> System.Func<Microsoft.AspNetCore.Http.HttpContext!, string!, System.Threading.Tasks.Task<bool>!>?
+Themia.Exceptional.AspNetCore.ExceptionalBrowserAccessOptions.AuthorizeUser.set -> void
+Themia.Exceptional.AspNetCore.ExceptionalBrowserAccessOptions.CookieLifetime.get -> System.TimeSpan
+Themia.Exceptional.AspNetCore.ExceptionalBrowserAccessOptions.CookieLifetime.set -> void
+Themia.Exceptional.AspNetCore.ExceptionalBrowserAccessOptions.ExceptionalBrowserAccessOptions() -> void
+Themia.Exceptional.AspNetCore.ExceptionalBrowserAccessOptions.MintUser.get -> System.Func<Microsoft.AspNetCore.Http.HttpContext!, System.Threading.Tasks.Task<string?>!>?
+Themia.Exceptional.AspNetCore.ExceptionalBrowserAccessOptions.MintUser.set -> void
+Themia.Exceptional.AspNetCore.ExceptionalBrowserAccessOptions.SameSite.get -> Microsoft.AspNetCore.Http.SameSiteMode
+Themia.Exceptional.AspNetCore.ExceptionalBrowserAccessOptions.SameSite.set -> void
+Themia.Exceptional.AspNetCore.ExceptionalDashboardOptions.BrowserAccess.get -> Themia.Exceptional.AspNetCore.ExceptionalBrowserAccessOptions?
+Themia.Exceptional.AspNetCore.ExceptionalDashboardOptions.BrowserAccess.set -> void

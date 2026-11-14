@@ -22,5 +22,6 @@
   <ItemGroup>
     <ProjectReference Include="../../src/neutral/Themia.Exceptional.AspNetCore/Themia.Exceptional.AspNetCore.csproj" />
     <ProjectReference Include="../../src/neutral/Themia.Exceptional/Themia.Exceptional.csproj" />
+    <ProjectReference Include="../../src/neutral/Themia.Challenges/Themia.Challenges.csproj" />
   </ItemGroup>
 </Project>
