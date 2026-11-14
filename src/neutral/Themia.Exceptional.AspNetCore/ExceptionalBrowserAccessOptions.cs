@@ -34,4 +34,7 @@ public sealed class ExceptionalBrowserAccessOptions
     /// redirect would otherwise drop the cookie. Never guessed at startup.
     /// </summary>
     public SameSiteMode SameSite { get; set; } = SameSiteMode.Strict;
+
+    // Set by MapThemiaExceptional; binds the cookie protector to this dashboard mount.
+    internal string MountPath { get; set; } = string.Empty;
 }

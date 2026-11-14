@@ -27,6 +27,10 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+### Security
+
+- **`Themia.Exceptional.AspNetCore` browser access hardening** (api-review security of #472, notes N1-N7). The dashboard cookie is bound to `ExceptionalOptions.ApplicationName` and the dashboard mount, so a cookie from another app sharing a Data Protection key ring no longer unprotects (existing 15 min cookies are invalidated once). `{prefix}/session` refuses `Sec-Fetch-Site: cross-site` when `SameSite` is Strict. `{prefix}/ticket` requires the `Authorize` predicate before `MintUser`. The session cookie is no longer set when the redeem fails, and a non-ASCII `return` falls back to the prefix. Dashboard HTML sends `X-Frame-Options: DENY` and (unless the host set one) `Content-Security-Policy: frame-ancestors 'none'`; an app that frames the dashboard must now allow it itself. Startup fails without an `IChallengeService`. `ticket=` is masked in captured URLs.
+
 ## [0.63.0] - 2026-11-14
 
 ### Added

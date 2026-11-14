@@ -16,7 +16,7 @@ internal static class CredentialShapeMasker
         // Authorization header: whatever the scheme, mask the whole value; an unclosed quote masks to the end.
         new(@"[""']?\bauthorization\b[""']?\s*[=:]\s*(?:""(?:\\.|[^""\\])*""|'(?:\\.|[^'\\])*'|[""'][\s\S]*|[^\r\n]*)", Options, MatchTimeout),
         // Keys matched by suffix (access_token, client_secret, db_password, ...).
-        new(@"[""']?\b(?:[\w.-]*(?:token|secret|password|passwd|pwd|api[_-]?key|access[_-]?key|credentials?)|auth)[""']?\s*[=:]\s*(?:""(?:\\.|[^""\\])*""|'(?:\\.|[^'\\])*'|[""'][\s\S]*|\S+)", Options, MatchTimeout),
+        new(@"[""']?\b(?:[\w.-]*(?:token|ticket|secret|password|passwd|pwd|api[_-]?key|access[_-]?key|credentials?)|auth)[""']?\s*[=:]\s*(?:""(?:\\.|[^""\\])*""|'(?:\\.|[^'\\])*'|[""'][\s\S]*|\S+)", Options, MatchTimeout),
         // JWT-like: three base64url segments starting with the "eyJ" header.
         new(@"eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]*", RegexOptions.Compiled | RegexOptions.CultureInvariant, MatchTimeout),
     ];

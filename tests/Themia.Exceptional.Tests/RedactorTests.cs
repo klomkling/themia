@@ -22,6 +22,10 @@ public sealed class RedactorTests
     public void DefaultRedactor_MasksSecretKeys(string key, string value)
         => Assert.Equal("***", ExceptionalOptions.DefaultRedactor(key, value));
 
+    [Fact]
+    public void DefaultRedactor_MasksATicketInsideAUrl()
+        => Assert.DoesNotContain("abc123", ExceptionalOptions.DefaultRedactor("Url", "https://h/exceptions/session?ticket=abc123&return=/x"));
+
     [Theory]
     [InlineData("User-Agent", "Edge")]
     [InlineData("email", "x@y.com")]

@@ -62,7 +62,8 @@ public sealed class ExceptionalOptions
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     /// <summary>Default redactor: masks values whose key names a categorical secret
-    /// (Authorization/Cookie/Set-Cookie, contains password/secret/token/api[-_]?key/session, or is an
+    /// (Authorization/Cookie/Set-Cookie, contains password/secret/token/ticket/api[-_]?key/session, or is the
+    /// dashboard session cookie <c>themia_dash</c>, or is an
     /// ASP.NET Core auth/session cookie such as <c>.AspNetCore.Cookies</c>) to <c>"***"</c>; returns all
     /// other values with credential-shaped content (JWT, Bearer/Basic, <c>key=secret</c>, Authorization) masked
     /// in place.</summary>
