@@ -47,14 +47,13 @@ public abstract class ConversationSchemaTests(ConversationEngineFixture fixture)
     [Fact]
     public async Task Migration_ShouldCreateTheNotifyCursorsTable_WithItsParticipantForeignKey()
     {
-        Assert.True(await fixture.TableExistsAsync("conversation_notify_cursors"));
         Assert.True(await fixture.ForeignKeyExistsAsync("fk_conversation_notify_cursors_participant"));
     }
 
     [Fact]
-    public async Task Migration_ShouldCreateAllSevenTables()
+    public async Task Migration_ShouldCreateAllEightTables()
     {
-        foreach (var table in new[] { "conversations", "conversation_participants", "conversation_messages", "conversation_attachments", "conversation_guest_sessions", "conversation_events", "conversation_tombstones" })
+        foreach (var table in new[] { "conversations", "conversation_participants", "conversation_messages", "conversation_attachments", "conversation_guest_sessions", "conversation_events", "conversation_tombstones", "conversation_notify_cursors" })
         {
             Assert.True(await fixture.TableExistsAsync(table), table);
         }

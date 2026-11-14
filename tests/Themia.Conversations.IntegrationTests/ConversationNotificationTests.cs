@@ -241,6 +241,35 @@ public abstract class ConversationNotificationTests(ConversationEngineFixture fi
     }
 
     [Fact]
+    public async Task Drain_ShouldSkipARecipient_WhoLeftBetweenTheClaimAndTheBatch()
+    {
+        var time = new FakeTimeProvider(DateTimeOffset.UtcNow);
+        var room = await RoomAsync(time);
+        await PostAsync(time, room, "m1");
+        time.Advance(Window + TimeSpan.FromSeconds(1));
+        var left = false;
+        var subscriber = new RecordingSubscriber
+        {
+            // B is claimed together with A; A's call runs first and B leaves before B's batch is built.
+            Hook = async n =>
+            {
+                if (left || n.ConversationId != room.Conversation)
+                {
+                    return;
+                }
+
+                left = true;
+                var leaver = n.ParticipantId == room.A ? room.B : room.A;
+                await fixture.ExecuteAsync("UPDATE conversation_participants SET left_at = @Now WHERE tenant_id = @Tenant AND id = @Id;", new { room.Tenant, Id = leaver, Now = time.GetUtcNow().UtcDateTime });
+            },
+        };
+
+        await Drain(time, subscriber).DrainAsync();
+
+        Assert.Single(subscriber.Seen, n => n.ConversationId == room.Conversation);
+    }
+
+    [Fact]
     public async Task Drain_ShouldNotifyAnActiveGuest()
     {
         var time = new FakeTimeProvider(DateTimeOffset.UtcNow);

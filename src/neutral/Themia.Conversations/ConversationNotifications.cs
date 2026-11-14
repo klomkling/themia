@@ -28,7 +28,7 @@ public sealed record DrainResult(DrainOutcome Outcome, int Delivered, int Skippe
 }
 
 /// <summary>One batched notification: a recipient has unread messages in one conversation. Ids and counts only, never message text or contact data.</summary>
-/// <param name="BatchId">Stable for (conversation, recipient, <paramref name="LastSeq"/>): a redelivery after a crash carries the same id when no message arrived since, so the subscriber dedupes on it.</param>
+/// <param name="BatchId">Stable for (conversation, recipient, <paramref name="LastSeq"/>): a redelivery after a crash carries the same id when no message arrived since, so the subscriber dedupes on it. A dedupe key only: derived from ids and a sequence number, so never a secret or a capability.</param>
 /// <param name="TenantId">The tenant.</param>
 /// <param name="ConversationId">The conversation.</param>
 /// <param name="ParticipantId">The recipient participant; the app resolves its contact and channel.</param>

@@ -89,9 +89,9 @@ internal sealed class ConversationNotificationService(
                 await transaction.CommitAsync(cancellationToken);
                 return;
             }
-            catch (DbException exception) when (dialect.IsDuplicateKey(exception))
+            catch (DbException exception) when (dialect.IsDuplicateKey(exception) || dialect.IsDeadlock(exception))
             {
-                logger.LogDebug("Conversation notification cursor seed met a concurrent drain (attempt {Attempt})", attempt);
+                logger.LogDebug("Conversation notification cursor seed met a concurrent drain, a duplicate key or a deadlock (attempt {Attempt})", attempt);
             }
         }
     }
@@ -134,9 +134,15 @@ internal sealed class ConversationNotificationService(
     private async Task<RecipientOutcome> NotifyOneAsync(DbConnection connection, IConversationNotificationSubscriber target, CursorKey key, Guid owner, CancellationToken cancellationToken)
     {
         var batch = await BuildBatchAsync(connection, key, cancellationToken);
+        if (batch.ReadSeq is null)
+        {
+            await ReleaseAsync(connection, key, owner, cancellationToken);
+            return RecipientOutcome.Skipped;
+        }
+
         if (batch.UnreadCount == 0)
         {
-            var marked = await MarkAsync(connection, key, owner, batch.ReadSeq, cancellationToken);
+            var marked = await MarkAsync(connection, key, owner, batch.ReadSeq.Value, cancellationToken);
             return marked ? RecipientOutcome.Skipped : LostLease(key);
         }
 
@@ -168,14 +174,18 @@ internal sealed class ConversationNotificationService(
         var read = await connection.QuerySingleOrDefaultAsync<long?>(new CommandDefinition(
             "SELECT CASE WHEN n.notified_seq > p.last_read_seq THEN n.notified_seq ELSE p.last_read_seq END " +
             "FROM conversation_notify_cursors n JOIN conversation_participants p ON p.tenant_id = n.tenant_id AND p.conversation_id = n.conversation_id AND p.id = n.participant_id " +
-            "WHERE n.tenant_id = @TenantId AND n.conversation_id = @ConversationId AND n.participant_id = @ParticipantId;",
+            "WHERE n.tenant_id = @TenantId AND n.conversation_id = @ConversationId AND n.participant_id = @ParticipantId AND p.left_at IS NULL;",
             parameters,
-            cancellationToken: cancellationToken)) ?? 0;
+            cancellationToken: cancellationToken));
+        if (read is null)
+        {
+            return new Batch(0, 0, null); // The recipient left (or the cursor is gone) since the claim: nothing to send.
+        }
 
         var counted = await connection.QuerySingleAsync<Counted>(new CommandDefinition(
             "SELECT COUNT(*) AS UnreadCount, COALESCE(MAX(seq), 0) AS LastSeq FROM conversation_messages " +
             "WHERE tenant_id = @TenantId AND conversation_id = @ConversationId AND participant_id <> @ParticipantId AND redacted_at IS NULL AND seq > @After;",
-            new { key.TenantId, key.ConversationId, key.ParticipantId, After = read },
+            new { key.TenantId, key.ConversationId, key.ParticipantId, After = read.Value },
             cancellationToken: cancellationToken));
         return new Batch((int)counted.UnreadCount, counted.LastSeq, read);
     }
@@ -232,7 +242,7 @@ internal sealed class ConversationNotificationService(
         public long LastSeq { get; init; }
     }
 
-    private readonly record struct Batch(int UnreadCount, long LastSeq, long ReadSeq);
+    private readonly record struct Batch(int UnreadCount, long LastSeq, long? ReadSeq);
 
     private enum RecipientOutcome
     {
