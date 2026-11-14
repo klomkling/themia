@@ -186,12 +186,12 @@ public abstract class ConversationNotificationTests(ConversationEngineFixture fi
 
         await Drain(time, subscriber).DrainAsync();
 
-        Assert.Empty(subscriber.Seen);
+        Assert.DoesNotContain(subscriber.Seen, n => n.ConversationId == room.Conversation);
         Assert.True(await EventDeliveredAsync(room));
     }
 
     [Fact]
-    public async Task Drain_ShouldNotBlockMarkRead_WhileAClaimHoldsTheCursorRow()
+    public async Task Drain_ShouldNotBlockMarkRead_WhileTheRealClaimHoldsTheCursorRow()
     {
         var time = new FakeTimeProvider(DateTimeOffset.UtcNow);
         var room = await RoomAsync(time);
@@ -199,22 +199,93 @@ public abstract class ConversationNotificationTests(ConversationEngineFixture fi
         await fixture.ExecuteAsync(
             "INSERT INTO conversation_notify_cursors (tenant_id, conversation_id, participant_id, notified_seq, created_at, updated_at) VALUES (@Tenant, @Conversation, @A, 0, @Now, @Now);",
             new { room.Tenant, room.Conversation, A = room.A, Now = time.GetUtcNow().UtcDateTime });
+        time.Advance(Window + TimeSpan.FromSeconds(1));
+        var service = Drain(time, new RecordingSubscriber());
 
         await using var holder = fixture.Dialect.CreateConnection();
         await holder.OpenAsync();
         await using var claim = await holder.BeginTransactionAsync(System.Data.IsolationLevel.ReadCommitted);
-        await Dapper.SqlMapper.QueryAsync<Guid>(holder,
-            $"SELECT n.participant_id FROM conversation_notify_cursors n {fixture.Dialect.CursorClaimTableHint} " +
-            "JOIN conversation_participants p ON p.tenant_id = n.tenant_id AND p.conversation_id = n.conversation_id AND p.id = n.participant_id " +
-            $"WHERE n.tenant_id = @Tenant AND n.conversation_id = @Conversation {fixture.Dialect.CursorClaimRowLockClause};",
-            new { room.Tenant, room.Conversation },
-            claim);
+        var now = time.GetUtcNow();
+        var claimed = await Dapper.SqlMapper.QueryAsync<Guid>(holder, service.ClaimSelectSql.Replace("SELECT n.tenant_id AS TenantId, n.conversation_id AS ConversationId, n.participant_id AS ParticipantId", "SELECT n.participant_id"),
+            new { Now = now.UtcDateTime, Cutoff = (now - Window).UtcDateTime, Limit = 1000 }, claim);
+        Assert.Contains(room.A, claimed);
 
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(20));
         var read = await Conversations(time).MarkReadAsync(Member("a"), room.Tenant, room.Conversation, 1, timeout.Token);
 
         Assert.Equal(1, read.LastReadSeq);
         await claim.RollbackAsync();
+    }
+
+    [Theory]
+    [InlineData("left", 0)]
+    [InlineData("revoked guest", 1)]
+    [InlineData("erased", 0)]
+    public async Task Drain_ShouldNotifyNoOneWhoIsNoLongerActive(string state, short participantKind)
+    {
+        var time = new FakeTimeProvider(DateTimeOffset.UtcNow);
+        var room = await RoomAsync(time);
+        await fixture.ExecuteAsync("UPDATE conversation_participants SET kind = @Kind WHERE tenant_id = @Tenant AND id = @Id;", new { room.Tenant, Id = room.A, Kind = participantKind });
+        await PostAsync(time, room, "m1");
+        var inactive = state == "erased"
+            ? "UPDATE conversation_participants SET display_name = 'erased', user_ref = NULL, left_at = @Now WHERE tenant_id = @Tenant AND id = @Id;"
+            : "UPDATE conversation_participants SET left_at = @Now WHERE tenant_id = @Tenant AND id = @Id;";
+        await fixture.ExecuteAsync(inactive, new { room.Tenant, Id = room.A, Now = time.GetUtcNow().UtcDateTime });
+        time.Advance(Window + TimeSpan.FromSeconds(1));
+        var subscriber = new RecordingSubscriber();
+
+        await Drain(time, subscriber).DrainAsync();
+
+        Assert.DoesNotContain(subscriber.Seen, n => n.ParticipantId == room.A);
+        Assert.Contains(subscriber.Seen, n => n.ParticipantId == room.B);
+    }
+
+    [Fact]
+    public async Task Drain_ShouldNotifyAnActiveGuest()
+    {
+        var time = new FakeTimeProvider(DateTimeOffset.UtcNow);
+        var room = await RoomAsync(time);
+        await fixture.ExecuteAsync("UPDATE conversation_participants SET kind = 1 WHERE tenant_id = @Tenant AND id = @Id;", new { room.Tenant, Id = room.A });
+        await PostAsync(time, room, "m1");
+        time.Advance(Window + TimeSpan.FromSeconds(1));
+        var subscriber = new RecordingSubscriber();
+
+        await Drain(time, subscriber).DrainAsync();
+
+        Assert.Contains(subscriber.Seen, n => n.ParticipantId == room.A);
+    }
+
+    [Fact]
+    public async Task Drain_ShouldNotFail_WhenTheConversationIsPurgedBetweenTheClaimAndTheMark()
+    {
+        var time = new FakeTimeProvider(DateTimeOffset.UtcNow);
+        var room = await RoomAsync(time);
+        await PostAsync(time, room, "m1");
+        time.Advance(Window + TimeSpan.FromSeconds(1));
+        var retention = new ConversationRetentionService(
+            fixture.Dialect, new ConversationOptions { NoLegalHoldPort = true }, new AllowAll(), new DefaultConversationLifecycleSink(), null, null, TimeProvider.System, NullLogger<ConversationRetentionService>.Instance);
+        var purged = false;
+        var subscriber = new RecordingSubscriber
+        {
+            Hook = async n =>
+            {
+                if (purged || n.ConversationId != room.Conversation)
+                {
+                    return;
+                }
+
+                purged = true;
+                await Conversations(time).CloseAsync(Member("poster"), room.Tenant, room.Conversation);
+                await fixture.ExecuteAsync("UPDATE conversations SET retention_until = @Until WHERE id = @Id;", new { Id = room.Conversation, Until = DateTime.UtcNow.AddDays(-1) });
+                Assert.Equal(1, (await retention.SweepAsync(room.Tenant)).Purged);
+            },
+        };
+
+        var result = await Drain(time, subscriber).DrainAsync();
+
+        Assert.True(purged);
+        Assert.Equal(0, result.Failed);
+        Assert.Equal(0, await fixture.ScalarAsync<int>("SELECT COUNT(*) FROM conversation_notify_cursors WHERE tenant_id = @Tenant;", new { room.Tenant }));
     }
 
     [Fact]

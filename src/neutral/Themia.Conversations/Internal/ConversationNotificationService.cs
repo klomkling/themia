@@ -83,7 +83,10 @@ internal sealed class ConversationNotificationService(
         {
             try
             {
-                await connection.ExecuteAsync(new CommandDefinition(sql, new { Now = now.UtcDateTime }, cancellationToken: cancellationToken));
+                // ReadCommitted, not the connection default: MySQL autocommit runs INSERT ... SELECT at REPEATABLE READ and would lock the rows it reads (participants, events).
+                await using var transaction = await connection.BeginTransactionAsync(IsolationLevel.ReadCommitted, cancellationToken);
+                await connection.ExecuteAsync(new CommandDefinition(sql, new { Now = now.UtcDateTime }, transaction, cancellationToken: cancellationToken));
+                await transaction.CommitAsync(cancellationToken);
                 return;
             }
             catch (DbException exception) when (dialect.IsDuplicateKey(exception))
@@ -93,9 +96,8 @@ internal sealed class ConversationNotificationService(
         }
     }
 
-    private async Task<List<CursorKey>> ClaimAsync(DbConnection connection, Guid owner, DateTimeOffset now, int batchSize, CancellationToken cancellationToken)
-    {
-        var select =
+    /// <summary>The claim query: the due recipients, locked on the cursor row only. Internal so a test can hold the real statement open on a second connection.</summary>
+    internal string ClaimSelectSql =>
             "SELECT n.tenant_id AS TenantId, n.conversation_id AS ConversationId, n.participant_id AS ParticipantId " +
             $"FROM conversation_notify_cursors n {dialect.CursorClaimTableHint} " +
             "JOIN conversation_participants p ON p.tenant_id = n.tenant_id AND p.conversation_id = n.conversation_id AND p.id = n.participant_id " +
@@ -105,9 +107,11 @@ internal sealed class ConversationNotificationService(
             "AND m.seq > CASE WHEN n.notified_seq > p.last_read_seq THEN n.notified_seq ELSE p.last_read_seq END) " +
             $"ORDER BY n.updated_at {dialect.LimitClause} {dialect.CursorClaimRowLockClause};";
 
+    private async Task<List<CursorKey>> ClaimAsync(DbConnection connection, Guid owner, DateTimeOffset now, int batchSize, CancellationToken cancellationToken)
+    {
         await using var transaction = await connection.BeginTransactionAsync(IsolationLevel.ReadCommitted, cancellationToken);
         var rows = (await connection.QueryAsync<CursorKey>(new CommandDefinition(
-            select,
+            ClaimSelectSql,
             new { Now = now.UtcDateTime, Cutoff = (now - options.NotifyDebounce).UtcDateTime, Limit = batchSize },
             transaction,
             cancellationToken: cancellationToken))).ToList();
