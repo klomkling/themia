@@ -9,6 +9,11 @@ public sealed class ExceptionalDashboardOptions
     /// (fail-closed) — the dashboard cannot be served without an explicit predicate.</summary>
     public Func<HttpContext, Task<bool>>? Authorize { get; set; }
 
+    /// <summary>Lets a browser reach the dashboard without a Bearer header: an authenticated call mints a short-lived
+    /// single-use ticket, a redeem URL swaps it for a scoped cookie. <see langword="null"/> (the default) leaves the
+    /// dashboard Bearer-only, with no extra routes. See <see cref="ExceptionalBrowserAccessOptions"/>.</summary>
+    public ExceptionalBrowserAccessOptions? BrowserAccess { get; set; }
+
     /// <summary>Runs when <see cref="Authorize"/> denies a request, instead of returning the bare 404.
     /// Use it to bounce an expired session to the host app's login page — otherwise a timed-out admin lands
     /// on a blank 404 with no explanation:

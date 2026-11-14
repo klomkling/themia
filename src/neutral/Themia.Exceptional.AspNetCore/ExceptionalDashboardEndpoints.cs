@@ -42,7 +42,18 @@ public static class ExceptionalDashboardEndpoints
                 "Exceptions dashboard mounted at {Path} without an Authorize predicate; all requests are denied.", path);
         }
 
+        if (options.BrowserAccess is { } browserAccess)
+        {
+            ExceptionalBrowserAccess.ValidateStartup(browserAccess, endpoints.ServiceProvider);
+        }
+
         var group = endpoints.MapGroup(path);
+        if (options.BrowserAccess is not null)
+        {
+            group.MapPost("ticket", (HttpContext ctx, CancellationToken ct) => ExceptionalBrowserAccess.MintAsync(ctx, options, path, ct));
+            group.MapGet("session", (HttpContext ctx, CancellationToken ct) => ExceptionalBrowserAccess.RedeemAsync(ctx, options, path, ct));
+        }
+
         group.MapGet("", (HttpContext ctx, IExceptionStore store, CancellationToken ct) => HandleListAsync(ctx, store, options, path, ct));
         group.MapGet("{guid:guid}", (Guid guid, HttpContext ctx, IExceptionStore store, CancellationToken ct) => HandleDetailAsync(ctx, store, options, path, guid, ct));
         group.MapGet("dashboard.css", (HttpContext ctx) => HandleCssAsync(ctx, options));
@@ -230,7 +241,14 @@ public static class ExceptionalDashboardEndpoints
 
         try
         {
-            return await options.Authorize(ctx).ConfigureAwait(false);
+            if (await options.Authorize(ctx).ConfigureAwait(false))
+            {
+                return true;
+            }
+
+            // No Bearer user: a browser holding the scoped dashboard cookie may still pass.
+            return options.BrowserAccess is { } access
+                && await ExceptionalBrowserAccess.CookieAuthorizedAsync(ctx, access).ConfigureAwait(false);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

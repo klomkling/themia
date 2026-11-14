@@ -14,6 +14,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../Themia.Exceptional/Themia.Exceptional.csproj" />
+    <ProjectReference Include="../Themia.Challenges/Themia.Challenges.csproj" />
   </ItemGroup>
   <ItemGroup>
     <AdditionalFiles Include="PublicAPI.Shipped.txt" />

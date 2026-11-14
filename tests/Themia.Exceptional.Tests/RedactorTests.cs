@@ -16,6 +16,8 @@ public sealed class RedactorTests
     [InlineData("X-Api-Key", "k-123")]
     [InlineData("X-Session-Token", "t-9")]
     [InlineData(".AspNetCore.Cookies", "c")]
+    [InlineData("__Secure-themia_dash", "c")]
+    [InlineData("ticket", "t")]
     [InlineData(".AspNetCore.Identity.Application", "c")]
     public void DefaultRedactor_MasksSecretKeys(string key, string value)
         => Assert.Equal("***", ExceptionalOptions.DefaultRedactor(key, value));
