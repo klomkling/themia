@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
 using Themia.Conversations.Internal;
@@ -38,6 +39,24 @@ public abstract class ConversationNotificationTests(ConversationEngineFixture fi
 
             Seen.Add(notification);
         }
+    }
+
+    private sealed class ThrowingSubscriber(string message) : IConversationNotificationSubscriber
+    {
+        public Task NotifyAsync(ConversationNotification notification, CancellationToken cancellationToken = default) => throw new InvalidOperationException(message);
+    }
+
+    private sealed class CapturingLogger<T> : ILogger<T>
+    {
+        public List<string> Entries { get; } = [];
+
+        public IDisposable? BeginScope<TState>(TState state)
+            where TState : notnull => null;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter) =>
+            Entries.Add($"{formatter(state, exception)} | {exception}");
     }
 
     private sealed record Room(string Tenant, Guid Conversation, Guid Poster, Guid A, Guid B);
@@ -278,6 +297,24 @@ public abstract class ConversationNotificationTests(ConversationEngineFixture fi
 
         Assert.Equal(DrainOutcome.SubscriberMissing, result.Outcome);
         Assert.Equal(0, await fixture.ScalarAsync<int>("SELECT COUNT(*) FROM conversation_notify_cursors WHERE tenant_id = @Tenant;", new { room.Tenant }));
+    }
+
+    [Fact]
+    public async Task Drain_ShouldNotLogTheSubscriberExceptionMessage_WhenTheSubscriberThrows()
+    {
+        const string Marker = "someone@example.com +66 81 234 5678";
+        var time = new FakeTimeProvider(DateTimeOffset.UtcNow);
+        var room = await RoomAsync(time);
+        await PostAsync(time, room, "m1");
+        time.Advance(Window + TimeSpan.FromSeconds(1));
+        var logger = new CapturingLogger<ConversationNotificationService>();
+        var drain = new ConversationNotificationService(
+            fixture.Dialect, new ConversationOptions { NotifyDebounce = Window }, new ThrowingSubscriber(Marker), time, logger);
+
+        await drain.DrainAsync();
+
+        Assert.Contains(logger.Entries, e => e.Contains(room.A.ToString(), StringComparison.OrdinalIgnoreCase) && e.Contains(nameof(InvalidOperationException), StringComparison.Ordinal));
+        Assert.DoesNotContain(logger.Entries, e => e.Contains("example.com", StringComparison.Ordinal) || e.Contains("5678", StringComparison.Ordinal));
     }
 
     [Theory]

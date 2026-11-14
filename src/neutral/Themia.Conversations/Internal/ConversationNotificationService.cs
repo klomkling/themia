@@ -143,7 +143,8 @@ internal sealed class ConversationNotificationService(
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
-            logger.LogWarning(exception, "Conversation notification failed for participant {ParticipantId} in conversation {ConversationId}; it is retried on the next drain", key.ParticipantId, key.ConversationId);
+            // The type name and ids only: the subscriber is app code talking to a channel, and its message can carry an address, a number or text.
+            logger.LogWarning("Conversation notification failed with {ExceptionType} for participant {ParticipantId} in conversation {ConversationId}; it is retried on the next drain", exception.GetType().Name, key.ParticipantId, key.ConversationId);
             await ReleaseAsync(connection, key, owner, cancellationToken);
             return RecipientOutcome.Failed;
         }
