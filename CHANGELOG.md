@@ -27,6 +27,10 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+### Added
+
+- **`Themia.SecondFactor`: README with the recipe for importing existing TOTP secrets without re-enrolling, and an integration test that runs it** (coord #0203). `IMfaMethodStore.AddAsync` with the stored secret, its protection scheme and `LastUsedStep` plus a protector that still reads the old scheme; documented limits: Themia refuses secrets under 16 bytes (80-bit legacy secrets must re-enrol), and one `TotpOptions` applies to all users. No code change in the package.
+
 ## [0.61.1] - 2026-11-14
 
 ### Added
