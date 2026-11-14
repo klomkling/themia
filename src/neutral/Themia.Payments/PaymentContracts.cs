@@ -128,7 +128,8 @@ public sealed record RefundRequest(ChargeRef Charge, Money? Amount, string? Reas
 /// <param name="Status">Usually <see cref="PaymentStatus.Pending"/>; the outcome arrives by webhook.</param>
 /// <param name="Amount">The refund amount as the provider answered it, or <b>null where the provider does not echo
 /// one</b> (or echoed one that could not be read). Null means "not confirmed", never "zero": a caller that wants to
-/// reconcile what it asked for against what the provider accepted compares only when this is set.</param>
+/// reconcile what it asked for against what the provider accepted compares only when this is set. Never block or fail a
+/// refund on a null; and compare the whole <see cref="Money"/> (minor units <b>and</b> currency), not the number alone.</param>
 public sealed record RefundCreation(string? RefundId, PaymentStatus Status, Money? Amount = null)
 {
     /// <summary>A refund answer that carries no amount. Kept so callers and gateways built against the

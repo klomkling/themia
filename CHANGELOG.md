@@ -38,6 +38,9 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
   answer carries no amount. The two-argument constructor is kept, so existing `new RefundCreation(id, status)` calls
   and gateways built against it bind unchanged. Additive, a PATCH per the pre-1.0 policy. The echo field names are
   not yet confirmed against Beam's sandbox; until then expect null.
+  Two source-visible effects for consumers: `Deconstruct` on `RefundCreation` now has three outputs instead of two (a
+  `var (id, status) = creation;` must become `var (id, status, _) = creation;`), and record equality now includes
+  `Amount`, so two creations that differ only in `Amount` are no longer equal.
 
 ## [0.61.1] - 2026-11-14
 
