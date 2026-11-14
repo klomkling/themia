@@ -36,10 +36,13 @@ One event row carries every recipient, but a batch is sent per (conversation, re
 marking it loses B, not marking it re-pushes A on every drain (and a new post changes `LastSeq`, so `BatchId` dedupe no longer saves A). The state is therefore a cursor row
 per recipient, in the **one forward migration** (the shipped migration is never edited; 3-engine block + replay guard like the other Themia migrations):
 
-`conversation_notify_cursors (tenant_id, conversation_id, participant_id, notified_seq, lease_owner, lease_expires_at)`, key `(tenant_id, conversation_id, participant_id)`,
+`conversation_notify_cursors (tenant_id, conversation_id, participant_id, notified_seq, lease_owner, lease_expires_at, created_at, updated_at)`, composite primary key `(tenant_id, conversation_id, participant_id)`, no id column,
 literal table name, byte-exact collation on the string columns, tenant-bound foreign key to the participant like every other child table.
 
-Events stay as the cheap "something changed" signal (undelivered index). An event is marked `delivered_at` only when every recipient in its payload has a cursor at or past its `Seq`.
+Events stay as the cheap "something changed" signal (undelivered index). An event is marked `delivered_at` only when every recipient in its payload is **covered** for its `Seq`.
+
+**Covered** (lead, #467 delta): a recipient is covered for a message when the recipient is inactive (left, erased, revoked) **or** the message is redacted **or** `max(notified_seq, last_read_seq) >= Seq`.
+Left, erased and redacted therefore never keep an event undelivered or a conversation rescanned.
 
 ## Rules
 
@@ -50,9 +53,9 @@ Events stay as the cheap "something changed" signal (undelivered index). An even
    `last_read_seq` without calling the subscriber, so the next post starts a fresh window instead of being instantly due and rescanned forever.
 4. **Failure isolation.** A subscriber exception leaves only that recipient's cursor, so A is never pushed again because B threw, and B retries on the next drain with its own `BatchId`.
    `Failed` counts them; each is logged at Warning with conversation id and participant id, never text or contact.
-5. **Claim unit = the cursor row (must-fix 2), lease with an owner (must-fix 3).** Every due predicate sits inside the locked select (PostgreSQL and MySQL 8.0.1+ `FOR UPDATE SKIP LOCKED`,
+5. **Claim unit = the cursor row (must-fix 2), lease with an owner (must-fix 3).** Every due predicate sits inside the locked select, which locks only the cursor row (`FOR UPDATE OF <cursor> SKIP LOCKED`; the due test is an `EXISTS`, not a `GROUP BY`, which a row lock cannot combine with) (PostgreSQL and MySQL 8.0.1+ `FOR UPDATE SKIP LOCKED`,
    SQL Server `UPDLOCK, READPAST`, MySQL at READ COMMITTED as in `MySqlMessagingDialect`), then `UPDATE ... SET lease_owner, lease_expires_at WHERE id IN (...)`, the shape of the
-   Messaging outbox claim; no outer filter on a locked subquery. A cursor row is created on first use (insert-if-absent), so a recipient with no row yet is claimable.
+   Messaging outbox claim; no outer filter on a locked subquery. A cursor row is created on first use by insert-if-absent as **its own committed statement before the claim** (a unique-key conflict is a no-op), so a recipient with no row yet is claimable and the claim never inserts under its own lock.
    The mark is `WHERE lease_owner = @me`: zero rows means the lease was lost (an expired lease was reclaimed), logged and **not** counted as `Delivered`.
    One claim takes at most `BatchSize` recipients; a drain that runs longer than the lease logs a Warning.
 6. **At least once.** The drain claims and commits, calls the subscriber **outside** any transaction, then marks in a second short transaction. A crash after the push re-pushes. The re-push
