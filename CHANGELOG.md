@@ -30,6 +30,18 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 ### Added
 
 - **`Themia.ETax.Withholding`: `WithholdingFilingCsv.Build` writes the monthly PND3 / PND53 CSV an accounting office keys a return from** (coord #0164). One file per form per month, one line per income row (payee tax id, name, address, date paid, income type, amount, rate, tax withheld), with row count and total paid / withheld as control figures. It is not the Revenue Department's e-filing layout: apps do not file themselves. Only Issued certificates count (a cancelled one and its replacement are never both in the file), every snapshot is checked against its stored hash, text cells that start like a formula are defused, and `ToUtf8Bytes()` adds a byte order mark so a spreadsheet reads the Thai text. A digit-only payee tax id or certificate number is written as the text formula `="0105556123456"` so a spreadsheet keeps its leading zero (PND53 ids start with 0).
+- **`Themia.Payments`: `RefundCreation.Amount`, the refund amount as the provider answered it** (coord #0211). A trailing
+  optional `Money? Amount = null`; null means the provider echoed none (or one that could not be read) and is "not
+  confirmed", never zero. A caller that must not mark a refund Succeeded on an answer it cannot reconcile compares
+  `Amount` with what it asked for only when it is set. `Themia.Payments.Beam` fills it from the `amount`/`currency`
+  of the refund answer when both are present and valid, and never throws on a malformed echo (the refund is already
+  made, a refusal would invite a retry). `Themia.Payments.TwoCTwoP` leaves it null: the Payment Process refund
+  answer carries no amount. The two-argument constructor is kept, so existing `new RefundCreation(id, status)` calls
+  and gateways built against it bind unchanged. Additive, a PATCH per the pre-1.0 policy. The echo field names are
+  not yet confirmed against Beam's sandbox; until then expect null.
+  Two source-visible effects for consumers: `Deconstruct` on `RefundCreation` now has three outputs instead of two (a
+  `var (id, status) = creation;` must become `var (id, status, _) = creation;`), and record equality now includes
+  `Amount`, so two creations that differ only in `Amount` are no longer equal.
 
 ## [0.61.1] - 2026-11-14
 

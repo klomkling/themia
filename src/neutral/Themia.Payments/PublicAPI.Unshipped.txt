@@ -124,7 +124,10 @@ Themia.Payments.RefundRequest.Reason.init -> void
 Themia.Payments.RefundRequest.IdempotencyKey.get -> string?
 Themia.Payments.RefundRequest.IdempotencyKey.init -> void
 Themia.Payments.RefundCreation
-Themia.Payments.RefundCreation.RefundCreation(string? RefundId, Themia.Payments.PaymentStatus Status) -> void
+Themia.Payments.RefundCreation.Amount.get -> Themia.Payments.Money?
+Themia.Payments.RefundCreation.Amount.init -> void
+Themia.Payments.RefundCreation.RefundCreation(string? refundId, Themia.Payments.PaymentStatus status) -> void
+Themia.Payments.RefundCreation.RefundCreation(string? RefundId, Themia.Payments.PaymentStatus Status, Themia.Payments.Money? Amount = null) -> void
 Themia.Payments.RefundCreation.RefundId.get -> string?
 Themia.Payments.RefundCreation.RefundId.init -> void
 Themia.Payments.RefundCreation.Status.get -> Themia.Payments.PaymentStatus

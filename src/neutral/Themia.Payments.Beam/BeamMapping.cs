@@ -167,6 +167,21 @@ internal static class BeamMapping
             ? ToPaidMethod(methodType)
             : null;
 
+    /// <summary>
+    /// Reads the <c>amount</c> and <c>currency</c> a Beam answer echoes into a <see cref="Money"/>, or
+    /// <see langword="null"/> when either is absent or unusable (wrong JSON type, negative, not an ISO 4217 code).
+    /// Never throws: the caller has already had a successful answer, and a refusal here would invite a retry.
+    /// </summary>
+    public static Money? ReadEchoedAmount(JsonElement root) =>
+        root.ValueKind == JsonValueKind.Object &&
+        root.TryGetProperty("amount", out var amountElement) &&
+        amountElement.ValueKind == JsonValueKind.Number &&
+        amountElement.TryGetInt64(out var minorUnits) &&
+        TryGetNonEmptyString(root, "currency", out var currency) &&
+        TryMoney(minorUnits, currency, out var money)
+            ? money
+            : null;
+
     /// <summary>Reads a required non-empty string property, without throwing on a missing or malformed one.</summary>
     public static bool TryGetNonEmptyString(JsonElement root, string propertyName, out string value)
     {
