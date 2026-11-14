@@ -55,12 +55,34 @@ public class WithholdingFilingCsvTests
         var lines = Lines(result.Csv);
         Assert.Equal(Header, lines[0]);
         Assert.Equal(
-            "1,WHT-2569-000123,1101700230708,สมชาย ใจดี,2 ถนนพระราม 4 กรุงเทพฯ,2026-10-14,fixture-fee,ค่าธรรมเนียม ค่านายหน้า,10000.00,3,300.00,WithheldAtSource",
+            "1,WHT-2569-000123,\"=\"\"1101700230708\"\"\",สมชาย ใจดี,2 ถนนพระราม 4 กรุงเทพฯ,2026-10-14,fixture-fee,ค่าธรรมเนียม ค่านายหน้า,10000.00,3,300.00,WithheldAtSource",
             lines[1]);
         Assert.Equal(2, lines.Length);
         Assert.Equal(1, result.RowCount);
         Assert.Equal(1_000_000, result.PaidSatang);
         Assert.Equal(30_000, result.WithheldSatang);
+    }
+
+    [Fact]
+    public void A_digit_only_id_is_written_as_a_text_formula_so_a_spreadsheet_keeps_its_leading_zero()
+    {
+        var payee = new TaxParty { Name = "บริษัท ตัวอย่าง จำกัด", TaxId = "0105556123456", Address = "x" };
+        var record = Record(With("0000123", new DateOnly(2026, 10, 5), payee: payee));
+
+        var line = Lines(WithholdingFilingCsv.Build([record], WithholdingFilingForm.Pnd3, 2026, 10).Csv)[1];
+
+        Assert.StartsWith("1,\"=\"\"0000123\"\"\",\"=\"\"0105556123456\"\"\",", line, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void An_id_with_a_non_digit_is_written_as_plain_text()
+    {
+        var payee = new TaxParty { Name = "x", TaxId = "01055-56123456", Address = "x" };
+        var record = Record(With("WHT-1", new DateOnly(2026, 10, 5), payee: payee));
+
+        var line = Lines(WithholdingFilingCsv.Build([record], WithholdingFilingForm.Pnd3, 2026, 10).Csv)[1];
+
+        Assert.StartsWith("1,WHT-1,01055-56123456,", line, StringComparison.Ordinal);
     }
 
     [Fact]

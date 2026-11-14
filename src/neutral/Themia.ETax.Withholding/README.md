@@ -97,6 +97,8 @@ file the office keys a PND3 or PND53 return from: one line per income row paid i
 - **Control totals:** `RowCount`, `PaidSatang` and `WithheldSatang` on the result are the figures to check against the return.
 - **Scope:** pass the payer's own certificates (read them through your store, scoped to the payer); Cancelled ones are skipped, so a replacement is counted once.
   A stored snapshot that no longer matches its hash is refused, not exported.
+- **Ids keep their leading zero:** a digit-only payee tax id or certificate number is written as `="0105556123456"` (CSV-quoted), which Excel shows as the text
+  `0105556123456`. A program that reads the file with a plain CSV parser sees the `="…"` wrapper and must strip it.
 - **Spreadsheets:** a text cell starting with `=`, `+`, `-` or `@` gets a leading apostrophe; `ToUtf8Bytes()` prefixes a byte order mark so Excel reads the Thai text.
 
 If the office later asks for a specific layout, that is a new request.

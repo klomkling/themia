@@ -57,8 +57,8 @@ public static class WithholdingFilingCsv
         string[] cells =
         [
             sequence.ToString(CultureInfo.InvariantCulture),
-            Text(snapshot.DocumentNumber),
-            Text(snapshot.Payee.TaxId),
+            Identifier(snapshot.DocumentNumber),
+            Identifier(snapshot.Payee.TaxId),
             Text(snapshot.Payee.Name),
             Text(snapshot.Payee.Address),
             row.DatePaid.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
@@ -77,6 +77,11 @@ public static class WithholdingFilingCsv
 
     private static string Percent(int basisPoints) =>
         ((decimal)basisPoints / BasisPointsPerPercent).ToString("0.##", CultureInfo.InvariantCulture);
+
+    // An id made only of digits (a PND53 tax id starts with 0) would lose its leading zeros in a spreadsheet, so it is written as the
+    // text formula ="digits". Digits only, so it cannot carry anything the formula guard in Text exists to stop.
+    private static string Identifier(string? value) =>
+        !string.IsNullOrEmpty(value) && value.All(char.IsAsciiDigit) ? "\"=\"\"" + value + "\"\"\"" : Text(value);
 
     // A text cell that starts like a formula gets a leading apostrophe (CSV injection), then RFC 4180 quoting when it needs it.
     private static string Text(string? value)
