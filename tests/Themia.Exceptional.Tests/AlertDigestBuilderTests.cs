@@ -24,7 +24,9 @@ public class AlertDigestBuilderTests
         ErrorHash = "h" + n,
         Trigger = ExceptionAlertTrigger.New,
         Type = type ?? "System.InvalidOperationException",
+#pragma warning disable CS0618 // Message is obsolete; set so the tests prove the digest never renders it
         Message = message ?? "boom",
+#pragma warning restore CS0618
         DuplicateCount = 3,
         FirstSeenUtc = Seen,
         LastSeenUtc = Seen.AddMinutes(2),

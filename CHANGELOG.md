@@ -27,6 +27,10 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+### Deprecated
+
+- **`ExceptionAlertCandidate.Message` is obsolete.** It has been always empty since the alert digest stopped carrying the exception message, and nothing reads it. It will be removed in the next MINOR release; a custom `IExceptionAlertStore` that sets it can stop, and one that reads it was already getting an empty string.
+
 ## [0.61.0] - 2026-11-14
 
 ### Added

@@ -22,6 +22,7 @@ public sealed class ExceptionAlertCandidate
     public string Type { get; init; } = string.Empty;
 
     /// <summary>Always empty: the store no longer reads the exception message and the digest never carries it.</summary>
+    [Obsolete("Always empty: alerts no longer carry the exception message. Will be removed in the next MINOR release.")]
     public string Message { get; init; } = string.Empty;
 
     /// <summary>How many times the error was rolled up into this row.</summary>
