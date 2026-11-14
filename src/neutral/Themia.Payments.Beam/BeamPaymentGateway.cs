@@ -191,7 +191,7 @@ public sealed class BeamPaymentGateway : IPaymentGateway, IPaymentGatewayCapabil
                 throw new PaymentApiException(FailureKind.Unknown, "malformed_response", (int)response.StatusCode);
             }
 
-            return new RefundCreation(refundId, PaymentStatus.Pending);
+            return new RefundCreation(refundId, PaymentStatus.Pending, BeamMapping.ReadEchoedAmount(root));
         }
     }
 

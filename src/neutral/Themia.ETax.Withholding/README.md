@@ -85,3 +85,20 @@ bytes: no clock, no culture, PDF dates pinned to the issue date, dates printed i
   (UTC+7), never supplied by the caller (a caller's `IssueDate` is ignored, so a certificate cannot be back- or post-dated; a date paid after today is
   refused). The date paid prints `dd/MM/BE-year` (`22/01/2567`); the issue date under the signature prints `dd / Thai month name / BE year`
   (`22 / พฤศจิกายน / 2567`).
+
+## Monthly return CSV (`WithholdingFilingCsv`)
+
+Apps do not file with the Revenue Department; the accounting office files for them. `WithholdingFilingCsv.Build(certificates, form, year, month)` returns the
+file the office keys a PND3 or PND53 return from: one line per income row paid in that month, ordered by date paid then certificate number.
+
+- **Columns:** `Sequence, Certificate number, Payee tax id, Payee name, Payee address, Date paid, Income type code, Income type, Amount paid, Rate percent, Tax withheld, Condition`.
+  Dates are `yyyy-MM-dd` (Gregorian), amounts are baht with two decimals, the rate is a percent without trailing zeros (empty when the row has none).
+- **One file per form per month:** call it once for `Pnd3` and once for `Pnd53`. The month is the month of each row's date paid, not the issue date.
+- **Control totals:** `RowCount`, `PaidSatang` and `WithheldSatang` on the result are the figures to check against the return.
+- **Scope:** pass the payer's own certificates (read them through your store, scoped to the payer); Cancelled ones are skipped, so a replacement is counted once.
+  A stored snapshot that no longer matches its hash is refused, not exported.
+- **Ids keep their leading zero:** a digit-only payee tax id or certificate number is written as `="0105556123456"` (CSV-quoted), which Excel shows as the text
+  `0105556123456`. A program that reads the file with a plain CSV parser sees the `="…"` wrapper and must strip it.
+- **Spreadsheets:** a text cell starting with `=`, `+`, `-` or `@` gets a leading apostrophe; `ToUtf8Bytes()` prefixes a byte order mark so Excel reads the Thai text.
+
+If the office later asks for a specific layout, that is a new request.
