@@ -46,15 +46,14 @@ Left, erased and redacted therefore never keep an event undelivered or a convers
 
 ## Rules
 
-1. **Due.** A recipient is due when it has messages from others (not redacted or deleted, the same filter as the read API's unread count) with `seq > max(last_read_seq, notified_seq)`
+1. **Due.** A recipient is due when it has messages from others (not redacted, the same filter as the read API's unread count) with `seq > max(last_read_seq, notified_seq)`
    and the **oldest** of those is older than `NotifyDebounce`. The window is fixed from that message and **not** reset by later posts: a busy thread notifies every window.
 2. **Batch** = (conversation, recipient): `UnreadCount` and `LastSeq` computed at drain time. A recipient who left, a revoked guest and an erased person (`left_at` set) are not recipients.
 3. **Every outcome moves the cursor (must-fix 4).** Success sets `notified_seq = LastSeq`. A skip (recipient read everything, left, only own messages) sets it to the recipient's current
    `last_read_seq` without calling the subscriber, so the next post starts a fresh window instead of being instantly due and rescanned forever.
 4. **Failure isolation.** A subscriber exception leaves only that recipient's cursor, so A is never pushed again because B threw, and B retries on the next drain with its own `BatchId`.
    `Failed` counts them; each is logged at Warning with conversation id and participant id, never text or contact.
-5. **Claim unit = the cursor row (must-fix 2), lease with an owner (must-fix 3).** Every due predicate sits inside the locked select, which locks only the cursor row (`FOR UPDATE OF <cursor> SKIP LOCKED`; the due test is an `EXISTS`, not a `GROUP BY`, which a row lock cannot combine with) (PostgreSQL and MySQL 8.0.1+ `FOR UPDATE SKIP LOCKED`,
-   SQL Server `UPDLOCK, READPAST`, MySQL at READ COMMITTED as in `MySqlMessagingDialect`), then `UPDATE ... SET lease_owner, lease_expires_at` addressed by the **composite key** `(tenant_id, conversation_id, participant_id)` of the claimed rows (the table has no id; on SQL Server, join the update on the claimed keys), the shape of the
+5. **Claim unit = the cursor row (must-fix 2), lease with an owner (must-fix 3).** Every due predicate sits inside the locked select, which locks only the cursor row (`FOR UPDATE OF <cursor> SKIP LOCKED`; the due test is an `EXISTS`, not a `GROUP BY`, which a row lock cannot combine with) (the same scoped form on PostgreSQL and MySQL 8.0.1+; SQL Server `UPDLOCK, READPAST` hints on the cursor table only; MySQL at READ COMMITTED as in `MySqlMessagingDialect`), then `UPDATE ... SET lease_owner, lease_expires_at` addressed by the **composite key** `(tenant_id, conversation_id, participant_id)` of the claimed rows (the table has no id; on SQL Server, join the update on the claimed keys), the shape of the
    Messaging outbox claim; no outer filter on a locked subquery. A cursor row is created on first use by insert-if-absent as **its own committed statement before the claim** (a unique-key conflict is a no-op), so a recipient with no row yet is claimable and the claim never inserts under its own lock.
    The mark is `WHERE lease_owner = @me`: zero rows means the lease was lost (an expired lease was reclaimed), logged and **not** counted as `Delivered`.
    One claim takes at most `BatchSize` recipients; a drain that runs longer than the lease logs a Warning.
@@ -83,7 +82,7 @@ Left, erased and redacted therefore never keep an event undelivered or a convers
 
 ## Delivery order
 
-1. migration + cursor table + dialect claim/mark (3 engines) + tests; 2. `DrainAsync`, options, PublicAPI, README; 3. (separate PR) attachments post API; 4. AspNetCore part only if cheap.
+1. migration + cursor table + dialect claim/mark (3 engines) + tests (these run at dialect level, before `DrainAsync` exists); 2. `DrainAsync`, options, PublicAPI, README; 3. (separate PR) attachments post API; 4. AspNetCore part only if cheap.
 Additive, a PATCH under the pre-1.0 policy.
 
 ## Decided
