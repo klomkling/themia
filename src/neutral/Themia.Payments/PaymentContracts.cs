@@ -126,7 +126,21 @@ public sealed record RefundRequest(ChargeRef Charge, Money? Amount, string? Reas
 /// <param name="RefundId">The provider's refund id — <b>null where the provider mints none</b>, as 2C2P's
 /// Payment Process does. Key your own records on the charge, not on this.</param>
 /// <param name="Status">Usually <see cref="PaymentStatus.Pending"/>; the outcome arrives by webhook.</param>
-public sealed record RefundCreation(string? RefundId, PaymentStatus Status);
+/// <param name="Amount">The refund amount as the provider answered it, or <b>null where the provider does not echo
+/// one</b> (or echoed one that could not be read). Null means "not confirmed", never "zero": a caller that wants to
+/// reconcile what it asked for against what the provider accepted compares only when this is set. Never block or fail a
+/// refund on a null; and compare the whole <see cref="Money"/> (minor units <b>and</b> currency), not the number alone.</param>
+public sealed record RefundCreation(string? RefundId, PaymentStatus Status, Money? Amount = null)
+{
+    /// <summary>A refund answer that carries no amount. Kept so callers and gateways built against the
+    /// two-argument form keep binding without recompiling.</summary>
+    /// <param name="refundId">The provider's refund id, or null where it mints none.</param>
+    /// <param name="status">Where the refund stands.</param>
+    public RefundCreation(string? refundId, PaymentStatus status)
+        : this(refundId, status, null)
+    {
+    }
+}
 
 /// <summary>One refund of a charge, as the provider reports it.</summary>
 /// <param name="RefundId">The provider's refund reference, or null where it gives none.</param>
