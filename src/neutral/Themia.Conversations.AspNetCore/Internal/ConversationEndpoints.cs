@@ -30,6 +30,7 @@ internal static class ConversationEndpoints
         group.MapGet("/conversations/{id:guid}/messages", ListAsync);
         group.MapPost("/conversations/{id:guid}/messages", PostAsync);
         group.MapPost("/conversations/{id:guid}/read", ReadAsync);
+        group.MapGet("/conversations/{id:guid}/attachments/{attachmentId:guid}", OpenAttachmentAsync);
     }
 
     private static async Task<IResult> ExchangeAsync(HttpContext context)
@@ -129,6 +130,11 @@ internal static class ConversationEndpoints
             return limited;
         }
 
+        if (MultipartBody.IsMultipart(context.Request))
+        {
+            return await PostMultipartAsync(context, id, caller, options);
+        }
+
         var (body, bodyFailure) = await JsonBody.ReadAsync<PostRequest>(context, options.MaxJsonBodyBytes);
         if (bodyFailure is not null)
         {
@@ -148,6 +154,75 @@ internal static class ConversationEndpoints
         }
 
         return PostOutcomeResult(result);
+    }
+
+    private static async Task<IResult> PostMultipartAsync(HttpContext context, Guid id, ResolvedCaller caller, ConversationHttpOptions options)
+    {
+        var attachments = context.RequestServices.GetService<IConversationAttachments>();
+        if (attachments is null)
+        {
+            return Problems.Of(StatusCodes.Status415UnsupportedMediaType, Problems.UnsupportedMediaType, "File uploads are not enabled.");
+        }
+
+        var limits = context.RequestServices.GetRequiredService<IOptions<ConversationOptions>>().Value;
+        var (post, failure) = await MultipartBody.ReadAsync(
+            context, limits.MaxAttachmentBytesPerMessage + options.MaxJsonBodyBytes, limits.MaxAttachmentsPerMessage);
+        if (failure is not null)
+        {
+            return failure;
+        }
+
+        if (!IsClientMessageId(post!.ClientMessageId))
+        {
+            return Problems.Validation(Problems.InvalidClientMessageId, $"clientMessageId must be 1 to {MaxClientMessageIdLength} characters without surrounding whitespace.");
+        }
+
+        var streams = post.Files.Select(f => f.OpenReadStream()).ToList();
+        try
+        {
+            var uploads = post.Files.Select((f, i) => new AttachmentUpload(LeafName(f.FileName), f.ContentType, streams[i])).ToList();
+            var result = await attachments.PostAsync(caller.Actor, caller.TenantId, id, new PostMessage(post.ClientMessageId!, post.Body ?? string.Empty), uploads, context.RequestAborted);
+            if (result.Outcome != PostOutcome.Refused)
+            {
+                RequestGate.RefundAcceptedGuest(context, caller);
+            }
+
+            return PostOutcomeResult(result);
+        }
+        finally
+        {
+            foreach (var stream in streams)
+            {
+                await stream.DisposeAsync();
+            }
+        }
+    }
+
+    /// <summary>The last path segment on either separator: a client may send a Windows or POSIX path, and the host OS decides what <c>Path.GetFileName</c> splits on.</summary>
+    private static string LeafName(string fileName) => fileName[(fileName.LastIndexOfAny(['/', '\\']) + 1)..];
+
+    private static async Task<IResult> OpenAttachmentAsync(HttpContext context, Guid id, Guid attachmentId)
+    {
+        var (caller, failure) = await RequestGate.ResolveAsync(context, id);
+        if (failure is not null)
+        {
+            return failure;
+        }
+
+        var attachments = context.RequestServices.GetService<IConversationAttachments>();
+        if (attachments is null)
+        {
+            return Problems.Missing();
+        }
+
+        var result = await attachments.OpenAsync(caller!.Actor, caller.TenantId, id, attachmentId, context.RequestAborted);
+        if (!result.Succeeded || result.Url is null || result.Attachment is null)
+        {
+            return Problems.Missing();
+        }
+
+        RequestGate.RefundAcceptedGuest(context, caller);
+        return Envelope(new { url = result.Url.AbsoluteUri, fileName = result.Attachment.FileName, contentType = result.Attachment.ContentType, size = result.Attachment.Size });
     }
 
     private static async Task<IResult> ReadAsync(HttpContext context, Guid id)

@@ -87,3 +87,41 @@ internal sealed class FakeGuestAccess : IGuestAccess
         return Task.FromResult(sessions.TryGetValue((tenantId, token), out var result) ? result : new GuestSessionResult(GuestExchangeOutcome.Refused, null, null, null));
     }
 }
+
+internal sealed class FakeConversationAttachments : IConversationAttachments
+{
+    public List<(PostMessage Message, List<(string FileName, string ContentType, long Length)> Files)> Posts { get; } = [];
+
+    public int Opens { get; private set; }
+
+    public PostResult PostResult { get; set; } = new(PostOutcome.Posted, Guid.Parse("22222222-2222-2222-2222-222222222222"), 2);
+
+    public OpenAttachmentResult OpenResult { get; set; } = new(
+        OpenAttachmentOutcome.Opened,
+        new Uri("https://files.example/signed?x=1"),
+        new AttachmentInfo(Guid.Parse("33333333-3333-3333-3333-333333333333"), "a.png", "image/png", 3));
+
+    public async Task<PostResult> PostAsync(ConversationActor actor, string tenantId, Guid conversationId, PostMessage message, IReadOnlyList<AttachmentUpload> files, CancellationToken cancellationToken = default)
+    {
+        var seen = new List<(string, string, long)>();
+        foreach (var file in files)
+        {
+            using var copy = new MemoryStream();
+            await file.Content.CopyToAsync(copy, cancellationToken);
+            seen.Add((file.FileName, file.ContentType, copy.Length));
+        }
+
+        lock (Posts)
+        {
+            Posts.Add((message, seen));
+        }
+
+        return PostResult;
+    }
+
+    public Task<OpenAttachmentResult> OpenAsync(ConversationActor actor, string tenantId, Guid conversationId, Guid attachmentId, CancellationToken cancellationToken = default)
+    {
+        Opens++;
+        return Task.FromResult(OpenResult);
+    }
+}
