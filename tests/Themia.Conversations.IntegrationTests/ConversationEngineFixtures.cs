@@ -63,7 +63,10 @@ public abstract class ConversationEngineFixture : IAsyncLifetime
     /// <summary>Quotes an identifier the way this engine's migration runner created it.</summary>
     public abstract string Quote(string identifier);
 
-    /// <summary>The statements that undo what a migration run that died halfway would not have done: the upload table's indexes and, where the engine pins them, its key collations.</summary>
+    /// <summary>
+    /// The statements that undo what a run that died halfway would not have done: the last index (the first one stays, so the index guard is exercised
+    /// on a present index and on a missing one) and, where the engine pins them, the key collations.
+    /// </summary>
     public abstract IReadOnlyList<string> PartialStateSql();
 
     /// <summary>Opens nothing yet: a connection of this engine to the given database.</summary>
@@ -194,7 +197,7 @@ public sealed class PostgresConversationFixture : ConversationEngineFixture
 
     /// <inheritdoc />
     public override IReadOnlyList<string> PartialStateSql() =>
-        ["DROP INDEX ix_conversation_attachment_uploads_created;", "DROP INDEX ix_conversation_attachment_uploads_conversation;"];
+        ["DROP INDEX ix_conversation_attachment_uploads_conversation;"];
 
 
     /// <inheritdoc />
@@ -270,7 +273,6 @@ public sealed class MySqlConversationFixture : ConversationEngineFixture
     /// <inheritdoc />
     public override IReadOnlyList<string> PartialStateSql() =>
     [
-        "DROP INDEX ix_conversation_attachment_uploads_created ON conversation_attachment_uploads;",
         "DROP INDEX ix_conversation_attachment_uploads_conversation ON conversation_attachment_uploads;",
         "ALTER TABLE conversation_attachment_uploads MODIFY COLUMN `tenant_id` VARCHAR(64) COLLATE utf8mb4_general_ci NOT NULL;",
         "ALTER TABLE conversation_attachment_uploads MODIFY COLUMN `storage_key` VARCHAR(300) COLLATE utf8mb4_general_ci NOT NULL;",
@@ -352,7 +354,6 @@ public sealed class SqlServerConversationFixture : ConversationEngineFixture
     /// <inheritdoc />
     public override IReadOnlyList<string> PartialStateSql() =>
     [
-        "DROP INDEX ix_conversation_attachment_uploads_created ON conversation_attachment_uploads;",
         "DROP INDEX ix_conversation_attachment_uploads_conversation ON conversation_attachment_uploads;",
         "ALTER TABLE conversation_attachment_uploads ALTER COLUMN [tenant_id] NVARCHAR(64) COLLATE Latin1_General_CI_AS NOT NULL;",
         "ALTER TABLE conversation_attachment_uploads ALTER COLUMN [storage_key] NVARCHAR(300) COLLATE Latin1_General_CI_AS NOT NULL;",

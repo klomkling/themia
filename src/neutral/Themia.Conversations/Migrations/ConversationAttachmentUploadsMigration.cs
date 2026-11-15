@@ -86,10 +86,6 @@ public sealed class ConversationAttachmentUploadsMigration : Migration
         dt(uploads.WithColumn("created_at")).NotNullable();
     }
 
-    /// <summary>
-    /// <c>tenant_id</c> as in the main schema, and <c>storage_key</c> to match <c>conversation_attachments.storage_key</c>: purge and erasure UNION the two
-    /// tables, and SQL Server refuses a UNION across two collations.
-    /// </summary>
     private const string MySqlCollationQuery =
         "SELECT COLLATION_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = @t AND COLUMN_NAME = @c";
 
@@ -112,8 +108,8 @@ public sealed class ConversationAttachmentUploadsMigration : Migration
 
     /// <summary>
     /// <c>tenant_id</c> as in the main schema, and <c>storage_key</c> to match <c>conversation_attachments.storage_key</c>: purge and erasure UNION the two
-    /// tables, and SQL Server refuses a UNION across two collations. The alter runs only when the column is not already pinned: SQL Server refuses to
-    /// alter a column an index covers, and a rerun after a partial MySQL run must not fail on work already done.
+    /// tables, and SQL Server refuses a UNION across two collations. The alter is skipped when the column already carries the collation, so a rerun after a
+    /// partial run repeats no finished work.
     /// </summary>
     private void PinKeyCollations(Func<string, string> quote, string alterVerb, Func<int, string> text, string collation, string collationQuery)
     {
