@@ -58,12 +58,37 @@ public sealed class ExternalAuthenticationFlowTests
         Assert.Null(principals.LastUser);
     }
 
+    [Fact]
+    public async Task Authenticate_ShouldDenyAndIssueNothing_WhenTheSuccessHookDeactivatedAPlatformUser()
+    {
+        var (flow, principals, store, hooks, stale) = BuildWithStore(platform: true);
+        hooks.OnSucceeded = () => store.Stored = ReloadedUser.After(stale, isActive: false);
+
+        var result = await flow.AuthenticateAsync(Provider, Request());
+
+        Assert.False(result.Succeeded);
+        Assert.Null(principals.LastUser);
+    }
+
+    [Fact]
+    public async Task Authenticate_ShouldKeepTheResolvedPlatformUser_WhenTheUserServiceCannotReadPlatformUsers()
+    {
+        var (flow, principals, store, hooks, stale) = BuildWithStore(platform: true, platformAware: false);
+        hooks.OnSucceeded = () => store.Stored = ReloadedUser.After(stale, isActive: false);
+
+        var result = await flow.AuthenticateAsync(Provider, Request());
+
+        Assert.True(result.Succeeded);
+        Assert.Same(stale, principals.LastUser);
+    }
+
     private static (ExternalAuthenticationFlow Flow, FakeClaimsPrincipalFactory Principals, FakeUserStore Store, RecordingExternalHooks Hooks, User Stale)
-        BuildWithStore()
+        BuildWithStore(bool platform = false, bool platformAware = true)
     {
         var stale = NewUser();
-        stale.TenantId = new Themia.Framework.Core.Abstractions.Tenancy.TenantId("acme");
-        var store = new FakeUserStore { Stored = stale };
+        stale.TenantId = platform ? null : new Themia.Framework.Core.Abstractions.Tenancy.TenantId("acme");
+        FakeUserStore store = platformAware ? new FakePlatformAwareUserStore() : new FakeUserStore();
+        store.Stored = stale;
         var principals = new FakeClaimsPrincipalFactory();
         var hooks = new RecordingExternalHooks();
         var provider = new FakeExternalAuthProvider { Result = ExternalAuthResult.Success(new ExternalIdentity(Provider, "sub-1", "a@example.com", true, "Alice")) };

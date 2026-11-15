@@ -333,6 +333,20 @@ public class UserServiceTests
     }
 
     [Fact]
+    public async Task FindPlatformUserByIdAsync_returns_the_platform_user_but_never_a_tenants_user()
+    {
+        var platform = new User { UserName = "root", NormalizedUserName = "ROOT", PasswordHash = "x", TenantId = null };
+        platform.SetId(Guid.NewGuid());
+        var tenantUser = new User { UserName = "bob", NormalizedUserName = "BOB", PasswordHash = "x", TenantId = new TenantId("beta") };
+        tenantUser.SetId(Guid.NewGuid());
+        store.Add(platform);
+        store.Add(tenantUser);
+
+        Assert.Same(platform, await ((IPlatformUserReader)sut).FindPlatformUserByIdAsync(platform.Id));
+        Assert.Null(await ((IPlatformUserReader)sut).FindPlatformUserByIdAsync(tenantUser.Id));
+    }
+
+    [Fact]
     public async Task SetActiveAsync_resolves_platform_user()
     {
         var platform = new User { UserName = "root", NormalizedUserName = "ROOT", PasswordHash = "x", TenantId = null };

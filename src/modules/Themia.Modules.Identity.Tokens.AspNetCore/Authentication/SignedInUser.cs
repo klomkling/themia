@@ -16,14 +16,23 @@ internal static class SignedInUser
     /// <summary>Returns the account as the store holds it now, or <see langword="null"/> when it may no longer sign in.</summary>
     public static async Task<User?> ReloadAsync(IUserService users, User signedIn, TimeProvider timeProvider, CancellationToken cancellationToken)
     {
-        // A platform user (no tenant) is resolved cross-tenant by name; FindByIdAsync is tenant-filtered, so under
-        // a tenant-scoped host it cannot see them and would wrongly report the account gone.
+        // FindByIdAsync is tenant-filtered and cannot see a platform user (no tenant, resolved cross-tenant by name),
+        // so those are re-read through IPlatformUserReader. A service that lacks it keeps the resolved copy.
+        User? fresh;
         if (signedIn.TenantId is null)
         {
-            return signedIn;
+            if (users is not IPlatformUserReader platform)
+            {
+                return signedIn;
+            }
+
+            fresh = await platform.FindPlatformUserByIdAsync(signedIn.Id, cancellationToken).ConfigureAwait(false);
+        }
+        else
+        {
+            fresh = await users.FindByIdAsync(signedIn.Id, cancellationToken).ConfigureAwait(false);
         }
 
-        var fresh = await users.FindByIdAsync(signedIn.Id, cancellationToken).ConfigureAwait(false);
         if (fresh is null || !fresh.IsActive || fresh.IsLockedOut(timeProvider.GetUtcNow()) || !Equals(fresh.TenantId, signedIn.TenantId))
         {
             return null;

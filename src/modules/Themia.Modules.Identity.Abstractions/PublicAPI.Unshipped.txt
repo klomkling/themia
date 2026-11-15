@@ -773,3 +773,5 @@ Themia.Modules.Identity.Abstractions.Authentication.ExternalSecondFactorProof.Am
 Themia.Modules.Identity.Abstractions.Authentication.ExternalSecondFactorProof.Amr.init -> void
 Themia.Modules.Identity.Abstractions.Authentication.ExternalSecondFactorProof.AuthenticatedAt.get -> System.DateTimeOffset
 Themia.Modules.Identity.Abstractions.Authentication.ExternalSecondFactorProof.AuthenticatedAt.init -> void
+Themia.Modules.Identity.Abstractions.IPlatformUserReader
+Themia.Modules.Identity.Abstractions.IPlatformUserReader.FindPlatformUserByIdAsync(System.Guid id, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Identity.Abstractions.Entities.User?>!

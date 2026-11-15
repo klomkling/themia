@@ -5,7 +5,7 @@ using Themia.Modules.Identity.Abstractions.Entities;
 
 namespace Themia.Modules.Identity.AspNetCore.Tests;
 
-internal sealed class FakeUserService : IUserService
+internal sealed class FakeUserService : IUserService, IPlatformUserReader
 {
     public PasswordVerificationResult VerifyResult { get; set; } = PasswordVerificationResult.Success;
     public User? UserToReturn { get; set; }
@@ -50,6 +50,10 @@ internal sealed class FakeUserService : IUserService
         // Like the store: the account whose id was asked for, however it was resolved at the start of the flow.
         return Task.FromResult(new[] { UserToReturn, EmailUserToReturn, PhoneUserToReturn }.FirstOrDefault(u => u is not null && u.Id == id) ?? UserToReturn);
     }
+
+    /// <summary>Like the store's platform-scope read: only a tenant-less account, whatever the ambient tenant.</summary>
+    public Task<User?> FindPlatformUserByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
+        Task.FromResult(new[] { UserToReturn, EmailUserToReturn, PhoneUserToReturn }.FirstOrDefault(u => u is { TenantId: null } && u.Id == id));
 
     public Task<User?> FindByEmailAsync(string email, CancellationToken cancellationToken = default)
     {

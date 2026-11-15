@@ -83,6 +83,54 @@ public sealed class OtpLoginFlowTests : IDisposable
     }
 
     [Fact]
+    public async Task Verify_ShouldDenyAndIssueNothing_WhenTheSuccessHookDeactivatedAPlatformUser()
+    {
+        var before = Eligible();
+        GivenAccount(before);
+        hooks.OnSucceededHook = () => users.UserToReturn = ReloadedUser.After(before, isActive: false);
+
+        var result = await flow.VerifyAsync(Guid.NewGuid(), Code);
+
+        Assert.False(result.Succeeded);
+        Assert.False(principals.Called);
+    }
+
+    [Fact]
+    public async Task Verify_OnAChannel_ShouldMintTheSessionFromTheReloadedUser_WhenTheSuccessHookRotatedTheSecurityStamp()
+    {
+        var before = Eligible();
+        before.TenantId = new Themia.Framework.Core.Abstractions.Tenancy.TenantId("acme");
+        GivenAccount(before);
+        var after = ReloadedUser.After(before);
+        hooks.OnSucceededHook = () => users.UserToReturn = after;
+
+        var result = await flow.VerifyAsync(Guid.NewGuid(), Code, new SessionRequest(before.TenantId, "web"));
+
+        Assert.True(result.Succeeded);
+        Assert.Same(after, principals.LastUser);
+    }
+
+    [Fact]
+    public async Task Verify_ShouldDenyAndIssueNothing_WhenTheSuccessHookLockedTheAccountOut()
+    {
+        var before = Eligible();
+        before.TenantId = new Themia.Framework.Core.Abstractions.Tenancy.TenantId("acme");
+        GivenAccount(before);
+        hooks.OnSucceededHook = () =>
+        {
+            var locked = ReloadedUser.After(before);
+            locked.LockoutEnabled = true;
+            locked.LockoutEnd = clock.GetUtcNow().AddHours(1);
+            users.UserToReturn = locked;
+        };
+
+        var result = await flow.VerifyAsync(Guid.NewGuid(), Code);
+
+        Assert.False(result.Succeeded);
+        Assert.False(principals.Called);
+    }
+
+    [Fact]
     public async Task Start_DeliversTheCodeForAConfirmedActivePhone()
     {
         var user = Eligible();

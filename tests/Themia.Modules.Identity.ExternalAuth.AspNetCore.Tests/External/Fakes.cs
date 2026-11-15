@@ -19,7 +19,7 @@ internal sealed class FakeClaimsPrincipalFactory : IClaimsPrincipalFactory
 }
 
 /// <summary>A store that answers only the id lookup, which is all the flow's post-hook reload uses.</summary>
-internal sealed class FakeUserStore : IUserService
+internal class FakeUserStore : IUserService
 {
     public User? Stored { get; set; }
 
@@ -81,4 +81,11 @@ internal sealed class FakeRefreshTokenService : IRefreshTokenService
         LastRevokeAllForUser = true;
         return Task.FromResult(0);
     }
+}
+
+/// <summary>A store that can also read a platform (tenant-less) user by id, as <c>UserService</c> does.</summary>
+internal sealed class FakePlatformAwareUserStore : FakeUserStore, IPlatformUserReader
+{
+    public Task<User?> FindPlatformUserByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Stored is { TenantId: null } u && u.Id == id ? u : null);
 }

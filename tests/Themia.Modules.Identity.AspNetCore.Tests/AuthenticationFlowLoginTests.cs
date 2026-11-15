@@ -55,17 +55,52 @@ public sealed class AuthenticationFlowLoginTests
     }
 
     [Fact]
-    public async Task Login_ShouldKeepTheResolvedPlatformUser_BecauseAnIdLookupUnderATenantCannotSeeThem()
+    public async Task Login_ShouldDenyAndIssueNothing_WhenTheSuccessHookLockedTheAccountOut()
     {
-        var platform = NewUser(); // no TenantId: resolved cross-tenant by name
-        var (flow, users, principals, hooks) = BuildWithPrincipals(platform);
-        hooks.OnSucceededHook = () => users.UserToReturn = null;
+        var before = NewUser();
+        before.TenantId = new Themia.Framework.Core.Abstractions.Tenancy.TenantId("acme");
+        var (flow, users, principals, hooks) = BuildWithPrincipals(before);
+        hooks.OnSucceededHook = () =>
+        {
+            var locked = ReloadedUser.After(before);
+            locked.LockoutEnabled = true;
+            locked.LockoutEnd = DateTimeOffset.UtcNow.AddHours(1);
+            users.UserToReturn = locked;
+        };
+
+        var result = await flow.LoginAsync("alice", "pw");
+
+        Assert.False(result.Succeeded);
+        Assert.False(principals.Called);
+    }
+
+    [Fact]
+    public async Task Login_ShouldMintFromTheReloadedPlatformUser_WhenTheSuccessHookRotatedTheSecurityStamp()
+    {
+        var before = NewUser(); // no TenantId: a platform user, invisible to the tenant-scoped id lookup
+        var (flow, users, principals, hooks) = BuildWithPrincipals(before);
+        var after = ReloadedUser.After(before);
+        hooks.OnSucceededHook = () => users.UserToReturn = after;
 
         var result = await flow.LoginAsync("alice", "pw");
 
         Assert.True(result.Succeeded);
-        Assert.Same(platform, principals.LastUser);
+        Assert.Same(after, principals.LastUser);
     }
+
+    [Fact]
+    public async Task Login_ShouldDenyAndIssueNothing_WhenTheSuccessHookDeactivatedAPlatformUser()
+    {
+        var before = NewUser();
+        var (flow, users, principals, hooks) = BuildWithPrincipals(before);
+        hooks.OnSucceededHook = () => users.UserToReturn = ReloadedUser.After(before, isActive: false);
+
+        var result = await flow.LoginAsync("alice", "pw");
+
+        Assert.False(result.Succeeded);
+        Assert.False(principals.Called);
+    }
+
 
     private static (AuthenticationFlow Flow, FakeUserService Users, FakeClaimsPrincipalFactory Principals, RecordingHooks Hooks) BuildWithPrincipals(User user)
     {

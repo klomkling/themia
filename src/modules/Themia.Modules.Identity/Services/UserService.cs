@@ -13,7 +13,7 @@ using Themia.Modules.Identity.Specifications;
 namespace Themia.Modules.Identity.Services;
 
 /// <summary>Default <see cref="IUserService"/> over the Themia data abstractions.</summary>
-public sealed class UserService : IUserService, IUserPasswordHashService
+public sealed class UserService : IUserService, IPlatformUserReader, IUserPasswordHashService
 {
     private readonly IRepository<User, Guid> users;
     private readonly IUnitOfWork unitOfWork;
@@ -275,6 +275,10 @@ public sealed class UserService : IUserService, IUserPasswordHashService
     /// <inheritdoc />
     public Task<User?> FindByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
         users.GetByIdAsync(id, cancellationToken);
+
+    /// <inheritdoc />
+    public Task<User?> FindPlatformUserByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
+        users.FirstOrDefaultAsync(new PlatformUserByIdSpec(id), cancellationToken);
 
     /// <inheritdoc />
     public async Task<User?> FindByUserNameAsync(string userName, CancellationToken cancellationToken = default)

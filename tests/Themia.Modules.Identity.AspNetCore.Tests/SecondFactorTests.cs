@@ -599,6 +599,21 @@ public sealed class SecondFactorTests : IDisposable
     }
 
     [Fact]
+    public async Task Completing_an_external_ticket_denies_and_issues_nothing_when_the_hook_deactivated_a_platform_user()
+    {
+        var before = Staff();
+        users.UserToReturn = before;
+        var pending = await ticketService.IssueAsync(new SecondFactorTicketData(
+            before.Id, before.TenantId, SecondFactorMethod.External, "line", false, false, before.SecurityStamp, SecondFactorStage.Verify));
+        externalHooks.OnSucceededHook = () => users.UserToReturn = ReloadedUser.After(before, isActive: false);
+
+        var result = await Completion().CompleteAsync(pending.Ticket, pending.UserId, pending.Stage);
+
+        Assert.NotEqual(SecondFactorCompletionOutcome.Completed, result.Outcome);
+        Assert.Equal(0, refresh.IssueCalls);
+    }
+
+    [Fact]
     public async Task An_external_ticket_is_refused_when_external_login_is_not_registered()
     {
         var user = Staff();
