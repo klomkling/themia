@@ -60,6 +60,16 @@ public sealed class GuestTests
         Assert.NotEqual(key, GuestSessionKey.Generate());
     }
 
+    [Fact]
+    public void SessionKey_ShouldRevealTheCookieText_WhileToStringStaysRedacted()
+    {
+        var key = GuestSessionKey.Generate();
+
+        Assert.True(GuestSessionKey.TryParse(key.Reveal(), out var parsed));
+        Assert.Equal(key, parsed);
+        Assert.DoesNotContain(key.Reveal(), key.ToString(), StringComparison.Ordinal);
+    }
+
     [Theory]
     [InlineData(GuestContactKind.Email, " Guest@Example.COM ", "email:guest@example.com")]
     [InlineData(GuestContactKind.Phone, "+66812345678", "phone:+66812345678")]

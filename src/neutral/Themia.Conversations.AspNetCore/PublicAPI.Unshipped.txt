@@ -1,0 +1,24 @@
+#nullable enable
+static Themia.Conversations.AspNetCore.ConversationHttpExtensions.AddThemiaConversationsHttp(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Themia.Conversations.AspNetCore.ConversationHttpOptions!>? configure = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static Themia.Conversations.AspNetCore.ConversationHttpExtensions.MapThemiaConversations(this Microsoft.AspNetCore.Routing.IEndpointRouteBuilder! endpoints, string! prefix) -> Microsoft.AspNetCore.Routing.RouteGroupBuilder!
+Themia.Conversations.AspNetCore.ConversationCaller
+Themia.Conversations.AspNetCore.ConversationCaller.Actor.get -> Themia.Conversations.ConversationActor!
+Themia.Conversations.AspNetCore.ConversationCaller.Actor.init -> void
+Themia.Conversations.AspNetCore.ConversationCaller.ConversationCaller(string! TenantId, Themia.Conversations.ConversationActor! Actor) -> void
+Themia.Conversations.AspNetCore.ConversationCaller.TenantId.get -> string!
+Themia.Conversations.AspNetCore.ConversationCaller.TenantId.init -> void
+Themia.Conversations.AspNetCore.ConversationHttpExtensions
+Themia.Conversations.AspNetCore.ConversationHttpOptions
+Themia.Conversations.AspNetCore.ConversationHttpOptions.ClientKey.get -> System.Func<Microsoft.AspNetCore.Http.HttpContext!, string?>!
+Themia.Conversations.AspNetCore.ConversationHttpOptions.ClientKey.set -> void
+Themia.Conversations.AspNetCore.ConversationHttpOptions.ConversationHttpOptions() -> void
+Themia.Conversations.AspNetCore.ConversationHttpOptions.ExchangesPerHour.get -> int
+Themia.Conversations.AspNetCore.ConversationHttpOptions.ExchangesPerHour.set -> void
+Themia.Conversations.AspNetCore.ConversationHttpOptions.MaxJsonBodyBytes.get -> int
+Themia.Conversations.AspNetCore.ConversationHttpOptions.MaxJsonBodyBytes.set -> void
+Themia.Conversations.AspNetCore.ConversationHttpOptions.PostsPerMinute.get -> int
+Themia.Conversations.AspNetCore.ConversationHttpOptions.PostsPerMinute.set -> void
+Themia.Conversations.AspNetCore.ConversationHttpOptions.UnprovenGuestRequestsPerMinute.get -> int
+Themia.Conversations.AspNetCore.ConversationHttpOptions.UnprovenGuestRequestsPerMinute.set -> void
+Themia.Conversations.AspNetCore.IConversationActorResolver
+Themia.Conversations.AspNetCore.IConversationActorResolver.ResolveAsync(Microsoft.AspNetCore.Http.HttpContext! context, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask<Themia.Conversations.AspNetCore.ConversationCaller?>
