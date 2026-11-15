@@ -70,7 +70,7 @@ internal static class ConversationEndpoints
         }
 
         var conversation = context.RequestServices.GetRequiredService<IOptions<ConversationOptions>>().Value;
-        if (!TryReadLong(context, "afterSeq", 0, out var afterSeq, min: 0) || afterSeq < 0)
+        if (!TryReadLong(context, "afterSeq", 0, out var afterSeq, min: 0))
         {
             return Problems.Validation(Problems.InvalidAfterSeq, "afterSeq must be a number of 0 or more.");
         }
