@@ -18,6 +18,10 @@ with the *why* and concrete upgrade steps.
 
 **Who is affected:** nobody who does not attach files. An app that rolls the application back must run `DROP TABLE conversation_attachment_uploads` only after its staged objects are deleted (run the retention sweep first); the table is the only record of an object whose post did not finish.
 
+**Large tables:** the `file_name` column is a NOT NULL add with a default. PostgreSQL 11+ and MySQL 8.0 (instant `ADD COLUMN`) do it without rewriting `conversation_attachments`. On SQL Server it is a metadata-only change on Enterprise edition only; on Standard it rewrites the table and holds a schema lock, so run it in a quiet window on a large `conversation_attachments`.
+
+**Interrupted run:** every step of the migration checks its own state (column, table, key collations, both indexes), so after a run that died partway, which MySQL cannot roll back, running it again finishes the remaining steps.
+
 **How to upgrade:** nothing for a forward upgrade. To use attachments register `IStorageProvider`, `AddThemiaImaging()` and `AddThemiaConversationAttachments()`. Use a storage backend that signs `Content-Disposition` (S3); the local provider cannot, so its downloads are not forced to attachment. A fake that implements `IConversationDialect` or uses the `ConversationService` constructor needs no change (the new parameters are optional).
 
 ## 0.63.1
