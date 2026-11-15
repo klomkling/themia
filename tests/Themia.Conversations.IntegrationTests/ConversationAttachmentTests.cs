@@ -179,6 +179,19 @@ public abstract class ConversationAttachmentTests(ConversationEngineFixture fixt
     }
 
     [Fact]
+    public async Task List_ShouldHideFileNames_WhenTheMaskerThrows()
+    {
+        var service = Service(new MemoryStorage());
+        var (tenant, conversation, _) = await RoomAsync(service);
+        await service.PostAsync(Member("alice"), tenant, conversation, new PostMessage("m1", ""), [Upload("call 0812345678.pdf", "application/pdf", Pdf(500))]);
+        var broken = new ConversationService(fixture.Dialect, new ConversationOptions(), new AllowAll(), new DefaultConversationEventSink(TimeProvider.System), new ThrowingMasker(), TimeProvider.System, NullLogger<ConversationService>.Instance, new MemoryStorage(), Images);
+
+        var page = await broken.ListAsync(Member("bob"), tenant, conversation, 0, 10);
+
+        Assert.Equal("attachment", Assert.Single(Assert.Single(page.Messages).Attachments).FileName);
+    }
+
+    [Fact]
     public async Task Post_ShouldNameAReEncodedImageByItsStoredType()
     {
         var service = Service(new MemoryStorage());

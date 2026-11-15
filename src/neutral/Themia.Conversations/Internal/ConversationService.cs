@@ -179,8 +179,12 @@ internal sealed partial class ConversationService(
         catch (Exception ex) when (ex is not OutOfMemoryException)
         {
             // The exception type only: a masker's message or stack may quote the text it choked on.
-            logger.LogWarning("Conversation {ConversationId} message {MessageId} could not be masked for a {Viewer} viewer ({ExceptionType}); its body is hidden", conversationId, message.Id, viewer, ex.GetType().Name);
-            return message with { Body = message.IsRedacted ? null : MaskFailedBody };
+            logger.LogWarning("Conversation {ConversationId} message {MessageId} could not be masked for a {Viewer} viewer ({ExceptionType}); its body and file names are hidden", conversationId, message.Id, viewer, ex.GetType().Name);
+            return message with
+            {
+                Body = message.IsRedacted ? null : MaskFailedBody,
+                Attachments = message.Attachments.Select(a => a with { FileName = AttachmentFileName.Fallback }).ToList(),
+            };
         }
     }
 
