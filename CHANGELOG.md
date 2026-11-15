@@ -27,6 +27,11 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+### Added
+
+- **`Themia.Conversations`: attach files to a post and download them** (coord #0182, item 2). New `IConversationAttachments` (`PostAsync` with `AttachmentUpload` files, `OpenAsync` returning a presigned URL of `AttachmentDownloadLifetime`, default 60 s, served with an attachment disposition); `AddThemiaConversationAttachments()` registers it and fails startup without an `IStorageProvider` or `IImageProcessor`. A separate interface, so adopter fakes of `IConversationService` still compile. Files must match `ConversationOptions.AllowedAttachmentContentTypes` (default jpeg, png, webp, pdf; no wildcard, no SVG) and their magic bytes; images are re-encoded through `Themia.Imaging` (EXIF and GPS dropped), a corrupt image rejects the message. `PostOutcome` gains `AttachmentRejected` and `QuotaExceeded`; `ConversationMessage.Attachments` lists the files. The per-conversation quota is re-checked under the counter lock, so parallel posts cannot pass the cap together. Migration `202611150001` adds `conversation_attachments.file_name` and the staging table `conversation_attachment_uploads`: a key is committed there before its object is written and removed in the post transaction, so erasure and purge reach every object, and the retention sweep deletes stale entries (`AttachmentUploadGrace`, 1 h). `Themia.Conversations` now references `Themia.Imaging`.
+- `Themia.Storage` / `Themia.Storage.S3`: `PresignedUrlRequest.ContentDisposition` is signed into S3 download URLs.
+
 ## [0.63.1] - 2026-11-14
 
 ### Security

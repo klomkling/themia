@@ -154,6 +154,12 @@ public enum PostOutcome
 
     /// <summary>The policy denied the call, or the actor is not an active participant of this conversation in this tenant.</summary>
     Refused = 4,
+
+    /// <summary>An attachment was refused: too many, too large, a type that is not allowed, bytes that do not match the declared type, or an image that cannot be re-encoded. Nothing was stored.</summary>
+    AttachmentRejected = 5,
+
+    /// <summary>The attachments would take the conversation past <see cref="ConversationOptions.MaxAttachmentBytesPerConversation"/>. Nothing was stored.</summary>
+    QuotaExceeded = 6,
 }
 
 /// <summary>How <see cref="IConversationService.ListAsync"/> ended.</summary>

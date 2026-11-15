@@ -37,6 +37,12 @@ internal sealed class ConversationRetentionService(
         await using var connection = await OpenConnectionAsync(cancellationToken);
         var expired = await MarkExpiredAsync(connection, tenantId, cancellationToken);
 
+        var swept = await SweepStaleUploadsAsync(connection, tenantId, batch, cancellationToken);
+        if (swept > 0)
+        {
+            logger.LogInformation("Conversation sweep for tenant {TenantId} deleted {Swept} unposted attachment uploads", tenantId, swept);
+        }
+
         var portMissing = holdPort is null && !options.NoLegalHoldPort;
         if (portMissing)
         {
@@ -84,6 +90,50 @@ internal sealed class ConversationRetentionService(
 
         logger.LogInformation("Conversation sweep for tenant {TenantId}: {Expired} expired, {Purged} purged, {Held} held, {Failed} failed", tenantId, expired, purged, held, failed);
         return new SweepResult(SweepOutcome.Completed, expired, purged, held, failed);
+    }
+
+    /// <summary>
+    /// Deletes the object and then the row of every staged upload older than <see cref="ConversationOptions.AttachmentUploadGrace"/>: the leftovers of a post that crashed or
+    /// whose cleanup failed. A failed delete keeps the row, so the next sweep retries.
+    /// </summary>
+    private async Task<int> SweepStaleUploadsAsync(DbConnection connection, string tenantId, int batch, CancellationToken cancellationToken)
+    {
+        if (storage is null)
+        {
+            return 0;
+        }
+
+        var stale = (await connection.QueryAsync<StaleUpload>(new CommandDefinition(
+            "SELECT id AS Id, storage_key AS StorageKey FROM conversation_attachment_uploads WHERE tenant_id = @TenantId AND created_at < @Cutoff ORDER BY created_at " + dialect.LimitClause + ";",
+            new { TenantId = tenantId, Cutoff = (time.GetUtcNow() - options.AttachmentUploadGrace).UtcDateTime, Limit = batch },
+            cancellationToken: cancellationToken))).ToList();
+
+        var swept = 0;
+        foreach (var upload in stale)
+        {
+            try
+            {
+                await storage.DeleteAsync(upload.StorageKey, cancellationToken);
+                await connection.ExecuteAsync(new CommandDefinition(
+                    "DELETE FROM conversation_attachment_uploads WHERE tenant_id = @TenantId AND id = @Id;",
+                    new { TenantId = tenantId, upload.Id },
+                    cancellationToken: cancellationToken));
+                swept++;
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException and not OutOfMemoryException)
+            {
+                logger.LogWarning("An unposted attachment upload {UploadId} could not be deleted ({ExceptionType}); the next sweep retries", upload.Id, ex.GetType().Name);
+            }
+        }
+
+        return swept;
+    }
+
+    private sealed class StaleUpload
+    {
+        public Guid Id { get; set; }
+
+        public string StorageKey { get; set; } = string.Empty;
     }
 
     /// <summary>One set-based statement for every due conversation of the tenant: cheap, and it keeps a stuck conversation from holding the others back as Active.</summary>
@@ -145,7 +195,8 @@ internal sealed class ConversationRetentionService(
     private async Task<bool> DeleteFilesAsync(DbConnection connection, string tenantId, Guid conversationId, CancellationToken cancellationToken)
     {
         var keys = (await connection.QueryAsync<string>(new CommandDefinition(
-            "SELECT storage_key FROM conversation_attachments WHERE tenant_id = @TenantId AND conversation_id = @ConversationId;",
+            "SELECT storage_key FROM conversation_attachments WHERE tenant_id = @TenantId AND conversation_id = @ConversationId " +
+            "UNION SELECT storage_key FROM conversation_attachment_uploads WHERE tenant_id = @TenantId AND conversation_id = @ConversationId;", // staged files too: an upload in flight is reachable from here
             new { TenantId = tenantId, ConversationId = conversationId },
             cancellationToken: cancellationToken))).ToList();
         if (keys.Count == 0)
@@ -221,7 +272,7 @@ internal sealed class ConversationRetentionService(
             cancellationToken: cancellationToken));
 
         // Children first (their foreign keys point at participants and messages), then the conversation row, which frees the subject key.
-        foreach (var table in new[] { "conversation_attachments", "conversation_guest_sessions", "conversation_messages", "conversation_notify_cursors", "conversation_participants", "conversation_events" })
+        foreach (var table in new[] { "conversation_attachments", "conversation_attachment_uploads", "conversation_guest_sessions", "conversation_messages", "conversation_notify_cursors", "conversation_participants", "conversation_events" })
         {
             await connection.ExecuteAsync(new CommandDefinition(
                 $"DELETE FROM {table} WHERE tenant_id = @TenantId AND conversation_id = @ConversationId;", scope, transaction, cancellationToken: cancellationToken));

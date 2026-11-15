@@ -1,6 +1,8 @@
 using System.Data.Common;
 using Dapper;
 using Microsoft.Extensions.Logging;
+using Themia.Imaging;
+using Themia.Storage;
 
 namespace Themia.Conversations.Internal;
 
@@ -15,7 +17,9 @@ internal sealed partial class ConversationService(
     IConversationEventSink sink,
     IConversationMasker masker,
     TimeProvider time,
-    ILogger<ConversationService> logger) : IConversationService
+    ILogger<ConversationService> logger,
+    IStorageProvider? storage = null,
+    IImageProcessor? images = null) : IConversationService, IConversationAttachments
 {
     private const int MaxOpenAttempts = 3;
     private const string MaskFailedBody = "[message hidden]";
@@ -158,7 +162,8 @@ internal sealed partial class ConversationService(
             new { TenantId = tenantId, ConversationId = conversationId, AfterSeq = afterSeq, Limit = Math.Min(limit, options.MaxListLimit) },
             transaction,
             cancellationToken: cancellationToken));
-        return rows.Select(r => ViewOf(viewer, r.ToMessage(viewer), conversationId)).ToList();
+        var attachments = await AttachmentsOfAsync(connection, transaction, tenantId, conversationId, afterSeq, rows.Select(r => r.Seq).DefaultIfEmpty(afterSeq).Max(), cancellationToken);
+        return rows.Select(r => ViewOf(viewer, r.ToMessage(viewer), conversationId) with { Attachments = attachments.TryGetValue(r.Id, out var list) ? list : [] }).ToList();
     }
 
     /// <summary>The message as the viewer may see it. A masker that throws (or times out) hides the body: fail closed, never the raw text.</summary>

@@ -449,3 +449,50 @@ Themia.Conversations.Migrations.ConversationNotifyCursorsMigration
 Themia.Conversations.Migrations.ConversationNotifyCursorsMigration.ConversationNotifyCursorsMigration() -> void
 override Themia.Conversations.Migrations.ConversationNotifyCursorsMigration.Down() -> void
 override Themia.Conversations.Migrations.ConversationNotifyCursorsMigration.Up() -> void
+Themia.Conversations.AttachmentInfo
+Themia.Conversations.AttachmentInfo.AttachmentInfo(System.Guid Id, string! FileName, string! ContentType, long Size) -> void
+Themia.Conversations.AttachmentInfo.ContentType.get -> string!
+Themia.Conversations.AttachmentInfo.ContentType.init -> void
+Themia.Conversations.AttachmentInfo.FileName.get -> string!
+Themia.Conversations.AttachmentInfo.FileName.init -> void
+Themia.Conversations.AttachmentInfo.Id.get -> System.Guid
+Themia.Conversations.AttachmentInfo.Id.init -> void
+Themia.Conversations.AttachmentInfo.Size.get -> long
+Themia.Conversations.AttachmentInfo.Size.init -> void
+Themia.Conversations.AttachmentUpload
+Themia.Conversations.AttachmentUpload.AttachmentUpload(string! FileName, string! ContentType, System.IO.Stream! Content) -> void
+Themia.Conversations.AttachmentUpload.Content.get -> System.IO.Stream!
+Themia.Conversations.AttachmentUpload.Content.init -> void
+Themia.Conversations.AttachmentUpload.ContentType.get -> string!
+Themia.Conversations.AttachmentUpload.ContentType.init -> void
+Themia.Conversations.AttachmentUpload.FileName.get -> string!
+Themia.Conversations.AttachmentUpload.FileName.init -> void
+Themia.Conversations.ConversationMessage.Attachments.get -> System.Collections.Generic.IReadOnlyList<Themia.Conversations.AttachmentInfo!>!
+Themia.Conversations.ConversationMessage.Attachments.init -> void
+Themia.Conversations.ConversationOptions.AllowedAttachmentContentTypes.get -> System.Collections.Generic.IList<string!>!
+Themia.Conversations.ConversationOptions.AttachmentDownloadLifetime.get -> System.TimeSpan
+Themia.Conversations.ConversationOptions.AttachmentDownloadLifetime.set -> void
+Themia.Conversations.ConversationOptions.AttachmentUploadGrace.get -> System.TimeSpan
+Themia.Conversations.ConversationOptions.AttachmentUploadGrace.set -> void
+Themia.Conversations.IConversationAttachments
+Themia.Conversations.IConversationAttachments.OpenAsync(Themia.Conversations.ConversationActor! actor, string! tenantId, System.Guid conversationId, System.Guid attachmentId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Conversations.OpenAttachmentResult!>!
+Themia.Conversations.IConversationAttachments.PostAsync(Themia.Conversations.ConversationActor! actor, string! tenantId, System.Guid conversationId, Themia.Conversations.PostMessage! message, System.Collections.Generic.IReadOnlyList<Themia.Conversations.AttachmentUpload!>! files, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Conversations.PostResult!>!
+Themia.Conversations.Migrations.ConversationAttachmentUploadsMigration
+Themia.Conversations.Migrations.ConversationAttachmentUploadsMigration.ConversationAttachmentUploadsMigration() -> void
+Themia.Conversations.OpenAttachmentOutcome
+Themia.Conversations.OpenAttachmentOutcome.Opened = 0 -> Themia.Conversations.OpenAttachmentOutcome
+Themia.Conversations.OpenAttachmentOutcome.Refused = 1 -> Themia.Conversations.OpenAttachmentOutcome
+Themia.Conversations.OpenAttachmentResult
+Themia.Conversations.OpenAttachmentResult.Attachment.get -> Themia.Conversations.AttachmentInfo?
+Themia.Conversations.OpenAttachmentResult.Attachment.init -> void
+Themia.Conversations.OpenAttachmentResult.OpenAttachmentResult(Themia.Conversations.OpenAttachmentOutcome Outcome, System.Uri? Url, Themia.Conversations.AttachmentInfo? Attachment) -> void
+Themia.Conversations.OpenAttachmentResult.Outcome.get -> Themia.Conversations.OpenAttachmentOutcome
+Themia.Conversations.OpenAttachmentResult.Outcome.init -> void
+Themia.Conversations.OpenAttachmentResult.Succeeded.get -> bool
+Themia.Conversations.OpenAttachmentResult.Url.get -> System.Uri?
+Themia.Conversations.OpenAttachmentResult.Url.init -> void
+Themia.Conversations.PostOutcome.AttachmentRejected = 5 -> Themia.Conversations.PostOutcome
+Themia.Conversations.PostOutcome.QuotaExceeded = 6 -> Themia.Conversations.PostOutcome
+override Themia.Conversations.Migrations.ConversationAttachmentUploadsMigration.Down() -> void
+override Themia.Conversations.Migrations.ConversationAttachmentUploadsMigration.Up() -> void
+static Themia.Conversations.DependencyInjection.ConversationServiceCollectionExtensions.AddThemiaConversationAttachments(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!

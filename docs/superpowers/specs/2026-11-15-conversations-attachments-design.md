@@ -38,3 +38,16 @@ Quota race (parallel posts over 200 MiB), declared-vs-sniffed type mismatch, EXI
 ## 6. Questions for review
 
 a) Presigned URL vs streaming through the app: presign leaks a bearer URL for 60 s; streaming costs the host bandwidth. Proposal: presign, short TTL. b) Re-encode failure on a corrupt image: reject the message, not store raw. c) Is list-by-prefix on `IStorageProvider` worth adding for orphans, or accept a documented bounded leak?
+
+## 7. As built (after plan review, GO WITH CHANGES)
+
+Supersedes the names and the orphan design above where they differ.
+
+- API is a separate interface, `IConversationAttachments.PostAsync(..., files)` and `OpenAsync` (not `PostWithAttachmentsAsync` on `IConversationService`): adopter fakes of the main interface keep compiling. `OpenAsync` returns `OpenAttachmentResult(Outcome, Url, Attachment)`.
+- **Orphans (answer to 6c):** no list-by-prefix. A staging table `conversation_attachment_uploads` holds each key, committed before the Put and deleted in the post transaction. Erasure, purge and the retention sweep (`AttachmentUploadGrace`, 1 h) work from rows, so every object that can exist is reachable from the database.
+- The Put is outside the deadlock retry loop; cleanup uses `CancellationToken.None`; quota is pre-checked, then re-checked under the counter lock.
+- Content types: explicit allow-list (`AllowedAttachmentContentTypes`, no wildcard, no SVG) and a magic-byte match. A corrupt image rejects the message (6b).
+- `file_name` column added; the download is a presigned URL (60 s, max 15 min) with an attachment disposition (6a).
+- Startup fails without an `IImageProcessor` or `IStorageProvider` (`AddThemiaConversationAttachments`).
+- Found by the tests: `storage_key` of the staging table must carry the same binary collation as `conversation_attachments.storage_key`, or the purge/erasure UNION fails on SQL Server.
+- Known gaps: staff redaction does not delete files; an erasure racing an in-flight upload leaks one object only if the process also crashes.
