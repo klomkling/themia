@@ -50,4 +50,5 @@ Supersedes the names and the orphan design above where they differ.
 - `file_name` column added; the download is a presigned URL (60 s, max 15 min) with an attachment disposition (6a).
 - Startup fails without an `IImageProcessor` or `IStorageProvider` (`AddThemiaConversationAttachments`).
 - Found by the tests: `storage_key` of the staging table must carry the same binary collation as `conversation_attachments.storage_key`, or the purge/erasure UNION fails on SQL Server.
-- Known gaps: staff redaction does not delete files; an erasure racing an in-flight upload leaks one object only if the process also crashes.
+- Redaction: Redaction today happens only through erasure, which deletes the person's files with the message bodies (tested); there is no staff-redact call yet, and one added later must delete the files of the message it redacts.
+- Known gap: an erasure racing an in-flight upload leaks one object only if the process also crashes.
