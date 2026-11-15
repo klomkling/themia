@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
+using Themia.Conversations.AspNetCore.Internal;
 
 namespace Themia.Conversations.AspNetCore;
 
@@ -32,12 +33,15 @@ public static class ConversationHttpExtensions
     {
         ArgumentNullException.ThrowIfNull(endpoints);
         ArgumentException.ThrowIfNullOrWhiteSpace(prefix);
-        if (endpoints.ServiceProvider.GetService<IConversationActorResolver>() is null)
+        var registrations = endpoints.ServiceProvider.GetRequiredService<IServiceProviderIsService>();
+        if (!registrations.IsService(typeof(IConversationActorResolver)))
         {
             throw new InvalidOperationException(
                 $"MapThemiaConversations needs an {nameof(IConversationActorResolver)}: the package never decides who a caller is. Register one that maps your authentication to a ConversationCaller.");
         }
 
-        return endpoints.MapGroup(prefix);
+        var group = endpoints.MapGroup(prefix);
+        ConversationEndpoints.Map(group, guestExchange: registrations.IsService(typeof(IGuestAccess)));
+        return group;
     }
 }
