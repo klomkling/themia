@@ -12,7 +12,8 @@ namespace Themia.Conversations.AspNetCore.Internal;
 internal static class GuestCookie
 {
     internal const int MaxTenantLength = 100;
-    private const int MaxValueLength = 512;
+    // A 100-char tenant of non-ASCII text serializes to 600 bytes of \uXXXX escapes, so ~890 base64url chars with the key; 512 locked such a guest out of their own cookie.
+    private const int MaxValueLength = 1024;
     private const string NamePrefix = "__Host-themia_conv_";
 
     public static string NameFor(Guid conversationId) => NamePrefix + conversationId.ToString("N");

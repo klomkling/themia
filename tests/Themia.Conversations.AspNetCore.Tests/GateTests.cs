@@ -126,6 +126,35 @@ public sealed class GateTests
         Assert.Empty(app.Service.Calls);
     }
 
+    [Fact]
+    public async Task Post_ShouldReachTheStore_WhenTheTenantIsAtTheLimitAndAllNonAscii()
+    {
+        await using var app = await TestApp.StartAsync();
+        var cookie = CookieFor(ConversationId, new string('\u0E01', GuestCookie.MaxTenantLength), NewKey());
+
+        var response = await app.SendAsync(HttpMethod.Post, TestApp.Path(ConversationId, "messages"), PostBody(), cookie: cookie);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        Assert.Single(app.Service.Calls);
+    }
+
+    [Theory]
+    [InlineData(768, true)]
+    [InlineData(769, false)]
+    public async Task Post_ShouldApplyTheCookieValueCapExactly_At1024Characters(int payloadBytes, bool reachesTheStore)
+    {
+        await using var app = await TestApp.StartAsync();
+        var key = NewKey();
+        var bare = JsonSerializer.Serialize(new { t = "tenant-a", k = key, p = string.Empty });
+        var payload = JsonSerializer.Serialize(new { t = "tenant-a", k = key, p = new string('x', payloadBytes - bare.Length) });
+        var value = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(payload));
+
+        var response = await app.SendAsync(HttpMethod.Post, TestApp.Path(ConversationId, "messages"), PostBody(), cookie: $"{GuestCookie.NameFor(ConversationId)}={value}");
+
+        Assert.Equal(reachesTheStore ? HttpStatusCode.Created : HttpStatusCode.Unauthorized, response.StatusCode);
+        Assert.Equal(reachesTheStore ? 1 : 0, app.Service.Calls.Count);
+    }
+
     [Theory]
     [InlineData("afterSeq=-1", "invalid_after_seq")]
     [InlineData("afterSeq=abc", "invalid_after_seq")]
