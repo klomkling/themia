@@ -27,6 +27,14 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+### Added
+
+- **`Themia.Modules.Identity.Abstractions`: `IPlatformUserReader.FindPlatformUserByIdAsync`**, a read of a tenant-less user by id regardless of the ambient tenant; implemented by `UserService`. Used by the sign-in flows to re-read a platform user after the success hook.
+
+### Fixed
+
+- **`Themia.Modules.Identity(.AspNetCore)` / `.ExternalAuth.AspNetCore`: the session is minted from a fresh read of the user after the sign-in success hook** (coord #0225). A hook that changes the account (granting a role rotates the security stamp) left the access token carrying the stamp read before the hook, so with `ValidateSecurityStampOnEachRequest = true` the first request answered 401 `invalid_token`. The password, one-time-code, external and second-factor-completion paths now re-read the user by id after the hook, apply the same active / lockout / tenant gate again (a hook that deactivated the account now denies the login), and mint the session from that copy. No public API change. A platform user (no tenant) is invisible to the tenant-scoped `FindByIdAsync`, so it is re-read through the new `IPlatformUserReader` (`UserService` implements it; only a tenant-less row can match). An external-login host that registers no `IUserService`, or whose user service does not implement `IPlatformUserReader`, keeps minting from the resolved user.
+
 ## [0.63.2] - 2026-11-15
 
 ### Fixed

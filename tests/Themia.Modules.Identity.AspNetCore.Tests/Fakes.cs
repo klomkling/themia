@@ -5,7 +5,7 @@ using Themia.Modules.Identity.Abstractions.Entities;
 
 namespace Themia.Modules.Identity.AspNetCore.Tests;
 
-internal sealed class FakeUserService : IUserService
+internal sealed class FakeUserService : IUserService, IPlatformUserReader
 {
     public PasswordVerificationResult VerifyResult { get; set; } = PasswordVerificationResult.Success;
     public User? UserToReturn { get; set; }
@@ -47,8 +47,13 @@ internal sealed class FakeUserService : IUserService
     public Task<User?> FindByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
         TenantSeenOnFindById = Themia.Framework.Core.Abstractions.Tenancy.TenantContextAccessor.CurrentTenantId;
-        return Task.FromResult(UserToReturn);
+        // Like the store: the account whose id was asked for, however it was resolved at the start of the flow.
+        return Task.FromResult(new[] { UserToReturn, EmailUserToReturn, PhoneUserToReturn }.FirstOrDefault(u => u is not null && u.Id == id) ?? UserToReturn);
     }
+
+    /// <summary>Like the store's platform-scope read: only a tenant-less account, whatever the ambient tenant.</summary>
+    public Task<User?> FindPlatformUserByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
+        Task.FromResult(new[] { UserToReturn, EmailUserToReturn, PhoneUserToReturn }.FirstOrDefault(u => u is { TenantId: null } && u.Id == id));
 
     public Task<User?> FindByEmailAsync(string email, CancellationToken cancellationToken = default)
     {
@@ -79,6 +84,9 @@ internal sealed class FakeClaimsPrincipalFactory : IClaimsPrincipalFactory
 
     public bool Called { get; private set; }
 
+    /// <summary>The user the last principal was built from: which copy of the account a flow minted the session from.</summary>
+    public User? LastUser { get; private set; }
+
     /// <summary>Claims added to every principal built, e.g. one an app later replaces.</summary>
     public List<Claim> ExtraClaims { get; } = [];
 
@@ -89,6 +97,7 @@ internal sealed class FakeClaimsPrincipalFactory : IClaimsPrincipalFactory
     {
         if (HonourCancellation) cancellationToken.ThrowIfCancellationRequested();
         Called = true;
+        LastUser = user;
         TenantSeen = Themia.Framework.Core.Abstractions.Tenancy.TenantContextAccessor.CurrentTenantId;
         return Task.FromResult(new ClaimsPrincipal(new ClaimsIdentity(
             [new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()), .. ExtraClaims], authenticationType)));
@@ -440,4 +449,20 @@ internal sealed class ThrowingObserver : IIdentityEventObserver
     public Task OnLogoutAsync(Guid? userId, bool allSessions, CancellationToken cancellationToken = default) => Throw();
     public Task OnLockedOutAsync(Guid userId, DateTimeOffset lockoutEnd, CancellationToken cancellationToken = default) => Throw();
     public Task OnUserMutatedAsync(Guid userId, UserMutation mutation, CancellationToken cancellationToken = default) => Throw();
+}
+
+/// <summary>The account as the store holds it after a sign-in hook changed it: same id and tenant, a rotated security stamp.</summary>
+internal static class ReloadedUser
+{
+    public static User After(User before, bool isActive = true)
+    {
+        var after = new User
+        {
+            UserName = before.UserName, TenantId = before.TenantId, IsActive = isActive, PhoneNumber = before.PhoneNumber,
+            NormalizedPhoneNumber = before.NormalizedPhoneNumber, PhoneNumberConfirmed = before.PhoneNumberConfirmed,
+            SecurityStamp = Guid.NewGuid().ToString("N"),
+        };
+        after.SetId(before.Id);
+        return after;
+    }
 }

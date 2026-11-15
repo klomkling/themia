@@ -267,7 +267,14 @@ public sealed class AuthenticationFlow : IAuthenticationFlow
             return await FailAsync(identifier, LoginFailureReason.Denied, LoginResult.Denied(), cancellationToken, succeeded.DenialReason).ConfigureAwait(false);
         }
 
-        var tokens = await IssueAsync(resolved, cancellationToken).ConfigureAwait(false);
+        // The hook may have changed the account (a granted role rotates the security stamp), so the session comes from a fresh read.
+        var session = await SignedInUser.ReloadAsync(users, resolved, timeProvider, cancellationToken).ConfigureAwait(false);
+        if (session is null)
+        {
+            return await FailAsync(identifier, LoginFailureReason.Denied, LoginResult.Denied(), cancellationToken, "account can no longer sign in after the success hook").ConfigureAwait(false);
+        }
+
+        var tokens = await IssueAsync(session, cancellationToken).ConfigureAwait(false);
         logger.LogInformation("User {UserId} authenticated via password.", resolved.Id);
         await RaiseAsync((o, ct) => o.OnLoginSucceededAsync(resolved.Id, resolved.UserName, ct), cancellationToken).ConfigureAwait(false);
         return LoginResult.Success(tokens);
