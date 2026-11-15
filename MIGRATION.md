@@ -12,6 +12,8 @@ with the *why* and concrete upgrade steps.
 
 ## Unreleased
 
+## 0.63.2
+
 ### `Themia.Conversations.AspNetCore` (new package, not breaking)
 
 **What changed:** a new package; no schema change and no change to existing packages except `GuestSessionKey.Reveal()`.

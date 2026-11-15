@@ -27,6 +27,8 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.63.2] - 2026-11-15
+
 ### Fixed
 
 - **`Themia.Conversations`: the attachments migration (`202611150001`) is idempotent step by step.** It returned early when the staging table existed, but on MySQL (non-transactional DDL) the collation pins and both indexes come after `CREATE TABLE`, so a run that died there and was rerun recorded the version without them. Each step now checks its own state. Integration tests on PostgreSQL, MySQL and SQL Server upgrade a database from the previous version with rows in it, replay, and finish a partially applied run.
