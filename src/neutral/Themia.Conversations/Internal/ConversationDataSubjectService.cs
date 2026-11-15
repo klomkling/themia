@@ -154,7 +154,8 @@ internal sealed class ConversationDataSubjectService(
     private async Task<bool> DeleteFilesAsync(DbConnection connection, string tenantId, Guid conversationId, Guid participantId, CancellationToken cancellationToken)
     {
         var keys = (await connection.QueryAsync<string>(new CommandDefinition(
-            $"SELECT storage_key FROM conversation_attachments WHERE {PersonAttachments};",
+            $"SELECT storage_key FROM conversation_attachments WHERE {PersonAttachments} " +
+            "UNION SELECT storage_key FROM conversation_attachment_uploads WHERE tenant_id = @TenantId AND conversation_id = @ConversationId AND owner_participant_id = @ParticipantId;",
             new { TenantId = tenantId, ConversationId = conversationId, ParticipantId = participantId },
             cancellationToken: cancellationToken))).ToList();
         if (keys.Count == 0)
@@ -193,6 +194,9 @@ internal sealed class ConversationDataSubjectService(
 
         var attachments = await connection.ExecuteAsync(new CommandDefinition(
             $"DELETE FROM conversation_attachments WHERE {PersonAttachments};", scope, transaction, cancellationToken: cancellationToken));
+        await connection.ExecuteAsync(new CommandDefinition(
+            "DELETE FROM conversation_attachment_uploads WHERE tenant_id = @TenantId AND conversation_id = @ConversationId AND owner_participant_id = @ParticipantId;",
+            scope, transaction, cancellationToken: cancellationToken));
         var redacted = await connection.ExecuteAsync(new CommandDefinition(
             "UPDATE conversation_messages SET body = NULL, redacted_at = @Now WHERE tenant_id = @TenantId AND conversation_id = @ConversationId AND participant_id = @ParticipantId AND redacted_at IS NULL;",
             scope, transaction, cancellationToken: cancellationToken));

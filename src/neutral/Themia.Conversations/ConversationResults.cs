@@ -47,7 +47,11 @@ public sealed record PostResult(PostOutcome Outcome, Guid? MessageId, long? Seq)
 /// <param name="CreatedAt">When it was stored (UTC).</param>
 /// <param name="IsRedacted">Whether the body was removed by erasure or staff redaction.</param>
 /// <param name="SenderLabel">How the viewer sees the sender: the display name, except that a guest sees staff by role label (or "Staff") and the system as "System".</param>
-public sealed record ConversationMessage(Guid Id, long Seq, Guid ParticipantId, MessageKind Kind, string? Body, DateTimeOffset CreatedAt, bool IsRedacted, string? SenderLabel = null);
+public sealed record ConversationMessage(Guid Id, long Seq, Guid ParticipantId, MessageKind Kind, string? Body, DateTimeOffset CreatedAt, bool IsRedacted, string? SenderLabel = null)
+{
+    /// <summary>The files attached to the message, empty when there are none. The bytes come from <see cref="IConversationAttachments.OpenAsync"/>.</summary>
+    public IReadOnlyList<AttachmentInfo> Attachments { get; init; } = [];
+}
 
 /// <summary>The result of <see cref="IConversationService.ListAsync"/>.</summary>
 /// <param name="Outcome">How the call ended.</param>

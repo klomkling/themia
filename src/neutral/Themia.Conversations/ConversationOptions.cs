@@ -21,6 +21,15 @@ public sealed class ConversationOptions
     /// <summary>Total bytes of the attachments of one message. Default 10 MiB.</summary>
     public long MaxAttachmentBytesPerMessage { get; set; } = 10L * 1024 * 1024;
 
+    /// <summary>The content types an attachment may declare; the bytes must also look like the declared type. An explicit allow-list: no wildcard, never SVG. Default JPEG, PNG, WebP and PDF.</summary>
+    public IList<string> AllowedAttachmentContentTypes { get; } = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
+
+    /// <summary>How long an uploaded-but-not-posted file may stay in storage before the sweep deletes it. Default 1 hour.</summary>
+    public TimeSpan AttachmentUploadGrace { get; set; } = TimeSpan.FromHours(1);
+
+    /// <summary>How long the download URL of an attachment stays valid. Default 60 seconds.</summary>
+    public TimeSpan AttachmentDownloadLifetime { get; set; } = TimeSpan.FromSeconds(60);
+
     /// <summary>Total bytes of the attachments of one conversation. Default 200 MiB.</summary>
     public long MaxAttachmentBytesPerConversation { get; set; } = 200L * 1024 * 1024;
 
@@ -64,6 +73,9 @@ public sealed class ConversationOptions
         Require(MaxDisplayNameLength is > 0 and <= DisplayNameColumnWidth, nameof(MaxDisplayNameLength), $"must be between 1 and {DisplayNameColumnWidth}, the width of the column");
         Require(MaxAttachmentsPerMessage > 0, nameof(MaxAttachmentsPerMessage), "must be positive");
         Require(MaxAttachmentBytesPerMessage > 0, nameof(MaxAttachmentBytesPerMessage), "must be positive");
+        Require(AllowedAttachmentContentTypes.Count > 0 && AllowedAttachmentContentTypes.All(t => !string.IsNullOrWhiteSpace(t) && !t.Contains('*', StringComparison.Ordinal) && !t.Equals("image/svg+xml", StringComparison.OrdinalIgnoreCase)), nameof(AllowedAttachmentContentTypes), "must list explicit types, no wildcard and no SVG");
+        Require(AttachmentUploadGrace > TimeSpan.Zero, nameof(AttachmentUploadGrace), "must be positive");
+        Require(AttachmentDownloadLifetime > TimeSpan.Zero && AttachmentDownloadLifetime <= TimeSpan.FromMinutes(15), nameof(AttachmentDownloadLifetime), "must be positive and at most 15 minutes");
         Require(MaxAttachmentBytesPerConversation >= MaxAttachmentBytesPerMessage, nameof(MaxAttachmentBytesPerConversation), "must not be smaller than the per-message cap");
         Require(MaxListLimit > 0, nameof(MaxListLimit), "must be positive");
         Require(DefaultRetention > TimeSpan.Zero, nameof(DefaultRetention), "must be positive");

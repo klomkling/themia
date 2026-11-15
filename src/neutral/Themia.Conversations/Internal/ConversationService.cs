@@ -1,6 +1,8 @@
 using System.Data.Common;
 using Dapper;
 using Microsoft.Extensions.Logging;
+using Themia.Imaging;
+using Themia.Storage;
 
 namespace Themia.Conversations.Internal;
 
@@ -15,7 +17,9 @@ internal sealed partial class ConversationService(
     IConversationEventSink sink,
     IConversationMasker masker,
     TimeProvider time,
-    ILogger<ConversationService> logger) : IConversationService
+    ILogger<ConversationService> logger,
+    IStorageProvider? storage = null,
+    IImageProcessor? images = null) : IConversationService, IConversationAttachments
 {
     private const int MaxOpenAttempts = 3;
     private const string MaskFailedBody = "[message hidden]";
@@ -158,7 +162,8 @@ internal sealed partial class ConversationService(
             new { TenantId = tenantId, ConversationId = conversationId, AfterSeq = afterSeq, Limit = Math.Min(limit, options.MaxListLimit) },
             transaction,
             cancellationToken: cancellationToken));
-        return rows.Select(r => ViewOf(viewer, r.ToMessage(viewer), conversationId)).ToList();
+        var attachments = await AttachmentsOfAsync(connection, transaction, tenantId, conversationId, afterSeq, rows.Select(r => r.Seq).DefaultIfEmpty(afterSeq).Max(), cancellationToken);
+        return rows.Select(r => ViewOf(viewer, r.ToMessage(viewer) with { Attachments = attachments.TryGetValue(r.Id, out var list) ? list : [] }, conversationId)).ToList();
     }
 
     /// <summary>The message as the viewer may see it. A masker that throws (or times out) hides the body: fail closed, never the raw text.</summary>
@@ -166,13 +171,38 @@ internal sealed partial class ConversationService(
     {
         try
         {
-            return masker.Mask(viewer, message);
+            var masked = masker.Mask(viewer, message);
+            return masked.Attachments.Count == 0
+                ? masked
+                : masked with { Attachments = masked.Attachments.Select(a => a with { FileName = MaskFileName(viewer, a.FileName) }).ToList() };
         }
         catch (Exception ex) when (ex is not OutOfMemoryException)
         {
             // The exception type only: a masker's message or stack may quote the text it choked on.
-            logger.LogWarning("Conversation {ConversationId} message {MessageId} could not be masked for a {Viewer} viewer ({ExceptionType}); its body is hidden", conversationId, message.Id, viewer, ex.GetType().Name);
-            return message with { Body = message.IsRedacted ? null : MaskFailedBody };
+            logger.LogWarning("Conversation {ConversationId} message {MessageId} could not be masked for a {Viewer} viewer ({ExceptionType}); its body and file names are hidden", conversationId, message.Id, viewer, ex.GetType().Name);
+            return message with
+            {
+                Body = message.IsRedacted ? null : MaskFailedBody,
+                Attachments = message.Attachments.Select(a => a with { FileName = AttachmentFileName.Fallback }).ToList(),
+            };
+        }
+    }
+
+    /// <summary>
+    /// A file name as the viewer may see it: it goes through the same masker as a body (a guest must not read a phone number in <c>call 0812345678.pdf</c>).
+    /// A masker that throws or hides the text leaves the neutral fallback, never the raw name.
+    /// </summary>
+    internal string MaskFileName(ConversationActorKind viewer, string fileName)
+    {
+        try
+        {
+            var probe = new ConversationMessage(Guid.Empty, 0, Guid.Empty, MessageKind.Text, fileName, DateTimeOffset.UnixEpoch, false);
+            return masker.Mask(viewer, probe).Body is { Length: > 0 } masked ? masked : AttachmentFileName.Fallback;
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            logger.LogWarning("An attachment file name could not be masked for a {Viewer} viewer ({ExceptionType}); a neutral name is used", viewer, ex.GetType().Name);
+            return AttachmentFileName.Fallback;
         }
     }
 

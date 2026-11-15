@@ -12,6 +12,14 @@ with the *why* and concrete upgrade steps.
 
 ## Unreleased
 
+### `Themia.Conversations`: attachments on post (not breaking)
+
+**What changed:** migration `202611150001` adds `conversation_attachments.file_name` (NOT NULL, default empty) and the table `conversation_attachment_uploads`, which has no foreign keys by design (a purge must still find a leaked key). `Themia.Conversations` references `Themia.Imaging`. New `IConversationAttachments` and `AddThemiaConversationAttachments()`; `IConversationService` is unchanged.
+
+**Who is affected:** nobody who does not attach files. An app that rolls the application back must run `DROP TABLE conversation_attachment_uploads` only after its staged objects are deleted (run the retention sweep first); the table is the only record of an object whose post did not finish.
+
+**How to upgrade:** nothing for a forward upgrade. To use attachments register `IStorageProvider`, `AddThemiaImaging()` and `AddThemiaConversationAttachments()`. Use a storage backend that signs `Content-Disposition` (S3); the local provider cannot, so its downloads are not forced to attachment. A fake that implements `IConversationDialect` or uses the `ConversationService` constructor needs no change (the new parameters are optional).
+
 ## 0.63.1
 
 ### `Themia.Exceptional.AspNetCore`: browser access hardening (not breaking)

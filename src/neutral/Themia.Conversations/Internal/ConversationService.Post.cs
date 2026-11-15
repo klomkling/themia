@@ -42,7 +42,7 @@ internal sealed partial class ConversationService
         }
     }
 
-    private async Task<PostResult> PostOnceAsync(ConversationActor actor, string tenantId, Guid conversationId, PostMessage message, CancellationToken cancellationToken)
+    private async Task<PostResult> PostOnceAsync(ConversationActor actor, string tenantId, Guid conversationId, PostMessage message, CancellationToken cancellationToken, IReadOnlyList<PreparedAttachment>? prepared = null)
     {
         await using var connection = await OpenConnectionAsync(cancellationToken);
         await using var transaction = await connection.BeginTransactionAsync(IsolationLevel.ReadCommitted, cancellationToken);
@@ -89,7 +89,7 @@ internal sealed partial class ConversationService
         {
             await connection.ExecuteAsync(new CommandDefinition(
                 "INSERT INTO conversation_messages (id, tenant_id, conversation_id, seq, participant_id, kind, body, client_message_id, created_at) VALUES (@Id, @TenantId, @ConversationId, @Seq, @ParticipantId, @Kind, @Body, @ClientMessageId, @Now);",
-                new { Id = messageId, TenantId = tenantId, ConversationId = conversationId, Seq = seq, ParticipantId = participantId, Kind = (short)MessageKind.Text, message.Body, message.ClientMessageId, Now = Now() },
+                new { Id = messageId, TenantId = tenantId, ConversationId = conversationId, Seq = seq, ParticipantId = participantId, Kind = (short)MessageKind.Text, Body = message.Body ?? string.Empty, message.ClientMessageId, Now = Now() },
                 transaction,
                 cancellationToken: cancellationToken));
         }
@@ -103,6 +103,12 @@ internal sealed partial class ConversationService
                 ?? throw new InvalidOperationException("A duplicate client message id was reported but no stored message was found.");
         }
 
+        if (prepared is not null && !await AttachAsync(connection, transaction, tenantId, conversationId, participantId, messageId, prepared, cancellationToken))
+        {
+            await transaction.RollbackAsync(CancellationToken.None); // the counter bump and the message go with it
+            return new PostResult(PostOutcome.QuotaExceeded, null, null);
+        }
+
         var recipients = (await connection.QueryAsync<Guid>(new CommandDefinition(
             "SELECT id FROM conversation_participants WHERE tenant_id = @TenantId AND conversation_id = @ConversationId AND left_at IS NULL AND id <> @ParticipantId;",
             new { TenantId = tenantId, ConversationId = conversationId, ParticipantId = participantId },
@@ -110,7 +116,7 @@ internal sealed partial class ConversationService
             cancellationToken: cancellationToken))).ToList();
         await sink.RaiseAsync(connection, transaction, new ConversationEvent(Guid.NewGuid(), tenantId, conversationId, ConversationEventKind.MessagePosted, messageId, seq, recipients), cancellationToken);
 
-        await transaction.CommitAsync(cancellationToken);
+        await transaction.CommitAsync(CancellationToken.None); // a cancel must not abandon a commit the server may already have applied: the caller cleans up on the outcome it can see
         logger.LogInformation("Conversation {ConversationId} message {MessageId} stored as seq {Seq}", conversationId, messageId, seq);
         return new PostResult(PostOutcome.Posted, messageId, seq);
     }

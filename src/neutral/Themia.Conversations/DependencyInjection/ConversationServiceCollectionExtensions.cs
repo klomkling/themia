@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Themia.Conversations.Internal;
+using Themia.Imaging;
 using Themia.Storage;
 
 namespace Themia.Conversations.DependencyInjection;
@@ -37,7 +38,9 @@ public static class ConversationServiceCollectionExtensions
             sp.GetRequiredService<IConversationEventSink>(),
             sp.GetRequiredService<IConversationMasker>(),
             sp.GetRequiredService<TimeProvider>(),
-            sp.GetRequiredService<ILogger<ConversationService>>()));
+            sp.GetRequiredService<ILogger<ConversationService>>(),
+            sp.GetService<IStorageProvider>(),
+            sp.GetService<IImageProcessor>()));
         services.TryAddSingleton<IConversationService>(sp => sp.GetRequiredService<ConversationService>());
         services.TryAddSingleton<IConversationOversight>(sp => new ConversationOversightService(
             sp.GetRequiredService<ConversationService>(),
@@ -69,6 +72,28 @@ public static class ConversationServiceCollectionExtensions
             sp.GetService<IStorageProvider>(),
             sp.GetRequiredService<TimeProvider>(),
             sp.GetRequiredService<ILogger<ConversationDataSubjectService>>()));
+        return services;
+    }
+
+    /// <summary>
+    /// Turns on <see cref="IConversationAttachments"/>. It needs an <see cref="IStorageProvider"/> and a Themia.Imaging <see cref="IImageProcessor"/> (<c>AddThemiaImaging</c>)
+    /// and fails at startup, not at the first upload, when either is missing. Call it after <c>AddThemiaConversations</c> and the storage and imaging registrations.
+    /// </summary>
+    /// <param name="services">The service collection.</param>
+    public static IServiceCollection AddThemiaConversationAttachments(this IServiceCollection services)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+
+        services.TryAddSingleton<IConversationAttachments>(sp =>
+        {
+            if (sp.GetService<IStorageProvider>() is null || sp.GetService<IImageProcessor>() is null)
+            {
+                throw new InvalidOperationException("AddThemiaConversationAttachments needs an IStorageProvider and an IImageProcessor (AddThemiaImaging) to be registered.");
+            }
+
+            return sp.GetRequiredService<ConversationService>();
+        });
+        services.AddHostedService<AttachmentSupportCheck>();
         return services;
     }
 
