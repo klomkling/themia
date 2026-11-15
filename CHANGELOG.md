@@ -27,6 +27,8 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.64.0] - 2026-11-16
+
 ### Changed
 
 - **`Themia.Modules.Identity.Abstractions`: `IPlatformUserReader` remarks.** The sign-in flows detect the reader with `is IPlatformUserReader` on the registered `IUserService`, so a decorator that wraps `IUserService` hides it and platform users keep the pre-hook copy. A wrapper must implement `IPlatformUserReader` and forward to the inner service. New conformance test on every engine (incl. SQL Server): the reader finds a platform user from any tenant scope and never a tenant's user.
