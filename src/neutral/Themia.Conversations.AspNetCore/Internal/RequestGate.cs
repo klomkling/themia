@@ -31,9 +31,9 @@ internal static class RequestGate
 
         if (GuestCookie.TryRead(context, conversationId, out var tenantId, out var key))
         {
-            // The key is unproven until the store accepts it, so random well-formed keys must not each get a bucket: limit by client, not by key.
+            // The key is unproven until the store accepts it, so random well-formed keys must not each get a bucket: limit by client alone: neither the key nor the route id is proven, so neither may create a bucket.
             var options = context.RequestServices.GetRequiredService<IOptions<ConversationHttpOptions>>().Value;
-            if (RequestRateLimiter.Check(context, "guest", RequestRateLimiter.ClientPartition(context) + "|" + conversationId.ToString("N"), options.UnprovenGuestRequestsPerMinute, TimeSpan.FromMinutes(1)) is { } limited)
+            if (RequestRateLimiter.Check(context, "guest", RequestRateLimiter.ClientPartition(context), options.UnprovenGuestRequestsPerMinute, TimeSpan.FromMinutes(1)) is { } limited)
             {
                 return (null, limited);
             }

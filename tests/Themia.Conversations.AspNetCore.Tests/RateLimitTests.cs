@@ -113,4 +113,32 @@ public sealed class RateLimitTests
         Assert.Contains(defaulted.Logs.Lines, l => l.Contains("ClientKey", StringComparison.Ordinal));
         Assert.DoesNotContain(configured.Logs.Lines, l => l.Contains("ClientKey", StringComparison.Ordinal));
     }
+
+    [Fact]
+    public void TryAcquire_ShouldRefuseNewKeysAndStayBounded_WhenEveryBucketIsLive()
+    {
+        var limiter = new Internal.RequestRateLimiter(new FakeTime());
+        for (var i = 0; i < Internal.RequestRateLimiter.MaxEntries; i++)
+        {
+            Assert.True(limiter.TryAcquire("k" + i, 5, TimeSpan.FromMinutes(1), out _));
+        }
+
+        Assert.False(limiter.TryAcquire("one-more", 5, TimeSpan.FromMinutes(1), out _));
+        Assert.True(limiter.TryAcquire("k0", 5, TimeSpan.FromMinutes(1), out _));
+    }
+
+    [Fact]
+    public async Task UnprovenGuest_ShouldShareOneBucketAcrossRouteIds_ForOneClient()
+    {
+        await using var app = await StartAsync(new FakeTime(), o => o.UnprovenGuestRequestsPerMinute = 2);
+        var last = HttpStatusCode.OK;
+
+        for (var i = 0; i < 3; i++)
+        {
+            var id = Guid.NewGuid();
+            last = (await app.SendAsync(HttpMethod.Get, TestApp.Path(id, "messages"), cookie: GateTests.CookieFor(id, "tenant-a", GateTests.NewKey()))).StatusCode;
+        }
+
+        Assert.Equal(HttpStatusCode.TooManyRequests, last);
+    }
 }

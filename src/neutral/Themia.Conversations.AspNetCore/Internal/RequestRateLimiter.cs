@@ -11,9 +11,12 @@ namespace Themia.Conversations.AspNetCore.Internal;
 /// </summary>
 internal sealed class RequestRateLimiter(TimeProvider time)
 {
-    private const int PruneThreshold = 10_000;
+    internal const int MaxEntries = 10_000;
+    private static readonly TimeSpan PruneInterval = TimeSpan.FromSeconds(1);
 
     private readonly ConcurrentDictionary<string, Window> windows = new(StringComparer.Ordinal);
+    private readonly object pruneLock = new();
+    private DateTimeOffset lastPrune;
 
     public static IResult? Check(HttpContext context, string scope, string partition, int limit, TimeSpan window)
     {
@@ -30,12 +33,11 @@ internal sealed class RequestRateLimiter(TimeProvider time)
     public bool TryAcquire(string key, int limit, TimeSpan window, out TimeSpan retryAfter)
     {
         var now = time.GetUtcNow();
-        if (windows.Count > PruneThreshold)
+        if (windows.Count >= MaxEntries && !windows.ContainsKey(key) && !MakeRoom(now))
         {
-            foreach (var entry in windows.Where(e => e.Value.EndsAt <= now))
-            {
-                windows.TryRemove(entry);
-            }
+            // Full of live buckets: fail closed for a new key rather than grow without bound or rescan on every call.
+            retryAfter = window;
+            return false;
         }
 
         var slot = windows.GetOrAdd(key, _ => new Window(now + window));
@@ -55,6 +57,23 @@ internal sealed class RequestRateLimiter(TimeProvider time)
 
             slot.Count++;
             return true;
+        }
+    }
+
+    private bool MakeRoom(DateTimeOffset now)
+    {
+        lock (pruneLock)
+        {
+            if (now - lastPrune >= PruneInterval)
+            {
+                lastPrune = now;
+                foreach (var entry in windows.Where(e => e.Value.EndsAt <= now))
+                {
+                    windows.TryRemove(entry);
+                }
+            }
+
+            return windows.Count < MaxEntries;
         }
     }
 
