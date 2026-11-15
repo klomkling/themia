@@ -28,6 +28,9 @@ public sealed class GuestSessionKey : IEquatable<GuestSessionKey>
 
     internal string Value { get; }
 
+    /// <summary>The text to put in the guest's session cookie. A method, not a property, so a logger or serialiser that reads properties cannot write it out. Never store or log it.</summary>
+    public string Reveal() => Value;
+
     /// <summary>Whether <paramref name="value"/> is a well-formed key; use it to refuse a malformed cookie without throwing.</summary>
     /// <param name="value">The cookie value.</param>
     /// <param name="key">The key, or <see langword="null"/> when the value is malformed.</param>

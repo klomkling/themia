@@ -151,6 +151,7 @@ Themia.Conversations.GuestLinkToken.Reveal() -> string!
 Themia.Conversations.GuestSessionKey
 Themia.Conversations.GuestSessionKey.Equals(Themia.Conversations.GuestSessionKey? other) -> bool
 Themia.Conversations.GuestSessionKey.GuestSessionKey(string! value) -> void
+Themia.Conversations.GuestSessionKey.Reveal() -> string!
 Themia.Conversations.GuestSessionResult
 Themia.Conversations.GuestSessionResult.ConversationId.get -> System.Guid?
 Themia.Conversations.GuestSessionResult.ConversationId.init -> void

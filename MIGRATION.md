@@ -12,6 +12,12 @@ with the *why* and concrete upgrade steps.
 
 ## Unreleased
 
+### `Themia.Conversations.AspNetCore` (new package, not breaking)
+
+**What changed:** a new package; no schema change and no change to existing packages except `GuestSessionKey.Reveal()`.
+
+**Who is affected:** apps that adopt it. Three things to get right: the web app and the API must be same-site (the guest cookie is `SameSite=Strict`); set `ConversationHttpOptions.ClientKey` from the header your edge guarantees, or every caller behind a proxy shares one rate-limit bucket; the rate limits are per node, so add an edge limit for a hard cap. No env var is added.
+
 ### `Themia.Conversations`: attachments on post (not breaking)
 
 **What changed:** migration `202611150001` adds `conversation_attachments.file_name` (NOT NULL, default empty) and the table `conversation_attachment_uploads`, which has no foreign keys by design (a purge must still find a leaked key). `Themia.Conversations` references `Themia.Imaging`. New `IConversationAttachments` and `AddThemiaConversationAttachments()`; `IConversationService` is unchanged.
