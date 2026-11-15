@@ -190,7 +190,7 @@ public sealed class S3StorageProvider : IStorageProvider, IDisposable
     public async Task<Uri> GetPresignedUrlAsync(string key, PresignedUrlRequest request, CancellationToken cancellationToken = default)
     {
         var (resolvedBucket, resolvedKey) = Resolve(key);
-        var url = await client.GetPreSignedURLAsync(new GetPreSignedUrlRequest
+        var presign = new GetPreSignedUrlRequest
         {
             BucketName = resolvedBucket,
             Key = resolvedKey,
@@ -198,7 +198,13 @@ public sealed class S3StorageProvider : IStorageProvider, IDisposable
             Expires = DateTime.UtcNow.Add(request.Expiry),
             ContentType = request.Operation == PresignedUrlOperation.Put ? request.ContentType : null,
             Protocol = PresignProtocol,
-        }).ConfigureAwait(false);
+        };
+        if (request.Operation == PresignedUrlOperation.Get && request.ContentDisposition is { Length: > 0 } disposition)
+        {
+            presign.ResponseHeaderOverrides.ContentDisposition = disposition;
+        }
+
+        var url = await client.GetPreSignedURLAsync(presign).ConfigureAwait(false);
         return new Uri(url);
     }
 

@@ -46,4 +46,11 @@ public sealed record StorageObjectInfo(string Key, long Length, string ContentTy
 public readonly record struct PresignedUrlRequest(
     PresignedUrlOperation Operation,
     TimeSpan Expiry,
-    string? ContentType = null);
+    string? ContentType = null)
+{
+    /// <summary>The <c>Content-Disposition</c> the download response must carry (Get only), for example
+    /// <c>attachment; filename*=UTF-8''report.pdf</c>. S3 signs it into the URL (<c>response-content-disposition</c>), so the caller cannot
+    /// be tricked into rendering an untrusted file inline. Ignored for Put. The local provider cannot carry it: its signed route serves the
+    /// stored content type, so use a backend that supports it when the file is untrusted.</summary>
+    public string? ContentDisposition { get; init; }
+}

@@ -31,6 +31,19 @@ public sealed class S3StorageProviderConformanceTests(GarageFixture garage)
     }
 
     [Fact]
+    public async Task Presigned_get_url_carries_the_requested_content_disposition()
+    {
+        var key = $"conf/{Guid.NewGuid():N}.bin";
+        await Provider.PutAsync(key, new MemoryStream(Encoding.UTF8.GetBytes("bytes")), new StoragePutOptions("application/pdf"));
+        var url = await Provider.GetPresignedUrlAsync(key, new PresignedUrlRequest(PresignedUrlOperation.Get, TimeSpan.FromMinutes(5)) { ContentDisposition = "attachment; filename*=UTF-8''a%20b.pdf" });
+
+        using var http = new HttpClient();
+        using var response = await http.GetAsync(url);
+
+        Assert.Equal("attachment; filename*=UTF-8''a%20b.pdf", response.Content.Headers.NonValidated["Content-Disposition"].ToString());
+    }
+
+    [Fact]
     public async Task A_provider_built_from_options_writes_and_reads_over_a_plain_http_endpoint()
     {
         // The conformance provider wraps a client this fixture configures itself, which hides what an app gets
