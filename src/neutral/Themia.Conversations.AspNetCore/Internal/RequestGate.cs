@@ -5,7 +5,7 @@ using Microsoft.Extensions.Options;
 namespace Themia.Conversations.AspNetCore.Internal;
 
 /// <summary>An authenticated request: the tenant, the actor, and whether the actor is a guest whose key the store has not yet accepted.</summary>
-internal sealed record ResolvedCaller(string TenantId, ConversationActor Actor, bool IsGuest);
+internal sealed record ResolvedCaller(string TenantId, ConversationActor Actor, bool IsGuest, RateTicket GuestTicket = default);
 
 /// <summary>The checks every endpoint runs before it reads a body, in the order that keeps an unauthenticated caller from making the server do work.</summary>
 internal static class RequestGate
@@ -35,12 +35,12 @@ internal static class RequestGate
         {
             // The slot is taken here, before any store call, so a burst of concurrent guesses is counted; RefundAcceptedGuest gives it back once the store accepts the key.
             var options = context.RequestServices.GetRequiredService<IOptions<ConversationHttpOptions>>().Value;
-            if (RequestRateLimiter.Check(context, GuestScope, RequestRateLimiter.ClientPartition(context), options.UnprovenGuestRequestsPerMinute, GuestWindow) is { } limited)
+            if (RequestRateLimiter.Check(context, GuestScope, RequestRateLimiter.ClientPartition(context), options.UnprovenGuestRequestsPerMinute, GuestWindow, out var ticket) is { } limited)
             {
                 return (null, limited);
             }
 
-            return (new ResolvedCaller(tenantId, ConversationActor.ForGuest(key!), IsGuest: true), null);
+            return (new ResolvedCaller(tenantId, ConversationActor.ForGuest(key!), IsGuest: true, ticket), null);
         }
 
         return (null, Problems.Of(StatusCodes.Status401Unauthorized, Problems.Unauthenticated, "Authentication is required."));
@@ -51,7 +51,7 @@ internal static class RequestGate
     {
         if (caller.IsGuest)
         {
-            RequestRateLimiter.Refund(context, GuestScope, RequestRateLimiter.ClientPartition(context));
+            RequestRateLimiter.Refund(context, caller.GuestTicket);
         }
     }
 }

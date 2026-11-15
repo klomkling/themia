@@ -217,4 +217,19 @@ public sealed class RateLimitTests
 
         Assert.Equal(HttpStatusCode.TooManyRequests, last);
     }
+
+    [Fact]
+    public void Refund_ShouldNotLowerALaterWindowsCount_WhenTheTicketsWindowHasRolled()
+    {
+        var time = new FakeTime();
+        var limiter = new Internal.RequestRateLimiter(time);
+        limiter.TryAcquire("guest", "c", 2, TimeSpan.FromMinutes(1), out _, out var stale);
+        time.Advance(TimeSpan.FromMinutes(2));
+        limiter.TryAcquire("guest", "c", 2, TimeSpan.FromMinutes(1), out _);
+        limiter.TryAcquire("guest", "c", 2, TimeSpan.FromMinutes(1), out _);
+
+        limiter.Refund(stale);
+
+        Assert.False(limiter.TryAcquire("guest", "c", 2, TimeSpan.FromMinutes(1), out _));
+    }
 }

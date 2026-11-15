@@ -7,6 +7,9 @@ using Microsoft.Extensions.Options;
 
 namespace Themia.Conversations.AspNetCore.Internal;
 
+/// <summary>The slot a request took, bound to its bucket and window so a refund can never land anywhere else.</summary>
+internal readonly record struct RateTicket(RequestRateLimiter.Window Slot, DateTimeOffset EndsAt);
+
 /// <summary>
 /// A per-node fixed-window counter. It lives in the endpoint path rather than in <c>UseRateLimiter</c> so the limits hold whether or not the host wires
 /// that middleware; the counters reset on restart and are not shared between nodes (stated in the README).
@@ -26,14 +29,17 @@ internal sealed class RequestRateLimiter(TimeProvider time)
 
     private readonly ConcurrentDictionary<string, Table> tables = new(StringComparer.Ordinal);
 
-    public static IResult? Check(HttpContext context, string scope, string partition, int limit, TimeSpan window)
+    public static IResult? Check(HttpContext context, string scope, string partition, int limit, TimeSpan window) =>
+        Check(context, scope, partition, limit, window, out _);
+
+    public static IResult? Check(HttpContext context, string scope, string partition, int limit, TimeSpan window, out RateTicket ticket)
     {
         var limiter = context.RequestServices.GetRequiredService<RequestRateLimiter>();
-        return limiter.TryAcquire(scope, partition, limit, window, out var retryAfter) ? null : Problems.TooManyRequests(context, retryAfter);
+        return limiter.TryAcquire(scope, partition, limit, window, out var retryAfter, out ticket) ? null : Problems.TooManyRequests(context, retryAfter);
     }
 
-    public static void Refund(HttpContext context, string scope, string partition) =>
-        context.RequestServices.GetRequiredService<RequestRateLimiter>().Refund(scope, partition);
+    public static void Refund(HttpContext context, RateTicket ticket) =>
+        context.RequestServices.GetRequiredService<RequestRateLimiter>().Refund(ticket);
 
     public static string ClientPartition(HttpContext context)
     {
@@ -64,7 +70,10 @@ internal sealed class RequestRateLimiter(TimeProvider time)
         return new IPAddress(bytes) + "/64";
     }
 
-    public bool TryAcquire(string scope, string key, int limit, TimeSpan window, out TimeSpan retryAfter)
+    public bool TryAcquire(string scope, string key, int limit, TimeSpan window, out TimeSpan retryAfter) =>
+        TryAcquire(scope, key, limit, window, out retryAfter, out _);
+
+    public bool TryAcquire(string scope, string key, int limit, TimeSpan window, out TimeSpan retryAfter, out RateTicket ticket)
     {
         var now = time.GetUtcNow();
         var table = TableFor(scope);
@@ -82,24 +91,29 @@ internal sealed class RequestRateLimiter(TimeProvider time)
             retryAfter = slot.EndsAt - now;
             if (slot.Count >= limit)
             {
+                ticket = default;
                 return false;
             }
 
             slot.Count++;
+            ticket = new RateTicket(slot, slot.EndsAt);
             return true;
         }
     }
 
-    /// <summary>Gives back a slot taken by <see cref="TryAcquire"/> once the request proved legitimate.</summary>
-    public void Refund(string scope, string key)
+    /// <summary>Gives back the slot a ticket took, only while its bucket is still in the window it was charged in: a refund never lands in a later window or another bucket.</summary>
+    public void Refund(RateTicket ticket)
     {
-        var table = TableFor(scope);
-        var slot = table.TryGet(key, out var found) ? found : table.Overflow;
-        lock (slot)
+        if (ticket.Slot is null)
         {
-            if (slot.Count > 0)
+            return;
+        }
+
+        lock (ticket.Slot)
+        {
+            if (ticket.Slot.EndsAt == ticket.EndsAt && ticket.Slot.Count > 0)
             {
-                slot.Count--;
+                ticket.Slot.Count--;
             }
         }
     }
