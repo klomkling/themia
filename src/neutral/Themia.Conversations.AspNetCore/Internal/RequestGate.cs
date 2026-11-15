@@ -12,6 +12,7 @@ internal static class RequestGate
 {
     public const string CsrfHeader = "X-Requested-With";
     public const string CsrfValue = "themia";
+    private const string GuestScope = "guest-failure";
 
     /// <summary>Every unsafe request must carry the header: the package cannot know whether the host's resolver is cookie-based, and a bearer client pays nothing for it.</summary>
     public static IResult? RequireCsrfHeader(HttpContext context) =>
@@ -31,9 +32,9 @@ internal static class RequestGate
 
         if (GuestCookie.TryRead(context, conversationId, out var tenantId, out var key))
         {
-            // The key is unproven until the store accepts it, so random well-formed keys must not each get a bucket: limit by client alone: neither the key nor the route id is proven, so neither may create a bucket.
+            // Only what the store rejects counts (see RecordGuestFailure): a legitimate guest behind a shared address is not throttled by its neighbours' good traffic.
             var options = context.RequestServices.GetRequiredService<IOptions<ConversationHttpOptions>>().Value;
-            if (RequestRateLimiter.Check(context, "guest", RequestRateLimiter.ClientPartition(context), options.UnprovenGuestRequestsPerMinute, TimeSpan.FromMinutes(1)) is { } limited)
+            if (RequestRateLimiter.Peek(context, GuestScope, RequestRateLimiter.ClientPartition(context), options.UnprovenGuestRequestsPerMinute) is { } limited)
             {
                 return (null, limited);
             }
@@ -42,5 +43,14 @@ internal static class RequestGate
         }
 
         return (null, Problems.Of(StatusCodes.Status401Unauthorized, Problems.Unauthenticated, "Authentication is required."));
+    }
+
+    /// <summary>Counts a guest request the store refused. Random or stale keys are refused, so this is the cost an attacker pays per guess.</summary>
+    public static void RecordGuestFailure(HttpContext context, ResolvedCaller caller)
+    {
+        if (caller.IsGuest)
+        {
+            RequestRateLimiter.Record(context, GuestScope, RequestRateLimiter.ClientPartition(context), TimeSpan.FromMinutes(1));
+        }
     }
 }

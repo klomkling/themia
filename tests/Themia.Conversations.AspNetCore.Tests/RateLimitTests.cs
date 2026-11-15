@@ -73,6 +73,7 @@ public sealed class RateLimitTests
     public async Task UnprovenGuest_ShouldBeLimitedByClient_WhenEveryRequestCarriesADifferentRandomKey()
     {
         await using var app = await StartAsync(new FakeTime(), o => o.UnprovenGuestRequestsPerMinute = 3);
+        app.Service.Page = new MessagePage(ListOutcome.Refused, []);
         var statuses = new List<HttpStatusCode>();
 
         for (var i = 0; i < 5; i++)
@@ -81,7 +82,7 @@ public sealed class RateLimitTests
             statuses.Add(response.StatusCode);
         }
 
-        Assert.Equal(new[] { HttpStatusCode.OK, HttpStatusCode.OK, HttpStatusCode.OK, HttpStatusCode.TooManyRequests, HttpStatusCode.TooManyRequests }, statuses);
+        Assert.Equal(new[] { HttpStatusCode.NotFound, HttpStatusCode.NotFound, HttpStatusCode.NotFound, HttpStatusCode.TooManyRequests, HttpStatusCode.TooManyRequests }, statuses);
         Assert.Equal(3, app.Service.Calls.Count);
     }
 
@@ -115,22 +116,45 @@ public sealed class RateLimitTests
     }
 
     [Fact]
-    public void TryAcquire_ShouldRefuseNewKeysAndStayBounded_WhenEveryBucketIsLive()
+    public void TryAcquire_ShouldStayBoundedAndNeverLockOutNewKeys_WhenOneScopeIsFlooded()
     {
         var limiter = new Internal.RequestRateLimiter(new FakeTime());
-        for (var i = 0; i < Internal.RequestRateLimiter.MaxEntries; i++)
+        for (var i = 0; i < Internal.RequestRateLimiter.MaxEntries + 500; i++)
         {
-            Assert.True(limiter.TryAcquire("k" + i, 5, TimeSpan.FromMinutes(1), out _));
+            Assert.True(limiter.TryAcquire("flooded", "k" + i, 5, TimeSpan.FromMinutes(1), out _));
         }
 
-        Assert.False(limiter.TryAcquire("one-more", 5, TimeSpan.FromMinutes(1), out _));
-        Assert.True(limiter.TryAcquire("k0", 5, TimeSpan.FromMinutes(1), out _));
+        Assert.True(limiter.TryAcquire("post", "legit", 1, TimeSpan.FromMinutes(1), out _));
+        Assert.False(limiter.TryAcquire("post", "legit", 1, TimeSpan.FromMinutes(1), out _));
     }
+
+    [Fact]
+    public async Task UnprovenGuest_ShouldNotCountGoodTraffic_ForOneSharedClient()
+    {
+        await using var app = await StartAsync(new FakeTime(), o => o.UnprovenGuestRequestsPerMinute = 2);
+        var statuses = new List<HttpStatusCode>();
+
+        for (var i = 0; i < 6; i++)
+        {
+            statuses.Add((await app.SendAsync(HttpMethod.Get, TestApp.Path(ConversationId, "messages"), cookie: GateTests.CookieFor(ConversationId, "tenant-a", GateTests.NewKey()))).StatusCode);
+        }
+
+        Assert.All(statuses, s => Assert.Equal(HttpStatusCode.OK, s));
+    }
+
+    [Theory]
+    [InlineData("2001:db8:1:2:aaaa:bbbb:cccc:dddd", "2001:db8:1:2::/64")]
+    [InlineData("2001:db8:1:2:1:2:3:4", "2001:db8:1:2::/64")]
+    [InlineData("::ffff:10.0.0.7", "10.0.0.7")]
+    [InlineData("10.0.0.7", "10.0.0.7")]
+    public void NormalizeAddress_ShouldCollapseAnIpv6SubscriberToItsSlash64(string address, string expected) =>
+        Assert.Equal(expected, Internal.RequestRateLimiter.NormalizeAddress(System.Net.IPAddress.Parse(address)));
 
     [Fact]
     public async Task UnprovenGuest_ShouldShareOneBucketAcrossRouteIds_ForOneClient()
     {
         await using var app = await StartAsync(new FakeTime(), o => o.UnprovenGuestRequestsPerMinute = 2);
+        app.Service.Page = new MessagePage(ListOutcome.Refused, []);
         var last = HttpStatusCode.OK;
 
         for (var i = 0; i < 3; i++)

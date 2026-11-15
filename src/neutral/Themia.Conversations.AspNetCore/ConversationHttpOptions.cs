@@ -12,7 +12,7 @@ public sealed class ConversationHttpOptions
     /// </summary>
     public Func<HttpContext, string?> ClientKey { get; set; } = DefaultClientKey;
 
-    internal static string? DefaultClientKey(HttpContext context) => context.Connection.RemoteIpAddress?.ToString();
+    internal static string? DefaultClientKey(HttpContext context) => Internal.RequestRateLimiter.NormalizeAddress(context.Connection.RemoteIpAddress);
 
     /// <summary>Posts per participant per conversation per minute. Default 30.</summary>
     public int PostsPerMinute { get; set; } = 30;
