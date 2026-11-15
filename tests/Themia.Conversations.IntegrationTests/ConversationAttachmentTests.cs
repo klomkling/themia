@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Text;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using SkiaSharp;
@@ -26,6 +27,27 @@ public abstract class ConversationAttachmentTests(ConversationEngineFixture fixt
         {
             await inner.RaiseAsync(connection, transaction, conversationEvent, CancellationToken.None);
             await cts.CancelAsync();
+        }
+    }
+
+    private sealed class DigitMasker : IConversationMasker
+    {
+        public ConversationMessage Mask(ConversationActorKind viewer, ConversationMessage message) =>
+            message with { Body = message.Body is null ? null : System.Text.RegularExpressions.Regex.Replace(message.Body, @"\d{6,}", "[hidden]") };
+    }
+
+    private sealed class ThrowAfterCommitLogger : ILogger<ConversationService>
+    {
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
+        {
+            if (logLevel == LogLevel.Information && formatter(state, exception).Contains("stored as seq", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("logger broke after the commit");
+            }
         }
     }
 
@@ -189,6 +211,39 @@ public abstract class ConversationAttachmentTests(ConversationEngineFixture fixt
         var page = await broken.ListAsync(Member("bob"), tenant, conversation, 0, 10);
 
         Assert.Equal("attachment", Assert.Single(Assert.Single(page.Messages).Attachments).FileName);
+    }
+
+    [Fact]
+    public async Task List_AndOpen_ShouldMaskTheFileName_ThroughTheMasker()
+    {
+        var storage = new MemoryStorage();
+        var poster = Service(storage);
+        var (tenant, conversation, _) = await RoomAsync(poster);
+        await poster.PostAsync(Member("alice"), tenant, conversation, new PostMessage("m1", "x"), [Upload("call 0812345678.pdf", "application/pdf", Pdf(500))]);
+        var viewing = new ConversationService(fixture.Dialect, new ConversationOptions(), new AllowAll(), new DefaultConversationEventSink(TimeProvider.System), new DigitMasker(), TimeProvider.System, NullLogger<ConversationService>.Instance, storage, Images);
+
+        var page = await viewing.ListAsync(Member("bob"), tenant, conversation, 0, 10);
+        var attachment = Assert.Single(Assert.Single(page.Messages).Attachments);
+        var opened = await viewing.OpenAsync(Member("bob"), tenant, conversation, attachment.Id);
+
+        Assert.DoesNotContain("0812345678", attachment.FileName, StringComparison.Ordinal);
+        Assert.DoesNotContain("0812345678", opened.Attachment!.FileName, StringComparison.Ordinal);
+        Assert.DoesNotContain("0812345678", Uri.UnescapeDataString(storage.Presigned.Last().ContentDisposition ?? ""), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Post_ShouldKeepTheObjects_WhenTheCallFailsAfterTheCommit()
+    {
+        var storage = new MemoryStorage();
+        var service = new ConversationService(fixture.Dialect, new ConversationOptions(), new AllowAll(), new DefaultConversationEventSink(TimeProvider.System), new RegexConversationMasker(), TimeProvider.System, new ThrowAfterCommitLogger(), storage, Images);
+        var (tenant, conversation, _) = await RoomAsync(service);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.PostAsync(Member("alice"), tenant, conversation, new PostMessage("m1", ""), [Upload("a.pdf", "application/pdf", Pdf(500))]));
+
+        Assert.Single(storage.Objects);
+        var page = await Service(storage).ListAsync(Member("bob"), tenant, conversation, 0, 10);
+        Assert.Single(Assert.Single(page.Messages).Attachments);
     }
 
     [Fact]
