@@ -33,6 +33,47 @@ public sealed class ExternalAuthenticationFlowTests
         return (flow, logins, refresh, access, hooks);
     }
 
+    [Fact]
+    public async Task Authenticate_ShouldMintTheSessionFromTheReloadedUser_WhenTheSuccessHookRotatedTheSecurityStamp()
+    {
+        var (flow, principals, store, hooks, stale) = BuildWithStore();
+        var fresh = ReloadedUser.After(stale);
+        hooks.OnSucceeded = () => store.Stored = fresh;
+
+        var result = await flow.AuthenticateAsync(Provider, Request());
+
+        Assert.True(result.Succeeded);
+        Assert.Same(fresh, principals.LastUser);
+    }
+
+    [Fact]
+    public async Task Authenticate_ShouldDenyAndIssueNothing_WhenTheSuccessHookDeactivatedTheAccount()
+    {
+        var (flow, principals, store, hooks, stale) = BuildWithStore();
+        hooks.OnSucceeded = () => store.Stored = ReloadedUser.After(stale, isActive: false);
+
+        var result = await flow.AuthenticateAsync(Provider, Request());
+
+        Assert.False(result.Succeeded);
+        Assert.Null(principals.LastUser);
+    }
+
+    private static (ExternalAuthenticationFlow Flow, FakeClaimsPrincipalFactory Principals, FakeUserStore Store, RecordingExternalHooks Hooks, User Stale)
+        BuildWithStore()
+    {
+        var stale = NewUser();
+        stale.TenantId = new Themia.Framework.Core.Abstractions.Tenancy.TenantId("acme");
+        var store = new FakeUserStore { Stored = stale };
+        var principals = new FakeClaimsPrincipalFactory();
+        var hooks = new RecordingExternalHooks();
+        var provider = new FakeExternalAuthProvider { Result = ExternalAuthResult.Success(new ExternalIdentity(Provider, "sub-1", "a@example.com", true, "Alice")) };
+        var flow = new ExternalAuthenticationFlow(
+            new FakeProviderRegistry(provider), new FakeExternalLoginService { Result = new ExternalLoginResult(stale, true, true) },
+            principals, new FakeAccessTokenService(TimeProvider.System), new FakeRefreshTokenService(), hooks, [], new IdentityModuleOptions(),
+            TimeProvider.System, NullLogger<ExternalAuthenticationFlow>.Instance, NotRequiredSecondFactorPolicy.Instance, null, null, store);
+        return (flow, principals, store, hooks, stale);
+    }
+
     private static ExternalAuthRequest Request() => new("auth-code", "https://app.test/callback");
 
     private sealed class FixedSecondFactorPolicy(SecondFactorRequirement requirement) : ISecondFactorPolicy
@@ -481,6 +522,7 @@ internal sealed class RecordingExternalHooks : ExternalAuthenticationHooksBase
     public ExternalLoginOutcome? FailedReason { get; private set; }
     public bool SucceededRanBeforeIssue { get; set; }
     public FakeRefreshTokenService? Refresh { get; set; }
+    public Action? OnSucceeded { get; set; }
 
     public override Task OnBeforeExternalLoginAsync(BeforeExternalLoginContext context, CancellationToken cancellationToken = default)
     {
@@ -492,6 +534,7 @@ internal sealed class RecordingExternalHooks : ExternalAuthenticationHooksBase
     public override Task OnExternalLoginSucceededAsync(ExternalLoginSucceededContext context, CancellationToken cancellationToken = default)
     {
         Calls.Add("succeeded");
+        OnSucceeded?.Invoke();
         if (Refresh is not null) SucceededRanBeforeIssue = Refresh.IssueCalls == 0;
         if (DenyOnSucceeded) context.Deny("gated");
         return Task.CompletedTask;

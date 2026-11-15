@@ -171,11 +171,21 @@ internal sealed class SecondFactorCompletion : ISecondFactorProofCompletion
             }
         }
 
+        // The hook may have changed the account (a granted role rotates the security stamp), so the session comes from a fresh read.
+        var session = await SignedInUser.ReloadAsync(users, user, timeProvider, cancellationToken).ConfigureAwait(false);
+        if (session is null)
+        {
+            const string reason = "account can no longer sign in after the success hook";
+            return data.Method == SecondFactorMethod.External
+                ? await DenyExternalAsync(data.Provider ?? string.Empty, reason, cancellationToken).ConfigureAwait(false)
+                : await DenyAsync(user.UserName, reason, cancellationToken).ConfigureAwait(false);
+        }
+
         // A one-time-code login made on an app channel (IOtpLoginFlow's channel overload) carries the channel as its provider and is
         // finished on that channel. External tickets also carry a provider, so the method is part of the test.
         var tokens = data.Method == SecondFactorMethod.Otp && data.Provider is { } channel
-            ? (await minter.MintAsync(user, new SessionRequest(data.TenantId, channel, Proof: proof), cancellationToken).ConfigureAwait(false)).Tokens
-            : await IssueSessionAsync(user, proof, cancellationToken).ConfigureAwait(false);
+            ? (await minter.MintAsync(session, new SessionRequest(data.TenantId, channel, Proof: proof), cancellationToken).ConfigureAwait(false)).Tokens
+            : await IssueSessionAsync(session, proof, cancellationToken).ConfigureAwait(false);
         logger.LogInformation("User {UserId} completed the second factor ({Method}).", user.Id, data.Method);
 
         if (data.Method == SecondFactorMethod.External)

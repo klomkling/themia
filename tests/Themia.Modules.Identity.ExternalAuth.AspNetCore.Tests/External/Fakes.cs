@@ -7,9 +7,38 @@ namespace Themia.Modules.Identity.ExternalAuth.AspNetCore.Tests.External;
 
 internal sealed class FakeClaimsPrincipalFactory : IClaimsPrincipalFactory
 {
-    public Task<ClaimsPrincipal> CreateAsync(User user, string authenticationType, CancellationToken cancellationToken = default) =>
-        Task.FromResult(new ClaimsPrincipal(new ClaimsIdentity(
+    /// <summary>The user the last principal was built from: which copy of the account the flow minted the session from.</summary>
+    public User? LastUser { get; private set; }
+
+    public Task<ClaimsPrincipal> CreateAsync(User user, string authenticationType, CancellationToken cancellationToken = default)
+    {
+        LastUser = user;
+        return Task.FromResult(new ClaimsPrincipal(new ClaimsIdentity(
             [new Claim(ClaimTypes.NameIdentifier, user.Id.ToString())], authenticationType)));
+    }
+}
+
+/// <summary>A store that answers only the id lookup, which is all the flow's post-hook reload uses.</summary>
+internal sealed class FakeUserStore : IUserService
+{
+    public User? Stored { get; set; }
+
+    public Task<User?> FindByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Stored is { } u && u.Id == id ? u : null);
+
+    public Task<UserCreationResult> CreateAsync(string userName, string password, string? email = null, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    public Task<UserCreationResult> CreateExternalUserAsync(string userName, string? email, bool emailVerified, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    public Task<User?> FindByUserNameAsync(string userName, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    public Task<User?> FindByEmailAsync(string email, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    public Task<User?> FindByPhoneAsync(string phoneNumber, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    public Task<UserMutationResult> SetEmailAsync(Guid userId, string? email, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    public Task<UserMutationResult> ConfirmEmailAsync(Guid userId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    public Task<UserMutationResult> SetPhoneNumberAsync(Guid userId, string? phoneNumber, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    public Task<UserMutationResult> ConfirmPhoneNumberAsync(Guid userId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    public Task<UserMutationResult> SetPasswordAsync(Guid userId, string password, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    public Task<PasswordVerificationResult> VerifyPasswordAsync(string userName, string password, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    public Task<UserMutationResult> SetActiveAsync(Guid userId, bool isActive, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    public Task<UserMutationResult> DeleteAsync(Guid userId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
 }
 
 internal sealed class FakeAccessTokenService(TimeProvider? clock = null) : IAccessTokenService

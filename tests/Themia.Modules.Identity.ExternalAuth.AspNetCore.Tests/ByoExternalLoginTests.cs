@@ -3,6 +3,7 @@ using Themia.Modules.Identity.Abstractions;
 using Themia.Modules.Identity.Abstractions.Authentication;
 using Themia.Modules.Identity.Abstractions.Entities;
 using Themia.Modules.Identity.ExternalAuth.AspNetCore.DependencyInjection;
+using Themia.Modules.Identity.ExternalAuth.AspNetCore.External;
 using Themia.Modules.Identity.ExternalAuth.AspNetCore.Tests.External;
 using Themia.Modules.Identity.Tokens.AspNetCore.DependencyInjection;
 using Themia.Modules.Identity.Tokens.AspNetCore.Options;
@@ -56,6 +57,54 @@ public sealed class ByoExternalLoginTests
         // with no Identity persistence / IUserService in the container.
         Assert.NotNull(result.Tokens);
         Assert.False(string.IsNullOrEmpty(result.Tokens!.Value.AccessToken));
+    }
+
+    [Fact]
+    public async Task External_login_reloads_the_user_after_the_hook_when_the_container_has_a_user_service()
+    {
+        var resolved = new User { UserName = "sub-1" };
+        resolved.SetId(Guid.NewGuid());
+        resolved.TenantId = new Themia.Framework.Core.Abstractions.Tenancy.TenantId("acme");
+        var store = new FakeUserStore { Stored = resolved };
+        var principals = new FakeClaimsPrincipalFactory();
+        var hooks = new HookThatRotatesTheStamp(store, resolved);
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddThemiaIdentityTokens(ConfigureJwt);
+        services.AddThemiaExternalAuth().AddProvider(new FakeExternalAuthProvider(Provider, IdentityFor("sub-1")));
+        services.AddScoped<IExternalLoginService>(_ => new FixedExternalLoginService(resolved));
+        services.AddScoped<IRefreshTokenService>(_ => new FakeRefreshTokenService());
+        services.AddScoped<IClaimsPrincipalFactory>(_ => principals);
+        services.AddSingleton<IUserService>(store);
+        services.AddSingleton(new IdentityModuleOptions()); // what AddThemiaIdentity registers; the greediest flow constructor needs it
+        services.AddSingleton<IExternalAuthenticationHooks>(hooks);
+
+        using var sp = services.BuildServiceProvider();
+        using var scope = sp.CreateScope();
+        var flow = scope.ServiceProvider.GetRequiredService<IExternalAuthenticationFlow>();
+
+        var result = await flow.AuthenticateAsync(Provider, new ExternalAuthRequest("auth-code", "https://app.example/callback"), CancellationToken.None);
+
+        Assert.True(result.Succeeded);
+        Assert.Same(hooks.Reloaded, principals.LastUser);
+    }
+
+    private sealed class FixedExternalLoginService(User user) : IExternalLoginService
+    {
+        public Task<ExternalLoginResult> ResolveOrProvisionAsync(ExternalIdentity identity, CancellationToken cancellationToken = default) =>
+            Task.FromResult(new ExternalLoginResult(user, WasCreated: false, WasLinked: false));
+    }
+
+    private sealed class HookThatRotatesTheStamp(FakeUserStore store, User before) : ExternalAuthenticationHooksBase
+    {
+        public User? Reloaded { get; private set; }
+
+        public override Task OnExternalLoginSucceededAsync(ExternalLoginSucceededContext context, CancellationToken cancellationToken = default)
+        {
+            Reloaded = ReloadedUser.After(before);
+            store.Stored = Reloaded;
+            return Task.CompletedTask;
+        }
     }
 
     /// <summary>A provider that returns a fixed validated identity, bypassing any real code exchange.</summary>

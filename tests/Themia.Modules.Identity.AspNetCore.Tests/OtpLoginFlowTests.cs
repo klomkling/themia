@@ -54,6 +54,35 @@ public sealed class OtpLoginFlowTests : IDisposable
     }
 
     [Fact]
+    public async Task Verify_ShouldMintTheSessionFromTheReloadedUser_WhenTheSuccessHookRotatedTheSecurityStamp()
+    {
+        var before = Eligible();
+        before.TenantId = new Themia.Framework.Core.Abstractions.Tenancy.TenantId("acme");
+        GivenAccount(before);
+        var after = ReloadedUser.After(before);
+        hooks.OnSucceededHook = () => users.UserToReturn = after;
+
+        var result = await flow.VerifyAsync(Guid.NewGuid(), Code);
+
+        Assert.True(result.Succeeded);
+        Assert.Same(after, principals.LastUser);
+    }
+
+    [Fact]
+    public async Task Verify_ShouldDenyAndIssueNothing_WhenTheSuccessHookDeactivatedTheAccount()
+    {
+        var before = Eligible();
+        before.TenantId = new Themia.Framework.Core.Abstractions.Tenancy.TenantId("acme");
+        GivenAccount(before);
+        hooks.OnSucceededHook = () => users.UserToReturn = ReloadedUser.After(before, isActive: false);
+
+        var result = await flow.VerifyAsync(Guid.NewGuid(), Code);
+
+        Assert.False(result.Succeeded);
+        Assert.False(principals.Called);
+    }
+
+    [Fact]
     public async Task Start_DeliversTheCodeForAConfirmedActivePhone()
     {
         var user = Eligible();

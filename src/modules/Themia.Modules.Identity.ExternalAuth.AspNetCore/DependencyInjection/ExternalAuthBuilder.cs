@@ -39,7 +39,8 @@ public static class ExternalAuthServiceCollectionExtensions
     /// <summary>Fail-fast check that the external-login flow's runtime dependencies are registered:
     /// <see cref="IExternalLoginService"/> (the bring-your-own user-store seam), and the token seams
     /// <see cref="IAccessTokenService"/> / <see cref="IRefreshTokenService"/> / <see cref="IClaimsPrincipalFactory"/>.
-    /// Deliberately does NOT require <c>IUserService</c> — the external flow never uses it.</summary>
+    /// Deliberately does NOT require <c>IUserService</c>: a bring-your-own host has no Identity store. When one is registered the flow
+    /// re-reads the user through it after the success hook; without it the session is minted from the resolved copy.</summary>
     /// <param name="services">The service collection.</param>
     /// <returns>The same service collection.</returns>
     /// <exception cref="InvalidOperationException">One or more required services are not registered.</exception>

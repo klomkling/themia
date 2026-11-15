@@ -298,10 +298,17 @@ public sealed class OtpLoginFlow : IOtpLoginFlow
             return await FailAsync(phone, LoginFailureReason.Denied, LoginResult.Denied(), cancellationToken, succeeded.DenialReason).ConfigureAwait(false);
         }
 
+        // The hook may have changed the account (a granted role rotates the security stamp), so the session comes from a fresh read.
+        var session = await SignedInUser.ReloadAsync(users, user, timeProvider, cancellationToken).ConfigureAwait(false);
+        if (session is null)
+        {
+            return await FailAsync(phone, LoginFailureReason.Denied, LoginResult.Denied(), cancellationToken, "account can no longer sign in after the success hook").ConfigureAwait(false);
+        }
+
         var tokens = target.Session is { } onChannel
-            ? (await minter.MintAsync(user, onChannel, cancellationToken).ConfigureAwait(false)).Tokens
+            ? (await minter.MintAsync(session, onChannel, cancellationToken).ConfigureAwait(false)).Tokens
             : await AuthTokenIssuer.IssueAsync(
-                principalFactory, accessTokens, refreshTokens, timeProvider, user, AuthenticationType, cancellationToken).ConfigureAwait(false);
+                principalFactory, accessTokens, refreshTokens, timeProvider, session, AuthenticationType, cancellationToken).ConfigureAwait(false);
         logger.LogInformation("User {UserId} authenticated via one-time phone code (challenge {ChallengeId}).", user.Id, challengeId);
         await RaiseAsync((o, ct) => o.OnLoginSucceededAsync(user.Id, user.UserName, ct), cancellationToken).ConfigureAwait(false);
         return LoginResult.Success(tokens);

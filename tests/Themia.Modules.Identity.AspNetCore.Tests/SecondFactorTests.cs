@@ -551,6 +551,54 @@ public sealed class SecondFactorTests : IDisposable
     }
 
     [Fact]
+    public async Task Completing_a_password_ticket_mints_the_session_from_the_reloaded_user_when_the_hook_rotated_the_stamp()
+    {
+        var before = Staff();
+        before.TenantId = new Themia.Framework.Core.Abstractions.Tenancy.TenantId("acme");
+        var pending = await PendingPasswordLoginAsync(before);
+        var after = ReloadedUser.After(before);
+        hooks.OnSucceededHook = () => users.UserToReturn = after;
+
+        var result = await Completion().CompleteAsync(pending.Ticket, pending.UserId, pending.Stage);
+
+        Assert.Equal(SecondFactorCompletionOutcome.Completed, result.Outcome);
+        Assert.Same(after, principals.LastUser);
+    }
+
+    [Fact]
+    public async Task Completing_an_external_ticket_mints_the_session_from_the_reloaded_user_when_the_hook_rotated_the_stamp()
+    {
+        var before = Staff();
+        before.TenantId = new Themia.Framework.Core.Abstractions.Tenancy.TenantId("acme");
+        users.UserToReturn = before;
+        var pending = await ticketService.IssueAsync(new SecondFactorTicketData(
+            before.Id, before.TenantId, SecondFactorMethod.External, "line", false, false, before.SecurityStamp, SecondFactorStage.Verify));
+        var after = ReloadedUser.After(before);
+        externalHooks.OnSucceededHook = () => users.UserToReturn = after;
+
+        var result = await Completion().CompleteAsync(pending.Ticket, pending.UserId, pending.Stage);
+
+        Assert.Equal(SecondFactorCompletionOutcome.Completed, result.Outcome);
+        Assert.Same(after, principals.LastUser);
+    }
+
+    [Fact]
+    public async Task Completing_an_external_ticket_denies_and_issues_nothing_when_the_hook_deactivated_the_account()
+    {
+        var before = Staff();
+        before.TenantId = new Themia.Framework.Core.Abstractions.Tenancy.TenantId("acme");
+        users.UserToReturn = before;
+        var pending = await ticketService.IssueAsync(new SecondFactorTicketData(
+            before.Id, before.TenantId, SecondFactorMethod.External, "line", false, false, before.SecurityStamp, SecondFactorStage.Verify));
+        externalHooks.OnSucceededHook = () => users.UserToReturn = ReloadedUser.After(before, isActive: false);
+
+        var result = await Completion().CompleteAsync(pending.Ticket, pending.UserId, pending.Stage);
+
+        Assert.NotEqual(SecondFactorCompletionOutcome.Completed, result.Outcome);
+        Assert.Equal(0, refresh.IssueCalls);
+    }
+
+    [Fact]
     public async Task An_external_ticket_is_refused_when_external_login_is_not_registered()
     {
         var user = Staff();

@@ -29,6 +29,7 @@ internal sealed class ExternalAuthenticationFlow : IExternalAuthenticationFlow
     private readonly ISecondFactorPolicy secondFactorPolicy;
     private readonly ISecondFactorTicketService? secondFactorTickets;
     private readonly ISessionProofStore? sessionProofs;
+    private readonly IUserService? users;
 
     /// <summary>Creates the flow with the default second-factor policy (nobody owes a second factor).</summary>
     public ExternalAuthenticationFlow(
@@ -61,8 +62,10 @@ internal sealed class ExternalAuthenticationFlow : IExternalAuthenticationFlow
         ILogger<ExternalAuthenticationFlow> logger,
         ISecondFactorPolicy secondFactorPolicy,
         ISecondFactorTicketService? secondFactorTickets = null,
-        ISessionProofStore? sessionProofs = null)
+        ISessionProofStore? sessionProofs = null,
+        IUserService? users = null)
     {
+        this.users = users;
         ArgumentNullException.ThrowIfNull(secondFactorPolicy);
         this.secondFactorPolicy = secondFactorPolicy;
         this.secondFactorTickets = secondFactorTickets;
@@ -240,17 +243,31 @@ internal sealed class ExternalAuthenticationFlow : IExternalAuthenticationFlow
             return await FailAsync(provider, ExternalLoginOutcome.Denied, ExternalLoginFlowResult.Denied(), cancellationToken, succeeded.DenialReason).ConfigureAwait(false);
         }
 
+        // The hook may have changed the account (a granted role rotates the security stamp), so the session comes from a fresh read.
+        // DI always supplies the user service; only a hand-built flow without one mints from the resolved copy.
+        var user = resolution.User;
+        if (users is not null)
+        {
+            var reloaded = await SignedInUser.ReloadAsync(users, resolution.User, timeProvider, cancellationToken).ConfigureAwait(false);
+            if (reloaded is null)
+            {
+                return await FailAsync(provider, ExternalLoginOutcome.Denied, ExternalLoginFlowResult.Denied(), cancellationToken, "account can no longer sign in after the success hook").ConfigureAwait(false);
+            }
+
+            user = reloaded;
+        }
+
         // Token issuance is the last step. For a freshly-provisioned user the user+link were already
         // committed by ResolveOrProvisionAsync, so a transient failure here returns a 500 but leaves a
         // resolvable link: the next attempt finds it and issues tokens without re-provisioning. The
         // success hook above means "authentication authorized" (it may still deny), not "session created".
         var tokens = federated is null
             ? await AuthTokenIssuer
-                .IssueAsync(principalFactory, accessTokens, refreshTokens, timeProvider, resolution.User, AuthenticationType, cancellationToken)
+                .IssueAsync(principalFactory, accessTokens, refreshTokens, timeProvider, user, AuthenticationType, cancellationToken)
                 .ConfigureAwait(false)
             : await AuthTokenIssuer
                 .IssueWithProofAsync(
-                    principalFactory, accessTokens, refreshTokens, sessionProofs!, timeProvider, logger, resolution.User, AuthenticationType,
+                    principalFactory, accessTokens, refreshTokens, sessionProofs!, timeProvider, logger, user, AuthenticationType,
                     new SessionProofSnapshot(string.Join(' ', federated.Amr), SessionProofStrength.Strong, federated.AuthenticatedAt), cancellationToken)
                 .ConfigureAwait(false);
         logger.LogInformation("User {UserId} authenticated via external provider {Provider}.", resolution.User.Id, provider);

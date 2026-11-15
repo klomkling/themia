@@ -27,6 +27,10 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+### Fixed
+
+- **`Themia.Modules.Identity(.AspNetCore)` / `.ExternalAuth.AspNetCore`: the session is minted from a fresh read of the user after the sign-in success hook** (coord #0225). A hook that changes the account (granting a role rotates the security stamp) left the access token carrying the stamp read before the hook, so with `ValidateSecurityStampOnEachRequest = true` the first request answered 401 `invalid_token`. The password, one-time-code, external and second-factor-completion paths now re-read the user by id after the hook, apply the same active / lockout / tenant gate again (a hook that deactivated the account now denies the login), and mint the session from that copy. No public API change. An external-login host that registers no `IUserService` (bring-your-own store) has nothing to re-read and keeps minting from the resolved user, and so does a platform user (no tenant), whom a tenant-scoped id lookup cannot see.
+
 ## [0.63.2] - 2026-11-15
 
 ### Fixed
