@@ -12,6 +12,16 @@ with the *why* and concrete upgrade steps.
 
 ## Unreleased
 
+## 0.64.0
+
+### `Themia.Modules.Identity.*`: sign-in session minted from a fresh user read (not breaking)
+
+**What changed:** after the success hook runs, the password, OTP, second-factor-completion and external flows re-read the user and mint the session from that copy, re-applying the active, lockout and tenant checks. A hook that grants a role (which rotates the security stamp) no longer yields a token with a stale `themia:security_stamp`, and a hook that deactivates or locks the account now denies the login. Platform (tenant-less) users are re-read through the new `IPlatformUserReader` (implemented by `UserService`). `ExternalAuthenticationFlow` gained an optional trailing constructor parameter `IUserService? users`.
+
+**Who is affected:** apps that register a custom or decorated `IUserService`: the flows test the registered instance with `is IPlatformUserReader`, so a wrapper hides the reader and platform users keep the pre-hook copy. Apps that construct `ExternalAuthenticationFlow` by hand and pass no `IUserService` keep the old behaviour. Apps whose success hook deactivates or locks an account now see that login denied.
+
+**How to upgrade:** nothing for the stock `UserService`. A wrapper around `IUserService` should also implement `IPlatformUserReader` and forward `FindPlatformUserByIdAsync` to the inner service.
+
 ## 0.63.2
 
 ### `Themia.Conversations.AspNetCore` (new package, not breaking)
