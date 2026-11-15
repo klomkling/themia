@@ -57,6 +57,43 @@ public abstract class ConversationEngineFixture : IAsyncLifetime
     /// <summary>Whether a foreign key named <paramref name="name"/> exists, read from the engine's catalog.</summary>
     public abstract Task<bool> ForeignKeyExistsAsync(string name);
 
+    /// <summary>Creates an empty database next to the shared one and returns its connection string, for tests that run migrations themselves.</summary>
+    public abstract Task<string> CreateFreshDatabaseAsync();
+
+    /// <summary>Quotes an identifier the way this engine's migration runner created it.</summary>
+    public abstract string Quote(string identifier);
+
+    /// <summary>
+    /// The statements that undo what a run that died halfway would not have done: the last index (the first one stays, so the index guard is exercised
+    /// on a present index and on a missing one) and, where the engine pins them, the key collations.
+    /// </summary>
+    public abstract IReadOnlyList<string> PartialStateSql();
+
+    /// <summary>Opens nothing yet: a connection of this engine to the given database.</summary>
+    public abstract DbConnection Connect(string connectionString);
+
+    /// <summary>Whether an index of the given <c>@Name</c> exists (a bool or 0/1 scalar).</summary>
+    public abstract string IndexExistsSql { get; }
+
+    /// <summary>The collation of column <c>@c</c> of table <c>@t</c>, or null where the engine has no per-column collation to pin.</summary>
+    public abstract string? CollationSql { get; }
+
+    /// <summary>Runs a statement against another database of this container.</summary>
+    public static async Task<T> ScalarOnAsync<T>(DbConnection connection, string sql, object? parameters = null)
+    {
+        await using var _ = connection;
+        await connection.OpenAsync();
+        return (await connection.ExecuteScalarAsync<T>(sql, parameters))!;
+    }
+
+    /// <summary>Runs a statement against another database of this container.</summary>
+    public static async Task ExecuteOnAsync(DbConnection connection, string sql)
+    {
+        await using var _ = connection;
+        await connection.OpenAsync();
+        await connection.ExecuteAsync(sql);
+    }
+
     /// <summary>The statement that takes a row lock on one conversation and fails at once, instead of waiting, when another transaction holds it.</summary>
     protected abstract string TryLockConversationSql { get; }
 
@@ -148,6 +185,31 @@ public sealed class PostgresConversationFixture : ConversationEngineFixture
     protected override bool IsLockNotAvailable(DbException exception) => exception is PostgresException { SqlState: PostgresErrorCodes.LockNotAvailable };
 
     /// <inheritdoc />
+    public override async Task<string> CreateFreshDatabaseAsync()
+    {
+        var name = "fresh_" + Guid.NewGuid().ToString("N");
+        await ExecuteAsync($"CREATE DATABASE {name};");
+        return new NpgsqlConnectionStringBuilder(ConnectionString) { Database = name, Pooling = false }.ConnectionString;
+    }
+
+    /// <inheritdoc />
+    public override string Quote(string identifier) => "\"" + identifier + "\"";
+
+    /// <inheritdoc />
+    public override IReadOnlyList<string> PartialStateSql() =>
+        ["DROP INDEX ix_conversation_attachment_uploads_conversation;"];
+
+
+    /// <inheritdoc />
+    public override DbConnection Connect(string connectionString) => new NpgsqlConnection(connectionString);
+
+    /// <inheritdoc />
+    public override string IndexExistsSql => "SELECT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = @Name);";
+
+    /// <inheritdoc />
+    public override string? CollationSql => null;
+
+    /// <inheritdoc />
     public override Task<bool> TableExistsAsync(string name) =>
         ScalarAsync<bool>("SELECT EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = @Name);", new { Name = name });
 
@@ -195,6 +257,37 @@ public sealed class MySqlConversationFixture : ConversationEngineFixture
 
     /// <inheritdoc />
     protected override bool IsLockNotAvailable(DbException exception) => exception is MySqlException { Number: 3572 }; // ER_LOCK_NOWAIT
+
+    /// <inheritdoc />
+    public override async Task<string> CreateFreshDatabaseAsync()
+    {
+        var name = "fresh_" + Guid.NewGuid().ToString("N");
+        var root = new MySqlConnectionStringBuilder(ConnectionString) { UserID = "root", Pooling = false };
+        await ExecuteOnAsync(new MySqlConnection(root.ConnectionString), $"CREATE DATABASE {name};");
+        return new MySqlConnectionStringBuilder(ConnectionString) { Database = name, UserID = "root", Pooling = false }.ConnectionString;
+    }
+
+    /// <inheritdoc />
+    public override string Quote(string identifier) => "`" + identifier + "`";
+
+    /// <inheritdoc />
+    public override IReadOnlyList<string> PartialStateSql() =>
+    [
+        "DROP INDEX ix_conversation_attachment_uploads_conversation ON conversation_attachment_uploads;",
+        "ALTER TABLE conversation_attachment_uploads MODIFY COLUMN `tenant_id` VARCHAR(64) COLLATE utf8mb4_general_ci NOT NULL;",
+        "ALTER TABLE conversation_attachment_uploads MODIFY COLUMN `storage_key` VARCHAR(300) COLLATE utf8mb4_general_ci NOT NULL;",
+    ];
+
+
+    /// <inheritdoc />
+    public override DbConnection Connect(string connectionString) => new MySqlConnection(connectionString);
+
+    /// <inheritdoc />
+    public override string IndexExistsSql => "SELECT EXISTS (SELECT 1 FROM information_schema.statistics WHERE table_schema = DATABASE() AND index_name = @Name);";
+
+    /// <inheritdoc />
+    public override string? CollationSql =>
+        "SELECT COLLATION_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = @t AND COLUMN_NAME = @c;";
 
     /// <inheritdoc />
     public override Task<bool> TableExistsAsync(string name) =>
@@ -246,6 +339,35 @@ public sealed class SqlServerConversationFixture : ConversationEngineFixture
 
     /// <inheritdoc />
     protected override bool IsLockNotAvailable(DbException exception) => exception is SqlException { Number: 1222 }; // lock request time out
+
+    /// <inheritdoc />
+    public override async Task<string> CreateFreshDatabaseAsync()
+    {
+        var name = "fresh_" + Guid.NewGuid().ToString("N");
+        await ExecuteAsync($"CREATE DATABASE {name};");
+        return new SqlConnectionStringBuilder(ConnectionString) { InitialCatalog = name, Pooling = false }.ConnectionString;
+    }
+
+    /// <inheritdoc />
+    public override string Quote(string identifier) => "[" + identifier + "]";
+
+    /// <inheritdoc />
+    public override IReadOnlyList<string> PartialStateSql() =>
+    [
+        "DROP INDEX ix_conversation_attachment_uploads_conversation ON conversation_attachment_uploads;",
+        "ALTER TABLE conversation_attachment_uploads ALTER COLUMN [tenant_id] NVARCHAR(64) COLLATE Latin1_General_CI_AS NOT NULL;",
+        "ALTER TABLE conversation_attachment_uploads ALTER COLUMN [storage_key] NVARCHAR(300) COLLATE Latin1_General_CI_AS NOT NULL;",
+    ];
+
+
+    /// <inheritdoc />
+    public override DbConnection Connect(string connectionString) => new SqlConnection(connectionString);
+
+    /// <inheritdoc />
+    public override string IndexExistsSql => "SELECT CASE WHEN EXISTS (SELECT 1 FROM sys.indexes WHERE name = @Name) THEN 1 ELSE 0 END;";
+
+    /// <inheritdoc />
+    public override string? CollationSql => "SELECT collation_name FROM sys.columns WHERE object_id = OBJECT_ID(@t) AND name = @c;";
 
     /// <inheritdoc />
     public override Task<bool> TableExistsAsync(string name) =>

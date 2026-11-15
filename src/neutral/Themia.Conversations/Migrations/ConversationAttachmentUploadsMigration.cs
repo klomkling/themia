@@ -28,12 +28,6 @@ public sealed class ConversationAttachmentUploadsMigration : Migration
     /// <inheritdoc />
     public override void Up()
     {
-        // Replay-safe (coord #0078): the staging table is created last, so its presence is the whole migration's presence.
-        if (Schema.Table(UploadsTable).Exists())
-        {
-            return;
-        }
-
         // The provider guard comes before the first schema change, so an unsupported provider is refused with nothing altered.
         IfDatabase(p =>
                 !p.StartsWith("Postgres", StringComparison.OrdinalIgnoreCase) &&
@@ -43,26 +37,30 @@ public sealed class ConversationAttachmentUploadsMigration : Migration
                 "Themia.Conversations supports only PostgreSQL, MySQL, and SQL Server. The active database provider is not " +
                 "supported; add a migration branch for it."));
 
+        // Replay-safe step by step (coord #0078): MySQL DDL is not transactional, so a run that died after CREATE TABLE leaves the table without its
+        // collations or indexes, and the ledger does not record it. Each step checks its own state, so a rerun finishes what the first run did not.
         if (!Schema.Table(ConversationSchemaMigration.AttachmentsTable).Column("file_name").Exists())
         {
             Alter.Table(ConversationSchemaMigration.AttachmentsTable).AddColumn("file_name").AsString(FileNameWidth).NotNullable().WithDefaultValue(string.Empty);
         }
 
+        var tableExists = Schema.Table(UploadsTable).Exists();
+
         // LOCKSTEP: the per-provider blocks and the unsupported-provider guard above are parallel whitelists; edit both when adding a provider.
-        IfDatabase("postgresql").Delegate(() => CreateTable(c => c.AsDateTimeOffset()));
+        IfDatabase("postgresql").Delegate(() => CreateTable(tableExists, c => c.AsDateTimeOffset()));
         IfDatabase("mysql").Delegate(() =>
         {
-            CreateTable(c => c.AsCustom("DATETIME(6)"));
-            PinKeyCollations(quote: c => $"`{c}`", alterVerb: "MODIFY COLUMN", text: n => $"VARCHAR({n})", collation: "utf8mb4_bin");
+            CreateTable(tableExists, c => c.AsCustom("DATETIME(6)"));
+            PinKeyCollations(quote: c => $"`{c}`", alterVerb: "MODIFY COLUMN", text: n => $"VARCHAR({n})", collation: "utf8mb4_bin", collationQuery: MySqlCollationQuery);
         });
         IfDatabase("sqlserver").Delegate(() =>
         {
-            CreateTable(c => c.AsDateTimeOffset());
-            PinKeyCollations(quote: c => $"[{c}]", alterVerb: "ALTER COLUMN", text: n => $"NVARCHAR({n})", collation: "Latin1_General_BIN2");
+            CreateTable(tableExists, c => c.AsDateTimeOffset());
+            PinKeyCollations(quote: c => $"[{c}]", alterVerb: "ALTER COLUMN", text: n => $"NVARCHAR({n})", collation: "Latin1_General_BIN2", collationQuery: SqlServerCollationQuery);
         });
 
-        Create.Index("ix_conversation_attachment_uploads_created").OnTable(UploadsTable).OnColumn("created_at").Ascending();
-        Create.Index("ix_conversation_attachment_uploads_conversation").OnTable(UploadsTable).OnColumn("tenant_id").Ascending().OnColumn("conversation_id").Ascending();
+        CreateIndexIfMissing("ix_conversation_attachment_uploads_created", tableExists, "created_at");
+        CreateIndexIfMissing("ix_conversation_attachment_uploads_conversation", tableExists, "tenant_id", "conversation_id");
     }
 
     /// <inheritdoc />
@@ -72,8 +70,13 @@ public sealed class ConversationAttachmentUploadsMigration : Migration
         Delete.Column("file_name").FromTable(ConversationSchemaMigration.AttachmentsTable);
     }
 
-    private void CreateTable(ColumnType dt)
+    private void CreateTable(bool tableExists, ColumnType dt)
     {
+        if (tableExists)
+        {
+            return;
+        }
+
         var uploads = Create.Table(UploadsTable)
             .WithColumn("id").AsGuid().NotNullable().PrimaryKey("pk_conversation_attachment_uploads")
             .WithColumn("tenant_id").AsString(ConversationSchemaMigration.TenantIdWidth).NotNullable()
@@ -83,15 +86,61 @@ public sealed class ConversationAttachmentUploadsMigration : Migration
         dt(uploads.WithColumn("created_at")).NotNullable();
     }
 
+    private const string MySqlCollationQuery =
+        "SELECT COLLATION_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = @t AND COLUMN_NAME = @c";
+
+    private const string SqlServerCollationQuery =
+        "SELECT collation_name FROM sys.columns WHERE object_id = OBJECT_ID(@t) AND name = @c";
+
+    private void CreateIndexIfMissing(string name, bool tableExists, string column, string? secondColumn = null)
+    {
+        if (tableExists && Schema.Table(UploadsTable).Index(name).Exists())
+        {
+            return;
+        }
+
+        var index = Create.Index(name).OnTable(UploadsTable).OnColumn(column).Ascending();
+        if (secondColumn is not null)
+        {
+            index.OnColumn(secondColumn).Ascending();
+        }
+    }
+
     /// <summary>
     /// <c>tenant_id</c> as in the main schema, and <c>storage_key</c> to match <c>conversation_attachments.storage_key</c>: purge and erasure UNION the two
-    /// tables, and SQL Server refuses a UNION across two collations.
+    /// tables, and SQL Server refuses a UNION across two collations. The alter is skipped when the column already carries the collation, so a rerun after a
+    /// partial run repeats no finished work.
     /// </summary>
-    private void PinKeyCollations(Func<string, string> quote, string alterVerb, Func<int, string> text, string collation)
+    private void PinKeyCollations(Func<string, string> quote, string alterVerb, Func<int, string> text, string collation, string collationQuery)
     {
         foreach (var (column, width) in new[] { ("tenant_id", ConversationSchemaMigration.TenantIdWidth), ("storage_key", StorageKeyWidth) })
         {
-            Execute.Sql($"ALTER TABLE {UploadsTable} {alterVerb} {quote(column)} {text(width)} COLLATE {collation} NOT NULL;");
+            var sql = $"ALTER TABLE {UploadsTable} {alterVerb} {quote(column)} {text(width)} COLLATE {collation} NOT NULL;";
+            Execute.WithConnection((connection, transaction) =>
+            {
+                using var read = connection.CreateCommand();
+                read.Transaction = transaction;
+                read.CommandText = collationQuery;
+                AddParameter(read, "@t", UploadsTable);
+                AddParameter(read, "@c", column);
+                if (string.Equals(read.ExecuteScalar() as string, collation, StringComparison.OrdinalIgnoreCase))
+                {
+                    return;
+                }
+
+                using var alter = connection.CreateCommand();
+                alter.Transaction = transaction;
+                alter.CommandText = sql;
+                alter.ExecuteNonQuery();
+            });
         }
+    }
+
+    private static void AddParameter(System.Data.IDbCommand command, string name, string value)
+    {
+        var parameter = command.CreateParameter();
+        parameter.ParameterName = name;
+        parameter.Value = value;
+        command.Parameters.Add(parameter);
     }
 }
