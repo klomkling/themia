@@ -193,6 +193,66 @@ public sealed class RateLimitTests
         Assert.Equal(7, responses.Count(r => r.StatusCode == HttpStatusCode.TooManyRequests));
     }
 
+    private static HttpRequestMessage GuestForm(string clientMessageId, string cookie)
+    {
+        var content = new MultipartFormDataContent
+        {
+            { new StringContent(clientMessageId), "clientMessageId" },
+            { new StringContent("hello"), "body" },
+        };
+        var file = new ByteArrayContent(new byte[3]);
+        file.Headers.ContentType = new("image/png");
+        content.Add(file, "files", "a.png");
+        var request = new HttpRequestMessage(HttpMethod.Post, TestApp.Path(ConversationId, "messages")) { Content = content };
+        request.Headers.Add("Cookie", cookie);
+        return request;
+    }
+
+    private async Task<List<HttpStatusCode>> GuestPostsAsync(PostOutcome outcome, bool multipart, int count, int limit)
+    {
+        var files = new FakeConversationAttachments { PostResult = new PostResult(outcome, Guid.NewGuid(), 1) };
+        await using var app = await TestApp.StartAsync(
+            o => o.UnprovenGuestRequestsPerMinute = limit,
+            services =>
+            {
+                services.Replace(ServiceDescriptor.Singleton<TimeProvider>(new FakeTime()));
+                services.AddSingleton<IConversationAttachments>(files);
+            });
+        app.Service.PostResult = new PostResult(outcome, Guid.NewGuid(), 1);
+        var statuses = new List<HttpStatusCode>();
+
+        for (var i = 0; i < count; i++)
+        {
+            var cookie = GateTests.CookieFor(ConversationId, "tenant-a", GateTests.NewKey());
+            var response = multipart
+                ? await app.SendAsync(GuestForm("c" + i, cookie))
+                : await app.SendAsync(HttpMethod.Post, TestApp.Path(ConversationId, "messages"), new { clientMessageId = "c" + i, body = "hi" }, cookie: cookie);
+            statuses.Add(response.StatusCode);
+        }
+
+        return statuses;
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task GuestPost_ShouldCountWrongKeysAgainstTheUnprovenLimit_AndAnswer429AfterIt(bool multipart)
+    {
+        var statuses = await GuestPostsAsync(PostOutcome.Refused, multipart, count: 4, limit: 2);
+
+        Assert.Equal(new[] { HttpStatusCode.NotFound, HttpStatusCode.NotFound, HttpStatusCode.TooManyRequests, HttpStatusCode.TooManyRequests }, statuses);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task GuestPost_ShouldNotCountAcceptedPostsAgainstTheUnprovenLimit(bool multipart)
+    {
+        var statuses = await GuestPostsAsync(PostOutcome.Posted, multipart, count: 6, limit: 2);
+
+        Assert.All(statuses, s => Assert.Equal(HttpStatusCode.Created, s));
+    }
+
     [Fact]
     public async Task UnprovenGuest_ShouldNotCountGoodTraffic_ForOneSharedClient()
     {
