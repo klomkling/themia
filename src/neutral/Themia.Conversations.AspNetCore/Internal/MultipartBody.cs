@@ -48,7 +48,7 @@ internal static class MultipartBody
         {
             return (null, Problems.Of(StatusCodes.Status413PayloadTooLarge, Problems.PayloadTooLarge, "The request body is too large."));
         }
-        catch (Exception ex) when (ex is InvalidDataException or InvalidOperationException or BadHttpRequestException or IOException)
+        catch (Exception ex) when (!context.RequestAborted.IsCancellationRequested && ex is InvalidDataException or InvalidOperationException or BadHttpRequestException or IOException)
         {
             return (null, Problems.Validation(Problems.InvalidBody, "The multipart body is not valid."));
         }

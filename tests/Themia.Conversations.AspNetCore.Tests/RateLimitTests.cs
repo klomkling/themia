@@ -106,6 +106,19 @@ public sealed class RateLimitTests
     }
 
     [Fact]
+    public async Task Post_ShouldShareOneBucketAcrossConversations_WhenTheSameMemberPosts()
+    {
+        await using var app = await StartAsync(new FakeTime(), o => o.PostsPerMinute = 2);
+        var body = new { clientMessageId = "m-1", body = "hi" };
+
+        await app.SendAsync(HttpMethod.Post, TestApp.Path(Guid.NewGuid(), "messages"), body, member: "tenant-a:alice");
+        await app.SendAsync(HttpMethod.Post, TestApp.Path(Guid.NewGuid(), "messages"), body, member: "tenant-a:alice");
+        var limited = await app.SendAsync(HttpMethod.Post, TestApp.Path(Guid.NewGuid(), "messages"), body, member: "tenant-a:alice");
+
+        Assert.Equal(HttpStatusCode.TooManyRequests, limited.StatusCode);
+    }
+
+    [Fact]
     public async Task Startup_ShouldWarnAboutTheSharedBucket_OnlyWhenClientKeyIsTheDefault()
     {
         await using var defaulted = await TestApp.StartAsync();

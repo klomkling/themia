@@ -124,7 +124,7 @@ internal static class ConversationEndpoints
 
         var options = context.RequestServices.GetRequiredService<IOptions<ConversationHttpOptions>>().Value;
         // A guest's tenant and route id are unproven, so the guest bucket is the client alone; only a resolver-proven member gets a (tenant, conversation, user) bucket.
-        var partition = caller!.IsGuest ? "guest|" + RequestRateLimiter.ClientPartition(context) : $"{caller.TenantId}|{id:N}|{caller.Actor.UserRef}";
+        var partition = caller!.IsGuest ? "guest|" + RequestRateLimiter.ClientPartition(context) : $"{caller.TenantId}|{caller.Actor.UserRef}";
         if (RequestRateLimiter.Check(context, caller.IsGuest ? "post-guest" : "post-member", partition, options.PostsPerMinute, TimeSpan.FromMinutes(1)) is { } limited)
         {
             return limited;

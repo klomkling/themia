@@ -49,7 +49,7 @@ CSRF header, then caller, then rate limit, then body size, then body parse, then
 |---|---|---|
 | `ExchangesPerHour` | 20 | per client, before the body is read |
 | `UnprovenGuestRequestsPerMinute` | 60 | per client, for cookie requests the store has not accepted yet; the slot is refunded once it accepts |
-| `PostsPerMinute` | 30 | members per tenant, conversation and user; guests per client |
+| `PostsPerMinute` | 30 | members per tenant and user (not per conversation, so random ids cannot mint buckets); guests per client |
 | `MaxJsonBodyBytes` | 64 KiB | JSON routes; multipart is capped at `MaxAttachmentBytesPerMessage` plus this |
 
 Over a limit: `429` with `Retry-After`.
