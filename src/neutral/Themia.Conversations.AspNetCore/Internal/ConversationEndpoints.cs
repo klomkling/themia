@@ -89,10 +89,10 @@ internal static class ConversationEndpoints
             .ListAsync(caller!.Actor, caller.TenantId, id, afterSeq, (int)limit, context.RequestAborted);
         if (page.Outcome != ListOutcome.Listed)
         {
-            RequestGate.RecordGuestFailure(context, caller);
             return Problems.Missing();
         }
 
+        RequestGate.RefundAcceptedGuest(context, caller);
         var messages = page.Messages.Select(m => new
         {
             id = m.Id,
@@ -142,9 +142,9 @@ internal static class ConversationEndpoints
 
         var result = await context.RequestServices.GetRequiredService<IConversationService>()
             .PostAsync(caller!.Actor, caller.TenantId, id, new PostMessage(body.ClientMessageId!, body.Body ?? string.Empty), context.RequestAborted);
-        if (result.Outcome == PostOutcome.Refused)
+        if (result.Outcome != PostOutcome.Refused)
         {
-            RequestGate.RecordGuestFailure(context, caller);
+            RequestGate.RefundAcceptedGuest(context, caller);
         }
 
         return PostOutcomeResult(result);
@@ -179,10 +179,10 @@ internal static class ConversationEndpoints
             .MarkReadAsync(caller!.Actor, caller.TenantId, id, seq, context.RequestAborted);
         if (result.Outcome != MarkReadOutcome.Marked)
         {
-            RequestGate.RecordGuestFailure(context, caller);
             return Problems.Missing();
         }
 
+        RequestGate.RefundAcceptedGuest(context, caller);
         return Envelope(new { lastReadSeq = result.LastReadSeq });
     }
 

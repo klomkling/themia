@@ -12,7 +12,8 @@ internal static class RequestGate
 {
     public const string CsrfHeader = "X-Requested-With";
     public const string CsrfValue = "themia";
-    private const string GuestScope = "guest-failure";
+    private const string GuestScope = "guest-unproven";
+    private static readonly TimeSpan GuestWindow = TimeSpan.FromMinutes(1);
 
     /// <summary>Every unsafe request must carry the header: the package cannot know whether the host's resolver is cookie-based, and a bearer client pays nothing for it.</summary>
     public static IResult? RequireCsrfHeader(HttpContext context) =>
@@ -32,9 +33,9 @@ internal static class RequestGate
 
         if (GuestCookie.TryRead(context, conversationId, out var tenantId, out var key))
         {
-            // Only what the store rejects counts (see RecordGuestFailure): a legitimate guest behind a shared address is not throttled by its neighbours' good traffic.
+            // The slot is taken here, before any store call, so a burst of concurrent guesses is counted; RefundAcceptedGuest gives it back once the store accepts the key.
             var options = context.RequestServices.GetRequiredService<IOptions<ConversationHttpOptions>>().Value;
-            if (RequestRateLimiter.Peek(context, GuestScope, RequestRateLimiter.ClientPartition(context), options.UnprovenGuestRequestsPerMinute) is { } limited)
+            if (RequestRateLimiter.Check(context, GuestScope, RequestRateLimiter.ClientPartition(context), options.UnprovenGuestRequestsPerMinute, GuestWindow) is { } limited)
             {
                 return (null, limited);
             }
@@ -45,12 +46,12 @@ internal static class RequestGate
         return (null, Problems.Of(StatusCodes.Status401Unauthorized, Problems.Unauthenticated, "Authentication is required."));
     }
 
-    /// <summary>Counts a guest request the store refused. Random or stale keys are refused, so this is the cost an attacker pays per guess.</summary>
-    public static void RecordGuestFailure(HttpContext context, ResolvedCaller caller)
+    /// <summary>Refunds the unproven-guest slot once the store accepted the key: only refused or invalid guest requests stay counted.</summary>
+    public static void RefundAcceptedGuest(HttpContext context, ResolvedCaller caller)
     {
         if (caller.IsGuest)
         {
-            RequestRateLimiter.Record(context, GuestScope, RequestRateLimiter.ClientPartition(context), TimeSpan.FromMinutes(1));
+            RequestRateLimiter.Refund(context, GuestScope, RequestRateLimiter.ClientPartition(context));
         }
     }
 }

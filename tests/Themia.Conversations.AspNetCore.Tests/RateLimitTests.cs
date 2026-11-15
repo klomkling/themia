@@ -129,6 +129,58 @@ public sealed class RateLimitTests
     }
 
     [Fact]
+    public void TryAcquire_ShouldNotEvictABucketAtItsLimit_WhenTheTableIsFlooded()
+    {
+        var time = new FakeTime();
+        var limiter = new Internal.RequestRateLimiter(time);
+        Assert.True(limiter.TryAcquire("exchange", "offender", 1, TimeSpan.FromHours(1), out _));
+        Assert.False(limiter.TryAcquire("exchange", "offender", 1, TimeSpan.FromHours(1), out _));
+        for (var i = 0; i < Internal.RequestRateLimiter.MaxEntries * 2; i++)
+        {
+            time.Advance(TimeSpan.FromMilliseconds(1));
+            limiter.TryAcquire("exchange", "k" + i, 5, TimeSpan.FromHours(1), out _);
+            if (i % 2000 == 0)
+            {
+                time.Advance(TimeSpan.FromSeconds(2));
+            }
+        }
+
+        Assert.False(limiter.TryAcquire("exchange", "offender", 1, TimeSpan.FromHours(1), out _));
+    }
+
+    [Fact]
+    public void TryAcquire_ShouldThrottleUntrackedKeysCollectively_WhenNoRoomCanBeMade()
+    {
+        var limiter = new Internal.RequestRateLimiter(new FakeTime());
+        for (var i = 0; i < Internal.RequestRateLimiter.MaxEntries; i++)
+        {
+            limiter.TryAcquire("exchange", "k" + i, 1, TimeSpan.FromHours(1), out _);
+            limiter.TryAcquire("exchange", "k" + i, 1, TimeSpan.FromHours(1), out _);
+        }
+
+        var passed = 0;
+        for (var i = 0; i < 100; i++)
+        {
+            passed += limiter.TryAcquire("exchange", "new" + i, 1, TimeSpan.FromHours(1), out _) ? 1 : 0;
+        }
+
+        Assert.Equal(Internal.RequestRateLimiter.OverflowFactor, passed);
+    }
+
+    [Fact]
+    public async Task UnprovenGuest_ShouldCountAConcurrentBurstBeforeTheStoreAnswers()
+    {
+        await using var app = await StartAsync(new FakeTime(), o => o.UnprovenGuestRequestsPerMinute = 3);
+        app.Service.Page = new MessagePage(ListOutcome.Refused, []);
+
+        var responses = await Task.WhenAll(Enumerable.Range(0, 10).Select(_ =>
+            app.SendAsync(HttpMethod.Get, TestApp.Path(ConversationId, "messages"), cookie: GateTests.CookieFor(ConversationId, "tenant-a", GateTests.NewKey()))));
+
+        Assert.Equal(3, responses.Count(r => r.StatusCode == HttpStatusCode.NotFound));
+        Assert.Equal(7, responses.Count(r => r.StatusCode == HttpStatusCode.TooManyRequests));
+    }
+
+    [Fact]
     public async Task UnprovenGuest_ShouldNotCountGoodTraffic_ForOneSharedClient()
     {
         await using var app = await StartAsync(new FakeTime(), o => o.UnprovenGuestRequestsPerMinute = 2);

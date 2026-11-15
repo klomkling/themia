@@ -12,13 +12,15 @@ namespace Themia.Conversations.AspNetCore.Internal;
 /// that middleware; the counters reset on restart and are not shared between nodes (stated in the README).
 /// </summary>
 /// <remarks>
-/// Each scope has its own bounded table, so flooding one dimension cannot starve another. When a table is full of live buckets the oldest tenth is
-/// evicted (at most once a second); if even that frees nothing, a new key is let through untracked. Memory stays bounded and a flood never locks
-/// legitimate new callers out; the price is that a flood of <see cref="MaxEntries"/> distinct keys can reset other callers' counters.
+/// Each scope has its own bounded table, so flooding one dimension cannot starve another. When a table is full the expired buckets go first, then the
+/// oldest tenth of those still under their limit (a bucket at its limit is never evicted, so a flood cannot reset an offender). Keys that still find no
+/// room share one overflow bucket per scope, <see cref="OverflowFactor"/> times the scope's limit: bounded memory, and a flood throttles new keys
+/// collectively instead of passing them free or refusing them outright.
 /// </remarks>
 internal sealed class RequestRateLimiter(TimeProvider time)
 {
     internal const int MaxEntries = 10_000;
+    internal const int OverflowFactor = 10;
     private const int Ipv6PrefixBytes = 8;
     private static readonly TimeSpan MaintenanceInterval = TimeSpan.FromSeconds(1);
 
@@ -30,15 +32,8 @@ internal sealed class RequestRateLimiter(TimeProvider time)
         return limiter.TryAcquire(scope, partition, limit, window, out var retryAfter) ? null : Problems.TooManyRequests(context, retryAfter);
     }
 
-    /// <summary>Refuses without counting: the caller counts only what it later learns was a failure.</summary>
-    public static IResult? Peek(HttpContext context, string scope, string partition, int limit)
-    {
-        var limiter = context.RequestServices.GetRequiredService<RequestRateLimiter>();
-        return limiter.IsOver(scope, partition, limit, out var retryAfter) ? Problems.TooManyRequests(context, retryAfter) : null;
-    }
-
-    public static void Record(HttpContext context, string scope, string partition, TimeSpan window) =>
-        context.RequestServices.GetRequiredService<RequestRateLimiter>().Add(scope, partition, window);
+    public static void Refund(HttpContext context, string scope, string partition) =>
+        context.RequestServices.GetRequiredService<RequestRateLimiter>().Refund(scope, partition);
 
     public static string ClientPartition(HttpContext context)
     {
@@ -76,13 +71,14 @@ internal sealed class RequestRateLimiter(TimeProvider time)
         var slot = table.Slot(key, now, window, MaxEntries);
         if (slot is null)
         {
-            retryAfter = TimeSpan.Zero;
-            return true;
+            slot = table.Overflow;
+            limit = checked(limit * OverflowFactor);
         }
 
         lock (slot)
         {
             slot.Roll(now, window);
+            slot.Limit = limit;
             retryAfter = slot.EndsAt - now;
             if (slot.Count >= limit)
             {
@@ -94,35 +90,17 @@ internal sealed class RequestRateLimiter(TimeProvider time)
         }
     }
 
-    public bool IsOver(string scope, string key, int limit, out TimeSpan retryAfter)
+    /// <summary>Gives back a slot taken by <see cref="TryAcquire"/> once the request proved legitimate.</summary>
+    public void Refund(string scope, string key)
     {
-        var now = time.GetUtcNow();
-        retryAfter = TimeSpan.Zero;
-        if (!TableFor(scope).TryGet(key, out var slot))
-        {
-            return false;
-        }
-
+        var table = TableFor(scope);
+        var slot = table.TryGet(key, out var found) ? found : table.Overflow;
         lock (slot)
         {
-            retryAfter = slot.EndsAt - now;
-            return slot.EndsAt > now && slot.Count >= limit;
-        }
-    }
-
-    public void Add(string scope, string key, TimeSpan window)
-    {
-        var now = time.GetUtcNow();
-        var slot = TableFor(scope).Slot(key, now, window, MaxEntries);
-        if (slot is null)
-        {
-            return;
-        }
-
-        lock (slot)
-        {
-            slot.Roll(now, window);
-            slot.Count++;
+            if (slot.Count > 0)
+            {
+                slot.Count--;
+            }
         }
     }
 
@@ -132,6 +110,7 @@ internal sealed class RequestRateLimiter(TimeProvider time)
     {
         private readonly ConcurrentDictionary<string, Window> windows = new(StringComparer.Ordinal);
         private readonly object maintenance = new();
+        public Window Overflow { get; } = new(DateTimeOffset.MinValue);
         private DateTimeOffset lastMaintenance;
 
         public bool TryGet(string key, out Window slot) => windows.TryGetValue(key, out slot!);
@@ -166,7 +145,7 @@ internal sealed class RequestRateLimiter(TimeProvider time)
 
                     if (windows.Count >= capacity)
                     {
-                        foreach (var oldest in windows.OrderBy(e => e.Value.EndsAt).Take(capacity / 10).ToList())
+                        foreach (var oldest in windows.Where(e => !e.Value.IsAtLimit).OrderBy(e => e.Value.EndsAt).Take(capacity / 10).ToList())
                         {
                             windows.TryRemove(oldest);
                         }
@@ -178,11 +157,24 @@ internal sealed class RequestRateLimiter(TimeProvider time)
         }
     }
 
-    private sealed class Window(DateTimeOffset endsAt)
+    internal sealed class Window(DateTimeOffset endsAt)
     {
         public DateTimeOffset EndsAt { get; private set; } = endsAt;
 
         public int Count { get; set; }
+
+        public int Limit { get; set; } = int.MaxValue;
+
+        public bool IsAtLimit
+        {
+            get
+            {
+                lock (this)
+                {
+                    return Count >= Limit;
+                }
+            }
+        }
 
         public void Roll(DateTimeOffset now, TimeSpan window)
         {
