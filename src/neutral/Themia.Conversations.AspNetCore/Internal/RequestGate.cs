@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace Themia.Conversations.AspNetCore.Internal;
 
@@ -30,6 +31,13 @@ internal static class RequestGate
 
         if (GuestCookie.TryRead(context, conversationId, out var tenantId, out var key))
         {
+            // The key is unproven until the store accepts it, so random well-formed keys must not each get a bucket: limit by client, not by key.
+            var options = context.RequestServices.GetRequiredService<IOptions<ConversationHttpOptions>>().Value;
+            if (RequestRateLimiter.Check(context, "guest", RequestRateLimiter.ClientPartition(context) + "|" + conversationId.ToString("N"), options.UnprovenGuestRequestsPerMinute, TimeSpan.FromMinutes(1)) is { } limited)
+            {
+                return (null, limited);
+            }
+
             return (new ResolvedCaller(tenantId, ConversationActor.ForGuest(key!), IsGuest: true), null);
         }
 

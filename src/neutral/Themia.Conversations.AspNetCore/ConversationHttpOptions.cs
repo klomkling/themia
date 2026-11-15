@@ -10,7 +10,9 @@ public sealed class ConversationHttpOptions
     /// proxy, so the default makes every caller one bucket: supply the real client address from the host's own resolver. Returning
     /// <see langword="null"/> puts the request in one shared bucket (fails closed). Default: the remote IP address.
     /// </summary>
-    public Func<HttpContext, string?> ClientKey { get; set; } = static context => context.Connection.RemoteIpAddress?.ToString();
+    public Func<HttpContext, string?> ClientKey { get; set; } = DefaultClientKey;
+
+    internal static string? DefaultClientKey(HttpContext context) => context.Connection.RemoteIpAddress?.ToString();
 
     /// <summary>Posts per participant per conversation per minute. Default 30.</summary>
     public int PostsPerMinute { get; set; } = 30;

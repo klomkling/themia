@@ -32,6 +32,12 @@ internal static class Problems
         return Results.Json(problem, statusCode: status, contentType: ProblemContentType);
     }
 
+    public static IResult TooManyRequests(HttpContext context, TimeSpan retryAfter)
+    {
+        context.Response.Headers.RetryAfter = Math.Max(1, (int)Math.Ceiling(retryAfter.TotalSeconds)).ToString(System.Globalization.CultureInfo.InvariantCulture);
+        return Of(StatusCodes.Status429TooManyRequests, RateLimited, "Too many requests.");
+    }
+
     public static IResult Missing() => Of(StatusCodes.Status404NotFound, NotFound, "Not found.");
 
     public static IResult Validation(string code, string title) => Of(StatusCodes.Status422UnprocessableEntity, code, title);

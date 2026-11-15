@@ -40,6 +40,11 @@ internal static class ConversationEndpoints
         }
 
         var options = context.RequestServices.GetRequiredService<IOptions<ConversationHttpOptions>>().Value;
+        if (RequestRateLimiter.Check(context, "exchange", RequestRateLimiter.ClientPartition(context), options.ExchangesPerHour, TimeSpan.FromHours(1)) is { } limited)
+        {
+            return limited;
+        }
+
         var (body, failure) = await JsonBody.ReadAsync<ExchangeRequest>(context, options.MaxJsonBodyBytes);
         if (failure is not null)
         {
@@ -116,6 +121,12 @@ internal static class ConversationEndpoints
         }
 
         var options = context.RequestServices.GetRequiredService<IOptions<ConversationHttpOptions>>().Value;
+        var participant = caller!.IsGuest ? "guest|" + RequestRateLimiter.ClientPartition(context) : "member|" + caller.Actor.UserRef;
+        if (RequestRateLimiter.Check(context, "post", $"{caller.TenantId}|{id:N}|{participant}", options.PostsPerMinute, TimeSpan.FromMinutes(1)) is { } limited)
+        {
+            return limited;
+        }
+
         var (body, bodyFailure) = await JsonBody.ReadAsync<PostRequest>(context, options.MaxJsonBodyBytes);
         if (bodyFailure is not null)
         {

@@ -1,6 +1,9 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Themia.Conversations.AspNetCore.Internal;
 
 namespace Themia.Conversations.AspNetCore;
@@ -20,6 +23,8 @@ public static class ConversationHttpExtensions
             options.Configure(configure);
         }
 
+        services.TryAddSingleton(TimeProvider.System);
+        services.TryAddSingleton<RequestRateLimiter>();
         return services;
     }
 
@@ -40,8 +45,19 @@ public static class ConversationHttpExtensions
                 $"MapThemiaConversations needs an {nameof(IConversationActorResolver)}: the package never decides who a caller is. Register one that maps your authentication to a ConversationCaller.");
         }
 
+        WarnWhenClientKeyIsDefault(endpoints.ServiceProvider);
         var group = endpoints.MapGroup(prefix);
         ConversationEndpoints.Map(group, guestExchange: registrations.IsService(typeof(IGuestAccess)));
         return group;
+    }
+
+    private static void WarnWhenClientKeyIsDefault(IServiceProvider services)
+    {
+        var options = services.GetService<IOptions<ConversationHttpOptions>>()?.Value;
+        if (options is not null && options.ClientKey == ConversationHttpOptions.DefaultClientKey)
+        {
+            services.GetService<ILoggerFactory>()?.CreateLogger("Themia.Conversations.Http").LogWarning(
+                "ConversationHttpOptions.ClientKey is the default (the remote IP address). Behind a reverse proxy every caller shares one rate-limit bucket; set ClientKey from your own client-address resolution.");
+        }
     }
 }
