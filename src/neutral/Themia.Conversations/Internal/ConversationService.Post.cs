@@ -116,7 +116,7 @@ internal sealed partial class ConversationService
             cancellationToken: cancellationToken))).ToList();
         await sink.RaiseAsync(connection, transaction, new ConversationEvent(Guid.NewGuid(), tenantId, conversationId, ConversationEventKind.MessagePosted, messageId, seq, recipients), cancellationToken);
 
-        await transaction.CommitAsync(cancellationToken);
+        await transaction.CommitAsync(CancellationToken.None); // a cancel must not abandon a commit the server may already have applied: the caller cleans up on the outcome it can see
         logger.LogInformation("Conversation {ConversationId} message {MessageId} stored as seq {Seq}", conversationId, messageId, seq);
         return new PostResult(PostOutcome.Posted, messageId, seq);
     }

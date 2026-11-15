@@ -34,12 +34,21 @@ public sealed class ConversationAttachmentUploadsMigration : Migration
             return;
         }
 
+        // The provider guard comes before the first schema change, so an unsupported provider is refused with nothing altered.
+        IfDatabase(p =>
+                !p.StartsWith("Postgres", StringComparison.OrdinalIgnoreCase) &&
+                !p.StartsWith("MySql", StringComparison.OrdinalIgnoreCase) &&
+                !p.StartsWith("SqlServer", StringComparison.OrdinalIgnoreCase))
+            .Delegate(() => throw new NotSupportedException(
+                "Themia.Conversations supports only PostgreSQL, MySQL, and SQL Server. The active database provider is not " +
+                "supported; add a migration branch for it."));
+
         if (!Schema.Table(ConversationSchemaMigration.AttachmentsTable).Column("file_name").Exists())
         {
             Alter.Table(ConversationSchemaMigration.AttachmentsTable).AddColumn("file_name").AsString(FileNameWidth).NotNullable().WithDefaultValue(string.Empty);
         }
 
-        // LOCKSTEP: the per-provider blocks and the unsupported-provider guard below are parallel whitelists; edit both when adding a provider.
+        // LOCKSTEP: the per-provider blocks and the unsupported-provider guard above are parallel whitelists; edit both when adding a provider.
         IfDatabase("postgresql").Delegate(() => CreateTable(c => c.AsDateTimeOffset()));
         IfDatabase("mysql").Delegate(() =>
         {
@@ -51,14 +60,6 @@ public sealed class ConversationAttachmentUploadsMigration : Migration
             CreateTable(c => c.AsDateTimeOffset());
             PinKeyCollations(quote: c => $"[{c}]", alterVerb: "ALTER COLUMN", text: n => $"NVARCHAR({n})", collation: "Latin1_General_BIN2");
         });
-
-        IfDatabase(p =>
-                !p.StartsWith("Postgres", StringComparison.OrdinalIgnoreCase) &&
-                !p.StartsWith("MySql", StringComparison.OrdinalIgnoreCase) &&
-                !p.StartsWith("SqlServer", StringComparison.OrdinalIgnoreCase))
-            .Delegate(() => throw new NotSupportedException(
-                "Themia.Conversations supports only PostgreSQL, MySQL, and SQL Server. The active database provider is not " +
-                "supported; add a migration branch for it."));
 
         Create.Index("ix_conversation_attachment_uploads_created").OnTable(UploadsTable).OnColumn("created_at").Ascending();
         Create.Index("ix_conversation_attachment_uploads_conversation").OnTable(UploadsTable).OnColumn("tenant_id").Ascending().OnColumn("conversation_id").Ascending();

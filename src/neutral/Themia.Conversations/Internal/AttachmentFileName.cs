@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text;
 
 namespace Themia.Conversations.Internal;
@@ -5,32 +6,69 @@ namespace Themia.Conversations.Internal;
 /// <summary>The name an attachment is stored and served under. The client's name is untrusted: it never reaches a path or a header unchanged.</summary>
 internal static class AttachmentFileName
 {
-    private const string Fallback = "attachment";
+    internal const string Fallback = "attachment";
     private static readonly char[] Forbidden = ['<', '>', ':', '"', '|', '?', '*', '/', '\\'];
 
-    public static string Sanitize(string? name)
+    /// <summary>
+    /// The stored name: the leaf of the client's name without control, format (U+202E and friends) or path characters, and with the extension forced to the
+    /// one the stored <paramref name="contentType"/> implies. A client that sends <c>invoice.hta</c> for a PDF gets <c>invoice.pdf</c>, so a download can never
+    /// carry an executable or renderable extension the allow-list refused.
+    /// </summary>
+    public static string Sanitize(string? name, string contentType)
     {
         var tail = (name ?? string.Empty).Replace('\\', '/').Split('/')[^1];
         var cleaned = new StringBuilder(tail.Length);
         foreach (var c in tail)
         {
-            if (!char.IsControl(c) && Array.IndexOf(Forbidden, c) < 0)
+            if (!IsDisallowed(c))
             {
                 cleaned.Append(c);
             }
         }
 
-        var result = cleaned.ToString().Trim().TrimStart('.');
-        if (result.Length > ConversationAttachmentUploadsMigrationWidth)
+        var stem = cleaned.ToString().Trim().TrimStart('.');
+        var extension = ExtensionOf(contentType);
+        if (extension is null)
         {
-            result = result[..ConversationAttachmentUploadsMigrationWidth];
-            if (char.IsHighSurrogate(result[^1]))
+            return Cap(stem, ConversationAttachmentUploadsMigrationWidth);
+        }
+
+        var dot = stem.LastIndexOf('.');
+        if (dot > 0)
+        {
+            stem = stem[..dot];
+        }
+
+        stem = stem.TrimEnd().TrimEnd('.');
+        return Cap(stem, ConversationAttachmentUploadsMigrationWidth - extension.Length) + extension;
+    }
+
+    private static bool IsDisallowed(char c) =>
+        char.IsControl(c)
+        || Array.IndexOf(Forbidden, c) >= 0
+        || CharUnicodeInfo.GetUnicodeCategory(c) is UnicodeCategory.Format or UnicodeCategory.LineSeparator or UnicodeCategory.ParagraphSeparator;
+
+    private static string? ExtensionOf(string contentType) => contentType switch
+    {
+        "application/pdf" => ".pdf",
+        "image/jpeg" => ".jpg",
+        "image/png" => ".png",
+        "image/webp" => ".webp",
+        _ => null,
+    };
+
+    private static string Cap(string value, int width)
+    {
+        if (value.Length > width)
+        {
+            value = value[..width];
+            if (value.Length > 0 && char.IsHighSurrogate(value[^1]))
             {
-                result = result[..^1];
+                value = value[..^1];
             }
         }
 
-        return result.Length == 0 ? Fallback : result;
+        return value.Length == 0 ? Fallback : value;
     }
 
     /// <summary>An attachment disposition with an ASCII fallback and the RFC 5987 name for clients that read it.</summary>

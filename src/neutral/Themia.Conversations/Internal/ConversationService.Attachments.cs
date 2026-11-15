@@ -88,8 +88,29 @@ internal sealed partial class ConversationService
         }
         catch
         {
-            await DiscardAsync(storage, tenantId, prepared); // CancellationToken.None inside: a cancelled caller must not leave the objects behind
+            // A cancel or a dropped connection can land after the server applied the commit: then the message and its attachment rows exist and the
+            // objects are theirs. Discarding would leave rows pointing at missing keys, so ask the database first (CancellationToken.None inside both).
+            if (!await MessageCommittedAsync(tenantId, conversationId, owner, message.ClientMessageId))
+            {
+                await DiscardAsync(storage, tenantId, prepared);
+            }
+
             throw;
+        }
+    }
+
+    private async Task<bool> MessageCommittedAsync(string tenantId, Guid conversationId, Guid participantId, string clientMessageId)
+    {
+        try
+        {
+            await using var connection = await OpenConnectionAsync(CancellationToken.None);
+            return await FindMessageAsync(connection, null, tenantId, conversationId, participantId, clientMessageId, CancellationToken.None) is not null;
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            // Unknown outcome: keep the objects. A leaked object is reachable from its staging row and the sweep; a deleted object under a stored message is not recoverable.
+            logger.LogWarning("Could not confirm whether a message was stored after a failed attachment post ({ExceptionType}); the objects are kept for the sweep", ex.GetType().Name);
+            return true;
         }
     }
 
@@ -122,6 +143,7 @@ internal sealed partial class ConversationService
             return refused;
         }
 
+        row.FileName = MaskFileName(actor.Kind, row.FileName);
         var url = await storage.GetPresignedUrlAsync(
             row.StorageKey,
             new PresignedUrlRequest(PresignedUrlOperation.Get, options.AttachmentDownloadLifetime) { ContentDisposition = AttachmentFileName.ContentDisposition(row.FileName) },
@@ -180,7 +202,7 @@ internal sealed partial class ConversationService
                     bytes = buffer.ToArray();
                     contentType = AttachmentSniffer.ImageTypeOf(processed.Extension);
                 }
-                catch (ArgumentException)
+                catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
                 {
                     return null; // corrupt or unsupported image: refuse the message rather than store the raw bytes
                 }
@@ -193,7 +215,7 @@ internal sealed partial class ConversationService
             }
 
             var id = Guid.NewGuid();
-            result.Add(new PreparedAttachment(id, $"conversations/{tenantId}/{conversationId:N}/{id:N}", AttachmentFileName.Sanitize(file.FileName), contentType, bytes, Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant()));
+            result.Add(new PreparedAttachment(id, $"conversations/{tenantId}/{conversationId:N}/{id:N}", AttachmentFileName.Sanitize(file.FileName, contentType), contentType, bytes, Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant()));
         }
 
         return result;

@@ -20,7 +20,27 @@ public abstract class ConversationAttachmentTests(ConversationEngineFixture fixt
         public ValueTask<bool> CanAsync(ConversationActor actor, ConversationTarget target, ConversationAction action, CancellationToken cancellationToken = default) => ValueTask.FromResult(true);
     }
 
-    private sealed class MemoryStorage : IStorageProvider
+    private sealed class CancellingSink(IConversationEventSink inner, CancellationTokenSource cts) : IConversationEventSink
+    {
+        public async Task RaiseAsync(System.Data.Common.DbConnection connection, System.Data.Common.DbTransaction transaction, ConversationEvent conversationEvent, CancellationToken cancellationToken = default)
+        {
+            await inner.RaiseAsync(connection, transaction, conversationEvent, CancellationToken.None);
+            await cts.CancelAsync();
+        }
+    }
+
+    private sealed class ThrowingMasker : IConversationMasker
+    {
+        public ConversationMessage Mask(ConversationActorKind viewer, ConversationMessage message) => throw new InvalidOperationException("masker broke");
+    }
+
+    private sealed class ThrowingImages : IImageProcessor
+    {
+        public Task<ProcessedImage> ProcessAsync(Stream input, ImageProcessingOptions? options = null, CancellationToken cancellationToken = default) =>
+            throw new InvalidOperationException("processor broke");
+    }
+
+    internal sealed class MemoryStorage : IStorageProvider
     {
         public ConcurrentDictionary<string, byte[]> Objects { get; } = new();
 
@@ -140,6 +160,88 @@ public abstract class ConversationAttachmentTests(ConversationEngineFixture fixt
         var stored = Assert.Single(storage.Objects.Values);
         Assert.DoesNotContain("GPS-SECRET-MARKER", Encoding.ASCII.GetString(stored));
         Assert.Equal("image/webp", Assert.Single(storage.Types.Values));
+    }
+
+    [Fact]
+    public async Task Post_ShouldKeepTheObjectsOfAStoredMessage_WhenTheCallerCancelsBeforeTheCommit()
+    {
+        var storage = new MemoryStorage();
+        using var cts = new CancellationTokenSource();
+        var service = new ConversationService(fixture.Dialect, new ConversationOptions(), new AllowAll(), new CancellingSink(new DefaultConversationEventSink(TimeProvider.System), cts), new RegexConversationMasker(), TimeProvider.System, NullLogger<ConversationService>.Instance, storage, Images);
+        var (tenant, conversation, _) = await RoomAsync(service);
+
+        var result = await service.PostAsync(Member("alice"), tenant, conversation, new PostMessage("m1", ""), [Upload("a.pdf", "application/pdf", Pdf(500))], cts.Token);
+
+        Assert.Equal(PostOutcome.Posted, result.Outcome);
+        Assert.Single(storage.Objects);
+        var page = await service.ListAsync(Member("bob"), tenant, conversation, 0, 10);
+        Assert.Single(Assert.Single(page.Messages).Attachments);
+    }
+
+    [Fact]
+    public async Task Post_ShouldNameAReEncodedImageByItsStoredType()
+    {
+        var service = Service(new MemoryStorage());
+        var (tenant, conversation, _) = await RoomAsync(service);
+
+        await service.PostAsync(Member("alice"), tenant, conversation, new PostMessage("m1", "photo"), [Upload("p.jpg", "image/jpeg", JpegWithExif())]);
+
+        var page = await service.ListAsync(Member("bob"), tenant, conversation, 0, 10);
+        Assert.Equal("p.webp", Assert.Single(Assert.Single(page.Messages).Attachments).FileName);
+    }
+
+    [Theory]
+    [InlineData("x.hta")]
+    [InlineData("x.html")]
+    [InlineData("x.svg")]
+    [InlineData("invoice\u202Elmth.pdf")]
+    public async Task Post_ShouldServeAPdfUnderAPdfName_WhateverTheClientCalledIt(string clientName)
+    {
+        var storage = new MemoryStorage();
+        var service = Service(storage);
+        var (tenant, conversation, _) = await RoomAsync(service);
+        var bytes = Encoding.ASCII.GetBytes("%PDF-<html><script>1</script>");
+
+        var result = await service.PostAsync(Member("alice"), tenant, conversation, new PostMessage("m1", "x"), [Upload(clientName, "application/pdf", bytes)]);
+
+        Assert.Equal(PostOutcome.Posted, result.Outcome);
+        var page = await service.ListAsync(Member("bob"), tenant, conversation, 0, 10);
+        var name = Assert.Single(Assert.Single(page.Messages).Attachments).FileName;
+        Assert.EndsWith(".pdf", name, StringComparison.Ordinal);
+        Assert.DoesNotContain(name, c => char.GetUnicodeCategory(c) == System.Globalization.UnicodeCategory.Format);
+        Assert.DoesNotContain("html", name, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Post_ShouldRejectTheMessage_WhenTheImageProcessorFailsUnexpectedly()
+    {
+        var storage = new MemoryStorage();
+        var service = Service(storage, images: new ThrowingImages());
+        var (tenant, conversation, _) = await RoomAsync(service);
+
+        var result = await service.PostAsync(Member("alice"), tenant, conversation, new PostMessage("m1", "x"), [Upload("p.png", "image/png", Png())]);
+
+        Assert.Equal(PostOutcome.AttachmentRejected, result.Outcome);
+        Assert.Empty(storage.Objects);
+    }
+
+    [Fact]
+    public async Task MaskFileName_ShouldHideAPhoneNumberFromAGuest_AndLeaveItForAMember()
+    {
+        var service = Service(new MemoryStorage());
+
+        Assert.DoesNotContain("0812345678", service.MaskFileName(ConversationActorKind.Guest, "call 0812345678.pdf"), StringComparison.Ordinal);
+        Assert.Equal("call 0812345678.pdf", service.MaskFileName(ConversationActorKind.Member, "call 0812345678.pdf"));
+        await Task.CompletedTask;
+    }
+
+    [Fact]
+    public async Task MaskFileName_ShouldFallBackToANeutralName_WhenTheMaskerThrows()
+    {
+        var service = new ConversationService(fixture.Dialect, new ConversationOptions(), new AllowAll(), new DefaultConversationEventSink(TimeProvider.System), new ThrowingMasker(), TimeProvider.System, NullLogger<ConversationService>.Instance, new MemoryStorage(), Images);
+
+        Assert.Equal("attachment", service.MaskFileName(ConversationActorKind.Guest, "call 0812345678.pdf"));
+        await Task.CompletedTask;
     }
 
     [Fact]

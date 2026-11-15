@@ -50,14 +50,45 @@ public sealed class AttachmentChecksTests
     [InlineData(null, "attachment")]
     [InlineData("รูป.png", "รูป.png")]
     public void Sanitize_ShouldKeepOnlyASafeLeafName(string? input, string expected) =>
-        Assert.Equal(expected, AttachmentFileName.Sanitize(input));
+        Assert.Equal(expected, AttachmentFileName.Sanitize(input, "application/x-unknown"));
+
+    [Theory]
+    [InlineData("x.hta", "application/pdf", "x.pdf")]
+    [InlineData("x.html", "application/pdf", "x.pdf")]
+    [InlineData("x.svg", "application/pdf", "x.pdf")]
+    [InlineData("invoice", "application/pdf", "invoice.pdf")]
+    [InlineData("a.b.exe", "application/pdf", "a.b.pdf")]
+    [InlineData("p.jpg", "image/webp", "p.webp")]
+    [InlineData("p.png", "image/jpeg", "p.jpg")]
+    [InlineData("รูป.html", "image/png", "รูป.png")]
+    [InlineData("...", "application/pdf", "attachment.pdf")]
+    public void Sanitize_ShouldForceTheExtensionOfTheStoredType(string input, string storedType, string expected) =>
+        Assert.Equal(expected, AttachmentFileName.Sanitize(input, storedType));
+
+    [Fact]
+    public void Sanitize_ShouldDropFormatCharacters_SoARightToLeftOverrideCannotDisguiseTheExtension()
+    {
+        var result = AttachmentFileName.Sanitize("invoice\u202Elmth.pdf\u200B", "application/pdf");
+
+        Assert.Equal("invoicelmth.pdf", result);
+        Assert.DoesNotContain(result, c => char.GetUnicodeCategory(c) == System.Globalization.UnicodeCategory.Format);
+    }
+
+    [Fact]
+    public void Sanitize_ShouldKeepTheForcedExtension_WhenTheNameIsAtTheLengthCap()
+    {
+        var result = AttachmentFileName.Sanitize(new string('a', 400) + ".html", "application/pdf");
+
+        Assert.Equal(255, result.Length);
+        Assert.EndsWith(".pdf", result, StringComparison.Ordinal);
+    }
 
     [Fact]
     public void Sanitize_ShouldCapTheLength_WithoutSplittingASurrogatePair()
     {
         var name = new string('a', 254) + "😀";
 
-        var result = AttachmentFileName.Sanitize(name);
+        var result = AttachmentFileName.Sanitize(name, "application/x-unknown");
 
         Assert.True(result.Length <= 255);
         Assert.False(char.IsHighSurrogate(result[^1]));
