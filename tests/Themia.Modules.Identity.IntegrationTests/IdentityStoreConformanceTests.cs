@@ -218,6 +218,32 @@ public abstract class IdentityStoreConformanceTests
     }
 
     [Fact]
+    public async Task Platform_user_reader_finds_a_platform_user_from_any_tenant_scope_but_never_a_tenants_user()
+    {
+        await ResetAsync();
+        Guid rootId;
+        Guid aliceId;
+        await using (var system = NewScope(tenant: null))
+        {
+            rootId = (await system.Users.CreateAsync("root", "pw")).UserId!.Value;
+        }
+
+        await using (var acme = NewScope(new TenantId("acme")))
+        {
+            aliceId = (await acme.Users.CreateAsync("alice", "pw")).UserId!.Value;
+        }
+
+        foreach (var tenant in new[] { "acme", "beta" })
+        {
+            await using var scope = NewScope(new TenantId(tenant));
+            var reader = Assert.IsAssignableFrom<IPlatformUserReader>(scope.Users);
+
+            Assert.Equal(rootId, (await reader.FindPlatformUserByIdAsync(rootId))?.Id);
+            Assert.Null(await reader.FindPlatformUserByIdAsync(aliceId));
+        }
+    }
+
+    [Fact]
     public async Task Platform_user_token_generate_and_consume_from_a_tenant_scope()
     {
         await ResetAsync();
