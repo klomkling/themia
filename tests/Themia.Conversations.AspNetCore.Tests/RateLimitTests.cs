@@ -87,6 +87,20 @@ public sealed class RateLimitTests
     }
 
     [Fact]
+    public async Task Post_ShouldKeepSeparateBuckets_WhenTwoMembersShareTheirTenantAndUserJoinedByThePipe()
+    {
+        await using var app = await StartAsync(new FakeTime(), o => o.PostsPerMinute = 1);
+        var body = new { clientMessageId = "m-1", body = "hi" };
+        var path = TestApp.Path(ConversationId, "messages");
+
+        var first = await app.SendAsync(HttpMethod.Post, path, body, member: "a|b:c");
+        var second = await app.SendAsync(HttpMethod.Post, path, body, member: "a:b|c");
+
+        Assert.Equal(HttpStatusCode.Created, first.StatusCode);
+        Assert.Equal(HttpStatusCode.Created, second.StatusCode);
+    }
+
+    [Fact]
     public async Task Post_ShouldReturn429WithoutReadingTheBody_WhenAMemberExceedsTheirPostLimit_AndNotLimitAnotherMember()
     {
         await using var app = await StartAsync(new FakeTime(), o => o.PostsPerMinute = 2);
@@ -126,6 +140,35 @@ public sealed class RateLimitTests
 
         Assert.Contains(defaulted.Logs.Lines, l => l.Contains("ClientKey", StringComparison.Ordinal));
         Assert.DoesNotContain(configured.Logs.Lines, l => l.Contains("ClientKey", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Refund_ShouldNotFreeASlotInALaterWindow_WhenTheTicketCameFromAnEarlierOne()
+    {
+        var time = new FakeTime();
+        var limiter = new Internal.RequestRateLimiter(time);
+        var window = TimeSpan.FromMinutes(1);
+        Assert.True(limiter.TryAcquire("post", "k", 1, window, out _, out var oldTicket));
+        time.Advance(window + TimeSpan.FromSeconds(1));
+        Assert.True(limiter.TryAcquire("post", "k", 1, window, out _));
+
+        limiter.Refund(oldTicket);
+
+        Assert.False(limiter.TryAcquire("post", "k", 1, window, out _));
+    }
+
+    [Fact]
+    public void Refund_ShouldFreeOnlyTheBucketTheTicketCameFrom()
+    {
+        var limiter = new Internal.RequestRateLimiter(new FakeTime());
+        var window = TimeSpan.FromMinutes(1);
+        Assert.True(limiter.TryAcquire("post", "a", 1, window, out _, out var ticketA));
+        Assert.True(limiter.TryAcquire("post", "b", 1, window, out _));
+
+        limiter.Refund(ticketA);
+
+        Assert.False(limiter.TryAcquire("post", "b", 1, window, out _));
+        Assert.True(limiter.TryAcquire("post", "a", 1, window, out _));
     }
 
     [Fact]
