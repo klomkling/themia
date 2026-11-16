@@ -191,6 +191,21 @@ public sealed class TaxDocumentDiscountTests
     }
 
     [Theory]
+    [InlineData(true, 3)]
+    [InlineData(false, 2)]
+    public void RenderHtml_ShouldPlanTheA5LastPageAtSevenRowsOnlyWhenADiscountIsPrinted(bool discounted, int expectedPages)
+    {
+        var size = TaxDocumentPageSize.A5Landscape;
+        var lines = TaxDocumentPageLayout.SinglePageRows(size, TaxDocumentKind.TaxInvoiceReceipt) + 8;
+        var snapshot = Discounted();
+        snapshot = snapshot with { Lines = Enumerable.Repeat(snapshot.Lines[0], lines).ToList(), Discount = discounted ? snapshot.Discount : null };
+
+        var html = Renderer().RenderHtml(snapshot, "5", TaxDocumentMarker.Original);
+
+        Assert.Equal(expectedPages, System.Text.RegularExpressions.Regex.Matches(html, "class=\"page\"").Count);
+    }
+
+    [Theory]
     [MemberData(nameof(FrozenVersions))]
     public void RenderHtml_ShouldRefuseADiscount_OnTheFrozenSingleSheetVersions(string version)
     {
