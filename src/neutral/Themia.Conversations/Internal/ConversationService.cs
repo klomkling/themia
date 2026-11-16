@@ -174,7 +174,7 @@ internal sealed partial class ConversationService(
             var masked = masker.Mask(viewer, message);
             return masked.Attachments.Count == 0
                 ? masked
-                : masked with { Attachments = masked.Attachments.Select(a => a with { FileName = MaskFileName(viewer, a.FileName) }).ToList() };
+                : masked with { Attachments = masked.Attachments.Select(a => a with { FileName = MaskFileName(viewer, a.FileName, a.ContentType) }).ToList() };
         }
         catch (Exception ex) when (ex is not OutOfMemoryException)
         {
@@ -190,14 +190,15 @@ internal sealed partial class ConversationService(
 
     /// <summary>
     /// A file name as the viewer may see it: it goes through the same masker as a body (a guest must not read a phone number in <c>call 0812345678.pdf</c>).
-    /// A masker that throws or hides the text leaves the neutral fallback, never the raw name.
+    /// A masker that throws or hides the text leaves the neutral fallback, never the raw name. What a masker returns is host code, so it goes through the
+    /// same character filter, length cap and stored-type extension as a client's name before it reaches a header or a list.
     /// </summary>
-    internal string MaskFileName(ConversationActorKind viewer, string fileName)
+    internal string MaskFileName(ConversationActorKind viewer, string fileName, string contentType)
     {
         try
         {
             var probe = new ConversationMessage(Guid.Empty, 0, Guid.Empty, MessageKind.Text, fileName, DateTimeOffset.UnixEpoch, false);
-            return masker.Mask(viewer, probe).Body is { Length: > 0 } masked ? masked : AttachmentFileName.Fallback;
+            return masker.Mask(viewer, probe).Body is { Length: > 0 } masked ? AttachmentFileName.Sanitize(masked, contentType) : AttachmentFileName.Fallback;
         }
         catch (Exception ex) when (ex is not OutOfMemoryException)
         {

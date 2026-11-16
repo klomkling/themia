@@ -103,10 +103,14 @@ internal sealed partial class ConversationService
                 ?? throw new InvalidOperationException("A duplicate client message id was reported but no stored message was found.");
         }
 
-        if (prepared is not null && !await AttachAsync(connection, transaction, tenantId, conversationId, participantId, messageId, prepared, cancellationToken))
+        if (prepared is not null)
         {
-            await transaction.RollbackAsync(CancellationToken.None); // the counter bump and the message go with it
-            return new PostResult(PostOutcome.QuotaExceeded, null, null);
+            var attached = await AttachAsync(connection, transaction, tenantId, conversationId, participantId, messageId, prepared, cancellationToken);
+            if (attached != PostOutcome.Posted)
+            {
+                await transaction.RollbackAsync(CancellationToken.None); // the counter bump and the message go with it
+                return new PostResult(attached, null, null);
+            }
         }
 
         var recipients = (await connection.QueryAsync<Guid>(new CommandDefinition(

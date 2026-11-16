@@ -75,6 +75,28 @@ public sealed class AttachmentChecksTests
     }
 
     [Fact]
+    public void Sanitize_ShouldDropUnpairedSurrogates_AndKeepPairedOnes()
+    {
+        // A Fact, not a Theory: xunit's data serialization would turn a lone surrogate into U+FFFD before the test saw it.
+        var cases = new (string Input, string Expected)[]
+        {
+            ("a\uD800b.pdf", "ab.pdf"),
+            ("a\uDC00b.pdf", "ab.pdf"),
+            ("\uD800\uDC00x.pdf", "\uD800\uDC00x.pdf"),
+            ("x\uDC00\uD800.pdf", "x.pdf"),
+        };
+        var utf8 = new System.Text.UTF8Encoding(false, throwOnInvalidBytes: true);
+
+        foreach (var (input, expected) in cases)
+        {
+            var result = AttachmentFileName.Sanitize(input, "application/pdf");
+
+            Assert.Equal(expected, result);
+            utf8.GetBytes(result);
+        }
+    }
+
+    [Fact]
     public void Sanitize_ShouldKeepTheForcedExtension_WhenTheNameIsAtTheLengthCap()
     {
         var result = AttachmentFileName.Sanitize(new string('a', 400) + ".html", "application/pdf");
