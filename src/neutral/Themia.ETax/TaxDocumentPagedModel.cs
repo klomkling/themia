@@ -11,7 +11,7 @@ internal static class TaxDocumentPagedModel
     {
         var isReceipt = s.Kind == TaxDocumentKind.TaxInvoiceReceipt;
         var isCredit = s.Kind == TaxDocumentKind.CreditNote;
-        var plan = TaxDocumentPageLayout.Plan(size, s.Kind, s.Lines.Count);
+        var plan = TaxDocumentPageLayout.Plan(size, s.Kind, s.Lines.Count, s.Discount is not null);
         var (titleTh, titleEn) = Title(s.Kind);
         var (markerTh, markerEn) = marker == TaxDocumentMarker.Original ? ("ต้นฉบับ", "Original") : ("สำเนา", "Copy");
 

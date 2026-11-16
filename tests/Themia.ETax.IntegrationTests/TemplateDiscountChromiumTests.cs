@@ -75,9 +75,9 @@ public sealed class TemplateDiscountChromiumTests
         await using var host = services.BuildServiceProvider();
         var size = TaxDocumentTemplates.PageSizeOf(version)!.Value;
         var kind = TaxDocumentKind.TaxInvoiceReceipt;
-        var lines = TaxDocumentPageLayout.SinglePageRows(size, kind) + TaxDocumentPageLayout.LastPageRows(size, kind)
+        var lines = TaxDocumentPageLayout.SinglePageRows(size, kind) + TaxDocumentPageLayout.LastPageRows(size, kind, discounted: true)
             + (withMiddlePage ? TaxDocumentPageLayout.MiddlePageRows(size, kind) : 0);
-        var planned = TaxDocumentPageLayout.Plan(size, kind, lines).Count;
+        var planned = TaxDocumentPageLayout.Plan(size, kind, lines, discounted: true).Count;
 
         var render = await host.GetRequiredService<TaxDocumentRenderer>()
             .RenderAsync(DiscountedReceipt(lines, withheld: 3_000), version, TaxDocumentMarker.Original);

@@ -37,7 +37,7 @@ internal readonly record struct TaxDocumentPagePlan(TaxDocumentPageRole Role, in
 internal static class TaxDocumentPageLayout
 {
     // A receipt page with the full header, the buyer box, and the totals, payment and signature blocks. A credit note spends the room of the reason block.
-    // A5 is the designer's page budget (six rows; a credit note four). The A5 receipt's last page was nine rows and spilled the signature block onto an extra page when a discount and withholding were both printed (measured on Chromium: eight fit, nine spill), so it is seven. A4 was measured on Chromium (a receipt with withholding rows fits 35 lines, a credit
+    // A5 is the designer's page budget (six rows; a credit note four). The A5 receipt's last page is nine rows, but seven when a discount is printed: a discount and withholding together spill the signature block onto an extra page at nine (measured on Chromium: eight fit, nine spill). Receipts without a discount keep nine, so a document issued before discounts paginates and renders byte-identically. A4 was measured on Chromium (a receipt with withholding rows fits 35 lines, a credit
     // note 33; a middle page 42; the last page 37 and 35) and set three to four rows lower, so a two-line address or a wrapped description still fits.
     public static int SinglePageRows(TaxDocumentPageSize size, TaxDocumentKind kind) => (size, kind == TaxDocumentKind.TaxInvoiceReceipt) switch
     {
@@ -51,11 +51,11 @@ internal static class TaxDocumentPageLayout
     public static int MiddlePageRows(TaxDocumentPageSize size, TaxDocumentKind kind) => size == TaxDocumentPageSize.A4Portrait ? 38 : 12;
 
     // The last page: compact header (no buyer box) and all the closing blocks.
-    public static int LastPageRows(TaxDocumentPageSize size, TaxDocumentKind kind) => (size, kind == TaxDocumentKind.TaxInvoiceReceipt) switch
+    public static int LastPageRows(TaxDocumentPageSize size, TaxDocumentKind kind, bool discounted = false) => (size, kind == TaxDocumentKind.TaxInvoiceReceipt) switch
     {
         (TaxDocumentPageSize.A4Portrait, true) => 34,
         (TaxDocumentPageSize.A4Portrait, false) => 32,
-        (_, true) => 7,
+        (_, true) => discounted ? 7 : 9,
         _ => 5,
     };
 
@@ -67,7 +67,7 @@ internal static class TaxDocumentPageLayout
         size == TaxDocumentPageSize.A5Landscape ? SinglePageRows(size, kind) : 0;
 
     /// <summary>Splits <paramref name="lineCount"/> lines over pages; every page carries at least one line.</summary>
-    public static IReadOnlyList<TaxDocumentPagePlan> Plan(TaxDocumentPageSize size, TaxDocumentKind kind, int lineCount)
+    public static IReadOnlyList<TaxDocumentPagePlan> Plan(TaxDocumentPageSize size, TaxDocumentKind kind, int lineCount, bool discounted = false)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(lineCount, 1);
 
@@ -77,7 +77,7 @@ internal static class TaxDocumentPageLayout
 
         var pages = new List<TaxDocumentPagePlan> { new(TaxDocumentPageRole.First, 0, single) };
         var next = single;
-        while (lineCount - next > LastPageRows(size, kind))
+        while (lineCount - next > LastPageRows(size, kind, discounted))
         {
             // Never take the line the last page needs: a document of n lines always ends on a page with at least one.
             var take = Math.Min(MiddlePageRows(size, kind), lineCount - next - 1);
