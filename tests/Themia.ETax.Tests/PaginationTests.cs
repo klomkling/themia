@@ -118,4 +118,20 @@ public sealed class PaginationTests
     [Fact]
     public void Plan_ShouldRejectNoLines() =>
         Assert.Throws<ArgumentOutOfRangeException>(() => Plan(A4, TaxDocumentKind.TaxInvoiceReceipt, 0));
+
+    [Theory]
+    [InlineData(8)]
+    [InlineData(9)]
+    public void Plan_ShouldKeepTheNineRowLastPageOnA5_WhenTheReceiptHasNoDiscount(int tail)
+    {
+        var size = TaxDocumentPageSize.A5Landscape;
+        var single = TaxDocumentPageLayout.SinglePageRows(size, TaxDocumentKind.TaxInvoiceReceipt);
+
+        var pages = Plan(size, TaxDocumentKind.TaxInvoiceReceipt, single + tail);
+
+        Assert.Equal(2, pages.Count);
+        Assert.Equal(tail, pages[^1].Count);
+        Assert.Equal(9, TaxDocumentPageLayout.LastPageRows(size, TaxDocumentKind.TaxInvoiceReceipt));
+        Assert.Equal(7, TaxDocumentPageLayout.LastPageRows(size, TaxDocumentKind.TaxInvoiceReceipt, discounted: true));
+    }
 }

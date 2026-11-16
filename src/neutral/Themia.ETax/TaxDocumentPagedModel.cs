@@ -11,7 +11,7 @@ internal static class TaxDocumentPagedModel
     {
         var isReceipt = s.Kind == TaxDocumentKind.TaxInvoiceReceipt;
         var isCredit = s.Kind == TaxDocumentKind.CreditNote;
-        var plan = TaxDocumentPageLayout.Plan(size, s.Kind, s.Lines.Count);
+        var plan = TaxDocumentPageLayout.Plan(size, s.Kind, s.Lines.Count, s.Discount is not null);
         var (titleTh, titleEn) = Title(s.Kind);
         var (markerTh, markerEn) = marker == TaxDocumentMarker.Original ? ("ต้นฉบับ", "Original") : ("สำเนา", "Copy");
 
@@ -106,6 +106,9 @@ internal static class TaxDocumentPagedModel
 
     private static object Totals(TaxDocumentSnapshot s) => new
     {
+        purchase = s.Discount is null ? null : TaxDocumentRenderModel.Money(s.Lines.Sum(l => l.AmountExVatSatang)),
+        discountLabel = s.Discount?.Description,
+        discount = s.Discount is { } d ? TaxDocumentRenderModel.Money(d.AmountExVatSatang) : null,
         subtotal = TaxDocumentRenderModel.Money(s.Totals.ExVatSatang),
         vat = TaxDocumentRenderModel.Money(s.Totals.VatSatang),
         total = TaxDocumentRenderModel.Money(s.Totals.InclVatSatang),

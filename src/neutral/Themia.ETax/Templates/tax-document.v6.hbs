@@ -180,7 +180,13 @@ table.last { margin-bottom: 0; }
       <div><span>ภาษีมูลค่าเพิ่ม {{@root.totals.rate}} ของผลต่าง <span class="en">VAT on difference</span></span><span>{{@root.totals.vat}}</span></div>
       <div class="grand"><span>{{#if @root.debit}}จำนวนเงินที่เพิ่มหนี้ <span class="en">Debit total</span>{{else}}จำนวนเงินที่ลดหนี้ <span class="en">Credit total</span>{{/if}}</span><span>{{@root.totals.total}}</span></div>
       {{else}}
+      {{#if @root.totals.discount}}
+      <div><span>รวมเป็นเงิน <span class="en">Purchase</span></span><span>{{@root.totals.purchase}}</span></div>
+      <div><span>หัก {{@root.totals.discountLabel}} <span class="en">Less</span></span><span>{{@root.totals.discount}}</span></div>
+      <div><span>มูลค่าหลังหักส่วนลด <span class="en">Remaining</span></span><span>{{@root.totals.subtotal}}</span></div>
+      {{else}}
       <div><span>รวมเป็นเงิน <span class="en">Subtotal</span></span><span>{{@root.totals.subtotal}}</span></div>
+      {{/if}}
       <div><span>ภาษีมูลค่าเพิ่ม {{@root.totals.rate}} <span class="en">VAT {{@root.totals.rate}}</span></span><span>{{@root.totals.vat}}</span></div>
       <div class="grand"><span>จำนวนเงินรวมทั้งสิ้น <span class="en">Total</span></span><span>{{@root.totals.total}}</span></div>
       {{#if @root.totals.withheld}}

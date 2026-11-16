@@ -58,6 +58,9 @@ public static class TaxDocumentTemplates
     internal static bool PrintsPaymentMethod(string templateVersion, TaxPaymentMethod method) =>
         method is TaxPaymentMethod.Cash or TaxPaymentMethod.Transfer || templateVersion is "6" or "7";
 
+    // Versions 1 to 3 are frozen (their template hashes are pinned), so only the paged versions carry the purchase / less / remaining rows.
+    internal static bool PrintsDiscount(string templateVersion) => templateVersion is "4" or "5" or "6" or "7";
+
     // Versions 2 and 3 share one layout; the version alone fixes how the amount in words reads a units digit of 1.
     internal static ThaiBahtTextEtMode EtModeOf(string templateVersion) => templateVersion switch
     {
