@@ -12,6 +12,8 @@ with the *why* and concrete upgrade steps.
 
 ## Unreleased
 
+## 0.65.0
+
 ### Themia.ETax: invoice discount (additive, needs an upgrade order)
 - `TaxDocumentSnapshot.Discount` is optional; nothing changes for a document without one. Issuing a discounted document needs template version `"4"` to `"7"` (`TaxDocumentTemplateOptions.TemplateVersion`); under `"1"` to `"3"` (the default is `"1"`) the issue is refused with `NotAllowed` on `discount`.
 - **Upgrade every Themia consumer before the first discounted document is issued.** The snapshot reader rejects unknown properties, so a build older than this release throws on a stored snapshot that carries `discount`. Rolling back after issuing one leaves those rows unreadable until the upgrade is back.
