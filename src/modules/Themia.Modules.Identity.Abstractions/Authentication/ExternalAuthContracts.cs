@@ -15,7 +15,7 @@ public readonly record struct ExternalAuthRequest(
 /// <param name="Subject">The stable provider subject (sub).</param>
 /// <param name="Email">The email, if the provider returned one.</param>
 /// <param name="EmailVerified">Whether the provider asserts the email is verified.</param>
-/// <param name="DisplayName">An optional display name.</param>
+/// <param name="DisplayName">An optional display name; may be null. Identity does not store or log it, so a host that needs the name keeps its own copy and erases it on its own side.</param>
 public readonly record struct ExternalIdentity(
     string Provider, string Subject, string? Email, bool EmailVerified, string? DisplayName)
 {

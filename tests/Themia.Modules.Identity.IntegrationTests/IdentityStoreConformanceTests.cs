@@ -22,6 +22,35 @@ file sealed class StubCurrentUserAccessor(string? userId) : ICurrentUserAccessor
     public string? UserId { get; } = userId;
 }
 
+file sealed class CapturingLoggerProvider : Microsoft.Extensions.Logging.ILoggerProvider
+{
+    private readonly ConcurrentQueue<string> messages = new();
+
+    public IReadOnlyCollection<string> Messages => messages;
+
+    public Microsoft.Extensions.Logging.ILogger CreateLogger(string categoryName) => new Capture(messages);
+
+    public void Dispose()
+    {
+    }
+
+    private sealed class Capture(ConcurrentQueue<string> sink) : Microsoft.Extensions.Logging.ILogger
+    {
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+
+        public bool IsEnabled(Microsoft.Extensions.Logging.LogLevel logLevel) => true;
+
+        public void Log<TState>(Microsoft.Extensions.Logging.LogLevel logLevel, Microsoft.Extensions.Logging.EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
+        {
+            sink.Enqueue(formatter(state, exception));
+            if (exception is not null)
+            {
+                sink.Enqueue(exception.ToString());
+            }
+        }
+    }
+}
+
 file sealed class WhereSpec<T> : Themia.Framework.Data.Abstractions.Specifications.Specification<T>
 {
     public WhereSpec(System.Linq.Expressions.Expression<Func<T, bool>> predicate) => Where(predicate);
@@ -43,6 +72,9 @@ public abstract class IdentityStoreConformanceTests
 
     /// <summary>Truncates the identity tables between tests.</summary>
     protected abstract Task ResetAsync();
+
+    /// <summary>Every value of every text-like column of every table in the identity schema, from the concrete class's fixture.</summary>
+    protected abstract Task<IReadOnlyList<string>> ReadAllTextAsync();
 
     /// <summary>The test connection string from the concrete class's fixture.</summary>
     protected abstract string ConnectionString { get; }
@@ -1475,6 +1507,28 @@ public abstract class IdentityStoreConformanceTests
         Assert.Equal(first.User.Id, second.User.Id);
         Assert.False(second.WasCreated);
         Assert.False(second.WasLinked);
+    }
+
+    [Fact] // coord #0226: Identity must not store or log ExternalIdentity.DisplayName; hosts rely on it to erase a name on their own side only
+    public async Task External_display_name_is_neither_stored_nor_logged()
+    {
+        const string Marker = "DisplayNameMarker-7f3a9c1e";
+        await ResetAsync();
+        var logs = new CapturingLoggerProvider();
+        await using var s = NewScope(new TenantId("acme"), configureServices: services =>
+        {
+            services.AddSingleton<Microsoft.Extensions.Logging.ILoggerProvider>(logs);
+            services.Configure<Microsoft.Extensions.Logging.LoggerFilterOptions>(o => o.MinLevel = Microsoft.Extensions.Logging.LogLevel.Trace);
+        });
+
+        var created = await s.ExternalLogins.ResolveOrProvisionAsync(new ExternalIdentity("Partner", "3:member-1", null, false, Marker));
+        await s.ExternalLogins.ResolveOrProvisionAsync(new ExternalIdentity("Partner", "3:member-1", null, false, Marker));
+
+        Assert.True(created.WasCreated);
+        var stored = await ReadAllTextAsync();
+        Assert.NotEmpty(stored); // the scan found the rows, so an empty result cannot pass for "not stored"
+        Assert.DoesNotContain(stored, v => v.Contains(Marker, StringComparison.Ordinal));
+        Assert.DoesNotContain(logs.Messages, m => m.Contains(Marker, StringComparison.Ordinal));
     }
 
     [Fact] // verified-email match → link to existing user

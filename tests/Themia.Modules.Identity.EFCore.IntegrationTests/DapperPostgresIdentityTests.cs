@@ -15,6 +15,7 @@ public sealed class DapperPostgresIdentityTests(PostgresIdentityFixture fixture)
 {
     protected override string ConnectionString => fixture.ConnectionString;
     protected override Task ResetAsync() => fixture.ResetAsync();
+    protected override Task<IReadOnlyList<string>> ReadAllTextAsync() => fixture.ReadAllTextAsync();
 
     protected override void RegisterIdentity(IServiceCollection services, Action<IdentityModuleOptions> configure)
         => services.AddThemiaIdentityDapper(configure);
