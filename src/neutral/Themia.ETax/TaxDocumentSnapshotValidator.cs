@@ -195,7 +195,7 @@ public static class TaxDocumentSnapshotValidator
     private static void ValidateTotalsArithmetic(TaxDocumentSnapshot s, TaxDocumentTotals t, List<TaxDocumentValidationError> errors)
     {
         if (s.Lines is { Count: > 0 } && s.Lines.All(l => l.AmountExVatSatang >= 0)
-            && checked(s.Lines.Aggregate(0L, (sum, l) => checked(sum + l.AmountExVatSatang)) - DiscountOf(s)) != t.ExVatSatang)
+            && ExpectedExVat(s) is { } expected && expected != t.ExVatSatang)
         {
             Add(errors, TaxDocumentValidationCode.TotalsInconsistent, "totals.ex_vat_satang");
         }
@@ -211,8 +211,13 @@ public static class TaxDocumentSnapshotValidator
             Add(errors, TaxDocumentValidationCode.TotalsInconsistent, "totals.net_received_satang");
     }
 
-    // A malformed discount is reported by ValidateDiscount; the totals check then reads it as zero so one mistake is not reported twice.
-    private static long DiscountOf(TaxDocumentSnapshot s) => s.Discount is { AmountExVatSatang: >= 0 } d ? d.AmountExVatSatang : 0;
+    // A malformed or oversized discount is reported by ValidateDiscount; the totals check then skips the ex-VAT sum so one mistake is not reported twice.
+    private static long? ExpectedExVat(TaxDocumentSnapshot s)
+    {
+        var lines = s.Lines.Aggregate(0L, (sum, l) => checked(sum + l.AmountExVatSatang));
+        var discount = s.Discount?.AmountExVatSatang ?? 0;
+        return discount < 0 || discount > lines ? null : lines - discount;
+    }
 
     private static void ValidateDiscount(TaxDocumentSnapshot s, List<TaxDocumentValidationError> errors)
     {

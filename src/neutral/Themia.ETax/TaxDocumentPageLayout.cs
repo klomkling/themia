@@ -37,7 +37,7 @@ internal readonly record struct TaxDocumentPagePlan(TaxDocumentPageRole Role, in
 internal static class TaxDocumentPageLayout
 {
     // A receipt page with the full header, the buyer box, and the totals, payment and signature blocks. A credit note spends the room of the reason block.
-    // A5 is the designer's page budget (six rows; a credit note four). A4 was measured on Chromium (a receipt with withholding rows fits 35 lines, a credit
+    // A5 is the designer's page budget (six rows; a credit note four). The A5 receipt's last page was nine rows and spilled the signature block onto an extra page when a discount and withholding were both printed (measured on Chromium: eight fit, nine spill), so it is seven. A4 was measured on Chromium (a receipt with withholding rows fits 35 lines, a credit
     // note 33; a middle page 42; the last page 37 and 35) and set three to four rows lower, so a two-line address or a wrapped description still fits.
     public static int SinglePageRows(TaxDocumentPageSize size, TaxDocumentKind kind) => (size, kind == TaxDocumentKind.TaxInvoiceReceipt) switch
     {
@@ -55,7 +55,7 @@ internal static class TaxDocumentPageLayout
     {
         (TaxDocumentPageSize.A4Portrait, true) => 34,
         (TaxDocumentPageSize.A4Portrait, false) => 32,
-        (_, true) => 9,
+        (_, true) => 7,
         _ => 5,
     };
 

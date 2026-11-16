@@ -50,4 +50,39 @@ public sealed class TemplateDiscountChromiumTests
 
         Assert.Equal(1, Pages(render.Pdf));
     }
+
+    // A discounted receipt whose last page holds exactly the layout's last-page budget: the two extra totals rows (discount and remaining) must not push
+    // the payment or signature block onto another page, or "page x of y" is wrong on a tax document.
+    public static TheoryData<string, bool> LastPageCases()
+    {
+        var data = new TheoryData<string, bool>();
+        foreach (var version in new[] { "4", "5", "6", "7" })
+        {
+            data.Add(version, false);
+            data.Add(version, true);
+        }
+
+        return data;
+    }
+
+    [Theory]
+    [MemberData(nameof(LastPageCases))]
+    public async Task Render_ShouldKeepTheLastPageOfADiscountedReceiptWithWithholdingWithinThePlannedPages(string version, bool withMiddlePage)
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddThemiaETaxRendering(o => ChromiumPath.Apply(o));
+        await using var host = services.BuildServiceProvider();
+        var size = TaxDocumentTemplates.PageSizeOf(version)!.Value;
+        var kind = TaxDocumentKind.TaxInvoiceReceipt;
+        var lines = TaxDocumentPageLayout.SinglePageRows(size, kind) + TaxDocumentPageLayout.LastPageRows(size, kind)
+            + (withMiddlePage ? TaxDocumentPageLayout.MiddlePageRows(size, kind) : 0);
+        var planned = TaxDocumentPageLayout.Plan(size, kind, lines).Count;
+
+        var render = await host.GetRequiredService<TaxDocumentRenderer>()
+            .RenderAsync(DiscountedReceipt(lines, withheld: 3_000), version, TaxDocumentMarker.Original);
+
+        Assert.Equal(withMiddlePage ? 3 : 2, planned);
+        Assert.Equal(planned, Pages(render.Pdf));
+    }
 }

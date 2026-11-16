@@ -66,7 +66,7 @@ public sealed class TaxDocumentDiscountTests
     {
         var errors = Validate(Discounted(discount: 93_459, exVat: 0, vat: 0, incl: 0));
 
-        Assert.Contains(errors, e => e is { Code: TaxDocumentValidationCode.Malformed, Field: "discount.amount_ex_vat_satang" });
+        AssertSingle(errors, TaxDocumentValidationCode.Malformed, "discount.amount_ex_vat_satang");
     }
 
     [Fact]
