@@ -10,7 +10,7 @@ internal static class AttachmentFileName
     private static readonly char[] Forbidden = ['<', '>', ':', '"', '|', '?', '*', '/', '\\'];
 
     /// <summary>
-    /// The stored name: the leaf of the client's name without control, format (U+202E and friends) or path characters, and with the extension forced to the
+    /// The stored name: the leaf of the client's name without control, format (U+202E and friends), path or unpaired surrogate characters, and with the extension forced to the
     /// one the stored <paramref name="contentType"/> implies. A client that sends <c>invoice.hta</c> for a PDF gets <c>invoice.pdf</c>, so a download can never
     /// carry an executable or renderable extension the allow-list refused.
     /// </summary>
@@ -18,9 +18,19 @@ internal static class AttachmentFileName
     {
         var tail = (name ?? string.Empty).Replace('\\', '/').Split('/')[^1];
         var cleaned = new StringBuilder(tail.Length);
-        foreach (var c in tail)
+        for (var i = 0; i < tail.Length; i++)
         {
-            if (!IsDisallowed(c))
+            var c = tail[i];
+            if (char.IsHighSurrogate(c) && i + 1 < tail.Length && Rune.TryCreate(c, tail[i + 1], out var pair))
+            {
+                if (!IsDisallowed(pair))
+                {
+                    cleaned.Append(c).Append(tail[i + 1]);
+                }
+
+                i++;
+            }
+            else if (!char.IsSurrogate(c) && !IsDisallowed(new Rune(c)))
             {
                 cleaned.Append(c);
             }
@@ -43,10 +53,10 @@ internal static class AttachmentFileName
         return Cap(stem, ConversationAttachmentUploadsMigrationWidth - extension.Length) + extension;
     }
 
-    private static bool IsDisallowed(char c) =>
-        char.IsControl(c)
-        || Array.IndexOf(Forbidden, c) >= 0
-        || CharUnicodeInfo.GetUnicodeCategory(c) is UnicodeCategory.Format or UnicodeCategory.LineSeparator or UnicodeCategory.ParagraphSeparator;
+    private static bool IsDisallowed(Rune r) =>
+        Rune.IsControl(r)
+        || (r.IsBmp && Array.IndexOf(Forbidden, (char)r.Value) >= 0)
+        || Rune.GetUnicodeCategory(r) is UnicodeCategory.Format or UnicodeCategory.LineSeparator or UnicodeCategory.ParagraphSeparator;
 
     private static string? ExtensionOf(string contentType) => contentType switch
     {

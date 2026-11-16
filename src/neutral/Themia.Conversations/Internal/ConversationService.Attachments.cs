@@ -143,7 +143,7 @@ internal sealed partial class ConversationService
             return refused;
         }
 
-        row.FileName = MaskFileName(actor.Kind, row.FileName);
+        row.FileName = MaskFileName(actor.Kind, row.FileName, row.ContentType);
         var url = await storage.GetPresignedUrlAsync(
             row.StorageKey,
             new PresignedUrlRequest(PresignedUrlOperation.Get, options.AttachmentDownloadLifetime) { ContentDisposition = AttachmentFileName.ContentDisposition(row.FileName) },
@@ -202,9 +202,15 @@ internal sealed partial class ConversationService
                     bytes = buffer.ToArray();
                     contentType = AttachmentSniffer.ImageTypeOf(processed.Extension);
                 }
-                catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
+                catch (ArgumentException)
                 {
                     return null; // corrupt or unsupported image: refuse the message rather than store the raw bytes
+                }
+                catch (InvalidOperationException ex)
+                {
+                    // Not a bad upload but a misconfigured processor: the rejection stays, and the operator gets one line (type only, no name or bytes).
+                    logger.LogWarning("An attachment image could not be processed ({ExceptionType}); check the image processor configuration", ex.GetType().Name);
+                    return null;
                 }
             }
 
@@ -307,12 +313,12 @@ internal sealed partial class ConversationService
     }
 
     /// <summary>Inside the post transaction, under the counter lock: re-check the quota, insert the rows, drop the staging rows.</summary>
-    private async Task<bool> AttachAsync(DbConnection connection, DbTransaction transaction, string tenantId, Guid conversationId, Guid participantId, Guid messageId, IReadOnlyList<PreparedAttachment> prepared, CancellationToken cancellationToken)
+    private async Task<PostOutcome> AttachAsync(DbConnection connection, DbTransaction transaction, string tenantId, Guid conversationId, Guid participantId, Guid messageId, IReadOnlyList<PreparedAttachment> prepared, CancellationToken cancellationToken)
     {
         var total = prepared.Sum(p => (long)p.Content.Length);
         if (await StoredBytesAsync(connection, transaction, tenantId, conversationId, cancellationToken) + total > options.MaxAttachmentBytesPerConversation)
         {
-            return false;
+            return PostOutcome.QuotaExceeded;
         }
 
         foreach (var item in prepared)
@@ -323,14 +329,18 @@ internal sealed partial class ConversationService
                 new { item.Id, TenantId = tenantId, ConversationId = conversationId, MessageId = messageId, Owner = participantId, item.StorageKey, item.FileName, item.ContentType, Size = (long)item.Content.Length, item.Sha256, Now = Now() },
                 transaction,
                 cancellationToken: cancellationToken));
-            await connection.ExecuteAsync(new CommandDefinition(
+            var staged = await connection.ExecuteAsync(new CommandDefinition(
                 "DELETE FROM conversation_attachment_uploads WHERE tenant_id = @TenantId AND id = @Id;",
                 new { TenantId = tenantId, item.Id },
                 transaction,
                 cancellationToken: cancellationToken));
+            if (staged != 1)
+            {
+                return PostOutcome.AttachmentRejected; // the sweep already took this upload's row and object: the key must not be attached
+            }
         }
 
-        return true;
+        return PostOutcome.Posted;
     }
 
     /// <summary>The attachments of the messages with <paramref name="afterSeq"/> &lt; seq &lt;= <paramref name="untilSeq"/>, grouped by message id. A range, not an id list, so one statement works on every engine.</summary>

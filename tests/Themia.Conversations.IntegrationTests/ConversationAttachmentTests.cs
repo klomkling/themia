@@ -56,6 +56,23 @@ public abstract class ConversationAttachmentTests(ConversationEngineFixture fixt
         public ConversationMessage Mask(ConversationActorKind viewer, ConversationMessage message) => throw new InvalidOperationException("masker broke");
     }
 
+    private sealed class FixedBodyMasker(string body) : IConversationMasker
+    {
+        public ConversationMessage Mask(ConversationActorKind viewer, ConversationMessage message) => message with { Body = body };
+    }
+
+    private sealed class CapturingLogger : ILogger<ConversationService>
+    {
+        public List<(LogLevel Level, string Message)> Entries { get; } = [];
+
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter) =>
+            Entries.Add((logLevel, formatter(state, exception)));
+    }
+
     private sealed class ThrowingImages : IImageProcessor
     {
         public Task<ProcessedImage> ProcessAsync(Stream input, ImageProcessingOptions? options = null, CancellationToken cancellationToken = default) =>
@@ -70,13 +87,21 @@ public abstract class ConversationAttachmentTests(ConversationEngineFixture fixt
 
         public List<PresignedUrlRequest> Presigned { get; } = [];
 
-        public Task<StorageObjectInfo> PutAsync(string key, Stream content, StoragePutOptions options, CancellationToken cancellationToken = default)
+        /// <summary>Runs after each Put, so a test can act between the object write and the post transaction (a sweep, for one).</summary>
+        public Func<string, Task>? AfterPut { get; set; }
+
+        public async Task<StorageObjectInfo> PutAsync(string key, Stream content, StoragePutOptions options, CancellationToken cancellationToken = default)
         {
             using var buffer = new MemoryStream();
-            content.CopyTo(buffer);
+            await content.CopyToAsync(buffer, cancellationToken);
             Objects[key] = buffer.ToArray();
             Types[key] = options.ContentType;
-            return Task.FromResult(new StorageObjectInfo(key, buffer.Length, options.ContentType, null));
+            if (AfterPut is not null)
+            {
+                await AfterPut(key);
+            }
+
+            return new StorageObjectInfo(key, buffer.Length, options.ContentType, null);
         }
 
         public Task DeleteAsync(string key, CancellationToken cancellationToken = default)
@@ -294,12 +319,83 @@ public abstract class ConversationAttachmentTests(ConversationEngineFixture fixt
     }
 
     [Fact]
+    public async Task Post_ShouldLogTheExceptionTypeOnly_WhenTheImageProcessorIsMisconfigured()
+    {
+        var logger = new CapturingLogger();
+        var service = new ConversationService(fixture.Dialect, new ConversationOptions(), new AllowAll(), new DefaultConversationEventSink(TimeProvider.System), new RegexConversationMasker(), TimeProvider.System, logger, new MemoryStorage(), new ThrowingImages());
+        var (tenant, conversation, _) = await RoomAsync(service);
+
+        var result = await service.PostAsync(Member("alice"), tenant, conversation, new PostMessage("m1", "x"), [Upload("secret-name.png", "image/png", Png())]);
+
+        Assert.Equal(PostOutcome.AttachmentRejected, result.Outcome);
+        var warning = Assert.Single(logger.Entries, e => e.Level == LogLevel.Warning);
+        Assert.Contains(nameof(InvalidOperationException), warning.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("secret-name", warning.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("processor broke", warning.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Post_ShouldNotLog_WhenTheImageIsSimplyCorrupt()
+    {
+        var logger = new CapturingLogger();
+        var service = new ConversationService(fixture.Dialect, new ConversationOptions(), new AllowAll(), new DefaultConversationEventSink(TimeProvider.System), new RegexConversationMasker(), TimeProvider.System, logger, new MemoryStorage(), Images);
+        var (tenant, conversation, _) = await RoomAsync(service);
+
+        var result = await service.PostAsync(Member("alice"), tenant, conversation, new PostMessage("m1", "x"), [Upload("p.png", "image/png", [.. Png()[..40], .. new byte[200]])]);
+
+        Assert.Equal(PostOutcome.AttachmentRejected, result.Outcome);
+        Assert.DoesNotContain(logger.Entries, e => e.Level >= LogLevel.Warning);
+    }
+
+    [Fact]
+    public async Task Post_ShouldRejectAndLeaveNothing_WhenTheStagingRowWasSweptBetweenThePutAndTheCommit()
+    {
+        var storage = new MemoryStorage();
+        var service = Service(storage);
+        var (tenant, conversation, _) = await RoomAsync(service);
+        storage.AfterPut = _ => fixture.ExecuteAsync("DELETE FROM conversation_attachment_uploads WHERE tenant_id = @Tenant;", new { Tenant = tenant });
+
+        var result = await service.PostAsync(Member("alice"), tenant, conversation, new PostMessage("m1", "x"), [Upload("plan.pdf", "application/pdf", Pdf(700))]);
+
+        Assert.Equal(PostOutcome.AttachmentRejected, result.Outcome);
+        Assert.Equal(0, await CountAsync("conversation_attachments", conversation));
+        Assert.Equal(0, await CountAsync("conversation_messages", conversation));
+        Assert.Empty(storage.Objects);
+    }
+
+    [Fact]
+    public async Task List_AndOpen_ShouldSanitizeWhatTheMaskerReturns()
+    {
+        var storage = new MemoryStorage();
+        var poster = Service(storage);
+        var (tenant, conversation, _) = await RoomAsync(poster);
+        await poster.PostAsync(Member("alice"), tenant, conversation, new PostMessage("m1", "x"), [Upload("plan.pdf", "application/pdf", Pdf(500))]);
+        var hostile = "../..\\evil‮gnp\r\nname\"<x>.html" + new string('z', 400);
+        var viewing = new ConversationService(fixture.Dialect, new ConversationOptions(), new AllowAll(), new DefaultConversationEventSink(TimeProvider.System), new FixedBodyMasker(hostile), TimeProvider.System, NullLogger<ConversationService>.Instance, storage, Images);
+
+        var page = await viewing.ListAsync(Member("bob"), tenant, conversation, 0, 10);
+        var listed = Assert.Single(Assert.Single(page.Messages).Attachments);
+        var opened = await viewing.OpenAsync(Member("bob"), tenant, conversation, listed.Id);
+
+        foreach (var name in new[] { listed.FileName, opened.Attachment!.FileName })
+        {
+            Assert.True(name.Length <= 255);
+            Assert.EndsWith(".pdf", name, StringComparison.Ordinal);
+            Assert.DoesNotContain(name, c => char.IsControl(c) || c is '/' or '\\' or '"' or '<' or '>' or '‮');
+        }
+
+        var disposition = storage.Presigned.Last().ContentDisposition ?? "";
+        Assert.DoesNotContain("\r", disposition, StringComparison.Ordinal);
+        Assert.DoesNotContain("\n", disposition, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task MaskFileName_ShouldHideAPhoneNumberFromAGuest_AndLeaveItForAMember()
     {
         var service = Service(new MemoryStorage());
 
-        Assert.DoesNotContain("0812345678", service.MaskFileName(ConversationActorKind.Guest, "call 0812345678.pdf"), StringComparison.Ordinal);
-        Assert.Equal("call 0812345678.pdf", service.MaskFileName(ConversationActorKind.Member, "call 0812345678.pdf"));
+        Assert.DoesNotContain("0812345678", service.MaskFileName(ConversationActorKind.Guest, "call 0812345678.pdf", "application/pdf"), StringComparison.Ordinal);
+        Assert.Equal("call 0812345678.pdf", service.MaskFileName(ConversationActorKind.Member, "call 0812345678.pdf", "application/pdf"));
         await Task.CompletedTask;
     }
 
@@ -308,7 +404,7 @@ public abstract class ConversationAttachmentTests(ConversationEngineFixture fixt
     {
         var service = new ConversationService(fixture.Dialect, new ConversationOptions(), new AllowAll(), new DefaultConversationEventSink(TimeProvider.System), new ThrowingMasker(), TimeProvider.System, NullLogger<ConversationService>.Instance, new MemoryStorage(), Images);
 
-        Assert.Equal("attachment", service.MaskFileName(ConversationActorKind.Guest, "call 0812345678.pdf"));
+        Assert.Equal("attachment", service.MaskFileName(ConversationActorKind.Guest, "call 0812345678.pdf", "application/pdf"));
         await Task.CompletedTask;
     }
 

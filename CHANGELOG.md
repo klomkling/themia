@@ -27,6 +27,10 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+### Fixed
+
+- `Themia.Conversations` attachments (coord #0221-#0224): a post whose staged upload was swept before the commit is now rejected (`AttachmentRejected`) instead of attaching a deleted object; unpaired surrogates are dropped from stored file names; a misconfigured image processor logs one warning (exception type only) while the rejection stays; the name a masker returns goes through the same character filter, length cap and extension as a client's name.
+
 ## [0.64.0] - 2026-11-16
 
 ### Changed
