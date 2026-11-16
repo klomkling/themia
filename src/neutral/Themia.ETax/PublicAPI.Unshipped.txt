@@ -445,3 +445,10 @@ Themia.ETax.ITaxDocumentNumberSource.NextNumberForFormAsync(System.Data.Common.D
 Themia.ETax.TaxDocumentBuyerBlock
 static Themia.ETax.TaxDocumentBuyerBlock.Lines(Themia.ETax.TaxParty! buyer, string! templateVersion) -> System.Collections.Generic.IReadOnlyList<string!>!
 static Themia.ETax.TaxDocumentBuyerBlock.Lines(Themia.ETax.TaxParty! buyer, Themia.ETax.TaxDocumentTemplateOptions! options) -> System.Collections.Generic.IReadOnlyList<string!>!
+Themia.ETax.TaxDocumentDiscount
+Themia.ETax.TaxDocumentDiscount.AmountExVatSatang.get -> long
+Themia.ETax.TaxDocumentDiscount.AmountExVatSatang.init -> void
+Themia.ETax.TaxDocumentDiscount.Description.get -> string!
+Themia.ETax.TaxDocumentDiscount.Description.init -> void
+Themia.ETax.TaxDocumentSnapshot.Discount.get -> Themia.ETax.TaxDocumentDiscount?
+Themia.ETax.TaxDocumentSnapshot.Discount.init -> void

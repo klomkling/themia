@@ -137,6 +137,9 @@ public sealed class TaxDocumentRenderer
 
     internal string RenderHtml(TaxDocumentSnapshot snapshot, string templateVersion, TaxDocumentMarker marker, TaxDocumentLogo? logo = null)
     {
+        if (snapshot.Discount is not null && !TaxDocumentTemplates.PrintsDiscount(templateVersion))
+            throw new ArgumentException($"Template version '{templateVersion}' has no rows for a discount; use version 4 to 7.", nameof(templateVersion));
+
         if (snapshot.Form == TaxDocumentForm.Abbreviated)
         {
             var abbreviatedModel = TaxDocumentRenderModel.Build(snapshot, marker, FontCss.Value, TaxDocumentTemplates.EtModeOf(templateVersion));

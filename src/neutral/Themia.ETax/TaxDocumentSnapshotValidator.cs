@@ -24,6 +24,7 @@ public static class TaxDocumentSnapshotValidator
         ValidateNote(snapshot, errors);
         ValidateReplacement(snapshot.Replacement, errors);
         ValidatePayment(snapshot, errors);
+        ValidateDiscount(snapshot, errors);
         ValidateLogo(snapshot, errors);
         ValidateCharacters(snapshot, errors);
         return errors;
@@ -194,7 +195,7 @@ public static class TaxDocumentSnapshotValidator
     private static void ValidateTotalsArithmetic(TaxDocumentSnapshot s, TaxDocumentTotals t, List<TaxDocumentValidationError> errors)
     {
         if (s.Lines is { Count: > 0 } && s.Lines.All(l => l.AmountExVatSatang >= 0)
-            && s.Lines.Aggregate(0L, (sum, l) => checked(sum + l.AmountExVatSatang)) != t.ExVatSatang)
+            && checked(s.Lines.Aggregate(0L, (sum, l) => checked(sum + l.AmountExVatSatang)) - DiscountOf(s)) != t.ExVatSatang)
         {
             Add(errors, TaxDocumentValidationCode.TotalsInconsistent, "totals.ex_vat_satang");
         }
@@ -208,6 +209,42 @@ public static class TaxDocumentSnapshotValidator
             Add(errors, TaxDocumentValidationCode.WithheldExceedsTotal, "totals.withheld_satang");
         if (t.NetReceivedSatang != t.InclVatSatang - t.WithheldSatang)
             Add(errors, TaxDocumentValidationCode.TotalsInconsistent, "totals.net_received_satang");
+    }
+
+    // A malformed discount is reported by ValidateDiscount; the totals check then reads it as zero so one mistake is not reported twice.
+    private static long DiscountOf(TaxDocumentSnapshot s) => s.Discount is { AmountExVatSatang: >= 0 } d ? d.AmountExVatSatang : 0;
+
+    private static void ValidateDiscount(TaxDocumentSnapshot s, List<TaxDocumentValidationError> errors)
+    {
+        if (s.Discount is not { } d)
+            return;
+
+        if (s.Kind != TaxDocumentKind.TaxInvoiceReceipt || s.Form != TaxDocumentForm.Full)
+        {
+            Add(errors, TaxDocumentValidationCode.NotAllowed, "discount");
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(d.Description))
+            Add(errors, TaxDocumentValidationCode.Required, "discount.description");
+        if (d.AmountExVatSatang < 0)
+        {
+            Add(errors, TaxDocumentValidationCode.Malformed, "discount.amount_ex_vat_satang");
+            return;
+        }
+
+        try
+        {
+            var lines = s.Lines is { Count: > 0 } && s.Lines.All(l => l.AmountExVatSatang >= 0)
+                ? s.Lines.Aggregate(0L, (sum, l) => checked(sum + l.AmountExVatSatang))
+                : (long?)null;
+            if (lines is { } sum && d.AmountExVatSatang > sum)
+                Add(errors, TaxDocumentValidationCode.Malformed, "discount.amount_ex_vat_satang");
+        }
+        catch (OverflowException)
+        {
+            // The lines are not a real document; the totals check reports them.
+        }
     }
 
     // The app may price VAT-exclusive (add VAT to the sum) or VAT-inclusive (split the total); either must reproduce the totals.
@@ -338,6 +375,8 @@ public static class TaxDocumentSnapshotValidator
             CheckText(s.Lines[i]?.Description, $"lines[{i}].description", errors);
             CheckText(s.Lines[i]?.Unit, $"lines[{i}].unit", errors);
         }
+
+        CheckText(s.Discount?.Description, "discount.description", errors);
 
         if (s.Note is { } n)
         {

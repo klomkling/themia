@@ -106,6 +106,9 @@ internal static class TaxDocumentPagedModel
 
     private static object Totals(TaxDocumentSnapshot s) => new
     {
+        purchase = s.Discount is null ? null : TaxDocumentRenderModel.Money(s.Lines.Sum(l => l.AmountExVatSatang)),
+        discountLabel = s.Discount?.Description,
+        discount = s.Discount is { } d ? TaxDocumentRenderModel.Money(d.AmountExVatSatang) : null,
         subtotal = TaxDocumentRenderModel.Money(s.Totals.ExVatSatang),
         vat = TaxDocumentRenderModel.Money(s.Totals.VatSatang),
         total = TaxDocumentRenderModel.Money(s.Totals.InclVatSatang),

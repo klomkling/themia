@@ -211,6 +211,8 @@ public sealed class TaxDocumentService
             errors.Add(new TaxDocumentValidationError(TaxDocumentValidationCode.Malformed, "kind"));
         if (snapshot.Payment is { } payment && Enum.IsDefined(payment.Method) && !TaxDocumentTemplates.PrintsPaymentMethod(_templateVersion, payment.Method))
             errors.Add(new TaxDocumentValidationError(TaxDocumentValidationCode.NotAllowed, "payment.method"));
+        if (snapshot.Discount is not null && !TaxDocumentTemplates.PrintsDiscount(_templateVersion))
+            errors.Add(new TaxDocumentValidationError(TaxDocumentValidationCode.NotAllowed, "discount"));
         return errors;
     }
 

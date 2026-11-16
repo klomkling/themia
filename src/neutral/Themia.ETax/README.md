@@ -130,3 +130,19 @@ table keeps its full height. The page size is part of the version, because a doc
   logo's SHA-256 on the document, and copies and the ORIGINAL send print exactly that image; if it is gone the render throws `TaxDocumentLogoException` and the sender
   fails the document with `logo_unavailable`. A document issued without a logo never prints one.
 - **Numbers:** the document number is whatever the number source prints, for example `RTX-6910-000001` (`TaxDocumentNumberOptions.YearStyle`, `Themia.ETax.Data`).
+
+## Discount on a receipt/tax invoice (template versions 4 to 7)
+
+A purchase paid partly or fully with credit prints on one document: purchase, less the discount, the remaining amount, VAT on the remaining amount, total. Set
+`TaxDocumentSnapshot.Discount` (`Description`, `AmountExVatSatang` >= 0 and at most the sum of the lines) and keep the lines at the full purchase ex-VAT.
+`Totals.ExVatSatang` is the remaining amount (sum of the lines minus the discount); `VatSatang`/`InclVatSatang` follow from it, so a discount equal to the lines gives a
+total of zero. Themia does not derive the amounts. To keep the printed total equal to the cash paid, split the cash and take the discount as the difference:
+
+```csharp
+var net = VatMath.Split(cashPaidSatang, rateBasisPoints);                                      // remaining ex-VAT, VAT, total = cash paid
+var discount = VatMath.Split(orderTotalSatang, rateBasisPoints).ExVatSatang - net.ExVatSatang; // lines = Split(orderTotal).ExVatSatang
+```
+
+Splitting the credit on its own can land a satang off the cash paid, and the validator accepts that. Full-form receipts only; notes, the abbreviated form and the
+frozen template versions 1 to 3 refuse a discount (`NotAllowed`, field `discount`). A build older than the one that added the field cannot read a stored snapshot
+that carries it: upgrade every consumer before the first discounted document is issued.

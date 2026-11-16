@@ -35,6 +35,9 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 - `ExternalIdentity.DisplayName` is documented as not stored or logged by Identity (coord #0226), and a three-engine test now guards it: after `ResolveOrProvisionAsync` with a marker name, the marker appears in no text column of any Identity table (found through the engine catalog) and in no log output. No behaviour change.
 
+### Added
+- `Themia.ETax`: an optional `TaxDocumentDiscount` on `TaxDocumentSnapshot.Discount` for a tax invoice/receipt whose purchase was partly or fully paid with credit (coord #0227). The lines keep the full purchase ex-VAT; `Totals.ExVatSatang` is the sum of the lines minus the discount, and VAT is worked out on that remaining amount. Template versions 4 to 7 print purchase / less / remaining / VAT / total, and a document without a discount renders as before. Full-form receipts only; credit and debit notes, abbreviated receipts and the frozen template versions 1 to 3 refuse it (`NotAllowed`, field `discount`). The field is omitted from the stored JSON when absent.
+
 ## [0.64.0] - 2026-11-16
 
 ### Changed

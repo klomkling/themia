@@ -12,6 +12,11 @@ with the *why* and concrete upgrade steps.
 
 ## Unreleased
 
+### Themia.ETax: invoice discount (additive, needs an upgrade order)
+- `TaxDocumentSnapshot.Discount` is optional; nothing changes for a document without one. Issuing a discounted document needs template version `"4"` to `"7"` (`TaxDocumentTemplateOptions.TemplateVersion`); under `"1"` to `"3"` (the default is `"1"`) the issue is refused with `NotAllowed` on `discount`.
+- **Upgrade every Themia consumer before the first discounted document is issued.** The snapshot reader rejects unknown properties, so a build older than this release throws on a stored snapshot that carries `discount`. Rolling back after issuing one leaves those rows unreadable until the upgrade is back.
+- Totals: `ExVatSatang` = sum of the lines - `Discount.AmountExVatSatang` (the "remaining" amount); `VatSatang` and `InclVatSatang` follow from it as before. Keep the total equal to the cash paid with: `net = VatMath.Split(cashPaid, rate)`, `discount = VatMath.Split(orderTotal, rate).ExVatSatang - net.ExVatSatang`. Splitting the credit on its own can print a satang off (101 satang order, 50 credit, 51 paid: the naive split prints 0.50) and the validator accepts it.
+
 ## 0.64.0
 
 ### `Themia.Modules.Identity.*`: sign-in session minted from a fresh user read (not breaking)

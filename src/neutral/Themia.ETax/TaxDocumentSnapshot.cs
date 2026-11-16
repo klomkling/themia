@@ -45,6 +45,13 @@ public sealed record TaxDocumentSnapshot
     /// <summary>Totals.</summary>
     public required TaxDocumentTotals Totals { get; init; }
 
+    /// <summary>
+    /// A discount off the purchase. Full-form tax invoices/receipts only. When present, <see cref="TaxDocumentTotals.ExVatSatang"/> is the sum of the lines minus the
+    /// discount. Omitted from the stored JSON when <see langword="null"/>, so a document without one is byte-identical to one issued before discounts existed;
+    /// a build older than the one that added this property cannot read a document that carries it.
+    /// </summary>
+    public TaxDocumentDiscount? Discount { get; init; }
+
     /// <summary>Required for credit and debit notes, forbidden otherwise.</summary>
     public TaxNoteReference? Note { get; init; }
 
