@@ -16,6 +16,7 @@ public sealed class EfSqlServerIdentityTests(SqlServerIdentityFixture fixture)
 {
     protected override string ConnectionString => fixture.ConnectionString;
     protected override Task ResetAsync() => fixture.ResetAsync();
+    protected override Task<IReadOnlyList<string>> ReadAllTextAsync() => fixture.ReadAllTextAsync();
 
     [Fact] // EF only: the Dapper unit of work keeps its own instance-version residual (see CHANGELOG)
     public Task A_rolled_back_unit_of_work_does_not_leave_the_held_instance_ahead_of_its_row()

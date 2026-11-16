@@ -31,6 +31,10 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 - `Themia.Conversations` attachments (coord #0221-#0224): a post whose staged upload was swept before the commit is now rejected (`AttachmentRejected`) instead of attaching a deleted object; unpaired surrogates are dropped from stored file names; a misconfigured image processor logs one warning (exception type only) while the rejection stays; the name a masker returns goes through the same character filter, length cap and extension as a client's name.
 
+### Changed
+
+- `ExternalIdentity.DisplayName` is documented as not stored or logged by Identity (coord #0226), and a three-engine test now guards it: after `ResolveOrProvisionAsync` with a marker name, the marker appears in no text column of any Identity table (found through the engine catalog) and in no log output. No behaviour change.
+
 ## [0.64.0] - 2026-11-16
 
 ### Changed

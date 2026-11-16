@@ -28,6 +28,39 @@ public sealed class PostgresIdentityFixture : IAsyncLifetime
 
     public async Task DisposeAsync() => await container.DisposeAsync();
 
+    /// <summary>Every value of every text-like column of every table in the identity schema, found through the catalog so a table or column added later is covered.</summary>
+    public async Task<IReadOnlyList<string>> ReadAllTextAsync()
+    {
+        await using var connection = new NpgsqlConnection(ConnectionString);
+        await connection.OpenAsync();
+        var columns = new List<(string Table, string Column)>();
+        await using (var catalog = connection.CreateCommand())
+        {
+            catalog.CommandText =
+                "SELECT table_name, column_name FROM information_schema.columns " +
+                "WHERE table_schema = 'identity' AND data_type IN ('text', 'character varying', 'character', 'json', 'jsonb');";
+            await using var reader = await catalog.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                columns.Add((reader.GetString(0), reader.GetString(1)));
+            }
+        }
+
+        var values = new List<string>();
+        foreach (var (table, column) in columns)
+        {
+            await using var select = connection.CreateCommand();
+            select.CommandText = $"SELECT \"{column}\"::text FROM identity.\"{table}\" WHERE \"{column}\" IS NOT NULL;";
+            await using var reader = await select.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                values.Add(reader.GetString(0));
+            }
+        }
+
+        return values;
+    }
+
     public async Task ResetAsync()
     {
         await using var connection = new NpgsqlConnection(ConnectionString);
