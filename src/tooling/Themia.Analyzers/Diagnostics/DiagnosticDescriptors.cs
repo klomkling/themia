@@ -43,4 +43,13 @@ internal static class DiagnosticDescriptors
         "DbSet.Find/FindAsync bypasses Themia's tenant post-check for already-tracked entities; use " +
         "DbContext.FindAsync<T>() or IReadRepository.GetByIdAsync(). Suppress THEMIA104 with a " +
         "justification for a deliberate bypass.");
+
+    public static readonly DiagnosticDescriptor ExceptionMessageInLog = ThemiaDiagnostics.CreateWarning(
+        "THEMIA105",
+        "Exception text passed to a logging call",
+        "'{0}' puts exception text in a log line; a library exception message can carry personal data. Log a fixed " +
+        "message, the ids and ex.GetType().Name, and pass the exception object as the exception argument only where " +
+        "the stack trace is needed. Suppress THEMIA105 with a justification when the text is known to be safe.",
+        "Themia.Privacy",
+        "https://github.com/klomkling/themia/blob/main/docs/analyzers/THEMIA105.md");
 }

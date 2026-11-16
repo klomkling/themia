@@ -27,6 +27,14 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+### Added
+
+- `Themia.Analyzers` THEMIA105 (Warning, category `Themia.Privacy`): flags exception text passed to a logging call (`ex.Message`, `ex.ToString()`, an `InnerException` message, or the exception object itself used as a template argument, in `ILogger` extension methods, `ILogger.Log`, `[LoggerMessage]` methods and `LoggerMessage.Define` delegates). A library exception message can carry personal data. The exception argument and `ex.GetType().Name` stay allowed. It ships in the same analyzer package as THEMIA101-104, so an app that references a Themia data package gets it on the next bump. See `docs/analyzers/THEMIA105.md`.
+
+### Changed
+
+- Log templates that carried exception text no longer do: `Themia.Mediator` `LoggingBehavior` drops `{ErrorMessage}` (the exception object is still the log's exception), and `Themia.MultiTenancy` `TenantResolutionMiddleware` logs `{ExceptionType}` instead of `{Reason}` for an identifier that cannot be bridged. Dashboards or alerts keyed on those properties need the new names.
+
 ## [0.65.0] - 2026-11-16
 
 ### Fixed

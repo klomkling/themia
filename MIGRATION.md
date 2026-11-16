@@ -12,6 +12,16 @@ with the *why* and concrete upgrade steps.
 
 ## Unreleased
 
+### THEMIA105: exception text in a logging call (build warning)
+
+**What changed.** `Themia.Analyzers` has a new rule, THEMIA105, a Warning like THEMIA101-104. It reaches an app through any Themia data package (`Themia.Framework.Data.Dapper`, `.EFCore`, `.Abstractions`) with no csproj change.
+
+**Why.** A library exception message can carry personal data (a failing serializer or store call echoing the value it rejected), and a log line is retained and shipped.
+
+**How to upgrade.** On the first build after the bump, an app that builds with warnings as errors fails on each hit until it is fixed or suppressed. Fix first: log a fixed message, the ids and `ex.GetType().Name`; pass `ex` as the exception argument only where the stack trace is needed. Passing `ex` does NOT keep personal data out of the log: a console or file sink renders `ex.ToString()`, message included. To justify a hit: `#pragma warning disable THEMIA105` or `[SuppressMessage("Themia.Privacy", "THEMIA105", Justification = "...")]`. To soften it, set `dotnet_diagnostic.THEMIA105.severity = suggestion` in `.editorconfig`. A project with no Themia data package reference gets the rule by adding `<PackageReference Include="Themia.Analyzers" PrivateAssets="all" />`.
+
+**Behaviour note.** `LoggingBehavior` (Mediator) and `TenantResolutionMiddleware` (MultiTenancy) changed a log property name, see the CHANGELOG.
+
 ## 0.65.0
 
 ### Themia.ETax: invoice discount (additive, needs an upgrade order)

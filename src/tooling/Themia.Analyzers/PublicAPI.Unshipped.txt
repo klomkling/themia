@@ -15,3 +15,7 @@ Themia.Analyzers.SwallowLogRethrowAnalyzer
 Themia.Analyzers.SwallowLogRethrowAnalyzer.SwallowLogRethrowAnalyzer() -> void
 Themia.Analyzers.SyncOverAsyncAnalyzer
 Themia.Analyzers.SyncOverAsyncAnalyzer.SyncOverAsyncAnalyzer() -> void
+override Themia.Analyzers.ExceptionMessageInLogAnalyzer.Initialize(Microsoft.CodeAnalysis.Diagnostics.AnalysisContext! context) -> void
+override Themia.Analyzers.ExceptionMessageInLogAnalyzer.SupportedDiagnostics.get -> System.Collections.Immutable.ImmutableArray<Microsoft.CodeAnalysis.DiagnosticDescriptor!>
+Themia.Analyzers.ExceptionMessageInLogAnalyzer
+Themia.Analyzers.ExceptionMessageInLogAnalyzer.ExceptionMessageInLogAnalyzer() -> void
