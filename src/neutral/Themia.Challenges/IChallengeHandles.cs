@@ -23,8 +23,12 @@ namespace Themia.Challenges;
 /// lookup and no counter row; bounding garbage handles is the app's per-IP limiter.
 /// </para>
 /// <para>
-/// The brute-force bound is unchanged: guesses are charged to a challenge, and challenges are bounded by
-/// issuance (<see cref="PurposeOptions.PerScopeWindow"/> times <see cref="PurposeOptions.MaxAttempts"/>).
+/// The brute-force bound changes shape. Guesses are charged to a challenge, and challenges are bounded by
+/// issuance, so the total per key and window is <see cref="PurposeOptions.PerScopeWindow"/> (and
+/// <see cref="ChallengeOptions.PerKeyWindow"/>) times <see cref="PurposeOptions.MaxAttempts"/>. The per-key
+/// <see cref="ChallengeOptions.VerifyWindow"/> no longer caps it: at 3 issues per 15 minutes and 5 attempts that
+/// is 15 guesses where the scope-keyed path allowed 10. Keep <c>PerScopeWindow.Limit x MaxAttempts</c> at or
+/// below the old <see cref="ChallengeOptions.VerifyWindow"/> limit if the bound must not grow.
 /// Set <see cref="PurposeOptions.MaxLiveChallenges"/> to 2 or more for handle flows, so a stranger's issue
 /// does not void the owner's live challenge, and set <see cref="PurposeOptions.RequireHandle"/> so no
 /// scope-keyed verify is left that could still spend the shared budget.

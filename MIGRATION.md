@@ -25,6 +25,8 @@ with the *why* and concrete upgrade steps.
 4. Keep a per-IP limiter on issue and on verify as defence in depth: an unknown handle costs one primary-key lookup and is not counted.
 5. Never pass a client-supplied handle to `RefundAsync`; it takes the same id and a refund is a server-side decision.
 
+**Brute-force bound.** It is now issuance x `MaxAttempts` per key and window (`PerScopeWindow`/`PerKeyWindow`), because the per-key `VerifyWindow` no longer caps handle verifies: 3 issues per 15 minutes x 5 attempts is 15 guesses, against 10 on the scope-keyed path. Keep `PerScopeWindow.Limit x MaxAttempts` at or below the old `VerifyWindow.Limit` if it must not grow.
+
 **Not covered.** A stranger can still spend the issue quota (`PerScopeWindow`, `PerKeyWindow`) of an address, so the owner cannot request a new code; the owner's already-live code keeps working.
 
 ## 0.66.0
