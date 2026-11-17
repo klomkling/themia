@@ -35,7 +35,7 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ### Changed
 
-- Build requirement: the analyzers (`Themia.Analyzers`, `Themia.SourceGenerator`) now reference Roslyn 5.12 (`Microsoft.CodeAnalysis` 5.12.0, bumped in 0.66.0). A compiler older than 5.12 (an older .NET SDK) refuses to load them with `CS9057` ("Analyzer assembly ... references version '5.12.0.0' of the compiler, which is newer than the currently running version"); the build then fails instead of the THEMIA rules silently not running. Use a current .NET 10 SDK. See MIGRATION.
+- Build requirement: the analyzers (`Themia.Analyzers`, `Themia.SourceGenerator`) now reference Roslyn 5.12 (`Microsoft.CodeAnalysis` 5.12.0, bumped in 0.66.0). A compiler older than 5.12 (an older .NET SDK) refuses to load them with `CS9057` ("Analyzer assembly ... references version '5.12.0.0' of the compiler, which is newer than the currently running version"). `CS9057` is a warning by default (an error only under `TreatWarningsAsErrors`), and the THEMIA rules do not run while it is reported. Use a current .NET 10 SDK. See MIGRATION.
 
 ## [0.66.0] - 2026-11-17
 
