@@ -27,15 +27,21 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.67.1] - 2026-11-18
+
+### Fixed
+
+- `Themia.Analyzers`, `Themia.SourceGenerator`, `Themia.Generators.Abstractions`: build against Roslyn 5.0.0 again (coord #0234). 0.66.0 and 0.67.0 referenced 5.12.0, which no released .NET SDK can load (`CS9057`: no THEMIA rule ran, the source generator did not run, consumers failed with `CS1061` on `ApplicationGeneratedServiceRegistration`). The pin is now a floor set by the oldest supported SDK (`eng/floor-sdk.txt`, 10.0.100), Dependabot ignores `Microsoft.CodeAnalysis.CSharp`/`.Analyzers`, and the `Analyzer flow` CI job builds a consumer on that SDK and fails on `CS9057`/`CS8032`. No API change.
+
 ## [0.67.0] - 2026-11-18
 
 ### Added
 
 - `Themia.Challenges`: `IChallengeHandles.VerifyByHandleAsync(handle, purpose, code, tenantId)` verifies a code against the one challenge a sender-held handle (the `ChallengeId` the issue call returned) names, and `PurposeOptions.RequireHandle` makes `VerifyAsync`/`PeekAsync` throw for a purpose so no scope-keyed verify is left (coord #0232). Nothing is charged until the handle resolves; the charge is a per-handle `VerifyWindow` bucket (reserved purpose `__themia_handle_verify__`), and only the handle's own row loses an attempt. Closes the lockout where a stranger who knows an address spends the owner's `VerifyWindow` and attempt budget. Additive: no schema change, `IChallengeService` unchanged.
 
-### Changed
+### Known issue
 
-- Build requirement: the analyzers (`Themia.Analyzers`, `Themia.SourceGenerator`) now reference Roslyn 5.12 (`Microsoft.CodeAnalysis` 5.12.0, bumped in 0.66.0). A compiler older than 5.12 (an older .NET SDK) refuses to load them with `CS9057` ("Analyzer assembly ... references version '5.12.0.0' of the compiler, which is newer than the currently running version"). `CS9057` is a warning by default (an error only under `TreatWarningsAsErrors`), and the THEMIA rules do not run while it is reported. Use a current .NET 10 SDK. See MIGRATION.
+- 0.66.0 and 0.67.0 are not usable: the analyzers and the source generator reference Roslyn 5.12 (`Microsoft.CodeAnalysis.CSharp` bumped by Dependabot), and no released .NET SDK ships a compiler that new (10.0.403/10.0.404 run 5.9). Every build reports `CS9057`, no THEMIA rule runs, and a consumer of the source generator fails with `CS1061` on `ApplicationGeneratedServiceRegistration`. Fixed in 0.67.1; do not use 0.66.0 or 0.67.0. (An earlier note here told adopters to update the SDK; there is no SDK to update to.)
 
 ## [0.66.0] - 2026-11-17
 
