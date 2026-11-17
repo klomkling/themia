@@ -497,3 +497,21 @@ Themia.Conversations.PostOutcome.QuotaExceeded = 6 -> Themia.Conversations.PostO
 override Themia.Conversations.Migrations.ConversationAttachmentUploadsMigration.Down() -> void
 override Themia.Conversations.Migrations.ConversationAttachmentUploadsMigration.Up() -> void
 static Themia.Conversations.DependencyInjection.ConversationServiceCollectionExtensions.AddThemiaConversationAttachments(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+Themia.Conversations.OversightRead.AttachmentId.get -> System.Guid?
+Themia.Conversations.OversightRead.AttachmentId.init -> void
+Themia.Conversations.OversightOpenOutcome
+Themia.Conversations.OversightOpenOutcome.Opened = 0 -> Themia.Conversations.OversightOpenOutcome
+Themia.Conversations.OversightOpenOutcome.Refused = 1 -> Themia.Conversations.OversightOpenOutcome
+Themia.Conversations.OversightOpenOutcome.AuditPortMissing = 2 -> Themia.Conversations.OversightOpenOutcome
+Themia.Conversations.OversightOpenOutcome.AuditFailed = 3 -> Themia.Conversations.OversightOpenOutcome
+Themia.Conversations.OversightOpenResult
+Themia.Conversations.OversightOpenResult.Attachment.get -> Themia.Conversations.AttachmentInfo?
+Themia.Conversations.OversightOpenResult.Attachment.init -> void
+Themia.Conversations.OversightOpenResult.Opened.get -> bool
+Themia.Conversations.OversightOpenResult.Outcome.get -> Themia.Conversations.OversightOpenOutcome
+Themia.Conversations.OversightOpenResult.Outcome.init -> void
+Themia.Conversations.OversightOpenResult.OversightOpenResult(Themia.Conversations.OversightOpenOutcome Outcome, System.Uri? Url, Themia.Conversations.AttachmentInfo? Attachment) -> void
+Themia.Conversations.OversightOpenResult.Url.get -> System.Uri?
+Themia.Conversations.OversightOpenResult.Url.init -> void
+Themia.Conversations.IConversationOversightAttachments
+Themia.Conversations.IConversationOversightAttachments.OpenAsync(Themia.Conversations.ConversationActor! actor, string! tenantId, System.Guid conversationId, System.Guid attachmentId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Conversations.OversightOpenResult!>!

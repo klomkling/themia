@@ -76,7 +76,7 @@ public static class ConversationServiceCollectionExtensions
     }
 
     /// <summary>
-    /// Turns on <see cref="IConversationAttachments"/>. It needs an <see cref="IStorageProvider"/> and a Themia.Imaging <see cref="IImageProcessor"/> (<c>AddThemiaImaging</c>)
+    /// Turns on <see cref="IConversationAttachments"/> and <see cref="IConversationOversightAttachments"/>. It needs an <see cref="IStorageProvider"/> and a Themia.Imaging <see cref="IImageProcessor"/> (<c>AddThemiaImaging</c>)
     /// and fails at startup, not at the first upload, when either is missing. Call it after <c>AddThemiaConversations</c> and the storage and imaging registrations.
     /// </summary>
     /// <param name="services">The service collection.</param>
@@ -93,6 +93,11 @@ public static class ConversationServiceCollectionExtensions
 
             return sp.GetRequiredService<ConversationService>();
         });
+        services.TryAddSingleton<IConversationOversightAttachments>(sp => new ConversationOversightAttachmentService(
+            sp.GetRequiredService<ConversationService>(),
+            sp.GetService<IConversationReadAudit>(),
+            sp.GetRequiredService<TimeProvider>(),
+            sp.GetRequiredService<ILogger<ConversationOversightAttachmentService>>()));
         services.AddHostedService<AttachmentSupportCheck>();
         return services;
     }

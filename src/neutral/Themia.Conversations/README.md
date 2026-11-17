@@ -121,6 +121,12 @@ var erased = await dataSubject.ErasePersonAsync(dsrActor, tenantId, PersonRef.Fo
 - **PDFs are stored as uploaded** (only images are re-encoded), so a PDF can carry active content or its own metadata; the forced attachment disposition is what keeps a browser from rendering it on your origin. Startup logs a warning when the storage is the local provider, which cannot force it.
 - **Not covered:** virus scan. Redaction today happens only through erasure, which deletes the person's files with the message bodies (tested); there is no staff-redact call yet, and one added later must delete the files of the message it redacts. An erasure that races an upload still in flight can leave that one object only if the process also crashes before it finishes.
 
+### Staff oversight open of a file
+
+`IConversationOversightAttachments.OpenAsync(actor, tenantId, conversationId, attachmentId)` gives staff a short-lived download URL for a file in a room they are not in. It follows the same order as `ReadAsync`: member with a user reference, policy `OversightRead`, audit port present, then one transaction that checks the room is not `Purging`, finds the file in that room and tenant, writes the audit row (`OversightRead` with `AttachmentId` set, `Count` 1) and commits. The URL is signed only after the commit; if the audit fails the outcome is `AuditFailed` and no URL exists. The staff member does not become a participant and no read marker moves. The file name goes through the masker like for a member.
+
+- **Not covered:** an erasure that deletes the file while the URL is being issued can hand out a URL to an object that is already gone (404 at fetch); member `OpenAsync` has the same race.
+
 ## Notification drain
 
 `IConversationNotifications.DrainAsync(DrainOptions? options, ct)` batches unread messages into one notification per recipient and hands each to your `IConversationNotificationSubscriber`; the package sends nothing itself. Schedule the call from your own job (for example on `Themia.Scheduling`); several nodes may run it at once.
