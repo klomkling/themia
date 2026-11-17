@@ -32,9 +32,16 @@ public sealed record OversightPage(OversightReadOutcome Outcome, IReadOnlyList<C
 /// <param name="ConversationId">The conversation that was read.</param>
 /// <param name="ActorKind">The kind of the reading actor (always a member).</param>
 /// <param name="ActorUserRef">The opaque user reference of the reader, in the app's namespace.</param>
-/// <param name="Count">How many messages the page held (0 for an empty page: the room was still opened).</param>
+/// <param name="Count">How many messages the page held (0 for an empty page: the room was still opened). For a file open (<see cref="AttachmentId"/> set) it is always 1.</param>
 /// <param name="ReadAt">When the read happened (the package's clock), so the port can bucket reads.</param>
-public sealed record OversightRead(string TenantId, Guid ConversationId, ConversationActorKind ActorKind, string ActorUserRef, int Count, DateTimeOffset ReadAt);
+public sealed record OversightRead(string TenantId, Guid ConversationId, ConversationActorKind ActorKind, string ActorUserRef, int Count, DateTimeOffset ReadAt)
+{
+    /// <summary>
+    /// The attachment that was opened, or null for a page read. A port that does not store it records a file open as a one-message read, so a port must persist it,
+    /// and a dedupe that ignores it hides downloads behind an earlier page read.
+    /// </summary>
+    public Guid? AttachmentId { get; init; }
+}
 
 /// <summary>
 /// Staff reading a conversation they are not a participant of. Only a member with a user reference can do it, the policy must allow
@@ -60,7 +67,7 @@ public interface IConversationOversight
 /// The audit trail of oversight reads. No default is registered: without one, <see cref="IConversationOversight.ReadAsync"/> answers
 /// <see cref="OversightReadOutcome.AuditPortMissing"/>. Called inside the read transaction, so what it writes commits with the read or not at all.
 /// The port must let a failure propagate: one that catches its own SQL error and carries on can leave the transaction unusable (PostgreSQL aborts it),
-/// and the read then answers <see cref="OversightReadOutcome.AuditFailed"/>. A single registration serves every read, so it must be safe for concurrent use. The app owns deduplication (for example one row per reader and conversation per 15 minutes, using <see cref="OversightRead.ReadAt"/>) and the retention of the trail.
+/// and the read then answers <see cref="OversightReadOutcome.AuditFailed"/>. A single registration serves every read, so it must be safe for concurrent use. The app owns deduplication (for example one row per reader and conversation per 15 minutes, using <see cref="OversightRead.ReadAt"/>; a file open carries <see cref="OversightRead.AttachmentId"/>, so key the dedupe on it too, or downloads vanish behind an earlier read) and the retention of the trail.
 /// </summary>
 public interface IConversationReadAudit
 {

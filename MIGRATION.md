@@ -22,6 +22,10 @@ with the *why* and concrete upgrade steps.
 
 **Behaviour note.** `LoggingBehavior` (Mediator) and `TenantResolutionMiddleware` (MultiTenancy) changed a log property name, see the CHANGELOG.
 
+### Conversations: audit entries for oversight file opens (additive)
+
+`OversightRead` has a new init-only `Guid? AttachmentId`, set when staff open a file through `IConversationOversightAttachments` (then `Count` is 1). Existing `IConversationReadAudit` ports compile unchanged, but a port that does not store `AttachmentId` records an open as a one-message read, and a dedupe that ignores it (for example one row per reader and conversation per 15 minutes) hides downloads. Persist it and key the dedupe on it. A policy that grants `OversightRead` now also allows staff to download the room's files; narrow the policy if that is not wanted.
+
 ## 0.65.0
 
 ### Themia.ETax: invoice discount (additive, needs an upgrade order)

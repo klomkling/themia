@@ -119,7 +119,7 @@ internal sealed partial class ConversationService
     {
         ConversationInput.Actor(actor);
         ConversationInput.Tenant(tenantId, nameof(tenantId));
-        var (storage, _) = RequireAttachmentSupport();
+        _ = RequireAttachmentSupport();
         var refused = new OpenAttachmentResult(OpenAttachmentOutcome.Refused, null, null);
 
         if (!await AllowedAsync(actor, tenantId, conversationId, ConversationAction.Read, cancellationToken))
@@ -133,17 +133,23 @@ internal sealed partial class ConversationService
             return refused;
         }
 
-        var row = await connection.QuerySingleOrDefaultAsync<AttachmentRow>(new CommandDefinition(
+        var row = await FindAttachmentAsync(connection, null, tenantId, conversationId, attachmentId, cancellationToken);
+        return row is null ? refused : await IssueDownloadAsync(row, actor.Kind, cancellationToken);
+    }
+
+    /// <summary>The attachment of a conversation, scoped by tenant and conversation, or null. Runs inside <paramref name="transaction"/> when one is given.</summary>
+    internal async Task<AttachmentRow?> FindAttachmentAsync(DbConnection connection, DbTransaction? transaction, string tenantId, Guid conversationId, Guid attachmentId, CancellationToken cancellationToken) =>
+        await connection.QuerySingleOrDefaultAsync<AttachmentRow>(new CommandDefinition(
             "SELECT id AS Id, storage_key AS StorageKey, file_name AS FileName, content_type AS ContentType, size AS Size FROM conversation_attachments " +
             "WHERE tenant_id = @TenantId AND conversation_id = @ConversationId AND id = @AttachmentId;",
             new { TenantId = tenantId, ConversationId = conversationId, AttachmentId = attachmentId },
-            cancellationToken: cancellationToken));
-        if (row is null)
-        {
-            return refused;
-        }
+            transaction, cancellationToken: cancellationToken));
 
-        row.FileName = MaskFileName(actor.Kind, row.FileName, row.ContentType);
+    /// <summary>Masks the file name for <paramref name="viewer"/> and signs a short-lived download-only URL. Does no database work, so it can run after a commit.</summary>
+    internal async Task<OpenAttachmentResult> IssueDownloadAsync(AttachmentRow row, ConversationActorKind viewer, CancellationToken cancellationToken)
+    {
+        var (storage, _) = RequireAttachmentSupport();
+        row.FileName = MaskFileName(viewer, row.FileName, row.ContentType);
         var url = await storage.GetPresignedUrlAsync(
             row.StorageKey,
             new PresignedUrlRequest(PresignedUrlOperation.Get, options.AttachmentDownloadLifetime) { ContentDisposition = AttachmentFileName.ContentDisposition(row.FileName) },
@@ -372,7 +378,7 @@ internal sealed partial class ConversationService
         return result;
     }
 
-    private sealed class AttachmentRow
+    internal sealed class AttachmentRow
     {
         public Guid Id { get; set; }
 
