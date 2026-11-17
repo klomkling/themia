@@ -64,9 +64,9 @@ public sealed class TenantResolutionMiddleware
             // Non-null but invalid identifier (length > 100, or a character outside the allowed set:
             // letters and digits are Unicode-aware via char.IsLetterOrDigit; '-' and '_' are also allowed).
             logger.LogWarning(
-                "Resolved tenant identifier '{TenantIdentifier}' could not be bridged to the framework tenant context ({Reason}); proceeding with no tenant context.",
+                "Resolved tenant identifier '{TenantIdentifier}' could not be bridged to the framework tenant context ({ExceptionType}); proceeding with no tenant context.",
                 identifier,
-                ex.Message);
+                ex.GetType().Name);
             bridgedTenantId = null;
         }
 
