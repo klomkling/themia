@@ -64,6 +64,9 @@ public abstract class ChallengeEngineFixture : IAsyncLifetime
     /// (<see cref="PurposeOptions.InvalidateSiblingsOnVerify"/>, coord #0192).</summary>
     public const string SiblingPurpose = "sibling-void";
 
+    /// <summary>A numeric code verified by handle (coord #0232): two live challenges allowed, so a stranger's issue voids nothing.</summary>
+    public const string HandlePurpose = "handle-otp";
+
     /// <summary><see cref="SiblingPurpose"/> as an opaque-token link, redeemed by <c>VerifyByTokenAsync</c>.</summary>
     public const string SiblingTokenPurpose = "sibling-void-token";
 
@@ -72,6 +75,9 @@ public abstract class ChallengeEngineFixture : IAsyncLifetime
     /// <summary>The live <see cref="IChallengeService"/>, resolved from DI exactly as an adopter would —
     /// every functional assertion in this project goes through this, never the dialect directly.</summary>
     public IChallengeService Service { get; private set; } = null!;
+
+    /// <summary>The live <see cref="IChallengeHandles"/>, resolved from DI as an adopter would.</summary>
+    public IChallengeHandles Handles { get; private set; } = null!;
 
     /// <summary>The engine's <see cref="IChallengeDialect"/> — used only for the raw-SQL assertions no
     /// public API exposes: schema existence, reading a persisted row's actual columns, and (SQL Server
@@ -120,6 +126,7 @@ public abstract class ChallengeEngineFixture : IAsyncLifetime
         provider = services.BuildServiceProvider();
 
         Service = provider.GetRequiredService<IChallengeService>();
+        Handles = provider.GetRequiredService<IChallengeHandles>();
         Dialect = provider.GetRequiredService<IChallengeDialect>();
         Options = provider.GetRequiredService<ChallengeOptions>();
         TimeProvider = provider.GetRequiredService<TimeProvider>();
@@ -176,6 +183,12 @@ public abstract class ChallengeEngineFixture : IAsyncLifetime
         options.ConfigurePurpose(OtherTokenPurpose, p =>
         {
             p.Format = ChallengeFormat.OpaqueToken(32);
+            p.PerScopeWindow = (1_000, TimeSpan.FromMinutes(15));
+        });
+        options.ConfigurePurpose(HandlePurpose, p =>
+        {
+            p.MaxLiveChallenges = 2;
+            p.RequireHandle = true;
             p.PerScopeWindow = (1_000, TimeSpan.FromMinutes(15));
         });
         options.ConfigurePurpose(SiblingPurpose, p =>

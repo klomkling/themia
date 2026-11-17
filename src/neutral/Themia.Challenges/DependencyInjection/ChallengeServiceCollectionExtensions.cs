@@ -60,6 +60,9 @@ public static class ChallengeServiceCollectionExtensions
             return new ChallengeService(dialect, sp.GetRequiredService<ChallengeOptions>(), sp.GetRequiredService<TimeProvider>(), logger);
         });
 
+        // The same scoped ChallengeService instance as IChallengeService, not a second one.
+        services.TryAddScoped<IChallengeHandles>(sp => (IChallengeHandles)sp.GetRequiredService<IChallengeService>());
+
         // Registered regardless of ChallengeOptions.PurgeEnabled and regardless of whether an engine
         // package has registered an IChallengeDialect yet: ChallengePurgeService checks both itself on
         // every poll, the same way OutboxDrainer's purge dialect is optional. This avoids forcing

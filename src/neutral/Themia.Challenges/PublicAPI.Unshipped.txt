@@ -125,3 +125,8 @@ Themia.Challenges.IChallengeDialect.IsDeadlock(System.Data.Common.DbException! e
 Themia.Challenges.PurposeOptions.InvalidateSiblingsOnVerify.get -> bool
 Themia.Challenges.PurposeOptions.InvalidateSiblingsOnVerify.set -> void
 Themia.Challenges.IChallengeService.InvalidateLiveAsync(Themia.Challenges.ChallengeScope! scope, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<int>!
+const Themia.Challenges.ChallengeOptions.HandleVerifyBucketPurpose = "__themia_handle_verify__" -> string!
+Themia.Challenges.IChallengeHandles
+Themia.Challenges.IChallengeHandles.VerifyByHandleAsync(System.Guid handle, string! purpose, string! code, string? tenantId = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Challenges.ChallengeVerifyResult!>!
+Themia.Challenges.PurposeOptions.RequireHandle.get -> bool
+Themia.Challenges.PurposeOptions.RequireHandle.set -> void

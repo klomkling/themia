@@ -50,7 +50,7 @@ namespace Themia.Challenges.Internal;
 /// close it, but "invalidate everything or nothing" is what the shipped dialects currently offer.
 /// </para>
 /// </remarks>
-internal sealed class ChallengeService : IChallengeService
+internal sealed class ChallengeService : IChallengeService, IChallengeHandles
 {
     private readonly IChallengeDialect dialect;
     private readonly ChallengeOptions options;
@@ -527,6 +527,12 @@ internal sealed class ChallengeService : IChallengeService
         ArgumentException.ThrowIfNullOrEmpty(code);
 
         var purpose = options.GetPurpose(scope.Purpose);
+        if (purpose.RequireHandle)
+        {
+            throw new InvalidOperationException(
+                $"Purpose '{scope.Purpose}' requires a challenge handle (PurposeOptions.RequireHandle); use IChallengeHandles.VerifyByHandleAsync.");
+        }
+
         var now = timeProvider.GetUtcNow();
 
         await using var connection = dialect.CreateConnection();
@@ -665,6 +671,117 @@ internal sealed class ChallengeService : IChallengeService
             : ChallengeVerifyResult.Incorrect(scope);
         logger.LogInformation("Challenge verify {Outcome} for purpose {Purpose}", mismatchOutcome.Outcome, scope.Purpose);
         return mismatchOutcome;
+    }
+
+    /// <inheritdoc />
+    public async Task<ChallengeVerifyResult> VerifyByHandleAsync(
+        Guid handle, string purpose, string code, string? tenantId = null, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(purpose);
+        ArgumentException.ThrowIfNullOrEmpty(code);
+
+        var purposeOptions = options.GetPurpose(purpose);
+        var now = timeProvider.GetUtcNow();
+        var unresolved = new ChallengeScope(ChallengeScope.UnresolvedKey, purpose, tenantId);
+
+        await using var connection = dialect.CreateConnection();
+
+        // Nothing is charged until the handle resolves: a counter row for a random Guid would let anyone
+        // create rate-window rows at will, and a charge before the lookup is the defect this method exists
+        // to remove. One outcome for unknown, wrong purpose and wrong tenant, as VerifyByTokenAsync does.
+        var row = await connection.QueryFirstOrDefaultAsync<ChallengeRow>(new CommandDefinition(
+            dialect.SelectByIdSql, new { Id = handle }, cancellationToken: cancellationToken));
+        if (row is null
+            || !string.Equals(row.Purpose, purpose, StringComparison.Ordinal)
+            || !string.Equals(row.TenantId, tenantId, StringComparison.Ordinal))
+        {
+            logger.LogInformation("Challenge handle verify NotFound for purpose {Purpose}", purpose);
+            return ChallengeVerifyResult.NotFound(unresolved);
+        }
+
+        var scope = new ChallengeScope(row.Key, row.Purpose, row.TenantId);
+
+        // Keyed by the handle, not by the address: ISSUE is anonymous, so a stranger can obtain a handle for
+        // the same address, and a per-address bucket would let them spend the owner's allowance again.
+        var windowStart = FloorToWindowStart(now, options.VerifyWindow.Window);
+        var handleCount = await IncrementWindowAsync(
+            connection,
+            new ChallengeScope(row.Id.ToString("N"), purpose, row.TenantId),
+            ChallengeOptions.HandleVerifyBucketPurpose,
+            windowStart,
+            cancellationToken);
+        if (handleCount > options.VerifyWindow.Limit)
+        {
+            logger.LogInformation("Challenge handle verify rate-limited for purpose {Purpose}", purpose);
+            return ChallengeVerifyResult.RateLimited(scope, RetryAfterFrom(windowStart + options.VerifyWindow.Window, now));
+        }
+
+        // Classified from the handle's own row. ClassifyMissingAsync reads the newest row of the scope and
+        // would answer for someone else's challenge. A voided row has consumed_at set, so it reads Consumed.
+        if (row.ConsumedAt is not null)
+        {
+            return HandleOutcome(ChallengeVerifyResult.Consumed(scope), purpose);
+        }
+
+        // Expiry is decided in SQL, never by comparing row.ExpiresAt here: MySQL DATETIME drops the offset, so
+        // the value read back is not comparable with a DateTimeOffset. The live query filters on expires_at
+        // with @Now; the handle's row not being in it, while unconsumed, means it expired.
+        var liveRows = await connection.QueryAsync<ChallengeRow>(new CommandDefinition(
+            dialect.SelectLiveByScopeSql(TenancyOf(scope)), LiveByScopeParams(scope, now), cancellationToken: cancellationToken));
+        var live = liveRows.FirstOrDefault(candidate => candidate.Id == row.Id);
+        if (live is null)
+        {
+            return HandleOutcome(ChallengeVerifyResult.Expired(scope), purpose);
+        }
+
+        row = live;
+
+        if (row.Attempts >= purposeOptions.MaxAttempts)
+        {
+            return HandleOutcome(ChallengeVerifyResult.AttemptsExhausted(scope), purpose);
+        }
+
+        if (SecretHasher.Verify(code, row.SecretHash, row.SecretSalt))
+        {
+            var won = await TryConsumeAsync(connection, row.Id, scope, purposeOptions, now, cancellationToken);
+            if (won)
+            {
+                return HandleOutcome(ChallengeVerifyResult.Verified(scope), purpose);
+            }
+
+            return HandleOutcome(
+                await IsSpentBudgetAsync(connection, row.Id, purposeOptions, cancellationToken)
+                    ? ChallengeVerifyResult.AttemptsExhausted(scope)
+                    : ChallengeVerifyResult.Consumed(scope),
+                purpose);
+        }
+
+        // Only this row is charged: the handle names one challenge. Rows affected 0 means it was consumed,
+        // voided or spent between the SELECT and now, so re-read it instead of guessing.
+        var charged = await connection.ExecuteAsync(new CommandDefinition(
+            dialect.RecordAttemptSql, new { row.Id, purposeOptions.MaxAttempts }, cancellationToken: cancellationToken));
+        if (charged == 0)
+        {
+            var current = await connection.QueryFirstOrDefaultAsync<ChallengeRow>(new CommandDefinition(
+                dialect.SelectByIdSql, new { Id = handle }, cancellationToken: cancellationToken));
+            return HandleOutcome(
+                current is { ConsumedAt: null } && current.Attempts >= purposeOptions.MaxAttempts
+                    ? ChallengeVerifyResult.AttemptsExhausted(scope)
+                    : ChallengeVerifyResult.Consumed(scope),
+                purpose);
+        }
+
+        return HandleOutcome(
+            row.Attempts + 1 >= purposeOptions.MaxAttempts
+                ? ChallengeVerifyResult.AttemptsExhausted(scope)
+                : ChallengeVerifyResult.Incorrect(scope),
+            purpose);
+    }
+
+    private ChallengeVerifyResult HandleOutcome(ChallengeVerifyResult result, string purpose)
+    {
+        logger.LogInformation("Challenge handle verify {Outcome} for purpose {Purpose}", result.Outcome, purpose);
+        return result;
     }
 
     /// <inheritdoc />
