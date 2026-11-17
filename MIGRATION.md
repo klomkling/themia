@@ -12,6 +12,8 @@ with the *why* and concrete upgrade steps.
 
 ## Unreleased
 
+## 0.66.0
+
 ### THEMIA105: exception text in a logging call (build warning)
 
 **What changed.** `Themia.Analyzers` has a new rule, THEMIA105, a Warning like THEMIA101-104. It reaches an app through any Themia data package (`Themia.Framework.Data.Dapper`, `.EFCore`, `.Abstractions`) with no csproj change.

@@ -27,6 +27,8 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.66.0] - 2026-11-17
+
 ### Added
 
 - `Themia.Analyzers` THEMIA105 (Warning, category `Themia.Privacy`): flags exception text passed to a logging call (`ex.Message`, `ex.ToString()`, an `InnerException` message, or the exception object itself used as a template argument, in `ILogger` extension methods, `ILogger.Log`, `[LoggerMessage]` methods and `LoggerMessage.Define` delegates). A library exception message can carry personal data. The exception argument and `ex.GetType().Name` stay allowed. It ships in the same analyzer package as THEMIA101-104, so an app that references a Themia data package gets it on the next bump. See `docs/analyzers/THEMIA105.md`.
