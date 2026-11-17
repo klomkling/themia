@@ -12,6 +12,23 @@ with the *why* and concrete upgrade steps.
 
 ## Unreleased
 
+### Challenges: verify an anonymous code by handle (optional, recommended for e-mail OTP)
+
+**What changed.** New `IChallengeHandles.VerifyByHandleAsync` and `PurposeOptions.RequireHandle`. Nothing existing changes; `IChallengeService` has no new member.
+
+**Why.** `VerifyAsync(scope, code)` finds the challenge by (key, purpose) and charges `VerifyWindow` per key before reading anything, and each wrong code costs every live challenge of the scope an attempt. When the key is an address a stranger knows, the stranger can make the owner's correct code come back `RateLimited` or `AttemptsExhausted`, and a per-IP limiter in the app cannot stop it.
+
+**How to adopt.**
+1. Configure the purpose with `MaxLiveChallenges = 2` (or more) so a stranger's issue does not void the owner's live challenge, and `RequireHandle = true`.
+2. After `IssueAsync`, return `ChallengeId` to the sender of the issue request only (the response body, or an HttpOnly SameSite=Strict cookie scoped to the verify path). Never put it in the message that carries the code.
+3. The verify endpoint takes (handle, code), parses the handle with `Guid.TryParse` (a failure answers like `NotFound` without calling the library) and calls `VerifyByHandleAsync`. Map the outcomes as before.
+4. Keep a per-IP limiter on issue and on verify as defence in depth: an unknown handle costs one primary-key lookup and is not counted.
+5. Never pass a client-supplied handle to `RefundAsync`; it takes the same id and a refund is a server-side decision.
+
+**Brute-force bound.** It is now issuance x `MaxAttempts` per key and window (`PerScopeWindow`/`PerKeyWindow`), because the per-key `VerifyWindow` no longer caps handle verifies: 3 issues per 15 minutes x 5 attempts is 15 guesses, against 10 on the scope-keyed path. Keep `PerScopeWindow.Limit x MaxAttempts` at or below the old `VerifyWindow.Limit` if it must not grow.
+
+**Not covered.** A stranger can still spend the issue quota (`PerScopeWindow`, `PerKeyWindow`) of an address, so the owner cannot request a new code; the owner's already-live code keeps working.
+
 ## 0.66.0
 
 ### THEMIA105: exception text in a logging call (build warning)

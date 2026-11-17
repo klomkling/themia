@@ -27,6 +27,10 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+### Added
+
+- `Themia.Challenges`: `IChallengeHandles.VerifyByHandleAsync(handle, purpose, code, tenantId)` verifies a code against the one challenge a sender-held handle (the `ChallengeId` the issue call returned) names, and `PurposeOptions.RequireHandle` makes `VerifyAsync`/`PeekAsync` throw for a purpose so no scope-keyed verify is left (coord #0232). Nothing is charged until the handle resolves; the charge is a per-handle `VerifyWindow` bucket (reserved purpose `__themia_handle_verify__`), and only the handle's own row loses an attempt. Closes the lockout where a stranger who knows an address spends the owner's `VerifyWindow` and attempt budget. Additive: no schema change, `IChallengeService` unchanged.
+
 ## [0.66.0] - 2026-11-17
 
 ### Added

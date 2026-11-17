@@ -94,6 +94,15 @@ public sealed class PurposeOptions
     public bool InvalidateSiblingsOnVerify { get; set; }
 
     /// <summary>
+    /// When true, <see cref="IChallengeService.VerifyAsync"/> and <see cref="IChallengeService.PeekAsync"/>
+    /// throw <see cref="InvalidOperationException"/> for this purpose: the only way to check a code is
+    /// <see cref="IChallengeHandles.VerifyByHandleAsync"/>. Off by default. Turn it on for an anonymous flow
+    /// whose key a stranger knows (an e-mail OTP), so no scope-keyed endpoint is left that can spend the
+    /// owner's <see cref="ChallengeOptions.VerifyWindow"/> or attempt budget.
+    /// </summary>
+    public bool RequireHandle { get; set; }
+
+    /// <summary>
     /// The rate limit on issuance for one scope (key + purpose + tenant): at most <c>Limit</c> secrets
     /// may be issued within <c>Window</c>. Defaults to 3 per 15 minutes. Narrower than
     /// <see cref="ChallengeOptions.PerKeyWindow"/>, which caps the same key across every purpose.
@@ -178,6 +187,13 @@ public sealed class ChallengeOptions
     /// only so the reservation is discoverable.
     /// </summary>
     public const string VerifyBucketPurpose = "__themia_verify__";
+
+    /// <summary>
+    /// The bucket purpose reserved for the per-handle counter rows of <see cref="IChallengeHandles"/>
+    /// (keyed by the challenge id, limited by <see cref="VerifyWindow"/>). Rejected by
+    /// <see cref="ConfigurePurpose"/> like <see cref="VerifyBucketPurpose"/>.
+    /// </summary>
+    public const string HandleVerifyBucketPurpose = "__themia_handle_verify__";
 
     /// <summary>
     /// The <see cref="ChallengeScope.Key"/> value reserved for the <see cref="TokenVerifyWindow"/>
@@ -401,7 +417,8 @@ public sealed class ChallengeOptions
         ArgumentNullException.ThrowIfNull(configure);
 
         if (string.Equals(purpose, GlobalKeyBucketPurpose, StringComparison.Ordinal)
-            || string.Equals(purpose, VerifyBucketPurpose, StringComparison.Ordinal))
+            || string.Equals(purpose, VerifyBucketPurpose, StringComparison.Ordinal)
+            || string.Equals(purpose, HandleVerifyBucketPurpose, StringComparison.Ordinal))
         {
             // Registering either would make ordinary traffic write into a reserved counter row, so that
             // limit would trip on unrelated activity and its refunds would credit the wrong bucket.
