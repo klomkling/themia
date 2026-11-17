@@ -113,12 +113,20 @@ cat > "$CONSUMER/global.json" <<EOF
 { "sdk": { "version": "$CONSUMER_SDK", "rollForward": "disable" } }
 EOF
 
+# The muxer resolves global.json from the CURRENT directory, not from the project path, so every consumer
+# command runs from $CONSUMER. Assert the SDK actually selected is the floor, or the check silently tests
+# the newest SDK instead.
+ACTIVE_SDK="$(cd "$CONSUMER" && dotnet --version)"
+[ "$ACTIVE_SDK" = "$CONSUMER_SDK" ] \
+  || { echo "ERROR: consumer would build with SDK $ACTIVE_SDK, not the floor $CONSUMER_SDK (global.json ignored?)"; exit 1; }
+echo "==> Active consumer SDK: $ACTIVE_SDK"
+
 BUILD_LOG="$WORK/consumer-build.log"
 # A library build (no entry point); THEMIA104 is a Warning, so the build itself should SUCCEED — we then
 # observe the warning. Capture the build's true exit code (PIPESTATUS[0], not tee's) so a restore or
 # analyzer-load failure is reported as such, rather than misattributed to "transitive flow broken".
 set +e
-dotnet build "$CONSUMER/consumer.csproj" --configuration Release 2>&1 | tee "$BUILD_LOG"
+(cd "$CONSUMER" && dotnet build consumer.csproj --configuration Release) 2>&1 | tee "$BUILD_LOG"
 build_rc=${PIPESTATUS[0]}
 set -e
 # CS9057 (the analyzer or generator is refused: it references a newer compiler) and CS8032 (it could not be
