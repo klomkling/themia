@@ -167,8 +167,9 @@ public sealed class ChallengeHandleTests : IDisposable
         var service = CreateService(maxAttempts: 100, verifyLimit: 2);
         var (handle, secret) = await IssueAsync(service);
 
-        await service.VerifyByHandleAsync(handle, Purpose, Wrong, Tenant);
-        await service.VerifyByHandleAsync(handle, Purpose, Wrong, Tenant);
+        // The Limit-th call is still served; only the one after it is refused.
+        Assert.Equal(ChallengeVerifyOutcome.Incorrect, (await service.VerifyByHandleAsync(handle, Purpose, Wrong, Tenant)).Outcome);
+        Assert.Equal(ChallengeVerifyOutcome.Incorrect, (await service.VerifyByHandleAsync(handle, Purpose, Wrong, Tenant)).Outcome);
         var limited = await service.VerifyByHandleAsync(handle, Purpose, secret, Tenant);
 
         Assert.Equal(ChallengeVerifyOutcome.RateLimited, limited.Outcome);
