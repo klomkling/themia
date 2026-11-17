@@ -211,12 +211,19 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      - name: Read the floor SDK
+        # eng/floor-sdk.txt is the one place the oldest supported .NET 10 SDK is named; the verify script
+        # reads the same file to pin the consumer build to it.
+        id: floor-sdk
+        run: echo "version=$(tr -d '[:space:]' < eng/floor-sdk.txt)" >> "$GITHUB_OUTPUT"
+
       - name: Setup .NET
         uses: actions/setup-dotnet@v6
         with:
           dotnet-version: |
             8.0.x
             10.0.x
+            ${{ steps.floor-sdk.outputs.version }}
 
       - name: Cache NuGet packages
         uses: actions/cache@v6
@@ -228,7 +235,8 @@ jobs:
       - name: Verify isolation analyzers flow to adopters
         # Packs the solution to a local feed, then builds a throwaway consumer of
         # Themia.Framework.Data.EFCore and asserts THEMIA104 fires — proving transitive analyzer flow,
-        # the part most likely to silently break in a future packaging change.
+        # the part most likely to silently break in a future packaging change. The consumer builds on the
+        # floor SDK, so a build-time Roslyn pin newer than that SDK's compiler (CS9057/CS8032) fails here.
         run: bash eng/verify-analyzer-flow.sh
 
   migrations-engine-guard:
