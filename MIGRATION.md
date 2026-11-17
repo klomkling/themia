@@ -10,7 +10,11 @@ with the *why* and concrete upgrade steps.
 - Each entry states: **What changed**, **Why**, and **How to upgrade** (before → after).
 - Non-breaking changes are *not* listed here — see the CHANGELOG.
 
-## Unreleased
+## 0.67.0
+
+### Build: analyzers need a current .NET SDK (CS9057)
+
+The analyzers ship against Roslyn 5.12. A build on an SDK whose compiler is older reports `CS9057` (analyzer assembly references a newer compiler version): a warning by default, an error under `TreatWarningsAsErrors`, and either way the THEMIA rules do not run. Update the .NET 10 SDK on developer machines and CI images (CI: `dotnet-version: 10.0.x`). Do not suppress `CS9057` or `CS8032`: the THEMIA rules would stop running. After the bump, confirm one build still reports a THEMIA rule.
 
 ### Challenges: verify an anonymous code by handle (optional, recommended for e-mail OTP)
 

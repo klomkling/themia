@@ -27,9 +27,15 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.67.0] - 2026-11-18
+
 ### Added
 
 - `Themia.Challenges`: `IChallengeHandles.VerifyByHandleAsync(handle, purpose, code, tenantId)` verifies a code against the one challenge a sender-held handle (the `ChallengeId` the issue call returned) names, and `PurposeOptions.RequireHandle` makes `VerifyAsync`/`PeekAsync` throw for a purpose so no scope-keyed verify is left (coord #0232). Nothing is charged until the handle resolves; the charge is a per-handle `VerifyWindow` bucket (reserved purpose `__themia_handle_verify__`), and only the handle's own row loses an attempt. Closes the lockout where a stranger who knows an address spends the owner's `VerifyWindow` and attempt budget. Additive: no schema change, `IChallengeService` unchanged.
+
+### Changed
+
+- Build requirement: the analyzers (`Themia.Analyzers`, `Themia.SourceGenerator`) now reference Roslyn 5.12 (`Microsoft.CodeAnalysis` 5.12.0, bumped in 0.66.0). A compiler older than 5.12 (an older .NET SDK) refuses to load them with `CS9057` ("Analyzer assembly ... references version '5.12.0.0' of the compiler, which is newer than the currently running version"). `CS9057` is a warning by default (an error only under `TreatWarningsAsErrors`), and the THEMIA rules do not run while it is reported. Use a current .NET 10 SDK. See MIGRATION.
 
 ## [0.66.0] - 2026-11-17
 
