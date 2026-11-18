@@ -775,3 +775,4 @@ Themia.Modules.Identity.Abstractions.Authentication.ExternalSecondFactorProof.Au
 Themia.Modules.Identity.Abstractions.Authentication.ExternalSecondFactorProof.AuthenticatedAt.init -> void
 Themia.Modules.Identity.Abstractions.IPlatformUserReader
 Themia.Modules.Identity.Abstractions.IPlatformUserReader.FindPlatformUserByIdAsync(System.Guid id, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Identity.Abstractions.Entities.User?>!
+Themia.Modules.Identity.Abstractions.Authentication.IExternalLoginLinkService.LinkReplacingHolderAsync(System.Guid userId, Themia.Modules.Identity.Abstractions.Authentication.ExternalIdentity identity, System.Guid expectedHolderId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Modules.Identity.Abstractions.Authentication.ExternalLoginLinkResult>!
