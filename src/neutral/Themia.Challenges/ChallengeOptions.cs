@@ -57,7 +57,10 @@ public sealed class PurposeOptions
 
     /// <summary>
     /// How many un-consumed, unexpired challenges may exist at once for a single scope. Defaults to 1:
-    /// issuing a new secret supersedes any earlier one still outstanding for the same key and purpose.
+    /// issuing a new secret supersedes any earlier one still outstanding for the same key and purpose. Above 1,
+    /// issuing past the cap voids the oldest live challenges so the newest N stay verifiable. The cap is exact
+    /// for sequential issues; two issues racing for the same scope at the same instant can leave N + 1 live
+    /// until the next issue.
     /// </summary>
     /// <exception cref="ArgumentOutOfRangeException">Assigned a value that is zero or negative.</exception>
     public int MaxLiveChallenges

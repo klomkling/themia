@@ -10,6 +10,12 @@ with the *why* and concrete upgrade steps.
 - Each entry states: **What changed**, **Why**, and **How to upgrade** (before → after).
 - Non-breaking changes are *not* listed here — see the CHANGELOG.
 
+## Unreleased
+
+### Challenges: `MaxLiveChallenges` above 1 is now a real cap
+
+A purpose with `MaxLiveChallenges = N` (N > 1) used to keep every issued code live until its TTL. Issuing the (N+1)th code now voids the oldest live one, so only the newest N verify. Nothing to change if you issue at most N codes per TTL (the intended resend-tolerance use). If a flow issues more and relied on older codes still verifying, raise N to cover the real worst case. The cap is exact for sequential issues; two issues racing for one scope at the same instant can leave N + 1 live until the next issue.
+
 ## 0.67.1
 
 ### Do not use 0.66.0 or 0.67.0: analyzers and source generator do not load (CS9057)

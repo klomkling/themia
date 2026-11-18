@@ -40,14 +40,10 @@ namespace Themia.Challenges.Internal;
 /// its cap.
 /// </para>
 /// <para>
-/// <b>Known limitation: the re-issue policy cannot enforce <c>MaxLiveChallenges &gt; 1</c> as an exact
-/// ceiling.</b> It invalidates outstanding challenges only when <see cref="PurposeOptions.MaxLiveChallenges"/>
-/// is 1, because the statement that would enforce a higher cap — invalidate all but the newest
-/// <c>N - 1</c> — does not exist; <see cref="IChallengeDialect.InvalidateLiveForScopeSql"/> only supports
-/// invalidating every live row for a scope, not a chosen subset of them. Above 1, live count is bounded
-/// only loosely, by the per-scope rate-limit window plus each challenge's own TTL. This is a real gap
-/// (unlike the verification limitation above, which this revision closed) — a future statement could
-/// close it, but "invalidate everything or nothing" is what the shipped dialects currently offer.
+/// <b>Known limitation: the cap is not exact under concurrent issues.</b> At <c>MaxLiveChallenges &gt; 1</c> an issue
+/// reads the live set and voids the oldest surplus by id inside its transaction (at 1 it is one blanket statement).
+/// Two issues for the same scope racing at the same instant can each read the same live set and both insert,
+/// leaving N + 1 live until the next issue; the per-scope issue window bounds how often that can happen.
 /// </para>
 /// </remarks>
 internal sealed class ChallengeService : IChallengeService, IChallengeHandles
@@ -297,6 +293,33 @@ internal sealed class ChallengeService : IChallengeService, IChallengeHandles
     }
 
     /// <summary>
+    /// Voids the oldest live challenges of a scope so that, once the one being issued is inserted, at most
+    /// <see cref="PurposeOptions.MaxLiveChallenges"/> remain. Uses only statements every dialect already has:
+    /// <see cref="IChallengeDialect.SelectLiveByScopeSql"/> (newest first) and <see cref="IChallengeDialect.ConsumeSql"/>
+    /// per surplus row. A row whose attempt budget is already spent is skipped by that statement's own guard; it is
+    /// unverifiable already, so nothing is left to void. Runs inside the issue transaction, so a failed insert
+    /// does not leave the older codes voided with nothing issued.
+    /// </summary>
+    private async Task VoidOldestBeyondCapAsync(
+        System.Data.Common.DbConnection connection,
+        System.Data.Common.DbTransaction transaction,
+        ChallengeScope scope,
+        PurposeOptions purpose,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var keep = purpose.MaxLiveChallenges - 1;
+        var live = (await connection.QueryAsync<ChallengeRow>(new CommandDefinition(
+            dialect.SelectLiveByScopeSql(TenancyOf(scope)), LiveByScopeParams(scope, now), transaction, cancellationToken: cancellationToken))).AsList();
+
+        foreach (var surplus in live.Skip(keep))
+        {
+            await connection.ExecuteAsync(new CommandDefinition(
+                dialect.ConsumeSql, new { Id = surplus.Id, Now = now, ConsumedAt = now, purpose.MaxAttempts }, transaction, cancellationToken: cancellationToken));
+        }
+    }
+
+    /// <summary>
     /// The supersede-then-insert pair is atomic. Without the transaction, an insert that fails after a successful
     /// invalidate leaves the user with their previous code already killed and no new one — strictly worse than
     /// either operation not having run at all. The rate-limit counters are deliberately NOT in this transaction:
@@ -317,9 +340,8 @@ internal sealed class ChallengeService : IChallengeService, IChallengeHandles
     {
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
 
-        // Re-issue policy: only MaxLiveChallenges == 1 is exactly enforceable with this dialect's statements (see
-        // the type-level remarks) — invalidating on every issue is safe even when nothing was previously live,
-        // since InvalidateLiveForScopeSql is a no-op UPDATE in that case.
+        // Re-issue policy: keep at most MaxLiveChallenges live per scope. At 1 a single blanket statement voids
+        // everything (a no-op UPDATE when nothing was live); above 1 the oldest surplus is voided by id below.
         if (purpose.MaxLiveChallenges == 1)
         {
             await connection.ExecuteAsync(new CommandDefinition(
@@ -327,6 +349,10 @@ internal sealed class ChallengeService : IChallengeService, IChallengeHandles
                 new { TenantId = scope.TenantId, Key = scope.Key, Purpose = scope.Purpose, Now = now, ConsumedAt = now },
                 transaction,
                 cancellationToken: cancellationToken));
+        }
+        else
+        {
+            await VoidOldestBeyondCapAsync(connection, transaction, scope, purpose, now, cancellationToken);
         }
 
         await connection.ExecuteAsync(new CommandDefinition(
