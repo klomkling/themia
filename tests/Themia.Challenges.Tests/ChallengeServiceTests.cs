@@ -680,6 +680,17 @@ public sealed class ChallengeServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task VerifyByToken_ShouldCarryTheIssuedChallengeId_WhenTheTokenIsAccepted()
+    {
+        var service = CreateService(o => o.ConfigurePurpose("magic-link", p => ConfigureToken(p)));
+        var issue = await service.IssueAsync(new ChallengeScope("user-42", "magic-link", "tenantA"));
+
+        var result = await service.VerifyByTokenAsync(issue.Secret!, "magic-link", "tenantA");
+
+        Assert.Equal(issue.ChallengeId, result.ChallengeId);
+    }
+
+    [Fact]
     public async Task VerifyByToken_ShouldNotResolve_ANumericChallenge()
     {
         // A numeric row stores no lookup hash: the hash has to be deterministic to be a lookup key, and a
