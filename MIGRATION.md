@@ -10,6 +10,18 @@ with the *why* and concrete upgrade steps.
 - Each entry states: **What changed**, **Why**, and **How to upgrade** (before → after).
 - Non-breaking changes are *not* listed here — see the CHANGELOG.
 
+## Unreleased
+
+### `IExternalLoginLinkService.LinkReplacingHolderAsync` (breaking for implementers)
+
+**What changed:** `IExternalLoginLinkService` gained `Task<ExternalLoginLinkResult> LinkReplacingHolderAsync(Guid userId, ExternalIdentity identity, Guid expectedHolderId, CancellationToken cancellationToken = default)`.
+
+**Why:** an app that lets a real user take over an identity held by a stub had to call `FindUserByLoginAsync`, `UnlinkAsync` and `LinkAsync` as three transactions; a failure between them left the identity with nobody. The new member does it atomically and refuses unless the holder is still the expected one.
+
+**Who is affected:** anything that implements `IExternalLoginLinkService`; `ExternalLoginLinkService` is the only implementer in Themia. Callers are unaffected.
+
+**How to upgrade:** add the member. A decorator forwards it to the inner service; a test fake can return `LinkedToAnotherUser`. If you adopt it: a hook that refuses unlinking a user's last channel will refuse every stub release unless it exempts the stub, and revoke the holder's sessions after `Linked` with `IRefreshTokenService.RevokeAllForUserAsync`.
+
 ## 0.67.2
 
 ### Challenges: `MaxLiveChallenges` above 1 is now a real cap

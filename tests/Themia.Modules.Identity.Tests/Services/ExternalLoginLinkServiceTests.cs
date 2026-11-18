@@ -526,6 +526,147 @@ public sealed class ExternalLoginLinkServiceTests
         Assert.Contains(linkStore, l => l.ExternalId == "ln-global");
     }
 
+    // ---- replacing a holder (coord #0233) ---------------------------------------------------------
+
+    private ExternalLoginLink SeedLink(User owner, string subject, TenantId? tenant = null)
+    {
+        var link = new ExternalLoginLink { UserId = owner.Id, Provider = "telegram", ExternalId = subject, TenantId = tenant ?? Acme };
+        link.SetId(Guid.CreateVersion7());
+        linkStore.Add(link);
+        return link;
+    }
+
+    [Fact]
+    public async Task LinkReplacingHolderAsync_ShouldMoveTheLinkAndAnnounceBothUsers_WhenTheHolderIsAsExpected()
+    {
+        var stub = Seed("stub");
+        var alice = Seed();
+        SeedLink(stub, "tg-1");
+
+        var result = await Build().LinkReplacingHolderAsync(alice.Id, Telegram("tg-1"), stub.Id);
+
+        Assert.Equal(ExternalLoginLinkOutcome.Linked, result.Outcome);
+        var link = Assert.Single(linkStore);
+        Assert.Equal(alice.Id, link.UserId);
+        Assert.Equal([UserMutation.ExternalLogin, UserMutation.ExternalLogin], hooks.Mutated);
+        Assert.Equal(2, observer.Mutated.Count);
+    }
+
+    [Fact]
+    public async Task LinkReplacingHolderAsync_ShouldWriteNothing_WhenSomeoneElseHoldsTheIdentity()
+    {
+        var stub = Seed("stub");
+        var other = Seed("other");
+        var alice = Seed();
+        var held = SeedLink(other, "tg-1");
+
+        var result = await Build().LinkReplacingHolderAsync(alice.Id, Telegram("tg-1"), stub.Id);
+
+        Assert.Equal(ExternalLoginLinkOutcome.LinkedToAnotherUser, result.Outcome);
+        Assert.Same(held, Assert.Single(linkStore));
+        Assert.Equal(other.Id, held.UserId);
+        Assert.Empty(hooks.Mutated);
+    }
+
+    [Fact]
+    public async Task LinkReplacingHolderAsync_ShouldBePlainLink_WhenNobodyHoldsTheIdentity()
+    {
+        var stub = Seed("stub");
+        var alice = Seed();
+
+        var result = await Build().LinkReplacingHolderAsync(alice.Id, Telegram("tg-1"), stub.Id);
+
+        Assert.Equal(ExternalLoginLinkOutcome.Linked, result.Outcome);
+        Assert.Equal(alice.Id, Assert.Single(linkStore).UserId);
+    }
+
+    [Fact]
+    public async Task LinkReplacingHolderAsync_ShouldBeAlreadyLinked_WhenTheClaimantHoldsIt()
+    {
+        var stub = Seed("stub");
+        var alice = Seed();
+        SeedLink(alice, "tg-1");
+
+        var result = await Build().LinkReplacingHolderAsync(alice.Id, Telegram("tg-1"), stub.Id);
+
+        Assert.Equal(ExternalLoginLinkOutcome.AlreadyLinkedToUser, result.Outcome);
+        Assert.Equal(alice.Id, Assert.Single(linkStore).UserId);
+    }
+
+    [Fact]
+    public async Task LinkReplacingHolderAsync_ShouldRefuseAndKeepTheHolderLink_WhenTheLinkHookRefuses()
+    {
+        var stub = Seed("stub");
+        var alice = Seed();
+        var held = SeedLink(stub, "tg-1");
+        hooks.RefuseLink = "one Telegram account per user";
+
+        var result = await Build().LinkReplacingHolderAsync(alice.Id, Telegram("tg-1"), stub.Id);
+
+        Assert.Equal(ExternalLoginLinkOutcome.Refused, result.Outcome);
+        Assert.Same(held, Assert.Single(linkStore));
+        Assert.Equal(stub.Id, held.UserId);
+        Assert.Empty(hooks.Mutated);
+    }
+
+    [Fact]
+    public async Task LinkReplacingHolderAsync_ShouldRefuseAndKeepTheHolderLink_WhenTheUnlinkHookRefuses()
+    {
+        var stub = Seed("stub");
+        var alice = Seed();
+        var held = SeedLink(stub, "tg-1");
+        hooks.RefuseUnlink = "last channel";
+
+        var result = await Build().LinkReplacingHolderAsync(alice.Id, Telegram("tg-1"), stub.Id);
+
+        Assert.Equal(ExternalLoginLinkOutcome.Refused, result.Outcome);
+        Assert.Same(held, Assert.Single(linkStore));
+        Assert.Equal(stub.Id, held.UserId);
+        Assert.Empty(hooks.Mutated);
+    }
+
+    [Fact]
+    public async Task LinkReplacingHolderAsync_ShouldRefuse_WhenTheClaimantIsInactive()
+    {
+        var stub = Seed("stub");
+        var alice = Seed(active: false);
+        SeedLink(stub, "tg-1");
+
+        var result = await Build().LinkReplacingHolderAsync(alice.Id, Telegram("tg-1"), stub.Id);
+
+        Assert.Equal(ExternalLoginLinkOutcome.UserInactive, result.Outcome);
+        Assert.Equal(stub.Id, Assert.Single(linkStore).UserId);
+    }
+
+    [Fact]
+    public async Task LinkReplacingHolderAsync_ShouldAnswerLinkedToAnotherUser_WhenTheRaceIsLost()
+    {
+        var stub = Seed("stub");
+        var alice = Seed();
+        var rival = Seed("rival");
+        SeedLink(stub, "tg-1");
+        uow.ConcurrencyFailures = 1;
+        uow.OnConcurrencyFailure = () =>
+        {
+            linkStore.Clear();
+            SeedLink(rival, "tg-1");
+        };
+
+        var result = await Build().LinkReplacingHolderAsync(alice.Id, Telegram("tg-1"), stub.Id);
+
+        Assert.Equal(ExternalLoginLinkOutcome.LinkedToAnotherUser, result.Outcome);
+        Assert.Equal(rival.Id, Assert.Single(linkStore).UserId);
+    }
+
+    [Fact]
+    public async Task LinkReplacingHolderAsync_ShouldThrow_WhenTheExpectedHolderIsEmpty()
+    {
+        var alice = Seed();
+
+        await Assert.ThrowsAsync<ArgumentException>(
+            () => Build().LinkReplacingHolderAsync(alice.Id, Telegram("tg-1"), Guid.Empty));
+    }
+
     // ---- doubles -------------------------------------------------------------------------------
 
     /// <summary>Opsezy's two channel rules (coord #0139), written against the overloads that carry the
