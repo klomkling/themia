@@ -629,7 +629,7 @@ internal sealed class ChallengeService : IChallengeService, IChallengeHandles
             if (!consume)
             {
                 logger.LogInformation("Challenge peek {Outcome} for purpose {Purpose}", ChallengeVerifyOutcome.Verified, scope.Purpose);
-                return ChallengeVerifyResult.Verified(scope, row.Id);
+                return ChallengeVerifyResult.Verified(scope);
             }
 
             // Losing the race (rows-affected 0: someone else's concurrent VerifyAsync already consumed this

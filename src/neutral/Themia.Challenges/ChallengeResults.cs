@@ -219,8 +219,15 @@ public sealed class ChallengeVerifyResult
     /// It is the id <see cref="ChallengeIssueResult.ChallengeId"/> returned when the challenge was issued, so a
     /// caller that kept no state between issue and verify can hand it to
     /// <see cref="IChallengeService.RefundAsync"/> after a successful sign-in to give back the issue-window charge.
-    /// Deliberately set only on <see cref="ChallengeVerifyOutcome.Verified"/>: a failed guess has no business
-    /// refunding a charge.
+    /// Deliberately set only on a <em>consuming</em> <see cref="ChallengeVerifyOutcome.Verified"/>: a failed guess has no
+    /// business refunding a charge, and a peek leaves the code live, so refunding it would give back the charge and still
+    /// leave the code usable.
+    /// <para>
+    /// <b>Cost ceiling.</b> A refund restores the per-scope and per-key issue quota, so a caller that refunds on every
+    /// successful sign-in no longer bounds how many messages a user who owns the destination can trigger by repeating
+    /// issue, verify, refund. Refund only where that is acceptable, and keep a separate per-destination send cap for
+    /// paid channels such as SMS.
+    /// </para>
     /// </summary>
     public Guid? ChallengeId { get; }
 

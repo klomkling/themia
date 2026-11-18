@@ -54,13 +54,14 @@ public sealed class VerifyResultChallengeIdTests : IDisposable
     }
 
     [Fact]
-    public async Task Peek_ShouldCarryTheIssuedChallengeId_WhenTheCodeMatches()
+    public async Task Peek_ShouldCarryNoChallengeId_BecauseTheCodeStaysLive()
     {
         var issued = await service.IssueAsync(scope);
 
         var result = await service.PeekAsync(scope, issued.Secret!);
 
-        Assert.Equal(issued.ChallengeId, result.ChallengeId);
+        Assert.Equal(ChallengeVerifyOutcome.Verified, result.Outcome);
+        Assert.Null(result.ChallengeId);
     }
 
     [Fact]
