@@ -83,4 +83,22 @@ public interface IConversationDataSubject
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>What was erased, and what was deferred or failed.</returns>
     Task<ErasureResult> ErasePersonAsync(ConversationActor actor, string tenantId, PersonRef person, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Lists the attachments <see cref="ErasePersonAsync"/> would delete for the same person: the files they own plus the files attached to a message they posted
+    /// (metadata only, no bytes, no audit event; the caller records the export). The set is the erase predicate itself, so an export and an erasure cannot drift apart.
+    /// </summary>
+    /// <remarks>
+    /// <para>Each conversation is read on its own, so the result is a point in time per conversation, not across the tenant. A conversation under legal hold is listed
+    /// (reading is allowed) although erasure defers it. A listed <see cref="PersonAttachment.StorageKey"/> may no longer resolve: erasure deletes files before its row
+    /// transaction, and a hold or purge that lands in between leaves rows whose file is gone. The caller reports "file no longer available" for that one file.</para>
+    /// <para><see cref="PersonAttachment.FileName"/> is empty for a row written before file names existed. Staging uploads that never became an attachment are not listed
+    /// (erasure deletes them, but they were never posted). A person already erased has no participant row left to find, so the result is <see cref="PersonAttachmentsOutcome.Listed"/> with no items.</para>
+    /// </remarks>
+    /// <param name="actor">The staff or DSR actor; the access policy decides with <see cref="ConversationAction.ListPersonData"/>.</param>
+    /// <param name="tenantId">The tenant; nothing in another tenant is read.</param>
+    /// <param name="person">The person.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>The attachments, ordered by conversation, message sequence and attachment id; or why nothing was listed.</returns>
+    Task<PersonAttachmentsResult> ListPersonAttachmentsAsync(ConversationActor actor, string tenantId, PersonRef person, CancellationToken cancellationToken = default);
 }

@@ -515,3 +515,34 @@ Themia.Conversations.OversightOpenResult.Url.get -> System.Uri?
 Themia.Conversations.OversightOpenResult.Url.init -> void
 Themia.Conversations.IConversationOversightAttachments
 Themia.Conversations.IConversationOversightAttachments.OpenAsync(Themia.Conversations.ConversationActor! actor, string! tenantId, System.Guid conversationId, System.Guid attachmentId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Conversations.OversightOpenResult!>!
+Themia.Conversations.ConversationAction.ListPersonData = 12 -> Themia.Conversations.ConversationAction
+Themia.Conversations.IConversationDataSubject.ListPersonAttachmentsAsync(Themia.Conversations.ConversationActor! actor, string! tenantId, Themia.Conversations.PersonRef! person, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Conversations.PersonAttachmentsResult!>!
+Themia.Conversations.PersonAttachmentsOutcome
+Themia.Conversations.PersonAttachmentsOutcome.Invalid = 2 -> Themia.Conversations.PersonAttachmentsOutcome
+Themia.Conversations.PersonAttachmentsOutcome.Listed = 0 -> Themia.Conversations.PersonAttachmentsOutcome
+Themia.Conversations.PersonAttachmentsOutcome.Refused = 1 -> Themia.Conversations.PersonAttachmentsOutcome
+Themia.Conversations.PersonAttachmentsResult
+Themia.Conversations.PersonAttachmentsResult.Attachments.get -> System.Collections.Generic.IReadOnlyList<Themia.Conversations.PersonAttachment!>!
+Themia.Conversations.PersonAttachmentsResult.Attachments.init -> void
+Themia.Conversations.PersonAttachmentsResult.Listed.get -> bool
+Themia.Conversations.PersonAttachmentsResult.Outcome.get -> Themia.Conversations.PersonAttachmentsOutcome
+Themia.Conversations.PersonAttachmentsResult.Outcome.init -> void
+Themia.Conversations.PersonAttachmentsResult.PersonAttachmentsResult(Themia.Conversations.PersonAttachmentsOutcome Outcome, System.Collections.Generic.IReadOnlyList<Themia.Conversations.PersonAttachment!>! Attachments) -> void
+Themia.Conversations.PersonAttachment
+Themia.Conversations.PersonAttachment.PersonAttachment(System.Guid ConversationId, System.Guid AttachmentId, long MessageSeq, string! FileName, string! ContentType, long Size, string! Sha256, string! StorageKey) -> void
+Themia.Conversations.PersonAttachment.ConversationId.get -> System.Guid
+Themia.Conversations.PersonAttachment.ConversationId.init -> void
+Themia.Conversations.PersonAttachment.AttachmentId.get -> System.Guid
+Themia.Conversations.PersonAttachment.AttachmentId.init -> void
+Themia.Conversations.PersonAttachment.MessageSeq.get -> long
+Themia.Conversations.PersonAttachment.MessageSeq.init -> void
+Themia.Conversations.PersonAttachment.FileName.get -> string!
+Themia.Conversations.PersonAttachment.FileName.init -> void
+Themia.Conversations.PersonAttachment.ContentType.get -> string!
+Themia.Conversations.PersonAttachment.ContentType.init -> void
+Themia.Conversations.PersonAttachment.Size.get -> long
+Themia.Conversations.PersonAttachment.Size.init -> void
+Themia.Conversations.PersonAttachment.Sha256.get -> string!
+Themia.Conversations.PersonAttachment.Sha256.init -> void
+Themia.Conversations.PersonAttachment.StorageKey.get -> string!
+Themia.Conversations.PersonAttachment.StorageKey.init -> void
