@@ -27,6 +27,8 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.69.0] - 2026-11-18
+
 ### Added
 
 - `Themia.Conversations`: `IConversationDataSubject.ListPersonAttachmentsAsync` lists the attachments a person owns or sent, metadata only (coord #0229, for a data-subject access request). It reads through the same predicate `ErasePersonAsync` deletes by, so an export and an erasure cannot drift. New `ConversationAction.ListPersonData` is checked by the access policy; `PersonAttachmentsResult` carries an outcome (`Listed`, `Refused`, `Invalid`) so a refused call is never an empty list. **(breaking for implementers of `IConversationDataSubject`, see [MIGRATION.md](MIGRATION.md#unreleased))**
