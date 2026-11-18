@@ -8,7 +8,7 @@ using Xunit;
 namespace Themia.Conversations.IntegrationTests;
 
 /// <summary>Per-person erasure end to end on a real PostgreSQL, MySQL and SQL Server.</summary>
-public abstract class ConversationErasureTests(ConversationEngineFixture fixture)
+public abstract partial class ConversationErasureTests(ConversationEngineFixture fixture)
 {
     private static readonly byte[] CurrentPepper = Encoding.UTF8.GetBytes("current-pepper-0123456789-0123456789");
     private static readonly byte[] OldPepper = Encoding.UTF8.GetBytes("old-pepper-0123456789-0123456789-xyz");

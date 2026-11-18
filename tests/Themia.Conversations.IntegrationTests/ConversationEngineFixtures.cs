@@ -154,6 +154,14 @@ public abstract class ConversationEngineFixture : IAsyncLifetime
         await connection.OpenAsync();
         return (await connection.ExecuteScalarAsync<T>(sql, parameters))!;
     }
+
+    /// <summary>Runs a query on a fresh connection and returns the first column of every row.</summary>
+    public async Task<List<T>> QueryAsync<T>(string sql, object? parameters = null)
+    {
+        await using var connection = Dialect.CreateConnection();
+        await connection.OpenAsync();
+        return (await connection.QueryAsync<T>(sql, parameters)).ToList();
+    }
 }
 
 /// <summary>PostgreSQL: one <c>postgres:16-alpine</c> container for every PostgreSQL test class.</summary>

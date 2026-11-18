@@ -106,6 +106,12 @@ public enum ConversationAction
     /// (<see cref="IConversationOversightAttachments.OpenAsync"/>). Allow it narrowly: every read and every file open is audited, but it shows message bodies and file contents.
     /// </summary>
     OversightRead = 11,
+
+    /// <summary>
+    /// List one person's data across conversations for a data-subject access request (<see cref="IConversationDataSubject.ListPersonAttachmentsAsync"/>).
+    /// Grant it to the DSR or staff actor only: it names every file the person owns or sent, in every conversation of the tenant.
+    /// </summary>
+    ListPersonData = 12,
 }
 
 /// <summary>How <see cref="IConversationService.OpenAsync"/> ended.</summary>

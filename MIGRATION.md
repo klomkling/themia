@@ -10,6 +10,19 @@ with the *why* and concrete upgrade steps.
 - Each entry states: **What changed**, **Why**, and **How to upgrade** (before → after).
 - Non-breaking changes are *not* listed here — see the CHANGELOG.
 
+## Unreleased
+
+### Conversations: `IConversationDataSubject.ListPersonAttachmentsAsync` and `ConversationAction.ListPersonData`
+
+**What changed.** `IConversationDataSubject` has a second member, `ListPersonAttachmentsAsync(actor, tenantId, person, ct)`, and `ConversationAction` has a new value `ListPersonData = 12`.
+
+**Why.** A data-subject access request needs the person's files listed by the rule erasure uses, not by a second query that can drift.
+
+**How to upgrade.**
+- If you only resolve `IConversationDataSubject` from DI, nothing breaks. If you implement it (a test fake), add the new member.
+- The access policy is asked `ConversationAction.ListPersonData` with a tenant-wide target (no conversation). No existing policy grants a value it has never seen, so nobody gains the right on upgrade. Grant it to the DSR or staff actor only, for example `action is ConversationAction.Erase or ConversationAction.ListPersonData`.
+- A listed `StorageKey` may no longer resolve (erasure deletes files before its row transaction); report "file no longer available" for that file rather than failing the export.
+
 ## 0.68.0
 
 ### `IExternalLoginLinkService.LinkReplacingHolderAsync` (breaking for implementers)

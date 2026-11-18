@@ -72,6 +72,48 @@ internal sealed class ConversationDataSubjectService(
 
     private static ErasureResult Empty(ErasureOutcome outcome) => new(outcome, 0, 0, 0, [], []);
 
+    /// <inheritdoc />
+    public async Task<PersonAttachmentsResult> ListPersonAttachmentsAsync(ConversationActor actor, string tenantId, PersonRef person, CancellationToken cancellationToken = default)
+    {
+        ConversationInput.Actor(actor);
+        ConversationInput.Tenant(tenantId, nameof(tenantId));
+        ArgumentNullException.ThrowIfNull(person);
+
+        if (!await policy.CanAsync(actor, new ConversationTarget(tenantId, null), ConversationAction.ListPersonData, cancellationToken))
+        {
+            return new PersonAttachmentsResult(PersonAttachmentsOutcome.Refused, []);
+        }
+
+        await using var connection = await OpenConnectionAsync(cancellationToken);
+        if (await FindParticipantsAsync(connection, tenantId, person, cancellationToken) is not { } found)
+        {
+            return new PersonAttachmentsResult(PersonAttachmentsOutcome.Invalid, []);
+        }
+
+        var attachments = new List<PersonAttachment>();
+        foreach (var (participantId, conversationId) in found)
+        {
+            attachments.AddRange(await connection.QueryAsync<PersonAttachment>(new CommandDefinition(
+                ListAttachmentsSql, new { TenantId = tenantId, ConversationId = conversationId, ParticipantId = participantId }, cancellationToken: cancellationToken)));
+        }
+
+        attachments.Sort(static (a, b) => ComparePositions(a, b));
+        logger.LogInformation("Listed {Attachments} attachments in {Conversations} conversations", attachments.Count, found.Count);
+        return new PersonAttachmentsResult(PersonAttachmentsOutcome.Listed, attachments);
+    }
+
+    private static int ComparePositions(PersonAttachment a, PersonAttachment b)
+    {
+        var byConversation = a.ConversationId.CompareTo(b.ConversationId);
+        if (byConversation != 0)
+        {
+            return byConversation;
+        }
+
+        var bySeq = a.MessageSeq.CompareTo(b.MessageSeq);
+        return bySeq != 0 ? bySeq : a.AttachmentId.CompareTo(b.AttachmentId);
+    }
+
     /// <summary>The participant rows of this person in this tenant, or <see langword="null"/> when the reference cannot be resolved.</summary>
     private async Task<List<(Guid ParticipantId, Guid ConversationId)>?> FindParticipantsAsync(DbConnection connection, string tenantId, PersonRef person, CancellationToken cancellationToken)
     {
@@ -150,6 +192,13 @@ internal sealed class ConversationDataSubjectService(
     private const string PersonAttachments =
         "tenant_id = @TenantId AND conversation_id = @ConversationId AND (owner_participant_id = @ParticipantId OR message_id IN " +
         "(SELECT id FROM conversation_messages WHERE tenant_id = @TenantId AND conversation_id = @ConversationId AND participant_id = @ParticipantId))";
+
+    /// <summary>The erase predicate filters in a derived table (its column names are unqualified), and the message sequence is joined outside it.</summary>
+    private const string ListAttachmentsSql =
+        "SELECT a.conversation_id AS ConversationId, a.id AS AttachmentId, m.seq AS MessageSeq, a.file_name AS FileName, a.content_type AS ContentType, " +
+        "a.size AS Size, a.sha256 AS Sha256, a.storage_key AS StorageKey " +
+        "FROM (SELECT id, tenant_id, conversation_id, message_id, file_name, content_type, size, sha256, storage_key FROM conversation_attachments WHERE " + PersonAttachments + ") a " +
+        "JOIN conversation_messages m ON m.tenant_id = a.tenant_id AND m.conversation_id = a.conversation_id AND m.id = a.message_id;";
 
     private async Task<bool> DeleteFilesAsync(DbConnection connection, string tenantId, Guid conversationId, Guid participantId, CancellationToken cancellationToken)
     {
