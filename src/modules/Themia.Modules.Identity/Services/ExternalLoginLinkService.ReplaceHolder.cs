@@ -45,8 +45,9 @@ public sealed partial class ExternalLoginLinkService
             return new ExternalLoginLinkResult(ExternalLoginLinkOutcome.AlreadyLinkedToUser);
         }
 
-        // A holder reached only through the platform fallback sits in a partition this scope cannot write.
-        if (isPlatform || holderLink.UserId != expectedHolderId)
+        // A holder in another partition sits where this scope cannot write: reached through the platform fallback, or
+        // surfaced by a data layer that shows global rows to a tenant scope (the spec has no tenant predicate of its own).
+        if (isPlatform || holderLink.TenantId != claimant.TenantId || holderLink.UserId != expectedHolderId)
         {
             return new ExternalLoginLinkResult(ExternalLoginLinkOutcome.LinkedToAnotherUser);
         }
