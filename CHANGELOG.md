@@ -28,6 +28,11 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 ## [Unreleased]
 
 ### Added
+- **Challenges: `ChallengeVerifyResult.ChallengeId` (coord #0230).** A `Verified` result (from `VerifyAsync`,
+  `VerifyByTokenAsync` and the handle path; a `PeekAsync` result carries none, the code stays live) now carries the id of the accepted challenge, so a caller that keeps no
+  state between issue and verify can call `RefundAsync(result.ChallengeId!.Value)` after a successful sign-in and
+  not be rate-limited by its own issue window. It is `null` for every other outcome by design: a failed guess must not
+  be able to refund a charge. Additive; no migration.
 - **Identity: `IExternalLoginLinkService.LinkReplacingHolderAsync` (coord #0233) (breaking for implementers).** Links an
   external identity to a claimant and, in the same transaction, takes it from a named holder (for example a stub the
   caller vetted). A compare-and-swap: it moves the link only while the holder is still the expected one, answers

@@ -169,11 +169,13 @@ public sealed class ChallengeIssueResult
 /// <summary>The result of verifying a challenge.</summary>
 public sealed class ChallengeVerifyResult
 {
-    private ChallengeVerifyResult(ChallengeVerifyOutcome outcome, ChallengeScope scope, TimeSpan? retryAfter = null)
+    private ChallengeVerifyResult(
+        ChallengeVerifyOutcome outcome, ChallengeScope scope, TimeSpan? retryAfter = null, Guid? challengeId = null)
     {
         Outcome = outcome;
         Scope = scope;
         RetryAfter = retryAfter;
+        ChallengeId = challengeId;
     }
 
     /// <summary>How the verify attempt ended. Switch over this rather than reading <see cref="Succeeded"/>
@@ -212,6 +214,23 @@ public sealed class ChallengeVerifyResult
     /// </remarks>
     public TimeSpan? RetryAfter { get; }
 
+    /// <summary>
+    /// The id of the challenge whose secret was accepted, or <see langword="null"/> for every other outcome.
+    /// It is the id <see cref="ChallengeIssueResult.ChallengeId"/> returned when the challenge was issued, so a
+    /// caller that kept no state between issue and verify can hand it to
+    /// <see cref="IChallengeService.RefundAsync"/> after a successful sign-in to give back the issue-window charge.
+    /// Deliberately set only on a <em>consuming</em> <see cref="ChallengeVerifyOutcome.Verified"/>: a failed guess has no
+    /// business refunding a charge, and a peek leaves the code live, so refunding it would give back the charge and still
+    /// leave the code usable.
+    /// <para>
+    /// <b>Cost ceiling.</b> A refund restores the per-scope and per-key issue quota, so a caller that refunds on every
+    /// successful sign-in no longer bounds how many messages a user who owns the destination can trigger by repeating
+    /// issue, verify, refund. Refund only where that is acceptable, and keep a separate per-destination send cap for
+    /// paid channels such as SMS.
+    /// </para>
+    /// </summary>
+    public Guid? ChallengeId { get; }
+
     /// <summary>Whether the submitted secret was correct.</summary>
     public bool Succeeded => Outcome == ChallengeVerifyOutcome.Verified;
 
@@ -219,6 +238,13 @@ public sealed class ChallengeVerifyResult
     /// <param name="scope">The scope that was verified.</param>
     /// <returns>A verified result.</returns>
     public static ChallengeVerifyResult Verified(ChallengeScope scope) => new(ChallengeVerifyOutcome.Verified, scope);
+
+    /// <summary>Creates a <see cref="ChallengeVerifyOutcome.Verified"/> result that names the accepted challenge.</summary>
+    /// <param name="scope">The scope that was verified.</param>
+    /// <param name="challengeId">The id of the challenge whose secret was accepted.</param>
+    /// <returns>A verified result whose <see cref="ChallengeId"/> is <paramref name="challengeId"/>.</returns>
+    public static ChallengeVerifyResult Verified(ChallengeScope scope, Guid challengeId) =>
+        new(ChallengeVerifyOutcome.Verified, scope, challengeId: challengeId);
 
     /// <summary>Creates an <see cref="ChallengeVerifyOutcome.Incorrect"/> result.</summary>
     /// <param name="scope">The scope that was verified.</param>

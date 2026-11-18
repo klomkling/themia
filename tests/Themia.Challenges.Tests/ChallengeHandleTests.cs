@@ -62,6 +62,17 @@ public sealed class ChallengeHandleTests : IDisposable
     private int Attempts(Guid id) => keepAlive.ExecuteScalar<int>("SELECT attempts FROM challenges WHERE id = @Id", new { Id = id });
 
     [Fact]
+    public async Task VerifyByHandle_ShouldCarryTheChallengeId_WhenTheCodeIsCorrect()
+    {
+        var service = CreateService();
+        var (handle, secret) = await IssueAsync(service);
+
+        var result = await service.VerifyByHandleAsync(handle, Purpose, secret, Tenant);
+
+        Assert.Equal(handle, result.ChallengeId);
+    }
+
+    [Fact]
     public async Task VerifyByHandle_ShouldVerifyOnce_WhenTheCodeIsCorrect()
     {
         var service = CreateService();

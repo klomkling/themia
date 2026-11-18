@@ -130,3 +130,5 @@ Themia.Challenges.IChallengeHandles
 Themia.Challenges.IChallengeHandles.VerifyByHandleAsync(System.Guid handle, string! purpose, string! code, string? tenantId = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Challenges.ChallengeVerifyResult!>!
 Themia.Challenges.PurposeOptions.RequireHandle.get -> bool
 Themia.Challenges.PurposeOptions.RequireHandle.set -> void
+Themia.Challenges.ChallengeVerifyResult.ChallengeId.get -> System.Guid?
+static Themia.Challenges.ChallengeVerifyResult.Verified(Themia.Challenges.ChallengeScope! scope, System.Guid challengeId) -> Themia.Challenges.ChallengeVerifyResult!
