@@ -11,6 +11,12 @@
 #   3. End-to-end: a throwaway consumer referencing Themia.Framework.Data.EFCore calls DbSet<T>.Find and
 #      must surface THEMIA104 at build time.
 #
+# The consumer is built with the FLOOR SDK (eng/floor-sdk.txt, the oldest .NET 10 SDK we support) through a
+# global.json, not with the SDK that packed the solution: the analyzers and the source generator load into
+# the consumer's compiler, and a compiler older than the Roslyn they reference refuses them (CS9057 /
+# CS8032), which silently drops every THEMIA rule and every generated registration. Build-time Roslyn pins
+# must therefore stay at or below what that SDK ships. THEMIA_CONSUMER_SDK overrides the floor locally.
+#
 # Run from anywhere (resolves the repo root from its own location). Used by .github/workflows/ci.yml.
 set -euo pipefail
 
@@ -81,6 +87,8 @@ cat > "$CONSUMER/consumer.csproj" <<EOF
   <ItemGroup>
     <!-- Microsoft.EntityFrameworkCore (and Themia.Analyzers) arrive transitively. -->
     <PackageReference Include="Themia.Framework.Data.EFCore" Version="$VERSION" />
+    <!-- The source generator loads into the same compiler; referencing it makes CS9057/CS8032 cover it too. -->
+    <PackageReference Include="Themia.SourceGenerator" Version="$VERSION" />
   </ItemGroup>
 </Project>
 EOF
@@ -98,14 +106,38 @@ public static class Probe
 }
 EOF
 
+CONSUMER_SDK="${THEMIA_CONSUMER_SDK:-$(tr -d '[:space:]' < eng/floor-sdk.txt)}"
+[ -n "$CONSUMER_SDK" ] || { echo "ERROR: eng/floor-sdk.txt is empty"; exit 1; }
+echo "==> Consumer SDK (floor): $CONSUMER_SDK"
+cat > "$CONSUMER/global.json" <<EOF
+{ "sdk": { "version": "$CONSUMER_SDK", "rollForward": "disable" } }
+EOF
+
+# The muxer resolves global.json from the CURRENT directory, not from the project path, so every consumer
+# command runs from $CONSUMER. Assert the SDK actually selected is the floor, or the check silently tests
+# the newest SDK instead.
+ACTIVE_SDK="$(cd "$CONSUMER" && dotnet --version)"
+[ "$ACTIVE_SDK" = "$CONSUMER_SDK" ] \
+  || { echo "ERROR: consumer would build with SDK $ACTIVE_SDK, not the floor $CONSUMER_SDK (global.json ignored?)"; exit 1; }
+echo "==> Active consumer SDK: $ACTIVE_SDK"
+
 BUILD_LOG="$WORK/consumer-build.log"
 # A library build (no entry point); THEMIA104 is a Warning, so the build itself should SUCCEED — we then
 # observe the warning. Capture the build's true exit code (PIPESTATUS[0], not tee's) so a restore or
 # analyzer-load failure is reported as such, rather than misattributed to "transitive flow broken".
 set +e
-dotnet build "$CONSUMER/consumer.csproj" --configuration Release 2>&1 | tee "$BUILD_LOG"
+(cd "$CONSUMER" && dotnet build consumer.csproj --configuration Release) 2>&1 | tee "$BUILD_LOG"
 build_rc=${PIPESTATUS[0]}
 set -e
+# CS9057 (the analyzer or generator is refused: it references a newer compiler) and CS8032 (it could not be
+# loaded at all) are warnings unless warnings are errors; either way the rules and generated code vanish.
+# Checked before the exit code so a TreatWarningsAsErrors build is still reported as this, not as "a restore
+# or analyzer-load problem".
+if grep -qE "(error|warning) (CS9057|CS8032)" "$BUILD_LOG"; then
+  echo "==> FAIL: the floor SDK $CONSUMER_SDK refuses a Themia analyzer or generator (CS9057/CS8032):"
+  echo "          a build-time Microsoft.CodeAnalysis pin is newer than that SDK's compiler."
+  exit 1
+fi
 if [ "$build_rc" -ne 0 ]; then
   echo "ERROR: the consumer build failed (exit $build_rc) — a restore or analyzer-load problem, NOT"
   echo "       necessarily a missing THEMIA104. See the build output above."

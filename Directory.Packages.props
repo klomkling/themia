@@ -114,9 +114,16 @@
     <PackageVersion Include="Serilog.Settings.Configuration" Version="10.0.1" />
     <PackageVersion Include="Serilog.Enrichers.Thread" Version="4.0.0" />
     <PackageVersion Include="Serilog.Enrichers.Environment" Version="3.0.1" />
-    <!-- Roslyn tooling (build-time, netstandard2.0 components) -->
-    <PackageVersion Include="Microsoft.CodeAnalysis.CSharp" Version="5.12.0" />
-    <PackageVersion Include="Microsoft.CodeAnalysis.Analyzers" Version="5.12.0" />
+    <!-- Roslyn tooling (build-time, netstandard2.0 components).
+         Microsoft.CodeAnalysis.CSharp is a FLOOR, not "latest": the analyzers and the source generator
+         reference it, and a compiler older than that Roslyn refuses to load them (CS9057), so no THEMIA
+         rule and no generated registration runs. 5.0.0 is the Roslyn the 10.0.1xx line starts at; the
+         analyzer-flow CI job builds a consumer on the floor SDK (eng/floor-sdk.txt) and fails on CS9057,
+         which is the proof, not this comment.
+         Dependabot ignores both pins; raise them by hand together with eng/floor-sdk.txt.
+         Analyzers 5.0.0 does not exist on NuGet, so it stays at 5.9.0 (it only checks this repo's own build). -->
+    <PackageVersion Include="Microsoft.CodeAnalysis.CSharp" Version="5.0.0" />
+    <PackageVersion Include="Microsoft.CodeAnalysis.Analyzers" Version="5.9.0" />
     <PackageVersion Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" Version="3.3.4" />
     <!-- Roslyn SDK test harness -->
     <PackageVersion Include="Microsoft.CodeAnalysis.CSharp.SourceGenerators.Testing.XUnit" Version="1.1.2" />

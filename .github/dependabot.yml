@@ -77,6 +77,15 @@ updates:
         update-types:
           - minor
           - patch
+    ignore:
+      # These two are the Roslyn the analyzers and the source generator are BUILT against, and an analyzer
+      # refuses to load into a compiler older than the Roslyn it references (CS9057). So the version is a
+      # floor set by the oldest supported .NET SDK (eng/floor-sdk.txt), not "latest": the bump to 5.12.0
+      # (b4ddb7b) shipped as 0.67.0 and no released SDK could load it. Raise them by hand, together with
+      # eng/floor-sdk.txt, when the supported SDK floor moves. The other Microsoft.CodeAnalysis.* packages
+      # (test frameworks, PublicApiAnalyzers) stay in the roslyn group and keep updating.
+      - dependency-name: "Microsoft.CodeAnalysis.CSharp"
+      - dependency-name: "Microsoft.CodeAnalysis.Analyzers"
 
   - package-ecosystem: github-actions
     directory: "/"
