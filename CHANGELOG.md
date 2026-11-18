@@ -27,6 +27,8 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.68.0] - 2026-11-18
+
 ### Added
 - **Challenges: `ChallengeVerifyResult.ChallengeId` (coord #0230).** A `Verified` result (from `VerifyAsync`,
   `VerifyByTokenAsync` and the handle path; a `PeekAsync` result carries none, the code stays live) now carries the id of the accepted challenge, so a caller that keeps no
