@@ -27,6 +27,8 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.67.2] - 2026-11-18
+
 ### Fixed
 
 - `Themia.Challenges`: `PurposeOptions.MaxLiveChallenges` above 1 is now enforced (coord #0231). Issuing past the cap voids the oldest live challenges so only the newest N stay verifiable; before, only 1 was honoured and six issued codes all verified at a cap of 2, widening the guess budget per scope to `MaxAttempts` x live codes. No API change. Purposes that set a cap above 1 and issue more than that many codes within the TTL now see the oldest codes stop verifying (see MIGRATION).
