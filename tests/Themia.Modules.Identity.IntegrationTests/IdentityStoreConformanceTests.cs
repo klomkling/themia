@@ -1766,6 +1766,23 @@ public abstract class IdentityStoreConformanceTests
         Assert.Empty(await s.Linking.GetLoginsAsync(claimant));
     }
 
+    [Fact] // coord #0233: with no tenant at all, the holder's link is a platform row and the swap must still write it
+    public async Task Link_replacing_holder_swaps_inside_the_platform_scope()
+    {
+        await ResetAsync();
+        var identity = new ExternalIdentity("telegram", "tg-platform-swap", null, false, null);
+        await using var s = NewScope(tenant: null);
+        var stub = (await s.Users.CreateAsync("platform-stub", "pw")).UserId!.Value;
+        var claimant = (await s.Users.CreateAsync("platform-claimant", "pw")).UserId!.Value;
+        Assert.Equal(ExternalLoginLinkOutcome.Linked, (await s.Linking.LinkAsync(stub, identity)).Outcome);
+
+        var result = await s.Linking.LinkReplacingHolderAsync(claimant, identity, stub);
+
+        Assert.Equal(ExternalLoginLinkOutcome.Linked, result.Outcome);
+        Assert.Empty(await s.Linking.GetLoginsAsync(stub));
+        Assert.Single(await s.Linking.GetLoginsAsync(claimant));
+    }
+
     [Fact] // coord #0233: a rival commits its swap between our re-read and our delete — our DELETE matches no row
     public async Task Link_replacing_holder_race_loser_answers_with_the_winner_and_does_not_throw()
     {
