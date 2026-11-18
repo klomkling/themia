@@ -629,7 +629,7 @@ internal sealed class ChallengeService : IChallengeService, IChallengeHandles
             if (!consume)
             {
                 logger.LogInformation("Challenge peek {Outcome} for purpose {Purpose}", ChallengeVerifyOutcome.Verified, scope.Purpose);
-                return ChallengeVerifyResult.Verified(scope);
+                return ChallengeVerifyResult.Verified(scope, row.Id);
             }
 
             // Losing the race (rows-affected 0: someone else's concurrent VerifyAsync already consumed this
@@ -644,7 +644,7 @@ internal sealed class ChallengeService : IChallengeService, IChallengeHandles
                 continue;
             }
 
-            var matchOutcome = won ? ChallengeVerifyResult.Verified(scope) : ChallengeVerifyResult.Consumed(scope);
+            var matchOutcome = won ? ChallengeVerifyResult.Verified(scope, row.Id) : ChallengeVerifyResult.Consumed(scope);
             logger.LogInformation("Challenge verify {Outcome} for purpose {Purpose}", matchOutcome.Outcome, scope.Purpose);
             return matchOutcome;
         }
@@ -772,7 +772,7 @@ internal sealed class ChallengeService : IChallengeService, IChallengeHandles
             var won = await TryConsumeAsync(connection, row.Id, scope, purposeOptions, now, cancellationToken);
             if (won)
             {
-                return HandleOutcome(ChallengeVerifyResult.Verified(scope), purpose);
+                return HandleOutcome(ChallengeVerifyResult.Verified(scope, row.Id), purpose);
             }
 
             return HandleOutcome(
@@ -893,7 +893,7 @@ internal sealed class ChallengeService : IChallengeService, IChallengeHandles
         // Verified twice would let one token confirm two requests.
         var won = await TryConsumeAsync(connection, row.Id, scope, purposeOptions, now, cancellationToken);
         var outcome = won
-            ? ChallengeVerifyResult.Verified(scope)
+            ? ChallengeVerifyResult.Verified(scope, row.Id)
             : await IsSpentBudgetAsync(connection, row.Id, purposeOptions, cancellationToken)
                 ? ChallengeVerifyResult.AttemptsExhausted(scope)
                 : ChallengeVerifyResult.Consumed(scope);

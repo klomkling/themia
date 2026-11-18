@@ -27,6 +27,13 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+### Added
+- **Challenges: `ChallengeVerifyResult.ChallengeId` (coord #0230).** A `Verified` result (from `VerifyAsync`, `PeekAsync`,
+  `VerifyByTokenAsync` and the handle path) now carries the id of the accepted challenge, so a caller that keeps no
+  state between issue and verify can call `RefundAsync(result.ChallengeId!.Value)` after a successful sign-in and
+  not be rate-limited by its own issue window. It is `null` for every other outcome by design: a failed guess must not
+  be able to refund a charge. Additive; no migration.
+
 ## [0.67.2] - 2026-11-18
 
 ### Fixed
