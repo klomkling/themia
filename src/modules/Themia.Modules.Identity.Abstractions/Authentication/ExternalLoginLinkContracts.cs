@@ -22,8 +22,10 @@ public enum ExternalLoginLinkOutcome
     AlreadyLinkedToUser,
 
     /// <summary>
-    /// The identity belongs to a different user. Nothing was written — an identity is never moved between
-    /// users, because that is an account takeover by another name.
+    /// The identity belongs to a different user. Nothing was written — <see cref="IExternalLoginLinkService.LinkAsync"/>
+    /// never moves an identity between users, because that is an account takeover by another name. The one
+    /// deliberate move is <see cref="IExternalLoginLinkService.LinkReplacingHolderAsync"/>, which the caller asks
+    /// for by naming the holder; when it answers this, its transaction rolled back and the holder still has the link.
     /// </summary>
     LinkedToAnotherUser,
 
@@ -132,6 +134,51 @@ public interface IExternalLoginLinkService
     /// </remarks>
     Task<ExternalLoginLinkResult> LinkAsync(
         Guid userId, ExternalIdentity identity, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Links an external identity to <paramref name="userId"/> and, in the same transaction, takes it from
+    /// <paramref name="expectedHolderId"/> when that user holds it now.
+    /// </summary>
+    /// <param name="userId">The claimant, who gets the link.</param>
+    /// <param name="identity">The verified external identity; only provider and subject are used.</param>
+    /// <param name="expectedHolderId">The user the caller has decided may lose the link (for example a stub
+    /// the caller found with <see cref="FindUserByLoginAsync"/> and vetted itself). Not an empty id.</param>
+    /// <param name="cancellationToken">A cancellation token.</param>
+    /// <returns>
+    /// <see cref="ExternalLoginLinkOutcome.Linked"/> when the swap committed, or when nobody held the identity
+    /// and it was linked as <see cref="LinkAsync"/> would. <see cref="ExternalLoginLinkOutcome.AlreadyLinkedToUser"/>
+    /// when the claimant already holds it. <see cref="ExternalLoginLinkOutcome.LinkedToAnotherUser"/> — nothing
+    /// written — when someone other than <paramref name="expectedHolderId"/> holds it (including a concurrent
+    /// claimant who won), or the holder sits in a partition this scope cannot write. The hooks and
+    /// <see cref="ExternalLoginLinkOutcome.UserInactive"/> / <see cref="ExternalLoginLinkOutcome.Refused"/> behave
+    /// as in <see cref="LinkAsync"/>.
+    /// </returns>
+    /// <remarks>
+    /// This is a compare-and-swap, not a callback: Themia never runs caller code inside its transaction, and
+    /// guarantees only that the holder was still <paramref name="expectedHolderId"/> when the link moved. Whether
+    /// that user may be displaced is the caller's decision, made before this call — the same decision a caller
+    /// of <see cref="FindUserByLoginAsync"/> + <see cref="UnlinkAsync"/> + <see cref="LinkAsync"/> already makes,
+    /// so this grants no capability those three do not; it makes the sequence atomic.
+    /// <para>
+    /// Hooks run before the transaction opens, both fail closed: <see cref="IUserLifecycleHooks.OnBeforeLinkExternalLoginAsync(Guid, string, string, IReadOnlyList{ExternalLoginInfo}, CancellationToken)"/>
+    /// for the claimant, then <see cref="IUserLifecycleHooks.OnBeforeUnlinkExternalLoginAsync(Guid, string, IReadOnlyList{ExternalLoginInfo}, CancellationToken)"/>
+    /// for the holder. A "never leave a user with no channel" unlink rule therefore refuses every stub release
+    /// unless it exempts the stub. After the commit both users get <see cref="IUserLifecycleHooks.OnUserMutatedAsync"/>
+    /// and the observers.
+    /// </para>
+    /// <para>
+    /// The holder's sessions are not ended (as with <see cref="UnlinkAsync"/>): a live refresh token keeps acting
+    /// as the holder. Call <see cref="IRefreshTokenService.RevokeAllForUserAsync"/> for the holder after
+    /// <see cref="ExternalLoginLinkOutcome.Linked"/>, outside this transaction. The holder's user row is not
+    /// touched. Two claimants racing for one holder produce exactly one <see cref="ExternalLoginLinkOutcome.Linked"/>.
+    /// </para>
+    /// <para>
+    /// An existing implementer of this interface must add this member.
+    /// </para>
+    /// </remarks>
+    /// <exception cref="ArgumentException"><paramref name="expectedHolderId"/> is <see cref="Guid.Empty"/>.</exception>
+    Task<ExternalLoginLinkResult> LinkReplacingHolderAsync(
+        Guid userId, ExternalIdentity identity, Guid expectedHolderId, CancellationToken cancellationToken = default);
 
     /// <summary>Removes every link the user holds for a provider.</summary>
     /// <param name="userId">The user.</param>

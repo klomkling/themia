@@ -33,6 +33,13 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
   state between issue and verify can call `RefundAsync(result.ChallengeId!.Value)` after a successful sign-in and
   not be rate-limited by its own issue window. It is `null` for every other outcome by design: a failed guess must not
   be able to refund a charge. Additive; no migration.
+- **Identity: `IExternalLoginLinkService.LinkReplacingHolderAsync` (coord #0233) (breaking for implementers).** Links an
+  external identity to a claimant and, in the same transaction, takes it from a named holder (for example a stub the
+  caller vetted). A compare-and-swap: it moves the link only while the holder is still the expected one, answers
+  `LinkedToAnotherUser` (nothing written) to anyone else, a platform-partition holder, or the loser of a race, and never
+  throws on that race. Both `OnBeforeLinkExternalLogin` (claimant) and `OnBeforeUnlinkExternalLogin` (holder) are consulted
+  before the transaction opens; after commit both users are announced. The holder's sessions are not revoked: call
+  `IRefreshTokenService.RevokeAllForUserAsync`. See MIGRATION.
 
 ## [0.67.2] - 2026-11-18
 

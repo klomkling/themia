@@ -1711,6 +1711,109 @@ public abstract class IdentityStoreConformanceTests
         }
     }
 
+    [Fact] // coord #0233: the holder's link moves to the claimant in one transaction, on the real schema
+    public async Task Link_replacing_holder_moves_the_link_from_the_stub_to_the_claimant()
+    {
+        await ResetAsync();
+        await using var s = NewScope(new TenantId("acme"));
+        var stub = (await s.Users.CreateAsync("stub", "pw")).UserId!.Value;
+        var claimant = (await s.Users.CreateAsync("claimant", "pw")).UserId!.Value;
+        var identity = new ExternalIdentity("telegram", "tg-swap", null, false, null);
+        await s.Linking.LinkAsync(stub, identity);
+
+        var result = await s.Linking.LinkReplacingHolderAsync(claimant, identity, stub);
+
+        Assert.Equal(ExternalLoginLinkOutcome.Linked, result.Outcome);
+        Assert.Equal(claimant, (await s.Linking.FindUserByLoginAsync("telegram", "tg-swap"))?.Id);
+        Assert.Empty(await s.Linking.GetLoginsAsync(stub));
+    }
+
+    [Fact] // coord #0233: a holder other than the expected one is never displaced
+    public async Task Link_replacing_holder_refuses_when_someone_else_holds_the_identity()
+    {
+        await ResetAsync();
+        await using var s = NewScope(new TenantId("acme"));
+        var stub = (await s.Users.CreateAsync("stub", "pw")).UserId!.Value;
+        var owner = (await s.Users.CreateAsync("owner", "pw")).UserId!.Value;
+        var claimant = (await s.Users.CreateAsync("claimant", "pw")).UserId!.Value;
+        var identity = new ExternalIdentity("telegram", "tg-owned", null, false, null);
+        await s.Linking.LinkAsync(owner, identity);
+
+        var result = await s.Linking.LinkReplacingHolderAsync(claimant, identity, stub);
+
+        Assert.Equal(ExternalLoginLinkOutcome.LinkedToAnotherUser, result.Outcome);
+        Assert.Equal(owner, (await s.Linking.FindUserByLoginAsync("telegram", "tg-owned"))?.Id);
+    }
+
+    [Fact] // coord #0233: a holder in the platform partition is not writable from a tenant scope
+    public async Task Link_replacing_holder_does_not_displace_a_platform_partition_holder()
+    {
+        await ResetAsync();
+        Guid platformHolder;
+        var identity = new ExternalIdentity("telegram", "tg-platform", null, false, null);
+        await using (var platform = NewScope(tenant: null))
+        {
+            platformHolder = (await platform.Users.CreateAsync("platform-holder", "pw")).UserId!.Value;
+            Assert.Equal(ExternalLoginLinkOutcome.Linked, (await platform.Linking.LinkAsync(platformHolder, identity)).Outcome);
+        }
+
+        await using var s = NewScope(new TenantId("acme"));
+        var claimant = (await s.Users.CreateAsync("claimant", "pw")).UserId!.Value;
+
+        var result = await s.Linking.LinkReplacingHolderAsync(claimant, identity, platformHolder);
+
+        Assert.Equal(ExternalLoginLinkOutcome.LinkedToAnotherUser, result.Outcome);
+        Assert.Empty(await s.Linking.GetLoginsAsync(claimant));
+    }
+
+    [Fact] // coord #0233: with no tenant at all, the holder's link is a platform row and the swap must still write it
+    public async Task Link_replacing_holder_swaps_inside_the_platform_scope()
+    {
+        await ResetAsync();
+        var identity = new ExternalIdentity("telegram", "tg-platform-swap", null, false, null);
+        await using var s = NewScope(tenant: null);
+        var stub = (await s.Users.CreateAsync("platform-stub", "pw")).UserId!.Value;
+        var claimant = (await s.Users.CreateAsync("platform-claimant", "pw")).UserId!.Value;
+        Assert.Equal(ExternalLoginLinkOutcome.Linked, (await s.Linking.LinkAsync(stub, identity)).Outcome);
+
+        var result = await s.Linking.LinkReplacingHolderAsync(claimant, identity, stub);
+
+        Assert.Equal(ExternalLoginLinkOutcome.Linked, result.Outcome);
+        Assert.Empty(await s.Linking.GetLoginsAsync(stub));
+        Assert.Single(await s.Linking.GetLoginsAsync(claimant));
+    }
+
+    [Fact] // coord #0233: a rival commits its swap between our re-read and our delete — our DELETE matches no row
+    public async Task Link_replacing_holder_race_loser_answers_with_the_winner_and_does_not_throw()
+    {
+        await ResetAsync();
+        var tenant = new TenantId("acme");
+        Guid stub, winner, loser;
+        var identity = new ExternalIdentity("telegram", "tg-swap-race", null, false, null);
+        await using (var seed = NewScope(tenant))
+        {
+            stub = (await seed.Users.CreateAsync("race-stub", "pw")).UserId!.Value;
+            winner = (await seed.Users.CreateAsync("swap-winner", "pw")).UserId!.Value;
+            loser = (await seed.Users.CreateAsync("swap-loser", "pw")).UserId!.Value;
+            await seed.Linking.LinkAsync(stub, identity);
+        }
+
+        var rivalHasRun = new int[1]; // shared: every scope builds its own decorator, only one may race
+        await using (var s = NewScope(tenant, configureServices: services =>
+            services.Decorate<IUnitOfWork>((inner, sp) => new SwapRivalUnitOfWork(inner, sp, winner, identity, stub, rivalHasRun))))
+        {
+            var result = await s.Linking.LinkReplacingHolderAsync(loser, identity, stub);
+
+            Assert.Equal(ExternalLoginLinkOutcome.LinkedToAnotherUser, result.Outcome);
+        }
+
+        await using (var verify = NewScope(tenant))
+        {
+            Assert.Equal(winner, (await verify.Linking.FindUserByLoginAsync("telegram", "tg-swap-race"))?.Id);
+            Assert.Empty(await verify.Linking.GetLoginsAsync(loser));
+        }
+    }
+
     [Fact] // the batch path is a collection Contains, which Dapper must translate to IN rather than refuse
     public async Task Logins_for_users_are_fetched_in_one_call()
     {
@@ -2960,4 +3063,31 @@ file sealed class RaceInjectingHooks(IServiceProvider rootProvider, Guid winnerU
 
         return UserMutationDecision.Allow();
     }
+}
+
+/// <summary>Lets a rival claimant commit its own swap of the same holder's link in an independent scope, once,
+/// just before this unit of work's first save inside its transaction — after the service's in-transaction
+/// re-read, before its DELETE. The DELETE then matches no row, which is the interleave a real race produces.</summary>
+file sealed class SwapRivalUnitOfWork(
+    IUnitOfWork inner, IServiceProvider rootProvider, Guid rivalUserId, ExternalIdentity identity, Guid holderId, int[] raced)
+    : IUnitOfWork
+{
+    public async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        if (Interlocked.Exchange(ref raced[0], 1) == 0)
+        {
+            await using var scope = rootProvider.CreateAsyncScope();
+            var linking = scope.ServiceProvider.GetRequiredService<IExternalLoginLinkService>();
+            var rival = await linking.LinkReplacingHolderAsync(rivalUserId, identity, holderId, cancellationToken);
+            Assert.Equal(ExternalLoginLinkOutcome.Linked, rival.Outcome);
+        }
+
+        return await inner.SaveChangesAsync(cancellationToken);
+    }
+
+    public Task<ITransactionScope> BeginTransactionAsync(CancellationToken cancellationToken = default) =>
+        inner.BeginTransactionAsync(cancellationToken);
+
+    public Task ExecuteInTransactionAsync(Func<CancellationToken, Task> work, CancellationToken cancellationToken = default) =>
+        inner.ExecuteInTransactionAsync(work, cancellationToken);
 }

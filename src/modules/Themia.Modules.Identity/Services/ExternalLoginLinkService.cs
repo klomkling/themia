@@ -12,7 +12,7 @@ using Themia.Modules.Identity.Specifications;
 namespace Themia.Modules.Identity.Services;
 
 /// <summary>Default <see cref="IExternalLoginLinkService"/> over <c>identity.external_logins</c>.</summary>
-public sealed class ExternalLoginLinkService : IExternalLoginLinkService
+public sealed partial class ExternalLoginLinkService : IExternalLoginLinkService
 {
     private readonly IRepository<User, Guid> users;
     private readonly IRepository<ExternalLoginLink, Guid> links;
