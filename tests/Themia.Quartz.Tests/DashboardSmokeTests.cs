@@ -21,8 +21,10 @@ public sealed class DashboardSmokeTests
 {
     // Owns the host + its scheduler so both are torn down deterministically. The scheduler is shut
     // down on dispose to avoid leaking Quartz background threads across (parallel) test classes.
-    private sealed class TestHostScope(IHost host, IScheduler scheduler) : IAsyncDisposable
+    internal sealed class TestHostScope(IHost host, IScheduler scheduler) : IAsyncDisposable
     {
+        public IScheduler Scheduler => scheduler;
+
         public HttpClient CreateClient() => host.GetTestClient();
 
         public async ValueTask DisposeAsync()
@@ -35,7 +37,7 @@ public sealed class DashboardSmokeTests
     // Middleware order: UseThemiaQuartz (gate + static files + Services bridge) must run before
     // UseRouting so that the authorize gate and embedded content serving intercept requests before
     // the endpoint dispatcher. MapThemiaQuartz inside UseEndpoints registers the controller route.
-    private static async Task<TestHostScope> StartHostAsync(
+    internal static async Task<TestHostScope> StartHostAsync(
         Func<HttpContext, Task<bool>>? authorize,
         int? deniedStatus = null,
         Action<ThemiaQuartzOptions>? configure = null)

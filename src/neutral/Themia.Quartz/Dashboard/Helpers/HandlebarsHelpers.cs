@@ -198,7 +198,7 @@ namespace Themia.Quartz.Dashboard.Helpers
         {
             if (arguments.Length > 0)
             {
-                output.WriteSafeString(JsonSerializer.Serialize(arguments[0], arguments[0]?.GetType() ?? typeof(object), DashboardJsonOptions.RawInject));
+                output.WriteSafeString(JsonSerializer.Serialize(arguments[0], arguments[0]?.GetType() ?? typeof(object), DashboardJsonOptions.Default));
             }
 
             if (args.Length <= 0)
@@ -206,7 +206,7 @@ namespace Themia.Quartz.Dashboard.Helpers
                 return;
             }
 
-            output.WriteSafeString(JsonSerializer.Serialize(args[0], args[0]?.GetType() ?? typeof(object), DashboardJsonOptions.RawInject));
+            output.WriteSafeString(JsonSerializer.Serialize(args[0], args[0]?.GetType() ?? typeof(object), DashboardJsonOptions.Default));
         }
 
         void RenderJobDataMapValue(EncodedTextWriter output, Context context, Arguments arguments)

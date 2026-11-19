@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Net;
 
 namespace Themia.Quartz.Dashboard
 {
@@ -38,14 +39,46 @@ namespace Themia.Quartz.Dashboard
             }
         }
 
+        const string LayoutName = "Layout";
+        readonly Dictionary<string, bool> _usesLayout = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
+
+        bool UsesLayout(string templatePath)
+        {
+            var fileSystem = (ViewFileSystemFactory.LayoutAwareFileSystem)_services.Handlebars.Configuration.FileSystem;
+            if (!UseCache)
+            {
+                return fileSystem.UsesLayout(templatePath);
+            }
+
+            lock (_usesLayout)
+            {
+                if (!_usesLayout.TryGetValue(templatePath, out var uses))
+                {
+                    _usesLayout[templatePath] = uses = fileSystem.UsesLayout(templatePath);
+                }
+
+                return uses;
+            }
+        }
+
+        // The view is rendered on its own (see ViewFileSystemFactory.LayoutAwareFileSystem), then handed to
+        // the layout as Page.Body.
         public string Render(string templatePath, object model)
         {
-            return GetRenderDelegate(templatePath)(model);
+            var body = GetRenderDelegate(templatePath)(model);
+            if (!UsesLayout(templatePath))
+            {
+                return body;
+            }
+
+            var page = (Controllers.PageControllerBase.Page)model;
+            page.Body = body;
+            return GetRenderDelegate(LayoutName + ".hbs")(page);
         }
 
         public string Encode(object value)
         {
-            return string.Format(CultureInfo.InvariantCulture, "{0}", value);
+            return WebUtility.HtmlEncode(string.Format(CultureInfo.InvariantCulture, "{0}", value));
         }
 
         public string ErrorPage(Exception ex)

@@ -8,16 +8,14 @@ namespace Themia.Quartz.Dashboard.Json
     /// (<c>PropertyNamingPolicy = null</c>) with nulls included, matching the Newtonsoft defaults the
     /// templates/JS depend on. The encoder is the only axis that varies:
     /// <list type="bullet">
-    /// <item><see cref="Default"/> — JSON written to HTTP responses (consumed via <c>JSON.parse</c>).
-    /// Uses the default encoder, which escapes <c>&lt; &gt; &amp; +</c> and non-ASCII (decoded back by
-    /// <c>JSON.parse</c>).</item>
-    /// <item><see cref="RawInject"/> — JSON injected RAW into HTML/JS templates (WriteSafeString /
-    /// triple-stache). Uses <see cref="JavaScriptEncoder.UnsafeRelaxedJsonEscaping"/> so those
-    /// characters are emitted literally, matching the pre-migration Newtonsoft behavior. Admin-only
-    /// dashboard — parity, not a new XSS surface.</item>
+    /// <item><see cref="Default"/> — the only choice for JSON that can hold user-controlled text (job,
+    /// trigger, group and calendar names, data-map values): HTTP responses and the <c>{{Json}}</c> /
+    /// <c>PageData</c> template helpers. It escapes <c>&lt; &gt; &amp; + ' "</c> and non-ASCII as
+    /// <c>\uXXXX</c>, so a value can never close a <c>&lt;script&gt;</c> block, and JavaScript decodes it back.</item>
+    /// <item><see cref="RawInject"/> — literal characters (<see cref="JavaScriptEncoder.UnsafeRelaxedJsonEscaping"/>).
+    /// Only for values the server itself defines (static labels, CLR type ids) that are injected raw.
+    /// Never pass it a value an operator or caller can set: it leaves <c>&lt;</c> unescaped.</item>
     /// </list>
-    /// Pick <see cref="RawInject"/> for anything emitted through a template without <c>JSON.parse</c>;
-    /// pick <see cref="Default"/> for everything returned as an <c>application/json</c> response.
     /// </summary>
     internal static class DashboardJsonOptions
     {
