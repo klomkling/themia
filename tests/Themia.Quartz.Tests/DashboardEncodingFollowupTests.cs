@@ -76,9 +76,9 @@ public sealed class DashboardEncodingFollowupTests
         var job = JobBuilder.Create<BlockingJob>().WithIdentity(HostileName, HostileGroup).StoreDurably().Build();
         await scope.Scheduler.AddJob(job, replace: true);
         await scope.Scheduler.TriggerJob(job.Key);
-        Assert.True(await BlockingJob.Started.WaitAsync(TimeSpan.FromSeconds(10)));
         try
         {
+            Assert.True(await BlockingJob.Started.WaitAsync(TimeSpan.FromSeconds(10)));
             var body = await GetAsync(scope, "/jobs/Executions/Index");
 
             AssertNoRawMarkup(body);
@@ -112,6 +112,7 @@ public sealed class DashboardEncodingFollowupTests
         var body = await GetAsync(scope, "/jobs/Scheduler/Index");
 
         AssertNoRawMarkup(body);
+        Assert.Contains("evil&lt;/script&gt;&lt;img src=x onerror=alert(1)&gt;", body, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -125,6 +126,7 @@ public sealed class DashboardEncodingFollowupTests
 
         Assert.DoesNotContain($"name={QuotedName}", body, StringComparison.Ordinal);
         Assert.DoesNotContain("name=a\"b", body, StringComparison.Ordinal);
+        Assert.Contains("a&quot;b'c.a&quot;b'c", body, StringComparison.Ordinal);
     }
 
     [Fact]
