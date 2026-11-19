@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Net;
 
 namespace Themia.Quartz.Dashboard
 {
@@ -77,7 +78,7 @@ namespace Themia.Quartz.Dashboard
 
         public string Encode(object value)
         {
-            return string.Format(CultureInfo.InvariantCulture, "{0}", value);
+            return WebUtility.HtmlEncode(string.Format(CultureInfo.InvariantCulture, "{0}", value));
         }
 
         public string ErrorPage(Exception ex)

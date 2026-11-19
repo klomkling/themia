@@ -1,4 +1,5 @@
 using Quartz;
+using Quartz.Impl.Calendar;
 using Xunit;
 
 namespace Themia.Quartz.Tests;
@@ -46,5 +47,32 @@ public sealed class DashboardEncodingTests
         Assert.True(response.IsSuccessStatusCode, $"{url} -> {(int)response.StatusCode}");
         Assert.DoesNotContain(RawMarkup, body, StringComparison.Ordinal);
         Assert.DoesNotContain(RawScriptClose, body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Names_ShouldAppearEncoded_WhenRenderedInMarkup()
+    {
+        await using var scope = await DashboardSmokeTests.StartHostAsync(authorize: _ => Task.FromResult(true));
+        await scope.Scheduler.AddJob(
+            JobBuilder.Create<NoopJob>().WithIdentity(HostileName, HostileGroup).StoreDurably().Build(), replace: true);
+
+        var body = await (await scope.CreateClient().GetAsync("/jobs/Jobs/Index")).Content.ReadAsStringAsync();
+
+        Assert.Contains("evil&lt;/script&gt;&lt;img src=x onerror=alert(1)&gt;", body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task CalendarEdit_ShouldEscapeScriptClose_WhenCalendarNameHoldsMarkup()
+    {
+        await using var scope = await DashboardSmokeTests.StartHostAsync(authorize: _ => Task.FromResult(true));
+        await scope.Scheduler.AddCalendar(HostileName, new HolidayCalendar(), replace: true, updateTriggers: false);
+
+        var response = await scope.CreateClient().GetAsync($"/jobs/Calendars/Edit?name={Q(HostileName)}");
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.True(response.IsSuccessStatusCode, $"{(int)response.StatusCode}");
+        Assert.DoesNotContain(RawMarkup, body, StringComparison.Ordinal);
+        Assert.DoesNotContain(RawScriptClose, body, StringComparison.Ordinal);
+        Assert.Contains("evil\\u003C/script\\u003E\\u003Cimg", body, StringComparison.Ordinal);
     }
 }

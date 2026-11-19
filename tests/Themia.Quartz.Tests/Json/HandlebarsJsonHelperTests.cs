@@ -8,9 +8,9 @@ namespace Themia.Quartz.Tests.Json;
 
 /// <summary>
 /// Pins the JSON produced by the Handlebars <c>{{json}}</c> helper registered in
-/// <see cref="HandlebarsHelpers"/>. The helper serializes with <c>DashboardJsonOptions.RawInject</c>
-/// (PascalCase, nulls included, <c>UnsafeRelaxedJsonEscaping</c> for raw template injection). These
-/// tests lock that casing + null-inclusion + literal-escaping contract the templates depend on.
+/// <see cref="HandlebarsHelpers"/>. The helper serializes with <c>DashboardJsonOptions.Default</c>
+/// (PascalCase, nulls included, markup characters escaped because the output is injected into inline scripts).
+/// These tests lock that casing + null-inclusion + escaping contract the templates depend on.
 /// </summary>
 public sealed class HandlebarsJsonHelperTests
 {
@@ -28,7 +28,7 @@ public sealed class HandlebarsJsonHelperTests
     public void JsonHelper_SerializesAnonymousObject_WithPascalCaseKeys()
     {
         var svc = CreateServices();
-        // The helper uses DashboardJsonOptions.RawInject: PascalCase, nulls included
+        // The helper uses DashboardJsonOptions.Default: PascalCase, nulls included
         var model = new { Name = "hello", Value = 42 };
         var output = Render(svc, "{{json this}}", model);
 
@@ -39,7 +39,7 @@ public sealed class HandlebarsJsonHelperTests
     public void JsonHelper_IncludesNullValues_UnlikeTypeHandlerService()
     {
         // Critical distinction: TypeHandlerService uses DefaultIgnoreCondition.WhenWritingNull (omits
-        // nulls), but the {{json}} helper (DashboardJsonOptions.RawInject) INCLUDES nulls.
+        // nulls), but the {{json}} helper (DashboardJsonOptions.Default) INCLUDES nulls.
         var svc = CreateServices();
         var model = new { Name = (string?)null, Value = 1 };
         var output = Render(svc, "{{json this}}", model);
@@ -117,21 +117,17 @@ public sealed class HandlebarsJsonHelperTests
     }
 
     [Fact]
-    public void JsonHelper_DoesNotEscapeNonAsciiOrPlus()
+    public void JsonHelper_EscapesMarkupCharacters_SoValueCannotCloseAnInlineScript()
     {
-        // Pins the UnsafeRelaxedJsonEscaping encoder on DashboardJsonOptions.RawInject (used by {{json}}).
-        // The {{json}} helper output is injected RAW into HTML/JS templates (WriteSafeString /
-        // triple-stache). Newtonsoft emitted + and non-ASCII chars literally; STJ's default
-        // encoder would escape them to \uXXXX. This test fails with the default encoder and
-        // passes only with UnsafeRelaxedJsonEscaping — proving the divergence is fixed.
+        // The {{json}} output is injected into an inline <script>; "</script>", "<", ">", "&" and quotes must
+        // leave as \uXXXX escapes (the default encoder), which JavaScript reads back as the same string.
         var svc = CreateServices();
-        var model = new { Label = "(UTC+07:00) Café" };
+        var model = new { Name = "a</script><b>&\"'" };
         var output = Render(svc, "{{json this}}", model);
 
-        // Must contain literal + (not the escaped +) and literal é (not the escaped é).
-        Assert.Contains("+", output);
-        Assert.Contains("é", output);
-        // Full value check
-        Assert.Contains("(UTC+07:00) Café", output);
+        Assert.DoesNotContain("<", output);
+        Assert.DoesNotContain(">", output);
+        Assert.DoesNotContain("&", output);
+        Assert.Contains("a\\u003C/script\\u003E\\u003Cb\\u003E\\u0026", output);
     }
 }
