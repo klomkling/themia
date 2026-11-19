@@ -1,3 +1,4 @@
+using System.Net;
 using HandlebarsDotNet;
 
 namespace Themia.Pdf;
@@ -13,7 +14,7 @@ internal sealed class HandlebarsHtmlTemplateRenderer : IHtmlTemplateRenderer
 
         _hbs = Handlebars.Create();
         _hbs.RegisterHelper("emptyIfNull", (output, _, arguments) =>
-            output.WriteSafeString(arguments.Length > 0 ? arguments[0]?.ToString() ?? string.Empty : string.Empty));
+            output.WriteSafeString(WebUtility.HtmlEncode(arguments.Length > 0 ? arguments[0]?.ToString() ?? string.Empty : string.Empty)));
 
         options.ConfigureHandlebars?.Invoke(_hbs);
     }
