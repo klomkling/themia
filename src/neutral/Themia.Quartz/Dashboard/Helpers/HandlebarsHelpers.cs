@@ -1,4 +1,4 @@
-﻿﻿using HandlebarsDotNet;
+﻿using HandlebarsDotNet;
 using Themia.Quartz.Dashboard.Models;
 using Themia.Quartz.Dashboard.TypeHandlers;
 using System;

@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Quartz;
+using Quartz.Impl.Calendar;
 using Xunit;
 
 namespace Themia.Quartz.Tests;
@@ -76,21 +77,23 @@ public sealed class DashboardCspTests
     }
 
     [Fact]
-    public async Task JobEditPage_ShouldKeepHostileNamesInsideTheJsonBlock_WhenNameHoldsScriptClose()
+    public async Task CalendarEditPage_ShouldKeepHostileNameInsideTheJsonBlock_WhenNameHoldsScriptClose()
     {
         await using var scope = await DashboardSmokeTests.StartHostAsync(authorize: _ => Task.FromResult(true));
-        await SeedAsync(scope.Scheduler);
+        await scope.Scheduler.AddCalendar(HostileName, new HolidayCalendar(), replace: true, updateTriggers: false);
 
         var body = await (await scope.CreateClient()
-            .GetAsync($"/jobs/Jobs/Edit?name={Q(HostileName)}&group={Q(HostileGroup)}")).Content.ReadAsStringAsync();
+            .GetAsync($"/jobs/Calendars/Edit?name={Q(HostileName)}")).Content.ReadAsStringAsync();
 
         var block = PageDataBlock.Match(body);
         Assert.True(block.Success, "page-data block missing");
-        Assert.DoesNotContain("</", block.Groups[1].Value, StringComparison.Ordinal);
-        Assert.DoesNotContain("<", block.Groups[1].Value, StringComparison.Ordinal);
-        Assert.DoesNotContain(">", block.Groups[1].Value, StringComparison.Ordinal);
-        Assert.DoesNotContain("&", block.Groups[1].Value, StringComparison.Ordinal);
-        using var parsed = JsonDocument.Parse(block.Groups[1].Value);
+        var json = block.Groups[1].Value;
+        Assert.DoesNotContain("<", json, StringComparison.Ordinal);
+        Assert.DoesNotContain(">", json, StringComparison.Ordinal);
+        Assert.DoesNotContain("&", json, StringComparison.Ordinal);
+        // Positive control: the name is in the block, escaped, not dropped.
+        Assert.Contains("evil\\u003C/script\\u003E", json, StringComparison.Ordinal);
+        using var parsed = JsonDocument.Parse(json);
         Assert.Equal(JsonValueKind.Object, parsed.RootElement.ValueKind);
         Assert.DoesNotContain("<img src=x", body, StringComparison.Ordinal);
     }

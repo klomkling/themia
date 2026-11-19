@@ -11,7 +11,7 @@ namespace Themia.Quartz.Dashboard
 {
     public static class ViewFileSystemFactory
     {
-        internal static LayoutAwareFileSystem Create(ThemiaQuartzOptions options)
+        public static ViewEngineFileSystem Create(ThemiaQuartzOptions options)
         {
             LayoutAwareFileSystem fs;
             if (string.IsNullOrEmpty(options.ViewsRootDirectory))
