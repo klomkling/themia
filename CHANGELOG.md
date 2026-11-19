@@ -27,6 +27,10 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+### Fixed
+
+- **fix: encode the `emptyIfNull` helper output (`Themia.Pdf`).** The built-in helper wrote its value without HTML encoding, so a template using it on user-supplied text (names, addresses) emitted that text as markup. It now encodes like `{{value}}`. A template that relied on `emptyIfNull` to pass an HTML fragment through must switch to `{{{value}}}` for trusted fragments.
+
 ## [0.69.0] - 2026-11-18
 
 ### Added

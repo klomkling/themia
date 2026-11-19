@@ -27,6 +27,16 @@ public sealed class HandlebarsHtmlTemplateRendererTests
     }
 
     [Fact]
+    public void Render_EmptyIfNullHelper_EncodesMarkup_WhenValueHoldsMarkup()
+    {
+        var sut = new HandlebarsHtmlTemplateRenderer(new ThemiaPdfOptions());
+
+        var html = sut.Render("{{emptyIfNull name}}", new { name = "<b>\"A&B\"</b>" });
+
+        Assert.Equal("&lt;b&gt;&quot;A&amp;B&quot;&lt;/b&gt;", html);
+    }
+
+    [Fact]
     public void Render_ConfigureHandlebars_RegistersCustomHelper()
     {
         var options = new ThemiaPdfOptions
