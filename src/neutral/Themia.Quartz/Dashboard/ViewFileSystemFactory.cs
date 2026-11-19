@@ -1,9 +1,11 @@
 ﻿using HandlebarsDotNet;
 using Microsoft.Extensions.FileProviders;
+using System;
 using System.Diagnostics;
 using System.IO;
 using System.Reflection;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace Themia.Quartz.Dashboard
 {
@@ -11,7 +13,7 @@ namespace Themia.Quartz.Dashboard
     {
         public static ViewEngineFileSystem Create(ThemiaQuartzOptions options)
         {
-            ViewEngineFileSystem fs;
+            LayoutAwareFileSystem fs;
             if (string.IsNullOrEmpty(options.ViewsRootDirectory))
             {
                 fs = new EmbeddedFileSystem();
@@ -24,7 +26,37 @@ namespace Themia.Quartz.Dashboard
             return fs;
         }
 
-        private class DiskFileSystem : ViewEngineFileSystem
+        // Handlebars.Net 2.1.6 renders a view that declares a layout ({{!<Layout}}) with output encoding
+        // suppressed, so every {{value}} in it reached the page raw (stored XSS through job / trigger /
+        // calendar names). Views are therefore served without the directive and ViewEngine applies the
+        // layout itself, so {{value}} stays HTML-encoded.
+        internal abstract class LayoutAwareFileSystem : ViewEngineFileSystem
+        {
+            const string LayoutName = "Layout";
+            static readonly Regex Directive = new Regex(@"^\uFEFF?[ \t]*\{\{!<[ \t]*(\w+)[ \t]*\}\}", RegexOptions.Compiled);
+
+            protected abstract string ReadRaw(string filename);
+
+            public override string GetFileContent(string filename)
+            {
+                var raw = ReadRaw(filename);
+                var directive = Directive.Match(raw);
+                return directive.Success ? raw.Substring(directive.Length) : raw;
+            }
+
+            public bool UsesLayout(string filename)
+            {
+                var directive = Directive.Match(ReadRaw(filename));
+                if (directive.Success && directive.Groups[1].Value != LayoutName)
+                {
+                    throw new InvalidOperationException($"Unsupported layout '{directive.Groups[1].Value}' in '{filename}'.");
+                }
+
+                return directive.Success;
+            }
+        }
+
+        private class DiskFileSystem : LayoutAwareFileSystem
         {
             string root;
 
@@ -33,7 +65,7 @@ namespace Themia.Quartz.Dashboard
                 this.root = root;
             }
 
-            public override string GetFileContent(string filename)
+            protected override string ReadRaw(string filename)
             {
                 return File.ReadAllText(GetFullPath(filename));
             }
@@ -54,10 +86,10 @@ namespace Themia.Quartz.Dashboard
             }
         }
 
-        private class EmbeddedFileSystem : ViewEngineFileSystem
+        private class EmbeddedFileSystem : LayoutAwareFileSystem
         {
             private EmbeddedFileProvider fs = new EmbeddedFileProvider(Assembly.GetExecutingAssembly(), "Themia.Quartz.Dashboard.Views");
-            public override string GetFileContent(string filename)
+            protected override string ReadRaw(string filename)
             {
                 var result = string.Empty;
                 var fi = fs.GetFileInfo(GetFullPath(filename));

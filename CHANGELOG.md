@@ -27,6 +27,10 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+### Fixed
+
+- **fix: encode names in Quartz dashboard views (`Themia.Quartz`).** Job, trigger and group names were written into the dashboard pages without HTML encoding. Anyone who can set those names (job registration code, or any user of an app that lets users name scheduled jobs) could run script in the browser of an administrator who opens `/admin/jobs`. Names are now encoded in every view. Upgrade if untrusted input can reach a job, trigger or group name.
+
 ## [0.69.0] - 2026-11-18
 
 ### Added

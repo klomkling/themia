@@ -60,6 +60,9 @@ namespace Themia.Quartz.Dashboard.Controllers
 
             public object Model { get; set; }
 
+            /// <summary>The rendered view, exposed to the layout as <c>{{{body}}}</c> (see <see cref="ViewEngine"/>).</summary>
+            public string Body { get; set; }
+
             public Page(PageControllerBase controller, object model = null)
             {
                 _controller = controller;
