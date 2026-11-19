@@ -33,26 +33,40 @@ namespace Themia.Quartz.Dashboard
         internal abstract class LayoutAwareFileSystem : ViewEngineFileSystem
         {
             const string LayoutName = "Layout";
-            static readonly Regex Directive = new Regex(@"^\uFEFF?[ \t]*\{\{!<[ \t]*(\w+)[ \t]*\}\}", RegexOptions.Compiled);
+            static readonly Regex Directive = new Regex(@"^\uFEFF?\s*\{\{!<\s*(\w+)\s*\}\}", RegexOptions.Compiled);
+            const string DirectiveMarker = "{{!<";
 
             protected abstract string ReadRaw(string filename);
 
             public override string GetFileContent(string filename)
             {
                 var raw = ReadRaw(filename);
-                var directive = Directive.Match(raw);
+                var directive = Match(raw, filename);
                 return directive.Success ? raw.Substring(directive.Length) : raw;
             }
 
             public bool UsesLayout(string filename)
             {
-                var directive = Directive.Match(ReadRaw(filename));
+                var directive = Match(ReadRaw(filename), filename);
                 if (directive.Success && directive.Groups[1].Value != LayoutName)
                 {
                     throw new InvalidOperationException($"Unsupported layout '{directive.Groups[1].Value}' in '{filename}'.");
                 }
 
                 return directive.Success;
+            }
+
+            // Fail closed: a layout directive the regex does not recognise would leave Handlebars.Net to
+            // render the view with output encoding suppressed, so it is rejected instead of served.
+            static Match Match(string raw, string filename)
+            {
+                var directive = Directive.Match(raw);
+                if (!directive.Success && raw.Contains(DirectiveMarker, StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException($"Unrecognised layout directive in '{filename}'; it must be the first token of the view.");
+                }
+
+                return directive;
             }
         }
 
