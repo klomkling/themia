@@ -11,9 +11,9 @@
 
 <div class="ui inverted page dimmer" id="dimmer"><div class="ui loader"></div></div>
 <form class="ui form" id="form" method="post" enctype="multipart/form-data">
-    <div class="ui clearing basic segment" style="padding: 0px" id="header">
+    <div class="ui clearing basic segment tq-s5" id="header">
         {{#if ViewBag.EnableEdit}}
-        <div style="float: right">
+        <div class="tq-s6">
             <a class="ui button" id="btn-discard" href="{{ActionUrl ''}}">Discard Changes</a>
             {{#unless Model.Job.IsNew}}
             <div class="negative ui button" id="btn-delete">Delete</div>
@@ -120,64 +120,7 @@
     </div>
 </div>
 
-<script>
-    $(function () {
-        const
-            $jobGroup = $('#jobGroup').val(),
-            $jobName = $('#jobName').val(),
-            $jobType = $('#jobType').val();
-
-        // inits
-        $('#job-properties .ui.dropdown, #header .ui.dropdown').each(function () {
-            $(this).dropdown({
-                allowAdditions: $(this).hasClass('allow-additions')
-            });
-        });
-
-        $('#save-dropdown').dropdown('setting', 'action', 'hide');
-        $('#job-properties .ui.checkbox').checkbox();
-
-        $('#jobTypeDropdown').dropdown('set selected', $jobType);
-
-        initDimmer();
-
-        // event handlers
-        $('#btn-delete').click(function () {
-            $('#delete-dialog .confirm-item').text($jobGroup + '.' + $jobName);
-            deleteItem({ name: $jobName, group: $jobGroup }, $('#job-properties'),
-                '{{ActionUrl "Delete"}}', '{{ActionUrl ""}}');
-        });
-
-        function save(triggerNow) {
-            if ($('#job-data-map .type-col .ui.dropdown.disabled').length > 0) return; // type change in progress
-
-            $('#dimmer').dimmer('show');
-
-            $('#job-data-map').jobDataMapPrepareForm();
-
-            var formData = new FormData($('#form')[0]);
-
-            $.ajax({
-                type: 'POST', enctype: 'multipart/form-data', url: '{{ActionUrl "Save"}}?trigger=' + triggerNow,
-                data: formData, processData: false, contentType: false, dataType: "json", cache: false,
-                success: function (data) {
-                    if (processValidationResponse(data)) {
-                        document.location = '{{ActionUrl ""}}';
-                    } else {
-                        $('#dimmer').dimmer('hide');
-                    }
-                },
-                error: function (e) {
-                    $('#dimmer').dimmer('hide');
-                    prependErrorMessage(e, $('#job-properties'));
-                }
-            });
-        }
-
-        $('#btn-save').click(function () { save(false); });
-        $('#btn-trigger').click(function () { save(true); });
-
-    });
-</script>
+{{{PageData urlDelete=(ActionUrl "Delete") urlHome=(ActionUrl "") urlSave=(ActionUrl "Save")}}}
+<script src="Content/Scripts/pages/jobs-edit.js"></script>
 
 <script src="Content/Scripts/post-validation.js"></script>

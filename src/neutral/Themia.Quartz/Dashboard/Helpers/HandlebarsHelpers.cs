@@ -18,6 +18,8 @@ namespace Themia.Quartz.Dashboard.Helpers
 {
     internal class HandlebarsHelpers
     {
+        private const string CalendarDefaultsKey = "calendarDefaults";
+
         Services _services;
         private readonly string baseUrl;
 
@@ -67,6 +69,7 @@ namespace Themia.Quartz.Dashboard.Helpers
             h.RegisterHelper(nameof(ViewBag), ViewBag);
             h.RegisterHelper(nameof(ActionUrl), ActionUrl);
             h.RegisterHelper(nameof(Json), (o, c, a) => Json(o, c, a));
+            h.RegisterHelper(nameof(PageData), PageData);
             h.RegisterHelper(nameof(Selected), Selected);
             h.RegisterHelper(nameof(isType), isType);
             h.RegisterHelper(nameof(eachPair), eachPair);
@@ -207,6 +210,37 @@ namespace Themia.Quartz.Dashboard.Helpers
             }
 
             output.WriteSafeString(JsonSerializer.Serialize(args[0], args[0]?.GetType() ?? typeof(object), DashboardJsonOptions.Default));
+        }
+
+        /// <summary>
+        /// Emits the page's data as a non-executable <c>application/json</c> block, so the page scripts live in
+        /// static files and the dashboard runs under <c>script-src 'self'</c> (no inline script, no nonce).
+        /// The JSON uses the default encoder, which escapes <c>&lt; &gt; &amp;</c> as <c>\uXXXX</c>: a value
+        /// holding <c>&lt;/script&gt;</c> cannot close the block. Hash arguments become properties; the
+        /// <see cref="CalendarDefaultsKey"/> flag adds the time-zone list and date format the calendar editor needs.
+        /// </summary>
+        void PageData(EncodedTextWriter output, Context context, Arguments arguments)
+        {
+            var data = new Dictionary<string, object>();
+            if (arguments.Length > 0 && arguments[0] is IDictionary<string, object> hash)
+            {
+                foreach (var pair in hash)
+                {
+                    data[pair.Key] = pair.Value;
+                }
+            }
+
+            if (data.Remove(CalendarDefaultsKey))
+            {
+                data["timezones"] = TimeZoneInfo.GetSystemTimeZones().ToDictionary();
+                data["defaultTimezone"] = TimeZoneInfo.Local.Id;
+                data["dateFormat"] = DateTimeSettings.DefaultDateFormat.ToUpperInvariant();
+            }
+
+            output.WriteSafeString(
+                "<script type=\"application/json\" id=\"page-data\">"
+                + JsonSerializer.Serialize(data, DashboardJsonOptions.Default)
+                + "</script>");
         }
 
         void RenderJobDataMapValue(EncodedTextWriter output, Context context, Arguments arguments)

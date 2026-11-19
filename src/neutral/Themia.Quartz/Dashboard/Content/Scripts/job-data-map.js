@@ -122,7 +122,7 @@ function jobDataMapItem() {
             }
 
             $.ajax({
-                type: 'POST', enctype: 'multipart/form-data', url: $changeTypeCallbackUrl,
+                type: 'POST', enctype: 'multipart/form-data', url: $('#job-data-map').data('change-type-url'),
                 data: formData, processData: false, contentType: false, cache: false,
                 timeout: 15000,
                 success: function (data) {

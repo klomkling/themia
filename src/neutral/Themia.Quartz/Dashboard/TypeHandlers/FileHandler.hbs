@@ -1,16 +1,16 @@
-﻿<div class="ui left icon fluid input file-selector" {{#if Value}}style="display: none"{{/if}}>
-    <input type="text" placeholder="Select file..." readonly style="cursor: pointer">
+﻿<div class="ui left icon fluid input file-selector{{#if Value}} tq-s3{{/if}}">
+    <input type="text" placeholder="Select file..." readonly class="tq-s2">
     <i class="file outline icon"></i>
-    <input type="file" name="data-map[file-value]" style="display: none">
+    <input type="file" name="data-map[file-value]" class="tq-s3">
 </div>
 
 {{#if Value}}
 <div class="ui left icon action input old-file">
-    <input type="text" value="{{Value.Length}} bytes" class="stats" readonly style="cursor: pointer">
+    <input type="text" value="{{Value.Length}} bytes" class="stats tq-s2" readonly>
     <i class="file outline icon"></i>
     <div class="ui button download-button">
         <i class="download icon"></i>Download
     </div>
-    <textarea name="data-map[old-file-value]" style="display: none">{{ToBase64 Value}}</textarea>
+    <textarea name="data-map[old-file-value]" class="tq-s3">{{ToBase64 Value}}</textarea>
 </div>
 {{/if}}

@@ -11,9 +11,9 @@
 
 <div class="ui inverted page dimmer" id="dimmer"><div class="ui loader"></div></div>
 <form class="ui form" id="form" method="post" enctype="multipart/form-data">
-    <div class="ui clearing basic segment" style="padding: 0px" id="header">
+    <div class="ui clearing basic segment tq-s5" id="header">
         {{#if ViewBag.EnableEdit}}
-        <div style="float: right">
+        <div class="tq-s6">
             <a class="ui button" id="btn-discard" href="{{ActionUrl ''}}">Discard Changes</a>
             {{#unless Model.Trigger.IsNew}}
             <div class="negative ui button" id="btn-delete">Delete</div>
@@ -152,7 +152,7 @@
                     <div class="seven wide field accept-error cron-field">
                         <label>Cron Expression <a href="http://cronmaker.com" target="_blank"><i class="external alternate icon"></i>http://cronmaker.com</a></label>
                         <input type="text" name="trigger[cron.expression]" placeholder="Cron Expression" id="cron-expression" value="{{Cron.Expression}}" />
-                        <div style="float: right; cursor:pointer; display: none" id="next-cron-dates"><i class="eye icon"></i></div>
+                        <div id="next-cron-dates" class="tq-s23"><i class="eye icon"></i></div>
                         <p id="cron-desc"></p>
                     </div>
                     <div class="nine wide field accept-error">
@@ -351,141 +351,7 @@
     </div>
 </div>
 
-<script>
-    const $misfireInstructionsMap = {{{ Model.Trigger.MisfireInstructionsJson }}};
-
-    $(function () {
-        const
-            $triggerGroup = $('#triggerGroup').val(),
-            $triggerName = $('#triggerName').val();
-
-        $('#trigger-properties .ui.dropdown, #header .ui.dropdown').each(function () {
-            $(this).dropdown({
-                allowAdditions: $(this).hasClass('allow-additions'),
-                placeholder: $(this).hasClass('allow-empty') ? 'false' : 'auto',
-                fullTextSearch: $(this).hasClass('fulltext') ? 'exact' : 'false'
-            });
-        });
-
-        $('#trigger-properties .ui.checkbox').checkbox();
-
-        function misfireInstrForDropdown(triggerType) {
-
-            const map = $misfireInstructionsMap[triggerType];
-            const keys = Object.keys(map);
-
-            const result = [];
-            for (let i = 0; i < keys.length; i++) { // prepare suitable object for dropdown
-                result.push({ name: map[keys[i]], value: keys[i] });
-            }
-
-            return result;
-        }
-
-        function triggerTypeChanged() {
-            const checkedInput = $('#trigger-type-radios').find(':checked');
-            $('.trigger-type').hide();
-            $('.' + checkedInput.val() + '.trigger-type').show();
-            $('#specificTriggerHeader').text(checkedInput.closest('.radio').find('label').text() + ' Trigger Properties');
-
-            $('#misfireInstructions').dropdown('change values', misfireInstrForDropdown(checkedInput.val()));
-            $('#misfireInstructions').dropdown('set selected', '0'); // reset misfire instruction to default value
-        }
-
-        $('#misfireInstructions').dropdown('setting', 'onChange', function (value) {
-            $('#selectedMisfireInstruction').val(value); // value is mirrored to hidden input because dynamically changed dropdown's value is not propagated properly during form submit
-        });
-
-        $('#trigger-type-radios .radio').checkbox('setting', 'onChange', triggerTypeChanged);
-        $('#trigger-type-radios input[value={{Lower Model.Trigger.Type}}]').closest('.radio').checkbox('check');
-
-        $('#misfireInstructions').dropdown('set selected', '{{Model.Trigger.MisfireInstruction}}'); // because misfire dropdown values were changed in triggerTypeChanged
-        $('#triggerPriority').dropdown('set selected', '{{Model.Trigger.Priority}}'); // in case priority is out of range [1-10]
-
-        $('#trigger-properties .ui.checkbox input[data-toggle-input]')
-            .closest('.ui.checkbox')
-            .checkbox('setting', 'onChange', function () {
-                $('#' + $(this).data('toggle-input')).prop('disabled', this.checked); // search for input's ID specified with attribute data-toggle-input and set accessibility for that input based on checkbox state
-            });
-
-        initDimmer();
-
-        // cron describe
-        initCronLiveDescription('{{ActionUrl "Cron"}}', $('#cron-expression'), $('#cron-desc'), $('#next-cron-dates'));
-
-        function initCalendars(elements) {
-            const
-                dateFmt = '{{Upper Model.Trigger.DateFormat}}',
-                timeFmt = '{{Model.Trigger.TimeFormat}}',
-                fmt = dateFmt + ' ' + timeFmt;
-
-            elements.each(function () {
-
-                const $cal = $(this);
-                var calType = 'datetime';
-                if ($cal.hasClass('time-only')) { calType = 'time'; }
-
-                $cal.calendar({
-                    type: calType,
-                    ampm: false,
-                    formatInput: calType === 'datetime',
-                    formatter: {
-                        date: function (date, settings) {
-                            return moment(date).format(dateFmt);
-                        },
-                        time: function (date, settings) {
-                            return moment(date).format(timeFmt);
-                        }
-                    },
-                    parser: {
-                        date: function (text, settings) {
-                            return moment(text, fmt).toDate();
-                        }
-                    }
-                });
-            });
-        }
-
-        initCalendars($('#trigger-properties .ui.calendar'));
-
-        $('#btn-delete').click(function () {
-            $('#delete-dialog .confirm-item').text($triggerGroup + '.' + $triggerName);
-            deleteItem({ name: $triggerName, group: $triggerGroup }, $('#trigger-properties'),
-                '{{ActionUrl "Delete"}}', '{{ActionUrl ""}}');
-        });
-
-        $('#btn-save').click(function () {
-
-            if ($('#job-data-map .type-col .ui.dropdown.disabled').length > 0) return; // type change in progress
-
-            $('#dimmer').dimmer('show');
-
-            $('#job-data-map').jobDataMapPrepareForm();
-
-            const formData = new FormData($('#form')[0]);
-
-            $.ajax({
-                type: 'POST', enctype: 'multipart/form-data', url: '{{ActionUrl "Save"}}',
-                data: formData, processData: false, contentType: false, dataType: "json", cache: false,
-                success: function (data) {
-                    if (processValidationResponse(data)) {
-                        document.location = '{{ActionUrl ""}}';
-                    } else {
-                        $('#dimmer').dimmer('hide');
-                    }
-                },
-                error: function (e) {
-                    $('#dimmer').dimmer('hide');
-                    prependErrorMessage(e, $('#trigger-properties'));
-                }
-            });
-        });
-
-        $('#next-cron-dates').click(function () {
-
-        });
-
-    });
-</script>
+{{{PageData urlCron=(ActionUrl "Cron") urlDelete=(ActionUrl "Delete") urlHome=(ActionUrl "") urlSave=(ActionUrl "Save") misfireInstructionsJson=Model.Trigger.MisfireInstructionsJson triggerType=(Lower Model.Trigger.Type) misfireInstruction=Model.Trigger.MisfireInstruction priority=Model.Trigger.Priority dateFormat=Model.Trigger.DateFormat timeFormat=Model.Trigger.TimeFormat}}}
+<script src="Content/Scripts/pages/triggers-edit.js"></script>
 
 <script src="Content/Scripts/post-validation.js"></script>

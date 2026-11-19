@@ -181,7 +181,32 @@ function loadAdditionalData(rowIndex, url) {
             $(data).find('>tbody>tr').each(function () {
                 applyAdditionalData($(this));
             });
+            applyHistogramGeometry();
             initHistogramTooltips($('.histogram > .bar'));
         }
     });
 }
+
+// CSP: pages carry their data in <script type="application/json" id="page-data"> (see the PageData helper),
+// and their scripts live in Content/Scripts/pages, so the dashboard runs under script-src 'self'.
+function readPageData() {
+    const el = document.getElementById('page-data');
+    return el ? JSON.parse(el.textContent) : {};
+}
+
+// Histogram geometry arrives as data-* and is applied through the CSSOM, which style-src 'self' allows.
+function applyHistogramGeometry(root) {
+    $(root || document).find('.histogram').each(function () {
+        $(this).css('width', $(this).data('width') + 'px');
+    }).find('> .bar').each(function () {
+        $(this).css({ left: $(this).data('left') + 'px', height: $(this).data('height') + '%' });
+    });
+}
+
+$(function () {
+    $('#top-menu .ui.dropdown').dropdown();
+    applyHistogramGeometry();
+});
+
+// Placeholder links (href="#") replace javascript: URLs, which script-src 'self' blocks.
+$(document).on('click', 'a[href="#"]', function (e) { e.preventDefault(); });
