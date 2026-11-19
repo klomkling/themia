@@ -21,7 +21,7 @@ function initQuartzCalendarEditor(options) {
             html: function (model) {
                 return [
                     createInfoMessage('The calendar excludes the set of times expressed by a given <b>Cron Expression</b>.' +
-                        '<p>For example, you could use this calendar to exclude all but business hours (8:00 - 17:00) every day using the expression <span style="white-space: nowrap; font-family: monospace; font-weight:bold; background-color: #fff; border: 1px solid #e3e3e8; padding: 2px 4px">* * 0-7,18-23 ? * *</span></p>' +
+                        '<p>For example, you could use this calendar to exclude all but business hours (8:00 - 17:00) every day using the expression <span class="cron-example">* * 0-7,18-23 ? * *</span></p>' +
                         '<p>It is important to remember that the cron expression here describes a set of times to be excluded from firing. Whereas the cron expression in Cron Trigger describes a set of times that can be included for firing. Thus, if a Cron Trigger has a given cron expression and is associated with a Cron Calendar with the same expression, the calendar will exclude all the times the trigger includes, and they will cancel each other out.</p>'),
                     createDescriptionField(model),
                     createLiveCronField('CronExpression', 'Cron Expression', model.CronExpression),
@@ -65,7 +65,7 @@ function initQuartzCalendarEditor(options) {
             html: function (model) {
 
                 const $grid = $('<table class="ui unstackable very basic single line table monthly">');
-                $grid.append('<tr><td style="text-align: right" colspan="7"><a href="javascript:void(0)" class="btn-invert">Invert</a> | <a href="javascript:void(0)" class="btn-clear">Clear</a></td></tr>');
+                $grid.append('<tr><td class="tq-s8" colspan="7"><a href="#" class="btn-invert">Invert</a> | <a href="#" class="btn-clear">Clear</a></td></tr>');
                 let c = 0;
                 for (let i = 0; i < 5; i++) {
                     var $row = $('<tr>');
@@ -158,7 +158,7 @@ function initQuartzCalendarEditor(options) {
     $(document).on('click', '.delete-field', function () { $(this).closest('.field').remove(); });
 
     function multiDatePicker(mode, name, placeholder, label, model, list) {
-        const actions = '<a href="javascript:void(0)" class="delete-field" title="Delete"><i class="red large trash alternate outline icon"></i></a>';
+        const actions = '<a href="#" class="delete-field" title="Delete"><i class="red large trash alternate outline icon"></i></a>';
         const elm = [];
         if (list) {
             for (let i in list)
@@ -283,7 +283,7 @@ function initQuartzCalendarEditor(options) {
                         value: value,
                         placeholder: label
                     }),
-                $('<div style="float: right; cursor:pointer; display: none" class="next-cron-dates"><i class="eye icon"></i></div>'),
+                $('<div class="next-cron-dates tq-s23"><i class="eye icon"></i></div>'),
                 $('<p class="cron-desc"></p>')
             ]);
 

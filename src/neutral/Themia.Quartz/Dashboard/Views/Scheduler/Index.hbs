@@ -8,7 +8,7 @@
 <div id="scheduler-dashboard">
     <div id="msg-panel"></div>
 
-    <h3 class="ui dividing header" style="margin-top: 0px">Overview</h3>
+    <h3 class="ui dividing header tq-s18">Overview</h3>
 
     <div class="ui inverted statistic stat-executed">
         <div class="value"><i class="small check icon"></i> {{ExecutedJobs}}</div>
@@ -27,7 +27,7 @@
 
     <div class="ui statistic stat-activity">
         <div class="value">
-            <div style="height: 50px" class="dashboard-histogram">{{>Histogram History}}</div>
+            <div class="dashboard-histogram tq-s19">{{>Histogram History}}</div>
         </div>
         <div class="label">Latest Activity</div>
     </div>
@@ -42,12 +42,12 @@
 
 
     <div class="ui stackable grid">
-        <div class="{{#if EnableEdit}}seven {{/if}}wide column" style="padding-right: 14px !important">
+        <div class="{{#if EnableEdit}}seven {{/if}}wide column tq-s20">
             <h3 class="ui dividing header">Status</h3>
             <table class="ui table">
                 <tbody>
                     <tr>
-                        <td style="min-width: 220px">In Standby Mode</td>
+                        <td class="tq-s21">In Standby Mode</td>
                         <td>{{Upper MetaData.InStandbyMode}}</td>
                     </tr>
                     <tr>
@@ -69,7 +69,7 @@
         <div class="{{#if EnableEdit}}nine {{/if}}wide column" id="col-actions">
             <h3 class="ui dividing header">Actions</h3>
 
-            <p style="margin-top: 1em">
+            <p class="tq-s22">
                 {{#if MetaData.InStandbyMode}}
                 <button class="ui small button green" id="btn-start"><i class="play icon"></i>Start</button>
                 {{else}}
@@ -92,7 +92,7 @@
     <table class="ui table">
         <tbody>
             <tr>
-                <td style="min-width: 220px">Machine Name</td>
+                <td class="tq-s21">Machine Name</td>
                 <td>{{MachineName}}</td>
             </tr>
             <tr>
@@ -126,7 +126,7 @@
     <table class="ui table">
         <tbody>
             <tr>
-                <td style="min-width: 220px">Job Store Clustered</td>
+                <td class="tq-s21">Job Store Clustered</td>
                 <td>{{Upper MetaData.JobStoreClustered}}</td>
             </tr>
             <tr>
@@ -144,7 +144,7 @@
     <table class="ui table">
         <tbody>
             <tr>
-                <td style="min-width: 220px">Thread Pool Size</td>
+                <td class="tq-s21">Thread Pool Size</td>
                 <td>{{MetaData.ThreadPoolSize}}</td>
             </tr>
             <tr>
@@ -169,41 +169,5 @@
 
 {{/with}}
 
-<script>
-    initHistogramTooltips($('.histogram > .bar'));
-    initDimmer();
-
-    function doAction(content) {
-        $('#dimmer').dimmer('show');
-
-        $.ajax({
-            type: 'POST', url: '{{ActionUrl "Action"}}',
-            data: JSON.stringify(content),
-            contentType: 'application/json', cache: false,
-            success: function () {
-                document.location = '{{ActionUrl ""}}';
-            },
-            error: function (e) {
-                $('#dimmer').dimmer('hide');
-                prependErrorMessage(e, $('#msg-panel'));
-            }
-        });
-    }
-
-    function confirmDialog(dlg, action) {
-        dlg.modal({ duration: 250, onApprove: function () { doAction({ action: action }); } })
-        .modal('show');
-    }
-
-    // event handlers
-    $('#btn-shutdown').click(function () { confirmDialog($('#shutdown-dialog'), 'shutdown'); });
-    $('#btn-pause').click(function () { doAction({ action: 'pause' }); });
-    $('#btn-resume').click(function () { doAction({ action: 'resume' }); });
-    $('#btn-standby').click(function () { doAction({ action: 'standby' }); });
-    $('#btn-start').click(function () { doAction({ action: 'start' }); });
-
-    $(document).on('click', '#job-groups.group-actions button, #trigger-groups.group-actions button', function () {
-        doAction({ action: $(this).data('action'), name: $(this).data('name'), groups: $(this).closest('.group-actions').attr('id') });
-    });
-
-</script>
+{{{PageData urlAction=(ActionUrl "Action") urlHome=(ActionUrl "")}}}
+<script src="Content/Scripts/pages/scheduler.js"></script>

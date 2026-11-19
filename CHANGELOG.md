@@ -31,6 +31,7 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 - **fix: encode names in Quartz dashboard views (`Themia.Quartz`).** Job, trigger and group names were written into the dashboard pages without HTML encoding. Anyone who can set those names (job registration code, or any user of an app that lets users name scheduled jobs) could run script in the browser of an administrator who opens `/admin/jobs`. Names are now encoded in every view. Upgrade if untrusted input can reach a job, trigger or group name.
 - **fix: encode the `emptyIfNull` helper output (`Themia.Pdf`).** The built-in helper wrote its value without HTML encoding, so a template using it on user-supplied text (names, addresses) emitted that text as markup. It now encodes like `{{value}}`. A template that relied on `emptyIfNull` to pass an HTML fragment through must switch to `{{{value}}}` for trusted fragments.
+- **`Themia.Quartz`: the `/admin/jobs` dashboard runs under a strict CSP (`script-src 'self'; style-src 'self'`) (coord #0236).** The views no longer carry inline `<script>`, inline `style=` attributes, `javascript:` links or event-handler attributes. Per-page data moves to a JSON block (`<script type="application/json" id="page-data">`, `<`, `>` and `&` escaped) read by static scripts under `Content/Scripts/pages/`; styles became classes in `Site.css`.
 
 ## [0.69.0] - 2026-11-18
 

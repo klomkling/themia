@@ -10,6 +10,14 @@ with the *why* and concrete upgrade steps.
 - Each entry states: **What changed**, **Why**, and **How to upgrade** (before → after).
 - Non-breaking changes are *not* listed here — see the CHANGELOG.
 
+## Unreleased
+
+### Quartz dashboard: strict-CSP markup, and `{{value}}` is encoded again
+
+**What changed.** The dashboard no longer needs `'unsafe-inline'` for scripts or styles. Page data is a JSON block read by `Content/Scripts/pages/*.js`; inline styles became `Site.css` classes. View output is now HTML-encoded (see CHANGELOG, Security).
+
+**How to upgrade.** Nothing to do. If you serve a custom `ViewsRootDirectory`, copy the new views, scripts and `Site.css` from the package: old views with inline scripts still work only without a strict CSP. `HeadHtml` and `BodyStartHtml` are adopter HTML injected raw; keep them free of inline script/style when you enforce the CSP.
+
 ## 0.69.0
 
 ### Conversations: `IConversationDataSubject.ListPersonAttachmentsAsync` and `ConversationAction.ListPersonData`

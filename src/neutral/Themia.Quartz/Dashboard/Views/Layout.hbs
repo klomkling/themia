@@ -62,17 +62,11 @@
         </div>
     </div>
 
-    <div class="ui main container" {{#footer}}style="min-height: calc(100% - 173px);"{{/footer}}>
+    <div class="ui main container{{#footer}} with-footer{{/footer}}">
         {{{body}}}
     </div>
 
     <div class="ui hidden divider"></div>
-
-    <script>
-        $(function () {
-            $('#top-menu .ui.dropdown').dropdown();
-        });
-    </script>
 
     {{#footer}}
     <footer class="dashboard-footer">
