@@ -44,6 +44,9 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 ### Tests
 
 - `Themia.Modules.Identity`: a refresh with a token that was never revoked is refused and left unconsumed once its user is soft-deleted (`RefreshTokenService` user lookup), with a positive control that an undeleted user still rotates.
+### Changed
+
+- **(breaking default) `Themia.Exceptional.AspNetCore`: `ExceptionalDashboardOptions.EnableActions` now defaults to `false` (coord #0235).** The `POST {guid}/protect`, `/delete` and `/hard-delete` routes were mapped by default under the same `Authorize` as the read-only list and detail, so an app that never set the option gave delete and hard-delete to everyone who could read the dashboard. They are now opt-in. An app that relies on the buttons must set `EnableActions = true`; an app that already sets it explicitly is unaffected. See [MIGRATION.md](MIGRATION.md#unreleased).
 
 ## [0.69.0] - 2026-11-18
 
