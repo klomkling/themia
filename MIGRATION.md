@@ -12,6 +12,14 @@ with the *why* and concrete upgrade steps.
 
 ## Unreleased
 
+### Exceptional dashboard: `EnableActions` defaults to `false`
+
+**What changed.** `ExceptionalDashboardOptions.EnableActions` was `true` by default and is now `false`. With it off, the protect, delete and hard-delete routes are not mapped and the buttons are not rendered; list and detail are unchanged.
+
+**Why.** The write routes shared the read policy (`Authorize`), so an app that forgot to set the option exposed deletion to every reader. A destructive capability should be opt-in.
+
+**How to upgrade.** If your operators use protect or delete, set `EnableActions = true` in the `MapThemiaExceptional` options. Apps that already set it explicitly need no change. A read-only dashboard needs nothing.
+
 ### Quartz dashboard: strict-CSP markup, and `{{value}}` is encoded again
 
 **What changed.** The dashboard no longer needs `'unsafe-inline'` for scripts or styles. Page data is a JSON block read by `Content/Scripts/pages/*.js`; inline styles became `Site.css` classes. View output is now HTML-encoded (see CHANGELOG, Security).

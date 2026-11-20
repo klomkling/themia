@@ -86,9 +86,11 @@ public sealed class ExceptionalDashboardOptions
     /// capture time, and set this to <c>false</c> if even authorized viewers should not see them.</summary>
     public bool ShowRequestBody { get; set; } = true;
 
-    /// <summary>Whether protect/delete actions (POST) are exposed in the UI and accepted. Default <c>true</c>.
-    /// Still gated by <see cref="Authorize"/> and a same-origin double-submit token.</summary>
-    public bool EnableActions { get; set; } = true;
+    /// <summary>Whether protect/delete/hard-delete actions (POST) are exposed in the UI and accepted. Default
+    /// <c>false</c>: the dashboard is read-only until an app opts in, so forgetting this setting never hands
+    /// delete rights to everyone who may read. When enabled they are still gated by <see cref="Authorize"/> and a
+    /// same-origin double-submit token.</summary>
+    public bool EnableActions { get; set; }
 
     /// <summary>Whether the detail view renders the captured request-context sections (headers/cookies/
     /// query/form/server variables) when present. Default <c>true</c>.</summary>
