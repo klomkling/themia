@@ -6,10 +6,16 @@ namespace Themia.Exceptional.AspNetCore.Tests;
 public sealed class DashboardOptionsDefaultsTests
 {
     [Fact]
-    public void Defaults_EnableActionsAndShowRequestContext_True()
+    public void Defaults_ShowRequestContext_True()
     {
         var o = new ExceptionalDashboardOptions();
-        Assert.True(o.EnableActions);
         Assert.True(o.ShowRequestContext);
+    }
+
+    [Fact]
+    public void Defaults_EnableActions_False_SoDeleteRoutesAreOptIn()
+    {
+        var o = new ExceptionalDashboardOptions();
+        Assert.False(o.EnableActions);
     }
 }
