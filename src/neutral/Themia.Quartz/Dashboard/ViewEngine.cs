@@ -65,13 +65,18 @@ namespace Themia.Quartz.Dashboard
         // the layout as Page.Body.
         public string Render(string templatePath, object model)
         {
-            var body = GetRenderDelegate(templatePath)(model);
             if (!UsesLayout(templatePath))
             {
-                return body;
+                return GetRenderDelegate(templatePath)(model);
             }
 
-            var page = (Controllers.PageControllerBase.Page)model;
+            if (model is not Controllers.PageControllerBase.Page page)
+            {
+                throw new InvalidOperationException(
+                    $"View '{templatePath}' declares a layout, so it must be rendered with a PageControllerBase.Page model (got {model?.GetType().FullName ?? "null"}).");
+            }
+
+            var body = GetRenderDelegate(templatePath)(model);
             page.Body = body;
             return GetRenderDelegate(LayoutName + ".hbs")(page);
         }
