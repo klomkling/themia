@@ -178,8 +178,10 @@ public static class ExceptionalDashboardEndpoints
     }
 
     // Ordinal, case-sensitive and whole-path: a trailing slash, other casing, a prefix or suffix, a nested
-    // segment or a ;param is not the asset and keeps going through Authorize. A mount behind PathBase or a
-    // nested group does not match and so fails closed to the gate.
+    // segment or a ;param is not the asset and keeps going through Authorize. HttpRequest.Path excludes
+    // PathBase, so behind UsePathBase the exact match still succeeds and the stylesheet is served. A mount
+    // inside a nested group (whose prefix is not part of the mount path passed here) does not match and
+    // fails closed to the gate.
     private static bool IsExactStylesheetPath(HttpContext ctx, string mountPath) =>
         string.Equals(ctx.Request.Path.Value, mountPath.TrimEnd('/') + "/dashboard.css", StringComparison.Ordinal);
 
