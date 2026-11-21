@@ -27,6 +27,8 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+## [0.70.0] - 2026-11-21
+
 ### Added
 
 - **`Themia.Exceptional.AspNetCore`: `ExceptionalDashboardOptions.AllowAnonymousAssets` (default `false`, coord #0240).** When set, `GET {mount}/dashboard.css` is answered without calling `Authorize` or the browser-access cookie check, for hosts that proxy the dashboard into a sandboxed frame whose stylesheet request carries no credential. Only the exact stylesheet path is exempt (any other spelling, the pages, the detail view and the actions stay gated), and the body is the constant stylesheet. Trade-off: anyone can then confirm the dashboard's mount point by requesting that path.
@@ -50,13 +52,13 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 - `Themia.Modules.Identity`: a refresh with a token that was never revoked is refused and left unconsumed once its user is soft-deleted (`RefreshTokenService` user lookup), with a positive control that an undeleted user still rotates.
 ### Changed
 
-- **(breaking default) `Themia.Exceptional.AspNetCore`: `ExceptionalDashboardOptions.EnableActions` now defaults to `false` (coord #0235).** The `POST {guid}/protect`, `/delete` and `/hard-delete` routes were mapped by default under the same `Authorize` as the read-only list and detail, so an app that never set the option gave delete and hard-delete to everyone who could read the dashboard. They are now opt-in. An app that relies on the buttons must set `EnableActions = true`; an app that already sets it explicitly is unaffected. See [MIGRATION.md](MIGRATION.md#unreleased).
+- **(breaking default) `Themia.Exceptional.AspNetCore`: `ExceptionalDashboardOptions.EnableActions` now defaults to `false` (coord #0235).** The `POST {guid}/protect`, `/delete` and `/hard-delete` routes were mapped by default under the same `Authorize` as the read-only list and detail, so an app that never set the option gave delete and hard-delete to everyone who could read the dashboard. They are now opt-in. An app that relies on the buttons must set `EnableActions = true`; an app that already sets it explicitly is unaffected. See [MIGRATION.md](MIGRATION.md#0700).
 
 ## [0.69.0] - 2026-11-18
 
 ### Added
 
-- `Themia.Conversations`: `IConversationDataSubject.ListPersonAttachmentsAsync` lists the attachments a person owns or sent, metadata only (coord #0229, for a data-subject access request). It reads through the same predicate `ErasePersonAsync` deletes by, so an export and an erasure cannot drift. New `ConversationAction.ListPersonData` is checked by the access policy; `PersonAttachmentsResult` carries an outcome (`Listed`, `Refused`, `Invalid`) so a refused call is never an empty list. **(breaking for implementers of `IConversationDataSubject`, see [MIGRATION.md](MIGRATION.md#unreleased))**
+- `Themia.Conversations`: `IConversationDataSubject.ListPersonAttachmentsAsync` lists the attachments a person owns or sent, metadata only (coord #0229, for a data-subject access request). It reads through the same predicate `ErasePersonAsync` deletes by, so an export and an erasure cannot drift. New `ConversationAction.ListPersonData` is checked by the access policy; `PersonAttachmentsResult` carries an outcome (`Listed`, `Refused`, `Invalid`) so a refused call is never an empty list. **(breaking for implementers of `IConversationDataSubject`, see [MIGRATION.md](MIGRATION.md#0700))**
 
 ## [0.68.0] - 2026-11-18
 
