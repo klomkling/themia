@@ -57,7 +57,7 @@ public static class ExceptionalDashboardEndpoints
 
         group.MapGet("", (HttpContext ctx, IExceptionStore store, CancellationToken ct) => HandleListAsync(ctx, store, options, path, ct));
         group.MapGet("{guid:guid}", (Guid guid, HttpContext ctx, IExceptionStore store, CancellationToken ct) => HandleDetailAsync(ctx, store, options, path, guid, ct));
-        group.MapGet("dashboard.css", (HttpContext ctx) => HandleCssAsync(ctx, options));
+        group.MapGet("dashboard.css", (HttpContext ctx) => HandleCssAsync(ctx, options, path));
 
         if (options.EnableActions)
         {
@@ -157,9 +157,15 @@ public static class ExceptionalDashboardEndpoints
     // A denial here is a bare 404 and never runs OnDenied: that hook typically redirects to the host's
     // login page, and a redirect on a subresource makes the browser fetch HTML where it asked for CSS.
     // OnDenied is for navigations.
-    private static async Task HandleCssAsync(HttpContext ctx, ExceptionalDashboardOptions options)
+    //
+    // AllowAnonymousAssets is the one opt-out, for hosts that serve the dashboard to a browser context which
+    // cannot send a credential on the page's own subresource request (a sandboxed proxy frame). It skips
+    // Authorize for the exact stylesheet path only; every other spelling falls through to the gate. The
+    // trade-off is stated on the option: the mount point becomes confirmable by anyone.
+    private static async Task HandleCssAsync(HttpContext ctx, ExceptionalDashboardOptions options, string mountPath)
     {
-        if (!await AuthorizedAsync(ctx, options).ConfigureAwait(false))
+        var anonymous = options.AllowAnonymousAssets && IsExactStylesheetPath(ctx, mountPath);
+        if (!anonymous && !await AuthorizedAsync(ctx, options).ConfigureAwait(false))
         {
             PreventCaching(ctx.Response);
             ctx.Response.StatusCode = StatusCodes.Status404NotFound;
@@ -170,6 +176,14 @@ public static class ExceptionalDashboardEndpoints
         ctx.Response.ContentType = "text/css; charset=utf-8";
         await ctx.Response.WriteAsync(DashboardCss.Content).ConfigureAwait(false);
     }
+
+    // Ordinal, case-sensitive and whole-path: a trailing slash, other casing, a prefix or suffix, a nested
+    // segment or a ;param is not the asset and keeps going through Authorize. HttpRequest.Path excludes
+    // PathBase, so behind UsePathBase the exact match still succeeds and the stylesheet is served. A mount
+    // inside a nested group (whose prefix is not part of the mount path passed here) does not match and
+    // fails closed to the gate.
+    private static bool IsExactStylesheetPath(HttpContext ctx, string mountPath) =>
+        string.Equals(ctx.Request.Path.Value, mountPath.TrimEnd('/') + "/dashboard.css", StringComparison.Ordinal);
 
     // The single deny path. OnDenied owns the response when set (typically a redirect to the host's login);
     // otherwise, and whenever it throws, the request fails closed with the route-hiding 404 — a broken hook

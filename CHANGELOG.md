@@ -27,6 +27,10 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+### Added
+
+- **`Themia.Exceptional.AspNetCore`: `ExceptionalDashboardOptions.AllowAnonymousAssets` (default `false`, coord #0240).** When set, `GET {mount}/dashboard.css` is answered without calling `Authorize` or the browser-access cookie check, for hosts that proxy the dashboard into a sandboxed frame whose stylesheet request carries no credential. Only the exact stylesheet path is exempt (any other spelling, the pages, the detail view and the actions stay gated), and the body is the constant stylesheet. Trade-off: anyone can then confirm the dashboard's mount point by requesting that path.
+
 ### Tests
 
 - `Themia.Quartz`: hostile-name tests for the History, Executions, Calendars and Scheduler views and a quote-name case for the Jobs trigger page.

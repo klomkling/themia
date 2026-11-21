@@ -92,6 +92,14 @@ public sealed class ExceptionalDashboardOptions
     /// same-origin double-submit token.</summary>
     public bool EnableActions { get; set; }
 
+    /// <summary>When <c>true</c>, <c>GET {mount}/dashboard.css</c> (the dashboard's only static asset, a
+    /// compile-time constant) is answered without calling <see cref="Authorize"/> or the browser-access cookie
+    /// check. Default <c>false</c>. For hosts that proxy the dashboard into a sandboxed frame whose
+    /// subresource requests carry no credential. Pages, detail and actions stay gated, and only the exact
+    /// stylesheet path is exempt. Trade-off: anyone can then confirm the dashboard's mount point by
+    /// requesting that path.</summary>
+    public bool AllowAnonymousAssets { get; set; }
+
     /// <summary>Whether the detail view renders the captured request-context sections (headers/cookies/
     /// query/form/server variables) when present. Default <c>true</c>.</summary>
     public bool ShowRequestContext { get; set; } = true;
