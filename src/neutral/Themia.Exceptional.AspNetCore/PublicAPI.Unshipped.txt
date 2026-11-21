@@ -2,6 +2,8 @@
 Themia.Exceptional.AspNetCore.ExceptionalDashboardEndpoints
 Themia.Exceptional.AspNetCore.ExceptionalDashboardOptions
 Themia.Exceptional.AspNetCore.ExceptionalDashboardOptions.ExceptionalDashboardOptions() -> void
+Themia.Exceptional.AspNetCore.ExceptionalDashboardOptions.AllowAnonymousAssets.get -> bool
+Themia.Exceptional.AspNetCore.ExceptionalDashboardOptions.AllowAnonymousAssets.set -> void
 Themia.Exceptional.AspNetCore.ExceptionalDashboardOptions.Authorize.get -> System.Func<Microsoft.AspNetCore.Http.HttpContext!, System.Threading.Tasks.Task<bool>!>?
 Themia.Exceptional.AspNetCore.ExceptionalDashboardOptions.Authorize.set -> void
 Themia.Exceptional.AspNetCore.ExceptionalDashboardOptions.DefaultPageSize.get -> int
