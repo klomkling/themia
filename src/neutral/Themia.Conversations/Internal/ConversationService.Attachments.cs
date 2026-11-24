@@ -1,3 +1,4 @@
+using System.Data;
 using System.Data.Common;
 using System.Security.Cryptography;
 using Dapper;
@@ -77,7 +78,12 @@ internal sealed partial class ConversationService
 
         try
         {
-            await StageAndWriteAsync(storage, tenantId, conversationId, owner, prepared, cancellationToken);
+            if (!await StageAndWriteAsync(storage, tenantId, conversationId, owner, prepared, cancellationToken))
+            {
+                await DiscardAsync(storage, tenantId, prepared);
+                return new PostResult(PostOutcome.Closed, null, null);
+            }
+
             var result = await PostWithRetryAsync(actor, tenantId, conversationId, message, prepared, cancellationToken);
             if (result.Outcome != PostOutcome.Posted)
             {
@@ -257,18 +263,36 @@ internal sealed partial class ConversationService
         return buffer.Length == 0 ? null : buffer.ToArray();
     }
 
-    /// <summary>Commits a staging row for each key, then writes the object. The row exists before the object, so a crash in between can only leave a row without an object.</summary>
-    private async Task StageAndWriteAsync(IStorageProvider storage, string tenantId, Guid conversationId, Guid owner, IReadOnlyList<PreparedAttachment> prepared, CancellationToken cancellationToken)
+    /// <summary>
+    /// Commits a staging row for each key, then writes the object. The row exists before the object, so a crash in between can only leave a row without an object. The rows are
+    /// staged under the conversation row lock and only while it is not being purged, so a purge claim either waits for them (and sees them) or wins and the stage is refused:
+    /// no file can arrive unseen after a purge looked. False when it was refused.
+    /// </summary>
+    private async Task<bool> StageAndWriteAsync(IStorageProvider storage, string tenantId, Guid conversationId, Guid owner, IReadOnlyList<PreparedAttachment> prepared, CancellationToken cancellationToken)
     {
         await using (var connection = await OpenConnectionAsync(cancellationToken))
+        await using (var transaction = await connection.BeginTransactionAsync(IsolationLevel.ReadCommitted, cancellationToken))
         {
+            var locked = await connection.ExecuteAsync(new CommandDefinition(
+                "UPDATE conversations SET retention_state = retention_state WHERE tenant_id = @TenantId AND id = @ConversationId AND retention_state IN (0, 1);",
+                new { TenantId = tenantId, ConversationId = conversationId },
+                transaction,
+                cancellationToken: cancellationToken));
+            if (locked == 0)
+            {
+                return false;
+            }
+
             foreach (var item in prepared)
             {
                 await connection.ExecuteAsync(new CommandDefinition(
                     "INSERT INTO conversation_attachment_uploads (id, tenant_id, conversation_id, owner_participant_id, storage_key, created_at) VALUES (@Id, @TenantId, @ConversationId, @Owner, @StorageKey, @Now);",
                     new { item.Id, TenantId = tenantId, ConversationId = conversationId, Owner = owner, item.StorageKey, Now = Now() },
+                    transaction,
                     cancellationToken: cancellationToken));
             }
+
+            await transaction.CommitAsync(cancellationToken);
         }
 
         foreach (var item in prepared)
@@ -276,6 +300,8 @@ internal sealed partial class ConversationService
             using var content = new MemoryStream(item.Content, writable: false);
             await storage.PutAsync(item.StorageKey, content, new StoragePutOptions(item.ContentType), cancellationToken);
         }
+
+        return true;
     }
 
     /// <summary>Best effort: deletes each object, then its staging row. A failed delete keeps the row, so the sweeper finds the key later. Never cancelled.</summary>

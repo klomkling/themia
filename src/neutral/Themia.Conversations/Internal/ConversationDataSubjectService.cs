@@ -18,8 +18,12 @@ internal sealed class ConversationDataSubjectService(
     ConversationGuestOptions? guestOptions,
     IStorageProvider? storage,
     TimeProvider time,
-    ILogger<ConversationDataSubjectService> logger) : IConversationDataSubject
+    ILogger<ConversationDataSubjectService> logger,
+    ILegalHoldPort? holdPort = null,
+    ConversationOptions? options = null) : IConversationDataSubject
 {
+    private readonly ConversationRoomEraser roomEraser = new(dialect, options ?? new ConversationOptions(), policy, holdPort, new ConversationPurger(dialect, sink, storage, time, logger), time, logger);
+
     internal const string ErasedDisplayName = "Erased participant";
     private const int MaxAttempts = 3;
 
@@ -68,6 +72,23 @@ internal sealed class ConversationDataSubjectService(
         var outcome = deferred.Count + failed.Count == 0 ? ErasureOutcome.Erased : erased > 0 ? ErasureOutcome.PartiallyErased : ErasureOutcome.Deferred;
         logger.LogInformation("Erased a person in {Erased} conversations ({Redacted} messages, {Attachments} attachments); {Deferred} deferred, {Failed} failed", erased, redacted, attachments, deferred.Count, failed.Count);
         return new ErasureResult(outcome, erased, redacted, attachments, deferred, failed);
+    }
+
+    /// <inheritdoc />
+    public Task<ConversationPurgeResult> PurgeConversationAsync(ConversationActor actor, string tenantId, Guid conversationId, CancellationToken cancellationToken = default)
+    {
+        ConversationInput.Actor(actor);
+        ConversationInput.Tenant(tenantId, nameof(tenantId));
+        return roomEraser.EraseAsync(actor, tenantId, conversationId, null, cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public Task<ConversationPurgeResult> PurgeConversationBySubjectAsync(ConversationActor actor, string tenantId, ConversationSubject subject, CancellationToken cancellationToken = default)
+    {
+        ConversationInput.Actor(actor);
+        ConversationInput.Tenant(tenantId, nameof(tenantId));
+        ConversationInput.Subject(subject);
+        return roomEraser.EraseAsync(actor, tenantId, null, subject, cancellationToken);
     }
 
     private static ErasureResult Empty(ErasureOutcome outcome) => new(outcome, 0, 0, 0, [], []);

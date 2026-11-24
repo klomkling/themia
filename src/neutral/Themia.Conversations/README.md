@@ -101,6 +101,10 @@ var erased = await dataSubject.ErasePersonAsync(dsrActor, tenantId, PersonRef.Fo
   their attachment rows and guest sessions, redacts their messages (`body` NULL, `redacted_at` set; sequence numbers and the other participants' rows are unchanged) and
   anonymises the participant (display name `Erased participant`, user reference and contact hash cleared, marked left). It is idempotent: a second call erases nothing and
   returns `Erased`. A person who joins again afterwards is a new participant.
+- **Purging one room.** `IConversationDataSubject.PurgeConversationAsync(actor, tenantId, conversationId)` (or `PurgeConversationBySubjectAsync`, which never creates a room) deletes the whole
+  conversation through the same purger as the retention sweep and returns counts only. Policy action `PurgeConversation` (deny by default if your policy does not know it). A legal hold (row state or
+  `ILegalHoldPort`; without a port it defers unless `NoLegalHoldPort` is set) or an upload younger than `AttachmentUploadGrace` gives `Deferred` (`Held`) and deletes nothing. A file that cannot be deleted gives
+  `Failed` and leaves the room `Purging`; call again to resume. A repeat call gives `NotFound` with the counts from the tombstone. The tombstone has no actor: record who erased in your own audit.
 - **Holds defer erasure.** A conversation under legal hold or being purged is reported in `DeferredConversationIds` (outcome `PartiallyErased` or `Deferred`) and untouched; the
   package keeps no queue, so the app's DSR record re-issues the call once the hold is lifted. A file that cannot be deleted lands in `FailedConversationIds`; its rows are untouched.
   If a hold lands after the files were deleted but before the transaction, the conversation is deferred with its files already gone (the accepted race again).

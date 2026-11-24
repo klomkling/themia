@@ -83,6 +83,8 @@ public abstract class ConversationAttachmentTests(ConversationEngineFixture fixt
     {
         public ConcurrentDictionary<string, byte[]> Objects { get; } = new();
 
+        public int Puts { get; private set; }
+
         public ConcurrentDictionary<string, string> Types { get; } = new();
 
         public List<PresignedUrlRequest> Presigned { get; } = [];
@@ -94,6 +96,7 @@ public abstract class ConversationAttachmentTests(ConversationEngineFixture fixt
         {
             using var buffer = new MemoryStream();
             await content.CopyToAsync(buffer, cancellationToken);
+            Puts++;
             Objects[key] = buffer.ToArray();
             Types[key] = options.ContentType;
             if (AfterPut is not null)
@@ -656,6 +659,23 @@ public abstract class ConversationAttachmentTests(ConversationEngineFixture fixt
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
             service.PostAsync(Member("alice"), tenant, conversation, new PostMessage("m1", "x"), [Upload("p.pdf", "application/pdf", Pdf(500))]));
+    }
+
+    [Fact]
+    public async Task Post_ShouldBeRefusedAndStageNothing_WhenTheRoomIsPurging()
+    {
+        var storage = new MemoryStorage();
+        var service = Service(storage);
+        var (tenant, conversation, _) = await RoomAsync(service);
+        await fixture.ExecuteAsync("UPDATE conversations SET retention_state = 3 WHERE id = @Id;", new { Id = conversation });
+
+        var result = await service.PostAsync(Member("alice"), tenant, conversation, new PostMessage("m1", ""), [Upload("a.pdf", "application/pdf", Pdf(500))]);
+
+        Assert.Equal(PostOutcome.Closed, result.Outcome);
+        Assert.Equal(0, storage.Puts); // refused at the staging gate, before any object is written
+        Assert.Empty(storage.Objects);
+        Assert.Equal(0, await fixture.ScalarAsync<int>("SELECT COUNT(*) FROM conversation_attachment_uploads WHERE conversation_id = @Id;", new { Id = conversation }));
+        Assert.Equal(0, await fixture.ScalarAsync<int>("SELECT COUNT(*) FROM conversation_attachments WHERE conversation_id = @Id;", new { Id = conversation }));
     }
 }
 
