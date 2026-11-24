@@ -23,8 +23,8 @@ public interface IConversationDialect
     string LimitClause { get; }
 
     /// <summary>
-    /// Adds one to <c>last_seq</c> of an <b>open</b> conversation of the tenant and returns the new value, in the caller's transaction: the row lock this takes is
-    /// what orders concurrent posts. Returns <see langword="null"/> when no open conversation matched (closed, or not this tenant's).
+    /// Adds one to <c>last_seq</c> of an <b>open</b> conversation of the tenant that is not being purged (<c>retention_state</c> Active or LegalHold) and returns the new value, in the caller's transaction: the row lock this takes is
+    /// what orders concurrent posts. Returns <see langword="null"/> when no open conversation matched (closed, being purged, or not this tenant's).
     /// </summary>
     /// <param name="connection">The open connection of the post transaction.</param>
     /// <param name="transaction">The post transaction.</param>

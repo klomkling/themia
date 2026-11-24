@@ -112,6 +112,12 @@ public enum ConversationAction
     /// Grant it to the DSR or staff actor only: it names every file the person owns or sent, in every conversation of the tenant.
     /// </summary>
     ListPersonData = 12,
+
+    /// <summary>
+    /// Delete one whole conversation with its messages, participants and files (<see cref="IConversationDataSubject.PurgeConversationAsync(ConversationActor, string, Guid, CancellationToken)"/>).
+    /// Separate from <see cref="Erase"/> on purpose: allowing a person erase does not allow deleting a room, and a policy that does not know this value denies it.
+    /// </summary>
+    PurgeConversation = 13,
 }
 
 /// <summary>How <see cref="IConversationService.OpenAsync"/> ended.</summary>

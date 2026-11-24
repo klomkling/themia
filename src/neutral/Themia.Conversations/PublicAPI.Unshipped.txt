@@ -546,3 +546,23 @@ Themia.Conversations.PersonAttachment.Sha256.get -> string!
 Themia.Conversations.PersonAttachment.Sha256.init -> void
 Themia.Conversations.PersonAttachment.StorageKey.get -> string!
 Themia.Conversations.PersonAttachment.StorageKey.init -> void
+Themia.Conversations.ConversationAction.PurgeConversation = 13 -> Themia.Conversations.ConversationAction
+Themia.Conversations.ConversationPurgeOutcome
+Themia.Conversations.ConversationPurgeOutcome.Deferred = 2 -> Themia.Conversations.ConversationPurgeOutcome
+Themia.Conversations.ConversationPurgeOutcome.Purged = 0 -> Themia.Conversations.ConversationPurgeOutcome
+Themia.Conversations.ConversationPurgeOutcome.Failed = 3 -> Themia.Conversations.ConversationPurgeOutcome
+Themia.Conversations.ConversationPurgeOutcome.NotFound = 1 -> Themia.Conversations.ConversationPurgeOutcome
+Themia.Conversations.ConversationPurgeOutcome.Refused = 4 -> Themia.Conversations.ConversationPurgeOutcome
+Themia.Conversations.ConversationPurgeResult
+Themia.Conversations.ConversationPurgeResult.AttachmentsDeleted.get -> int
+Themia.Conversations.ConversationPurgeResult.AttachmentsDeleted.init -> void
+Themia.Conversations.ConversationPurgeResult.Complete.get -> bool
+Themia.Conversations.ConversationPurgeResult.Failed.get -> bool
+Themia.Conversations.ConversationPurgeResult.Held.get -> bool
+Themia.Conversations.ConversationPurgeResult.ConversationPurgeResult(Themia.Conversations.ConversationPurgeOutcome Outcome, int MessagesDeleted, int AttachmentsDeleted) -> void
+Themia.Conversations.ConversationPurgeResult.MessagesDeleted.get -> int
+Themia.Conversations.ConversationPurgeResult.MessagesDeleted.init -> void
+Themia.Conversations.ConversationPurgeResult.Outcome.get -> Themia.Conversations.ConversationPurgeOutcome
+Themia.Conversations.ConversationPurgeResult.Outcome.init -> void
+Themia.Conversations.IConversationDataSubject.PurgeConversationAsync(Themia.Conversations.ConversationActor! actor, string! tenantId, System.Guid conversationId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Conversations.ConversationPurgeResult!>!
+Themia.Conversations.IConversationDataSubject.PurgeConversationBySubjectAsync(Themia.Conversations.ConversationActor! actor, string! tenantId, Themia.Conversations.ConversationSubject! subject, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Themia.Conversations.ConversationPurgeResult!>!

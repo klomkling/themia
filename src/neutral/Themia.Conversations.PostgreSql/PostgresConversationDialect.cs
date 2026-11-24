@@ -40,7 +40,7 @@ public sealed class PostgresConversationDialect : IConversationDialect
     /// <inheritdoc />
     public async Task<long?> IncrementLastSeqAsync(DbConnection connection, DbTransaction transaction, string tenantId, Guid conversationId, CancellationToken cancellationToken = default) =>
         await connection.ExecuteScalarAsync<long?>(new CommandDefinition(
-            "UPDATE conversations SET last_seq = last_seq + 1 WHERE tenant_id = @TenantId AND id = @ConversationId AND state = 0 RETURNING last_seq;",
+            "UPDATE conversations SET last_seq = last_seq + 1 WHERE tenant_id = @TenantId AND id = @ConversationId AND state = 0 AND retention_state IN (0, 1) RETURNING last_seq;",
             new { TenantId = tenantId, ConversationId = conversationId },
             transaction,
             cancellationToken: cancellationToken));

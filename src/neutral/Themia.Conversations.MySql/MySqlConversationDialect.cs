@@ -53,7 +53,7 @@ public sealed class MySqlConversationDialect : IConversationDialect
         // MySQL has no RETURNING: LAST_INSERT_ID(expr) stores the new value for this connection. It is read only when the UPDATE matched a row, in a
         // statement of its own, because after a zero-row UPDATE it would still hold an older value from a previous statement on the connection.
         var matched = await connection.ExecuteAsync(new CommandDefinition(
-            "UPDATE conversations SET last_seq = LAST_INSERT_ID(last_seq + 1) WHERE tenant_id = @TenantId AND id = @ConversationId AND state = 0;",
+            "UPDATE conversations SET last_seq = LAST_INSERT_ID(last_seq + 1) WHERE tenant_id = @TenantId AND id = @ConversationId AND state = 0 AND retention_state IN (0, 1);",
             new { TenantId = tenantId, ConversationId = conversationId },
             transaction,
             cancellationToken: cancellationToken));

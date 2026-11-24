@@ -71,7 +71,9 @@ public static class ConversationServiceCollectionExtensions
             sp.GetService<ConversationGuestOptions>(),
             sp.GetService<IStorageProvider>(),
             sp.GetRequiredService<TimeProvider>(),
-            sp.GetRequiredService<ILogger<ConversationDataSubjectService>>()));
+            sp.GetRequiredService<ILogger<ConversationDataSubjectService>>(),
+            sp.GetService<ILegalHoldPort>(),
+            sp.GetRequiredService<ConversationOptions>()));
         return services;
     }
 

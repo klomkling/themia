@@ -73,6 +73,41 @@ public sealed record ErasureResult(
     public bool Complete => Outcome == ErasureOutcome.Erased;
 }
 
+/// <summary>How <see cref="IConversationDataSubject.PurgeConversationAsync(ConversationActor, string, Guid, CancellationToken)"/> ended.</summary>
+public enum ConversationPurgeOutcome
+{
+    /// <summary>The conversation, its rows and every file were deleted by this call.</summary>
+    Purged = 0,
+
+    /// <summary>No such conversation: it never existed or an earlier erase (or a retention purge) already deleted it. Safe to treat as done.</summary>
+    NotFound = 1,
+
+    /// <summary>Nothing was deleted: the conversation is under legal hold, or a recent upload may still be arriving. Ask again later.</summary>
+    Deferred = 2,
+
+    /// <summary>A file could not be deleted (or no <c>IStorageProvider</c> is registered) or the database failed. Rows are kept and the conversation stays claimed for deletion; ask again.</summary>
+    Failed = 3,
+
+    /// <summary>The access policy refused <see cref="ConversationAction.PurgeConversation"/>.</summary>
+    Refused = 4,
+}
+
+/// <summary>The result of <see cref="IConversationDataSubject.PurgeConversationAsync(ConversationActor, string, Guid, CancellationToken)"/>. Counts only: no text, file name or participant.</summary>
+/// <param name="Outcome">How the call ended.</param>
+/// <param name="MessagesDeleted">Messages deleted; for <see cref="ConversationPurgeOutcome.NotFound"/> the count the earlier purge recorded, or 0 when none is known.</param>
+/// <param name="AttachmentsDeleted">Attachments deleted; same rule as <paramref name="MessagesDeleted"/>.</param>
+public sealed record ConversationPurgeResult(ConversationPurgeOutcome Outcome, int MessagesDeleted, int AttachmentsDeleted)
+{
+    /// <summary>Whether nothing of the conversation is left: it was erased now or earlier.</summary>
+    public bool Complete => Outcome is ConversationPurgeOutcome.Purged or ConversationPurgeOutcome.NotFound;
+
+    /// <summary>Whether nothing was deleted because of a legal hold or an upload still arriving; ask again later.</summary>
+    public bool Held => Outcome == ConversationPurgeOutcome.Deferred;
+
+    /// <summary>Whether a file or the database failed; the conversation stays claimed and a retry resumes.</summary>
+    public bool Failed => Outcome == ConversationPurgeOutcome.Failed;
+}
+
 /// <summary>Data-subject requests: erase one person's data across the tenant's conversations while the other participants' history keeps its shape.</summary>
 public interface IConversationDataSubject
 {
@@ -101,4 +136,28 @@ public interface IConversationDataSubject
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>The attachments, ordered by conversation, message sequence and attachment id; or why nothing was listed.</returns>
     Task<PersonAttachmentsResult> ListPersonAttachmentsAsync(ConversationActor actor, string tenantId, PersonRef person, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Deletes one whole conversation: messages, participants, read markers, events, every attachment row and its stored file, and writes a tombstone with the counts.
+    /// The same code path as a retention purge. Idempotent: a conversation that is gone answers <see cref="ConversationPurgeOutcome.NotFound"/> with the tombstone's counts.
+    /// </summary>
+    /// <remarks>
+    /// A conversation under legal hold (the <see cref="ILegalHoldPort"/> is asked every time) or with a recent upload in flight is <see cref="ConversationPurgeOutcome.Deferred"/>.
+    /// After a file failure the conversation stays in the purge state (no post, join or hold), the rows stay, and the same call finishes the job. The tombstone does not name the actor:
+    /// record who asked in your own audit.
+    /// </remarks>
+    /// <param name="actor">The actor; the access policy decides with <see cref="ConversationAction.PurgeConversation"/>.</param>
+    /// <param name="tenantId">The tenant; nothing in another tenant is touched.</param>
+    /// <param name="conversationId">The conversation.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>How it ended, and the counts.</returns>
+    Task<ConversationPurgeResult> PurgeConversationAsync(ConversationActor actor, string tenantId, Guid conversationId, CancellationToken cancellationToken = default);
+
+    /// <summary>Same as <see cref="PurgeConversationAsync"/>, addressed by subject. Never creates a conversation: a subject with none is <see cref="ConversationPurgeOutcome.NotFound"/>.</summary>
+    /// <param name="actor">The actor; the access policy decides with <see cref="ConversationAction.PurgeConversation"/>.</param>
+    /// <param name="tenantId">The tenant; nothing in another tenant is touched.</param>
+    /// <param name="subject">The conversation's subject.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>How it ended, and the counts.</returns>
+    Task<ConversationPurgeResult> PurgeConversationBySubjectAsync(ConversationActor actor, string tenantId, ConversationSubject subject, CancellationToken cancellationToken = default);
 }

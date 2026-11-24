@@ -27,6 +27,15 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+### Added
+
+- **`Themia.Conversations`: room-scoped purge, `IConversationDataSubject.PurgeConversationAsync` / `PurgeConversationBySubjectAsync` (coord #0244).** Deletes one conversation (messages, participants, read markers, events, attachment rows and stored files) and returns `ConversationPurgeResult` (`Outcome`, `MessagesDeleted`, `AttachmentsDeleted`, computed `Held` and `Failed`; counts only, no text). Outcomes: `Purged`, `NotFound` (idempotent: a repeat call returns the tombstone's counts), `Deferred` (legal hold from the row or `ILegalHoldPort`, or an upload younger than `AttachmentUploadGrace`), `Failed` (a file could not be deleted; the room stays `Purging` and a retry resumes), `Refused`. It shares one purger with the retention sweep, so a tombstone and a `Purged` event are written as for a sweep. The by-subject overload never creates a room. New policy action `ConversationAction.PurgeConversation` (separate from `Erase`; a policy that does not know it denies). The tombstone records no actor: keep who asked in your own audit.
+
+### Changed
+
+- **Adopter signal:** `IConversationDataSubject` gained two members, so an adopter's own fake or implementer of it stops compiling until it adds them.
+- `PostAsync` and attachment staging now refuse a room whose retention state is not Active or LegalHold (a `Purging` room answers `Closed`), so nothing is written into a room being deleted.
+
 ## [0.70.0] - 2026-11-21
 
 ### Added
