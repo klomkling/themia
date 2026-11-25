@@ -406,6 +406,23 @@ public abstract partial class ConversationErasureTests
     }
 
     [Fact]
+    public async Task PurgeConversation_ShouldFailAndKeepTheMessages_WhenThePortThrowsOnTheRowsReask()
+    {
+        var tenant = NewTenant();
+        var room = await RoomAsync(tenant);
+        var storage = new RecordingStorage();
+        var hold = new ScriptedHold(() => false, () => false, () => throw new InvalidOperationException("port down"));
+
+        var result = await Eraser(storage, hold).PurgeConversationAsync(Member("staff"), tenant, room.Conversation);
+
+        Assert.Equal(ConversationPurgeOutcome.Failed, result.Outcome);
+        Assert.Equal([room.AliceKey], storage.Deleted);
+        Assert.Equal(3, await StateAsync(room.Conversation));
+        Assert.Equal(3, await CountAsync("SELECT COUNT(*) FROM conversation_messages WHERE conversation_id = @Id;", new { Id = room.Conversation }));
+        Assert.Equal(0, await CountAsync("SELECT COUNT(*) FROM conversation_tombstones WHERE conversation_id = @Id;", new { Id = room.Conversation }));
+    }
+
+    [Fact]
     public async Task PurgeConversation_ShouldLeaveAnotherTenantsRoomUntouched_WhenBothShareTheSubject()
     {
         var tenantA = NewTenant();
