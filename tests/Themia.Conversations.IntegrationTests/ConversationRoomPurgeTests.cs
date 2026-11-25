@@ -21,6 +21,15 @@ public abstract partial class ConversationErasureTests
         public ValueTask<bool> IsHeldAsync(string tenantId, ConversationSubject subject, CancellationToken cancellationToken = default) => ValueTask.FromResult(held);
     }
 
+    /// <summary>Answers from a script, one entry per ask (the last repeats); an entry may also run a side effect or throw, to stage a hold that lands between two asks.</summary>
+    private sealed class ScriptedHold(params Func<bool>[] script) : ILegalHoldPort
+    {
+        public int Asks { get; private set; }
+
+        public ValueTask<bool> IsHeldAsync(string tenantId, ConversationSubject subject, CancellationToken cancellationToken = default) =>
+            ValueTask.FromResult(script[Math.Min(Asks++, script.Length - 1)]());
+    }
+
     private ConversationDataSubjectService Eraser(IStorageProvider? storage, ILegalHoldPort? hold = null, ConversationOptions? options = null, IConversationAccessPolicy? policy = null) =>
         new(fixture.Dialect, policy ?? new AllowAll(), new DefaultConversationLifecycleSink(), null, storage, TimeProvider.System, NullLogger<ConversationDataSubjectService>.Instance, hold, options ?? new ConversationOptions { NoLegalHoldPort = hold is null });
 
@@ -314,14 +323,86 @@ public abstract partial class ConversationErasureTests
         var tenant = NewTenant();
         var room = await RoomAsync(tenant);
         await fixture.ExecuteAsync("UPDATE conversations SET retention_state = 1 WHERE id = @Id;", new { Id = room.Conversation });
-        var purger = new ConversationPurger(fixture.Dialect, new DefaultConversationLifecycleSink(), new RecordingStorage(), TimeProvider.System, NullLogger.Instance);
+        var purger = new ConversationPurger(fixture.Dialect, new DefaultConversationLifecycleSink(), null, new RecordingStorage(), TimeProvider.System, NullLogger.Instance);
 
-        var counts = await purger.DeleteRowsAsync(tenant, room.Conversation, "booking", "B-1", CancellationToken.None);
+        var rows = await purger.DeleteRowsAsync(tenant, room.Conversation, new ConversationSubject("booking", "B-1"), CancellationToken.None);
 
-        Assert.Null(counts);
+        Assert.Equal(PurgeRowsOutcome.LostClaim, rows.Outcome);
         Assert.Equal(1, await StateAsync(room.Conversation));
         Assert.True(await RowsAsync(room.Conversation) > 0);
         Assert.Equal(0, await CountAsync("SELECT COUNT(*) FROM conversation_tombstones WHERE conversation_id = @Id;", new { Id = room.Conversation }));
+    }
+
+    [Fact]
+    public async Task PurgeConversation_ShouldKeepTheMessagesAndHold_WhenTheHoldArrivesAfterTheFilesWereDeleted()
+    {
+        var tenant = NewTenant();
+        var room = await RoomAsync(tenant);
+        var storage = new RecordingStorage();
+        var hold = new ScriptedHold(() => false, () => false, () => true); // eraser, files, rows
+
+        var result = await Eraser(storage, hold).PurgeConversationAsync(Member("staff"), tenant, room.Conversation);
+
+        Assert.True(result.Held);
+        Assert.Equal(3, hold.Asks);
+        Assert.Equal([room.AliceKey], storage.Deleted);
+        Assert.Equal(1, await StateAsync(room.Conversation));
+        Assert.Equal(3, await CountAsync("SELECT COUNT(*) FROM conversation_messages WHERE conversation_id = @Id;", new { Id = room.Conversation }));
+        Assert.Equal(0, await CountAsync("SELECT COUNT(*) FROM conversation_tombstones WHERE conversation_id = @Id;", new { Id = room.Conversation }));
+    }
+
+    [Fact]
+    public async Task PurgeConversation_ShouldDeleteNoFile_WhenTheHoldArrivesAfterTheClaim()
+    {
+        var tenant = NewTenant();
+        var room = await RoomAsync(tenant);
+        var storage = new RecordingStorage();
+        var hold = new ScriptedHold(() => false, () => true); // eraser, files
+
+        var result = await Eraser(storage, hold).PurgeConversationAsync(Member("staff"), tenant, room.Conversation);
+
+        Assert.True(result.Held);
+        Assert.Empty(storage.Deleted);
+        Assert.Equal(1, await StateAsync(room.Conversation));
+        Assert.True(await RowsAsync(room.Conversation) > 0);
+    }
+
+    [Fact]
+    public async Task PurgeConversation_ShouldAnswerNotFound_WhenAnotherFinisherDeletedTheRoomBeforeTheReask()
+    {
+        var tenant = NewTenant();
+        var room = await RoomAsync(tenant);
+        var finisher = Eraser(new RecordingStorage());
+        var hold = new ScriptedHold(
+            () => false,
+            () =>
+            {
+                // A second caller resumes the claim and finishes the purge while this one is between its claim and its file step.
+                var done = finisher.PurgeConversationAsync(Member("staff"), tenant, room.Conversation).GetAwaiter().GetResult();
+                Assert.Equal(ConversationPurgeOutcome.Purged, done.Outcome);
+                return true;
+            });
+
+        var result = await Eraser(new RecordingStorage(), hold).PurgeConversationAsync(Member("staff"), tenant, room.Conversation);
+
+        Assert.Equal(ConversationPurgeOutcome.NotFound, result.Outcome);
+        Assert.Equal(3, result.MessagesDeleted);
+    }
+
+    [Fact]
+    public async Task PurgeConversation_ShouldFailAndStayClaimed_WhenThePortThrowsOnTheReask()
+    {
+        var tenant = NewTenant();
+        var room = await RoomAsync(tenant);
+        var storage = new RecordingStorage();
+        var hold = new ScriptedHold(() => false, () => throw new InvalidOperationException("port down"));
+
+        var result = await Eraser(storage, hold).PurgeConversationAsync(Member("staff"), tenant, room.Conversation);
+
+        Assert.Equal(ConversationPurgeOutcome.Failed, result.Outcome);
+        Assert.Empty(storage.Deleted);
+        Assert.Equal(3, await StateAsync(room.Conversation));
+        Assert.True(await RowsAsync(room.Conversation) > 0);
     }
 
     [Fact]

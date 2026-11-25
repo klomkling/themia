@@ -95,17 +95,19 @@ internal sealed class ConversationRoomEraser(
             return Result(ConversationPurgeOutcome.Deferred);
         }
 
-        if (!await purger.DeleteFilesAsync(connection, tenantId, room.Id, cancellationToken))
+        var subject = new ConversationSubject(room.SubjectType, room.SubjectId);
+        switch (await purger.DeleteFilesAsync(connection, tenantId, room.Id, subject, cancellationToken))
         {
-            return Result(ConversationPurgeOutcome.Failed);
+            case PurgeFilesOutcome.Failed:
+                return Result(ConversationPurgeOutcome.Failed);
+            case PurgeFilesOutcome.Held or PurgeFilesOutcome.LostClaim:
+                return await ResolveLostClaimAsync(connection, tenantId, room, cancellationToken); // gone is NotFound, present (held) is Deferred
         }
 
-        if (await purger.DeleteRowsAsync(tenantId, room.Id, room.SubjectType, room.SubjectId, cancellationToken) is not { } counts)
-        {
-            return await ResolveLostClaimAsync(connection, tenantId, room, cancellationToken);
-        }
-
-        return new ConversationPurgeResult(ConversationPurgeOutcome.Purged, Clamp(counts.Messages), Clamp(counts.Attachments));
+        var rows = await purger.DeleteRowsAsync(tenantId, room.Id, subject, cancellationToken);
+        return rows.Outcome == PurgeRowsOutcome.Purged
+            ? new ConversationPurgeResult(ConversationPurgeOutcome.Purged, Clamp(rows.Counts.Messages), Clamp(rows.Counts.Attachments))
+            : await ResolveLostClaimAsync(connection, tenantId, room, cancellationToken);
     }
 
     /// <summary>The claim did not hold: another finisher deleted the room (NotFound, with the tombstone's counts) or a hold took it (Deferred).</summary>

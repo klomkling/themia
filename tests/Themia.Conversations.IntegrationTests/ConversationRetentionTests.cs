@@ -32,6 +32,15 @@ public abstract class ConversationRetentionTests(ConversationEngineFixture fixtu
         }
     }
 
+    /// <summary>Held from the nth ask on (1-based), so a hold can land between the sweep's own check and the purger's.</summary>
+    private sealed class LateHoldPort(int heldFromAsk) : ILegalHoldPort
+    {
+        public int Asks { get; private set; }
+
+        public ValueTask<bool> IsHeldAsync(string tenantId, ConversationSubject subject, CancellationToken cancellationToken = default) =>
+            ValueTask.FromResult(++Asks >= heldFromAsk);
+    }
+
     private sealed class ThrowingHoldPort : ILegalHoldPort
     {
         public ValueTask<bool> IsHeldAsync(string tenantId, ConversationSubject subject, CancellationToken cancellationToken = default) =>
@@ -239,6 +248,23 @@ public abstract class ConversationRetentionTests(ConversationEngineFixture fixtu
         Assert.Equal(0, await fixture.ScalarAsync<int>("SELECT COUNT(*) FROM conversations WHERE id = @Id;", new { Id = free }));
     }
 
+    [Theory]
+    [InlineData(2, false)] // after the claim, before any file
+    [InlineData(3, true)]  // after the files, before the rows
+    public async Task Sweep_ShouldCountAsHeldAndKeepTheMessages_WhenTheHoldArrivesAfterTheClaim(int heldFromAsk, bool filesGone)
+    {
+        var tenant = NewTenant();
+        var (conversation, key) = await ClosedConversationAsync(tenant, "B-late");
+        var storage = new RecordingStorage();
+
+        var result = await Retention(new LateHoldPort(heldFromAsk), storage).SweepAsync(tenant);
+
+        Assert.Equal(new SweepResult(SweepOutcome.Completed, 1, 0, 1, 0), result);
+        Assert.Equal(filesGone ? [key] : [], storage.Deleted);
+        Assert.Equal((int)ConversationRetentionState.LegalHold, await StateOfAsync(conversation));
+        Assert.Equal(2, await CountAsync("conversation_messages", conversation));
+    }
+
     [Fact]
     public async Task Sweep_ShouldNeverUnHold_WhenThePortLaterSaysNotHeld()
     {
@@ -285,7 +311,7 @@ public abstract class ConversationRetentionTests(ConversationEngineFixture fixtu
         var second = await Retention(port, storage).SweepAsync(tenant);
 
         Assert.Equal(1, second.Purged);
-        Assert.Equal(["B-1"], port.Asked);
+        Assert.Equal(["B-1", "B-1", "B-1"], port.Asked); // the sweep, then the purger before the files and again before the rows
         Assert.Equal(0, await fixture.ScalarAsync<int>("SELECT COUNT(*) FROM conversations WHERE id = @Id;", new { Id = conversation }));
     }
 

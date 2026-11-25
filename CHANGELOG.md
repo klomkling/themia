@@ -27,6 +27,10 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Themia.Conversations:** a legal hold that `ILegalHoldPort` reports after a purge has claimed a conversation now stops the purge. The check runs before any file is deleted and again before the rows are deleted, in both the room purge and the retention sweep. The conversation moves to LegalHold, and erasure answers Deferred (the sweep counts it as held). Behaviour change: a conversation held late now stays LegalHold instead of being purged. A hold that lands during the file deletes keeps the messages, not the files already deleted.
+
 ## [0.71.0] - 2026-11-25
 
 ### Added
