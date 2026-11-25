@@ -20,7 +20,7 @@ internal sealed class ConversationRetentionService(
     TimeProvider time,
     ILogger<ConversationRetentionService> logger) : IConversationRetention
 {
-    private readonly ConversationPurger purger = new(dialect, sink, storage, time, logger);
+    private readonly ConversationPurger purger = new(dialect, sink, holdPort, storage, time, logger);
     private const int MaxBatchSize = 1000;
     private const int Expired = (int)ConversationRetentionState.Expired;
     private const int Purging = (int)ConversationRetentionState.Purging;
@@ -177,12 +177,23 @@ internal sealed class ConversationRetentionService(
                 return PurgeStep.Skipped; // reopened, held or purged since the read
             }
 
-            if (!await purger.DeleteFilesAsync(connection, tenantId, candidate.Id, cancellationToken))
+            var subject = new ConversationSubject(candidate.SubjectType, candidate.SubjectId);
+            switch (await purger.DeleteFilesAsync(connection, tenantId, candidate.Id, subject, cancellationToken))
             {
-                return PurgeStep.Failed;
+                case PurgeFilesOutcome.Failed:
+                    return PurgeStep.Failed;
+                case PurgeFilesOutcome.Held:
+                    return PurgeStep.Held; // a hold found after the claim counts like one found before it
+                case PurgeFilesOutcome.LostClaim:
+                    return PurgeStep.Skipped;
             }
 
-            return await purger.DeleteRowsAsync(tenantId, candidate.Id, candidate.SubjectType, candidate.SubjectId, cancellationToken) is null ? PurgeStep.Skipped : PurgeStep.Purged;
+            return (await purger.DeleteRowsAsync(tenantId, candidate.Id, subject, cancellationToken)).Outcome switch
+            {
+                PurgeRowsOutcome.Purged => PurgeStep.Purged,
+                PurgeRowsOutcome.Held => PurgeStep.Held,
+                _ => PurgeStep.Skipped,
+            };
         }
         catch (Exception ex) when (ex is not OperationCanceledException and not OutOfMemoryException)
         {
