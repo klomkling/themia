@@ -989,6 +989,73 @@ public abstract class IdentityStoreConformanceTests
     }
 
     [Fact]
+    public async Task Refresh_that_loses_to_a_revoke_between_its_read_and_its_write_answers_Invalid_and_leaves_no_live_session()
+    {
+        await ResetAsync();
+        var tenant = new TenantId("acme");
+        Guid userId;
+        string raw;
+        Guid familyId;
+        await using (var seed = NewScope(tenant))
+        {
+            userId = (await seed.Users.CreateAsync("rt-revoke-ordering-1", "pw")).UserId!.Value;
+            var issued = await seed.RefreshTokens.IssueAsync(userId);
+            raw = issued.RawToken;
+            familyId = issued.FamilyId;
+        }
+
+        var revoked = new int[1];
+        await using (var s = NewScope(tenant, configureServices: services =>
+            services.Decorate<IUnitOfWork>((inner, sp) => new RevokeBeforeTransactionUnitOfWork(inner, sp, userId, revoked))))
+        {
+            var result = await s.RefreshTokens.ValidateAndRotateAsync(raw);
+
+            Assert.Equal(RefreshOutcome.Invalid, result.Outcome);
+        }
+
+        await using var verify = NewScope(tenant);
+        Assert.False(await verify.RefreshTokens.IsSessionLiveAsync(userId, familyId));
+    }
+
+    [Fact]
+    public async Task Refresh_racing_RevokeAllForUser_never_leaves_a_live_session()
+    {
+        const int Rounds = 25;
+        await ResetAsync();
+        var tenant = new TenantId("acme");
+        var live = 0;
+        for (var round = 0; round < Rounds; round++)
+        {
+            Guid userId;
+            string raw;
+            Guid familyId;
+            await using (var seed = NewScope(tenant))
+            {
+                userId = (await seed.Users.CreateAsync($"rt-race-{round}", "pw")).UserId!.Value;
+                var issued = await seed.RefreshTokens.IssueAsync(userId);
+                raw = issued.RawToken;
+                familyId = issued.FamilyId;
+            }
+
+            await using var rotateScope = NewScope(tenant);
+            await using var revokeScope = NewScope(tenant);
+            var go = new TaskCompletionSource();
+            var rotate = Task.Run(async () => { await go.Task; return await rotateScope.RefreshTokens.ValidateAndRotateAsync(raw); });
+            var revoke = Task.Run(async () => { await go.Task; return await revokeScope.RefreshTokens.RevokeAllForUserAsync(userId); });
+            go.SetResult();
+            await Task.WhenAll(rotate, revoke);
+
+            await using var verify = NewScope(tenant);
+            if (await verify.RefreshTokens.IsSessionLiveAsync(userId, familyId))
+            {
+                live++;
+            }
+        }
+
+        Assert.Equal(0, live);
+    }
+
+    [Fact]
     public async Task Refresh_replay_after_rotation_revokes_family()
     {
         await ResetAsync();
@@ -3090,4 +3157,25 @@ file sealed class SwapRivalUnitOfWork(
 
     public Task ExecuteInTransactionAsync(Func<CancellationToken, Task> work, CancellationToken cancellationToken = default) =>
         inner.ExecuteInTransactionAsync(work, cancellationToken);
+}
+
+/// <summary>Commits a revoke of the user's sessions in an independent scope, once, just before this unit of work opens its transaction:
+/// after the refresh service read its parent, before it wrote anything. That is ordering 1 of coord #0245.</summary>
+file sealed class RevokeBeforeTransactionUnitOfWork(IUnitOfWork inner, IServiceProvider rootProvider, Guid userId, int[] revoked) : IUnitOfWork
+{
+    public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default) => inner.SaveChangesAsync(cancellationToken);
+
+    public Task<ITransactionScope> BeginTransactionAsync(CancellationToken cancellationToken = default) =>
+        inner.BeginTransactionAsync(cancellationToken);
+
+    public async Task ExecuteInTransactionAsync(Func<CancellationToken, Task> work, CancellationToken cancellationToken = default)
+    {
+        if (Interlocked.Exchange(ref revoked[0], 1) == 0)
+        {
+            await using var scope = rootProvider.CreateAsyncScope();
+            await scope.ServiceProvider.GetRequiredService<IRefreshTokenService>().RevokeAllForUserAsync(userId);
+        }
+
+        await inner.ExecuteInTransactionAsync(work, cancellationToken);
+    }
 }

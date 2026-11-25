@@ -3,6 +3,7 @@ using System.Text;
 using Microsoft.Extensions.Logging;
 using Themia.Framework.Data.Abstractions.Exceptions;
 using Themia.Framework.Data.Abstractions.Repositories;
+using Themia.Framework.Data.Abstractions.Specifications;
 using Themia.Framework.Data.Abstractions.UnitOfWork;
 using Themia.Modules.Identity.Abstractions;
 using Themia.Modules.Identity.Abstractions.Authentication;
@@ -19,6 +20,8 @@ namespace Themia.Modules.Identity.Services;
 /// revokes the family.</summary>
 public sealed class RefreshTokenService : IRefreshTokenService, ISessionRevoker
 {
+    private const int MaxUpdatePasses = 5;
+
     private const int TokenByteLength = 32;
 
     private readonly IRepository<User, Guid> users;
@@ -127,11 +130,12 @@ public sealed class RefreshTokenService : IRefreshTokenService, ISessionRevoker
         }
 
         var (successor, raw) = Create(match.UserId, match.FamilyId, match.SecurityStamp ?? user.SecurityStamp);
-        // Compare-and-set: the successor carries the parent's id in replaced_token_id, which has a filtered
-        // unique index. Two simultaneous rotations of the same token both try to insert a successor with the
-        // same replaced_token_id; the index lets only one commit. The loser hits a unique violation in the
-        // transaction below. Without the reuse grace it returns Invalid (the legitimate winner already rotated);
-        // with it, it takes the replay path and gets the winner's successor.
+        // Compare-and-set, twice over. (1) The successor carries the parent's id in replaced_token_id, which has a filtered
+        // unique index: two simultaneous rotations of the same token both try to insert a successor with the same
+        // replaced_token_id and the index lets only one commit. (2) The parent is consumed by an UPDATE that only matches a
+        // parent that is still unrevoked and unconsumed, so a revoke (or a rival rotation) that committed after the read
+        // above makes it affect no row. It runs first, so the parent row is locked before the successor is inserted: a
+        // revoke waiting on that row then runs after this transaction commits and sees the successor (RevokeUntilStableAsync).
         successor.ReplacedTokenId = match.Id;
         var graceOn = options.RefreshReuseGrace > TimeSpan.Zero;
         try
@@ -141,26 +145,30 @@ public sealed class RefreshTokenService : IRefreshTokenService, ISessionRevoker
             await unitOfWork.ExecuteInTransactionAsync(
                 async ct =>
                 {
-                    await tokens.AddAsync(successor, ct).ConfigureAwait(false);
-                    match.ConsumedAt = now;
-                    match.ReplacedById = successor.Id;
-                    if (graceOn)
+                    var sealedSuccessor = graceOn ? RefreshSuccessorProtector.Protect(rawToken, match.Id, raw) : null;
+                    var consumed = await tokens.UpdateWhereAsync(
+                        new RotatableRefreshTokenSpec(match.Id),
+                        set => set.Set(t => t.ConsumedAt, now).Set(t => t.ReplacedById, successor.Id).Set(t => t.SuccessorCiphertext, sealedSuccessor),
+                        ct).ConfigureAwait(false);
+                    if (consumed == 0)
                     {
-                        match.SuccessorCiphertext = RefreshSuccessorProtector.Protect(rawToken, match.Id, raw);
+                        // Throw, never return: the unit of work saves what was staged and commits after this lambda returns.
+                        throw new ParentNoLongerRotatableException();
                     }
 
-                    tokens.Update(match);
+                    await tokens.AddAsync(successor, ct).ConfigureAwait(false);
                 },
                 cancellationToken).ConfigureAwait(false);
         }
         // ConcurrencyException is deliberately NOT caught here: RefreshToken carries no optimistic-concurrency
-        // token today, so the parent UPDATE always affects its row and the filtered unique index on
-        // replaced_token_id is the sole race gate. If RefreshToken later gains a row-version (issue #86
-        // follow-up), this catch must also handle ConcurrencyException. Do not add that clause until then —
-        // it would handle a currently-impossible scenario.
-        catch (UniqueConstraintException)
+        // token, and the parent write is a set-based compare-and-set that reports a lost race by its row count.
+        // If RefreshToken later gains a row-version (issue #86 follow-up), this catch must also handle
+        // ConcurrencyException. Do not add that clause until then.
+        catch (Exception ex) when (ex is UniqueConstraintException or ParentNoLongerRotatableException)
         {
-            // Lost the race. The tracker was cleared by the failed transaction, so this read sees the winner's row.
+            // Lost the race, to a rival rotation (unique index, or a parent already consumed) or to a revoke. The failed transaction
+            // cleared the tracker, so this read sees what won. A revoked parent replays nothing and answers Invalid; a revoke
+            // already ended the family, so nothing is logged or revoked again here.
             return await ReplayAfterLostRaceAsync(rawToken, hash, user, cancellationToken).ConfigureAwait(false);
         }
 
@@ -219,10 +227,9 @@ public sealed class RefreshTokenService : IRefreshTokenService, ISessionRevoker
             // RevokedAt == null && ExpiresAt > now), instead of loading-and-stamping each row. On None, like
             // RevokeFamilyAsync: the token proved the owner, the revoke is decided, and a client that
             // disconnects here must not leave the sessions valid.
-            var revoked = await tokens.UpdateWhereAsync(
+            var revoked = await UpdateUntilStableAsync(
                 new ActiveRefreshTokensByUserSpec(match.UserId, now),
-                set => set.Set(t => t.RevokedAt, now),
-                CancellationToken.None).ConfigureAwait(false);
+                set => set.Set(t => t.RevokedAt, now)).ConfigureAwait(false);
             logger.LogInformation("Revoked all active refresh tokens for user {UserId} ({Count} tokens).", match.UserId, revoked);
             return revoked;
         }
@@ -292,18 +299,16 @@ public sealed class RefreshTokenService : IRefreshTokenService, ISessionRevoker
         // Both UPDATEs are on None: the session to keep was validated above, nothing is undecided after that, and an
         // abort between them would revoke the others but leave the kept session unbound, signing the caller out at
         // their next refresh.
-        var revoked = await tokens.UpdateWhereAsync(
+        var revoked = await UpdateUntilStableAsync(
             new ActiveRefreshTokensByUserExceptFamilySpec(user.Id, keepFamilyId, now),
-            set => set.Set(t => t.RevokedAt, now),
-            CancellationToken.None).ConfigureAwait(false);
+            set => set.Set(t => t.RevokedAt, now)).ConfigureAwait(false);
         // The kept session is the caller's own (they just changed the password, say): bind it to the current stamp so it survives
         // the rotation. Call this AFTER the mutation that rotated the stamp; before it, the kept session ends at its next refresh.
         // keepSessionId is the caller's assertion that it is the authenticated session (the `sid` of the principal): the family is
         // checked to be live and the user's, not to be current, so an app must never take it from unauthenticated input.
-        await tokens.UpdateWhereAsync(
-            new ActiveRefreshTokensByUserAndFamilySpec(user.Id, keepFamilyId, now),
-            set => set.Set(t => t.SecurityStamp, user.SecurityStamp),
-            CancellationToken.None).ConfigureAwait(false);
+        await UpdateUntilStableAsync(
+            new ActiveRefreshTokensOnAnotherStampSpec(user.Id, keepFamilyId, now, user.SecurityStamp),
+            set => set.Set(t => t.SecurityStamp, user.SecurityStamp)).ConfigureAwait(false);
         logger.LogInformation("Revoked {Count} refresh tokens for user {UserId}, keeping one session.", revoked, user.Id);
         return revoked;
     }
@@ -326,10 +331,9 @@ public sealed class RefreshTokenService : IRefreshTokenService, ISessionRevoker
 
         var now = timeProvider.GetUtcNow();
         // On None: the owner resolved above, so the revoke is decided; a disconnect must not leave sessions valid.
-        var revoked = await tokens.UpdateWhereAsync(
+        var revoked = await UpdateUntilStableAsync(
             new ActiveRefreshTokensByUserSpec(user.Id, now),
-            set => set.Set(t => t.RevokedAt, now),
-            CancellationToken.None).ConfigureAwait(false);
+            set => set.Set(t => t.RevokedAt, now)).ConfigureAwait(false);
         logger.LogInformation("Revoked all active refresh tokens for user {UserId} ({Count} tokens).", user.Id, revoked);
         return revoked;
     }
@@ -428,10 +432,40 @@ public sealed class RefreshTokenService : IRefreshTokenService, ISessionRevoker
         // predicate means already-revoked rows are not needlessly rewritten. Deliberately NOT bound to the
         // caller's token: every caller has already decided to revoke (reuse, a stamp mismatch, logout), and a
         // client that aborts the request must not be able to cancel that decision half-applied.
-        return await tokens.UpdateWhereAsync(
+        return await UpdateUntilStableAsync(
             new ActiveRefreshTokensByFamilySpec(familyId),
-            set => set.Set(t => t.RevokedAt, now).Set(t => t.SuccessorCiphertext, null),
-            CancellationToken.None).ConfigureAwait(false);
+            set => set.Set(t => t.RevokedAt, now).Set(t => t.SuccessorCiphertext, null)).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Runs one set-based UPDATE until a pass changes nothing, and returns the rows changed in all passes. One pass is not enough against a
+    /// rotation: a rotation that holds the parent row makes the statement wait, and when the rotation commits, the waiting statement
+    /// re-checks the parent but cannot see the successor row inserted by that commit. The next pass takes a new snapshot and does.
+    /// Each pass is its own statement at the engine's default READ COMMITTED level and must stay out of any transaction of its own: under
+    /// REPEATABLE READ or SERIALIZABLE, pass two would reuse pass one's snapshot and find nothing. Not tied to a cancellation token, like
+    /// every caller's decision to revoke. Every row seen so far is already updated when this throws.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">The rows did not settle within <see cref="MaxUpdatePasses"/> passes.</exception>
+    private async Task<int> UpdateUntilStableAsync(ISpecification<RefreshToken> specification, Action<IBulkUpdateSetters<RefreshToken>> set)
+    {
+        var total = 0;
+        for (var pass = 1; pass <= MaxUpdatePasses; pass++)
+        {
+            var changed = await tokens.UpdateWhereAsync(specification, set, CancellationToken.None).ConfigureAwait(false);
+            if (changed == 0)
+            {
+                return total;
+            }
+
+            total += changed;
+        }
+
+        throw new InvalidOperationException($"The refresh token update did not settle after {MaxUpdatePasses} passes.");
+    }
+
+    // Thrown inside the rotation transaction when the parent can no longer be rotated, so nothing staged is saved or committed.
+    private sealed class ParentNoLongerRotatableException : Exception
+    {
     }
 
     private (RefreshToken Entity, string Raw) Create(Guid userId, Guid familyId, string? securityStamp)

@@ -273,6 +273,11 @@ Four rules worth knowing before you build on it:
 - **Linking and unlinking end no sessions.** Sessions are not tagged by the identity that opened them, so
   after unlinking a compromised identity call `IRefreshTokenService.RevokeAllForUserAsync(userId)` — it is
   the only way to reach the session that identity holds.
+- **Revoking a user's or a family's sessions needs READ COMMITTED.** `RevokeAllForUserAsync`, `RevokeAsync(allForUser: true)`
+  and the family and keep-one revokes repeat their UPDATE until a pass changes nothing, so a refresh that races the revoke
+  cannot leave a live session. Each pass must take a fresh snapshot: do not wrap a revoke in a REPEATABLE READ or
+  SERIALIZABLE transaction, where the second pass would see the first pass's snapshot and miss a session committed meanwhile.
+  If the rows do not settle within 5 passes the call throws `InvalidOperationException`.
 
 **Unlinking is how a user without a password locks themselves out**, and the module does not stop it: a
 sign-in method can live entirely outside Identity (a phone-OTP login on `Themia.Challenges`, for one), so

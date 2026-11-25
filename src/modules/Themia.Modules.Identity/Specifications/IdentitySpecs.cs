@@ -233,6 +233,13 @@ internal sealed class AgedSuccessorCiphertextByUserSpec : Specification<RefreshT
         Where(t => t.UserId == userId && t.SuccessorCiphertext != null && t.ConsumedAt < consumedBefore);
 }
 
+/// <summary>The parent of a rotation, only while it is still unrevoked and unconsumed: the compare-and-set that makes a rotation lose to a
+/// revoke or to a rival rotation that committed after the parent was read.</summary>
+internal sealed class RotatableRefreshTokenSpec : Specification<RefreshToken>
+{
+    public RotatableRefreshTokenSpec(Guid id) => Where(t => t.Id == id && t.RevokedAt == null && t.ConsumedAt == null);
+}
+
 /// <summary>A family's not-yet-revoked tokens — the rows a family revocation actually flips.</summary>
 internal sealed class ActiveRefreshTokensByFamilySpec : Specification<RefreshToken>
 {
@@ -252,6 +259,15 @@ internal sealed class ActiveRefreshTokensByUserAndFamilySpec : Specification<Ref
 {
     public ActiveRefreshTokensByUserAndFamilySpec(Guid userId, Guid familyId, DateTimeOffset now) =>
         Where(t => t.UserId == userId && t.FamilyId == familyId && t.RevokedAt == null && t.ExpiresAt > now);
+}
+
+/// <summary>The live tokens of one family that are not bound to <c>stamp</c> yet (or are bound to none): the rows a rebind still has to move,
+/// so a repeated rebind reaches zero.</summary>
+internal sealed class ActiveRefreshTokensOnAnotherStampSpec : Specification<RefreshToken>
+{
+    public ActiveRefreshTokensOnAnotherStampSpec(Guid userId, Guid familyId, DateTimeOffset now, string stamp) =>
+        Where(t => t.UserId == userId && t.FamilyId == familyId && t.RevokedAt == null && t.ExpiresAt > now
+            && (t.SecurityStamp == null || t.SecurityStamp != stamp));
 }
 
 /// <summary>A live session as the owner's CURRENT stamp sees it: unrevoked, unexpired, and bound to that stamp (or not bound
