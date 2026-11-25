@@ -10,6 +10,23 @@ with the *why* and concrete upgrade steps.
 - Each entry states: **What changed**, **Why**, and **How to upgrade** (before → after).
 - Non-breaking changes are *not* listed here — see the CHANGELOG.
 
+## 0.71.0
+
+### Conversations: room-scoped purge, `PurgeConversationAsync` (breaking for implementers)
+
+**What changed.**
+- `IConversationDataSubject` gained two members, `PurgeConversationAsync(actor, tenantId, conversationId, ct)` and `PurgeConversationBySubjectAsync(actor, tenantId, subject, ct)`. Both return `ConversationPurgeResult`.
+- `ConversationAction` has a new value `PurgeConversation = 13`.
+- `PostAsync` and attachment staging now answer `PostOutcome.Closed` for a room that is `Purging` (they already refused a closed room); nothing is written into a room being deleted.
+
+**Why.** An app has to delete one finished conversation, not every conversation of a person. The purge reuses the retention sweep's code path, so files, rows, the tombstone and the `Purged` event behave the same.
+
+**How to upgrade.**
+- If you only resolve `IConversationDataSubject` from DI, nothing breaks. If you implement it (a test fake), add the two members.
+- The access policy is asked `ConversationAction.PurgeConversation` with the conversation (or subject) as target. No existing policy grants a value it has never seen, so every call answers `Refused` until your host policy allows it; grant it to the actor that performs deletions only.
+- A caller that posts to a room can now get `Closed` while that room is being purged; treat it like any closed room.
+- The outcomes are `Purged`, `NotFound` (already gone; counts come from the tombstone), `Deferred` (legal hold, no `ILegalHoldPort` and `NoLegalHoldPort` unset, or an upload in flight) and `Failed` (a file could not be deleted; the room stays claimed and a retry resumes). Alert on `Failed`.
+
 ## 0.70.0
 
 ### Exceptional dashboard: `EnableActions` defaults to `false`
