@@ -22,7 +22,7 @@ internal sealed class ConversationDataSubjectService(
     ILegalHoldPort? holdPort = null,
     ConversationOptions? options = null) : IConversationDataSubject
 {
-    private readonly ConversationRoomEraser roomEraser = new(dialect, options ?? new ConversationOptions(), policy, holdPort, new ConversationPurger(dialect, sink, storage, time, logger), time, logger);
+    private readonly ConversationRoomEraser roomEraser = new(dialect, options ?? new ConversationOptions(), policy, holdPort, new ConversationPurger(dialect, sink, holdPort, storage, time, logger), time, logger);
 
     internal const string ErasedDisplayName = "Erased participant";
     private const int MaxAttempts = 3;
