@@ -141,6 +141,27 @@ public class RefreshRevokeRaceTests
     }
 
     [Fact]
+    public async Task RevokeAsyncForAllUserSessions_ShouldRevokeASuccessorThatCommittedAfterTheStatementTookItsSnapshot()
+    {
+        var user = AddUser();
+        var issued = await Sut().IssueAsync(user.Id);
+        var added = false;
+        tokenRepo.AfterUpdateWhere = (_, _) =>
+        {
+            if (!added)
+            {
+                added = true;
+                AddLiveRow(user, issued.FamilyId);
+            }
+        };
+
+        var revoked = await Sut().RevokeAsync(issued.RawToken, allForUser: true);
+
+        Assert.Equal(2, revoked);
+        Assert.All(tokens, t => Assert.NotNull(t.RevokedAt));
+    }
+
+    [Fact]
     public async Task RevokeAllForUser_ShouldThrowAfterFivePasses_WhenEveryPassFindsAFreshLiveRow()
     {
         var user = AddUser();
