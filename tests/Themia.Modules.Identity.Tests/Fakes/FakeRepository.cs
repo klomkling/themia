@@ -83,6 +83,10 @@ internal sealed class FakeRepository<T>(List<T> store, Func<T, Guid> idSelector)
     /// <summary>Runs before each <see cref="UpdateWhereAsync"/> matches, to replay a parallel writer that got there first.</summary>
     public Action<ISpecification<T>>? BeforeUpdateWhere { get; set; }
 
+    /// <summary>Runs after each <see cref="UpdateWhereAsync"/> has matched and written, with the rows it matched, to replay a writer that
+    /// commits after a running statement took its snapshot (the statement cannot see that row).</summary>
+    public Action<ISpecification<T>, int>? AfterUpdateWhere { get; set; }
+
     public Task<int> UpdateWhereAsync(
         ISpecification<T> specification,
         Action<IBulkUpdateSetters<T>> set,
@@ -99,6 +103,7 @@ internal sealed class FakeRepository<T>(List<T> store, Func<T, Guid> idSelector)
 
         // One lock around match + write: a real set-based UPDATE is atomic per row, and the compare-and-set
         // callers (OTP attempt counting) depend on that to be tested under parallel load.
+        int count;
         lock (store)
         {
             var matched = Query(specification).ToList();
@@ -109,8 +114,11 @@ internal sealed class FakeRepository<T>(List<T> store, Func<T, Guid> idSelector)
                     property.SetValue(entity, value);
                 }
             }
-            return Task.FromResult(matched.Count);
+            count = matched.Count;
         }
+
+        AfterUpdateWhere?.Invoke(specification, count);
+        return Task.FromResult(count);
     }
 
     private sealed class FakeBulkUpdateSetters : IBulkUpdateSetters<T>

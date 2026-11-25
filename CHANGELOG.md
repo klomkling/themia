@@ -27,6 +27,10 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Themia.Modules.Identity:** a refresh that races `RevokeAllForUser`, a family revoke or `RevokeAllForUserExcept` now answers `Invalid`. Before, it could mint a session the revoke missed (coord #0245).
+
 ## [0.71.0] - 2026-11-25
 
 ### Added
