@@ -323,4 +323,58 @@ public abstract partial class ConversationErasureTests
         Assert.True(await RowsAsync(room.Conversation) > 0);
         Assert.Equal(0, await CountAsync("SELECT COUNT(*) FROM conversation_tombstones WHERE conversation_id = @Id;", new { Id = room.Conversation }));
     }
+
+    [Fact]
+    public async Task PurgeConversation_ShouldLeaveAnotherTenantsRoomUntouched_WhenBothShareTheSubject()
+    {
+        var tenantA = NewTenant();
+        var tenantB = NewTenant();
+        var roomA = await RoomAsync(tenantA);
+        var roomB = await RoomAsync(tenantB);
+        var storage = new RecordingStorage();
+
+        var byId = await Eraser(storage).PurgeConversationAsync(Member("staff"), tenantA, roomA.Conversation);
+
+        Assert.Equal(ConversationPurgeOutcome.Purged, byId.Outcome);
+        Assert.Equal([roomA.AliceKey], storage.Deleted);
+        Assert.Equal(0, await RowsAsync(roomA.Conversation));
+        await AssertUntouchedAsync(roomB);
+    }
+
+    [Fact]
+    public async Task PurgeConversationBySubject_ShouldLeaveAnotherTenantsRoomUntouched_WhenBothShareTheSubject()
+    {
+        var tenantA = NewTenant();
+        var tenantB = NewTenant();
+        var roomA = await RoomAsync(tenantA);
+        var roomB = await RoomAsync(tenantB);
+        var storage = new RecordingStorage();
+
+        var result = await Eraser(storage).PurgeConversationBySubjectAsync(Member("staff"), tenantA, new ConversationSubject("booking", "B-1"));
+
+        Assert.Equal(ConversationPurgeOutcome.Purged, result.Outcome);
+        Assert.Equal([roomA.AliceKey], storage.Deleted);
+        await AssertUntouchedAsync(roomB);
+    }
+
+    [Fact]
+    public async Task PurgeConversation_ShouldAnswerNotFoundAndTouchNothing_WhenTheIdBelongsToAnotherTenant()
+    {
+        var tenantA = NewTenant();
+        var roomB = await RoomAsync(NewTenant());
+        var storage = new RecordingStorage();
+
+        var result = await Eraser(storage).PurgeConversationAsync(Member("staff"), tenantA, roomB.Conversation);
+
+        Assert.Equal(ConversationPurgeOutcome.NotFound, result.Outcome);
+        Assert.Empty(storage.Deleted);
+        await AssertUntouchedAsync(roomB);
+    }
+
+    private async Task AssertUntouchedAsync(Room room)
+    {
+        Assert.True(await RowsAsync(room.Conversation) > 0);
+        Assert.Equal(0, await StateAsync(room.Conversation));
+        Assert.Equal(0, await CountAsync("SELECT COUNT(*) FROM conversation_tombstones WHERE conversation_id = @Id;", new { Id = room.Conversation }));
+    }
 }
