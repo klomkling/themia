@@ -104,6 +104,9 @@ public sealed class ProofAuthTokenIssuerTests : IDisposable
         Assert.Empty(store.Rows);
         Assert.Null(access.LastPrincipal);
         Assert.True(refresh.RevokeCalls >= 1);
+        store.SaveResult = true;
+        var retry = await ((IProofAuthTokenIssuer)Issuer(store)).CompleteSessionAsync(user.Id, pending.Ticket, pending.Stage, Request(), Proof());
+        Assert.Equal(IssueOutcome.TicketInvalid, retry.Outcome);
     }
 
     [Fact]
@@ -154,5 +157,29 @@ public sealed class ProofAuthTokenIssuerTests : IDisposable
 
         Assert.Equal(IssueOutcome.LockedOut, result.Outcome);
         Assert.Empty(store.Rows);
+    }
+
+    [Fact]
+    public async Task Complete_refuses_a_null_proof_instead_of_falling_back_to_a_session_without_amr()
+    {
+        var pending = await PendingAsync();
+
+        await Assert.ThrowsAsync<ArgumentNullException>(() =>
+            ((IProofAuthTokenIssuer)Issuer(store)).CompleteSessionAsync(user.Id, pending.Ticket, pending.Stage, Request(), null!));
+
+        Assert.Equal(0, refresh.IssueCalls);
+    }
+
+    [Fact]
+    public async Task Complete_accepts_a_proof_exactly_at_the_clock_skew_and_refuses_one_second_beyond()
+    {
+        var pending = await PendingAsync();
+        var issuer = (IProofAuthTokenIssuer)Issuer(store);
+
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            issuer.CompleteSessionAsync(user.Id, pending.Ticket, pending.Stage, Request(), Proof(clock.GetUtcNow().AddMinutes(5).AddSeconds(1))));
+        var atEdge = await issuer.CompleteSessionAsync(user.Id, pending.Ticket, pending.Stage, Request(), Proof(clock.GetUtcNow().AddMinutes(5)));
+
+        Assert.True(atEdge.Succeeded);
     }
 }
