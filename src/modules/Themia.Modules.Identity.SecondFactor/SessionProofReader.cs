@@ -29,12 +29,4 @@ internal sealed class SessionProofReader(ISessionProofStore store) : ISessionPro
         snapshot.Strength == SessionProofStrength.Strong ? MfaStrength.Strong : MfaStrength.Weak,
         snapshot.AuthenticatedAt,
         RecoveryCodeOnly: snapshot.Restriction != SessionRestriction.None);
-
-    internal static SessionProofSnapshot ToSnapshot(SecondFactorResult verified, SessionRestriction restriction) => new(
-        string.Join(' ', verified.Amr),
-        // The service reports a recovery code as Strong, but it must never read as a strong proof: it would pass the fresh-strong
-        // gate and let a restricted session remove a method or mint new codes.
-        verified.Strength == MfaStrength.Strong && !verified.UsedRecoveryCode ? SessionProofStrength.Strong : SessionProofStrength.Weak,
-        verified.AuthenticatedAt ?? throw new InvalidOperationException("Only a succeeded second-factor result carries a proof."),
-        restriction);
 }
