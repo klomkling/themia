@@ -13,8 +13,10 @@ namespace Themia.Modules.Identity.AspNetCore.Authentication;
 /// refresh row is revoked again if the access token cannot be issued. A new session asks the <see cref="ISecondFactorPolicy"/>; a
 /// renewal does not, because it must name a live session of the same user, and a session only exists once the factor was passed.
 /// </summary>
-internal sealed class GuardedAuthTokenIssuer : IAuthTokenIssuer
+internal sealed class GuardedAuthTokenIssuer : IProofAuthTokenIssuer
 {
+    private static readonly TimeSpan ProofClockSkew = TimeSpan.FromMinutes(5);
+
     private readonly IUserService users;
     private readonly IAccessTokenService accessTokens;
     private readonly IRefreshTokenService refreshTokens;
@@ -89,11 +91,35 @@ internal sealed class GuardedAuthTokenIssuer : IAuthTokenIssuer
         }
     }
 
-    public async Task<IssueResult> CompleteSessionAsync(
-        Guid userId, string ticket, SecondFactorStage expectedStage, SessionRequest request, CancellationToken cancellationToken = default)
+    public Task<IssueResult> CompleteSessionAsync(
+        Guid userId, string ticket, SecondFactorStage expectedStage, SessionRequest request, CancellationToken cancellationToken = default) =>
+        CompleteCoreAsync(userId, ticket, expectedStage, request, null, cancellationToken);
+
+    public Task<IssueResult> CompleteSessionAsync(
+        Guid userId, string ticket, SecondFactorStage expectedStage, SessionRequest request, SessionProofSnapshot proof, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(proof);
+        return CompleteCoreAsync(userId, ticket, expectedStage, request, proof, cancellationToken);
+    }
+
+    private async Task<IssueResult> CompleteCoreAsync(
+        Guid userId, string ticket, SecondFactorStage expectedStage, SessionRequest request, SessionProofSnapshot? proof, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(ticket);
         ChannelSessionMinter.Validate(request);
+        if (proof is not null)
+        {
+            // Both checks come before the ticket is burnt: a misconfigured app or a bad timestamp must not cost the user their login.
+            if (this.proofs is null)
+            {
+                throw new InvalidOperationException("No ISessionProofStore is registered, so the second-factor proof cannot be stored.");
+            }
+
+            if (proof.AuthenticatedAt > timeProvider.GetUtcNow() + ProofClockSkew)
+            {
+                throw new ArgumentException("The proof is dated in the future.", nameof(proof));
+            }
+        }
 
         // Burnt first, whatever follows: a ticket is spent by the attempt to use it.
         var data = await (tickets ?? throw new InvalidOperationException("No ISecondFactorTicketService is registered."))
@@ -124,7 +150,7 @@ internal sealed class GuardedAuthTokenIssuer : IAuthTokenIssuer
                 return IssueResult.Refused(IssueOutcome.TicketInvalid);
             }
 
-            return await IssueNewSessionAsync(user, request, cancellationToken).ConfigureAwait(false);
+            return await IssueNewSessionAsync(user, proof is null ? request : request with { Proof = proof }, cancellationToken).ConfigureAwait(false);
         }
     }
 

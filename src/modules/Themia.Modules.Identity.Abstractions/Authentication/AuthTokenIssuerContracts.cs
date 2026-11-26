@@ -115,3 +115,24 @@ public interface IAuthTokenIssuer
     /// <param name="cancellationToken">A cancellation token.</param>
     Task<IssueResult> RenewSessionAsync(Guid userId, Guid sessionId, SessionRequest request, CancellationToken cancellationToken = default);
 }
+
+/// <summary>An <see cref="IAuthTokenIssuer"/> that can also finish an app-channel ticket with a second-factor proof, so the new session
+/// carries <c>amr</c> and <c>auth_time</c> and keeps them across refresh. The proof is asserted by the caller and not checked here:
+/// pass only what your own verification actually established (see <c>SessionProofs.From</c> for a verified Themia second factor).
+/// A separate interface so existing implementations of <see cref="IAuthTokenIssuer"/> keep compiling.</summary>
+public interface IProofAuthTokenIssuer : IAuthTokenIssuer
+{
+    /// <summary>Completes the ticket exactly as <see cref="IAuthTokenIssuer.CompleteSessionAsync"/> does and stores
+    /// <paramref name="proof"/> on the new session before any token is issued.</summary>
+    /// <param name="userId">The user whose factor the app just verified.</param>
+    /// <param name="ticket">The ticket from <see cref="PendingSecondFactor.Ticket"/>.</param>
+    /// <param name="expectedStage">The stage the app just handled.</param>
+    /// <param name="request">The tenant, channel and app claims; its <see cref="SessionRequest.Proof"/> must be null.</param>
+    /// <param name="proof">What the verified factor proved. Its time must not be in the future.</param>
+    /// <param name="cancellationToken">A cancellation token.</param>
+    /// <returns>The issued session, or why not. Throws <see cref="InvalidOperationException"/> when no <see cref="ISessionProofStore"/> is
+    /// registered (the ticket is not spent) or the proof cannot be stored (the ticket is spent and nothing is issued), and
+    /// <see cref="ArgumentException"/> for a request that carries a proof or a proof dated in the future.</returns>
+    Task<IssueResult> CompleteSessionAsync(
+        Guid userId, string ticket, SecondFactorStage expectedStage, SessionRequest request, SessionProofSnapshot proof, CancellationToken cancellationToken = default);
+}

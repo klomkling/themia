@@ -120,7 +120,7 @@ internal sealed class SecondFactorBridge(
         }
 
         var restriction = await RestrictionAsync(subject, primary, stage, verified, cancellationToken).ConfigureAwait(false);
-        var snapshot = SessionProofReader.ToSnapshot(verified, restriction);
+        var snapshot = SessionProofs.From(verified, restriction);
         var completed = await completion.CompleteAsync(pending.Ticket, pending.UserId, stage, snapshot, cancellationToken).ConfigureAwait(false);
         return new SecondFactorBridgeResult(verified, completed);
     }
