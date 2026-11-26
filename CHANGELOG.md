@@ -27,6 +27,10 @@ Breaking changes are prefixed **(breaking)** and cross-referenced in [MIGRATION.
 
 ## [Unreleased]
 
+### Added
+
+- **Themia.Modules.Identity: `IProofAuthTokenIssuer` and `SessionProofs.From` (coord #0246).** An app-channel session finished with `IProofAuthTokenIssuer.CompleteSessionAsync(..., SessionProofSnapshot proof)` now stores the proof on the new session, so `amr` and `auth_time` appear in the first token and survive refresh and `RenewSessionAsync`. `GuardedAuthTokenIssuer` implements both interfaces, and the new one is registered with the same scoped instance as `IAuthTokenIssuer`. With no `ISessionProofStore` registered the call throws before the ticket is spent; a proof that cannot be stored burns the ticket, revokes the new refresh token and throws; a request that already carries a proof, or a proof dated in the future, is an `ArgumentException`. The proof is asserted by the caller: pass only what your own verification established. `SessionProofs.From(SecondFactorResult, SessionRestriction)` builds the snapshot for a Themia-verified factor (a recovery code is never strong); the second-factor bridge now uses it too. `IProofAuthTokenIssuer` always resolves `GuardedAuthTokenIssuer`, so an app that replaced `IAuthTokenIssuer` with its own type must replace `IProofAuthTokenIssuer` as well.
+
 ### Fixed
 
 - **Themia.Modules.Identity:** a refresh that races `RevokeAllForUser`, a family revoke or `RevokeAllForUserExcept` now answers `Invalid`. Before, it could mint a session the revoke missed (coord #0245).

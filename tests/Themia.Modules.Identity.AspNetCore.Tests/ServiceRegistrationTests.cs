@@ -49,6 +49,22 @@ public sealed class ServiceRegistrationTests
     }
 
     [Fact]
+    public void AddThemiaIdentityAspNetCore_registers_the_proof_issuer_as_the_same_scoped_instance_as_the_plain_issuer()
+    {
+        var services = WithCoreIdentity();
+        services.AddThemiaIdentityAspNetCore(Configure);
+
+        var plain = Assert.Single(services, d => d.ServiceType == typeof(IAuthTokenIssuer));
+        var proof = Assert.Single(services, d => d.ServiceType == typeof(IProofAuthTokenIssuer));
+        var concrete = Assert.Single(services, d => d.ServiceType.Name == "GuardedAuthTokenIssuer");
+        Assert.Equal(ServiceLifetime.Scoped, plain.Lifetime);
+        Assert.Equal(ServiceLifetime.Scoped, proof.Lifetime);
+        Assert.Equal(ServiceLifetime.Scoped, concrete.Lifetime);
+        Assert.NotNull(plain.ImplementationFactory);
+        Assert.NotNull(proof.ImplementationFactory);
+    }
+
+    [Fact]
     public void AddThemiaIdentityAspNetCore_keeps_an_app_second_factor_policy()
     {
         var services = WithCoreIdentity();
