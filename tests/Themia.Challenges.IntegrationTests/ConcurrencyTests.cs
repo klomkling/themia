@@ -76,9 +76,9 @@ public abstract class ConcurrencyTests
             var serviceA = new ChallengeService(gatedDialect, fixture.Options, fixture.TimeProvider, NullLogger<ChallengeService>.Instance);
             var serviceB = new ChallengeService(gatedDialect, fixture.Options, fixture.TimeProvider, NullLogger<ChallengeService>.Instance);
 
-            var results = await Task.WhenAll(
-                serviceA.VerifyAsync(scope, issue.Secret!),
-                serviceB.VerifyAsync(scope, issue.Secret!));
+            var results = await RaceOutcome.WhenAllReportedAsync(
+                () => serviceA.VerifyAsync(scope, issue.Secret!),
+                () => serviceB.VerifyAsync(scope, issue.Secret!));
 
             var outcomes = string.Join(", ", results.Select(r => r.Outcome));
             Assert.True(1 == results.Count(r => r.Outcome == ChallengeVerifyOutcome.Verified), $"round {round}: outcomes were [{outcomes}]");
