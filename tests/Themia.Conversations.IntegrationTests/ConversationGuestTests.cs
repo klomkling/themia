@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Themia.Challenges;
 using Themia.Conversations.Internal;
@@ -90,7 +91,19 @@ public abstract class ConversationGuestTests(ConversationEngineFixture fixture)
         public ConversationMessage Mask(ConversationActorKind viewer, ConversationMessage message) => throw new TimeoutException("pattern timed out");
     }
 
-    private sealed record Rig(ConversationService Store, ConversationGuests Guests, FakeChallenges Challenges, TimeProvider Time);
+    private sealed class CapturingLogger : ILogger<ConversationService>
+    {
+        public List<string> Entries { get; } = [];
+
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter) =>
+            Entries.Add($"{logLevel}: {formatter(state, exception)}");
+    }
+
+    private sealed record Rig(ConversationService Store, ConversationGuests Guests, FakeChallenges Challenges, TimeProvider Time, CapturingLogger StoreLog);
 
     private static string NewTenant() => "t-" + Guid.NewGuid().ToString("N");
 
@@ -103,9 +116,10 @@ public abstract class ConversationGuestTests(ConversationEngineFixture fixture)
         configure?.Invoke(guestOptions);
         var options = new ConversationOptions();
         time ??= TimeProvider.System;
-        var store = new ConversationService(fixture.Dialect, options, new AllowAll(), new DefaultConversationEventSink(time), masker ?? new RegexConversationMasker(), time, NullLogger<ConversationService>.Instance);
+        var storeLog = new CapturingLogger();
+        var store = new ConversationService(fixture.Dialect, options, new AllowAll(), new DefaultConversationEventSink(time), masker ?? new RegexConversationMasker(), time, storeLog);
         var challenges = new FakeChallenges();
-        return new Rig(store, new ConversationGuests(store, fixture.Dialect, options, guestOptions, challenges, time, NullLogger<ConversationGuests>.Instance), challenges, time);
+        return new Rig(store, new ConversationGuests(store, fixture.Dialect, options, guestOptions, challenges, time, NullLogger<ConversationGuests>.Instance), challenges, time, storeLog);
     }
 
     private static async Task<(string Tenant, Guid Conversation)> OpenWithMemberAsync(Rig rig)
@@ -357,6 +371,7 @@ public abstract class ConversationGuestTests(ConversationEngineFixture fixture)
         var asMember = await rig.Store.ListAsync(Member("staff"), tenant, conversation, 0, 10);
 
         var seen = asGuest.Messages.Single();
+        Assert.True(seen.Body != "[message hidden]", "the masker failed: " + string.Join(" | ", rig.StoreLog.Entries));
         Assert.Equal("call [phone hidden] or mail [email hidden] [handle hidden] [handle hidden]", seen.Body);
         Assert.Equal("Front desk", seen.SenderLabel);
         Assert.Equal(Text, asMember.Messages.Single().Body);
