@@ -59,7 +59,8 @@ public abstract class AttemptBoundTests
         using var barrier = new Barrier(racers);
         var gated = new StatementHookDialect(fixture.Dialect, beforeConsume: null, beforeRecordAttempt: () => Wait(barrier));
 
-        var results = await Task.WhenAll(Enumerable.Range(0, racers).Select(i => NewService(gated).VerifyAsync(scope, $"00000{i}")));
+        var results = await RaceOutcome.WhenAllReportedAsync(
+            Enumerable.Range(0, racers).Select(i => (Func<Task<ChallengeVerifyResult>>)(() => NewService(gated).VerifyAsync(scope, $"00000{i}"))).ToArray());
 
         var incorrect = results.Count(r => r.Outcome == ChallengeVerifyOutcome.Incorrect);
         var exhausted = results.Count(r => r.Outcome == ChallengeVerifyOutcome.AttemptsExhausted);
@@ -153,7 +154,10 @@ public abstract class AttemptBoundTests
     {
         if (!barrier.SignalAndWait(GateTimeout))
         {
-            throw new InvalidOperationException("The racing guesses never all reached the charge; the run would have been sequential.");
+            throw new InvalidOperationException(
+                "The racing guesses never all reached the charge; the run would have been sequential. "
+                + $"Racers not yet arrived: {barrier.ParticipantsRemaining} of {barrier.ParticipantCount}. "
+                + $"Thread pool: {ThreadPool.ThreadCount} threads, {ThreadPool.PendingWorkItemCount} queued work items.");
         }
     }
 
